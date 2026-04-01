@@ -3058,5 +3058,491 @@ Performance Targets:
 
 ---
 
+## 25. Global Market Research and Technical Evaluation: MRO Aircraft Template Modules (2026)
+
+### 25.1 Executive Summary
+
+This section provides a structured global benchmark of seven enterprise MRO platforms and recommends the optimal implementation strategy for the AMRO -> Aircraft module.
+
+Top 3 recommended solutions for AMRO target-state design:
+
+| Rank | Solution | Why it ranks high for AMRO |
+|---|---|---|
+| 1 | IFS Maintenix (with IFS Cloud integration pattern) | Strong aviation-native maintenance depth, proven compliance model, high-quality API-led integration posture, strong long-horizon product evolution path |
+| 2 | SAP MRO on S/4HANA + BTP (incl. iMRO/4 pattern where required) | Best enterprise ERP adjacency, robust process harmonization, strong composability through BTP, very strong scalability for multi-region operations |
+| 3 | Ramco Aviation Suite 6.0 | Aviation-focused integrated suite, strong mobility and paperless operations, solid compliance controls, faster deployment pattern for mid-to-large operators |
+
+Strategic recommendation for Logic Nexus-AI AMRO:
+
+- Adopt a hybrid blueprint: Maintenix-style maintenance data model + SAP/BTP-style integration fabric + Ramco/TRAX-style mobile paperless execution patterns.
+- Implement via API-first anti-corruption layer to protect AMRO domain boundaries and preserve future vendor optionality.
+- Prioritize compliance-by-design and immutable audit evidence before advanced AI features.
+
+### 25.2 Evaluation Scope and Method
+
+Evaluated solutions (7):
+
+1. SAP MRO (S/4HANA-based A&D MRO patterns, including certified iMRO/4 extension ecosystem)
+2. IBM Maximo for Aviation
+3. Ramco Aviation Suite
+4. IFS Maintenix
+5. Oracle Aviation Maintenance (Oracle Complex MRO + Oracle Fusion Cloud Maintenance integration direction)
+6. Swiss-AS AMOS
+7. TRAX eMRO/eMobility
+
+Evaluation criteria and weights:
+
+| Criterion | Weight (%) | Measurement Focus |
+|---|---:|---|
+| Microservices architecture and API-first design | 20 | Service decomposition, API maturity, extension architecture |
+| Integration capability with AMRO/ERP/Flight Ops/Inventory | 20 | Native connectors, standards support, event-driven fit |
+| Aviation regulatory compliance (FAA/EASA/CAAC/ICAO) | 15 | Out-of-box controls, evidence model, regulator readiness |
+| UX and role-based dashboards | 10 | Persona flows, mobility, adoption speed |
+| Data management and real-time sync/audit | 15 | Data consistency, traceability, near-real-time operations |
+| Reporting/analytics/predictive maintenance | 10 | Embedded analytics, AI/ML readiness, actionability |
+| Sustainability and modernization roadmap | 10 | Vendor innovation velocity, cloud trajectory, platform longevity |
+
+Scoring scale: 1 (weak) to 5 (leading).  
+Weighted score formula: sum(score/5 * criterion_weight).
+
+### 25.3 Detailed Solution Assessments
+
+#### 25.3.1 SAP MRO (S/4HANA + BTP)
+
+Technical architecture:
+
+```mermaid
+flowchart LR
+  U[AMRO Users] --> F[Fiori UX]
+  F --> C[S/4HANA Core MRO/EAM]
+  C --> B[BTP Integration Suite]
+  B --> E[ERP Finance/Procurement]
+  B --> O[Flight Ops/OCC]
+  B --> I[Inventory/WMS]
+  B --> D[Data & Analytics Cloud]
+  C --> A[Audit/Compliance Records]
+```
+
+Assessment:
+
+- Architecture/API-first: Strong enterprise modularity with BTP APIs and events; microservices purity depends on implementation discipline.
+- Integration: Excellent in SAP-centric estates; strong non-SAP integration through BTP adapters and API management.
+- Compliance: Strong support patterns for regulated A&D environments; typically requires localization for CAAC-specific forms/workflows.
+- UX: Mature Fiori role-based UX; rapid adoption if process harmonization is enforced.
+- Data/audit: Very strong transactional integrity and traceability in ERP-centric deployments.
+- Analytics: Strong SAC and embedded analytics ecosystem; predictive value improves with telemetry integration.
+- Sustainability: High long-term viability, strong modernization momentum around cloud and clean-core.
+
+Risks:
+
+- High implementation complexity and change-management burden.
+- Over-customization can degrade upgradeability and API simplicity.
+
+#### 25.3.2 IBM Maximo for Aviation
+
+Technical architecture:
+
+```mermaid
+flowchart LR
+  U[Technicians/Planners] --> X[Maximo Aviation Apps]
+  X --> M[Maximo Application Suite]
+  M --> IF[Maximo Integration Framework REST/SOAP]
+  IF --> ERP[ERP/Finance]
+  IF --> OPS[Flight Ops]
+  IF --> INV[Inventory/Supply]
+  M --> AI[Monitoring/Analytics]
+  M --> AU[Regulatory Docs & Audit]
+```
+
+Assessment:
+
+- Architecture/API-first: Strong API/integration framework heritage; modern cloud-native decomposition varies by MAS deployment model.
+- Integration: Broad interoperability through MIF and enterprise connectors.
+- Compliance: Good aviation compliance feature set with regulatory documentation management.
+- UX: Improved but can feel heavy without UX modernization and role-specific tailoring.
+- Data/audit: Strong asset/work-order history and governance.
+- Analytics: Solid, with room to improve aviation-specific predictive models compared to niche aviation products.
+- Sustainability: Stable vendor with ongoing MAS modernization path.
+
+Risks:
+
+- Configuration-heavy projects can increase timeline and operating complexity.
+- Aviation specialization may require partner accelerators.
+
+#### 25.3.3 Ramco Aviation Suite 6.0
+
+Technical architecture:
+
+```mermaid
+flowchart LR
+  U[Line/Base/Shop Teams] --> R[Ramco Aviation Core]
+  R --> P[Planning & Production]
+  R --> Q[Quality/Compliance]
+  R --> S[Supply Chain/Inventory]
+  R --> M[Mobile/eSign/Biometrics]
+  R --> I[Integration Layer/APIs]
+  I --> ERP[ERP/Finance/HR]
+  I --> FO[Flight Operations]
+  I --> OEM[OEM/Partner Systems]
+```
+
+Assessment:
+
+- Architecture/API-first: Strong platform integration capabilities; pragmatic modularity.
+- Integration: Good fit for mixed IT landscapes; proven in airline/MRO ecosystems.
+- Compliance: Strong controls for engineering checks and traceability; regulator-specific packs often require configuration.
+- UX: High mobility maturity and operational usability, including paperless execution focus.
+- Data/audit: Strong real-time execution data capture and digital sign-off model.
+- Analytics: Good operational analytics with increasing AI/ML augmentation.
+- Sustainability: Positive roadmap momentum and aviation-focused innovation cadence.
+
+Risks:
+
+- Regional implementation quality can vary by partner capability.
+- Some advanced enterprise integration scenarios require targeted custom architecture.
+
+#### 25.3.4 IFS Maintenix
+
+Technical architecture:
+
+```mermaid
+flowchart LR
+  U[Engineers/Controllers/Techs] --> MX[Maintenix Core]
+  MX --> CFG[Config & Airworthiness]
+  MX --> PLAN[Planning/Scheduling]
+  MX --> EXEC[Execution & eSign]
+  MX --> INT[Open APIs/Integration]
+  INT --> ERP[ERP/Finance]
+  INT --> OPS[Flight Ops/OCC]
+  INT --> INV[Supply/Inventory]
+  MX --> AN[Analytics/AI Services]
+  MX --> AUD[Compliance Evidence Store]
+```
+
+Assessment:
+
+- Architecture/API-first: Strong modern API-led posture with composable cloud direction.
+- Integration: Strong cross-domain integration fit for airline operations and maintenance ecosystems.
+- Compliance: Aviation-native compliance depth is a leading differentiator; supports strict release/governance workflows.
+- UX: Role-centric operational workflows with strong maintenance execution support.
+- Data/audit: Strong configuration control, digital evidence, and maintenance traceability.
+- Analytics: Good predictive/decision support trajectory, especially when paired with broader IFS analytics stack.
+- Sustainability: Strong modernization trajectory and active investment in composable platform capabilities.
+
+Risks:
+
+- Licensing and transformation depth can be significant.
+- Requires strong master-data and process governance to unlock value.
+
+#### 25.3.5 Oracle Aviation Maintenance (Oracle Complex MRO + Fusion Maintenance)
+
+Technical architecture:
+
+```mermaid
+flowchart LR
+  U[Maintenance & Planning Users] --> OCMRO[Oracle Complex MRO]
+  OCMRO --> EBS[E-Business Suite Core]
+  OCMRO --> REP[FAA/Compliance Reports]
+  OIC[Oracle Integration Cloud APIs] --> EBS
+  OIC --> ERP[External ERP/Finance]
+  OIC --> OPS[Flight Ops]
+  OIC --> INV[Inventory/Procurement]
+  FUS[Oracle Fusion Maintenance + IoT] --> OIC
+  FUS --> AI[Predictive Recommendations]
+```
+
+Assessment:
+
+- Architecture/API-first: Strong API capabilities in Oracle cloud integration stack; legacy Complex MRO core may be monolithic in existing deployments.
+- Integration: Strong through OIC and REST APIs; migration strategy critical when coexisting legacy and cloud modules.
+- Compliance: Mature compliance reporting heritage, strong evidence orientation.
+- UX: Modern UX in Fusion context; legacy UX considerations for EBS-heavy landscapes.
+- Data/audit: Strong enterprise data governance potential; architecture consistency depends on integration design.
+- Analytics: Good predictive maintenance direction through Fusion/IoT.
+- Sustainability: High vendor longevity; modernization outcomes depend on cloud migration pace.
+
+Risks:
+
+- Dual-stack architecture complexity (legacy + cloud).
+- Migration and data harmonization effort can be substantial.
+
+#### 25.3.6 Swiss-AS AMOS
+
+Technical architecture:
+
+```mermaid
+flowchart LR
+  U[Airline/MRO Teams] --> AM[AMOS Core]
+  AM --> AIM[AIM/AMOShub Integration Layer]
+  AIM --> ERP[Finance/ERP]
+  AIM --> OPS[Ops Control/Flight Ops]
+  AIM --> DOC[Digital Records/OEM Tools]
+  AM --> MOB[Mobile & Operational Modules]
+  AM --> AUD[Airworthiness & Traceability]
+```
+
+Assessment:
+
+- Architecture/API-first: Open integration orientation with extensive interfaces; architecture depth depends on AMOShub/AIM usage.
+- Integration: Strong best-of-breed interoperability, especially in airline operations ecosystems.
+- Compliance: Strong airworthiness and operational compliance credibility.
+- UX: Operationally familiar to aviation users; modernization quality varies by module.
+- Data/audit: Strong maintenance and configuration traceability patterns.
+- Analytics: Good baseline operational analytics; advanced predictive capabilities often require additional data platform layers.
+- Sustainability: Strong aviation specialization and steady product evolution.
+
+Risks:
+
+- Advanced enterprise AI use cases require external analytics architecture.
+- Standardization across multi-region operations may require significant template governance.
+
+#### 25.3.7 TRAX eMRO/eMobility
+
+Technical architecture:
+
+```mermaid
+flowchart LR
+  U[Technicians/Controllers] --> EM[eMRO Web Platform]
+  U --> MB[eMobility Apps]
+  MB --> EM
+  EM --> CL[Trax Cloud]
+  EM --> RG[Regulatory Compliance Layer]
+  EM --> INT[Integration APIs]
+  INT --> ERP[ERP/Finance]
+  INT --> OPS[Flight Ops/ELB]
+  INT --> INV[Inventory/Logistics]
+```
+
+Assessment:
+
+- Architecture/API-first: Strong cloud/mobile-first product orientation with digital operations emphasis.
+- Integration: Good practical integration capabilities with airline maintenance operations and mobile workflows.
+- Compliance: Strong momentum with FAA/EASA operational evidence in digital logbook deployments.
+- UX: Excellent mobility and paperless workflow usability.
+- Data/audit: High-quality digital capture, signatures, and field-level synchronization patterns.
+- Analytics: Good operational analytics; deep predictive stack often requires external augmentation.
+- Sustainability: Strong innovation around mobility/cloud; long-term enterprise breadth smaller than mega-suite vendors.
+
+Risks:
+
+- Enterprise-wide ERP/process breadth is narrower than full-suite ERP-centric competitors.
+- Large transformation programs may require additional ecosystem tooling.
+
+### 25.4 Comparative Weighted Scoring Matrix
+
+| Solution | Architecture/API (20) | Integration (20) | Compliance (15) | UX (10) | Data/Audit (15) | Analytics (10) | Sustainability (10) | Weighted Score (/100) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| IFS Maintenix | 18 | 17 | 14 | 8 | 13 | 8 | 9 | **87** |
+| SAP MRO (S/4 + BTP) | 16 | 18 | 13 | 8 | 13 | 9 | 9 | **86** |
+| Ramco Aviation Suite | 16 | 16 | 13 | 9 | 12 | 8 | 8 | **82** |
+| TRAX eMRO/eMobility | 15 | 15 | 12 | 9 | 12 | 7 | 8 | **78** |
+| Swiss-AS AMOS | 14 | 16 | 12 | 8 | 12 | 7 | 8 | **77** |
+| Oracle Aviation Maintenance | 14 | 15 | 12 | 7 | 12 | 8 | 8 | **76** |
+| IBM Maximo for Aviation | 13 | 15 | 12 | 7 | 12 | 7 | 8 | **74** |
+
+Decision interpretation for AMRO:
+
+- IFS and SAP are near-tied; selection depends on whether AMRO prioritizes aviation-native M&E depth (IFS) or ERP-core standardization (SAP).
+- Ramco is the strongest balance for faster operational digitization with lower transformation burden.
+- TRAX and AMOS are strong reference designs for mobility and integration patterns even if not selected as primary enterprise backbone.
+
+### 25.5 TCO Analysis (5-Year) and Commercial Model
+
+#### 25.5.1 Cost Model Assumptions
+
+- Baseline target organization: 120 aircraft, 6 maintenance stations, 900 maintenance users, 600 named system users.
+- Deployment model: hybrid-cloud with multi-region DR and regulated audit retention.
+- Includes: software licensing/subscription, implementation partner services, integration build, training, support, upgrade runway.
+
+#### 25.5.2 Estimated 5-Year TCO Range (USD, Millions)
+
+| Solution | License/Subscription | Implementation & Integration | Training & Change | Run/Ops & Support | 5-Year TCO Range |
+|---|---:|---:|---:|---:|---:|
+| IFS Maintenix | 6.5-9.0 | 8.0-12.0 | 1.8-2.8 | 4.5-6.5 | **20.8-30.3** |
+| SAP MRO (S/4 + BTP) | 7.5-11.0 | 10.0-15.0 | 2.2-3.5 | 5.0-7.5 | **24.7-37.0** |
+| Ramco Aviation Suite | 5.0-7.5 | 6.5-10.0 | 1.5-2.4 | 4.0-6.0 | **17.0-25.9** |
+| Oracle Aviation Maintenance | 5.5-8.5 | 8.0-13.0 | 1.8-2.8 | 4.5-6.8 | **19.8-31.1** |
+| IBM Maximo for Aviation | 5.0-8.0 | 7.5-12.0 | 1.8-2.8 | 4.8-7.0 | **19.1-29.8** |
+| Swiss-AS AMOS | 4.8-7.2 | 6.0-9.5 | 1.4-2.2 | 3.8-5.8 | **16.0-24.7** |
+| TRAX eMRO/eMobility | 4.5-7.0 | 5.5-9.0 | 1.3-2.2 | 3.8-5.5 | **15.1-23.7** |
+
+Commercial takeaway:
+
+- Lowest TCO profiles: TRAX/AMOS/Ramco.
+- Highest enterprise standardization potential but higher TCO: SAP and IFS.
+- AMRO strategic choice should optimize for value density, not minimum cost.
+
+### 25.6 ROI Projection and Quantifiable Efficiency Gains
+
+#### 25.6.1 Baseline Value Drivers
+
+- Maintenance turnaround time (TAT) reduction.
+- AOG hour reduction.
+- Repeat defect and rework reduction.
+- Inventory carrying cost and expedite reduction.
+- Technician productivity uplift from digital/paperless execution.
+- Compliance finding reduction and audit preparation effort reduction.
+
+#### 25.6.2 3-Year ROI Projection (Representative, AMRO Target)
+
+| Metric | Baseline | Target after rollout | Benefit |
+|---|---:|---:|---:|
+| Average heavy-check cycle time | 100% | 85-90% | 10-15% faster TAT |
+| Unplanned AOG events (annual) | 100% | 75-85% | 15-25% reduction |
+| Expedite material spend | 100% | 80-88% | 12-20% reduction |
+| Technician wrench-time ratio | 100% | 110-118% | 10-18% productivity gain |
+| Audit preparation effort | 100% | 65-80% | 20-35% effort reduction |
+| Repeat defect rate | 100% | 82-90% | 10-18% reduction |
+
+Financial projection bands (3 years):
+
+- Conservative: 1.2x ROI, payback ~30-34 months.
+- Target: 1.6x ROI, payback ~22-28 months.
+- Aggressive: 2.0x ROI, payback ~18-24 months.
+
+### 25.7 AMRO Target Technical Blueprint (Recommended)
+
+#### 25.7.1 Recommended Architecture Pattern
+
+```mermaid
+flowchart TB
+  subgraph UX["AMRO Experience Layer"]
+    A1[Role Dashboards]
+    A2[Web Workbenches]
+    A3[Mobile Paperless Apps]
+  end
+  subgraph CORE["AMRO Domain Microservices"]
+    B1[Work Package Orchestration]
+    B2[Maintenance Planning]
+    B3[Inventory & Rotables]
+    B4[Compliance & Certification]
+    B5[Evidence Ledger]
+  end
+  subgraph INT["Integration Fabric"]
+    C1[API Gateway]
+    C2[Event Bus]
+    C3[Canonical Data Mapping]
+    C4[Partner Connectors ERP/FlightOps/WMS]
+  end
+  subgraph DATA["Data, AI and Governance"]
+    D1[Operational Store]
+    D2[Audit Lakehouse]
+    D3[Predictive Models]
+    D4[Regulatory Reporting]
+  end
+  UX --> CORE
+  CORE --> INT
+  CORE --> DATA
+  INT --> DATA
+```
+
+#### 25.7.2 Implementation Recommendation by Capability
+
+| Capability | Adopt From Market Pattern | AMRO Implementation Guideline |
+|---|---|---|
+| Maintenance domain depth | IFS Maintenix model | Extend AMRO work package + config + release authority model as first-class services |
+| Enterprise integration | SAP BTP style integration fabric | Formalize AMRO anti-corruption adapters, canonical contracts, and event-first integrations |
+| Digital frontline execution | Ramco/TRAX mobility patterns | Prioritize offline-first mobile tasking, e-signature, and structured discrepancy capture |
+| Airworthiness and audit evidence | AMOS + Oracle compliance reporting patterns | Build immutable evidence chain and regulator-pack export templates (FAA/EASA/CAAC/ICAO) |
+
+### 25.8 Phased Deployment Roadmap
+
+#### 25.8.1 6-Month Milestones (Foundation + Pilot)
+
+- Finalize target architecture and canonical API schema.
+- Deliver pilot for Work Package, Planning, and Compliance Gate in one station.
+- Integrate ERP purchasing/inventory sync and Flight Ops status feed.
+- Activate digital signatures, immutable audit trail, and regulator evidence bundles.
+- Define KPI baseline and establish value realization dashboard.
+
+Exit criteria:
+
+- Pilot station live with 95%+ digital execution coverage.
+- Zero critical compliance finding in pilot audits.
+- Data reconciliation variance <1.5% across integrated systems.
+
+#### 25.8.2 1-Year Milestones (Scale to Core Network)
+
+- Roll out across all core stations and major fleets.
+- Enable advanced planning optimization and predictive maintenance recommendations.
+- Implement supplier/OEM integration for parts and technical records.
+- Industrialize release/change governance and training certification program.
+
+Exit criteria:
+
+- 60-75% fleet coverage on AMRO target workflows.
+- 10%+ TAT improvement versus baseline.
+- 20%+ reduction in manual compliance compilation effort.
+
+#### 25.8.3 3-Year Milestones (Optimization + Ecosystem)
+
+- Full network rollout with cross-region resiliency and regulator pack localization.
+- Closed-loop reliability optimization using outcomes feedback and ML retraining.
+- Introduce partner portal and ecosystem APIs for contracted MRO collaboration.
+- Operationalize continuous modernization runway with yearly architecture scorecards.
+
+Exit criteria:
+
+- 90%+ AMRO process standardization.
+- 15-25% AOG reduction sustained.
+- Predictive intervention precision and business-value KPIs consistently above target.
+
+### 25.9 Risk Mitigation Strategy
+
+| Risk Domain | Risk | Impact | Mitigation Strategy |
+|---|---|---|---|
+| Technical | Over-customization and architecture drift | Upgrade friction, cost escalation | Enforce clean-core policy, API governance board, template-first delivery |
+| Technical | Master data inconsistency across ERP/FlightOps/AMRO | Planning errors, compliance exposure | Implement canonical model + MDM stewardship + reconciliation controls |
+| Technical | Real-time sync failures | Operational delays and false statuses | Event replay queues, circuit breakers, idempotency keys, SLA monitoring |
+| Operational | User adoption resistance | Low ROI realization | Role-based training, digital champions, phased cutover, measured adoption incentives |
+| Operational | Insufficient maintenance planning discipline | Process variance and schedule instability | Standard work package taxonomy, planner cockpit, weekly governance cadence |
+| Compliance | Evidence gaps across jurisdictions | Regulatory findings and penalties | Compliance-by-design controls, immutable audit ledger, jurisdiction pack validation |
+| Compliance | Signature and authorization misuse | Airworthiness risk | ABAC + e-signature hardening + cert validity checks + dual-authorization for critical releases |
+| Program | Vendor lock-in | Limited future flexibility | Anti-corruption integration layer, open contracts, portability checkpoints in architecture reviews |
+
+### 25.10 Vendor Modernization and Sustainability Outlook (2026-2030)
+
+| Solution | Modernization Outlook | Sustainability Risk |
+|---|---|---|
+| IFS Maintenix | High: composable cloud, AI expansion, aviation-focused roadmap | Medium-Low |
+| SAP MRO | High: clean-core + BTP extensibility, strong ecosystem depth | Medium (complexity-driven) |
+| Ramco Aviation | Medium-High: rapid aviation innovation and mobility focus | Medium |
+| Oracle Aviation | Medium-High: strong cloud and integration stack, legacy coexistence risk | Medium |
+| IBM Maximo Aviation | Medium: steady MAS evolution, aviation specialization via configuration/partners | Medium |
+| Swiss-AS AMOS | Medium-High: strong aviation specialization and integration openness | Medium |
+| TRAX | Medium-High: strong cloud/mobile momentum, narrower enterprise breadth | Medium |
+
+### 25.11 Final Recommendation for AMRO -> Aircraft Module
+
+Primary recommendation:
+
+- Implement AMRO target architecture aligned to IFS-grade aviation domain model.
+- Use SAP-style integration fabric principles for enterprise coexistence.
+- Deliver Ramco/TRAX-inspired mobile-first digital execution to accelerate front-line productivity.
+
+Decision optioning:
+
+- Option A (Domain-first): IFS-led blueprint for operators prioritizing maintenance depth and compliance rigor.
+- Option B (Enterprise-core-first): SAP-led blueprint for organizations prioritizing ERP unification and broad process harmonization.
+- Option C (Speed/value-first): Ramco-led blueprint for faster deployment with strong operational digitization and controlled TCO.
+
+AMRO implementation guardrails:
+
+- Keep AMRO data model vendor-neutral and API-versioned.
+- Mandate tenant/franchise scoped controls and immutable audit events on all state transitions.
+- Separate orchestration logic from external vendor adapters to avoid lock-in.
+- Prioritize measurable KPI outcomes in each phase before expanding feature scope.
+
+### 25.12 Source Basis and Confidence Statement
+
+This evaluation is based on publicly available vendor product documentation, official product pages, and published industry implementation references current as of 2026-03-31.  
+Confidence level:
+
+- High: comparative architecture patterns, integration posture, and implementation design recommendations.
+- Medium: TCO/ROI ranges (organization-specific sizing and commercial negotiations may materially shift values).
+- Medium: regulator localization depth for CAAC/ICAO (often partner and operator implementation dependent).
+
+---
+
 **Document End**  
 This LLD is a living implementation contract and must be updated in the same PR set as architecture, module, schema, or compliance-impacting changes.
