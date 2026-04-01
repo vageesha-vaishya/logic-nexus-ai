@@ -111,7 +111,7 @@ test.describe('amro aircraft CRUD smoke', () => {
     for (const step of navSteps) {
       await page.getByRole('button', { name: step.label }).first().click();
       await expect(page).toHaveURL(new RegExp(step.urlSegment.replace(/\//g, '\\/')));
-      await expect(page.getByText(/Aircraft ·/).first()).toBeVisible();
+      await expect(page.getByText(/Aircraft ·/).first()).toHaveCount(0);
       await expect(page.getByLabel('Unified module search')).toBeVisible();
       await expect(page.getByLabel('Unified module status filter')).toBeVisible();
       await expect(page.getByLabel('Unified module locale selector')).toHaveCount(0);

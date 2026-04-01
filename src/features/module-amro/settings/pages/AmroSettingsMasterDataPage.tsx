@@ -6844,25 +6844,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             onClearFilters={clearAircraftUnifiedFilters}
             labels={aircraftUnifiedLabels}
             dynamicFilters={aircraftUnifiedDynamicFilters}
+            showHeaderSummary={false}
+            showNavRail={false}
             showLocaleSelector={false}
             showDynamicFilters={false}
             showActions={false}
             showClearFilters={false}
           >
-            <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4 text-[12px]">
-              <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
-                Fleet size: <span className="font-semibold">{aircraftDashboardKpis.fleet_size}</span>
-              </div>
-              <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
-                Open work packages: <span className="font-semibold">{aircraftDashboardKpis.open_work_packages}</span>
-              </div>
-              <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
-                Open defects: <span className="font-semibold">{aircraftDashboardKpis.open_defects}</span>
-              </div>
-              <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/30 px-2 py-1">
-                Compliance ready: <span className="font-semibold">{aircraftDashboardKpis.compliance_ready_pct}%</span>
-              </div>
-            </div>
+            <></>
           </AircraftUnifiedLayout>
         ) : null}
 

@@ -80,6 +80,8 @@ type AircraftUnifiedLayoutProps = {
   onClearFilters?: () => void;
   labels?: Partial<AircraftUnifiedLayoutLabels>;
   dynamicFilters?: AircraftUnifiedDynamicFilter[];
+  showHeaderSummary?: boolean;
+  showNavRail?: boolean;
   showLocaleSelector?: boolean;
   showDynamicFilters?: boolean;
   showActions?: boolean;
@@ -138,6 +140,8 @@ export function AircraftUnifiedLayout({
   onClearFilters,
   labels,
   dynamicFilters = [],
+  showHeaderSummary = true,
+  showNavRail = true,
   showLocaleSelector = true,
   showDynamicFilters = true,
   showActions = true,
@@ -149,40 +153,44 @@ export function AircraftUnifiedLayout({
   return (
     <Card className="mdm-template-panel" data-testid="aircraft-unified-layout">
       <CardHeader className="mdm-template-panel-head space-y-3">
-        <div className="flex flex-wrap items-start justify-between gap-2">
-          <div>
-            <CardTitle className="mdm-template-panel-title">{title}</CardTitle>
-            <p className="pt-1 text-xs text-[hsl(var(--mdm-template-muted))]">{subtitle}</p>
+        {showHeaderSummary ? (
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div>
+              <CardTitle className="mdm-template-panel-title">{title}</CardTitle>
+              <p className="pt-1 text-xs text-[hsl(var(--mdm-template-muted))]">{subtitle}</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge variant="secondary">Locale: {localeValue.toUpperCase()}</Badge>
+              <Badge variant="secondary">Module: {activeModuleKey}</Badge>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="secondary">Locale: {localeValue.toUpperCase()}</Badge>
-            <Badge variant="secondary">Module: {activeModuleKey}</Badge>
+        ) : null}
+        {showNavRail ? (
+          <div
+            className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2"
+            data-testid="aircraft-unified-nav"
+            role="toolbar"
+            aria-label={uiLabels.navAriaLabel}
+          >
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <Button
+                  key={item.path}
+                  type="button"
+                  variant={activeModuleKey === item.key ? 'default' : 'outline'}
+                  size="sm"
+                  className="h-8"
+                  onClick={() => onNavigate(item.path)}
+                  aria-pressed={activeModuleKey === item.key}
+                >
+                  <Icon className="mr-1 h-3.5 w-3.5" />
+                  {item.label}
+                </Button>
+              );
+            })}
           </div>
-        </div>
-        <div
-          className="flex flex-wrap gap-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/20 p-2"
-          data-testid="aircraft-unified-nav"
-          role="toolbar"
-          aria-label={uiLabels.navAriaLabel}
-        >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Button
-                key={item.path}
-                type="button"
-                variant={activeModuleKey === item.key ? 'default' : 'outline'}
-                size="sm"
-                className="h-8"
-                onClick={() => onNavigate(item.path)}
-                aria-pressed={activeModuleKey === item.key}
-              >
-                <Icon className="mr-1 h-3.5 w-3.5" />
-                {item.label}
-              </Button>
-            );
-          })}
-        </div>
+        ) : null}
         <div className="flex items-center gap-2 overflow-x-auto rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 p-2 xl:flex-nowrap xl:overflow-visible">
           <div className="min-w-[260px] flex-1 shrink-0 xl:min-w-[200px]">
             <div className="relative">

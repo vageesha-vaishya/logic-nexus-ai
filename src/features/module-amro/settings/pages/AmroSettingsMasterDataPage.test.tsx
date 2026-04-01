@@ -1421,6 +1421,14 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   it('routes each aircraft sub-module to its dedicated interface without cross-module content leakage', async () => {
     renderAircraftSubModulePage('/dashboard/amro/aircraft/list');
     expect(await screen.findByLabelText('Unified module search', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.queryByText(/Aircraft · Aircraft List/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Standardized aircraft list controls/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Locale: EN/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Module: list/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Fleet size:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Open work packages:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Open defects:/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Compliance ready:/i)).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Records per page')).not.toBeInTheDocument();
     fireEvent.change(screen.getByLabelText('Unified module search'), { target: { value: 'A320' } });
 
