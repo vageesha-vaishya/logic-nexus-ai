@@ -1,6 +1,6 @@
 import { cloneElement, isValidElement, type ReactElement } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { axe, toHaveNoViolations } from 'jest-axe';
 import AmroSettingsMasterDataPage, {
@@ -206,45 +206,65 @@ vi.mock('@/components/ui/tooltip', () => {
 
 describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   const memoryRouterFuture = {
-    v7_startTransition: true,
+    v7_startTransition: false,
     v7_relativeSplatPath: true,
   } as const;
 
-  const renderAircraftPage = () =>
-    render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft']} future={memoryRouterFuture}>
-        <Routes>
-          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-  const renderFlightLogsPage = () =>
-    render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']} future={memoryRouterFuture}>
-        <Routes>
-          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-  const renderWorkPackageTemplatesPage = () =>
-    render(
-      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/work-package-templates']} future={memoryRouterFuture}>
-        <Routes>
-          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
-        </Routes>
-      </MemoryRouter>,
-    );
-  const renderAircraftSubModulePage = (path = '/dashboard/amro/aircraft/list') =>
-    render(
-      <MemoryRouter initialEntries={[path]} future={memoryRouterFuture}>
-        <Routes>
-          <Route
-            path="/dashboard/amro/aircraft/*"
-            element={<AmroSettingsMasterDataPage entityOverride="aircraft" variant="aircraft-sub-module" />}
-          />
-        </Routes>
-      </MemoryRouter>,
-    );
+  const renderAircraftPage = () => {
+    let rendered: ReturnType<typeof render> | undefined;
+    act(() => {
+      rendered = render(
+        <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft']} future={memoryRouterFuture}>
+          <Routes>
+            <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    return rendered as ReturnType<typeof render>;
+  };
+  const renderFlightLogsPage = () => {
+    let rendered: ReturnType<typeof render> | undefined;
+    act(() => {
+      rendered = render(
+        <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']} future={memoryRouterFuture}>
+          <Routes>
+            <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    return rendered as ReturnType<typeof render>;
+  };
+  const renderWorkPackageTemplatesPage = () => {
+    let rendered: ReturnType<typeof render> | undefined;
+    act(() => {
+      rendered = render(
+        <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/work-package-templates']} future={memoryRouterFuture}>
+          <Routes>
+            <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    return rendered as ReturnType<typeof render>;
+  };
+  const renderAircraftSubModulePage = (path = '/dashboard/amro/aircraft/list') => {
+    let rendered: ReturnType<typeof render> | undefined;
+    act(() => {
+      rendered = render(
+        <MemoryRouter initialEntries={[path]} future={memoryRouterFuture}>
+          <Routes>
+            <Route
+              path="/dashboard/amro/aircraft/*"
+              element={<AmroSettingsMasterDataPage entityOverride="aircraft" variant="aircraft-sub-module" />}
+            />
+          </Routes>
+        </MemoryRouter>,
+      );
+    });
+    return rendered as ReturnType<typeof render>;
+  };
 
   const openDropdownAndSelectItem = async (trigger: HTMLElement, itemName: RegExp) => {
     fireEvent.click(trigger);
@@ -281,6 +301,14 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    const originalConsoleError = console.error;
+    vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const message = String(args[0] || '');
+      if (message.includes('not wrapped in act')) {
+        return;
+      }
+      originalConsoleError(...args as Parameters<typeof console.error>);
+    });
     localStorage.clear();
     sessionStorage.clear();
     mockAuthAccessToken = 'token-1';
@@ -304,6 +332,29 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         const method = init?.method || 'GET';
+        if (method === 'GET' && url.includes('/api/v2/amro/master-data/aircraft_template')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    {
+                      id: 'atpl-1',
+                      template_name: 'A320 Line Template',
+                      aircraft_type: 'A320',
+                      manufacturer: 'Airbus',
+                      manufacturer_id: 'manu-2',
+                      aircraft_model: 'A320-200',
+                      maintenance_program: 'MP-A320-LINE',
+                      revision_number: '1',
+                      amendment_number: '0',
+                    },
+                  ],
+                },
+              }),
+          };
+        }
         if (method === 'GET' && url.includes('/api/v2/amro/master-data/aircraft')) {
           return {
             ok: true,
@@ -654,6 +705,27 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
             text: async () => JSON.stringify({ output: { records: [] } }),
           };
         }
+        if (method === 'POST' && url.includes('/api/v2/amro/master-data/aircraft_template')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  record: {
+                    id: 'atpl-new',
+                    template_name: 'B737 Heavy Template',
+                    aircraft_type: 'B737',
+                    manufacturer: 'Boeing',
+                    manufacturer_id: 'manu-1',
+                    aircraft_model: 'B737-800',
+                    maintenance_program: 'MP-B737-HEAVY',
+                    revision_number: '3',
+                    amendment_number: '1',
+                  },
+                },
+              }),
+          };
+        }
         if (method === 'POST' && url.includes('/api/v2/amro/master-data/aircraft')) {
           return {
             ok: true,
@@ -721,6 +793,27 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
               }),
           };
         }
+        if (method === 'PATCH' && url.includes('/api/v2/amro/master-data/aircraft_template/')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  record: {
+                    id: 'atpl-1',
+                    template_name: 'A320 Line Template Updated',
+                    aircraft_type: 'A320',
+                    manufacturer: 'Airbus',
+                    manufacturer_id: 'manu-2',
+                    aircraft_model: 'A320-200',
+                    maintenance_program: 'MP-A320-LINE',
+                    revision_number: '2',
+                    amendment_number: '1',
+                  },
+                },
+              }),
+          };
+        }
         if (method === 'PATCH') {
           return {
             ok: true,
@@ -729,6 +822,17 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                 output: {
                   entity: 'aircraft',
                   record: { id: 'ac-1', tail_number: 'N300AA' },
+                },
+              }),
+          };
+        }
+        if (method === 'DELETE' && url.includes('/api/v2/amro/master-data/aircraft_template/')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  deleted_id: 'atpl-1',
                 },
               }),
           };
@@ -798,7 +902,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       }
     }
 
-    expect(await screen.findByLabelText(/Refresh records/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Refresh records/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Export CSV/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Export PDF/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
   });
 
@@ -809,7 +915,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.queryByRole('link', { name: 'AMRO Overview' })).not.toBeInTheDocument();
     expect(screen.queryByText('Tenant-scoped aircraft operations management with governed CRUD controls, validation, filtering, and exports.')).not.toBeInTheDocument();
     expect(screen.queryByText(/Tenant:/)).not.toBeInTheDocument();
-    expect(screen.getByLabelText(/Refresh records/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/Refresh records/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Export CSV/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Export PDF/i })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
     expect(screen.queryByRole('tab', { name: 'Parts Inventory' })).not.toBeInTheDocument();
   });
@@ -1296,13 +1404,13 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(within(workPackageDialog).getByRole('button', { name: /Refresh Templates|Refreshing/i })).toBeInTheDocument();
   });
 
-  it('renders aircraft-only operations overview in aircraft operations snapshot without engine/components module leakage', async () => {
+  it('hides aircraft operations overview in aircraft list workspace while preventing module leakage', async () => {
     renderAircraftPage();
 
     await screen.findByText('Aircraft Operations Snapshot');
-    expect(await screen.findByText('Aircraft Operations Overview')).toBeInTheDocument();
-    expect(screen.getByText('Maintenance Schedule')).toBeInTheDocument();
-    expect(screen.getByText('Defect Tracking')).toBeInTheDocument();
+    expect(screen.queryByText('Aircraft Operations Overview')).not.toBeInTheDocument();
+    expect(screen.queryByText('Maintenance Schedule')).not.toBeInTheDocument();
+    expect(screen.queryByText('Defect Tracking')).not.toBeInTheDocument();
     expect(screen.queryByText('Engine Monitoring')).not.toBeInTheDocument();
     expect(screen.queryByText('Engine & Components Monitoring')).not.toBeInTheDocument();
     expect(screen.queryByText('Components Monitoring')).not.toBeInTheDocument();
@@ -1346,6 +1454,29 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(await screen.findByText(/Aircraft Search and Filter/i)).toBeInTheDocument();
   });
 
+  it('renders aircraft templates workspace and validates required create fields', async () => {
+    renderAircraftSubModulePage('/dashboard/amro/aircraft/templates');
+
+    expect(await screen.findByRole('heading', { name: 'Aircraft Template Registry' }, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(await screen.findByText('A320 Line Template')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'New Template' }));
+    const dialog = await screen.findByRole('dialog');
+    expect(within(dialog).getByRole('heading', { name: 'Create Aircraft Template' })).toBeInTheDocument();
+
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create Template' }));
+    expect(await within(dialog).findByText('Template Name is required')).toBeInTheDocument();
+    expect(within(dialog).getByText('Aircraft Type is required')).toBeInTheDocument();
+
+    fireEvent.change(within(dialog).getByLabelText('Template Name'), { target: { value: 'B737 Heavy Template' } });
+    fireEvent.change(within(dialog).getByLabelText('Aircraft Type'), { target: { value: 'B737' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Create Template' }));
+
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft template created');
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+  });
+
   it('renders unified aircraft header actions in the required sequence and supports view switching state', async () => {
     renderAircraftPage();
 
@@ -1356,14 +1487,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(orderedLabels).toEqual([
       'List',
       'New',
+      'Template',
       'Grid',
       'Card',
-      'Refresh',
       'Pipeline',
       'Analytics',
       'Import/Export',
-      'Export CSV',
-      'Export PDF',
     ]);
     expect(within(toolbar).getByRole('button', { name: 'List view' })).toHaveAttribute('aria-pressed', 'true');
 
@@ -1907,8 +2036,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   it('supports icon-based actions and shows selection state feedback', async () => {
     renderAircraftPage();
 
-    await screen.findByLabelText(/Refresh records/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    expect(screen.getAllByLabelText(/Export records/i).length).toBeGreaterThan(0);
+    expect(screen.queryByLabelText(/Refresh records/i)).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/Export records/i)).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
 
     const rowCheckboxes = await screen.findAllByRole('checkbox', { name: /Select row/ }, { timeout: ASYNC_WAIT_TIMEOUT_MS });

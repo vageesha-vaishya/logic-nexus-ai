@@ -95,7 +95,16 @@ import {
   type FlightLogFormValues,
   validateFlightLogFormValues,
 } from './FlightLogForm';
-import { buildApiHeaders, parseApiPayload, verifyReferenceExists } from './amro-settings-master-data/services';
+import {
+  buildApiHeaders,
+  createAircraftTemplate,
+  deleteAircraftTemplate,
+  listAircraftTemplates,
+  parseApiPayload,
+  updateAircraftTemplate,
+  verifyReferenceExists,
+  type AircraftTemplateRecord,
+} from './amro-settings-master-data/services';
 import {
   buildAircraftPresenceCollaborators,
   buildAircraftWorkPackageSnapshot,
@@ -212,6 +221,39 @@ type AircraftTempOption = {
   revisionNumber: string;
   amendmentNumber: string;
 };
+
+type AircraftTemplateFormValues = {
+  template_name: string;
+  aircraft_type: string;
+  manufacturer: string;
+  manufacturer_id: string;
+  aircraft_model: string;
+  maintenance_program: string;
+  revision_number: string;
+  amendment_number: string;
+};
+
+const getDefaultAircraftTemplateFormValues = (): AircraftTemplateFormValues => ({
+  template_name: '',
+  aircraft_type: '',
+  manufacturer: '',
+  manufacturer_id: '',
+  aircraft_model: '',
+  maintenance_program: '',
+  revision_number: '',
+  amendment_number: '',
+});
+
+const mapAircraftTemplateRecordToFormValues = (record: AircraftTemplateRecord): AircraftTemplateFormValues => ({
+  template_name: String(record.template_name || '').trim(),
+  aircraft_type: String(record.aircraft_type || '').trim(),
+  manufacturer: String(record.manufacturer || '').trim(),
+  manufacturer_id: String(record.manufacturer_id || '').trim(),
+  aircraft_model: String(record.aircraft_model || '').trim(),
+  maintenance_program: String(record.maintenance_program || '').trim(),
+  revision_number: String(record.revision_number || '').trim(),
+  amendment_number: String(record.amendment_number || '').trim(),
+});
 
 const isSystemSelectValue = (value: string): boolean => value.startsWith('__');
 const TEMPLATE_REGISTRY_TIMEOUT_MS = 12000;
@@ -773,6 +815,7 @@ type AircraftDashboardOutput = {
 
 const AIRCRAFT_NAV_RAIL = [
   { label: 'Aircraft List', path: '/dashboard/amro/aircraft/list', view: 'list' as const, icon: TimerReset },
+  { label: 'Templates', path: '/dashboard/amro/aircraft/templates', view: 'module' as const, icon: FileSpreadsheet },
   { label: 'Engine', path: '/dashboard/amro/aircraft/engine', view: 'analytics' as const, icon: CheckSquare },
   { label: 'Components', path: '/dashboard/amro/aircraft/components', view: 'grid' as const, icon: CheckSquare },
   { label: 'Documents', path: '/dashboard/amro/aircraft/documents', view: 'import_export' as const, icon: FileText },
@@ -780,12 +823,13 @@ const AIRCRAFT_NAV_RAIL = [
   { label: 'Maintenance Planning', path: '/dashboard/amro/aircraft/work-packages', view: 'card' as const, icon: CalendarDays },
 ] as const;
 
-type AircraftSubModuleSegment = 'list' | 'engine' | 'components' | 'documents' | 'ad-sb' | 'work-packages';
+type AircraftSubModuleSegment = 'list' | 'templates' | 'engine' | 'components' | 'documents' | 'ad-sb' | 'work-packages';
 
-const AIRCRAFT_SUBMODULE_SEGMENTS: ReadonlyArray<AircraftSubModuleSegment> = ['list', 'engine', 'components', 'documents', 'ad-sb', 'work-packages'];
+const AIRCRAFT_SUBMODULE_SEGMENTS: ReadonlyArray<AircraftSubModuleSegment> = ['list', 'templates', 'engine', 'components', 'documents', 'ad-sb', 'work-packages'];
 
 const AIRCRAFT_SUBMODULE_VIEW_MAP: Record<string, 'module' | AircraftLeadsTab> = {
   list: 'module',
+  templates: 'module',
   engine: 'analytics',
   components: 'grid',
   documents: 'import_export',
@@ -1278,6 +1322,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [assemblyModelOptionsLoading, setAssemblyModelOptionsLoading] = useState(false);
   const [assemblyModelOptionsError, setAssemblyModelOptionsError] = useState('');
   const [systemTemplateModelOptions, setSystemTemplateModelOptions] = useState<AircraftTempOption[]>([]);
+  const [aircraftTemplateRows, setAircraftTemplateRows] = useState<AircraftTemplateRecord[]>([]);
+  const [aircraftTemplateLoading, setAircraftTemplateLoading] = useState(false);
+  const [aircraftTemplateError, setAircraftTemplateError] = useState('');
+  const [aircraftTemplateDialogOpen, setAircraftTemplateDialogOpen] = useState(false);
+  const [aircraftTemplateDialogMode, setAircraftTemplateDialogMode] = useState<'create' | 'update'>('create');
+  const [aircraftTemplateDialogSubmitting, setAircraftTemplateDialogSubmitting] = useState(false);
+  const [aircraftTemplateDeleteSubmitting, setAircraftTemplateDeleteSubmitting] = useState(false);
+  const [aircraftTemplateDeleteDialogOpen, setAircraftTemplateDeleteDialogOpen] = useState(false);
+  const [selectedAircraftTemplateId, setSelectedAircraftTemplateId] = useState('');
+  const [aircraftTemplateFormValues, setAircraftTemplateFormValues] = useState<AircraftTemplateFormValues>(getDefaultAircraftTemplateFormValues());
+  const [aircraftTemplateFormErrors, setAircraftTemplateFormErrors] = useState<Record<string, string>>({});
   const [aircraftTypeOptions, setAircraftTypeOptions] = useState<string[]>([]);
   const [aircraftStatusOptions, setAircraftStatusOptions] = useState<string[]>([]);
   const [aircraftBaseCatalogOptions, setAircraftBaseCatalogOptions] = useState<string[]>([]);
@@ -1390,6 +1445,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
   const canEscalateAircraftOps = hasPermission('approve_work_orders');
+  const canManageAircraftTemplates = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
+  const canDeleteAircraftTemplates = hasPermission('approve_work_orders') || hasPermission('delete_flight_logs');
   const canManageAircraftLeads = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
   const canDeleteAircraftLeads = hasPermission('approve_work_orders') || hasPermission('delete_flight_logs');
   const scope = useMemo(
@@ -1436,13 +1493,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     entity === 'aircraft'
     && aircraftEnhancementEnabled
     && ((!isAircraftSubModule && aircraftNavigationView !== 'module') || aircraftSubModuleSegment === 'work-packages');
+  const showAircraftTemplatesWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'templates';
   const showAircraftMasterRecords = entity === 'aircraft'
     ? (!isAircraftSubModule || aircraftSubModuleSegment === 'list')
+      && !showAircraftTemplatesWorkspace
     : !showAircraftLeadWorkspace;
   const showAircraftEngineWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'engine';
   const showAircraftComponentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'components';
   const showAircraftDocumentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'documents';
   const showAircraftAdSbWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'ad-sb';
+  const showAircraftOperationsOverview = !showAircraftEngineWorkspace && !showAircraftComponentsWorkspace && !showAircraftDocumentsWorkspace && !showAircraftAdSbWorkspace && !showAircraftTemplatesWorkspace;
+  const showAircraftOperationsOverviewSection = false;
   const handleAircraftViewNavigation = useCallback((tab: AircraftLeadsTab) => {
     if (isAircraftSubModule) {
       const nextPath = AIRCRAFT_NAV_RAIL.find((item) => item.view === tab)?.path || '/dashboard/amro/aircraft/list';
@@ -2145,6 +2206,185 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setAircraftListboxOptionsLoading(false);
     }
   }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftCreateCatalogOptions, fetchAircraftTempOptions, scope, seedAircraftTemplatesIfNeeded]);
+
+  const loadAircraftTemplatesWorkspace = useCallback(async () => {
+    if (entity !== 'aircraft') {
+      return;
+    }
+    setAircraftTemplateLoading(true);
+    setAircraftTemplateError('');
+    try {
+      const records = await listAircraftTemplates(scope, sessionAccessToken);
+      setAircraftTemplateRows(records);
+      const templateOptions = records
+        .map((record) => {
+          const id = String(record.id || '').trim();
+          const name = String(record.template_name || '').trim();
+          if (!id || !name) return null;
+          return {
+            id,
+            name,
+            aircraftType: String(record.aircraft_type || '').trim(),
+            manufacturerId: String(record.manufacturer_id || '').trim(),
+            manufacturerName: String(record.manufacturer || '').trim(),
+            aircraftModel: String(record.aircraft_model || '').trim(),
+            maintenanceProgram: String(record.maintenance_program || '').trim(),
+            revisionNumber: String(record.revision_number || '').trim(),
+            amendmentNumber: String(record.amendment_number || '').trim(),
+          } satisfies AircraftTempOption;
+        })
+        .filter((record): record is AircraftTempOption => Boolean(record));
+      setSystemTemplateModelOptions(templateOptions);
+      setAircraftTypeOptions((previous) => {
+        const fromTemplates = templateOptions.map((option) => String(option.aircraftType || '').trim()).filter(Boolean);
+        const merged = Array.from(new Set([...previous, ...fromTemplates, ...AIRCRAFT_TYPE_FALLBACK_OPTIONS]));
+        return merged;
+      });
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load aircraft templates');
+      setAircraftTemplateError(message);
+      toast.error(message);
+    } finally {
+      setAircraftTemplateLoading(false);
+    }
+  }, [entity, scope, sessionAccessToken]);
+
+  const resetAircraftTemplateDialog = useCallback(() => {
+    setAircraftTemplateDialogOpen(false);
+    setAircraftTemplateDialogMode('create');
+    setAircraftTemplateDialogSubmitting(false);
+    setAircraftTemplateFormErrors({});
+    setAircraftTemplateFormValues(getDefaultAircraftTemplateFormValues());
+    setSelectedAircraftTemplateId('');
+  }, []);
+
+  const validateAircraftTemplateForm = useCallback((values: AircraftTemplateFormValues): Record<string, string> => {
+    const errors: Record<string, string> = {};
+    if (!values.template_name.trim()) {
+      errors.template_name = 'Template Name is required';
+    }
+    if (!values.aircraft_type.trim()) {
+      errors.aircraft_type = 'Aircraft Type is required';
+    }
+    return errors;
+  }, []);
+
+  const openCreateAircraftTemplateDialog = useCallback(() => {
+    if (!canManageAircraftTemplates) {
+      toast.error('You do not have permission to manage templates');
+      return;
+    }
+    setAircraftTemplateDialogMode('create');
+    setAircraftTemplateFormValues(getDefaultAircraftTemplateFormValues());
+    setAircraftTemplateFormErrors({});
+    setSelectedAircraftTemplateId('');
+    setAircraftTemplateDialogOpen(true);
+  }, [canManageAircraftTemplates]);
+
+  const openEditAircraftTemplateDialog = useCallback(
+    (record: AircraftTemplateRecord) => {
+      if (!canManageAircraftTemplates) {
+        toast.error('You do not have permission to manage templates');
+        return;
+      }
+      const templateId = String(record.id || '').trim();
+      if (!templateId) {
+        toast.error('Select a valid template');
+        return;
+      }
+      setAircraftTemplateDialogMode('update');
+      setAircraftTemplateFormValues(mapAircraftTemplateRecordToFormValues(record));
+      setAircraftTemplateFormErrors({});
+      setSelectedAircraftTemplateId(templateId);
+      setAircraftTemplateDialogOpen(true);
+    },
+    [canManageAircraftTemplates],
+  );
+
+  const submitAircraftTemplateDialog = useCallback(async () => {
+    if (!canManageAircraftTemplates) {
+      toast.error('You do not have permission to manage templates');
+      return;
+    }
+    const validationErrors = validateAircraftTemplateForm(aircraftTemplateFormValues);
+    setAircraftTemplateFormErrors(validationErrors);
+    if (Object.keys(validationErrors).length > 0) {
+      return;
+    }
+    setAircraftTemplateDialogSubmitting(true);
+    try {
+      if (aircraftTemplateDialogMode === 'create') {
+        await createAircraftTemplate(scope, sessionAccessToken, aircraftTemplateFormValues);
+        toast.success('Aircraft template created');
+      } else {
+        await updateAircraftTemplate(scope, sessionAccessToken, selectedAircraftTemplateId, aircraftTemplateFormValues);
+        toast.success('Aircraft template updated');
+      }
+      resetAircraftTemplateDialog();
+      await loadAircraftTemplatesWorkspace();
+    } catch (error) {
+      toast.error(String((error as Error).message || 'Failed to save aircraft template'));
+    } finally {
+      setAircraftTemplateDialogSubmitting(false);
+    }
+  }, [
+    aircraftTemplateDialogMode,
+    aircraftTemplateFormValues,
+    canManageAircraftTemplates,
+    loadAircraftTemplatesWorkspace,
+    resetAircraftTemplateDialog,
+    scope,
+    selectedAircraftTemplateId,
+    sessionAccessToken,
+    validateAircraftTemplateForm,
+  ]);
+
+  const openDeleteAircraftTemplateDialog = useCallback(
+    (record: AircraftTemplateRecord) => {
+      if (!canDeleteAircraftTemplates) {
+        toast.error('You do not have permission to delete templates');
+        return;
+      }
+      const templateId = String(record.id || '').trim();
+      if (!templateId) {
+        toast.error('Select a valid template');
+        return;
+      }
+      setSelectedAircraftTemplateId(templateId);
+      setAircraftTemplateDeleteDialogOpen(true);
+    },
+    [canDeleteAircraftTemplates],
+  );
+
+  const confirmDeleteAircraftTemplate = useCallback(async () => {
+    if (!canDeleteAircraftTemplates) {
+      toast.error('You do not have permission to delete templates');
+      return;
+    }
+    if (!selectedAircraftTemplateId.trim()) {
+      toast.error('Select a template first');
+      return;
+    }
+    setAircraftTemplateDeleteSubmitting(true);
+    try {
+      await deleteAircraftTemplate(scope, sessionAccessToken, selectedAircraftTemplateId);
+      toast.success('Aircraft template deleted');
+      setAircraftTemplateDeleteDialogOpen(false);
+      setSelectedAircraftTemplateId('');
+      await loadAircraftTemplatesWorkspace();
+    } catch (error) {
+      toast.error(String((error as Error).message || 'Failed to delete aircraft template'));
+    } finally {
+      setAircraftTemplateDeleteSubmitting(false);
+    }
+  }, [canDeleteAircraftTemplates, loadAircraftTemplatesWorkspace, scope, selectedAircraftTemplateId, sessionAccessToken]);
+
+  useEffect(() => {
+    if (!showAircraftTemplatesWorkspace) {
+      return;
+    }
+    void loadAircraftTemplatesWorkspace();
+  }, [loadAircraftTemplatesWorkspace, showAircraftTemplatesWorkspace]);
 
   const loadRecords = useCallback(async () => {
     const requestId = recordsRequestIdRef.current + 1;
@@ -5732,11 +5972,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   );
   const headerPaletteActions = useMemo<AircraftPaletteAction[]>(
     () => {
+      const hideAircraftUtilityActions = entity === 'aircraft';
       if (entity === 'aircraft' && aircraftEnhancementEnabled) {
         const resolveAircraftViewActive = (tab: AircraftLeadsTab): boolean => (tab === 'list'
           ? aircraftNavigationView === 'module'
           : aircraftNavigationView === tab);
-        return [
+        const actions: AircraftPaletteAction[] = [
           {
             id: 'view-list',
             label: 'List',
@@ -5759,6 +6000,20 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             ariaLabel: 'New aircraft record',
             onAction: async () => {
               handleOpenCreateModal();
+            },
+          },
+          {
+            id: 'aircraft-templates',
+            label: 'Template',
+            icon: <FileSpreadsheet className="h-4 w-4" aria-hidden="true" />,
+            group: 'primary',
+            variant: 'outline',
+            permission: 'edit_aircraft_records',
+            disabled: !canManageAircraftTemplates,
+            active: isAircraftSubModule && aircraftSubModuleSegment === 'templates',
+            ariaLabel: 'Aircraft template workspace',
+            onAction: async () => {
+              navigate(`/dashboard/amro/aircraft/templates${location.search}`, { replace: true });
             },
           },
           {
@@ -5864,51 +6119,56 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             },
           },
         ];
+        return hideAircraftUtilityActions
+          ? actions.filter((action) => action.id !== 'refresh-records' && action.id !== 'export-csv' && action.id !== 'export-pdf')
+          : actions;
       }
-      const actions: AircraftPaletteAction[] = [
-        {
-          id: 'refresh-records',
-          label: 'Refresh',
-          icon: <RefreshCw className={cn('h-4 w-4', busyAction === 'refresh' && 'animate-spin')} aria-hidden="true" />,
-          group: 'contextual',
-          variant: 'secondary',
-          disabled: loading,
-          loading: busyAction === 'refresh',
-          ariaLabel: 'Refresh records',
-          onAction: async () => {
-            setBusyAction('refresh');
-            await loadRecords();
-            setBusyAction(null);
+      const actions: AircraftPaletteAction[] = hideAircraftUtilityActions
+        ? []
+        : [
+          {
+            id: 'refresh-records',
+            label: 'Refresh',
+            icon: <RefreshCw className={cn('h-4 w-4', busyAction === 'refresh' && 'animate-spin')} aria-hidden="true" />,
+            group: 'contextual',
+            variant: 'secondary',
+            disabled: loading,
+            loading: busyAction === 'refresh',
+            ariaLabel: 'Refresh records',
+            onAction: async () => {
+              setBusyAction('refresh');
+              await loadRecords();
+              setBusyAction(null);
+            },
+            errorMessage: 'Refresh failed',
           },
-          errorMessage: 'Refresh failed',
-        },
-        {
-          id: 'export-csv',
-          label: 'Export CSV',
-          icon: <FileUp className="h-4 w-4" aria-hidden="true" />,
-          group: 'secondary',
-          variant: 'outline',
-          loading: busyAction === 'export',
-          disabled: busyAction === 'export_pdf',
-          ariaLabel: 'Export records CSV',
-          onAction: async () => {
-            await handleExport();
+          {
+            id: 'export-csv',
+            label: 'Export CSV',
+            icon: <FileUp className="h-4 w-4" aria-hidden="true" />,
+            group: 'secondary',
+            variant: 'outline',
+            loading: busyAction === 'export',
+            disabled: busyAction === 'export_pdf',
+            ariaLabel: 'Export records CSV',
+            onAction: async () => {
+              await handleExport();
+            },
           },
-        },
-        {
-          id: 'export-pdf',
-          label: 'Export PDF',
-          icon: <FileText className="h-4 w-4" aria-hidden="true" />,
-          group: 'secondary',
-          variant: 'outline',
-          loading: busyAction === 'export_pdf',
-          disabled: busyAction === 'export',
-          ariaLabel: 'Export records PDF',
-          onAction: async () => {
-            await handleExportPdf();
+          {
+            id: 'export-pdf',
+            label: 'Export PDF',
+            icon: <FileText className="h-4 w-4" aria-hidden="true" />,
+            group: 'secondary',
+            variant: 'outline',
+            loading: busyAction === 'export_pdf',
+            disabled: busyAction === 'export',
+            ariaLabel: 'Export records PDF',
+            onAction: async () => {
+              await handleExportPdf();
+            },
           },
-        },
-      ];
+        ];
       actions.push({
         id: 'new-record',
         label: `New ${ENTITY_LABEL[entity]}`,
@@ -5925,14 +6185,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [
       aircraftEnhancementEnabled,
       aircraftNavigationView,
+      aircraftSubModuleSegment,
       busyAction,
+      canManageAircraftTemplates,
       entity,
       handleAircraftViewNavigation,
       handleExport,
       handleExportPdf,
       handleOpenCreateModal,
+      isAircraftSubModule,
       loadRecords,
+      location.search,
       loading,
+      navigate,
     ],
   );
   const aircraftStatusPaletteActions = useMemo<AircraftPaletteAction[]>(
@@ -6146,29 +6411,31 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   );
                 })}
               </div>
-              <div className="space-y-2">
-                <div className="flex items-center justify-between gap-2">
-                  <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                    {showAircraftDocumentsWorkspace
-                      ? 'Documents Management'
-                      : showAircraftAdSbWorkspace
-                        ? 'AD/SB Management'
-                        : showAircraftEngineWorkspace && !showAircraftComponentsWorkspace
-                          ? 'Engine Operations'
-                          : showAircraftComponentsWorkspace && !showAircraftEngineWorkspace
-                            ? 'Components Monitoring'
-                            : 'Aircraft Operations Overview'}
-                  </h3>
-                  <Badge variant="secondary">View: {aircraftDashboardModule}</Badge>
+              {!showAircraftOperationsOverview || showAircraftOperationsOverviewSection ? (
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-2">
+                    <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                      {showAircraftDocumentsWorkspace
+                        ? 'Documents Management'
+                        : showAircraftAdSbWorkspace
+                          ? 'AD/SB Management'
+                          : showAircraftEngineWorkspace && !showAircraftComponentsWorkspace
+                            ? 'Engine Operations'
+                            : showAircraftComponentsWorkspace && !showAircraftEngineWorkspace
+                              ? 'Components Monitoring'
+                              : 'Aircraft Operations Overview'}
+                    </h3>
+                    <Badge variant="secondary">View: {aircraftDashboardModule}</Badge>
+                  </div>
+                  {aircraftDashboardLoading ? (
+                    <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Loading operations telemetry…</p>
+                  ) : null}
+                  {aircraftDashboardError ? (
+                    <p className="text-[12px] text-destructive">{aircraftDashboardError}</p>
+                  ) : null}
                 </div>
-                {aircraftDashboardLoading ? (
-                  <p className="text-[12px] text-[hsl(var(--mdm-template-muted))]">Loading operations telemetry…</p>
-                ) : null}
-                {aircraftDashboardError ? (
-                  <p className="text-[12px] text-destructive">{aircraftDashboardError}</p>
-                ) : null}
-              </div>
-              {!showAircraftEngineWorkspace && !showAircraftComponentsWorkspace && !showAircraftDocumentsWorkspace && !showAircraftAdSbWorkspace ? (
+              ) : null}
+              {showAircraftOperationsOverviewSection && showAircraftOperationsOverview ? (
                 <div className="grid gap-4 xl:grid-cols-2">
                   <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
                     <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Maintenance Schedule</h4>
@@ -6643,6 +6910,84 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             activeTab={aircraftLeadsActiveTab}
             onActiveTabChange={setAircraftLeadsActiveTab}
           />
+        ) : null}
+        {showAircraftTemplatesWorkspace ? (
+          <Card className="mdm-template-panel">
+            <CardHeader className="mdm-template-panel-head">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <CardTitle className="mdm-template-panel-title">Aircraft Template Registry</CardTitle>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => void loadAircraftTemplatesWorkspace()}
+                    disabled={aircraftTemplateLoading}
+                  >
+                    <RefreshCw className={cn('mr-1.5 h-3.5 w-3.5', aircraftTemplateLoading && 'animate-spin')} aria-hidden="true" />
+                    Refresh
+                  </Button>
+                  <Button type="button" size="sm" onClick={openCreateAircraftTemplateDialog} disabled={!canManageAircraftTemplates}>
+                    <Plus className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    New Template
+                  </Button>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent className="mdm-template-panel-body space-y-3">
+              {aircraftTemplateError ? (
+                <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+                  {aircraftTemplateError}
+                </div>
+              ) : null}
+              <div className="overflow-auto rounded-md border">
+                <Table className="table-fixed">
+                  <TableHeader>
+                    <TableRow className="bg-[#F8FAFC]">
+                      <TableHead className="w-[220px] px-3 py-2">Template Name</TableHead>
+                      <TableHead className="w-[120px] px-3 py-2">Aircraft Type</TableHead>
+                      <TableHead className="w-[160px] px-3 py-2">Manufacturer</TableHead>
+                      <TableHead className="w-[160px] px-3 py-2">Model</TableHead>
+                      <TableHead className="w-[140px] px-3 py-2">Program</TableHead>
+                      <TableHead className="w-[120px] px-3 py-2">Revision</TableHead>
+                      <TableHead className="w-[130px] px-3 py-2">Amendment</TableHead>
+                      <TableHead className="w-[150px] px-3 py-2 text-right">Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {aircraftTemplateRows.length === 0 && !aircraftTemplateLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                          No aircraft templates found.
+                        </TableCell>
+                      </TableRow>
+                    ) : null}
+                    {aircraftTemplateRows.map((template) => (
+                      <TableRow key={template.id}>
+                        <TableCell className="px-3 py-2">{template.template_name || '-'}</TableCell>
+                        <TableCell className="px-3 py-2">{template.aircraft_type || '-'}</TableCell>
+                        <TableCell className="px-3 py-2">{template.manufacturer || '-'}</TableCell>
+                        <TableCell className="px-3 py-2">{template.aircraft_model || '-'}</TableCell>
+                        <TableCell className="px-3 py-2">{template.maintenance_program || '-'}</TableCell>
+                        <TableCell className="px-3 py-2">{template.revision_number || '-'}</TableCell>
+                        <TableCell className="px-3 py-2">{template.amendment_number || '-'}</TableCell>
+                        <TableCell className="px-3 py-2">
+                          <div className="flex items-center justify-end gap-2">
+                            <Button type="button" variant="outline" size="sm" onClick={() => openEditAircraftTemplateDialog(template)} disabled={!canManageAircraftTemplates}>
+                              Edit
+                            </Button>
+                            <Button type="button" variant="destructive" size="sm" onClick={() => openDeleteAircraftTemplateDialog(template)} disabled={!canDeleteAircraftTemplates}>
+                              Delete
+                            </Button>
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            </CardContent>
+          </Card>
         ) : null}
         {showAircraftMasterRecords ? (
         <Card className="mdm-template-panel">
@@ -8564,6 +8909,143 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
           </DialogContent>
         </Dialog>
+        <Dialog
+          open={aircraftTemplateDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              resetAircraftTemplateDialog();
+              return;
+            }
+            setAircraftTemplateDialogOpen(true);
+          }}
+        >
+          <DialogContent className="mdm-template-dialog mdm-template-dialog-large">
+            <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
+              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                {aircraftTemplateDialogMode === 'create' ? 'Create Aircraft Template' : 'Update Aircraft Template'}
+              </DialogTitle>
+              <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
+                Maintain reusable aircraft template metadata for creation workflows.
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4 px-6 pb-6 pt-4">
+              <div className="grid gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label htmlFor="aircraft-template-name" className="mdm-template-label">Template Name</Label>
+                  <Input
+                    id="aircraft-template-name"
+                    value={aircraftTemplateFormValues.template_name}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setAircraftTemplateFormValues((previous) => ({ ...previous, template_name: value }));
+                      if (aircraftTemplateFormErrors.template_name) {
+                        setAircraftTemplateFormErrors((previous) => ({ ...previous, template_name: '' }));
+                      }
+                    }}
+                    className={cn('mdm-template-input', aircraftTemplateFormErrors.template_name && 'border-destructive')}
+                    aria-invalid={Boolean(aircraftTemplateFormErrors.template_name)}
+                  />
+                  {aircraftTemplateFormErrors.template_name ? <p className="mdm-template-danger">{aircraftTemplateFormErrors.template_name}</p> : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="aircraft-template-type" className="mdm-template-label">Aircraft Type</Label>
+                  <Input
+                    id="aircraft-template-type"
+                    value={aircraftTemplateFormValues.aircraft_type}
+                    onChange={(event) => {
+                      const value = event.target.value;
+                      setAircraftTemplateFormValues((previous) => ({ ...previous, aircraft_type: value }));
+                      if (aircraftTemplateFormErrors.aircraft_type) {
+                        setAircraftTemplateFormErrors((previous) => ({ ...previous, aircraft_type: '' }));
+                      }
+                    }}
+                    className={cn('mdm-template-input', aircraftTemplateFormErrors.aircraft_type && 'border-destructive')}
+                    aria-invalid={Boolean(aircraftTemplateFormErrors.aircraft_type)}
+                  />
+                  {aircraftTemplateFormErrors.aircraft_type ? <p className="mdm-template-danger">{aircraftTemplateFormErrors.aircraft_type}</p> : null}
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="aircraft-template-manufacturer" className="mdm-template-label">Manufacturer</Label>
+                  <Input
+                    id="aircraft-template-manufacturer"
+                    value={aircraftTemplateFormValues.manufacturer}
+                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, manufacturer: event.target.value }))}
+                    className="mdm-template-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="aircraft-template-manufacturer-id" className="mdm-template-label">Manufacturer ID</Label>
+                  <Input
+                    id="aircraft-template-manufacturer-id"
+                    value={aircraftTemplateFormValues.manufacturer_id}
+                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, manufacturer_id: event.target.value }))}
+                    className="mdm-template-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="aircraft-template-model" className="mdm-template-label">Aircraft Model</Label>
+                  <Input
+                    id="aircraft-template-model"
+                    value={aircraftTemplateFormValues.aircraft_model}
+                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, aircraft_model: event.target.value }))}
+                    className="mdm-template-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="aircraft-template-program" className="mdm-template-label">Maintenance Program</Label>
+                  <Input
+                    id="aircraft-template-program"
+                    value={aircraftTemplateFormValues.maintenance_program}
+                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, maintenance_program: event.target.value }))}
+                    className="mdm-template-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="aircraft-template-revision" className="mdm-template-label">Revision Number</Label>
+                  <Input
+                    id="aircraft-template-revision"
+                    value={aircraftTemplateFormValues.revision_number}
+                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, revision_number: event.target.value }))}
+                    className="mdm-template-input"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="aircraft-template-amendment" className="mdm-template-label">Amendment Number</Label>
+                  <Input
+                    id="aircraft-template-amendment"
+                    value={aircraftTemplateFormValues.amendment_number}
+                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, amendment_number: event.target.value }))}
+                    className="mdm-template-input"
+                  />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 border-t border-[hsl(var(--mdm-template-border))] pt-4">
+                <Button type="button" variant="outline" onClick={resetAircraftTemplateDialog}>
+                  Cancel
+                </Button>
+                <Button type="button" onClick={() => void submitAircraftTemplateDialog()} disabled={aircraftTemplateDialogSubmitting}>
+                  {aircraftTemplateDialogSubmitting ? 'Saving...' : aircraftTemplateDialogMode === 'create' ? 'Create Template' : 'Save Changes'}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+        <AlertDialog open={aircraftTemplateDeleteDialogOpen} onOpenChange={setAircraftTemplateDeleteDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete aircraft template?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This action permanently removes the template from the registry.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={aircraftTemplateDeleteSubmitting}>Cancel</AlertDialogCancel>
+              <AlertDialogAction onClick={() => void confirmDeleteAircraftTemplate()} disabled={aircraftTemplateDeleteSubmitting}>
+                {aircraftTemplateDeleteSubmitting ? 'Deleting...' : 'Delete Template'}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
         <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
