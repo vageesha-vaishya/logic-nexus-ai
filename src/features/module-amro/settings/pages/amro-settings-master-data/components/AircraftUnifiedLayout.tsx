@@ -83,6 +83,7 @@ type AircraftUnifiedLayoutProps = {
   showHeaderSummary?: boolean;
   showNavRail?: boolean;
   showSearchControls?: boolean;
+  showResultSummary?: boolean;
   showLocaleSelector?: boolean;
   showDynamicFilters?: boolean;
   showActions?: boolean;
@@ -144,6 +145,7 @@ export function AircraftUnifiedLayout({
   showHeaderSummary = true,
   showNavRail = true,
   showSearchControls = true,
+  showResultSummary = true,
   showLocaleSelector = true,
   showDynamicFilters = true,
   showActions = true,
@@ -291,11 +293,13 @@ export function AircraftUnifiedLayout({
             ) : null}
           </div>
         ) : null}
-        <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[hsl(var(--mdm-template-muted))]">
-          <span>
-            {resultSummary ? `${resultSummary.visible}/${resultSummary.total} ${uiLabels.resultLabel}` : `0/0 ${uiLabels.resultLabel}`}
-          </span>
-        </div>
+        {showResultSummary ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[hsl(var(--mdm-template-muted))]">
+            <span>
+              {resultSummary ? `${resultSummary.visible}/${resultSummary.total} ${uiLabels.resultLabel}` : `0/0 ${uiLabels.resultLabel}`}
+            </span>
+          </div>
+        ) : null}
       </CardHeader>
       <CardContent className="mdm-template-panel-body space-y-3">
         {loading ? (

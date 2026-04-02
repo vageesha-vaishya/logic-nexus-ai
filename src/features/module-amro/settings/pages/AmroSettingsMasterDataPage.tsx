@@ -6596,6 +6596,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             showHeaderSummary={false}
             showNavRail={false}
             showSearchControls={false}
+            showResultSummary={false}
             showLocaleSelector={false}
             showDynamicFilters={false}
             showActions={false}
@@ -7330,42 +7331,49 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           <CardContent className="mdm-template-panel-body space-y-3">
             <div className="rounded-md border">
               {entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule ? (
-                <div className="flex items-center gap-2 overflow-x-auto border-b border-[hsl(var(--mdm-template-border))] bg-background/70 p-2 xl:flex-nowrap xl:overflow-visible">
-                  <div className="min-w-[260px] flex-1 shrink-0 xl:min-w-[200px]">
-                    <div className="relative">
-                      <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-                      <Input
-                        value={aircraftUnifiedSearch}
-                        onChange={(event) => setAircraftUnifiedSearch(event.target.value)}
-                        placeholder={aircraftUnifiedLabels.searchPlaceholder}
-                        className="pl-8"
-                        aria-label={aircraftUnifiedLabels.searchAriaLabel}
-                      />
+                <div className="border-b border-[hsl(var(--mdm-template-border))] bg-background/70 p-2">
+                  <div className="flex items-center gap-2 overflow-x-auto xl:flex-nowrap xl:overflow-visible">
+                    <div className="min-w-[260px] flex-1 shrink-0 xl:min-w-[200px]">
+                      <div className="relative">
+                        <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          value={aircraftUnifiedSearch}
+                          onChange={(event) => setAircraftUnifiedSearch(event.target.value)}
+                          placeholder={aircraftUnifiedLabels.searchPlaceholder}
+                          className="pl-8"
+                          aria-label={aircraftUnifiedLabels.searchAriaLabel}
+                        />
+                      </div>
                     </div>
+                    <div className="w-[160px] shrink-0 xl:w-[140px]">
+                      <Select value={aircraftUnifiedStatusFilter} onValueChange={setAircraftUnifiedStatusFilter}>
+                        <SelectTrigger aria-label={aircraftUnifiedLabels.statusAriaLabel}>
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {aircraftUnifiedStatusOptions.map((option) => (
+                            <SelectItem key={`records-status-option-${option.value}`} value={option.value}>
+                              {option.label}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={clearAircraftUnifiedFilters}
+                      className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
+                    >
+                      {aircraftUnifiedLabels.clearFilters}
+                    </Button>
                   </div>
-                  <div className="w-[160px] shrink-0 xl:w-[140px]">
-                    <Select value={aircraftUnifiedStatusFilter} onValueChange={setAircraftUnifiedStatusFilter}>
-                      <SelectTrigger aria-label={aircraftUnifiedLabels.statusAriaLabel}>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {aircraftUnifiedStatusOptions.map((option) => (
-                          <SelectItem key={`records-status-option-${option.value}`} value={option.value}>
-                            {option.label}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[hsl(var(--mdm-template-muted))]">
+                    <span>
+                      {`${aircraftUnifiedResultSummary.visible}/${aircraftUnifiedResultSummary.total} ${aircraftUnifiedLabels.resultLabel}`}
+                    </span>
                   </div>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={clearAircraftUnifiedFilters}
-                    className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
-                  >
-                    {aircraftUnifiedLabels.clearFilters}
-                  </Button>
                 </div>
               ) : null}
               <div className="overflow-auto max-h-[560px]">
