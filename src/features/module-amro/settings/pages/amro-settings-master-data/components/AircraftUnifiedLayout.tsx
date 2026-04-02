@@ -82,6 +82,7 @@ type AircraftUnifiedLayoutProps = {
   dynamicFilters?: AircraftUnifiedDynamicFilter[];
   showHeaderSummary?: boolean;
   showNavRail?: boolean;
+  showSearchControls?: boolean;
   showLocaleSelector?: boolean;
   showDynamicFilters?: boolean;
   showActions?: boolean;
@@ -142,6 +143,7 @@ export function AircraftUnifiedLayout({
   dynamicFilters = [],
   showHeaderSummary = true,
   showNavRail = true,
+  showSearchControls = true,
   showLocaleSelector = true,
   showDynamicFilters = true,
   showActions = true,
@@ -191,102 +193,104 @@ export function AircraftUnifiedLayout({
             })}
           </div>
         ) : null}
-        <div className="flex items-center gap-2 overflow-x-auto rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 p-2 xl:flex-nowrap xl:overflow-visible">
-          <div className="min-w-[260px] flex-1 shrink-0 xl:min-w-[200px]">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-              <Input
-                value={searchValue}
-                onChange={(event) => onSearchChange(event.target.value)}
-                placeholder={uiLabels.searchPlaceholder}
-                className="pl-8"
-                aria-label={uiLabels.searchAriaLabel}
-              />
+        {showSearchControls ? (
+          <div className="flex items-center gap-2 overflow-x-auto rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 p-2 xl:flex-nowrap xl:overflow-visible">
+            <div className="min-w-[260px] flex-1 shrink-0 xl:min-w-[200px]">
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  value={searchValue}
+                  onChange={(event) => onSearchChange(event.target.value)}
+                  placeholder={uiLabels.searchPlaceholder}
+                  className="pl-8"
+                  aria-label={uiLabels.searchAriaLabel}
+                />
+              </div>
             </div>
-          </div>
-          <div className="w-[160px] shrink-0 xl:w-[140px]">
-            <Select value={statusValue} onValueChange={onStatusChange}>
-              <SelectTrigger aria-label={uiLabels.statusAriaLabel}>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {statusOptions.map((option) => (
-                  <SelectItem key={`status-option-${option.value}`} value={option.value}>
-                    {option.label}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          {showLocaleSelector ? (
-            <div className="w-[140px] shrink-0 xl:w-[120px]">
-              <Select value={localeValue} onValueChange={onLocaleChange}>
-                <SelectTrigger aria-label={uiLabels.localeAriaLabel}>
+            <div className="w-[160px] shrink-0 xl:w-[140px]">
+              <Select value={statusValue} onValueChange={onStatusChange}>
+                <SelectTrigger aria-label={uiLabels.statusAriaLabel}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {localeOptions.map((option) => (
-                    <SelectItem key={`locale-option-${option.value}`} value={option.value}>
+                  {statusOptions.map((option) => (
+                    <SelectItem key={`status-option-${option.value}`} value={option.value}>
                       {option.label}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-          ) : null}
-          {showDynamicFilters ? dynamicFilters.map((filterField) => {
-            if (filterField.type === 'select') {
+            {showLocaleSelector ? (
+              <div className="w-[140px] shrink-0 xl:w-[120px]">
+                <Select value={localeValue} onValueChange={onLocaleChange}>
+                  <SelectTrigger aria-label={uiLabels.localeAriaLabel}>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {localeOptions.map((option) => (
+                      <SelectItem key={`locale-option-${option.value}`} value={option.value}>
+                        {option.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            ) : null}
+            {showDynamicFilters ? dynamicFilters.map((filterField) => {
+              if (filterField.type === 'select') {
+                return (
+                  <div key={filterField.id} className={cn('w-[160px] shrink-0 xl:w-[140px]', filterField.className)}>
+                    <Select value={filterField.value} onValueChange={filterField.onValueChange}>
+                      <SelectTrigger aria-label={filterField.ariaLabel}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {filterField.options.map((option) => (
+                          <SelectItem key={`${filterField.id}-${option.value}`} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                );
+              }
               return (
-                <div key={filterField.id} className={cn('w-[160px] shrink-0 xl:w-[140px]', filterField.className)}>
-                  <Select value={filterField.value} onValueChange={filterField.onValueChange}>
-                    <SelectTrigger aria-label={filterField.ariaLabel}>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {filterField.options.map((option) => (
-                        <SelectItem key={`${filterField.id}-${option.value}`} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div key={filterField.id} className={cn('w-[180px] shrink-0 xl:w-[160px]', filterField.className)}>
+                  <Input
+                    type={filterField.type}
+                    value={filterField.value}
+                    onChange={(event) => filterField.onValueChange(event.target.value)}
+                    placeholder={filterField.placeholder}
+                    aria-label={filterField.ariaLabel}
+                  />
                 </div>
               );
-            }
-            return (
-              <div key={filterField.id} className={cn('w-[180px] shrink-0 xl:w-[160px]', filterField.className)}>
-                <Input
-                  type={filterField.type}
-                  value={filterField.value}
-                  onChange={(event) => filterField.onValueChange(event.target.value)}
-                  placeholder={filterField.placeholder}
-                  aria-label={filterField.ariaLabel}
-                />
-              </div>
-            );
-          }) : null}
-          {showActions && actions.length > 0 ? (
-            <AircraftActionPalette
-              actions={actions}
-              hasPermission={hasPermission}
-              compact
-              buttonClassName="h-9 px-2 xl:h-8 xl:px-2 xl:text-xs"
-              className={cn('shrink-0 justify-end xl:gap-1')}
-              toolbarLabel="Aircraft unified actions"
-            />
-          ) : null}
-          {showClearFilters ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={onClearFilters}
-              className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
-            >
-              {uiLabels.clearFilters}
-            </Button>
-          ) : null}
-        </div>
+            }) : null}
+            {showActions && actions.length > 0 ? (
+              <AircraftActionPalette
+                actions={actions}
+                hasPermission={hasPermission}
+                compact
+                buttonClassName="h-9 px-2 xl:h-8 xl:px-2 xl:text-xs"
+                className={cn('shrink-0 justify-end xl:gap-1')}
+                toolbarLabel="Aircraft unified actions"
+              />
+            ) : null}
+            {showClearFilters ? (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={onClearFilters}
+                className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
+              >
+                {uiLabels.clearFilters}
+              </Button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-[hsl(var(--mdm-template-muted))]">
           <span>
             {resultSummary ? `${resultSummary.visible}/${resultSummary.total} ${uiLabels.resultLabel}` : `0/0 ${uiLabels.resultLabel}`}

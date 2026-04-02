@@ -64,6 +64,7 @@ import {
   ListChecks,
   Plus,
   RefreshCw,
+  Search,
   SlidersHorizontal,
   TimerReset,
   Trash2,
@@ -6593,6 +6594,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             dynamicFilters={aircraftUnifiedDynamicFilters}
             showHeaderSummary={false}
             showNavRail={false}
+            showSearchControls={false}
             showLocaleSelector={false}
             showDynamicFilters={false}
             showActions={false}
@@ -7325,7 +7327,47 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
           </CardHeader>
           <CardContent className="mdm-template-panel-body space-y-3">
-            <div className="overflow-auto rounded-md border max-h-[560px]">
+            <div className="rounded-md border">
+              {entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule ? (
+                <div className="flex items-center gap-2 overflow-x-auto border-b border-[hsl(var(--mdm-template-border))] bg-background/70 p-2 xl:flex-nowrap xl:overflow-visible">
+                  <div className="min-w-[260px] flex-1 shrink-0 xl:min-w-[200px]">
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        value={aircraftUnifiedSearch}
+                        onChange={(event) => setAircraftUnifiedSearch(event.target.value)}
+                        placeholder={aircraftUnifiedLabels.searchPlaceholder}
+                        className="pl-8"
+                        aria-label={aircraftUnifiedLabels.searchAriaLabel}
+                      />
+                    </div>
+                  </div>
+                  <div className="w-[160px] shrink-0 xl:w-[140px]">
+                    <Select value={aircraftUnifiedStatusFilter} onValueChange={setAircraftUnifiedStatusFilter}>
+                      <SelectTrigger aria-label={aircraftUnifiedLabels.statusAriaLabel}>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {aircraftUnifiedStatusOptions.map((option) => (
+                          <SelectItem key={`records-status-option-${option.value}`} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={clearAircraftUnifiedFilters}
+                    className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
+                  >
+                    {aircraftUnifiedLabels.clearFilters}
+                  </Button>
+                </div>
+              ) : null}
+              <div className="overflow-auto max-h-[560px]">
                 <Table className="table-fixed">
                   <colgroup>
                     <col className="w-[52px]" />
@@ -7554,6 +7596,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     ))}
                   </TableBody>
                 </Table>
+            </div>
             </div>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-muted-foreground">
