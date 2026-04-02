@@ -1083,6 +1083,58 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(createPayload.trigger_reference_id).toBe('ac-1');
   });
 
+  it.each([
+    ['Schedule Due', 'schedule_due'],
+    ['Campaign', 'campaign'],
+    ['Predictive Alert', 'predictive_alert'],
+  ])('persists FR-AMRO-034 trigger metadata for %s source', async (triggerLabel, triggerValue) => {
+    renderAircraftPage();
+
+    await screen.findByText('Aircraft Operations Snapshot');
+    fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
+    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+
+    expect(await within(workPackageDialog).findByLabelText('Template registry')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    const lineTemplateOption = within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
+    fireEvent.change(within(workPackageDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
+
+    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
+    fireEvent.change(screen.getByLabelText('Number'), { target: { value: `145-${triggerValue}` } });
+    fireEvent.change(screen.getByLabelText('Topic'), { target: { value: `${triggerLabel} verification package` } });
+    fireEvent.change(screen.getByLabelText('Revision'), { target: { value: 'R2' } });
+    fireEvent.change(screen.getByLabelText('TTAF'), { target: { value: '120.5' } });
+
+    fireEvent.click(screen.getByLabelText('Status'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Planning' }));
+
+    fireEvent.click(screen.getByLabelText('Validation'));
+    fireEvent.click(await screen.findByRole('option', { name: 'Pending' }));
+
+    fireEvent.click(screen.getByLabelText('Trigger source'));
+    fireEvent.click(await screen.findByRole('option', { name: triggerLabel }));
+
+    fireEvent.click(within(workPackageDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
+    fireEvent.click(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' }));
+    await waitFor(() => {
+      expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package created');
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+
+    const createCalls = vi
+      .mocked(fetch)
+      .mock.calls
+      .filter(([input, init]) =>
+        String(input).includes('/api/v2/amro/work-packages?interface=create-work-package')
+        && String(init?.method || 'GET').toUpperCase() === 'POST');
+    expect(createCalls.length).toBeGreaterThan(0);
+    const createPayload = JSON.parse(String(createCalls[createCalls.length - 1]?.[1]?.body || '{}')) as Record<string, unknown>;
+    expect(createPayload.source).toBe(triggerValue);
+    expect(createPayload.trigger_source).toBe(triggerValue);
+    expect(createPayload.trigger_reference_id).toBe('ac-1');
+  });
+
   it('shows New WP template registry errors and supports template refresh retry', async () => {
     const fetchMock = vi.mocked(fetch);
     const baseImplementation = fetchMock.getMockImplementation();

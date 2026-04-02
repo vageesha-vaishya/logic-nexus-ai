@@ -1,3 +1,5 @@
+import { mkdirSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { expect, test, type Page } from '@playwright/test';
 
 const E2E_ADMIN_EMAIL = process.env.E2E_ADMIN_EMAIL ?? 'Bahuguna.vimal@gmail.com';
@@ -23,6 +25,16 @@ async function ensureAuthenticated(page: Page) {
   await page.goto('/dashboard/amro/overview');
   test.skip(page.url().includes('/auth'), 'Unable to authenticate with configured credentials');
 }
+
+const AIRCRAFT_NAV_STEPS = [
+  { label: 'Aircraft List', slug: 'list', urlSegment: '/dashboard/amro/aircraft/list' },
+  { label: 'Templates', slug: 'templates', urlSegment: '/dashboard/amro/aircraft/templates' },
+  { label: 'Engine', slug: 'engine', urlSegment: '/dashboard/amro/aircraft/engine' },
+  { label: 'Components', slug: 'components', urlSegment: '/dashboard/amro/aircraft/components' },
+  { label: 'Documents', slug: 'documents', urlSegment: '/dashboard/amro/aircraft/documents' },
+  { label: 'AD/SB', slug: 'ad-sb', urlSegment: '/dashboard/amro/aircraft/ad-sb' },
+  { label: 'Operations', slug: 'work-packages', urlSegment: '/dashboard/amro/aircraft/work-packages' },
+] as const;
 
 test.describe('amro overview dashboard', () => {
   test('renders overview surfaces with filters, charts, and export controls', async ({ page }) => {
@@ -77,9 +89,6 @@ test.describe('amro aircraft CRUD smoke', () => {
     }
     test.skip(page.url().includes('/auth'), 'Authentication failed for AMRO aircraft unified module navigation');
 
-    const unifiedLayout = page.getByTestId('aircraft-unified-layout');
-    test.skip((await unifiedLayout.count()) === 0, 'Unified aircraft layout is unavailable in this environment profile');
-    await expect(unifiedLayout.first()).toBeVisible();
     const headerToolbar = page.getByRole('toolbar', { name: 'Aircraft header actions' });
     await expect(headerToolbar).toBeVisible();
     await expect(headerToolbar.getByRole('button', { name: 'Aircraft List' })).toBeVisible();
@@ -98,19 +107,11 @@ test.describe('amro aircraft CRUD smoke', () => {
     await expect(headerToolbar.getByRole('button', { name: 'Analytics' })).toHaveCount(0);
     await expect(headerToolbar.getByRole('button', { name: 'Import/Export' })).toHaveCount(0);
 
-    const navSteps = [
-      { label: 'Aircraft List', urlSegment: '/dashboard/amro/aircraft/list' },
-      { label: 'Templates', urlSegment: '/dashboard/amro/aircraft/templates' },
-      { label: 'Engine', urlSegment: '/dashboard/amro/aircraft/engine' },
-      { label: 'Components', urlSegment: '/dashboard/amro/aircraft/components' },
-      { label: 'Documents', urlSegment: '/dashboard/amro/aircraft/documents' },
-      { label: 'AD/SB', urlSegment: '/dashboard/amro/aircraft/ad-sb' },
-      { label: 'Operations', urlSegment: '/dashboard/amro/aircraft/work-packages' },
-    ];
-
-    for (const step of navSteps) {
+    for (const step of AIRCRAFT_NAV_STEPS) {
       await page.getByRole('button', { name: step.label }).first().click();
       await expect(page).toHaveURL(new RegExp(step.urlSegment.replace(/\//g, '\\/')));
+      await expect(page.getByTestId('aircraft-unified-layout')).toHaveCount(0);
+      await expect(page.getByText('Aircraft Operations Snapshot').first()).toBeVisible();
       await expect(page.getByText(/Aircraft ·/).first()).toHaveCount(0);
       await expect(page.getByLabel('Unified module search')).toBeVisible();
       await expect(page.getByLabel('Unified module status filter')).toBeVisible();
@@ -131,6 +132,42 @@ test.describe('amro aircraft CRUD smoke', () => {
     await expect(page.getByLabel('Unified module search')).toHaveValue('A320');
     await page.getByRole('button', { name: 'Aircraft List' }).first().click();
     await expect(page.getByLabel('Unified module search')).toHaveValue('A320');
+  });
+
+  test('captures whitespace-regression evidence across aircraft forms and responsive breakpoints', async ({ page, browserName }, testInfo) => {
+    const viewportMatrix = [
+      { name: 'desktop', width: 1440, height: 900 },
+      { name: 'tablet', width: 1024, height: 1366 },
+      { name: 'mobile', width: 390, height: 844 },
+    ] as const;
+
+    await page.goto('/dashboard/amro/aircraft/list');
+    if (page.url().includes('/auth')) {
+      await login(page);
+      await page.goto('/dashboard/amro/aircraft/list');
+    }
+    test.skip(page.url().includes('/auth'), 'Authentication failed for AMRO aircraft whitespace validation');
+
+    const headerToolbar = page.getByRole('toolbar', { name: 'Aircraft header actions' });
+    test.skip((await headerToolbar.count()) === 0, 'Aircraft header actions are unavailable in this environment profile');
+    await expect(headerToolbar).toBeVisible();
+
+    for (const viewport of viewportMatrix) {
+      await page.setViewportSize({ width: viewport.width, height: viewport.height });
+      for (const moduleStep of AIRCRAFT_NAV_STEPS) {
+        await page.getByRole('button', { name: moduleStep.label }).first().click();
+        await expect(page).toHaveURL(new RegExp(moduleStep.urlSegment.replace(/\//g, '\\/')));
+        await expect(page.getByTestId('aircraft-unified-layout')).toHaveCount(0);
+        await expect(page.getByText('Aircraft Operations Snapshot').first()).toBeVisible();
+        await expect(page.getByLabel('Unified module search')).toBeVisible();
+
+        const screenshotFile = testInfo.outputPath(
+          `artifacts/mro/screenshots/whitespace-after/${browserName}/${viewport.name}/${moduleStep.slug}.png`,
+        );
+        mkdirSync(dirname(screenshotFile), { recursive: true });
+        await page.screenshot({ path: screenshotFile, fullPage: true });
+      }
+    }
   });
 
   test('creates, updates, and deletes an aircraft record from master data page', async ({ page }) => {

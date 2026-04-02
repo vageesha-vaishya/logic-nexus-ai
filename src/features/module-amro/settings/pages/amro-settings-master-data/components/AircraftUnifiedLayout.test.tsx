@@ -177,4 +177,36 @@ describe('AircraftUnifiedLayout', () => {
     fireEvent.change(screen.getByLabelText('Effective date'), { target: { value: '2026-01-01' } });
     expect(onDateChange).toHaveBeenCalledWith('2026-01-01');
   });
+
+  it('omits layout container when all sections are disabled and no body content exists', () => {
+    render(
+      <AircraftUnifiedLayout
+        title="Aircraft · List"
+        subtitle="Hidden layout"
+        activeModuleKey="list"
+        navItems={[{ key: 'list', label: 'Aircraft List', path: '/dashboard/amro/aircraft/list', icon: FileText }]}
+        onNavigate={vi.fn()}
+        searchValue=""
+        onSearchChange={vi.fn()}
+        statusValue="all"
+        onStatusChange={vi.fn()}
+        statusOptions={[{ value: 'all', label: 'All Statuses' }]}
+        localeValue="en"
+        onLocaleChange={vi.fn()}
+        localeOptions={[{ value: 'en', label: 'English' }]}
+        showHeaderSummary={false}
+        showNavRail={false}
+        showSearchControls={false}
+        showResultSummary={false}
+        showLocaleSelector={false}
+        showDynamicFilters={false}
+        showActions={false}
+        showClearFilters={false}
+      >
+        <></>
+      </AircraftUnifiedLayout>,
+    );
+
+    expect(screen.queryByTestId('aircraft-unified-layout')).not.toBeInTheDocument();
+  });
 });
