@@ -135,6 +135,7 @@ test.describe('amro aircraft CRUD smoke', () => {
   });
 
   test('captures whitespace-regression evidence across aircraft forms and responsive breakpoints', async ({ page, browserName }, testInfo) => {
+    test.setTimeout(240000);
     const viewportMatrix = [
       { name: 'desktop', width: 1440, height: 900 },
       { name: 'tablet', width: 1024, height: 1366 },

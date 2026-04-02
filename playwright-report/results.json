@@ -11,7 +11,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 1
+      "actualWorkers": 4
     },
     "preserveOutput": "always",
     "reporter": [
@@ -46,7 +46,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "chromium",
         "name": "chromium",
@@ -64,7 +64,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "chrome-latest",
         "name": "chrome-latest",
@@ -82,7 +82,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "msedge-latest",
         "name": "msedge-latest",
@@ -100,7 +100,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "firefox",
         "name": "firefox",
@@ -118,7 +118,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "webkit",
         "name": "webkit",
@@ -136,7 +136,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "ios-mobile",
         "name": "ios-mobile",
@@ -154,7 +154,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 1
+          "actualWorkers": 4
         },
         "id": "android-mobile",
         "name": "android-mobile",
@@ -174,7 +174,11 @@
     "updateSourceMethod": "patch",
     "version": "1.57.0",
     "workers": 5,
-    "webServer": null
+    "webServer": {
+      "command": "npm run dev:vite -- --host 0.0.0.0 --port 4173 --strictPort",
+      "url": "http://localhost:4173",
+      "reuseExistingServer": true
+    }
   },
   "suites": [
     {
@@ -187,81 +191,190 @@
         {
           "title": "amro aircraft CRUD smoke",
           "file": "tests/e2e/amro-overview-dashboard.spec.ts",
-          "line": 91,
+          "line": 122,
           "column": 6,
           "specs": [
             {
-              "title": "navigates unified aircraft module rail for all standardized workspaces",
-              "ok": false,
+              "title": "captures whitespace-regression evidence across aircraft forms and responsive breakpoints",
+              "ok": true,
               "tags": [],
               "tests": [
                 {
-                  "timeout": 30000,
-                  "annotations": [],
-                  "expectedStatus": "passed",
+                  "timeout": 240000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Aircraft header actions are unavailable in this environment profile",
+                      "location": {
+                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                        "line": 153,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
                   "projectId": "chromium",
                   "projectName": "chromium",
                   "results": [
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "failed",
-                      "duration": 436,
-                      "error": {
-                        "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:4173/dashboard/amro/aircraft/list\nCall log:\n\u001b[2m  - navigating to \"http://localhost:4173/dashboard/amro/aircraft/list\", waiting until \"load\"\u001b[22m\n",
-                        "stack": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:4173/dashboard/amro/aircraft/list\nCall log:\n\u001b[2m  - navigating to \"http://localhost:4173/dashboard/amro/aircraft/list\", waiting until \"load\"\u001b[22m\n\n    at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts:73:16",
-                        "location": {
-                          "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                          "column": 16,
-                          "line": 73
-                        },
-                        "snippet": "\u001b[0m \u001b[90m 71 |\u001b[39m   test(\u001b[32m'navigates unified aircraft module rail for all standardized workspaces'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m 72 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39msetViewportSize({ width\u001b[33m:\u001b[39m \u001b[35m1440\u001b[39m\u001b[33m,\u001b[39m height\u001b[33m:\u001b[39m \u001b[35m900\u001b[39m })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 73 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m'/dashboard/amro/aircraft/list'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 74 |\u001b[39m     \u001b[36mif\u001b[39m (page\u001b[33m.\u001b[39murl()\u001b[33m.\u001b[39mincludes(\u001b[32m'/auth'\u001b[39m)) {\n \u001b[90m 75 |\u001b[39m       \u001b[36mawait\u001b[39m login(page)\u001b[33m;\u001b[39m\n \u001b[90m 76 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m'/dashboard/amro/aircraft/list'\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m"
-                      },
-                      "errors": [
-                        {
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "column": 16,
-                            "line": 73
-                          },
-                          "message": "Error: page.goto: net::ERR_CONNECTION_REFUSED at http://localhost:4173/dashboard/amro/aircraft/list\nCall log:\n\u001b[2m  - navigating to \"http://localhost:4173/dashboard/amro/aircraft/list\", waiting until \"load\"\u001b[22m\n\n\n\u001b[0m \u001b[90m 71 |\u001b[39m   test(\u001b[32m'navigates unified aircraft module rail for all standardized workspaces'\u001b[39m\u001b[33m,\u001b[39m \u001b[36masync\u001b[39m ({ page }) \u001b[33m=>\u001b[39m {\n \u001b[90m 72 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39msetViewportSize({ width\u001b[33m:\u001b[39m \u001b[35m1440\u001b[39m\u001b[33m,\u001b[39m height\u001b[33m:\u001b[39m \u001b[35m900\u001b[39m })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 73 |\u001b[39m     \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m'/dashboard/amro/aircraft/list'\u001b[39m)\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 74 |\u001b[39m     \u001b[36mif\u001b[39m (page\u001b[33m.\u001b[39murl()\u001b[33m.\u001b[39mincludes(\u001b[32m'/auth'\u001b[39m)) {\n \u001b[90m 75 |\u001b[39m       \u001b[36mawait\u001b[39m login(page)\u001b[33m;\u001b[39m\n \u001b[90m 76 |\u001b[39m       \u001b[36mawait\u001b[39m page\u001b[33m.\u001b[39mgoto(\u001b[32m'/dashboard/amro/aircraft/list'\u001b[39m)\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts:73:16\u001b[22m"
-                        }
-                      ],
+                      "status": "skipped",
+                      "duration": 45263,
+                      "errors": [],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-04-01T12:56:16.554Z",
-                      "annotations": [],
-                      "attachments": [
+                      "startTime": "2026-04-02T10:43:32.043Z",
+                      "annotations": [
                         {
-                          "name": "screenshot",
-                          "contentType": "image/png",
-                          "path": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/test-failed-1.png"
-                        },
-                        {
-                          "name": "video",
-                          "contentType": "video/webm",
-                          "path": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/video.webm"
-                        },
-                        {
-                          "name": "trace",
-                          "contentType": "application/zip",
-                          "path": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/trace.zip"
+                          "type": "skip",
+                          "description": "Aircraft header actions are unavailable in this environment profile",
+                          "location": {
+                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                            "line": 153,
+                            "column": 10
+                          }
                         }
                       ],
-                      "errorLocation": {
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                },
+                {
+                  "timeout": 240000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Aircraft header actions are unavailable in this environment profile",
+                      "location": {
                         "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "column": 16,
-                        "line": 73
+                        "line": 153,
+                        "column": 10
                       }
                     }
                   ],
-                  "status": "unexpected"
+                  "expectedStatus": "skipped",
+                  "projectId": "msedge-latest",
+                  "projectName": "msedge-latest",
+                  "results": [
+                    {
+                      "workerIndex": 1,
+                      "parallelIndex": 1,
+                      "status": "skipped",
+                      "duration": 44426,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-04-02T10:43:32.121Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Aircraft header actions are unavailable in this environment profile",
+                          "location": {
+                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                            "line": 153,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                },
+                {
+                  "timeout": 240000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Aircraft header actions are unavailable in this environment profile",
+                      "location": {
+                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                        "line": 153,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "firefox",
+                  "projectName": "firefox",
+                  "results": [
+                    {
+                      "workerIndex": 2,
+                      "parallelIndex": 2,
+                      "status": "skipped",
+                      "duration": 32232,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-04-02T10:43:32.048Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Aircraft header actions are unavailable in this environment profile",
+                          "location": {
+                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                            "line": 153,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
+                },
+                {
+                  "timeout": 240000,
+                  "annotations": [
+                    {
+                      "type": "skip",
+                      "description": "Aircraft header actions are unavailable in this environment profile",
+                      "location": {
+                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                        "line": 153,
+                        "column": 10
+                      }
+                    }
+                  ],
+                  "expectedStatus": "skipped",
+                  "projectId": "webkit",
+                  "projectName": "webkit",
+                  "results": [
+                    {
+                      "workerIndex": 3,
+                      "parallelIndex": 3,
+                      "status": "skipped",
+                      "duration": 44443,
+                      "errors": [],
+                      "stdout": [],
+                      "stderr": [],
+                      "retry": 0,
+                      "startTime": "2026-04-02T10:43:32.936Z",
+                      "annotations": [
+                        {
+                          "type": "skip",
+                          "description": "Aircraft header actions are unavailable in this environment profile",
+                          "location": {
+                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                            "line": 153,
+                            "column": 10
+                          }
+                        }
+                      ],
+                      "attachments": []
+                    }
+                  ],
+                  "status": "skipped"
                 }
               ],
-              "id": "29b7b4c4b3ccbdec0fdb-acfc46cd511ffe19c73a",
+              "id": "29b7b4c4b3ccbdec0fdb-f158a05467306ecde8fe",
               "file": "tests/e2e/amro-overview-dashboard.spec.ts",
-              "line": 92,
+              "line": 220,
               "column": 3
             }
           ]
@@ -271,11 +384,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-04-01T12:56:15.688Z",
-    "duration": 1746.65,
+    "startTime": "2026-04-02T10:43:17.519Z",
+    "duration": 62705.791000000005,
     "expected": 0,
-    "skipped": 0,
-    "unexpected": 1,
+    "skipped": 4,
+    "unexpected": 0,
     "flaky": 0
   }
 }
