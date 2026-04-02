@@ -1473,6 +1473,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   it('routes each aircraft sub-module to its dedicated interface without cross-module content leakage', async () => {
     renderAircraftSubModulePage('/dashboard/amro/aircraft/list');
     expect(await screen.findByLabelText('Unified module search', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New Aircraft Record' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New Aircraft Record' })).toBeEnabled();
     expect(screen.queryByText(/Aircraft · Aircraft List/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Standardized aircraft list controls/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/Locale: EN/i)).not.toBeInTheDocument();
@@ -1519,6 +1521,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Templates' }));
     expect(await screen.findByRole('heading', { name: 'Aircraft Template Registry' }, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'New Template' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Template aircraft type')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Template manufacturer')).not.toBeInTheDocument();
 
@@ -1526,6 +1529,15 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(await screen.findByLabelText('Unified module search')).toBeInTheDocument();
     expect(screen.queryByLabelText('Records per page')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Unified module search')).toHaveValue('A320');
+  });
+
+  it('disables unified New action in aircraft sub-module when create permissions are missing', async () => {
+    mockHasPermission.mockImplementation(() => false);
+    renderAircraftSubModulePage('/dashboard/amro/aircraft/list');
+    expect(await screen.findByLabelText('Unified module search', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    const newButton = screen.getByRole('button', { name: 'New Aircraft Record' });
+    expect(newButton).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'New Aircraft Record' })).toBeDisabled();
   });
 
   it('renders aircraft templates workspace and validates required create fields', async () => {

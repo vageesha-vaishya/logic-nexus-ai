@@ -1,42 +1,60 @@
-<testsuites id="" name="" tests="4" failures="0" skipped="4" errors="0" time="62.705791000000005">
-<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-04-02T10:43:24.737Z" hostname="chromium" tests="1" failures="0" skipped="1" time="45.263" errors="0">
-<testcase name="amro aircraft CRUD smoke › captures whitespace-regression evidence across aircraft forms and responsive breakpoints" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="45.263">
-<properties>
-<property name="skip" value="Aircraft header actions are unavailable in this environment profile">
-</property>
-</properties>
-<skipped>
-</skipped>
-</testcase>
-</testsuite>
-<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-04-02T10:43:24.737Z" hostname="msedge-latest" tests="1" failures="0" skipped="1" time="44.426" errors="0">
-<testcase name="amro aircraft CRUD smoke › captures whitespace-regression evidence across aircraft forms and responsive breakpoints" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="44.426">
-<properties>
-<property name="skip" value="Aircraft header actions are unavailable in this environment profile">
-</property>
-</properties>
-<skipped>
-</skipped>
-</testcase>
-</testsuite>
-<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-04-02T10:43:24.737Z" hostname="firefox" tests="1" failures="0" skipped="1" time="32.232" errors="0">
-<testcase name="amro aircraft CRUD smoke › captures whitespace-regression evidence across aircraft forms and responsive breakpoints" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="32.232">
-<properties>
-<property name="skip" value="Aircraft header actions are unavailable in this environment profile">
-</property>
-</properties>
-<skipped>
-</skipped>
-</testcase>
-</testsuite>
-<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-04-02T10:43:24.737Z" hostname="webkit" tests="1" failures="0" skipped="1" time="44.443" errors="0">
-<testcase name="amro aircraft CRUD smoke › captures whitespace-regression evidence across aircraft forms and responsive breakpoints" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="44.443">
-<properties>
-<property name="skip" value="Aircraft header actions are unavailable in this environment profile">
-</property>
-</properties>
-<skipped>
-</skipped>
+<testsuites id="" name="" tests="1" failures="1" skipped="0" errors="0" time="24.258161">
+<testsuite name="tests/e2e/amro-overview-dashboard.spec.ts" timestamp="2026-04-02T12:00:24.102Z" hostname="chromium" tests="1" failures="1" skipped="0" time="15.492" errors="0">
+<testcase name="amro aircraft CRUD smoke › navigates unified aircraft module rail for all standardized workspaces" classname="tests/e2e/amro-overview-dashboard.spec.ts" time="15.492">
+<failure message="amro-overview-dashboard.spec.ts:123:3 navigates unified aircraft module rail for all standardized workspaces" type="FAILURE">
+<![CDATA[  [chromium] › tests/e2e/amro-overview-dashboard.spec.ts:123:3 › amro aircraft CRUD smoke › navigates unified aircraft module rail for all standardized workspaces 
+
+    Error: expect(locator).toBeVisible() failed
+
+    Locator: getByRole('toolbar', { name: 'Aircraft header actions' })
+    Expected: visible
+    Timeout: 5000ms
+    Error: element(s) not found
+
+    Call log:
+      - Expect "toBeVisible" with timeout 5000ms
+      - waiting for getByRole('toolbar', { name: 'Aircraft header actions' })
+
+
+      91 |
+      92 |     const headerToolbar = page.getByRole('toolbar', { name: 'Aircraft header actions' });
+    > 93 |     await expect(headerToolbar).toBeVisible();
+         |                                 ^
+      94 |     await expect(headerToolbar.getByRole('button', { name: 'Aircraft List' })).toBeVisible();
+      95 |     await expect(headerToolbar.getByRole('button', { name: 'Templates' })).toBeVisible();
+      96 |     await expect(headerToolbar.getByRole('button', { name: 'Engine' })).toBeVisible();
+        at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts:93:33
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: video (video/webm) ──────────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/video.webm
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+]]>
+</failure>
+<system-out>
+<![CDATA[
+[[ATTACHMENT|../test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/test-failed-1.png]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/video.webm]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/error-context.md]]
+
+[[ATTACHMENT|../test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/trace.zip]]
+]]>
+</system-out>
 </testcase>
 </testsuite>
 </testsuites>

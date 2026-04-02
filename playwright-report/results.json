@@ -11,7 +11,7 @@
     "grepInvert": null,
     "maxFailures": 0,
     "metadata": {
-      "actualWorkers": 4
+      "actualWorkers": 1
     },
     "preserveOutput": "always",
     "reporter": [
@@ -46,7 +46,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "chromium",
         "name": "chromium",
@@ -64,7 +64,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "chrome-latest",
         "name": "chrome-latest",
@@ -82,7 +82,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "msedge-latest",
         "name": "msedge-latest",
@@ -100,7 +100,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "firefox",
         "name": "firefox",
@@ -118,7 +118,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "webkit",
         "name": "webkit",
@@ -136,7 +136,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "ios-mobile",
         "name": "ios-mobile",
@@ -154,7 +154,7 @@
         "repeatEach": 1,
         "retries": 0,
         "metadata": {
-          "actualWorkers": 4
+          "actualWorkers": 1
         },
         "id": "android-mobile",
         "name": "android-mobile",
@@ -195,186 +195,82 @@
           "column": 6,
           "specs": [
             {
-              "title": "captures whitespace-regression evidence across aircraft forms and responsive breakpoints",
-              "ok": true,
+              "title": "navigates unified aircraft module rail for all standardized workspaces",
+              "ok": false,
               "tags": [],
               "tests": [
                 {
-                  "timeout": 240000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "Aircraft header actions are unavailable in this environment profile",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 153,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
+                  "timeout": 30000,
+                  "annotations": [],
+                  "expectedStatus": "passed",
                   "projectId": "chromium",
                   "projectName": "chromium",
                   "results": [
                     {
                       "workerIndex": 0,
                       "parallelIndex": 0,
-                      "status": "skipped",
-                      "duration": 45263,
-                      "errors": [],
+                      "status": "failed",
+                      "duration": 15492,
+                      "error": {
+                        "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('toolbar', { name: 'Aircraft header actions' })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('toolbar', { name: 'Aircraft header actions' })\u001b[22m\n",
+                        "stack": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('toolbar', { name: 'Aircraft header actions' })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('toolbar', { name: 'Aircraft header actions' })\u001b[22m\n\n    at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts:93:33",
+                        "location": {
+                          "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                          "column": 33,
+                          "line": 93
+                        },
+                        "snippet": "\u001b[0m \u001b[90m 91 |\u001b[39m\n \u001b[90m 92 |\u001b[39m     \u001b[36mconst\u001b[39m headerToolbar \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m'toolbar'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'Aircraft header actions'\u001b[39m })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 93 |\u001b[39m     \u001b[36mawait\u001b[39m expect(headerToolbar)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 94 |\u001b[39m     \u001b[36mawait\u001b[39m expect(headerToolbar\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'Aircraft List'\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 95 |\u001b[39m     \u001b[36mawait\u001b[39m expect(headerToolbar\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'Templates'\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 96 |\u001b[39m     \u001b[36mawait\u001b[39m expect(headerToolbar\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'Engine'\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m"
+                      },
+                      "errors": [
+                        {
+                          "location": {
+                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
+                            "column": 33,
+                            "line": 93
+                          },
+                          "message": "Error: \u001b[2mexpect(\u001b[22m\u001b[31mlocator\u001b[39m\u001b[2m).\u001b[22mtoBeVisible\u001b[2m(\u001b[22m\u001b[2m)\u001b[22m failed\n\nLocator: getByRole('toolbar', { name: 'Aircraft header actions' })\nExpected: visible\nTimeout: 5000ms\nError: element(s) not found\n\nCall log:\n\u001b[2m  - Expect \"toBeVisible\" with timeout 5000ms\u001b[22m\n\u001b[2m  - waiting for getByRole('toolbar', { name: 'Aircraft header actions' })\u001b[22m\n\n\n\u001b[0m \u001b[90m 91 |\u001b[39m\n \u001b[90m 92 |\u001b[39m     \u001b[36mconst\u001b[39m headerToolbar \u001b[33m=\u001b[39m page\u001b[33m.\u001b[39mgetByRole(\u001b[32m'toolbar'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'Aircraft header actions'\u001b[39m })\u001b[33m;\u001b[39m\n\u001b[31m\u001b[1m>\u001b[22m\u001b[39m\u001b[90m 93 |\u001b[39m     \u001b[36mawait\u001b[39m expect(headerToolbar)\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m    |\u001b[39m                                 \u001b[31m\u001b[1m^\u001b[22m\u001b[39m\n \u001b[90m 94 |\u001b[39m     \u001b[36mawait\u001b[39m expect(headerToolbar\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'Aircraft List'\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 95 |\u001b[39m     \u001b[36mawait\u001b[39m expect(headerToolbar\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'Templates'\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\n \u001b[90m 96 |\u001b[39m     \u001b[36mawait\u001b[39m expect(headerToolbar\u001b[33m.\u001b[39mgetByRole(\u001b[32m'button'\u001b[39m\u001b[33m,\u001b[39m { name\u001b[33m:\u001b[39m \u001b[32m'Engine'\u001b[39m }))\u001b[33m.\u001b[39mtoBeVisible()\u001b[33m;\u001b[39m\u001b[0m\n\u001b[2m    at /Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts:93:33\u001b[22m"
+                        }
+                      ],
                       "stdout": [],
                       "stderr": [],
                       "retry": 0,
-                      "startTime": "2026-04-02T10:43:32.043Z",
-                      "annotations": [
+                      "startTime": "2026-04-02T12:00:26.685Z",
+                      "annotations": [],
+                      "attachments": [
                         {
-                          "type": "skip",
-                          "description": "Aircraft header actions are unavailable in this environment profile",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 153,
-                            "column": 10
-                          }
+                          "name": "screenshot",
+                          "contentType": "image/png",
+                          "path": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/test-failed-1.png"
+                        },
+                        {
+                          "name": "video",
+                          "contentType": "video/webm",
+                          "path": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/video.webm"
+                        },
+                        {
+                          "name": "error-context",
+                          "contentType": "text/markdown",
+                          "path": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/error-context.md"
+                        },
+                        {
+                          "name": "trace",
+                          "contentType": "application/zip",
+                          "path": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/test-results/playwright/tests-e2e-amro-overview-da-b26a8-all-standardized-workspaces-chromium/trace.zip"
                         }
                       ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 240000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "Aircraft header actions are unavailable in this environment profile",
-                      "location": {
+                      "errorLocation": {
                         "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 153,
-                        "column": 10
+                        "column": 33,
+                        "line": 93
                       }
                     }
                   ],
-                  "expectedStatus": "skipped",
-                  "projectId": "msedge-latest",
-                  "projectName": "msedge-latest",
-                  "results": [
-                    {
-                      "workerIndex": 1,
-                      "parallelIndex": 1,
-                      "status": "skipped",
-                      "duration": 44426,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-04-02T10:43:32.121Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "Aircraft header actions are unavailable in this environment profile",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 153,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 240000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "Aircraft header actions are unavailable in this environment profile",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 153,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "firefox",
-                  "projectName": "firefox",
-                  "results": [
-                    {
-                      "workerIndex": 2,
-                      "parallelIndex": 2,
-                      "status": "skipped",
-                      "duration": 32232,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-04-02T10:43:32.048Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "Aircraft header actions are unavailable in this environment profile",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 153,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
-                },
-                {
-                  "timeout": 240000,
-                  "annotations": [
-                    {
-                      "type": "skip",
-                      "description": "Aircraft header actions are unavailable in this environment profile",
-                      "location": {
-                        "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                        "line": 153,
-                        "column": 10
-                      }
-                    }
-                  ],
-                  "expectedStatus": "skipped",
-                  "projectId": "webkit",
-                  "projectName": "webkit",
-                  "results": [
-                    {
-                      "workerIndex": 3,
-                      "parallelIndex": 3,
-                      "status": "skipped",
-                      "duration": 44443,
-                      "errors": [],
-                      "stdout": [],
-                      "stderr": [],
-                      "retry": 0,
-                      "startTime": "2026-04-02T10:43:32.936Z",
-                      "annotations": [
-                        {
-                          "type": "skip",
-                          "description": "Aircraft header actions are unavailable in this environment profile",
-                          "location": {
-                            "file": "/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/amro-overview-dashboard.spec.ts",
-                            "line": 153,
-                            "column": 10
-                          }
-                        }
-                      ],
-                      "attachments": []
-                    }
-                  ],
-                  "status": "skipped"
+                  "status": "unexpected"
                 }
               ],
-              "id": "29b7b4c4b3ccbdec0fdb-f158a05467306ecde8fe",
+              "id": "29b7b4c4b3ccbdec0fdb-acfc46cd511ffe19c73a",
               "file": "tests/e2e/amro-overview-dashboard.spec.ts",
-              "line": 220,
+              "line": 123,
               "column": 3
             }
           ]
@@ -384,11 +280,11 @@
   ],
   "errors": [],
   "stats": {
-    "startTime": "2026-04-02T10:43:17.519Z",
-    "duration": 62705.791000000005,
+    "startTime": "2026-04-02T12:00:20.022Z",
+    "duration": 24258.161,
     "expected": 0,
-    "skipped": 4,
-    "unexpected": 0,
+    "skipped": 0,
+    "unexpected": 1,
     "flaky": 0
   }
 }

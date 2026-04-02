@@ -130,8 +130,6 @@ import { AircraftActionPalette, type AircraftPaletteAction } from './amro-settin
 import { AircraftWorkPackageCreateDialog } from './amro-settings-master-data/components/AircraftWorkPackageCreateDialog';
 import { WorkPackageTemplateCreateSection } from './amro-settings-master-data/components/WorkPackageTemplateCreateSection';
 import {
-  AircraftUnifiedLayout,
-  type AircraftUnifiedDynamicFilter,
   filterUnifiedModuleRows,
   type AircraftUnifiedFilterOption,
   type AircraftUnifiedLayoutLabels,
@@ -861,12 +859,6 @@ const AIRCRAFT_UNIFIED_STATUS_OPTIONS: AircraftUnifiedFilterOption[] = [
   { value: 'compliant', label: 'Compliant' },
 ];
 
-const AIRCRAFT_UNIFIED_LOCALE_OPTIONS: AircraftUnifiedFilterOption[] = [
-  { value: 'en', label: 'English' },
-  { value: 'es', label: 'Español' },
-  { value: 'fr', label: 'Français' },
-];
-
 const AIRCRAFT_UNIFIED_LAYOUT_I18N: Record<string, AircraftUnifiedLayoutLabels> = {
   en: {
     searchPlaceholder: 'Search in active module',
@@ -1484,6 +1476,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
   const canEscalateAircraftOps = hasPermission('approve_work_orders');
+  const canCreateAircraftRecords = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
   const canManageAircraftTemplates = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
   const canDeleteAircraftTemplates = hasPermission('approve_work_orders') || hasPermission('delete_flight_logs');
   const canManageAircraftLeads = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
@@ -3975,6 +3968,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   );
 
   const handleOpenCreateModal = useCallback(() => {
+    if (!canCreateAircraftRecords) {
+      toast.error('You do not have permission to create records');
+      return;
+    }
     setBusyAction('create');
     if (entity === 'flight_logs') {
       const aircraftIdHint = flightAircraftFilter.trim();
@@ -3993,7 +3990,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setActiveFormTab('basic');
     setModalOpen(true);
     setBusyAction(null);
-  }, [entity, flightAircraftFilter]);
+  }, [canCreateAircraftRecords, entity, flightAircraftFilter]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -6125,68 +6122,44 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (aircraftSubModuleSegment === 'work-packages') return 'work-packages';
     return 'list';
   }, [aircraftSubModuleSegment]);
-  const aircraftUnifiedSubtitles = useMemo<Record<AircraftUnifiedLayoutModuleKey, string>>(
-    () => ({
-      list: 'Standardized aircraft list controls, KPI telemetry, and governed navigation for fleet operations.',
-      templates: 'Reusable aircraft template registry with validated create/update/delete flows.',
-      engine: 'Engine lifecycle analytics, scheduling risk insights, and integrated compliance tracking.',
-      components: 'Component monitoring, reliability drill-down, replacement telemetry, and alerts.',
-      documents: 'Documents workspace with unified filtering, status controls, and publication actions.',
-      'ad-sb': 'AD/SB compliance monitoring with role-based control actions and audit-ready status views.',
-      'work-packages': 'Maintenance planning orchestration with New WP, Existing WP, and non-performed task workflows.',
-    }),
-    [],
-  );
-  const aircraftUnifiedActions = useMemo<AircraftPaletteAction[]>(() => {
+  const canOpenAircraftSubModuleCreateAction = useMemo(() => {
     if (activeAircraftUnifiedModuleKey === 'templates') {
-      return [
-        {
-          id: 'refresh-template-registry',
-          label: 'Refresh',
-          icon: <RefreshCw className={cn('h-3.5 w-3.5', aircraftTemplateLoading && 'animate-spin')} aria-hidden="true" />,
-          group: 'secondary',
-          disabled: aircraftTemplateLoading,
-          onAction: async () => {
-            await loadAircraftTemplatesWorkspace();
-          },
-        },
-        {
-          id: 'new-template-registry',
-          label: 'New Template',
-          icon: <Plus className="h-3.5 w-3.5" aria-hidden="true" />,
-          group: 'primary',
-          permission: 'edit_aircraft_records',
-          disabled: !canManageAircraftTemplates,
-          onAction: async () => {
-            openCreateAircraftTemplateDialog();
-          },
-        },
-      ];
+      return canManageAircraftTemplates;
     }
     if (activeAircraftUnifiedModuleKey === 'work-packages') {
-      return [
-        {
-          id: 'create-work-package-unified',
-          label: 'Create Work Package',
-          icon: <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />,
-          group: 'primary',
-          permission: 'create_maintenance_request',
-          onAction: async () => {
-            openAircraftWorkPackageDialog();
-          },
-        },
-      ];
+      return canCreateWorkPackage;
     }
-    return aircraftKpiPaletteActions;
-  }, [
-    activeAircraftUnifiedModuleKey,
-    aircraftKpiPaletteActions,
-    aircraftTemplateLoading,
-    canManageAircraftTemplates,
-    loadAircraftTemplatesWorkspace,
-    openAircraftWorkPackageDialog,
-    openCreateAircraftTemplateDialog,
-  ]);
+    return canCreateAircraftRecords;
+  }, [activeAircraftUnifiedModuleKey, canCreateAircraftRecords, canCreateWorkPackage, canManageAircraftTemplates]);
+  const aircraftSubModuleCreateActionLabel = useMemo(() => {
+    if (activeAircraftUnifiedModuleKey === 'templates') {
+      return 'New Template';
+    }
+    if (activeAircraftUnifiedModuleKey === 'work-packages') {
+      return 'New Work Package';
+    }
+    return 'New Aircraft Record';
+  }, [activeAircraftUnifiedModuleKey]);
+  const isAircraftSubModuleCreateActionLoading = useMemo(() => {
+    if (activeAircraftUnifiedModuleKey === 'templates') {
+      return aircraftTemplateDialogSubmitting;
+    }
+    if (activeAircraftUnifiedModuleKey === 'work-packages') {
+      return aircraftWorkPackageSubmitting;
+    }
+    return busyAction === 'create';
+  }, [activeAircraftUnifiedModuleKey, aircraftTemplateDialogSubmitting, aircraftWorkPackageSubmitting, busyAction]);
+  const handleAircraftSubModuleCreateAction = useCallback(() => {
+    if (activeAircraftUnifiedModuleKey === 'templates') {
+      openCreateAircraftTemplateDialog();
+      return;
+    }
+    if (activeAircraftUnifiedModuleKey === 'work-packages') {
+      openAircraftWorkPackageDialog();
+      return;
+    }
+    handleOpenCreateModal();
+  }, [activeAircraftUnifiedModuleKey, handleOpenCreateModal, openAircraftWorkPackageDialog, openCreateAircraftTemplateDialog]);
   useEffect(() => {
     if (activeAircraftUnifiedModuleKey !== 'list') {
       return;
@@ -6395,82 +6368,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftUnifiedDocumentCategoryFilter('all');
     setAircraftUnifiedAdSbComplianceFilter('all');
   }, []);
-  const aircraftUnifiedDynamicFilters = useMemo<AircraftUnifiedDynamicFilter[]>(() => {
-    if (activeAircraftUnifiedModuleKey === 'list') {
-      return [
-        {
-          id: 'list-page-size',
-          type: 'select',
-          value: pageSize,
-          onValueChange: setPageSize,
-          ariaLabel: 'Records per page',
-          options: [
-            { value: '25', label: '25 / page' },
-            { value: '50', label: '50 / page' },
-            { value: '100', label: '100 / page' },
-          ],
-          className: 'w-[140px] xl:w-[120px]',
-        },
-      ];
-    }
-    if (activeAircraftUnifiedModuleKey === 'templates') {
-      return [
-        {
-          id: 'template-type',
-          type: 'select',
-          value: aircraftUnifiedTemplateTypeFilter,
-          onValueChange: setAircraftUnifiedTemplateTypeFilter,
-          ariaLabel: 'Template aircraft type',
-          options: aircraftTemplateTypeOptions,
-        },
-        {
-          id: 'template-manufacturer',
-          type: 'select',
-          value: aircraftUnifiedTemplateManufacturerFilter,
-          onValueChange: setAircraftUnifiedTemplateManufacturerFilter,
-          ariaLabel: 'Template manufacturer',
-          options: aircraftTemplateManufacturerOptions,
-        },
-      ];
-    }
-    if (activeAircraftUnifiedModuleKey === 'documents') {
-      return [
-        {
-          id: 'document-category',
-          type: 'select',
-          value: aircraftUnifiedDocumentCategoryFilter,
-          onValueChange: setAircraftUnifiedDocumentCategoryFilter,
-          ariaLabel: 'Document category',
-          options: aircraftDocumentCategoryOptions,
-        },
-      ];
-    }
-    if (activeAircraftUnifiedModuleKey === 'ad-sb') {
-      return [
-        {
-          id: 'ad-sb-compliance',
-          type: 'select',
-          value: aircraftUnifiedAdSbComplianceFilter,
-          onValueChange: setAircraftUnifiedAdSbComplianceFilter,
-          ariaLabel: 'AD/SB compliance state',
-          options: aircraftAdSbComplianceOptions,
-        },
-      ];
-    }
-    return [];
-  }, [
-    activeAircraftUnifiedModuleKey,
-    aircraftAdSbComplianceOptions,
-    aircraftDocumentCategoryOptions,
-    aircraftTemplateManufacturerOptions,
-    aircraftTemplateTypeOptions,
-    aircraftUnifiedAdSbComplianceFilter,
-    aircraftUnifiedDocumentCategoryFilter,
-    aircraftUnifiedTemplateManufacturerFilter,
-    aircraftUnifiedTemplateTypeFilter,
-    pageSize,
-    setPageSize,
-  ]);
   const aircraftUnifiedResultSummary = useMemo(() => {
     if (activeAircraftUnifiedModuleKey === 'templates') {
       return { visible: filteredAircraftTemplateRows.length, total: aircraftTemplateRows.length };
@@ -6565,47 +6462,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </TabsList>
           </Tabs>
         ) : null}
-        {entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule ? (
-          <AircraftUnifiedLayout
-            title={`Aircraft · ${AIRCRAFT_NAV_RAIL.find((item) => item.path === currentAircraftNavPath)?.label || 'Workspace'}`}
-            subtitle={aircraftUnifiedSubtitles[activeAircraftUnifiedModuleKey]}
-            activeModuleKey={activeAircraftUnifiedModuleKey}
-            navItems={AIRCRAFT_NAV_RAIL.map((item) => ({
-              key: item.path.split('/').pop() === 'work-packages' ? 'work-packages' : (item.path.split('/').pop() as AircraftUnifiedLayoutModuleKey),
-              label: item.label,
-              path: item.path,
-              icon: item.icon,
-            }))}
-            onNavigate={handleAircraftContextNavigation}
-            searchValue={aircraftUnifiedSearch}
-            onSearchChange={setAircraftUnifiedSearch}
-            statusValue={aircraftUnifiedStatusFilter}
-            onStatusChange={setAircraftUnifiedStatusFilter}
-            statusOptions={aircraftUnifiedStatusOptions}
-            localeValue={aircraftUnifiedLocale}
-            onLocaleChange={setAircraftUnifiedLocale}
-            localeOptions={AIRCRAFT_UNIFIED_LOCALE_OPTIONS}
-            actions={aircraftUnifiedActions}
-            hasPermission={hasPermission}
-            loading={aircraftDashboardLoading || aircraftTemplateLoading}
-            error={aircraftTemplateError || aircraftDashboardError}
-            resultSummary={aircraftUnifiedResultSummary}
-            onClearFilters={clearAircraftUnifiedFilters}
-            labels={aircraftUnifiedLabels}
-            dynamicFilters={aircraftUnifiedDynamicFilters}
-            showHeaderSummary={false}
-            showNavRail={false}
-            showSearchControls={false}
-            showResultSummary={false}
-            showLocaleSelector={false}
-            showDynamicFilters={false}
-            showActions={false}
-            showClearFilters={false}
-          >
-            <></>
-          </AircraftUnifiedLayout>
-        ) : null}
-
         {entity === 'aircraft' && aircraftEnhancementEnabled ? (
           <Card className="mdm-template-panel">
             <CardHeader className="mdm-template-panel-head">
@@ -7368,6 +7224,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     >
                       {aircraftUnifiedLabels.clearFilters}
                     </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="default"
+                  onClick={handleAircraftSubModuleCreateAction}
+                  disabled={!canOpenAircraftSubModuleCreateAction || isAircraftSubModuleCreateActionLoading}
+                  aria-label={aircraftSubModuleCreateActionLabel}
+                  aria-busy={isAircraftSubModuleCreateActionLoading}
+                  className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
+                >
+                  {isAircraftSubModuleCreateActionLoading ? 'Creating…' : 'New'}
+                </Button>
                   </div>
                   <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[hsl(var(--mdm-template-muted))]">
                     <span>

@@ -115,6 +115,7 @@ test.describe('amro aircraft CRUD smoke', () => {
       await expect(page.getByText(/Aircraft ·/).first()).toHaveCount(0);
       await expect(page.getByLabel('Unified module search')).toBeVisible();
       await expect(page.getByLabel('Unified module status filter')).toBeVisible();
+      await expect(page.getByRole('button', { name: /^New / })).toBeVisible();
       await expect(page.getByLabel('Unified module locale selector')).toHaveCount(0);
       await expect(page.getByRole('button', { name: 'Clear filters' })).toHaveCount(0);
       await expect(page.getByLabel('Records per page')).toHaveCount(0);
