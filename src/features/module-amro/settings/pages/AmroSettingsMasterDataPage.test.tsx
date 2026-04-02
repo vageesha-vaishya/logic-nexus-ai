@@ -902,10 +902,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       }
     }
 
-    expect(screen.queryByLabelText(/Refresh records/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Export CSV/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Export PDF/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Run Bulk Import/ })).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
   });
 
   it('renders aircraft sub-module as standalone AMRO surface without entity tabs', async () => {
@@ -970,6 +968,30 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
     expect(mockToastSuccess).toHaveBeenCalledWith('Parts Inventory record created');
+  });
+
+  it('renders unified control row for non-aircraft master data entities and applies search filter behavior', async () => {
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/parts-inventory']} future={memoryRouterFuture}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByLabelText('Unified module search', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /New Parts Inventory/i })).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Unified module search'), { target: { value: 'PART-999' } });
+    await waitFor(() => {
+      expect(screen.queryByText('PART-100')).not.toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    await waitFor(() => {
+      expect(screen.getByText('PART-100')).toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('renders manufacturer and assembly type dropdown options for model creation', async () => {
@@ -1488,6 +1510,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Engine' }));
     expect(await screen.findByText(/View: engine/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
     expect(screen.getByText(/TBO Remaining:/i)).toBeInTheDocument();
     expect(screen.getByText(/Engine Lifecycle Management/i)).toBeInTheDocument();
     expect(screen.getByText(/Maintenance Scheduling & Tracking/i)).toBeInTheDocument();
@@ -1503,24 +1527,32 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Components' }));
     expect(await screen.findByText(/View: components/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
     expect(screen.getByText(/AD\/SB Compliance:/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('Records per page')).not.toBeInTheDocument();
     expect(screen.queryByText(/Document Repository/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Documents' }));
     expect(await screen.findByText(/Documents Management/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
     expect(screen.getByText(/Document Repository/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('Document category')).not.toBeInTheDocument();
     expect(screen.queryByText(/Engine Drill-down/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'AD/SB' }));
     expect(await screen.findByText(/AD\/SB Management/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
     expect(screen.getByText(/AD\/SB Compliance Management/i)).toBeInTheDocument();
     expect(screen.queryByLabelText('AD/SB compliance state')).not.toBeInTheDocument();
     expect(screen.queryByText(/Document Repository/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Templates' }));
     expect(await screen.findByRole('heading', { name: 'Aircraft Template Registry' }, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'New Template' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Template aircraft type')).not.toBeInTheDocument();
     expect(screen.queryByLabelText('Template manufacturer')).not.toBeInTheDocument();
@@ -1545,6 +1577,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     expect(await screen.findByRole('heading', { name: 'Aircraft Template Registry' }, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(await screen.findByText('A320 Line Template')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module search')).toBeInTheDocument();
+    expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'New Template' }));
     const dialog = await screen.findByRole('dialog');

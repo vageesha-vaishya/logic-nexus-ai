@@ -64,7 +64,6 @@ import {
   ListChecks,
   Plus,
   RefreshCw,
-  Search,
   SlidersHorizontal,
   TimerReset,
   Trash2,
@@ -127,6 +126,8 @@ import {
 import { FlightLogsFilters } from './amro-settings-master-data/components/FlightLogsFilters';
 import { AircraftLeadsManager, type AircraftLeadsTab } from './amro-settings-master-data/components/AircraftLeadsManager';
 import { AircraftActionPalette, type AircraftPaletteAction } from './amro-settings-master-data/components/AircraftActionPalette';
+import { AircraftDataTableFrame } from './amro-settings-master-data/components/AircraftDataTableFrame';
+import { AircraftListingControls } from './amro-settings-master-data/components/AircraftListingControls';
 import { AircraftWorkPackageCreateDialog } from './amro-settings-master-data/components/AircraftWorkPackageCreateDialog';
 import { WorkPackageTemplateCreateSection } from './amro-settings-master-data/components/WorkPackageTemplateCreateSection';
 import {
@@ -892,6 +893,39 @@ const AIRCRAFT_UNIFIED_LAYOUT_I18N: Record<string, AircraftUnifiedLayoutLabels> 
   },
 };
 
+const MASTER_DATA_CONTROLS_I18N: Record<string, AircraftUnifiedLayoutLabels> = {
+  en: {
+    searchPlaceholder: 'Search in active module',
+    searchAriaLabel: 'Unified module search',
+    statusAriaLabel: 'Unified module status filter',
+    localeAriaLabel: 'Unified module locale selector',
+    navAriaLabel: 'Unified module navigation',
+    clearFilters: 'Clear filters',
+    loadingMessage: 'Loading module data…',
+    resultLabel: 'records',
+  },
+  es: {
+    searchPlaceholder: 'Buscar en el módulo activo',
+    searchAriaLabel: 'Búsqueda del módulo unificado',
+    statusAriaLabel: 'Filtro de estado del módulo unificado',
+    localeAriaLabel: 'Selector de idioma del módulo unificado',
+    navAriaLabel: 'Navegación de módulos unificados',
+    clearFilters: 'Limpiar filtros',
+    loadingMessage: 'Cargando datos del módulo…',
+    resultLabel: 'registros',
+  },
+  fr: {
+    searchPlaceholder: 'Rechercher dans le module actif',
+    searchAriaLabel: 'Recherche du module unifié',
+    statusAriaLabel: 'Filtre de statut du module unifié',
+    localeAriaLabel: 'Sélecteur de langue du module unifié',
+    navAriaLabel: 'Navigation du module unifié',
+    clearFilters: 'Réinitialiser les filtres',
+    loadingMessage: 'Chargement des données du module…',
+    resultLabel: 'enregistrements',
+  },
+};
+
 
 const MANUFACTURER_SEED_NAMES = [
   'AIRBUS',
@@ -1442,7 +1476,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const aircraftColumnPreferencesHydratedRef = useRef(false);
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
-  const masterSearchFieldRef = useRef<HTMLInputElement | null>(null);
   const recordsRequestControllerRef = useRef<AbortController | null>(null);
   const recordsRequestIdRef = useRef(0);
   const rowsRenderSignatureRef = useRef('');
@@ -1534,6 +1567,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const showAircraftComponentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'components';
   const showAircraftDocumentsWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'documents';
   const showAircraftAdSbWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'ad-sb';
+  const showAircraftUnifiedControlsInOperationsCard = entity === 'aircraft'
+    && aircraftEnhancementEnabled
+    && isAircraftSubModule
+    && aircraftSubModuleSegment !== 'list'
+    && aircraftSubModuleSegment !== 'templates';
   const showAircraftOperationsOverview = !showAircraftEngineWorkspace && !showAircraftComponentsWorkspace && !showAircraftDocumentsWorkspace && !showAircraftAdSbWorkspace && !showAircraftTemplatesWorkspace;
   const showAircraftOperationsOverviewSection = false;
   const handleAircraftViewNavigation = useCallback((tab: AircraftLeadsTab) => {
@@ -1545,13 +1583,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setAircraftLeadsActiveTab(tab);
       setAircraftNavigationView('module');
       window.requestAnimationFrame(() => {
-        masterSearchFieldRef.current?.focus();
+        focusUnifiedMasterSearch();
       });
       return;
     }
     setAircraftLeadsActiveTab(tab);
     setAircraftNavigationView(tab);
   }, [isAircraftSubModule, location.search, navigate]);
+  const focusUnifiedMasterSearch = useCallback(() => {
+    const field = document.querySelector<HTMLInputElement>('[aria-label="Unified module search"]');
+    if (field) {
+      field.focus();
+    }
+  }, []);
 
   useEffect(() => {
     if (entity !== 'aircraft') {
@@ -6337,6 +6381,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     () => AIRCRAFT_UNIFIED_LAYOUT_I18N[aircraftUnifiedLocale] || AIRCRAFT_UNIFIED_LAYOUT_I18N.en,
     [aircraftUnifiedLocale],
   );
+  const masterDataControlsLabels = useMemo<AircraftUnifiedLayoutLabels>(
+    () => MASTER_DATA_CONTROLS_I18N[aircraftUnifiedLocale] || MASTER_DATA_CONTROLS_I18N.en,
+    [aircraftUnifiedLocale],
+  );
   const aircraftUnifiedStatusOptions = useMemo<AircraftUnifiedFilterOption[]>(() => {
     if (aircraftUnifiedLocale === 'es') {
       return [
@@ -6360,6 +6408,27 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     return AIRCRAFT_UNIFIED_STATUS_OPTIONS;
   }, [aircraftUnifiedLocale]);
+  const masterDataStatusOptions = useMemo<AircraftUnifiedFilterOption[]>(() => {
+    if (aircraftUnifiedLocale === 'es') {
+      return [
+        { value: 'all', label: 'Todos los estados' },
+        { value: 'active', label: 'Activo' },
+        { value: 'inactive', label: 'Inactivo' },
+      ];
+    }
+    if (aircraftUnifiedLocale === 'fr') {
+      return [
+        { value: 'all', label: 'Tous les statuts' },
+        { value: 'active', label: 'Actif' },
+        { value: 'inactive', label: 'Inactif' },
+      ];
+    }
+    return [
+      { value: 'all', label: 'All Statuses' },
+      { value: 'active', label: 'Active' },
+      { value: 'inactive', label: 'Inactive' },
+    ];
+  }, [aircraftUnifiedLocale]);
   const clearAircraftUnifiedFilters = useCallback(() => {
     setAircraftUnifiedSearch('');
     setAircraftUnifiedStatusFilter('all');
@@ -6367,6 +6436,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftUnifiedTemplateManufacturerFilter('all');
     setAircraftUnifiedDocumentCategoryFilter('all');
     setAircraftUnifiedAdSbComplianceFilter('all');
+  }, []);
+  const clearMasterDataControls = useCallback(() => {
+    setSearch('');
+    setStatusFilter('all');
   }, []);
   const aircraftUnifiedResultSummary = useMemo(() => {
     if (activeAircraftUnifiedModuleKey === 'templates') {
@@ -6468,6 +6541,26 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               <CardTitle className="mdm-template-panel-title">Aircraft Operations Snapshot</CardTitle>
             </CardHeader>
             <CardContent className="mdm-template-panel-body space-y-4">
+              {showAircraftUnifiedControlsInOperationsCard ? (
+                <AircraftListingControls
+                  searchValue={aircraftUnifiedSearch}
+                  onSearchChange={setAircraftUnifiedSearch}
+                  searchPlaceholder={aircraftUnifiedLabels.searchPlaceholder}
+                  searchAriaLabel={aircraftUnifiedLabels.searchAriaLabel}
+                  statusValue={aircraftUnifiedStatusFilter}
+                  onStatusChange={setAircraftUnifiedStatusFilter}
+                  statusAriaLabel={aircraftUnifiedLabels.statusAriaLabel}
+                  statusOptions={aircraftUnifiedStatusOptions}
+                  clearFiltersLabel={aircraftUnifiedLabels.clearFilters}
+                  onClearFilters={clearAircraftUnifiedFilters}
+                  createLabel="New"
+                  createAriaLabel={aircraftSubModuleCreateActionLabel}
+                  onCreate={handleAircraftSubModuleCreateAction}
+                  createDisabled={!canOpenAircraftSubModuleCreateAction}
+                  createLoading={isAircraftSubModuleCreateActionLoading}
+                  resultSummaryText={`${aircraftUnifiedResultSummary.visible}/${aircraftUnifiedResultSummary.total} ${aircraftUnifiedLabels.resultLabel}`}
+                />
+              ) : null}
               <div className="grid gap-4 lg:grid-cols-3">
                 <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
                   <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">Aircraft Identity Sheet</h3>
@@ -7031,6 +7124,24 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               </div>
             </CardHeader>
             <CardContent className="mdm-template-panel-body space-y-3">
+              <AircraftListingControls
+                searchValue={aircraftUnifiedSearch}
+                onSearchChange={setAircraftUnifiedSearch}
+                searchPlaceholder={aircraftUnifiedLabels.searchPlaceholder}
+                searchAriaLabel={aircraftUnifiedLabels.searchAriaLabel}
+                statusValue={aircraftUnifiedStatusFilter}
+                onStatusChange={setAircraftUnifiedStatusFilter}
+                statusAriaLabel={aircraftUnifiedLabels.statusAriaLabel}
+                statusOptions={aircraftUnifiedStatusOptions}
+                clearFiltersLabel={aircraftUnifiedLabels.clearFilters}
+                onClearFilters={clearAircraftUnifiedFilters}
+                createLabel="New"
+                createAriaLabel={aircraftSubModuleCreateActionLabel}
+                onCreate={handleAircraftSubModuleCreateAction}
+                createDisabled={!canOpenAircraftSubModuleCreateAction}
+                createLoading={isAircraftSubModuleCreateActionLoading}
+                resultSummaryText={`${aircraftUnifiedResultSummary.visible}/${aircraftUnifiedResultSummary.total} ${aircraftUnifiedLabels.resultLabel}`}
+              />
               {aircraftTemplateError ? (
                 <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-sm text-destructive">
                   {aircraftTemplateError}
@@ -7088,39 +7199,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         {showAircraftMasterRecords && !(entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule) ? (
         <Card className="mdm-template-panel">
           <CardHeader className="mdm-template-panel-head">
-            <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Search and Filter</CardTitle>
+            <CardTitle className="mdm-template-panel-title">{ENTITY_LABEL[entity]} Advanced Filters</CardTitle>
           </CardHeader>
           <CardContent className="mdm-template-panel-body mdm-template-grid-five">
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="amro-master-search" className="mdm-template-label">Search</Label>
-              <Input ref={masterSearchFieldRef} id="amro-master-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search..." className="mdm-template-input" />
-            </div>
-            <div className="space-y-2">
-              <Label className="mdm-template-label">Status</Label>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-                <SelectTrigger className="mdm-template-input">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All</SelectItem>
-                  <SelectItem value="active">Active</SelectItem>
-                  <SelectItem value="inactive">Inactive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-2">
-              <Label className="mdm-template-label">Page Size</Label>
-              <Select value={pageSize} onValueChange={setPageSize}>
-                <SelectTrigger className="mdm-template-input">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="25">25</SelectItem>
-                  <SelectItem value="50">50</SelectItem>
-                  <SelectItem value="100">100</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
             {entity === 'flight_logs' ? (
               <FlightLogsFilters
                 flightDateFrom={flightDateFrom}
@@ -7185,66 +7266,50 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
           </CardHeader>
           <CardContent className="mdm-template-panel-body space-y-3">
-            <div className="rounded-md border">
-              {entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule ? (
-                <div className="border-b border-[hsl(var(--mdm-template-border))] bg-background/70 p-2">
-                  <div className="flex items-center gap-2 overflow-x-auto xl:flex-nowrap xl:overflow-visible">
-                    <div className="min-w-[260px] flex-1 shrink-0 xl:min-w-[200px]">
-                      <div className="relative">
-                        <Search className="pointer-events-none absolute left-2 top-2 h-4 w-4 text-muted-foreground" />
-                        <Input
-                          value={aircraftUnifiedSearch}
-                          onChange={(event) => setAircraftUnifiedSearch(event.target.value)}
-                          placeholder={aircraftUnifiedLabels.searchPlaceholder}
-                          className="pl-8"
-                          aria-label={aircraftUnifiedLabels.searchAriaLabel}
-                        />
-                      </div>
-                    </div>
-                    <div className="w-[160px] shrink-0 xl:w-[140px]">
-                      <Select value={aircraftUnifiedStatusFilter} onValueChange={setAircraftUnifiedStatusFilter}>
-                        <SelectTrigger aria-label={aircraftUnifiedLabels.statusAriaLabel}>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {aircraftUnifiedStatusOptions.map((option) => (
-                            <SelectItem key={`records-status-option-${option.value}`} value={option.value}>
-                              {option.label}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="outline"
-                      onClick={clearAircraftUnifiedFilters}
-                      className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
-                    >
-                      {aircraftUnifiedLabels.clearFilters}
-                    </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="default"
-                  onClick={handleAircraftSubModuleCreateAction}
-                  disabled={!canOpenAircraftSubModuleCreateAction || isAircraftSubModuleCreateActionLoading}
-                  aria-label={aircraftSubModuleCreateActionLabel}
-                  aria-busy={isAircraftSubModuleCreateActionLoading}
-                  className="h-9 shrink-0 px-3 xl:h-8 xl:px-2 xl:text-xs"
-                >
-                  {isAircraftSubModuleCreateActionLoading ? 'Creating…' : 'New'}
-                </Button>
-                  </div>
-                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2 text-xs text-[hsl(var(--mdm-template-muted))]">
-                    <span>
-                      {`${aircraftUnifiedResultSummary.visible}/${aircraftUnifiedResultSummary.total} ${aircraftUnifiedLabels.resultLabel}`}
-                    </span>
-                  </div>
-                </div>
-              ) : null}
-              <div className="overflow-auto max-h-[560px]">
+            <AircraftDataTableFrame
+              controls={
+                entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule
+                  ? (
+                    <AircraftListingControls
+                      searchValue={aircraftUnifiedSearch}
+                      onSearchChange={setAircraftUnifiedSearch}
+                      searchPlaceholder={aircraftUnifiedLabels.searchPlaceholder}
+                      searchAriaLabel={aircraftUnifiedLabels.searchAriaLabel}
+                      statusValue={aircraftUnifiedStatusFilter}
+                      onStatusChange={setAircraftUnifiedStatusFilter}
+                      statusAriaLabel={aircraftUnifiedLabels.statusAriaLabel}
+                      statusOptions={aircraftUnifiedStatusOptions}
+                      clearFiltersLabel={aircraftUnifiedLabels.clearFilters}
+                      onClearFilters={clearAircraftUnifiedFilters}
+                      createLabel="New"
+                      createAriaLabel={aircraftSubModuleCreateActionLabel}
+                      onCreate={handleAircraftSubModuleCreateAction}
+                      createDisabled={!canOpenAircraftSubModuleCreateAction}
+                      createLoading={isAircraftSubModuleCreateActionLoading}
+                      resultSummaryText={`${aircraftUnifiedResultSummary.visible}/${aircraftUnifiedResultSummary.total} ${aircraftUnifiedLabels.resultLabel}`}
+                    />
+                  )
+                  : (
+                    <AircraftListingControls
+                      searchValue={search}
+                      onSearchChange={setSearch}
+                      searchPlaceholder={masterDataControlsLabels.searchPlaceholder}
+                      searchAriaLabel={masterDataControlsLabels.searchAriaLabel}
+                      statusValue={statusFilter}
+                      onStatusChange={setStatusFilter}
+                      statusAriaLabel={masterDataControlsLabels.statusAriaLabel}
+                      statusOptions={masterDataStatusOptions}
+                      clearFiltersLabel={masterDataControlsLabels.clearFilters}
+                      onClearFilters={clearMasterDataControls}
+                      createLabel={`New ${ENTITY_LABEL[entity]}`}
+                      createAriaLabel={`New ${ENTITY_LABEL[entity]}`}
+                      onCreate={handleOpenCreateModal}
+                      createLoading={busyAction === 'create'}
+                      resultSummaryText={`${renderedRows.length}/${rows.length} ${masterDataControlsLabels.resultLabel}`}
+                    />
+                  )
+              }
+            >
                 <Table className="table-fixed">
                   <colgroup>
                     <col className="w-[52px]" />
@@ -7473,8 +7538,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     ))}
                   </TableBody>
                 </Table>
-            </div>
-            </div>
+            </AircraftDataTableFrame>
             <div className="flex flex-wrap items-center justify-between gap-2">
               <p className="text-sm text-muted-foreground">
                 Selection Summary: Active Record {selectedRecordLabel} | Checked: {selectedRowIds.length} | Records: {renderedRows.length}
