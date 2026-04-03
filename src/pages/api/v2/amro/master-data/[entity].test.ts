@@ -809,4 +809,98 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const results = ((res.jsonBody as any)?.output?.validation?.results || []) as Array<{ issues?: Array<{ field?: string; message?: string }> }>;
     expect(results[0]?.issues?.some((issue) => issue.field === 'aircraft_model' && String(issue.message || '').includes('selected manufacturer'))).toBe(true);
   });
+
+  it('creates work package template and reads link snapshot after insert', async () => {
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: {
+        record: {
+          id: 'wpt-1',
+          template_code: 'WP-LINE-001',
+          template_name: 'Line Check Package',
+          maintenance_type: 'line',
+          tasks_json: [{ task_template_id: '11111111-1111-4111-8111-111111111111' }],
+        },
+        created_relationships: [
+          {
+            work_package_template_id: 'wpt-1',
+            task_template_id: '11111111-1111-4111-8111-111111111111',
+            tenant_id: 'tenant-1',
+            model_id: 'model-1',
+          },
+        ],
+      },
+      error: null,
+    });
+    const linkEqTemplateMock = vi.fn().mockResolvedValue({
+      data: [{ task_template_id: '11111111-1111-4111-8111-111111111111' }],
+      error: null,
+    });
+    const linkEqTenantMock = vi.fn().mockReturnValue({ eq: linkEqTemplateMock });
+    const linkSelectMock = vi.fn().mockReturnValue({ eq: linkEqTenantMock });
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'work_package_template_task_templates') {
+        return { select: linkSelectMock };
+      }
+      if (table === 'maintenance_events') {
+        return { insert: auditInsertMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock, rpc: rpcMock } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { entity: 'work_package_templates' },
+      body: {
+        template_code: 'WP-LINE-001',
+        version: 1,
+        active: true,
+        template_name: 'Line Check Package',
+        maintenance_type: 'line',
+        scope_json: [],
+        tasks_json: [{ task_template_id: '11111111-1111-4111-8111-111111111111' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(201);
+    expect(rpcMock).toHaveBeenCalledTimes(1);
+    expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
+  });
+
+  it('rolls back atomic create when task_template_id does not exist', async () => {
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'Validation failed: task_template_id not found (99999999-9999-4999-8999-999999999999)' },
+    });
+    const fromMock = vi.fn();
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock, rpc: rpcMock } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { entity: 'work_package_templates' },
+      body: {
+        template_code: 'WP-LINE-ROLLBACK',
+        version: 1,
+        active: true,
+        template_name: 'Rollback Check',
+        maintenance_type: 'line',
+        scope_json: [],
+        tasks_json: [{ task_template_id: '99999999-9999-4999-8999-999999999999' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    expect(String((res.jsonBody as any)?.error || '')).toContain('Validation failed: task_template_id not found');
+    expect(fromMock).not.toHaveBeenCalledWith('maintenance_events');
+  });
 });

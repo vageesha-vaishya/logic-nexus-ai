@@ -327,4 +327,100 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     const issues = ((res.jsonBody as any)?.output?.validation?.issues || []) as Array<{ field?: string; message?: string }>;
     expect(issues.some((issue) => issue.field === 'aircraft_model' && String(issue.message || '').includes('selected manufacturer'))).toBe(true);
   });
+
+  it('updates work package template and reads synchronized link snapshot', async () => {
+    const existingMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'wpt-1',
+        tenant_id: 'tenant-1',
+        template_code: 'WP-LINE-001',
+        template_name: 'Line Check Package',
+        maintenance_type: 'line',
+        tasks_json: [{ task_template_id: '11111111-1111-4111-8111-111111111111' }],
+      },
+      error: null,
+    });
+    const existingQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: existingMaybeSingleMock,
+    };
+    existingQuery.eq.mockReturnValue(existingQuery);
+    existingQuery.limit.mockReturnValue(existingQuery);
+    const existingSelectMock = vi.fn().mockReturnValue(existingQuery);
+
+    const updateMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'wpt-1',
+        tenant_id: 'tenant-1',
+        template_name: 'Line Check Updated',
+        tasks_json: [{ task_template_id: '22222222-2222-4222-8222-222222222222' }],
+      },
+      error: null,
+    });
+    const updateQuery: any = {
+      eq: vi.fn(),
+      select: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: updateMaybeSingleMock,
+    };
+    updateQuery.eq.mockReturnValue(updateQuery);
+    updateQuery.select.mockReturnValue(updateQuery);
+    updateQuery.limit.mockReturnValue(updateQuery);
+    const updateMock = vi.fn().mockReturnValue(updateQuery);
+
+    const linkEqTemplateMock = vi.fn().mockResolvedValue({
+      data: [{ task_template_id: '22222222-2222-4222-8222-222222222222' }],
+      error: null,
+    });
+    const linkEqTenantMock = vi.fn().mockReturnValue({ eq: linkEqTemplateMock });
+    const linkSelectMock = vi.fn().mockReturnValue({ eq: linkEqTenantMock });
+    const relationDeleteEqTemplateMock = vi.fn().mockResolvedValue({ error: null });
+    const relationDeleteEqTenantMock = vi.fn().mockReturnValue({ eq: relationDeleteEqTemplateMock });
+    const relationDeleteMock = vi.fn().mockReturnValue({ eq: relationDeleteEqTenantMock });
+    const relationInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const taskTemplatesInMock = vi.fn().mockResolvedValue({
+      data: [{ id: '22222222-2222-4222-8222-222222222222', assembly_models: 'model-1', franchise_id: null }],
+      error: null,
+    });
+    const taskTemplatesEqMock = vi.fn().mockReturnValue({ in: taskTemplatesInMock });
+    const taskTemplatesSelectMock = vi.fn().mockReturnValue({ eq: taskTemplatesEqMock });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'work_package_templates') {
+        if (fromMock.mock.calls.length === 1) {
+          return { select: existingSelectMock };
+        }
+        return { update: updateMock };
+      }
+      if (table === 'work_package_template_task_templates') {
+        return { select: linkSelectMock, delete: relationDeleteMock, insert: relationInsertMock };
+      }
+      if (table === 'task_templates') {
+        return { select: taskTemplatesSelectMock };
+      }
+      if (table === 'maintenance_events') {
+        return { insert: auditInsertMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
+    const req: ApiRequest = {
+      method: 'PATCH',
+      query: { entity: 'work_package_templates', id: 'wpt-1' },
+      body: {
+        template_name: 'Line Check Updated',
+        tasks_json: [{ task_template_id: '22222222-2222-4222-8222-222222222222' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
+  });
 });

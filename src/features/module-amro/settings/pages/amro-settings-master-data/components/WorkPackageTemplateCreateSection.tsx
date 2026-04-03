@@ -79,6 +79,9 @@ export function WorkPackageTemplateCreateSection({
   const [workPackageTemplateTaskFilters, setWorkPackageTemplateTaskFilters] = useState<Record<WorkPackageTaskSortColumn, string>>(
     DEFAULT_WORK_PACKAGE_TASK_FILTERS,
   );
+  const resolveWorkPackageTaskTemplateId = useCallback((task: Record<string, unknown>): string => {
+    return String(task.id || '').trim();
+  }, []);
 
   const loadWorkPackageTemplateTaskTemplates = useCallback(async () => {
     if (!scopedDb || !scope.tenantId) {
@@ -257,8 +260,10 @@ export function WorkPackageTemplateCreateSection({
   }, [selectedWorkPackageAircraftModelTaskItems, workPackageTemplateTaskFilters, workPackageTemplateTaskSortColumn, workPackageTemplateTaskSortDirection]);
 
   const selectedWorkPackageAircraftModelTaskRowIds = useMemo(
-    () => selectedWorkPackageAircraftModelTaskRows.map((task, index) => `${String(task.id || task.task_id || index)}-${index}`),
-    [selectedWorkPackageAircraftModelTaskRows],
+    () => selectedWorkPackageAircraftModelTaskRows
+      .map((task) => resolveWorkPackageTaskTemplateId(task))
+      .filter((value) => value.length > 0),
+    [resolveWorkPackageTaskTemplateId, selectedWorkPackageAircraftModelTaskRows],
   );
 
   const allWorkPackageTemplateTasksSelected = selectedWorkPackageAircraftModelTaskRowIds.length > 0
@@ -280,27 +285,79 @@ export function WorkPackageTemplateCreateSection({
     setWorkPackageTemplateTaskFilters((previous) => ({ ...previous, [column]: value }));
   }, []);
 
+  const resolveSelectedWorkPackageTaskPayload = useCallback((selectedIds: string[]) => {
+    const selectedIdSet = new Set(selectedIds);
+    return selectedWorkPackageAircraftModelTaskRows
+      .map((task) => ({
+        rowId: resolveWorkPackageTaskTemplateId(task),
+        task,
+      }))
+      .filter((entry) => selectedIdSet.has(entry.rowId))
+      .map(({ task }) => ({
+        task_template_id: resolveWorkPackageTaskTemplateId(task),
+        task_id: task.task_id ?? null,
+        code_form_no: task.code_form_no ?? null,
+        ata_code: task.ata_code ?? null,
+        reference_amp: task.reference_amp ?? null,
+        description: task.description ?? null,
+      }))
+      .filter((entry) => entry.task_template_id.trim().length > 0);
+  }, [resolveWorkPackageTaskTemplateId, selectedWorkPackageAircraftModelTaskRows]);
+
   const toggleWorkPackageTemplateTaskSelection = useCallback((rowId: string, checked: boolean) => {
     setWorkPackageTemplateSelectedTaskIds((previous) => {
-      if (checked) {
-        return previous.includes(rowId) ? previous : [...previous, rowId];
-      }
-      return previous.filter((id) => id !== rowId);
+      const nextSelectedIds = checked
+        ? (previous.includes(rowId) ? previous : [...previous, rowId])
+        : previous.filter((id) => id !== rowId);
+      setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
+      return nextSelectedIds;
     });
-  }, []);
+  }, [resolveSelectedWorkPackageTaskPayload, setFieldValue]);
 
   const toggleWorkPackageTemplateSelectAllTasks = useCallback((checked: boolean) => {
     setWorkPackageTemplateSelectedTaskIds((previous) => {
-      if (checked) {
-        return Array.from(new Set([...previous, ...selectedWorkPackageAircraftModelTaskRowIds]));
-      }
-      return previous.filter((id) => !selectedWorkPackageAircraftModelTaskRowIds.includes(id));
+      const nextSelectedIds = checked
+        ? Array.from(new Set([...previous, ...selectedWorkPackageAircraftModelTaskRowIds]))
+        : previous.filter((id) => !selectedWorkPackageAircraftModelTaskRowIds.includes(id));
+      setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
+      return nextSelectedIds;
     });
-  }, [selectedWorkPackageAircraftModelTaskRowIds]);
+  }, [resolveSelectedWorkPackageTaskPayload, selectedWorkPackageAircraftModelTaskRowIds, setFieldValue]);
 
   useEffect(() => {
-    setWorkPackageTemplateSelectedTaskIds((previous) => previous.filter((id) => selectedWorkPackageAircraftModelTaskRowIds.includes(id)));
-  }, [selectedWorkPackageAircraftModelTaskRowIds]);
+    setWorkPackageTemplateSelectedTaskIds((previous) => {
+      const nextSelectedIds = previous.filter((id) => selectedWorkPackageAircraftModelTaskRowIds.includes(id));
+      if (nextSelectedIds.length !== previous.length) {
+        setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
+      }
+      return nextSelectedIds;
+    });
+  }, [resolveSelectedWorkPackageTaskPayload, selectedWorkPackageAircraftModelTaskRowIds, setFieldValue]);
+
+  const selectedWorkPackageTaskPayload = useMemo(() => {
+    return resolveSelectedWorkPackageTaskPayload(workPackageTemplateSelectedTaskIds);
+  }, [resolveSelectedWorkPackageTaskPayload, workPackageTemplateSelectedTaskIds]);
+
+  useEffect(() => {
+    const nextValue = JSON.stringify(selectedWorkPackageTaskPayload);
+    const currentValue = (() => {
+      const raw = formValues.tasks_json;
+      if (typeof raw === 'string') {
+        return raw.trim();
+      }
+      if (Array.isArray(raw) || (raw && typeof raw === 'object')) {
+        try {
+          return JSON.stringify(raw);
+        } catch {
+          return '';
+        }
+      }
+      return '';
+    })();
+    if (nextValue !== currentValue) {
+      setFieldValue('tasks_json', nextValue);
+    }
+  }, [formValues.tasks_json, selectedWorkPackageTaskPayload, setFieldValue]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -530,8 +587,11 @@ export function WorkPackageTemplateCreateSection({
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedWorkPackageAircraftModelTaskRows.length ? selectedWorkPackageAircraftModelTaskRows.map((task, index) => {
-                    const rowId = `${String(task.id || task.task_id || index)}-${index}`;
+                  {selectedWorkPackageAircraftModelTaskRows.length ? selectedWorkPackageAircraftModelTaskRows.map((task) => {
+                    const rowId = resolveWorkPackageTaskTemplateId(task);
+                    if (!rowId) {
+                      return null;
+                    }
                     return (
                     <tr key={rowId} className="border-t border-slate-100 text-slate-700">
                       <td className="px-2 py-1.5">

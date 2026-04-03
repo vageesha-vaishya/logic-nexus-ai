@@ -27,6 +27,7 @@ import {
   HttpError,
 } from './shared';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../../_utils/compatibility-facade';
+import { logger } from '@/lib/logger';
 
 const ENTITY_UNAVAILABLE = new Map<string, number>();
 const ENTITY_COLUMN_OVERRIDES = new Map<string, Set<string>>();
@@ -510,6 +511,388 @@ function isValidationOnly(req: ApiRequest, body: Record<string, unknown>): boole
     .trim()
     .toLowerCase();
   return bodyFlag === 'true' || bodyFlag === '1' || bodyFlag === 'yes' || bodyFlag === 'on';
+}
+
+type SelectedTaskTemplateResolution = {
+  taskTemplateIds: string[];
+  taskReferenceTokens: string[];
+  aircraftModelToken: string | null;
+};
+
+function asArray(value: unknown): unknown[] {
+  return Array.isArray(value) ? value : [];
+}
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export function extractSelectedTaskTemplateResolution(payload: Record<string, unknown>): SelectedTaskTemplateResolution {
+  const parsedTasksJson = (() => {
+    if (Array.isArray(payload.tasks_json)) {
+      return payload.tasks_json;
+    }
+    if (typeof payload.tasks_json === 'string') {
+      const raw = payload.tasks_json.trim();
+      if (!raw) {
+        return [];
+      }
+      try {
+        const decoded = JSON.parse(raw);
+        return Array.isArray(decoded) ? decoded : [];
+      } catch {
+        return [];
+      }
+    }
+    return [];
+  })();
+  const tasksJson = asArray(parsedTasksJson);
+  const identifiers = new Set<string>();
+  const referenceTokens = new Set<string>();
+  const aircraftModelToken = asNullableString(payload.aircraft_model);
+
+  tasksJson.forEach((entry) => {
+    if (!entry) return;
+    if (typeof entry === 'string') {
+      const normalized = entry.trim();
+      if (!normalized) return;
+      if (isUuid(normalized)) {
+        identifiers.add(normalized);
+      } else {
+        referenceTokens.add(normalized);
+      }
+      return;
+    }
+    if (typeof entry !== 'object') {
+      return;
+    }
+    const row = entry as Record<string, unknown>;
+    const idCandidates = [
+      row.task_template_id,
+      row.taskTemplateId,
+      row.id,
+    ];
+    const resolvedId = idCandidates
+      .map((candidate) => asNullableString(candidate))
+      .find((candidate): candidate is string => Boolean(candidate));
+    if (resolvedId) {
+      if (isUuid(resolvedId)) {
+        identifiers.add(resolvedId);
+      } else {
+        referenceTokens.add(resolvedId);
+      }
+    }
+    const taskTemplateRecord = row.task_template && typeof row.task_template === 'object'
+      ? (row.task_template as Record<string, unknown>)
+      : null;
+    const referenceCandidates = [
+      row.task_id,
+      row.taskId,
+      row.code_form_no,
+      row.codeFormNo,
+      taskTemplateRecord?.task_id,
+      taskTemplateRecord?.code_form_no,
+      taskTemplateRecord?.id,
+    ];
+    referenceCandidates.forEach((candidate) => {
+      const token = asNullableString(candidate);
+      if (!token) return;
+      if (isUuid(token)) {
+        identifiers.add(token);
+        return;
+      }
+      referenceTokens.add(token);
+    });
+    if (typeof row.task_template === 'string') {
+      const token = asNullableString(row.task_template);
+      if (!token) return;
+      if (isUuid(token)) {
+        identifiers.add(token);
+      } else {
+        referenceTokens.add(token);
+      }
+    }
+  });
+
+  return {
+    taskTemplateIds: Array.from(identifiers),
+    taskReferenceTokens: Array.from(referenceTokens),
+    aircraftModelToken,
+  };
+}
+
+async function logWorkPackageTemplateLinkSnapshot(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  correlationId: string;
+  templateId: string;
+  tenantId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from('work_package_template_task_templates')
+    .select('task_template_id', { count: 'exact' })
+    .eq('tenant_id', params.tenantId)
+    .eq('work_package_template_id', params.templateId);
+  if (error) {
+    logger.warn('[AMRO Master Data API] failed to read work package template link snapshot', {
+      correlationId: params.correlationId,
+      templateId: params.templateId,
+      message: String(error.message || ''),
+    });
+    return;
+  }
+  logger.info('[AMRO Master Data API] work package template link snapshot', {
+    correlationId: params.correlationId,
+    templateId: params.templateId,
+    linkedTaskTemplateCount: Number((Array.isArray(data) ? data.length : 0) || 0),
+  });
+}
+
+function isFranchiseCompatible(
+  recordFranchiseId: string | null,
+  requestFranchiseId: string | null,
+): boolean {
+  if (!requestFranchiseId) return true;
+  if (!recordFranchiseId) return true;
+  return recordFranchiseId === requestFranchiseId;
+}
+
+async function resolveWorkPackageTemplateModelId(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  franchiseId: string | null,
+  modelToken: string | null,
+): Promise<string | null> {
+  if (!modelToken) return null;
+
+  const token = modelToken.trim();
+  let query = supabase
+    .from('assembly_models')
+    .select('id,franchise_id,model_code,name,primary_model')
+    .eq('tenant_id', tenantId);
+  if (franchiseId) {
+    query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+  }
+  query = query.or(`model_code.eq.${token},name.eq.${token},primary_model.eq.${token}`);
+  if (isUuid(token)) {
+    query = query.or(`id.eq.${token}`);
+  }
+  const { data, error } = await query.limit(25);
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  const rows = (Array.isArray(data) ? data : [])
+    .filter((record) =>
+      isFranchiseCompatible(
+        asNullableString((record as Record<string, unknown>).franchise_id),
+        franchiseId,
+      ),
+    );
+  if (!rows.length) {
+    return null;
+  }
+  const exact = rows.find((row) => {
+    const source = row as Record<string, unknown>;
+    return [source.model_code, source.name, source.primary_model, source.id]
+      .map((value) => asNullableString(value))
+      .some((value) => value === token);
+  });
+  const resolved = exact || rows[0];
+  return asNullableString((resolved as Record<string, unknown>).id);
+}
+
+export async function syncWorkPackageTemplateTaskLinks(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  tenantId: string;
+  franchiseId: string | null;
+  userId: string;
+  correlationId: string;
+  workPackageTemplateId: string;
+  taskTemplateIds: string[];
+  taskReferenceTokens: string[];
+  aircraftModelToken: string | null;
+}) {
+  const uniqueTaskTemplateIds = Array.from(new Set(
+    params.taskTemplateIds
+      .map((id) => asNullableString(id))
+      .filter((id): id is string => Boolean(id))
+      .filter((id) => isUuid(id)),
+  ));
+  const uniqueTaskReferenceTokens = Array.from(new Set(
+    params.taskReferenceTokens
+      .map((token) => asNullableString(token))
+      .filter((token): token is string => Boolean(token))
+      .filter((token) => !isUuid(token)),
+  ));
+  logger.info('[AMRO Master Data API] work package template relationship sync started', {
+    correlationId: params.correlationId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    selectedTaskTemplateCount: uniqueTaskTemplateIds.length,
+    selectedTaskTemplateIds: uniqueTaskTemplateIds,
+    selectedTaskReferenceCount: uniqueTaskReferenceTokens.length,
+    selectedTaskReferenceTokens: uniqueTaskReferenceTokens,
+    aircraftModelToken: params.aircraftModelToken || '',
+  });
+
+  const taskTemplateRowsById = new Map<string, Record<string, unknown>>();
+  const resolvedReferenceTokens = new Set<string>();
+  const resolveScopedTaskTemplateQuery = () => {
+    let query = params.supabase
+      .from('task_templates')
+      .select('id,assembly_models,franchise_id,task_id,code_form_no')
+      .eq('tenant_id', params.tenantId);
+    if (params.franchiseId) {
+      query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+    }
+    return query;
+  };
+  if (uniqueTaskTemplateIds.length > 0) {
+    const { data: byIdRows, error: byIdError } = await resolveScopedTaskTemplateQuery().in('id', uniqueTaskTemplateIds);
+    if (byIdError) {
+      throw new HttpError(byIdError.message, 400);
+    }
+    (Array.isArray(byIdRows) ? byIdRows : []).forEach((row) => {
+      const record = row as Record<string, unknown>;
+      const id = asNullableString(record.id);
+      if (!id) return;
+      taskTemplateRowsById.set(id, record);
+    });
+  }
+  if (uniqueTaskReferenceTokens.length > 0) {
+    const { data: byTaskIdRows, error: byTaskIdError } = await resolveScopedTaskTemplateQuery().in('task_id', uniqueTaskReferenceTokens);
+    if (byTaskIdError) {
+      throw new HttpError(byTaskIdError.message, 400);
+    }
+    (Array.isArray(byTaskIdRows) ? byTaskIdRows : []).forEach((row) => {
+      const record = row as Record<string, unknown>;
+      const id = asNullableString(record.id);
+      const taskId = asNullableString(record.task_id);
+      if (taskId) resolvedReferenceTokens.add(taskId);
+      if (!id) return;
+      taskTemplateRowsById.set(id, record);
+    });
+    const { data: byCodeRows, error: byCodeError } = await resolveScopedTaskTemplateQuery().in('code_form_no', uniqueTaskReferenceTokens);
+    if (byCodeError) {
+      throw new HttpError(byCodeError.message, 400);
+    }
+    (Array.isArray(byCodeRows) ? byCodeRows : []).forEach((row) => {
+      const record = row as Record<string, unknown>;
+      const id = asNullableString(record.id);
+      const codeFormNo = asNullableString(record.code_form_no);
+      if (codeFormNo) resolvedReferenceTokens.add(codeFormNo);
+      if (!id) return;
+      taskTemplateRowsById.set(id, record);
+    });
+  }
+
+  const taskTemplateRows = Array.from(taskTemplateRowsById.values());
+  const availableIds = new Set(
+    taskTemplateRows
+      .map((row) => asNullableString((row as Record<string, unknown>).id))
+      .filter((id): id is string => Boolean(id)),
+  );
+  const missingIds = uniqueTaskTemplateIds.filter((id) => !availableIds.has(id));
+  const missingReferenceTokens = uniqueTaskReferenceTokens.filter((token) => !resolvedReferenceTokens.has(token));
+  if (missingIds.length > 0 || missingReferenceTokens.length > 0) {
+    const missingTokens = [...missingIds, ...missingReferenceTokens];
+    logger.warn('[AMRO Master Data API] task template validation failed for work package template', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+      missingTaskTemplateIds: missingIds,
+      missingTaskReferenceTokens: missingReferenceTokens,
+    });
+    throw new HttpError(`Validation failed: task_template reference not found (${missingTokens.join(', ')})`, 422);
+  }
+  const resolvedTaskTemplateIds = Array.from(availableIds);
+  if (resolvedTaskTemplateIds.length === 0) {
+    let cleanupQuery = params.supabase
+      .from('work_package_template_task_templates')
+      .delete()
+      .eq('tenant_id', params.tenantId)
+      .eq('work_package_template_id', params.workPackageTemplateId);
+    if (params.franchiseId) {
+      cleanupQuery = cleanupQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+    }
+    const { error: cleanupError } = await cleanupQuery;
+    if (cleanupError) {
+      throw new HttpError(cleanupError.message, 400);
+    }
+    logger.info('[AMRO Master Data API] no task templates resolved for work package template sync, existing links cleared', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+    });
+    return;
+  }
+
+  let modelId = await resolveWorkPackageTemplateModelId(
+    params.supabase,
+    params.tenantId,
+    params.franchiseId,
+    params.aircraftModelToken,
+  );
+  if (!modelId) {
+    const modelIds = Array.from(
+      new Set(
+        taskTemplateRows
+          .map((row) => asNullableString((row as Record<string, unknown>).assembly_models))
+          .filter((value): value is string => Boolean(value)),
+      ),
+    );
+    if (modelIds.length === 1) {
+      modelId = modelIds[0];
+    } else if (modelIds.length > 1) {
+      throw new HttpError('Validation failed: selected task templates belong to different aircraft models', 422);
+    } else {
+      throw new HttpError('Validation failed: aircraft_model is required to link selected task templates', 422);
+    }
+  }
+
+  let deleteQuery = params.supabase
+    .from('work_package_template_task_templates')
+    .delete()
+    .eq('tenant_id', params.tenantId)
+    .eq('work_package_template_id', params.workPackageTemplateId);
+  if (params.franchiseId) {
+    deleteQuery = deleteQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+  }
+  const { error: deleteError } = await deleteQuery;
+  if (deleteError) {
+    throw new HttpError(deleteError.message, 400);
+  }
+
+  const relationshipRows = resolvedTaskTemplateIds.map((taskTemplateId) => ({
+    tenant_id: params.tenantId,
+    franchise_id: params.franchiseId,
+    work_package_template_id: params.workPackageTemplateId,
+    model_id: modelId,
+    task_template_id: taskTemplateId,
+    created_by: params.userId,
+    updated_by: params.userId,
+  }));
+  let relationInsertResult = await params.supabase
+    .from('work_package_template_task_templates')
+    .insert(relationshipRows);
+  if (
+    relationInsertResult.error &&
+    /column .*created_by.* does not exist|column .*updated_by.* does not exist/i.test(String(relationInsertResult.error.message || ''))
+  ) {
+    relationInsertResult = await params.supabase
+      .from('work_package_template_task_templates')
+      .insert(relationshipRows.map((row) => {
+        const { created_by, updated_by, ...rest } = row;
+        return rest;
+      }));
+  }
+  if (relationInsertResult.error) {
+    throw new HttpError(relationInsertResult.error.message, 400);
+  }
+
+  logger.info('[AMRO Master Data API] linked work package template task templates', {
+    correlationId: params.correlationId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    linkedTaskTemplateCount: resolvedTaskTemplateIds.length,
+    linkedTaskTemplateIds: resolvedTaskTemplateIds,
+    resolvedModelId: modelId,
+  });
 }
 
 type FlightLogQueryFilters = {
@@ -1127,12 +1510,109 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (supportsFranchiseScope) {
       insertPayload.franchise_id = franchiseId;
     }
+    if (entity === 'work_package_templates') {
+      const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(payload);
+      logger.info('[AMRO Master Data API] create request received for work package template', {
+        correlationId: ctx.correlationId,
+        apiPath: `/api/v2/amro/master-data/${entity}`,
+        method: req.method,
+        tenantId,
+        franchiseId: franchiseId || null,
+        templateCode: asNullableString(insertPayload.template_code),
+        templateName: asNullableString(insertPayload.template_name),
+        maintenanceType: asNullableString(insertPayload.maintenance_type),
+        aircraftModel: aircraftModelToken,
+        selectedTaskTemplateCount: taskTemplateIds.length,
+        selectedTaskTemplateIds: taskTemplateIds,
+        selectedTaskReferenceCount: taskReferenceTokens.length,
+        selectedTaskReferenceTokens: taskReferenceTokens,
+      });
+      const rpcPayload: Record<string, unknown> = {
+        ...insertPayload,
+      };
+      const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_package_template_atomic', {
+        p_tenant_id: tenantId,
+        p_franchise_id: franchiseId,
+        p_user_id: auth.userId,
+        p_correlation_id: ctx.correlationId,
+        p_payload: rpcPayload,
+      });
+      if (atomicError) {
+        const message = String(atomicError.message || '');
+        if (/validation failed/i.test(message)) {
+          throw new HttpError(message, 422);
+        }
+        throw new HttpError(message || 'Failed to create work package template transaction', 400);
+      }
+      const atomic = atomicResult && typeof atomicResult === 'object'
+        ? (atomicResult as Record<string, unknown>)
+        : {};
+      const createdRecord = atomic.record && typeof atomic.record === 'object'
+        ? (atomic.record as Record<string, unknown>)
+        : null;
+      const createdTemplateId = asNullableString(createdRecord?.id);
+      if (!createdTemplateId) {
+        throw new HttpError('Atomic create did not return work package template id', 500);
+      }
+      const createdRelationshipsRaw = Array.isArray(atomic.created_relationships)
+        ? (atomic.created_relationships as unknown[])
+        : [];
+      const createdRelationships = createdRelationshipsRaw
+        .filter((item) => item && typeof item === 'object')
+        .map((item) => item as Record<string, unknown>);
+      createdRelationships.forEach((relationship, index) => {
+        logger.debug('[AMRO Master Data API] inserted work package template task relationship', {
+          correlationId: ctx.correlationId,
+          workPackageTemplateId: createdTemplateId,
+          relationshipIndex: index,
+          taskTemplateId: asNullableString(relationship.task_template_id),
+          modelId: asNullableString(relationship.model_id),
+        });
+      });
+      const { data: verificationRows, error: verificationError } = await supabase
+        .from('work_package_template_task_templates')
+        .select('task_template_id')
+        .eq('tenant_id', tenantId)
+        .eq('work_package_template_id', createdTemplateId);
+      if (verificationError) {
+        throw new HttpError(verificationError.message, 400);
+      }
+      const persistedRelationshipCount = Array.isArray(verificationRows) ? verificationRows.length : 0;
+      if (persistedRelationshipCount !== createdRelationships.length) {
+        throw new HttpError(
+          `Verification failed: relationship count mismatch. expected=${createdRelationships.length} actual=${persistedRelationshipCount}`,
+          500,
+        );
+      }
+      await writeAuditRecord({
+        tenantId,
+        franchiseId,
+        userId: auth.userId,
+        entity,
+        action: 'create',
+        entityId: createdTemplateId,
+        afterData: createdRecord,
+      });
+      res.status(201).json({
+        version: 'v2',
+        correlationId: ctx.correlationId,
+        output: {
+          entity,
+          record: createdRecord,
+          created_task_relationships: createdRelationships,
+          relationship_count: createdRelationships.length,
+        },
+      });
+      return;
+    }
     const { data, error } = await supabase
       .from(entityConfig.table)
       .insert(insertPayload)
       .select(entityConfig.listColumns)
       .maybeSingle();
-    if (error) throw new HttpError(error.message, 400);
+    if (error) {
+      throw new HttpError(error.message, 400);
+    }
     await writeAuditRecord({
       tenantId,
       franchiseId,

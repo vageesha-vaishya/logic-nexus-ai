@@ -2904,12 +2904,49 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           }
         }
       }
+      if (entity === 'work_package_templates') {
+        const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
+        const selectedTaskTemplateIds = tasksJson
+          .map((entry) => {
+            if (!entry || typeof entry !== 'object') return null;
+            const row = entry as Record<string, unknown>;
+            return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
+          })
+          .filter((value): value is string => Boolean(value));
+        logger.info('[AMRO Master Data UI] creating work package template request', {
+          entity,
+          requestUrl: `/api/v2/amro/master-data/${entity}`,
+          templateCode: String(payload.template_code || ''),
+          templateName: String(payload.template_name || ''),
+          maintenanceType: String(payload.maintenance_type || ''),
+          aircraftModel: String(payload.aircraft_model || ''),
+          selectedTaskTemplateCount: selectedTaskTemplateIds.length,
+          selectedTaskTemplateIds,
+          tasksJsonPreview: tasksJson.slice(0, 5),
+        });
+      }
       const response = await fetch(`/api/v2/amro/master-data/${entity}`, {
         method: 'POST',
         headers,
         body: JSON.stringify(payload),
       });
       const responsePayload = await parseApiPayload(response);
+      if (entity === 'work_package_templates') {
+        const responseOutput = (responsePayload.output && typeof responsePayload.output === 'object')
+          ? (responsePayload.output as Record<string, unknown>)
+          : null;
+        const createdRecord = (responseOutput?.record && typeof responseOutput.record === 'object')
+          ? (responseOutput.record as Record<string, unknown>)
+          : null;
+        logger.info('[AMRO Master Data UI] work package template create response', {
+          entity,
+          requestUrl: `/api/v2/amro/master-data/${entity}`,
+          status: response.status,
+          ok: response.ok,
+          responseError: String(responsePayload.error || ''),
+          createdTemplateId: String(createdRecord?.id || ''),
+        });
+      }
       if (!response.ok) {
         const validationErrors = extractValidationErrors(responsePayload);
         if (Object.keys(validationErrors).length > 0) {
@@ -3003,12 +3040,50 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           }
         }
       }
+      if (entity === 'work_package_templates') {
+        const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
+        const selectedTaskTemplateIds = tasksJson
+          .map((entry) => {
+            if (!entry || typeof entry !== 'object') return null;
+            const row = entry as Record<string, unknown>;
+            return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
+          })
+          .filter((value): value is string => Boolean(value));
+        logger.info('[AMRO Master Data UI] updating work package template request', {
+          entity,
+          requestUrl: `/api/v2/amro/master-data/${entity}/${selectedId}`,
+          workPackageTemplateId: String(selectedId || ''),
+          templateCode: String(payload.template_code || ''),
+          templateName: String(payload.template_name || ''),
+          maintenanceType: String(payload.maintenance_type || ''),
+          aircraftModel: String(payload.aircraft_model || ''),
+          selectedTaskTemplateCount: selectedTaskTemplateIds.length,
+          selectedTaskTemplateIds,
+          tasksJsonPreview: tasksJson.slice(0, 5),
+        });
+      }
       const response = await fetch(`/api/v2/amro/master-data/${entity}/${selectedId}`, {
         method: 'PATCH',
         headers,
         body: JSON.stringify(payload),
       });
       const responsePayload = await parseApiPayload(response);
+      if (entity === 'work_package_templates') {
+        const responseOutput = (responsePayload.output && typeof responsePayload.output === 'object')
+          ? (responsePayload.output as Record<string, unknown>)
+          : null;
+        const updatedRecord = (responseOutput?.record && typeof responseOutput.record === 'object')
+          ? (responseOutput.record as Record<string, unknown>)
+          : null;
+        logger.info('[AMRO Master Data UI] work package template update response', {
+          entity,
+          requestUrl: `/api/v2/amro/master-data/${entity}/${selectedId}`,
+          status: response.status,
+          ok: response.ok,
+          responseError: String(responsePayload.error || ''),
+          updatedTemplateId: String(updatedRecord?.id || selectedId || ''),
+        });
+      }
       if (!response.ok) {
         const validationErrors = extractValidationErrors(responsePayload);
         if (Object.keys(validationErrors).length > 0) {

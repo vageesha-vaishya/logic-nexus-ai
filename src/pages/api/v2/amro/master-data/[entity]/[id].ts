@@ -21,6 +21,8 @@ import {
   HttpError,
 } from '../shared';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../../../_utils/compatibility-facade';
+import { logger } from '@/lib/logger';
+import { extractSelectedTaskTemplateResolution, syncWorkPackageTemplateTaskLinks } from '../[entity]';
 
 function isV2Enabled(): boolean {
   const normalized = String(process.env.AMRO_MASTER_DATA_V2_ENABLED || 'true').trim().toLowerCase();
@@ -269,6 +271,32 @@ function isValidationOnly(req: ApiRequest, body: Record<string, unknown>): boole
   return bodyFlag === 'true' || bodyFlag === '1' || bodyFlag === 'yes' || bodyFlag === 'on';
 }
 
+async function logWorkPackageTemplateLinkSnapshot(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  correlationId: string;
+  templateId: string;
+  tenantId: string;
+}) {
+  const { data, error } = await params.supabase
+    .from('work_package_template_task_templates')
+    .select('task_template_id', { count: 'exact' })
+    .eq('tenant_id', params.tenantId)
+    .eq('work_package_template_id', params.templateId);
+  if (error) {
+    logger.warn('[AMRO Master Data API] failed to read work package template link snapshot', {
+      correlationId: params.correlationId,
+      templateId: params.templateId,
+      message: String(error.message || ''),
+    });
+    return;
+  }
+  logger.info('[AMRO Master Data API] work package template link snapshot', {
+    correlationId: params.correlationId,
+    templateId: params.templateId,
+    linkedTaskTemplateCount: Number((Array.isArray(data) ? data.length : 0) || 0),
+  });
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'PATCH', 'DELETE', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -373,6 +401,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       requireCreateFields: false,
       includeOnlyProvidedFields: true,
     });
+    if (entity === 'work_package_templates') {
+      const existingVersion = (existingRecord as Record<string, unknown>).version;
+      const existingScope = (existingRecord as Record<string, unknown>).scope_json;
+      const existingTasks = (existingRecord as Record<string, unknown>).tasks_json;
+      if (payload.version === undefined || payload.version === null) {
+        payload.version = existingVersion ?? 1;
+      }
+      if (payload.scope_json === undefined || payload.scope_json === null) {
+        payload.scope_json = Array.isArray(existingScope) ? existingScope : [];
+      }
+      if (payload.tasks_json === undefined || payload.tasks_json === null) {
+        payload.tasks_json = Array.isArray(existingTasks) ? existingTasks : [];
+      }
+    }
     let manufacturerIssues: { field: string; message: string }[] = [];
     let aircraftModelIssues: { field: string; message: string }[] = [];
     if (entity === 'aircraft' && (payload.manufacturer_id || payload.manufacturer || payload.manufacturer_code)) {
@@ -441,10 +483,29 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       return;
     }
-    const updatePayload = {
+    const updatePayload: Record<string, unknown> = {
       ...payload,
       updated_by: auth.userId,
     };
+    if (entity === 'work_package_templates') {
+      const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(updatePayload);
+      logger.info('[AMRO Master Data API] update request received for work package template', {
+        correlationId: ctx.correlationId,
+        apiPath: `/api/v2/amro/master-data/${entity}/${id}`,
+        method: req.method,
+        tenantId,
+        franchiseId: franchiseId || null,
+        workPackageTemplateId: id,
+        templateCode: asNullableString(updatePayload.template_code),
+        templateName: asNullableString(updatePayload.template_name),
+        maintenanceType: asNullableString(updatePayload.maintenance_type),
+        aircraftModel: aircraftModelToken,
+        selectedTaskTemplateCount: taskTemplateIds.length,
+        selectedTaskTemplateIds: taskTemplateIds,
+        selectedTaskReferenceCount: taskReferenceTokens.length,
+        selectedTaskReferenceTokens: taskReferenceTokens,
+      });
+    }
     const updateBaseQuery = supabase
       .from(entityConfig.table)
       .update(updatePayload)
@@ -452,7 +513,45 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       .select(entityConfig.listColumns)
       .limit(1);
     const { data, error } = await updateBaseQuery.eq('tenant_id', tenantId).maybeSingle();
-    if (error) throw new HttpError(error.message, 400);
+    if (error) {
+      if (entity === 'work_package_templates') {
+        logger.error('[AMRO Master Data API] failed to update work package template', {
+          correlationId: ctx.correlationId,
+          workPackageTemplateId: id,
+          message: String(error.message || ''),
+        });
+      }
+      throw new HttpError(error.message, 400);
+    }
+    if (entity === 'work_package_templates') {
+      const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(updatePayload);
+      try {
+        await syncWorkPackageTemplateTaskLinks({
+          supabase,
+          tenantId,
+          franchiseId,
+          userId: auth.userId,
+          correlationId: ctx.correlationId,
+          workPackageTemplateId: id,
+          taskTemplateIds,
+          taskReferenceTokens,
+          aircraftModelToken,
+        });
+        await logWorkPackageTemplateLinkSnapshot({
+          supabase,
+          correlationId: ctx.correlationId,
+          templateId: id,
+          tenantId,
+        });
+      } catch (relationshipError) {
+        logger.error('[AMRO Master Data API] failed syncing work package template relationships after update', {
+          correlationId: ctx.correlationId,
+          workPackageTemplateId: id,
+          message: String((relationshipError as Error)?.message || relationshipError),
+        });
+        throw relationshipError;
+      }
+    }
     await writeAuditRecord({
       tenantId,
       franchiseId,
