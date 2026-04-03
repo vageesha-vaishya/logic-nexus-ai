@@ -203,6 +203,11 @@ router.post(
     const tenantId = req.tenantId;
     const userId = req.userId;
     const franchiseId = getFranchiseId(req);
+    logger.info('[AMRO Work Package Template] POST Method received xyz001', {
+      tenantId,
+      franchiseId,
+      userId,
+    });
     if (!tenantId || !userId) {
       res.status(401).json(toErrorResponse('Missing tenant or user context', 'MISSING_CONTEXT', 401));
       return;
@@ -279,8 +284,13 @@ router.post(
 router.get(
   '/work-package-templates',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+   
     const tenantId = req.tenantId;
     const franchiseId = getFranchiseId(req);
+    logger.info('[AMRO Work Package Template] GET Method received', {
+      tenantId,
+      franchiseId,
+    });
     if (!tenantId) {
       res.status(401).json(toErrorResponse('Missing tenant context', 'MISSING_TENANT', 401));
       return;
