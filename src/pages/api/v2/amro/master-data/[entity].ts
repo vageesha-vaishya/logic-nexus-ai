@@ -711,6 +711,15 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   taskReferenceTokens: string[];
   aircraftModelToken: string | null;
 }) {
+  logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-01 sync-started', {
+    correlationId: params.correlationId,
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    requestedTaskTemplateCount: params.taskTemplateIds.length,
+    requestedTaskReferenceCount: params.taskReferenceTokens.length,
+    aircraftModelToken: params.aircraftModelToken || null,
+  });
   const uniqueTaskTemplateIds = Array.from(new Set(
     params.taskTemplateIds
       .map((id) => asNullableString(id))
@@ -732,6 +741,12 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     selectedTaskReferenceTokens: uniqueTaskReferenceTokens,
     aircraftModelToken: params.aircraftModelToken || '',
   });
+  logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-02 normalized-identifiers', {
+    correlationId: params.correlationId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    uniqueTaskTemplateCount: uniqueTaskTemplateIds.length,
+    uniqueTaskReferenceCount: uniqueTaskReferenceTokens.length,
+  });
 
   const taskTemplateRowsById = new Map<string, Record<string, unknown>>();
   const resolvedReferenceTokens = new Set<string>();
@@ -746,6 +761,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     return query;
   };
   if (uniqueTaskTemplateIds.length > 0) {
+    logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-03 querying-task-templates-by-id', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+      queryIdCount: uniqueTaskTemplateIds.length,
+    });
     const { data: byIdRows, error: byIdError } = await resolveScopedTaskTemplateQuery().in('id', uniqueTaskTemplateIds);
     if (byIdError) {
       throw new HttpError(byIdError.message, 400);
@@ -758,6 +778,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     });
   }
   if (uniqueTaskReferenceTokens.length > 0) {
+    logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-04 querying-task-templates-by-reference', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+      queryReferenceCount: uniqueTaskReferenceTokens.length,
+    });
     const { data: byTaskIdRows, error: byTaskIdError } = await resolveScopedTaskTemplateQuery().in('task_template_id', uniqueTaskReferenceTokens);
     if (byTaskIdError) {
       throw new HttpError(byTaskIdError.message, 400);
@@ -792,6 +817,13 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   );
   const missingIds = uniqueTaskTemplateIds.filter((id) => !availableIds.has(id));
   const missingReferenceTokens = uniqueTaskReferenceTokens.filter((token) => !resolvedReferenceTokens.has(token));
+  logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-05 resolution-summary', {
+    correlationId: params.correlationId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    resolvedTaskTemplateCount: availableIds.size,
+    missingTaskTemplateCount: missingIds.length,
+    missingReferenceTokenCount: missingReferenceTokens.length,
+  });
   if (missingIds.length > 0 || missingReferenceTokens.length > 0) {
     const missingTokens = [...missingIds, ...missingReferenceTokens];
     logger.warn('[AMRO Master Data API] task template validation failed for work package template', {
@@ -804,6 +836,10 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   }
   const resolvedTaskTemplateIds = Array.from(availableIds);
   if (resolvedTaskTemplateIds.length === 0) {
+    logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-06 no-task-resolved-cleanup-start', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+    });
     let cleanupQuery = params.supabase
       .from('work_package_template_task_templates')
       .delete()
@@ -817,6 +853,10 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
       throw new HttpError(cleanupError.message, 400);
     }
     logger.info('[AMRO Master Data API] no task templates resolved for work package template sync, existing links cleared', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+    });
+    logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-07 no-task-resolved-cleanup-complete', {
       correlationId: params.correlationId,
       workPackageTemplateId: params.workPackageTemplateId,
     });
@@ -845,17 +885,33 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
       throw new HttpError('Validation failed: aircraft_model is required to link selected task templates', 422);
     }
   }
+  logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-08 model-resolved', {
+    correlationId: params.correlationId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    resolvedModelId: modelId,
+    resolvedTaskTemplateCount: resolvedTaskTemplateIds.length,
+  });
 
   let deleteQuery = params.supabase
     .from('work_package_template_task_templates')
     .delete()
     .eq('tenant_id', params.tenantId)
     .eq('work_package_template_id', params.workPackageTemplateId);
+  logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-09 deleting-existing-links', {
+    correlationId: params.correlationId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    franchiseScoped: Boolean(params.franchiseId),
+  });
   if (params.franchiseId) {
     deleteQuery = deleteQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
   }
   const { error: deleteError } = await deleteQuery;
   if (deleteError) {
+    logger.error('[AMRO WORK PACKAGE TEMPLATE SYNC] step-09-delete-failed', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+      message: String(deleteError.message || ''),
+    });
     throw new HttpError(deleteError.message, 400);
   }
 
@@ -868,6 +924,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     created_by: params.userId,
     updated_by: params.userId,
   }));
+  logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-10 inserting-links', {
+    correlationId: params.correlationId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    insertRowCount: relationshipRows.length,
+  });
   let relationInsertResult = await params.supabase
     .from('work_package_template_task_templates')
     .insert(relationshipRows);
@@ -875,6 +936,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     relationInsertResult.error &&
     /column .*created_by.* does not exist|column .*updated_by.* does not exist/i.test(String(relationInsertResult.error.message || ''))
   ) {
+    logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-11 retry-insert-without-audit-columns', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+      message: String(relationInsertResult.error.message || ''),
+    });
     relationInsertResult = await params.supabase
       .from('work_package_template_task_templates')
       .insert(relationshipRows.map((row) => {
@@ -883,6 +949,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
       }));
   }
   if (relationInsertResult.error) {
+    logger.error('[AMRO WORK PACKAGE TEMPLATE SYNC] step-12-insert-failed', {
+      correlationId: params.correlationId,
+      workPackageTemplateId: params.workPackageTemplateId,
+      message: String(relationInsertResult.error.message || ''),
+    });
     throw new HttpError(relationInsertResult.error.message, 400);
   }
 
@@ -892,6 +963,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     linkedTaskTemplateCount: resolvedTaskTemplateIds.length,
     linkedTaskTemplateIds: resolvedTaskTemplateIds,
     resolvedModelId: modelId,
+  });
+  logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-13 sync-completed', {
+    correlationId: params.correlationId,
+    workPackageTemplateId: params.workPackageTemplateId,
+    linkedTaskTemplateCount: resolvedTaskTemplateIds.length,
   });
 }
 
@@ -1507,11 +1583,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       created_by: auth.userId,
       updated_by: auth.userId,
     };
+    logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP -001] ', {function: 'insertPayload'});
     if (supportsFranchiseScope) {
       insertPayload.franchise_id = franchiseId;
     }
     if (entity === 'work_package_templates') {
       const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(payload);
+      logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP 000] ', {function: 'insertPayload'});
       logger.info('[AMRO Master Data API] create request received for work package template', {
         correlationId: ctx.correlationId,
         apiPath: `/api/v2/amro/master-data/${entity}`,
@@ -1546,6 +1624,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         tasks_json: normalizeJsonArray(insertPayload.tasks_json),
         scope_json: normalizeJsonArray(insertPayload.scope_json),
       };
+      logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-01 rpc-payload-prepared', {
+        correlationId: ctx.correlationId,
+        tenantId,
+        franchiseId: franchiseId || null,
+        taskCountInPayload: Array.isArray(rpcPayload.tasks_json) ? rpcPayload.tasks_json.length : 0,
+        scopeCountInPayload: Array.isArray(rpcPayload.scope_json) ? rpcPayload.scope_json.length : 0,
+      });
+      logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-02 calling-atomic-function', {
+        correlationId: ctx.correlationId,
+        functionName: 'amro_create_work_package_template_atomic',
+      });
       const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_package_template_atomic', {
         p_tenant_id: tenantId,
         p_franchise_id: franchiseId,
@@ -1555,11 +1644,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       if (atomicError) {
         const message = String(atomicError.message || '');
+        logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-03 atomic-function-failed', {
+          correlationId: ctx.correlationId,
+          message,
+        });
         if (/validation failed/i.test(message)) {
           throw new HttpError(message, 422);
         }
         if (/amro_create_work_package_template_atomic/i.test(message) && /does not exist|undefined function/i.test(message)) {
-          throw new HttpError('Atomic create function is missing in database. Apply latest Supabase migrations.', 500);
+          logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-04 atomic-function-missing', {
+            correlationId: ctx.correlationId,
+            message,
+          });
+          throw new HttpError('Atomic create function is missing in database. Apply latest Supabase migrations Sarvesh.', 500);
         }
         throw new HttpError(message || 'Failed to create work package template transaction', 400);
       }
@@ -1571,6 +1668,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         : null;
       const createdTemplateId = asNullableString(createdRecord?.id);
       if (!createdTemplateId) {
+        logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-05 missing-created-template-id', {
+          correlationId: ctx.correlationId,
+        });
         throw new HttpError('Atomic create did not return work package template id', 500);
       }
       const createdRelationshipsRaw = Array.isArray(atomic.created_relationships)
@@ -1579,6 +1679,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const createdRelationships = createdRelationshipsRaw
         .filter((item) => item && typeof item === 'object')
         .map((item) => item as Record<string, unknown>);
+      logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-06 atomic-function-succeeded', {
+        correlationId: ctx.correlationId,
+        createdTemplateId,
+        createdRelationshipCount: createdRelationships.length,
+      });
       createdRelationships.forEach((relationship, index) => {
         logger.debug('[AMRO Master Data API] inserted work package template task relationship', {
           correlationId: ctx.correlationId,
@@ -1595,10 +1700,27 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         .eq('tenant_id', tenantId)
         .eq('work_package_template_id', createdTemplateId);
       if (verificationError) {
+        logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-07 verification-query-failed', {
+          correlationId: ctx.correlationId,
+          createdTemplateId,
+          message: String(verificationError.message || ''),
+        });
         throw new HttpError(verificationError.message, 400);
       }
       const persistedRelationshipCount = Array.isArray(verificationRows) ? verificationRows.length : 0;
+      logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-08 verification-summary', {
+        correlationId: ctx.correlationId,
+        createdTemplateId,
+        requestedTaskCount,
+        persistedRelationshipCount,
+      });
       if (persistedRelationshipCount !== requestedTaskCount) {
+        logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-09 verification-mismatch', {
+          correlationId: ctx.correlationId,
+          createdTemplateId,
+          requestedTaskCount,
+          persistedRelationshipCount,
+        });
         throw new HttpError(
           `Verification failed: relationship count mismatch. expected=${requestedTaskCount} actual=${persistedRelationshipCount}`,
           500,
@@ -1623,6 +1745,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           relationship_count: createdRelationships.length,
           requested_task_count: requestedTaskCount,
         },
+      });
+      logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-10 response-sent', {
+        correlationId: ctx.correlationId,
+        createdTemplateId,
+        requestedTaskCount,
+        relationshipCount: createdRelationships.length,
       });
       return;
     }

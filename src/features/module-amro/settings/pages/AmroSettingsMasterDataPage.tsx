@@ -2913,7 +2913,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
           })
           .filter((value): value is string => Boolean(value));
-        logger.info('[AMRO Master Data UI] creating work package template request', {
+        logger.info('[AMRO Master Data UI] creating work package template request work_package_templates', {
           entity,
           requestUrl: `/api/v2/amro/master-data/${entity}`,
           templateCode: String(payload.template_code || ''),
@@ -5500,8 +5500,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     return Object.entries(source).slice(0, 6);
   }, [aircraftDashboardEngineModule]);
   const aircraftEngineConfigurationRows = useMemo(() => {
-    const cfg =
-      (aircraftDashboardEngineModule?.configuration_management as { entries?: unknown[] } | undefined)?.entries || [];
+    const cfg = (aircraftDashboardEngineModule
+      ? ((aircraftDashboardEngineModule as unknown as Record<string, unknown>).configuration_management as { entries?: unknown[] } | undefined)
+      : undefined)?.entries || [];
     return Array.isArray(cfg) ? (cfg as Array<Record<string, unknown>>).slice(0, 6) : [];
   }, [aircraftDashboardEngineModule]);
   const aircraftEngineAnomalies = useMemo(

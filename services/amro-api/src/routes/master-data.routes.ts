@@ -1197,6 +1197,10 @@ router.post(
       res.status(404).json({ error: 'Not Found', version: 'v2', correlationId });
       return;
     }
+     logger.info('[AMRO Master Data] POST Method received for entity', {
+      correlationId,
+      entity: req.params.entity,
+    });
     if (!req.tenantId || !req.userId) {
       throw new HttpError('Missing tenant or user context', 401);
     }
@@ -1207,7 +1211,10 @@ router.post(
     const franchiseId = extractFranchiseId(req);
     const supabase = getSupabaseAdminClient();
     const scopePayload = { tenant_id: req.tenantId, franchise_id: franchiseId };
-
+   logger.info('[AMRO Master Data] POST Method received for entity002', {
+      correlationId,
+      entity: req.params.entity,
+    });
     if (isBulkImport) {
       if (!records.length) {
         throw new HttpError('records are required for bulk import', 400);
@@ -1257,7 +1264,7 @@ router.post(
       });
       return;
     }
-
+    logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP -001] ', {function: 'insertPayload'});
     const hydratedBody = entity === 'aircraft' ? await hydrateAircraftPayload(supabase, req.tenantId, franchiseId, body) : body;
     const payload = sanitizeWritePayload(entity, hydratedBody);
     if (entity === 'assembly_models') {

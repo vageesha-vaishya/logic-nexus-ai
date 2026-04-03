@@ -11,6 +11,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { authMiddleware, AuthRequest, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware';
 import masterDataRoutes from './routes/master-data.routes';
 import workOrdersRoutes from './routes/work-orders.routes';
+import workPackageTemplateRoutes from './routes/work-package-template-routes';
 import { ErrorResponse } from './types/amro.types';
 import { logger } from './utils/logger';
 import { amroEventsProducer } from './events/amro-events.producer';
@@ -1376,6 +1377,7 @@ app.use('/api/v2/amro', authMiddleware);
 app.use('/api/v1', workOrdersRoutes);
 app.use('/api/v2', workOrdersRoutes);
 app.use('/api/v2', masterDataRoutes);
+app.use('/api/v2', workPackageTemplateRoutes);
 
 // ============================================================================
 // ERROR HANDLING
