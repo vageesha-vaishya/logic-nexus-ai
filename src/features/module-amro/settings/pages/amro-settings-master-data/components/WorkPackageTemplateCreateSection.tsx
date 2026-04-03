@@ -79,8 +79,8 @@ export function WorkPackageTemplateCreateSection({
   const [workPackageTemplateTaskFilters, setWorkPackageTemplateTaskFilters] = useState<Record<WorkPackageTaskSortColumn, string>>(
     DEFAULT_WORK_PACKAGE_TASK_FILTERS,
   );
-  const resolveWorkPackageTaskTemplateId = useCallback((task: Record<string, unknown>): string => {
-    return String(task.id || '').trim();
+  const resolveWorkPackageTaskTemplateId = useCallback((taskTemplate: Record<string, unknown>): string => {
+    return String(taskTemplate.id || '').trim();
   }, []);
 
   const loadWorkPackageTemplateTaskTemplates = useCallback(async () => {
@@ -216,10 +216,10 @@ export function WorkPackageTemplateCreateSection({
       const compact = normalized.replace(/[^a-z0-9]/g, '');
       return normalizedTokens.some((token) => token && compact.includes(token));
     };
-    return workPackageTemplateTaskTemplates.filter((task) => {
+    return workPackageTemplateTaskTemplates.filter((taskTemplate) => {
       const taskText = (() => {
         try {
-          return JSON.stringify(task);
+          return JSON.stringify(taskTemplate);
         } catch {
           return '';
         }
@@ -229,15 +229,15 @@ export function WorkPackageTemplateCreateSection({
   }, [formValues.aircraft_model, workPackageTemplateAircraftModelOptions, workPackageTemplateTaskTemplates]);
 
   const selectedWorkPackageAircraftModelTaskRows = useMemo(() => {
-    const filtered = selectedWorkPackageAircraftModelTaskItems.filter((task) => {
+    const filtered = selectedWorkPackageAircraftModelTaskItems.filter((taskTemplate) => {
       const resolveValue = (column: WorkPackageTaskSortColumn): string => {
         if (column === 'is_mandatory') {
-          return typeof task.is_mandatory === 'boolean' ? String(task.is_mandatory) : '';
+          return typeof taskTemplate.is_mandatory === 'boolean' ? String(taskTemplate.is_mandatory) : '';
         }
         if (column === 'task_id') {
-          return String(task.task_template_id ?? task.task_id ?? '').toLowerCase();
+          return String(taskTemplate.task_template_id ?? taskTemplate.task_id ?? '').toLowerCase();
         }
-        return String(task[column] ?? '').toLowerCase();
+        return String(taskTemplate[column] ?? '').toLowerCase();
       };
       return (Object.entries(workPackageTemplateTaskFilters) as Array<[WorkPackageTaskSortColumn, string]>).every(([column, rawFilter]) => {
         const normalizedFilter = rawFilter.trim().toLowerCase();
@@ -268,7 +268,7 @@ export function WorkPackageTemplateCreateSection({
 
   const selectedWorkPackageAircraftModelTaskRowIds = useMemo(
     () => selectedWorkPackageAircraftModelTaskRows
-      .map((task) => resolveWorkPackageTaskTemplateId(task))
+      .map((taskTemplate) => resolveWorkPackageTaskTemplateId(taskTemplate))
       .filter((value) => value.length > 0),
     [resolveWorkPackageTaskTemplateId, selectedWorkPackageAircraftModelTaskRows],
   );
@@ -293,12 +293,12 @@ export function WorkPackageTemplateCreateSection({
   }, []);
 
   const taskTemplateById = useMemo(() => {
-    return workPackageTemplateTaskTemplates.reduce((map, task) => {
-      const id = resolveWorkPackageTaskTemplateId(task);
+    return workPackageTemplateTaskTemplates.reduce((map, taskTemplate) => {
+      const id = resolveWorkPackageTaskTemplateId(taskTemplate);
       if (!id) {
         return map;
       }
-      map.set(id, task);
+      map.set(id, taskTemplate);
       return map;
     }, new Map<string, Record<string, unknown>>());
   }, [resolveWorkPackageTaskTemplateId, workPackageTemplateTaskTemplates]);
@@ -308,19 +308,19 @@ export function WorkPackageTemplateCreateSection({
       .map((id) => String(id || '').trim())
       .filter((id) => id.length > 0)
       .map((id) => {
-        const task = taskTemplateById.get(id);
-        if (!task) {
+        const taskTemplate = taskTemplateById.get(id);
+        if (!taskTemplate) {
           return {
             task_template_id: id,
           };
         }
         return {
           task_template_id: id,
-          task_id: task.task_template_id ?? task.task_id ?? null,
-          code_form_no: task.code_form_no ?? null,
-          ata_code: task.ata_code ?? null,
-          reference_amp: task.reference_amp ?? null,
-          description: task.description ?? null,
+          task_id: taskTemplate.task_template_id ?? taskTemplate.task_id ?? null,
+          code_form_no: taskTemplate.code_form_no ?? null,
+          ata_code: taskTemplate.ata_code ?? null,
+          reference_amp: taskTemplate.reference_amp ?? null,
+          description: taskTemplate.description ?? null,
         };
       });
   }, [taskTemplateById]);
@@ -598,8 +598,8 @@ export function WorkPackageTemplateCreateSection({
                   </tr>
                 </thead>
                 <tbody>
-                  {selectedWorkPackageAircraftModelTaskRows.length ? selectedWorkPackageAircraftModelTaskRows.map((task) => {
-                    const rowId = resolveWorkPackageTaskTemplateId(task);
+                  {selectedWorkPackageAircraftModelTaskRows.length ? selectedWorkPackageAircraftModelTaskRows.map((taskTemplate) => {
+                    const rowId = resolveWorkPackageTaskTemplateId(taskTemplate);
                     if (!rowId) {
                       return null;
                     }
@@ -609,18 +609,18 @@ export function WorkPackageTemplateCreateSection({
                         <Checkbox
                           checked={workPackageTemplateSelectedTaskIds.includes(rowId)}
                           onCheckedChange={(checked) => toggleWorkPackageTemplateTaskSelection(rowId, Boolean(checked))}
-                          aria-label={`Select task row ${String(task.task_template_id || task.task_id || rowId)}`}
+                          aria-label={`Select task row ${String(taskTemplate.task_template_id || taskTemplate.task_id || rowId)}`}
                         />
                       </td>
-                      <td className="px-2 py-1.5">{String(task.task_template_id || task.task_id || '-')}</td>
-                      <td className="px-2 py-1.5">{String(task.code_form_no || '-')}</td>
-                      <td className="px-2 py-1.5">{String(task.ata_code || '-')}</td>
-                      <td className="px-2 py-1.5">{String(task.reference_amp || '-')}</td>
-                      <td className="px-2 py-1.5">{String(task.description || '-')}</td>
-                      <td className="px-2 py-1.5">{String(task.category_code || '-')}</td>
-                      <td className="px-2 py-1.5">{String(task.estimated_man_hours || '-')}</td>
-                      <td className="px-2 py-1.5">{typeof task.is_mandatory === 'boolean' ? String(task.is_mandatory) : '-'}</td>
-                      <td className="px-2 py-1.5">{typeof task.task_template_detail_json === 'object' && task.task_template_detail_json !== null ? JSON.stringify(task.task_template_detail_json) : String(task.task_template_detail_json || '-')}</td>
+                      <td className="px-2 py-1.5">{String(taskTemplate.task_template_id || taskTemplate.task_id || '-')}</td>
+                      <td className="px-2 py-1.5">{String(taskTemplate.code_form_no || '-')}</td>
+                      <td className="px-2 py-1.5">{String(taskTemplate.ata_code || '-')}</td>
+                      <td className="px-2 py-1.5">{String(taskTemplate.reference_amp || '-')}</td>
+                      <td className="px-2 py-1.5">{String(taskTemplate.description || '-')}</td>
+                      <td className="px-2 py-1.5">{String(taskTemplate.category_code || '-')}</td>
+                      <td className="px-2 py-1.5">{String(taskTemplate.estimated_man_hours || '-')}</td>
+                      <td className="px-2 py-1.5">{typeof taskTemplate.is_mandatory === 'boolean' ? String(taskTemplate.is_mandatory) : '-'}</td>
+                      <td className="px-2 py-1.5">{typeof taskTemplate.task_template_detail_json === 'object' && taskTemplate.task_template_detail_json !== null ? JSON.stringify(taskTemplate.task_template_detail_json) : String(taskTemplate.task_template_detail_json || '-')}</td>
                     </tr>
                     );
                   }) : (
