@@ -1178,6 +1178,20 @@ Errors:
 - Support 50,000 evidence uploads per day with integrity verification enabled.
 - Support 5,000 integration events per minute with idempotent processing.
 
+### 22.4 Engine Module NFR Tie-In (AMRO -> Aircraft -> Engine)
+
+| Engine Capability | Target SLO | Hard Limit | Verification Method |
+|---|---:|---:|---|
+| Engine dashboard read model refresh | < 700 ms p95 | 1.2 s | End-to-end trace + synthetic checks |
+| Engine next-due calculation API | < 250 ms p95 | 500 ms | API latency telemetry |
+| Engine configuration graph fetch | < 300 ms p95 | 600 ms | API + DB plan analysis |
+| Predictive risk score retrieval | < 400 ms p95 | 800 ms | Scoring pipeline metrics |
+| Engine compliance gate evaluation | < 350 ms p95 | 700 ms | Compliance service traces |
+
+- Reliability objective: maintain 99.9% availability for engine-specific APIs and engine dashboard read models.
+- Horizontal scale objective: support 10,000+ concurrent authenticated users with tenant-scoped query isolation.
+- Compatibility objective: additive API evolution only; existing consumers remain functional during one full deprecation cycle.
+
 ---
 
 ## 23. Integration Points and Contract Governance
@@ -1247,6 +1261,29 @@ Errors:
 - Instrument every workflow stage with observability and policy version traces.
 - Keep security and compliance checks in execution paths, not post-processing paths.
 - Treat forecasting as decision support with explainability and human override controls.
+
+### 25.3 Engine API Contract Priorities (Next-Due + Configuration Graph)
+
+| Contract ID | Endpoint | Purpose | Backward Compatibility Rule |
+|---|---|---|---|
+| API-ENG-001 | `GET /api/v2/amro/engine-assets` | List tenant-scoped engine assets and lifecycle state | Additive fields only; preserve current list response shape |
+| API-ENG-002 | `GET /api/v2/amro/engine-assets/:id/configuration-graph` | Return engine serialized configuration, module positions, LLP stack | Keep existing fields stable; new graph nodes are optional |
+| API-ENG-003 | `POST /api/v2/amro/engine-assets/:id/next-due` | Calculate next due using usage + policy + compliance constraints | Preserve request field aliases for one deprecation cycle |
+| API-ENG-004 | `GET /api/v2/amro/engine-assets/:id/performance-history` | Retrieve trend and anomaly timeline for engine health analysis | Maintain paging contract; additive metrics only |
+
+- Every response must include `tenant_id`, `franchise_id`, and trace identifiers for audit replay.
+- Engine API contracts must publish conformance fixtures before partner rollout.
+
+### 25.4 Engine Phased Roadmap (P0/P1/P2)
+
+| Phase | Scope | Deliverables | Acceptance Criteria |
+|---|---|---|---|
+| P0 | Read-model and baseline contracts | Engine configuration panel, API-ENG-001/002 read contracts, telemetry instrumentation | Engine UI renders configuration entries with < 700 ms p95 |
+| P1 | Scheduling and compliance orchestration | API-ENG-003 next-due service, compliance gate hooks, work-order linkage | Next-due outputs traceable to policy snapshots and obligations |
+| P2 | Predictive and integration hardening | API-ENG-004, model lifecycle governance, partner event contracts | Failure prediction confidence and drift checks exposed with audit trace |
+
+- Microservice split sequence: `engine-core-service` (P0), `engine-schedule-service` (P1), `engine-intelligence-service` (P2).
+- Data contract sequence: stable canonical engine asset envelope first, then additive scheduling/predictive extensions.
 
 ---
 
@@ -1345,6 +1382,17 @@ User Interfaces (SCR-AMRO-001..012)
 External Systems
     <-> MOD-AMRO-08 Integration Hub (ERP/IoT/Regulator adapters, replay queues)
 ```
+
+### 26.6.1 Engine Change Block (Architecture Mapping Extension)
+
+- Add `MOD-AMRO-11 Engine Core` to the architecture map for engine lifecycle, configuration graph, and shop-visit context.
+- Add `MOD-AMRO-12 Engine Scheduling` to compute next-due outcomes from meter usage, policy snapshots, and compliance obligations.
+- Add `MOD-AMRO-13 Engine Intelligence` for anomaly scoring, health trends, and recommendation traceability.
+- Publish engine events through outbox:
+  - `engine.asset.configuration.updated`
+  - `engine.asset.next_due.computed`
+  - `engine.asset.risk.scored`
+- Enforce compatibility guardrail: existing AMRO APIs remain available; engine APIs are introduced additively under `/api/v2/amro/engine-*`.
 
 ### 26.7 Implementation Sequence Mapping (Build Order, Dependencies, Deployment Priority)
 

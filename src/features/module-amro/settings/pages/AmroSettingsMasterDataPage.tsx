@@ -1416,6 +1416,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftUnifiedTemplateManufacturerFilter, setAircraftUnifiedTemplateManufacturerFilter] = useState('all');
   const [aircraftUnifiedDocumentCategoryFilter, setAircraftUnifiedDocumentCategoryFilter] = useState('all');
   const [aircraftUnifiedAdSbComplianceFilter, setAircraftUnifiedAdSbComplianceFilter] = useState('all');
+  const [supplierTypeFilter, setSupplierTypeFilter] = useState('all');
+  const [facilityStationFilter, setFacilityStationFilter] = useState('all');
+  const [workCenterTypeFilter, setWorkCenterTypeFilter] = useState('all');
   const deferredAircraftUnifiedSearch = useDeferredValue(aircraftUnifiedSearch);
   const [aircraftTypeOptions, setAircraftTypeOptions] = useState<string[]>([]);
   const [aircraftStatusOptions, setAircraftStatusOptions] = useState<string[]>([]);
@@ -3561,12 +3564,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setFieldValue,
   ]);
 
-  const supportsColumnFilters = entity === 'aircraft' || entity === 'flight_logs';
+  const supportsColumnHeaderFilters = entity === 'aircraft' || entity === 'flight_logs';
 
   const filteredRows = useMemo(() => {
-    if (!supportsColumnFilters) {
-      return rows;
-    }
     return rows.filter((row) => {
       const columnMatch = Object.entries(columnFilters).every(([column, rawValue]) => {
         const value = rawValue.trim().toLowerCase();
@@ -3595,11 +3595,52 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         if (flightPilotFilter.trim() && !String(row.pilot_name || '').toLowerCase().includes(flightPilotFilter.trim().toLowerCase())) return false;
         if (flightNumberFilter.trim() && !String(row.flight_number || '').toLowerCase().includes(flightNumberFilter.trim().toLowerCase())) return false;
       }
+      if (entity === 'suppliers' && supplierTypeFilter !== 'all') {
+        const normalizedType = String(
+          row.supplier_type
+          || row.supplier_category
+          || row.vendor_type
+          || row.type
+          || '',
+        ).trim().toLowerCase();
+        if (normalizedType !== supplierTypeFilter) return false;
+      }
+      if (entity === 'maintenance_facilities' && facilityStationFilter !== 'all') {
+        const normalizedStation = String(
+          row.station_code
+          || row.station
+          || row.facility_station
+          || '',
+        ).trim().toLowerCase();
+        if (normalizedStation !== facilityStationFilter) return false;
+      }
+      if (entity === 'work_centers' && workCenterTypeFilter !== 'all') {
+        const normalizedCenterType = String(
+          row.center_type
+          || row.work_center_type
+          || row.type
+          || '',
+        ).trim().toLowerCase();
+        if (normalizedCenterType !== workCenterTypeFilter) return false;
+      }
       return true;
     });
-  }, [columnFilters, entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, rows, supportsColumnFilters]);
+  }, [
+    columnFilters,
+    entity,
+    facilityStationFilter,
+    flightAircraftFilter,
+    flightDateFrom,
+    flightDateTo,
+    flightNumberFilter,
+    flightPilotFilter,
+    flightRegistrationFilter,
+    rows,
+    supplierTypeFilter,
+    workCenterTypeFilter,
+  ]);
 
-  const renderedRows = supportsColumnFilters ? filteredRows : rows;
+  const renderedRows = filteredRows;
   const renderedRowIds = useMemo(() => renderedRows.map((row) => row.id), [renderedRows]);
   const renderedRowIdSet = useMemo(() => new Set(renderedRowIds), [renderedRowIds]);
 
@@ -5383,6 +5424,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     const source = aircraftDashboardEngineModule?.component_monitoring?.statuses || {};
     return Object.entries(source).slice(0, 6);
   }, [aircraftDashboardEngineModule]);
+  const aircraftEngineConfigurationRows = useMemo(() => {
+    const cfg =
+      (aircraftDashboardEngineModule?.configuration_management as { entries?: unknown[] } | undefined)?.entries || [];
+    return Array.isArray(cfg) ? (cfg as Array<Record<string, unknown>>).slice(0, 6) : [];
+  }, [aircraftDashboardEngineModule]);
   const aircraftEngineAnomalies = useMemo(
     () =>
       Array.isArray((aircraftDashboardEngineModule?.component_monitoring?.anomaly_detection as { anomalies?: unknown[] } | undefined)?.anomalies)
@@ -6429,6 +6475,30 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       { value: 'inactive', label: 'Inactive' },
     ];
   }, [aircraftUnifiedLocale]);
+  const supplierTypeOptions = useMemo(() => {
+    const values = new Set<string>();
+    rows.forEach((row) => {
+      const value = String(row.supplier_type || row.supplier_category || row.vendor_type || row.type || '').trim();
+      if (value) values.add(value);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+  const facilityStationOptions = useMemo(() => {
+    const values = new Set<string>();
+    rows.forEach((row) => {
+      const value = String(row.station_code || row.station || row.facility_station || '').trim();
+      if (value) values.add(value);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
+  const workCenterTypeOptions = useMemo(() => {
+    const values = new Set<string>();
+    rows.forEach((row) => {
+      const value = String(row.center_type || row.work_center_type || row.type || '').trim();
+      if (value) values.add(value);
+    });
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }, [rows]);
   const clearAircraftUnifiedFilters = useCallback(() => {
     setAircraftUnifiedSearch('');
     setAircraftUnifiedStatusFilter('all');
@@ -6440,7 +6510,93 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const clearMasterDataControls = useCallback(() => {
     setSearch('');
     setStatusFilter('all');
-  }, []);
+    setSupplierTypeFilter('all');
+    setFacilityStationFilter('all');
+    setWorkCenterTypeFilter('all');
+    if (entity === 'suppliers') {
+      setColumnFilterValue('supplier_type', '');
+    }
+    if (entity === 'maintenance_facilities') {
+      setColumnFilterValue('station_code', '');
+    }
+    if (entity === 'work_centers') {
+      setColumnFilterValue('center_type', '');
+    }
+  }, [entity, setColumnFilterValue]);
+  const masterDataSecondaryControls = useMemo(() => {
+    if (entity === 'suppliers') {
+      return (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="w-full">
+            <Select value={supplierTypeFilter} onValueChange={setSupplierTypeFilter}>
+              <SelectTrigger aria-label="Supplier type filter">
+                <SelectValue placeholder="Supplier type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Supplier Types</SelectItem>
+                {supplierTypeOptions.map((option) => (
+                  <SelectItem key={`supplier-type-option-${option}`} value={option.toLowerCase()}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    }
+    if (entity === 'maintenance_facilities') {
+      return (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="w-full">
+            <Select value={facilityStationFilter} onValueChange={setFacilityStationFilter}>
+              <SelectTrigger aria-label="Facility station filter">
+                <SelectValue placeholder="Facility station" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Stations</SelectItem>
+                {facilityStationOptions.map((option) => (
+                  <SelectItem key={`facility-station-option-${option}`} value={option.toLowerCase()}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    }
+    if (entity === 'work_centers') {
+      return (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="w-full">
+            <Select value={workCenterTypeFilter} onValueChange={setWorkCenterTypeFilter}>
+              <SelectTrigger aria-label="Work center type filter">
+                <SelectValue placeholder="Work center type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Work Center Types</SelectItem>
+                {workCenterTypeOptions.map((option) => (
+                  <SelectItem key={`work-center-type-option-${option}`} value={option.toLowerCase()}>
+                    {option}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      );
+    }
+    return null;
+  }, [
+    entity,
+    facilityStationFilter,
+    facilityStationOptions,
+    supplierTypeFilter,
+    supplierTypeOptions,
+    workCenterTypeFilter,
+    workCenterTypeOptions,
+  ]);
   const aircraftUnifiedResultSummary = useMemo(() => {
     if (activeAircraftUnifiedModuleKey === 'templates') {
       return { visible: filteredAircraftTemplateRows.length, total: aircraftTemplateRows.length };
@@ -6889,6 +7045,22 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                           ))
                         )}
                       </div>
+                      <div className="space-y-1 text-[12px]">
+                        <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Engine Configuration Management</p>
+                        {aircraftEngineConfigurationRows.length === 0 ? (
+                          <p className="text-[hsl(var(--mdm-template-muted))]">No engine configuration entries available.</p>
+                        ) : (
+                          aircraftEngineConfigurationRows.map((row, index) => (
+                            <div key={`engine-configuration-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
+                              {String(row.engine_serial_number || row.serial_number || row.engine || `Engine ${index + 1}`)}
+                              {' · '}position {String(row.engine_position || row.position || '-')}
+                              {' · '}TSN {String(row.tsn ?? '-')}
+                              {' · '}CSN {String(row.csn ?? '-')}
+                              {' · '}module {String(row.module || row.module_name || '-')}
+                            </div>
+                          ))
+                        )}
+                      </div>
                       <div className="grid gap-2 text-[12px] md:grid-cols-3">
                         <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
                           <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Serialized Engine Tracking</p>
@@ -7309,6 +7481,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     />
                   )
               }
+              beforeContent={
+                !(entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule) && masterDataSecondaryControls ? (
+                  <div className="border-b border-[hsl(var(--mdm-template-border))] bg-background/60 p-2">
+                    {masterDataSecondaryControls}
+                  </div>
+                ) : null
+              }
             >
                 <Table className="table-fixed">
                   <colgroup>
@@ -7353,7 +7532,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                         </TableHead>
                       ))}
                     </TableRow>
-                    {supportsColumnFilters ? (
+                    {supportsColumnHeaderFilters ? (
                       <TableRow className="bg-white">
                         <TableHead className="sticky top-[41px] z-10 bg-white px-3 py-2 text-[12px] font-medium text-[#94A3B8]">Filter</TableHead>
                         {entity === 'aircraft' ? <TableHead className="sticky top-[41px] z-10 bg-white px-3 py-2" /> : null}

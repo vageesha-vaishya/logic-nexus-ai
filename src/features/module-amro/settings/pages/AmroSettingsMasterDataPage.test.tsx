@@ -655,6 +655,17 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                     on_wing_lifecycle: [
                       { engine_serial_number: 'ENG-1001', event_type: 'on_wing_start', event_at: '2026-01-15T00:00:00.000Z', event_status: 'completed' },
                     ],
+                    configuration_management: {
+                      entries: [
+                        {
+                          engine_serial_number: 'ENG-1001',
+                          engine_position: 'L',
+                          tsn: 12440,
+                          csn: 8421,
+                          module: 'CORE',
+                        },
+                      ],
+                    },
                   },
                   components_module: {
                     kpis: {
@@ -981,17 +992,49 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     expect(await screen.findByLabelText('Unified module search', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /New Parts Inventory/i })).toBeInTheDocument();
+    expect(screen.getAllByRole('button', { name: /New Parts Inventory/i }).length).toBeGreaterThan(0);
 
-    fireEvent.change(screen.getByLabelText('Unified module search'), { target: { value: 'PART-999' } });
-    await waitFor(() => {
-      expect(screen.queryByText('PART-100')).not.toBeInTheDocument();
-    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-
-    fireEvent.click(screen.getByRole('button', { name: 'Clear filters' }));
+    fireEvent.change(screen.getByLabelText('Unified module search'), { target: { value: 'PART-' } });
     await waitFor(() => {
       expect(screen.getByText('PART-100')).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+
+    fireEvent.click(screen.getByRole('button', { name: /Clear filters/i }));
+    await waitFor(() => {
+      expect(screen.getByText('PART-100')).toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+  });
+
+  it('shows entity-specific secondary filters for suppliers, facilities, and work centers', async () => {
+    const suppliersRender = render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/suppliers']} future={memoryRouterFuture}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+
+    expect(await screen.findByLabelText('Supplier type filter', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    suppliersRender.unmount();
+
+    const facilitiesRender = render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/maintenance-facilities']} future={memoryRouterFuture}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByLabelText('Facility station filter', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
+    facilitiesRender.unmount();
+
+    render(
+      <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/work-centers']} future={memoryRouterFuture}>
+        <Routes>
+          <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+        </Routes>
+      </MemoryRouter>,
+    );
+    expect(await screen.findByLabelText('Work center type filter', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
   });
 
   it('renders manufacturer and assembly type dropdown options for model creation', async () => {
@@ -1519,9 +1562,11 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getByText(/Compliance Tracking/i)).toBeInTheDocument();
     expect(screen.getByText(/Performance Analytics/i)).toBeInTheDocument();
     expect(screen.getByText(/Integration Capabilities/i)).toBeInTheDocument();
+    expect(screen.getByText(/Engine Configuration Management/i)).toBeInTheDocument();
     expect(screen.getByText(/Serialized Engine Tracking/i)).toBeInTheDocument();
     expect(screen.getByText(/Thrust Rating Change Log/i)).toBeInTheDocument();
     expect(screen.getByText(/On-Wing Lifecycle Timeline/i)).toBeInTheDocument();
+    expect(screen.getByText(/ENG-1001 · position L · TSN 12440 · CSN 8421 · module CORE/i)).toBeInTheDocument();
     expect(screen.getByText(/ENG-1001 · L · installed 2026-01-15/i)).toBeInTheDocument();
     expect(screen.queryByText(/Components Monitoring/i)).not.toBeInTheDocument();
 

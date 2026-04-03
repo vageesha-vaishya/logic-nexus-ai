@@ -15,6 +15,7 @@ import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '
 import { getSupabaseAdminClient } from '../../_utils/supabaseAdmin';
 import { buildAmroServiceBoundaryEnvelope, createAmroIsolationScope } from './anti-corruption-adapter';
 import { appendAmroAuditLedgerRecord } from './audit-ledger';
+import { listEngineConfigurationEntries } from './engine-read-model-store';
 
 type DashboardRole = 'technician' | 'engineer' | 'manager';
 type DashboardModule = 'overview' | 'engine' | 'components' | 'all';
@@ -580,6 +581,7 @@ function buildEngineOperationsModule(args: {
   signalSource: string;
   generatedAt: string;
   trendDays: number;
+  configurationEntries: Array<Record<string, unknown>>;
 }): JsonRecord {
   const {
     engineSnapshot,
@@ -590,6 +592,7 @@ function buildEngineOperationsModule(args: {
     signalSource,
     generatedAt,
     trendDays,
+    configurationEntries,
   } = args;
   const engineKeywords = ['engine', 'borescope', 'tbo', 'llp', 'hot section', 'compressor', 'turbine'];
   const engineMaintenanceRows = maintenanceRows.filter((row) => {
@@ -907,6 +910,9 @@ function buildEngineOperationsModule(args: {
     ...engineSnapshot,
     lifecycle_management: lifecycleRows,
     serialized_engine_tracking: serializedEngineRecords.slice(0, 80),
+    configuration_management: {
+      entries: configurationEntries,
+    },
     thrust_rating_management: thrustRatingHistory.slice(0, 80),
     on_wing_lifecycle: onWingLifecycleRecords.slice(0, 120),
     lifecycle_traceability: lifecycleTraceability,
@@ -1609,6 +1615,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       trendDays,
     });
     const generatedAt = new Date().toISOString();
+    const configurationEntries = listEngineConfigurationEntries({ tenantId, franchiseId });
     const engineOperationsModule = buildEngineOperationsModule({
       engineSnapshot: engineSnapshot as JsonRecord,
       maintenanceRows,
@@ -1618,6 +1625,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       signalSource: signalData.source,
       generatedAt,
       trendDays,
+      configurationEntries,
     });
     const combinedAlerts = [...engineSnapshot.alerts, ...componentsSnapshot.alerts].sort((left, right) => {
       const rank = (severity: unknown) => {
