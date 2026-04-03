@@ -551,20 +551,20 @@ export function extractSelectedTaskTemplateResolution(payload: Record<string, un
   const referenceTokens = new Set<string>();
   const aircraftModelToken = asNullableString(payload.aircraft_model);
 
-  tasksJson.forEach((entry) => {
-    if (!entry) return;
+  for (const entry of tasksJson) {
+    if (!entry) continue;
     if (typeof entry === 'string') {
       const normalized = entry.trim();
-      if (!normalized) return;
+      if (!normalized) continue;
       if (isUuid(normalized)) {
         identifiers.add(normalized);
       } else {
         referenceTokens.add(normalized);
       }
-      return;
+      continue;
     }
     if (typeof entry !== 'object') {
-      return;
+      continue;
     }
     const row = entry as Record<string, unknown>;
     const idCandidates = [
@@ -605,14 +605,14 @@ export function extractSelectedTaskTemplateResolution(payload: Record<string, un
     });
     if (typeof row.task_template === 'string') {
       const token = asNullableString(row.task_template);
-      if (!token) return;
+      if (!token) continue;
       if (isUuid(token)) {
         identifiers.add(token);
       } else {
         referenceTokens.add(token);
       }
     }
-  });
+  }
 
   return {
     taskTemplateIds: Array.from(identifiers),
@@ -738,7 +738,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   const resolveScopedTaskTemplateQuery = () => {
     let query = params.supabase
       .from('task_templates')
-      .select('id,assembly_models,franchise_id,task_id,code_form_no')
+      .select('id,assembly_models,franchise_id,task_template_id,code_form_no')
       .eq('tenant_id', params.tenantId);
     if (params.franchiseId) {
       query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
@@ -758,14 +758,14 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     });
   }
   if (uniqueTaskReferenceTokens.length > 0) {
-    const { data: byTaskIdRows, error: byTaskIdError } = await resolveScopedTaskTemplateQuery().in('task_id', uniqueTaskReferenceTokens);
+    const { data: byTaskIdRows, error: byTaskIdError } = await resolveScopedTaskTemplateQuery().in('task_template_id', uniqueTaskReferenceTokens);
     if (byTaskIdError) {
       throw new HttpError(byTaskIdError.message, 400);
     }
     (Array.isArray(byTaskIdRows) ? byTaskIdRows : []).forEach((row) => {
       const record = row as Record<string, unknown>;
       const id = asNullableString(record.id);
-      const taskId = asNullableString(record.task_id);
+      const taskId = asNullableString(record.task_template_id);
       if (taskId) resolvedReferenceTokens.add(taskId);
       if (!id) return;
       taskTemplateRowsById.set(id, record);
@@ -1527,8 +1527,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         selectedTaskReferenceCount: taskReferenceTokens.length,
         selectedTaskReferenceTokens: taskReferenceTokens,
       });
+      const normalizeJsonArray = (value: unknown): unknown[] => {
+        if (Array.isArray(value)) return value;
+        if (typeof value === 'string') {
+          const raw = value.trim();
+          if (!raw) return [];
+          try {
+            const decoded = JSON.parse(raw);
+            return Array.isArray(decoded) ? decoded : [];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      };
       const rpcPayload: Record<string, unknown> = {
         ...insertPayload,
+        tasks_json: normalizeJsonArray(insertPayload.tasks_json),
+        scope_json: normalizeJsonArray(insertPayload.scope_json),
       };
       const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_package_template_atomic', {
         p_tenant_id: tenantId,
@@ -1541,6 +1557,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         const message = String(atomicError.message || '');
         if (/validation failed/i.test(message)) {
           throw new HttpError(message, 422);
+        }
+        if (/amro_create_work_package_template_atomic/i.test(message) && /does not exist|undefined function/i.test(message)) {
+          throw new HttpError('Atomic create function is missing in database. Apply latest Supabase migrations.', 500);
         }
         throw new HttpError(message || 'Failed to create work package template transaction', 400);
       }
@@ -1569,6 +1588,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           modelId: asNullableString(relationship.model_id),
         });
       });
+      const requestedTaskCount = Array.isArray(createdRecord?.tasks_json) ? createdRecord?.tasks_json.length : 0;
       const { data: verificationRows, error: verificationError } = await supabase
         .from('work_package_template_task_templates')
         .select('task_template_id')
@@ -1578,9 +1598,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new HttpError(verificationError.message, 400);
       }
       const persistedRelationshipCount = Array.isArray(verificationRows) ? verificationRows.length : 0;
-      if (persistedRelationshipCount !== createdRelationships.length) {
+      if (persistedRelationshipCount !== requestedTaskCount) {
         throw new HttpError(
-          `Verification failed: relationship count mismatch. expected=${createdRelationships.length} actual=${persistedRelationshipCount}`,
+          `Verification failed: relationship count mismatch. expected=${requestedTaskCount} actual=${persistedRelationshipCount}`,
           500,
         );
       }
@@ -1601,6 +1621,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           record: createdRecord,
           created_task_relationships: createdRelationships,
           relationship_count: createdRelationships.length,
+          requested_task_count: requestedTaskCount,
         },
       });
       return;

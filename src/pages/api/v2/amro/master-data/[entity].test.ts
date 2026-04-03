@@ -869,6 +869,10 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     expect(res.statusCode).toBe(201);
     expect(rpcMock).toHaveBeenCalledTimes(1);
+    const rpcArgs = rpcMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    const rpcPayload = (rpcArgs?.p_payload || {}) as Record<string, unknown>;
+    expect(Array.isArray(rpcPayload.tasks_json)).toBe(true);
+    expect(Array.isArray(rpcPayload.scope_json)).toBe(true);
     expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
     expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
   });
@@ -902,5 +906,61 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(res.statusCode).toBe(422);
     expect(String((res.jsonBody as any)?.error || '')).toContain('Validation failed: task_template_id not found');
     expect(fromMock).not.toHaveBeenCalledWith('maintenance_events');
+  });
+
+  it('creates work package template with no selected tasks and returns empty relationships', async () => {
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: {
+        record: {
+          id: 'wpt-empty-1',
+          template_code: 'WP-EMPTY-001',
+          template_name: 'Empty Tasks',
+          maintenance_type: 'line',
+          tasks_json: [],
+        },
+        created_relationships: [],
+      },
+      error: null,
+    });
+    const linkEqTemplateMock = vi.fn().mockResolvedValue({
+      data: [],
+      error: null,
+    });
+    const linkEqTenantMock = vi.fn().mockReturnValue({ eq: linkEqTemplateMock });
+    const linkSelectMock = vi.fn().mockReturnValue({ eq: linkEqTenantMock });
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'work_package_template_task_templates') {
+        return { select: linkSelectMock };
+      }
+      if (table === 'maintenance_events') {
+        return { insert: auditInsertMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock, rpc: rpcMock } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { entity: 'work_package_templates' },
+      body: {
+        template_code: 'WP-EMPTY-001',
+        version: 1,
+        active: true,
+        template_name: 'Empty Tasks',
+        maintenance_type: 'line',
+        scope_json: [],
+        tasks_json: [],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(201);
+    expect(Array.isArray((res.jsonBody as any)?.output?.created_task_relationships)).toBe(true);
+    expect(((res.jsonBody as any)?.output?.created_task_relationships || []).length).toBe(0);
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-empty-1');
   });
 });

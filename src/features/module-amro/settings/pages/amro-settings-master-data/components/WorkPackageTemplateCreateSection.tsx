@@ -94,14 +94,14 @@ export function WorkPackageTemplateCreateSection({
     try {
       let query = (scopedDb as any)
         .from('task_templates')
-        .select('id,task_id,tenant_id,franchise_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,task_template_scope_json')
+        .select('id,task_template_id,tenant_id,franchise_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,task_template_scope_json')
         .eq('tenant_id', scope.tenantId);
       if (scope.franchiseId) {
         query = query.eq('franchise_id', scope.franchiseId);
       } else {
         query = query.is('franchise_id', null);
       }
-      const { data, error } = await query.order('task_id', { ascending: true });
+      const { data, error } = await query.order('task_template_id', { ascending: true });
       if (error) {
         throw new Error(String(error.message || 'Failed to load task templates'));
       }
@@ -234,6 +234,9 @@ export function WorkPackageTemplateCreateSection({
         if (column === 'is_mandatory') {
           return typeof task.is_mandatory === 'boolean' ? String(task.is_mandatory) : '';
         }
+        if (column === 'task_id') {
+          return String(task.task_template_id ?? task.task_id ?? '').toLowerCase();
+        }
         return String(task[column] ?? '').toLowerCase();
       };
       return (Object.entries(workPackageTemplateTaskFilters) as Array<[WorkPackageTaskSortColumn, string]>).every(([column, rawFilter]) => {
@@ -247,10 +250,14 @@ export function WorkPackageTemplateCreateSection({
     return [...filtered].sort((left, right) => {
       const leftValue = workPackageTemplateTaskSortColumn === 'is_mandatory'
         ? String(typeof left.is_mandatory === 'boolean' ? left.is_mandatory : '').toLowerCase()
-        : String(left[workPackageTemplateTaskSortColumn] ?? '').toLowerCase();
+        : workPackageTemplateTaskSortColumn === 'task_id'
+          ? String(left.task_template_id ?? left.task_id ?? '').toLowerCase()
+          : String(left[workPackageTemplateTaskSortColumn] ?? '').toLowerCase();
       const rightValue = workPackageTemplateTaskSortColumn === 'is_mandatory'
         ? String(typeof right.is_mandatory === 'boolean' ? right.is_mandatory : '').toLowerCase()
-        : String(right[workPackageTemplateTaskSortColumn] ?? '').toLowerCase();
+        : workPackageTemplateTaskSortColumn === 'task_id'
+          ? String(right.task_template_id ?? right.task_id ?? '').toLowerCase()
+          : String(right[workPackageTemplateTaskSortColumn] ?? '').toLowerCase();
       if (leftValue === rightValue) {
         return 0;
       }
@@ -285,24 +292,38 @@ export function WorkPackageTemplateCreateSection({
     setWorkPackageTemplateTaskFilters((previous) => ({ ...previous, [column]: value }));
   }, []);
 
+  const taskTemplateById = useMemo(() => {
+    return workPackageTemplateTaskTemplates.reduce((map, task) => {
+      const id = resolveWorkPackageTaskTemplateId(task);
+      if (!id) {
+        return map;
+      }
+      map.set(id, task);
+      return map;
+    }, new Map<string, Record<string, unknown>>());
+  }, [resolveWorkPackageTaskTemplateId, workPackageTemplateTaskTemplates]);
+
   const resolveSelectedWorkPackageTaskPayload = useCallback((selectedIds: string[]) => {
-    const selectedIdSet = new Set(selectedIds);
-    return selectedWorkPackageAircraftModelTaskRows
-      .map((task) => ({
-        rowId: resolveWorkPackageTaskTemplateId(task),
-        task,
-      }))
-      .filter((entry) => selectedIdSet.has(entry.rowId))
-      .map(({ task }) => ({
-        task_template_id: resolveWorkPackageTaskTemplateId(task),
-        task_id: task.task_id ?? null,
-        code_form_no: task.code_form_no ?? null,
-        ata_code: task.ata_code ?? null,
-        reference_amp: task.reference_amp ?? null,
-        description: task.description ?? null,
-      }))
-      .filter((entry) => entry.task_template_id.trim().length > 0);
-  }, [resolveWorkPackageTaskTemplateId, selectedWorkPackageAircraftModelTaskRows]);
+    return selectedIds
+      .map((id) => String(id || '').trim())
+      .filter((id) => id.length > 0)
+      .map((id) => {
+        const task = taskTemplateById.get(id);
+        if (!task) {
+          return {
+            task_template_id: id,
+          };
+        }
+        return {
+          task_template_id: id,
+          task_id: task.task_template_id ?? task.task_id ?? null,
+          code_form_no: task.code_form_no ?? null,
+          ata_code: task.ata_code ?? null,
+          reference_amp: task.reference_amp ?? null,
+          description: task.description ?? null,
+        };
+      });
+  }, [taskTemplateById]);
 
   const toggleWorkPackageTemplateTaskSelection = useCallback((rowId: string, checked: boolean) => {
     setWorkPackageTemplateSelectedTaskIds((previous) => {
@@ -320,16 +341,6 @@ export function WorkPackageTemplateCreateSection({
         ? Array.from(new Set([...previous, ...selectedWorkPackageAircraftModelTaskRowIds]))
         : previous.filter((id) => !selectedWorkPackageAircraftModelTaskRowIds.includes(id));
       setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
-      return nextSelectedIds;
-    });
-  }, [resolveSelectedWorkPackageTaskPayload, selectedWorkPackageAircraftModelTaskRowIds, setFieldValue]);
-
-  useEffect(() => {
-    setWorkPackageTemplateSelectedTaskIds((previous) => {
-      const nextSelectedIds = previous.filter((id) => selectedWorkPackageAircraftModelTaskRowIds.includes(id));
-      if (nextSelectedIds.length !== previous.length) {
-        setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
-      }
       return nextSelectedIds;
     });
   }, [resolveSelectedWorkPackageTaskPayload, selectedWorkPackageAircraftModelTaskRowIds, setFieldValue]);
@@ -598,10 +609,10 @@ export function WorkPackageTemplateCreateSection({
                         <Checkbox
                           checked={workPackageTemplateSelectedTaskIds.includes(rowId)}
                           onCheckedChange={(checked) => toggleWorkPackageTemplateTaskSelection(rowId, Boolean(checked))}
-                          aria-label={`Select task row ${String(task.task_id || rowId)}`}
+                          aria-label={`Select task row ${String(task.task_template_id || task.task_id || rowId)}`}
                         />
                       </td>
-                      <td className="px-2 py-1.5">{String(task.task_id || '-')}</td>
+                      <td className="px-2 py-1.5">{String(task.task_template_id || task.task_id || '-')}</td>
                       <td className="px-2 py-1.5">{String(task.code_form_no || '-')}</td>
                       <td className="px-2 py-1.5">{String(task.ata_code || '-')}</td>
                       <td className="px-2 py-1.5">{String(task.reference_amp || '-')}</td>

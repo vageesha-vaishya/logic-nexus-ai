@@ -34,6 +34,9 @@ BEGIN
       v_record public.work_package_templates%ROWTYPE;
       v_created_at timestamptz := now();
       v_updated_at timestamptz := v_created_at;
+      v_scope_json jsonb := '[]'::jsonb;
+      v_tasks_json jsonb := '[]'::jsonb;
+      v_task_ids_raw uuid[] := ARRAY[]::uuid[];
       v_task_ids uuid[] := ARRAY[]::uuid[];
       v_missing_ids text[] := ARRAY[]::text[];
       v_relationships jsonb := '[]'::jsonb;
@@ -58,21 +61,52 @@ BEGIN
         RETURN v_existing;
       END IF;
 
-      SELECT COALESCE(array_agg(DISTINCT (entry->>'task_template_id')::uuid), ARRAY[]::uuid[])
-      INTO v_task_ids
-      FROM jsonb_array_elements(COALESCE(p_payload->'tasks_json', '[]'::jsonb)) AS entry
+      v_tasks_json := COALESCE(p_payload->'tasks_json', '[]'::jsonb);
+      IF jsonb_typeof(v_tasks_json) = 'string' THEN
+        BEGIN
+          v_tasks_json := COALESCE((p_payload->>'tasks_json')::jsonb, '[]'::jsonb);
+        EXCEPTION WHEN others THEN
+          RAISE EXCEPTION 'Validation failed: tasks_json must be a JSON array';
+        END;
+      END IF;
+      IF jsonb_typeof(v_tasks_json) <> 'array' THEN
+        RAISE EXCEPTION 'Validation failed: tasks_json must be a JSON array';
+      END IF;
+
+      v_scope_json := COALESCE(p_payload->'scope_json', '[]'::jsonb);
+      IF jsonb_typeof(v_scope_json) = 'string' THEN
+        BEGIN
+          v_scope_json := COALESCE((p_payload->>'scope_json')::jsonb, '[]'::jsonb);
+        EXCEPTION WHEN others THEN
+          v_scope_json := '[]'::jsonb;
+        END;
+      END IF;
+      IF jsonb_typeof(v_scope_json) <> 'array' THEN
+        v_scope_json := '[]'::jsonb;
+      END IF;
+
+      SELECT COALESCE(array_agg((entry->>'task_template_id')::uuid), ARRAY[]::uuid[])
+      INTO v_task_ids_raw
+      FROM jsonb_array_elements(v_tasks_json) AS entry
       WHERE jsonb_typeof(entry) = 'object'
-        AND entry ? 'task_template_id'
-        AND (entry->>'task_template_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$';
+        AND entry ? 'task_template_id';
+
+      SELECT COALESCE(array_agg(DISTINCT id_value), ARRAY[]::uuid[])
+      INTO v_task_ids
+      FROM unnest(v_task_ids_raw) AS id_value;
 
       IF EXISTS (
         SELECT 1
-        FROM jsonb_array_elements(COALESCE(p_payload->'tasks_json', '[]'::jsonb)) AS entry
+        FROM jsonb_array_elements(v_tasks_json) AS entry
         WHERE jsonb_typeof(entry) = 'object'
           AND (NOT (entry ? 'task_template_id')
             OR NOT ((entry->>'task_template_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'))
       ) THEN
         RAISE EXCEPTION 'Validation failed: each tasks_json element must include a valid UUID task_template_id';
+      END IF;
+
+      IF array_length(v_task_ids_raw, 1) IS NOT NULL AND array_length(v_task_ids_raw, 1) <> array_length(v_task_ids, 1) THEN
+        RAISE EXCEPTION 'Validation failed: duplicate task_template_id values are not allowed';
       END IF;
 
       IF array_length(v_task_ids, 1) IS NOT NULL THEN
@@ -114,8 +148,8 @@ BEGIN
         COALESCE((p_payload->>'active')::boolean, true),
         COALESCE(p_payload->>'template_name', ''),
         COALESCE(p_payload->>'maintenance_type', ''),
-        COALESCE(p_payload->'scope_json', '[]'::jsonb),
-        COALESCE(p_payload->'tasks_json', '[]'::jsonb),
+        v_scope_json,
+        v_tasks_json,
         NULLIF(p_payload->>'policy_snapshot_id', ''),
         p_user_id,
         p_user_id,
