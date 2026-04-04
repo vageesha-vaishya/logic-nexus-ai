@@ -255,6 +255,7 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
   work_package_templates: [
     { key: 'template_code', label: 'Template Code', type: 'text', required: true },
     { key: 'template_name', label: 'Template Name', type: 'text', required: true },
+    { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
     { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['line', 'base', 'hangar', 'shop'] },
     { key: 'version', label: 'Version', type: 'number', required: true, min: 1 },
     { key: 'active', label: 'Active', type: 'boolean' },
@@ -315,5 +316,5 @@ export const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
   assembly_models: { manufacturer_id: '', assembly_type_id: '', model_code: '', name: '', primary_model: '', description: '', is_active: true, metadata: '{}' },
   regulator_profiles: { regulator_code: '', regulator_name: '', jurisdiction: '', policy_version: '', effective_from: new Date().toISOString().slice(0, 10), effective_to: '', is_active: true, metadata: '{}' },
   shift_calendars: { station_code: '', shift_name: '', shift_start_time: '08:00:00', shift_end_time: '16:00:00', capacity: 1, effective_from: new Date().toISOString().slice(0, 10), effective_to: '', is_active: true },
-  work_package_templates: { template_code: '', template_name: '', maintenance_type: 'line', version: 1, active: true, policy_snapshot_id: '', scope_json: '[]', tasks_json: '[]' },
+  work_package_templates: { template_code: '', template_name: '', aircraft_model: '', maintenance_type: 'line', version: 1, active: true, policy_snapshot_id: '', scope_json: '[]', tasks_json: '[]' },
 };

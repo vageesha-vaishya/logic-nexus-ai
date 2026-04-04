@@ -64,6 +64,79 @@ function toErrorResponse(error: string, code: string, statusCode: number): Error
   return { error, code, statusCode };
 }
 
+async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { status: (code: number) => { json: (body: unknown) => void } }): Promise<void> {
+  const tenantId = req.tenantId;
+  const userId = req.userId;
+  const franchiseId = getFranchiseId(req);
+  logger.info('[AMRO Work Package Template] POST Method received xyz001', {
+    tenantId,
+    franchiseId,
+    userId,
+  });
+  if (!tenantId || !userId) {
+    res.status(401).json(toErrorResponse('Missing tenant or user context', 'MISSING_CONTEXT', 401));
+    return;
+  }
+
+  const request = (req.body || {}) as WorkPackageTemplateRequest;
+  if (!request.template_code || !request.template_name || !request.maintenance_type || !request.aircraft_model) {
+    res.status(400).json(
+      toErrorResponse(
+        'Missing required fields: template_code, template_name, maintenance_type, aircraft_model',
+        'VALIDATION_ERROR',
+        400,
+      ),
+    );
+    return;
+  }
+
+  const selectedTaskTemplateIds = normalizeTaskTemplateIds(request.selected_task_template_ids);
+  const validation = await validateTaskTemplateIds(tenantId, franchiseId, selectedTaskTemplateIds);
+  if (!validation.valid) {
+    if (validation.invalidIds.length > 0) {
+      res.status(422).json(toErrorResponse(`Invalid task_template_id values: ${validation.invalidIds.join(', ')}`, 'VALIDATION_ERROR', 422));
+      return;
+    }
+    res.status(422).json(toErrorResponse(`task_template_id not found: ${validation.missingIds.join(', ')}`, 'NOT_FOUND', 422));
+    return;
+  }
+
+  const payload = {
+    template_code: String(request.template_code || '').trim(),
+    version: Number(request.version || 1),
+    active: request.active !== false,
+    template_name: String(request.template_name || '').trim(),
+    maintenance_type: String(request.maintenance_type || '').trim(),
+    scope_json: Array.isArray(request.scope_json) ? request.scope_json : [],
+    tasks_json: selectedTaskTemplateIds.map((taskTemplateId) => ({ task_template_id: taskTemplateId })),
+    policy_snapshot_id: request.policy_snapshot_id || null,
+    aircraft_model: request.aircraft_model || null,
+  };
+
+  const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_package_template_atomic', {
+    p_tenant_id: tenantId,
+    p_franchise_id: franchiseId,
+    p_user_id: userId,
+    p_correlation_id: String(req.header('x-correlation-id') || crypto.randomUUID()),
+    p_payload: payload,
+  });
+  if (atomicError) {
+    logger.error('[WorkPackageTemplateRoutes] create failed', {
+      tenantId,
+      message: String(atomicError.message || ''),
+    });
+    const message = String(atomicError.message || '');
+    const statusCode = /validation failed/i.test(message) ? 422 : /duplicate key/i.test(message) ? 409 : 400;
+    res.status(statusCode).json(toErrorResponse(message, 'CREATE_FAILED', statusCode));
+    return;
+  }
+
+  const createdRecord = (atomicResult as Record<string, unknown> | null)?.record as Record<string, unknown> | undefined;
+  const createdId = String(createdRecord?.id || '').trim();
+  const records = await buildTemplateListResponse(tenantId, franchiseId, createdId ? [createdId] : undefined);
+  res.status(201).json({ data: records[0] || createdRecord || null });
+}
+
 async function validateTaskTemplateIds(
   tenantId: string,
   franchiseId: string | null,
@@ -198,78 +271,21 @@ async function buildTemplateListResponse(
  *     tags: [Work Package Templates]
  */
 router.post(
+  '/amro/work-packages',
+  asyncHandler(async (req: AuthRequest, res, next): Promise<void> => {
+    const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    if (interfaceName !== 'create-work-package-template') {
+      next();
+      return;
+    }
+    await createWorkPackageTemplateFromRequest(req, res);
+  }),
+);
+
+router.post(
   '/work-package-templates',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
-    const tenantId = req.tenantId;
-    const userId = req.userId;
-    const franchiseId = getFranchiseId(req);
-    logger.info('[AMRO Work Package Template] POST Method received xyz001', {
-      tenantId,
-      franchiseId,
-      userId,
-    });
-    if (!tenantId || !userId) {
-      res.status(401).json(toErrorResponse('Missing tenant or user context', 'MISSING_CONTEXT', 401));
-      return;
-    }
-
-    const request = (req.body || {}) as WorkPackageTemplateRequest;
-    if (!request.template_code || !request.template_name || !request.maintenance_type) {
-      res.status(400).json(
-        toErrorResponse(
-          'Missing required fields: template_code, template_name, maintenance_type',
-          'VALIDATION_ERROR',
-          400,
-        ),
-      );
-      return;
-    }
-
-    const selectedTaskTemplateIds = normalizeTaskTemplateIds(request.selected_task_template_ids);
-    const validation = await validateTaskTemplateIds(tenantId, franchiseId, selectedTaskTemplateIds);
-    if (!validation.valid) {
-      if (validation.invalidIds.length > 0) {
-        res.status(422).json(toErrorResponse(`Invalid task_template_id values: ${validation.invalidIds.join(', ')}`, 'VALIDATION_ERROR', 422));
-        return;
-      }
-      res.status(422).json(toErrorResponse(`task_template_id not found: ${validation.missingIds.join(', ')}`, 'NOT_FOUND', 422));
-      return;
-    }
-
-    const payload = {
-      template_code: String(request.template_code || '').trim(),
-      version: Number(request.version || 1),
-      active: request.active !== false,
-      template_name: String(request.template_name || '').trim(),
-      maintenance_type: String(request.maintenance_type || '').trim(),
-      scope_json: Array.isArray(request.scope_json) ? request.scope_json : [],
-      tasks_json: selectedTaskTemplateIds.map((taskTemplateId) => ({ task_template_id: taskTemplateId })),
-      policy_snapshot_id: request.policy_snapshot_id || null,
-      aircraft_model: request.aircraft_model || null,
-    };
-
-    const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_package_template_atomic', {
-      p_tenant_id: tenantId,
-      p_franchise_id: franchiseId,
-      p_user_id: userId,
-      p_correlation_id: String(req.header('x-correlation-id') || crypto.randomUUID()),
-      p_payload: payload,
-    });
-    if (atomicError) {
-      logger.error('[WorkPackageTemplateRoutes] create failed', {
-        tenantId,
-        message: String(atomicError.message || ''),
-      });
-      const message = String(atomicError.message || '');
-      const statusCode = /validation failed/i.test(message) ? 422 : /duplicate key/i.test(message) ? 409 : 400;
-      res.status(statusCode).json(toErrorResponse(message, 'CREATE_FAILED', statusCode));
-      return;
-    }
-
-    const createdRecord = (atomicResult as Record<string, unknown> | null)?.record as Record<string, unknown> | undefined;
-    const createdId = String(createdRecord?.id || '').trim();
-    const records = await buildTemplateListResponse(tenantId, franchiseId, createdId ? [createdId] : undefined);
-    res.status(201).json({ data: records[0] || createdRecord || null });
+    await createWorkPackageTemplateFromRequest(req, res);
     return;
   }),
 );

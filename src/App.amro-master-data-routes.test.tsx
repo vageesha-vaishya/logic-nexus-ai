@@ -125,6 +125,7 @@ describe('App AMRO master data route mapping', () => {
     { path: '/dashboard/amro/settings/master-data/shift-calendars', marker: 'route-shift-calendars' },
     { path: '/dashboard/amro/settings/master-data/work-packages', marker: 'route-work-packages' },
     { path: '/dashboard/amro/settings/master-data/work-package-templates', marker: 'route-work-package-templates' },
+    { path: '/dashboard/amro/settings/work-package-templates', marker: 'route-work-package-templates' },
   ])('resolves $path to the expected AMRO wrapper component', async ({ path, marker }) => {
     window.history.pushState({}, 'Route Test', path);
     render(<App />);

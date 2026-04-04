@@ -1375,9 +1375,9 @@ app.use('/api/v2/amro', authMiddleware);
 
 // Mount work orders routes
 app.use('/api/v1', workOrdersRoutes);
+app.use('/api/v2', workPackageTemplateRoutes);
 app.use('/api/v2', workOrdersRoutes);
 app.use('/api/v2', masterDataRoutes);
-app.use('/api/v2', workPackageTemplateRoutes);
 
 // ============================================================================
 // ERROR HANDLING
