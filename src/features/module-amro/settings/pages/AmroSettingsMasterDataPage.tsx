@@ -258,6 +258,7 @@ const mapAircraftTemplateRecordToFormValues = (record: AircraftTemplateRecord): 
 
 const isSystemSelectValue = (value: string): boolean => value.startsWith('__');
 const TEMPLATE_REGISTRY_TIMEOUT_MS = 12000;
+const ENGINE_USABILITY_STORAGE_KEY = 'amro.engine.usability.session.events.v1';
 const WORK_PACKAGE_CREATE_TIMEOUT_MS = 20000;
 
 const resolveWorkPackageApiErrorMessage = (error: unknown, fallbackMessage: string): string => {
@@ -785,6 +786,12 @@ type AircraftDashboardComponentsModule = {
 };
 
 type AircraftDashboardModuleFilter = 'overview' | 'engine' | 'components' | 'all';
+type EngineUsabilityTaskId =
+  | 'engine_risk_scan'
+  | 'engine_maintenance_next_due'
+  | 'engine_compliance_readiness'
+  | 'engine_anomaly_review'
+  | 'engine_data_entry_validation';
 
 type AircraftDashboardReportSection = {
   section: string;
@@ -5613,6 +5620,175 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return `${String(row.ts).slice(5, 10)} | ${'#'.repeat(barSize)} ${row.value.toFixed(2)}`;
     });
   }, [aircraftEnginePerformanceSeries]);
+  const engineUsabilitySessionIdRef = useRef<string>('');
+  const engineUsabilityTaskStartRef = useRef<Partial<Record<EngineUsabilityTaskId, number>>>({});
+  const pushEngineUsabilityMarker = useCallback(
+    (
+      eventType: 'task_start' | 'task_end',
+      taskId: EngineUsabilityTaskId,
+      payload?: {
+        outcome?: 'completed' | 'failed' | 'abandoned';
+        durationMs?: number;
+        metadata?: Record<string, unknown>;
+      },
+    ) => {
+      if (typeof window === 'undefined') return;
+      if (!engineUsabilitySessionIdRef.current) {
+        engineUsabilitySessionIdRef.current = typeof crypto !== 'undefined' && 'randomUUID' in crypto
+          ? crypto.randomUUID()
+          : `engine-usability-${Date.now()}`;
+      }
+
+      const marker = {
+        session_id: engineUsabilitySessionIdRef.current,
+        event_type: eventType,
+        task_id: taskId,
+        timestamp: new Date().toISOString(),
+        outcome: payload?.outcome,
+        duration_ms: payload?.durationMs,
+        metadata: payload?.metadata || {},
+      };
+
+      logger.info('AMRO Engine usability task marker', {
+        component: 'AmroSettingsMasterDataPage',
+        marker,
+      });
+
+      try {
+        const existingRaw = window.localStorage.getItem(ENGINE_USABILITY_STORAGE_KEY);
+        const existing = existingRaw ? (JSON.parse(existingRaw) as Array<Record<string, unknown>>) : [];
+        const next = [...existing.slice(-299), marker];
+        window.localStorage.setItem(ENGINE_USABILITY_STORAGE_KEY, JSON.stringify(next));
+      } catch (storageError) {
+        logger.warn('Unable to persist engine usability marker', {
+          component: 'AmroSettingsMasterDataPage',
+          message: String((storageError as Error).message || storageError),
+        });
+      }
+
+      window.dispatchEvent(new CustomEvent('amro:engine-usability-marker', { detail: marker }));
+    },
+    [],
+  );
+  const startEngineUsabilityTask = useCallback(
+    (taskId: EngineUsabilityTaskId, metadata?: Record<string, unknown>) => {
+      if (engineUsabilityTaskStartRef.current[taskId]) return;
+      engineUsabilityTaskStartRef.current[taskId] = Date.now();
+      pushEngineUsabilityMarker('task_start', taskId, { metadata });
+    },
+    [pushEngineUsabilityMarker],
+  );
+  const endEngineUsabilityTask = useCallback(
+    (
+      taskId: EngineUsabilityTaskId,
+      outcome: 'completed' | 'failed' | 'abandoned' = 'completed',
+      metadata?: Record<string, unknown>,
+    ) => {
+      const startedAt = engineUsabilityTaskStartRef.current[taskId];
+      const durationMs = startedAt ? Math.max(0, Date.now() - startedAt) : undefined;
+      delete engineUsabilityTaskStartRef.current[taskId];
+      pushEngineUsabilityMarker('task_end', taskId, { outcome, durationMs, metadata });
+    },
+    [pushEngineUsabilityMarker],
+  );
+  const handleEngineLaneNavigation = useCallback(
+    (laneId: string) => {
+      if (laneId === 'engine-lane-maintenance') {
+        endEngineUsabilityTask('engine_risk_scan', 'completed', { trigger: 'lane_navigation' });
+        startEngineUsabilityTask('engine_maintenance_next_due', { lane: laneId });
+        return;
+      }
+      if (laneId === 'engine-lane-compliance') {
+        startEngineUsabilityTask('engine_compliance_readiness', { lane: laneId });
+        return;
+      }
+      if (laneId === 'engine-lane-analytics') {
+        startEngineUsabilityTask('engine_anomaly_review', { lane: laneId });
+      }
+    },
+    [endEngineUsabilityTask, startEngineUsabilityTask],
+  );
+  const handleExportEngineUsabilityEvents = useCallback(
+    (format: 'json' | 'csv') => {
+      if (typeof window === 'undefined') return;
+
+      let events: Array<Record<string, unknown>> = [];
+      try {
+        const stored = window.localStorage.getItem(ENGINE_USABILITY_STORAGE_KEY);
+        events = stored ? (JSON.parse(stored) as Array<Record<string, unknown>>) : [];
+      } catch (error) {
+        logger.warn('Engine usability export failed to parse localStorage payload', {
+          component: 'AmroSettingsMasterDataPage',
+          message: String((error as Error).message || error),
+        });
+        toast.error('Unable to parse usability events for export');
+        return;
+      }
+
+      if (!Array.isArray(events) || events.length === 0) {
+        toast.error('No usability session events available to export');
+        return;
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+      const fileNameBase = `amro-engine-usability-events-${timestamp}`;
+      let blob: Blob;
+      let fileName: string;
+
+      if (format === 'json') {
+        fileName = `${fileNameBase}.json`;
+        blob = new Blob([`${JSON.stringify(events, null, 2)}\n`], { type: 'application/json;charset=utf-8' });
+      } else {
+        const headers = ['session_id', 'event_type', 'task_id', 'timestamp', 'outcome', 'duration_ms', 'metadata'];
+        const escapeCsvCell = (value: unknown): string => {
+          const text = value == null ? '' : String(value).replace(/"/g, '""');
+          return `"${text}"`;
+        };
+        const csvRows = [
+          headers.join(','),
+          ...events.map((row) =>
+            [
+              escapeCsvCell(row.session_id),
+              escapeCsvCell(row.event_type),
+              escapeCsvCell(row.task_id),
+              escapeCsvCell(row.timestamp),
+              escapeCsvCell(row.outcome),
+              escapeCsvCell(row.duration_ms),
+              escapeCsvCell(typeof row.metadata === 'string' ? row.metadata : JSON.stringify(row.metadata || {})),
+            ].join(',')
+          ),
+        ];
+        fileName = `${fileNameBase}.csv`;
+        blob = new Blob([`${csvRows.join('\n')}\n`], { type: 'text/csv;charset=utf-8' });
+      }
+
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = fileName;
+      document.body.appendChild(anchor);
+      anchor.click();
+      document.body.removeChild(anchor);
+      window.URL.revokeObjectURL(url);
+
+      logger.info('Engine usability events exported', {
+        component: 'AmroSettingsMasterDataPage',
+        format,
+        rows: events.length,
+      });
+      toast.success(`Exported ${events.length} usability events as ${format.toUpperCase()}`);
+    },
+    [],
+  );
+  useEffect(() => {
+    if (!showAircraftEngineWorkspace) {
+      (Object.keys(engineUsabilityTaskStartRef.current) as EngineUsabilityTaskId[]).forEach((taskId) => {
+        endEngineUsabilityTask(taskId, 'abandoned', { reason: 'engine_workspace_exit' });
+      });
+      return;
+    }
+    startEngineUsabilityTask('engine_risk_scan', { source: 'engine_workspace_entry' });
+  }, [endEngineUsabilityTask, showAircraftEngineWorkspace, startEngineUsabilityTask]);
   useEffect(() => {
     if (engineEntrySerial.trim()) return;
     const primaryAsset = aircraftEngineAssets[0];
@@ -5636,16 +5812,30 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (!Number.isFinite(csn) || csn < 0) nextErrors.csn = 'CSN must be a positive number';
       if (Object.keys(nextErrors).length > 0) {
         setEngineEntryErrors(nextErrors);
+        endEngineUsabilityTask('engine_data_entry_validation', 'failed', {
+          error_fields: Object.keys(nextErrors),
+        });
         return;
       }
       setEngineEntryErrors({});
       setEngineEntrySubmitting(true);
       window.setTimeout(() => {
         setEngineEntrySubmitting(false);
+        endEngineUsabilityTask('engine_data_entry_validation', 'completed', {
+          engine_serial: serial,
+          position: engineEntryPosition,
+        });
         toast.success(`Engine data validated for ${serial} (${engineEntryPosition})`);
       }, 250);
     },
-    [engineEntryCsn, engineEntryModule, engineEntryPosition, engineEntrySerial, engineEntryTsn],
+    [
+      endEngineUsabilityTask,
+      engineEntryCsn,
+      engineEntryModule,
+      engineEntryPosition,
+      engineEntrySerial,
+      engineEntryTsn,
+    ],
   );
   const aircraftEngineAnomalies = useMemo(
     () =>
@@ -5704,6 +5894,72 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     const layers = (validation as Record<string, unknown>).validation_layers;
     return layers && typeof layers === 'object' ? (layers as Record<string, unknown>) : {};
   }, [aircraftDashboardEngineModule]);
+  const aircraftEngineHeadlineKpis = useMemo(
+    () => [
+      {
+        label: 'TBO Remaining',
+        value: `${String(aircraftDashboardEngineModule?.kpis?.tbo_remaining_hours ?? 0)}h`,
+        tone: 'default',
+      },
+      {
+        label: 'LLP Remaining',
+        value: String(aircraftDashboardEngineModule?.kpis?.llp_avg_remaining_cycles ?? 0),
+        tone: 'default',
+      },
+      {
+        label: 'Oil Consumption',
+        value: `${String(aircraftDashboardEngineModule?.kpis?.oil_consumption_lph ?? 0)} L/H`,
+        tone: Number(aircraftDashboardEngineModule?.kpis?.oil_consumption_lph ?? 0) > 6 ? 'warning' : 'default',
+      },
+      {
+        label: 'Vibration',
+        value: `${String(aircraftDashboardEngineModule?.kpis?.vibration_ips ?? 0)} IPS`,
+        tone: Number(aircraftDashboardEngineModule?.kpis?.vibration_ips ?? 0) > 2.8 ? 'warning' : 'default',
+      },
+    ],
+    [aircraftDashboardEngineModule],
+  );
+  const aircraftEngineWorkflowLanes = useMemo(
+    () => [
+      {
+        id: 'engine-lane-maintenance',
+        title: 'Maintenance Lane',
+        count: aircraftEngineMaintenanceRows.length,
+        total: aircraftEngineMaintenanceRows.length,
+      },
+      {
+        id: 'engine-lane-work-orders',
+        title: 'Work Order Lane',
+        count: aircraftEngineRecentWorkOrders.length,
+        total: Number(aircraftEngineWorkOrderTotals.open || 0) + Number(aircraftEngineWorkOrderTotals.in_progress || 0) + Number(aircraftEngineWorkOrderTotals.blocked || 0) + Number(aircraftEngineWorkOrderTotals.completed || 0),
+      },
+      {
+        id: 'engine-lane-compliance',
+        title: 'Compliance Lane',
+        count: Number(aircraftEngineComplianceSummary.readyCount || 0),
+        total: Number(aircraftEngineComplianceSummary.readyCount || 0) + Number(aircraftEngineComplianceSummary.pendingCount || 0) + Number(aircraftEngineComplianceSummary.overdueCount || 0),
+      },
+      {
+        id: 'engine-lane-analytics',
+        title: 'Performance Lane',
+        count: aircraftEngineAnomalies.length,
+        total: aircraftEnginePerformanceSeries.length,
+      },
+    ],
+    [
+      aircraftEngineAnomalies.length,
+      aircraftEngineComplianceSummary.overdueCount,
+      aircraftEngineComplianceSummary.pendingCount,
+      aircraftEngineComplianceSummary.readyCount,
+      aircraftEngineMaintenanceRows.length,
+      aircraftEnginePerformanceSeries.length,
+      aircraftEngineRecentWorkOrders.length,
+      aircraftEngineWorkOrderTotals.blocked,
+      aircraftEngineWorkOrderTotals.completed,
+      aircraftEngineWorkOrderTotals.in_progress,
+      aircraftEngineWorkOrderTotals.open,
+    ],
+  );
   const aircraftComponentsOpenDefects = useMemo(
     () => (Array.isArray(aircraftDashboardComponentsModule?.drilldown?.open_defects) ? aircraftDashboardComponentsModule.drilldown.open_defects.slice(0, 6) : []),
     [aircraftDashboardComponentsModule],
@@ -7048,211 +7304,259 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               {showAircraftEngineWorkspace || showAircraftComponentsWorkspace ? (
                 <div className={`grid gap-4 ${showAircraftEngineWorkspace && showAircraftComponentsWorkspace ? 'xl:grid-cols-2' : ''}`}>
                   {showAircraftEngineWorkspace ? (
-                    <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-2.5">
-                      <div className="flex items-center justify-between gap-2">
-                        <h4 className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Engine Lifecycle Management</h4>
-                        <div className="flex items-center gap-1">
-                          {Object.entries(aircraftDashboardEngineModule?.statuses || {}).slice(0, 3).map(([key, value]) => (
-                            <Badge key={`engine-status-${key}`} variant={mapStatusToBadgeVariant(value)}>
-                              {key.replace(/_/g, ' ')}: {String(value)}
-                            </Badge>
+                    <section className="space-y-4 rounded-xl border border-[hsl(var(--mdm-template-border))] bg-gradient-to-b from-background via-background to-muted/10 p-3 md:p-4" aria-label="Engine operations workspace">
+                      <div className="rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm">
+                        <div className="flex flex-wrap items-start justify-between gap-3">
+                          <div className="space-y-1">
+                            <h4 className="text-sm font-semibold tracking-tight text-[hsl(var(--mdm-template-heading))]">Engine Operations Command Center</h4>
+                            <p className="text-xs text-[hsl(var(--mdm-template-muted))]">
+                              Unified lifecycle, reliability, compliance, and performance cockpit for certified engine operations.
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap items-center justify-end gap-1.5">
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleExportEngineUsabilityEvents('json')}
+                              aria-label="Export engine usability session events as JSON"
+                            >
+                              <FileText className="h-3.5 w-3.5" aria-hidden="true" />
+                              Export JSON
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleExportEngineUsabilityEvents('csv')}
+                              aria-label="Export engine usability session events as CSV"
+                            >
+                              <FileSpreadsheet className="h-3.5 w-3.5" aria-hidden="true" />
+                              Export CSV
+                            </Button>
+                            {Object.entries(aircraftDashboardEngineModule?.statuses || {}).slice(0, 3).map(([key, value]) => (
+                              <Badge key={`engine-status-${key}`} variant={mapStatusToBadgeVariant(value)} className="text-[11px]">
+                                {key.replace(/_/g, ' ')}: {String(value)}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                          {aircraftEngineHeadlineKpis.map((item) => (
+                            <div
+                              key={item.label}
+                              className={cn(
+                                'rounded-lg border px-3 py-2 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md',
+                                item.tone === 'warning'
+                                  ? 'border-amber-300/70 bg-amber-50/70 text-amber-950'
+                                  : 'border-[hsl(var(--mdm-template-border))] bg-muted/40'
+                              )}
+                            >
+                              <p className="text-[11px] uppercase tracking-wide text-[hsl(var(--mdm-template-muted))]">{item.label}</p>
+                              <p className="mt-0.5 text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">{item.value}</p>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-3 flex flex-wrap items-center gap-2" aria-label="Engine workflow navigation">
+                          {aircraftEngineWorkflowLanes.map((lane) => (
+                            <a
+                              key={lane.id}
+                              href={`#${lane.id}`}
+                              onClick={() => handleEngineLaneNavigation(lane.id)}
+                              className="inline-flex items-center gap-1.5 rounded-full border border-[hsl(var(--mdm-template-border))] bg-background px-3 py-1 text-[11px] font-medium text-[hsl(var(--mdm-template-heading))] transition-colors duration-150 hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                            >
+                              <span>{lane.title}</span>
+                              <Badge variant="secondary" className="px-1.5 py-0 text-[10px]">{lane.count}/{lane.total}</Badge>
+                            </a>
                           ))}
                         </div>
                       </div>
-                      <div className="grid grid-cols-2 gap-2 text-[12px]">
-                        <div className="rounded-md bg-muted/40 p-2.5">TBO Remaining: <span className="font-semibold">{String(aircraftDashboardEngineModule?.kpis?.tbo_remaining_hours ?? 0)}h</span></div>
-                        <div className="rounded-md bg-muted/40 p-2.5">LLP Remaining: <span className="font-semibold">{String(aircraftDashboardEngineModule?.kpis?.llp_avg_remaining_cycles ?? 0)}</span></div>
-                        <div className="rounded-md bg-muted/40 p-2.5">Oil Cons.: <span className="font-semibold">{String(aircraftDashboardEngineModule?.kpis?.oil_consumption_lph ?? 0)} L/H</span></div>
-                        <div className="rounded-md bg-muted/40 p-2.5">Vibration: <span className="font-semibold">{String(aircraftDashboardEngineModule?.kpis?.vibration_ips ?? 0)} IPS</span></div>
+
+                      <div className="rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm">
+                        <div className="flex flex-wrap items-center justify-between gap-2">
+                          <p className="text-xs font-semibold uppercase tracking-[0.08em] text-[hsl(var(--mdm-template-muted))]">Performance trend</p>
+                          <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">
+                            Source {String(aircraftDashboardEngineModule?.component_monitoring?.source || 'aircraft-dashboard')} ·
+                            Updated {String(aircraftDashboardEngineModule?.component_monitoring?.realtime_updated_at || aircraftDashboard?.metadata?.generated_at || '').slice(0, 19).replace('T', ' ')}
+                          </p>
+                        </div>
+                        <div className="mt-2 h-[220px] w-full">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <LineChart data={aircraftEngineTrend}>
+                              <CartesianGrid strokeDasharray="3 3" />
+                              <XAxis dataKey="day" />
+                              <YAxis />
+                              <RechartsTooltip />
+                              <Line type="monotone" dataKey="tbo_remaining_hours" stroke="#2563EB" strokeWidth={2.25} dot={false} />
+                              <Line type="monotone" dataKey="vibration_ips" stroke="#DC2626" strokeWidth={2.25} dot={false} />
+                              <Line type="monotone" dataKey="oil_consumption_lph" stroke="#0891B2" strokeWidth={2.25} dot={false} />
+                            </LineChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                      <div className="h-[210px] w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <LineChart data={aircraftEngineTrend}>
-                            <CartesianGrid strokeDasharray="3 3" />
-                            <XAxis dataKey="day" />
-                            <YAxis />
-                            <RechartsTooltip />
-                            <Line type="monotone" dataKey="tbo_remaining_hours" stroke="#2563EB" strokeWidth={2} dot={false} />
-                            <Line type="monotone" dataKey="vibration_ips" stroke="#DC2626" strokeWidth={2} dot={false} />
-                            <Line type="monotone" dataKey="oil_consumption_lph" stroke="#0891B2" strokeWidth={2} dot={false} />
-                          </LineChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="grid gap-2 text-[12px] md:grid-cols-2">
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2.5">
+
+                      <div className="grid gap-3 xl:grid-cols-2">
+                        <section id="engine-lane-maintenance" className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm transition-all duration-200 hover:shadow-md">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Maintenance Scheduling & Tracking</p>
-                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                                Prioritized engine work queue with due horizon, execution state, and operational blockers.
-                              </p>
+                              <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Maintenance Scheduling & Tracking</p>
+                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">Prioritized queue, due horizon, conflict detection, and resource assignment control.</p>
                             </div>
                             <Badge variant="outline">Planner View</Badge>
                           </div>
                           <div className="grid grid-cols-2 gap-2 text-[11px]">
-                            <div className="rounded-md bg-muted/40 p-2.5">
-                              Scheduled Rows: <span className="font-semibold">{filteredAircraftEngineMaintenanceRows.length}</span>
-                            </div>
-                            <div className="rounded-md bg-muted/40 p-2.5">
-                              Total Queue: <span className="font-semibold">{aircraftEngineMaintenanceRows.length}</span>
-                            </div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Visible <span className="font-semibold">{filteredAircraftEngineMaintenanceRows.length}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Total <span className="font-semibold">{aircraftEngineMaintenanceRows.length}</span></div>
                           </div>
                           {filteredAircraftEngineMaintenanceRows.length === 0 ? (
-                            <p className="text-[hsl(var(--mdm-template-muted))]">No engine schedule rows in selected window.</p>
+                            <p className="rounded-md border border-dashed border-[hsl(var(--mdm-template-border))] px-2.5 py-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">No engine schedule rows in selected window.</p>
                           ) : (
-                            <div className="grid gap-1">
+                            <div className="grid gap-1.5">
                               {filteredAircraftEngineMaintenanceRows.map((row, index) => (
-                                <div key={`engine-maintenance-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/60 px-2 py-1.5">
+                                <article
+                                  key={`engine-maintenance-row-${index + 1}`}
+                                  className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-2 transition-all duration-200 hover:border-primary/40 hover:bg-background"
+                                  onClick={() =>
+                                    endEngineUsabilityTask('engine_maintenance_next_due', 'completed', {
+                                      work_package: String(row.work_package_number || row.title || ''),
+                                      status: String(row.status || 'open'),
+                                    })
+                                  }
+                                >
                                   <div className="flex items-center justify-between gap-2">
-                                    <p className="font-medium text-[11px] text-[hsl(var(--mdm-template-heading))]">
+                                    <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">
                                       {String(row.work_package_number || row.title || `Engine work order ${index + 1}`)}
                                     </p>
-                                    <Badge variant={mapStatusToBadgeVariant(String(row.status || 'open'))}>
-                                      {String(row.status || 'open')}
-                                    </Badge>
+                                    <Badge variant={mapStatusToBadgeVariant(String(row.status || 'open'))}>{String(row.status || 'open')}</Badge>
                                   </div>
                                   <div className="mt-1 grid grid-cols-2 gap-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                                    <span>Due in: <span className="font-semibold text-foreground">{String(row.due_in_days ?? '-')}d</span></span>
-                                    <span>Compliance: <span className="font-semibold text-foreground">{String(row.compliance_state || 'pending')}</span></span>
+                                    <span>Due in <span className="font-semibold text-foreground">{String(row.due_in_days ?? '-')}d</span></span>
+                                    <span>Compliance <span className="font-semibold text-foreground">{String(row.compliance_state || 'pending')}</span></span>
                                   </div>
-                                </div>
+                                </article>
                               ))}
                             </div>
                           )}
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            Conflicts: <span className="font-semibold">{aircraftEngineMaintenanceConflicts.length}</span> · Allocated Resources: <span className="font-semibold">{aircraftEngineResourceAllocation.length}</span>
+                          <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2 text-[11px]">
+                            Conflicts <span className="font-semibold">{aircraftEngineMaintenanceConflicts.length}</span> · Allocations <span className="font-semibold">{aircraftEngineResourceAllocation.length}</span>
                           </div>
                           {aircraftEngineMaintenanceConflicts.length > 0 ? (
-                            <div className="grid gap-1" role="status" aria-live="polite" aria-label="Engine maintenance conflicts">
+                            <div className="grid gap-1.5" role="status" aria-live="polite" aria-label="Engine maintenance conflicts">
                               {aircraftEngineMaintenanceConflicts.map((row, index) => (
-                                <div key={`engine-conflict-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
+                                <div key={`engine-conflict-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 text-[11px]">
                                   {String(row.conflict_type || 'conflict')} · resolution {String(row.resolution || 'monitor')} · {String(row.auto_resolution_status || 'queued')}
                                 </div>
                               ))}
                             </div>
                           ) : null}
-                          {aircraftEngineResourceAllocation.length > 0 ? (
-                            <div className="grid gap-1">
-                              {aircraftEngineResourceAllocation.map((row, index) => (
-                                <div key={`engine-allocation-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
-                                  {String(row.assigned_team || 'unassigned')} · {String(row.required_skill || 'skill')} · {String(row.allocation_status || 'allocated')}
-                                </div>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2.5">
+                        </section>
+
+                        <section className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm transition-all duration-200 hover:shadow-md">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Component Monitoring</p>
-                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                                Live engine signal health and component telemetry status for dispatch readiness.
-                              </p>
+                              <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Component Monitoring</p>
+                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">Live telemetry status for dispatch readiness and predictive reliability alerts.</p>
                             </div>
                             <Badge variant="outline">Live Signal View</Badge>
                           </div>
-                          <p className="text-[hsl(var(--mdm-template-muted))]">
-                            Real-time source {String(aircraftDashboardEngineModule?.component_monitoring?.source || 'aircraft-dashboard')} · updated {String(aircraftDashboardEngineModule?.component_monitoring?.realtime_updated_at || aircraftDashboard?.metadata?.generated_at || '').slice(0, 19).replace('T', ' ')}
-                          </p>
                           {aircraftEngineRealtimeStatuses.length === 0 ? (
-                            <p className="text-[hsl(var(--mdm-template-muted))]">No live component signals received.</p>
+                            <p className="rounded-md border border-dashed border-[hsl(var(--mdm-template-border))] px-2.5 py-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">No live component signals received.</p>
                           ) : (
-                            <div className="grid gap-1">
+                            <div className="grid gap-1.5">
                               {aircraftEngineRealtimeStatuses.map(([key, value], index) => (
-                                <div key={`engine-realtime-status-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/60 px-2 py-1.5">
+                                <div key={`engine-realtime-status-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 transition-colors duration-150 hover:bg-background">
                                   <div className="flex items-center justify-between gap-2">
-                                    <p className="font-medium text-[11px] text-[hsl(var(--mdm-template-heading))]">{key.replace(/_/g, ' ')}</p>
+                                    <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">{key.replace(/_/g, ' ')}</p>
                                     <Badge variant={mapStatusToBadgeVariant(String(value))}>{String(value)}</Badge>
                                   </div>
                                 </div>
                               ))}
                             </div>
                           )}
-                        </div>
+                        </section>
                       </div>
-                      <div className="grid gap-2 text-[12px] md:grid-cols-2">
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2.5">
+
+                      <div className="grid gap-3 xl:grid-cols-2">
+                        <section id="engine-lane-work-orders" className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm transition-all duration-200 hover:shadow-md">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Work Order Management</p>
-                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                                Execution pipeline for engine maintenance packages, signatures, and parts readiness.
-                              </p>
+                              <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Work Order Management</p>
+                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">Execution flow with signature workflow and parts readiness indicators.</p>
                             </div>
                             <Badge variant="outline">Operations View</Badge>
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-md bg-muted/40 p-2.5">Open: <span className="font-semibold">{aircraftEngineWorkOrderTotals.open}</span></div>
-                            <div className="rounded-md bg-muted/40 p-2.5">In Progress: <span className="font-semibold">{aircraftEngineWorkOrderTotals.in_progress}</span></div>
-                            <div className="rounded-md bg-muted/40 p-2.5">Blocked: <span className="font-semibold">{aircraftEngineWorkOrderTotals.blocked}</span></div>
-                            <div className="rounded-md bg-muted/40 p-2.5">Completed: <span className="font-semibold">{aircraftEngineWorkOrderTotals.completed}</span></div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Open <span className="font-semibold">{aircraftEngineWorkOrderTotals.open}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">In Progress <span className="font-semibold">{aircraftEngineWorkOrderTotals.in_progress}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Blocked <span className="font-semibold">{aircraftEngineWorkOrderTotals.blocked}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Completed <span className="font-semibold">{aircraftEngineWorkOrderTotals.completed}</span></div>
                           </div>
                           {aircraftEngineRecentWorkOrders.length > 0 ? (
-                            <div className="grid gap-1 pt-1">
+                            <div className="grid gap-1.5">
                               {aircraftEngineRecentWorkOrders.map((row, index) => (
-                                <div key={`engine-work-order-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/60 px-2 py-1.5">
+                                <div key={`engine-work-order-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5">
                                   <div className="flex items-center justify-between gap-2">
-                                    <p className="font-medium text-[11px] text-[hsl(var(--mdm-template-heading))]">
+                                    <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">
                                       {String(row.work_package_number || row.title || `Work order ${index + 1}`)}
                                     </p>
-                                    <Badge variant={mapStatusToBadgeVariant(String(row.status || 'open'))}>
-                                      {String(row.status || 'open')}
-                                    </Badge>
+                                    <Badge variant={mapStatusToBadgeVariant(String(row.status || 'open'))}>{String(row.status || 'open')}</Badge>
                                   </div>
                                 </div>
                               ))}
                             </div>
                           ) : null}
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            Digital Signatures: <span className="font-semibold">{aircraftEngineDigitalSignatures.completed}/{aircraftEngineDigitalSignatures.totalRequired}</span> · Pending {aircraftEngineDigitalSignatures.pending}
+                          <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2 text-[11px]">
+                            Digital signatures <span className="font-semibold">{aircraftEngineDigitalSignatures.completed}/{aircraftEngineDigitalSignatures.totalRequired}</span> · pending {aircraftEngineDigitalSignatures.pending}
                           </div>
                           {aircraftEnginePartsTracking.length > 0 ? (
-                            <div className="grid gap-1 pt-1">
+                            <div className="grid gap-1.5">
                               {aircraftEnginePartsTracking.map((row, index) => (
-                                <div key={`engine-part-track-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/60 px-2 py-1.5">
+                                <div key={`engine-part-track-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5">
                                   <div className="flex items-center justify-between gap-2">
-                                    <p className="font-medium text-[11px] text-[hsl(var(--mdm-template-heading))]">
-                                      {String(row.part_number || `Part ${index + 1}`)}
-                                    </p>
-                                    <Badge variant={mapStatusToBadgeVariant(String(row.status || 'reserved'))}>
-                                      {String(row.status || 'reserved')}
-                                    </Badge>
+                                    <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">{String(row.part_number || `Part ${index + 1}`)}</p>
+                                    <Badge variant={mapStatusToBadgeVariant(String(row.status || 'reserved'))}>{String(row.status || 'reserved')}</Badge>
                                   </div>
-                                  <div className="mt-1 text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                                    Quantity issued/required: <span className="font-semibold text-foreground">{String(row.quantity_issued ?? 0)}/{String(row.quantity_required ?? 0)}</span>
-                                  </div>
+                                  <p className="mt-1 text-[11px] text-[hsl(var(--mdm-template-muted))]">Quantity {String(row.quantity_issued ?? 0)}/{String(row.quantity_required ?? 0)}</p>
                                 </div>
                               ))}
                             </div>
                           ) : null}
-                        </div>
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2.5">
+                        </section>
+
+                        <section id="engine-lane-compliance" className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm transition-all duration-200 hover:shadow-md">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Compliance Tracking</p>
-                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                                Regulatory readiness view combining AD/SB obligations, authority profile state, and standards alignment.
-                              </p>
+                              <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Compliance Tracking</p>
+                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">AD/SB obligations, regulator profile state, and standards alignment view.</p>
                             </div>
                             <Badge variant="outline">Governance View</Badge>
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-md bg-muted/40 p-2.5">Ready: <span className="font-semibold">{aircraftEngineComplianceSummary.readyCount}</span></div>
-                            <div className="rounded-md bg-muted/40 p-2.5">Pending: <span className="font-semibold">{aircraftEngineComplianceSummary.pendingCount}</span></div>
-                            <div className="rounded-md bg-muted/40 p-2.5">Overdue: <span className="font-semibold">{aircraftEngineComplianceSummary.overdueCount}</span></div>
-                            <div className="rounded-md bg-muted/40 p-2.5">Compliance: <span className="font-semibold">{aircraftEngineComplianceSummary.compliancePct}%</span></div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Ready <span className="font-semibold">{aircraftEngineComplianceSummary.readyCount}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Pending <span className="font-semibold">{aircraftEngineComplianceSummary.pendingCount}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Overdue <span className="font-semibold">{aircraftEngineComplianceSummary.overdueCount}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Compliance <span className="font-semibold">{aircraftEngineComplianceSummary.compliancePct}%</span></div>
                           </div>
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            Forecast Risk: <span className="font-semibold">{aircraftEnginePerformanceSummary.forecastRisk}</span> · Utilization {aircraftEnginePerformanceSummary.utilizationPct}%
+                          <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2 text-[11px]">
+                            Forecast risk <span className="font-semibold">{aircraftEnginePerformanceSummary.forecastRisk}</span> · utilization {aircraftEnginePerformanceSummary.utilizationPct}%
                           </div>
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            AD/SB: <span className="font-semibold">{String(aircraftEngineAdSbTracking.pending_obligations ?? 0)}</span> pending of {String(aircraftEngineAdSbTracking.total_obligations ?? 0)}
+                          <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2 text-[11px]">
+                            AD/SB pending <span className="font-semibold">{String(aircraftEngineAdSbTracking.pending_obligations ?? 0)}</span> of {String(aircraftEngineAdSbTracking.total_obligations ?? 0)}
                           </div>
-                          <div className="grid gap-1 pt-1">
+                          <div className="grid gap-1.5">
                             {Object.entries(aircraftEngineRegulatoryProfiles).slice(0, 3).map(([authority, details]) => (
-                              <div key={`engine-regulatory-${authority}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/60 px-2 py-1.5">
+                              <div
+                                key={`engine-regulatory-${authority}`}
+                                className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5"
+                                onClick={() =>
+                                  endEngineUsabilityTask('engine_compliance_readiness', 'completed', {
+                                    authority,
+                                    status: String(((details as Record<string, unknown>) || {}).status || 'monitoring'),
+                                  })
+                                }
+                              >
                                 <div className="flex items-center justify-between gap-2">
-                                  <p className="font-medium text-[11px] text-[hsl(var(--mdm-template-heading))]">{authority.toUpperCase()}</p>
+                                  <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">{authority.toUpperCase()}</p>
                                   <Badge variant={mapStatusToBadgeVariant(String(((details as Record<string, unknown>) || {}).status || 'monitoring'))}>
                                     {String(((details as Record<string, unknown>) || {}).status || 'monitoring')}
                                   </Badge>
@@ -7261,39 +7565,34 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                             ))}
                           </div>
                           {aircraftEngineComplianceStandards.length > 0 ? (
-                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
-                              Standards: {aircraftEngineComplianceStandards.join(', ')}
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 text-[11px]">
+                              Standards {aircraftEngineComplianceStandards.join(', ')}
                             </div>
                           ) : null}
-                        </div>
+                        </section>
                       </div>
-                      <div className="grid gap-2 text-[12px] md:grid-cols-2">
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2.5">
+
+                      <div className="grid gap-3 xl:grid-cols-2">
+                        <section id="engine-lane-analytics" className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm transition-all duration-200 hover:shadow-md">
                           <div className="flex items-start justify-between gap-2">
                             <div>
-                              <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Performance Analytics</p>
-                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                                Predictive risk, anomaly trend, and engine performance history in one operator panel.
-                              </p>
+                              <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Performance Analytics</p>
+                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">Predictive failure profile, anomaly trend, and read-model coverage.</p>
                             </div>
                             <Badge variant="outline">Intelligence View</Badge>
                           </div>
-                          <div className="grid grid-cols-2 gap-2">
-                            <div className="rounded-md bg-muted/40 p-2.5">Anomaly Index: <span className="font-semibold">{aircraftEnginePerformanceSummary.anomalyIndex}</span></div>
-                            <div className="rounded-md bg-muted/40 p-2.5">Trend Points: <span className="font-semibold">{aircraftEnginePerformanceSummary.trendSummary.length || aircraftEngineTrend.length}</span></div>
+                          <div className="grid grid-cols-2 gap-2 text-[11px]">
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Anomaly Index <span className="font-semibold">{aircraftEnginePerformanceSummary.anomalyIndex}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Trend Points <span className="font-semibold">{aircraftEnginePerformanceSummary.trendSummary.length || aircraftEngineTrend.length}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Prediction <span className="font-semibold">{String(aircraftEngineFailurePrediction.risk_score || 0)}</span></div>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2">Confidence <span className="font-semibold">{String(aircraftEngineFailurePrediction.confidence_pct || 0)}%</span></div>
                           </div>
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            Failure Prediction: <span className="font-semibold">{String(aircraftEngineFailurePrediction.risk_score || 0)}</span> score · confidence {String(aircraftEngineFailurePrediction.confidence_pct || 0)}%
-                          </div>
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            Detected Anomalies: <span className="font-semibold">{aircraftEngineAnomalies.length}</span>
-                          </div>
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            Read Model Assets: <span className="font-semibold">{aircraftEngineAssets.length}</span>
+                          <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2 text-[11px]">
+                            Detected anomalies <span className="font-semibold">{aircraftEngineAnomalies.length}</span> · read model assets <span className="font-semibold">{aircraftEngineAssets.length}</span>
                           </div>
                           {aircraftEnginePerformanceMiniChartRows.length > 0 ? (
-                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5" role="img" aria-label="Engine performance mini chart">
-                              <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Performance History Mini-Chart</p>
+                            <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5" role="img" aria-label="Engine performance mini chart">
+                              <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">Performance History Mini-Chart</p>
                               <div className="grid gap-0.5 font-mono text-[11px]">
                                 {aircraftEnginePerformanceMiniChartRows.map((row, index) => (
                                   <div key={`engine-mini-chart-row-${index + 1}`}>{row}</div>
@@ -7302,93 +7601,166 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                             </div>
                           ) : null}
                           {aircraftEngineReadModelError ? (
-                            <div className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-amber-900">
+                            <div className="rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] text-amber-900">
                               Engine read-model warning: {aircraftEngineReadModelError}
                             </div>
                           ) : null}
                           {aircraftEngineAnomalies.length > 0 ? (
-                            <div className="grid gap-1" role="status" aria-live="polite" aria-label="Engine anomaly detections">
+                            <div className="grid gap-1.5" role="status" aria-live="polite" aria-label="Engine anomaly detections">
                               {aircraftEngineAnomalies.map((row, index) => (
-                                <div key={`engine-anomaly-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
+                                <div
+                                  key={`engine-anomaly-row-${index + 1}`}
+                                  className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 text-[11px]"
+                                  onClick={() =>
+                                    endEngineUsabilityTask('engine_anomaly_review', 'completed', {
+                                      signal_type: String(row.signal_type || 'signal'),
+                                      anomaly_score: String(row.anomaly_score || 0),
+                                    })
+                                  }
+                                >
                                   {String(row.signal_type || 'signal')} · score {String(row.anomaly_score || 0)} · z {String(row.z_score || 0)}
                                 </div>
                               ))}
                             </div>
                           ) : null}
-                        </div>
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2.5">
-                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Integration Capabilities</p>
+                        </section>
+
+                        <section className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm transition-all duration-200 hover:shadow-md">
+                          <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Integration & Validation Mesh</p>
                           {aircraftEngineIntegrationRows.length === 0 ? (
-                            <p className="text-[hsl(var(--mdm-template-muted))]">No integration adapters reported.</p>
+                            <p className="rounded-md border border-dashed border-[hsl(var(--mdm-template-border))] px-2.5 py-2 text-[11px] text-[hsl(var(--mdm-template-muted))]">No integration adapters reported.</p>
                           ) : (
-                            <div className="grid gap-1">
+                            <div className="grid gap-1.5">
                               {aircraftEngineIntegrationRows.map((row, index) => (
-                                <div key={`engine-integration-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
+                                <div key={`engine-integration-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 text-[11px]">
                                   {String(row.system || row.name || 'Integration')} · {String(row.direction || 'bi-directional')} · {String(row.protocol || 'rest')} · {String(row.status || 'active')} · latency {String(row.latency_ms ?? '-')}ms
                                 </div>
                               ))}
                             </div>
                           )}
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            Channels: REST {String(aircraftEngineIntegrationResilience.rest_channels || 0)} · MQ {String(aircraftEngineIntegrationResilience.message_queue_channels || 0)} · Retry backlog {String(aircraftEngineIntegrationResilience.retry_backlog || 0)}
+                          <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2 text-[11px]">
+                            Channels REST {String(aircraftEngineIntegrationResilience.rest_channels || 0)} · MQ {String(aircraftEngineIntegrationResilience.message_queue_channels || 0)} · retry backlog {String(aircraftEngineIntegrationResilience.retry_backlog || 0)}
                           </div>
-                          <div className="rounded-md bg-muted/40 p-2.5">
-                            Circuit Breaker: state {String(((aircraftEngineIntegrationResilience.circuit_breaker as Record<string, unknown>) || {}).state || 'closed')} · threshold {String(((aircraftEngineIntegrationResilience.circuit_breaker as Record<string, unknown>) || {}).failure_threshold || 0)} · retry attempts {String(((aircraftEngineIntegrationResilience.retry_policy as Record<string, unknown>) || {}).attempts || 0)}
+                          <div className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-muted/40 px-2.5 py-2 text-[11px]">
+                            Circuit breaker {String(((aircraftEngineIntegrationResilience.circuit_breaker as Record<string, unknown>) || {}).state || 'closed')} · threshold {String(((aircraftEngineIntegrationResilience.circuit_breaker as Record<string, unknown>) || {}).failure_threshold || 0)} · retry {String(((aircraftEngineIntegrationResilience.retry_policy as Record<string, unknown>) || {}).attempts || 0)}
                           </div>
                           {Object.keys(aircraftEngineStandardsAlignment).length > 0 ? (
-                            <div className="grid gap-1">
+                            <div className="grid gap-1.5">
                               {Object.entries(aircraftEngineStandardsAlignment).map(([key, value]) => (
-                                <div key={`engine-standard-alignment-${key}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
+                                <div key={`engine-standard-alignment-${key}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 text-[11px]">
                                   {key.replace(/_/g, ' ').toUpperCase()}: {String(value)}
                                 </div>
                               ))}
                             </div>
                           ) : null}
                           {Object.keys(aircraftEngineValidationLayers).length > 0 ? (
-                            <div className="grid gap-1">
+                            <div className="grid gap-1.5">
                               {Object.entries(aircraftEngineValidationLayers).map(([key, value]) => (
-                                <div key={`engine-validation-layer-${key}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
+                                <div key={`engine-validation-layer-${key}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 text-[11px]">
                                   {key.replace(/_/g, ' ')}: {String(value)}
                                 </div>
                               ))}
                             </div>
                           ) : null}
-                        </div>
+                        </section>
                       </div>
-                      <div className="space-y-1 text-[12px]">
-                        <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Engine Lifecycle Records</p>
-                        {aircraftEngineLifecycleRows.length === 0 ? (
-                          <p className="text-[hsl(var(--mdm-template-muted))]">No lifecycle records in selected window.</p>
-                        ) : (
-                          aircraftEngineLifecycleRows.map((row, index) => (
-                            <div key={`engine-lifecycle-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
-                              {String(row.asset || row.registration || row.aircraft_id || 'Engine asset')} · {String(row.phase || row.lifecycle_stage || 'active')} · due {String(row.next_event_due_in_days ?? '-')}d · health {String(row.health_score ?? '-')}
+
+                      <div className="grid gap-3 lg:grid-cols-2">
+                        <section className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm">
+                          <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Lifecycle & Configuration Records</p>
+                          {aircraftEngineLifecycleRows.length === 0 ? (
+                            <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">No lifecycle records in selected window.</p>
+                          ) : (
+                            <div className="grid gap-1.5">
+                              {aircraftEngineLifecycleRows.map((row, index) => (
+                                <div key={`engine-lifecycle-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 text-[11px]">
+                                  {String(row.asset || row.registration || row.aircraft_id || 'Engine asset')} · {String(row.phase || row.lifecycle_stage || 'active')} · due {String(row.next_event_due_in_days ?? '-')}d · health {String(row.health_score ?? '-')}
+                                </div>
+                              ))}
                             </div>
-                          ))
-                        )}
-                      </div>
-                      <div className="space-y-1 text-[12px]">
-                        <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Engine Configuration Management</p>
-                        {aircraftEngineConfigurationRows.length === 0 ? (
-                          <p className="text-[hsl(var(--mdm-template-muted))]">No engine configuration entries available.</p>
-                        ) : (
-                          aircraftEngineConfigurationRows.map((row, index) => (
-                            <div key={`engine-configuration-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2.5 py-1.5">
-                              {String(row.engine_serial_number || row.serial_number || row.engine || `Engine ${index + 1}`)}
-                              {' · '}position {String(row.engine_position || row.position || '-')}
-                              {' · '}TSN {String(row.tsn ?? '-')}
-                              {' · '}CSN {String(row.csn ?? '-')}
-                              {' · '}module {String(row.module || row.module_name || '-')}
+                          )}
+                          {aircraftEngineConfigurationRows.length === 0 ? (
+                            <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">No engine configuration entries available.</p>
+                          ) : (
+                            <div className="grid gap-1.5">
+                              {aircraftEngineConfigurationRows.map((row, index) => (
+                                <div key={`engine-configuration-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5 text-[11px]">
+                                  {String(row.engine_serial_number || row.serial_number || row.engine || `Engine ${index + 1}`)}
+                                  {' · '}position {String(row.engine_position || row.position || '-')}
+                                  {' · '}TSN {String(row.tsn ?? '-')}
+                                  {' · '}CSN {String(row.csn ?? '-')}
+                                  {' · '}module {String(row.module || row.module_name || '-')}
+                                </div>
+                              ))}
                             </div>
-                          ))
-                        )}
+                          )}
+                        </section>
+
+                        <section className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm">
+                          <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Serialized Tracking & Thrust Records</p>
+                          <div className="grid gap-2 md:grid-cols-3">
+                            <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 p-2">
+                              <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">Serialized Engines</p>
+                              {aircraftEngineSerializedTrackingRows.length === 0 ? (
+                                <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">No serialized records.</p>
+                              ) : (
+                                aircraftEngineSerializedTrackingRows.map((row, index) => (
+                                  <div key={`engine-serialized-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1 text-[11px]">
+                                    {String(row.engine_serial_number || row.serial_number || `Engine ${index + 1}`)} · {String(row.engine_position || 'position n/a')}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                            <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 p-2">
+                              <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">Thrust Rating Changes</p>
+                              {aircraftEngineThrustRatingRows.length === 0 ? (
+                                <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">No thrust changes.</p>
+                              ) : (
+                                aircraftEngineThrustRatingRows.map((row, index) => (
+                                  <div key={`engine-thrust-rating-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1 text-[11px]">
+                                    {String(row.engine_serial_number || `Engine ${index + 1}`)} · {String(row.rated_thrust ?? '-')} · {String(row.derate_mode || 'normal')}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                            <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 p-2">
+                              <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">On-Wing Timeline</p>
+                              {aircraftEngineOnWingLifecycleRows.length === 0 ? (
+                                <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">No on-wing events.</p>
+                              ) : (
+                                aircraftEngineOnWingLifecycleRows.map((row, index) => (
+                                  <div key={`engine-on-wing-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1 text-[11px]">
+                                    {String(row.engine_serial_number || row.asset || `Engine ${index + 1}`)} · {String(row.event_type || 'event')} · {String(row.event_status || 'logged')}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-1 text-[12px]">
+                            <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">Engine Drill-down</p>
+                            {aircraftEngineDefectDrivers.length === 0 ? (
+                              <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">No defect drivers in selected window.</p>
+                            ) : (
+                              aircraftEngineDefectDrivers.map((row, index) => (
+                                <div key={`engine-driver-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2 py-1 text-[11px]">
+                                  {String(row.title || 'Engine anomaly')} · {String(row.severity || 'medium')} · due {String(row.due_in_days ?? '-')}d
+                                </div>
+                              ))
+                            )}
+                          </div>
+                        </section>
                       </div>
-                      <div className="space-y-2 rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/80 p-2.5">
+
+                      <section className="space-y-2 rounded-lg border border-[hsl(var(--mdm-template-border))] bg-card/80 p-3 shadow-sm">
                         <div className="flex items-center justify-between gap-2">
-                          <p className="text-[13px] font-semibold text-[hsl(var(--mdm-template-heading))]">Engine Data Entry (Validated)</p>
+                          <p className="text-sm font-semibold text-[hsl(var(--mdm-template-heading))]">Engine Data Entry (Validated)</p>
                           <Badge variant="outline">Operator Assisted</Badge>
                         </div>
-                        <form className="grid gap-2 md:grid-cols-5" onSubmit={handleSubmitEngineDataEntry}>
+                        <form
+                          className="grid gap-2 md:grid-cols-5"
+                          onSubmit={handleSubmitEngineDataEntry}
+                          onFocusCapture={() => startEngineUsabilityTask('engine_data_entry_validation', { source: 'form_focus' })}
+                        >
                           <div className="space-y-1 md:col-span-2">
                             <Label htmlFor="engine-entry-serial" className="text-[11px]">Engine Serial</Label>
                             <Input
@@ -7397,13 +7769,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               onChange={(event) => setEngineEntrySerial(event.target.value)}
                               placeholder="ENG-1001"
                               aria-label="Engine serial input"
+                              className="transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary"
                             />
                             {engineEntryErrors.serial ? <p className="text-[11px] text-destructive">{engineEntryErrors.serial}</p> : null}
                           </div>
                           <div className="space-y-1">
                             <Label htmlFor="engine-entry-position" className="text-[11px]">Position</Label>
                             <Select value={engineEntryPosition} onValueChange={(value) => setEngineEntryPosition(value as 'L' | 'R' | 'C' | 'AUX')}>
-                              <SelectTrigger id="engine-entry-position" aria-label="Engine position input">
+                              <SelectTrigger id="engine-entry-position" aria-label="Engine position input" className="focus-visible:ring-2 focus-visible:ring-primary">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -7422,6 +7795,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               onChange={(event) => setEngineEntryModule(event.target.value)}
                               placeholder="CORE"
                               aria-label="Engine module input"
+                              className="transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary"
                             />
                             {engineEntryErrors.module ? <p className="text-[11px] text-destructive">{engineEntryErrors.module}</p> : null}
                           </div>
@@ -7433,6 +7807,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               onChange={(event) => setEngineEntryTsn(event.target.value)}
                               placeholder="12440"
                               aria-label="Engine TSN input"
+                              className="transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary"
                             />
                             {engineEntryErrors.tsn ? <p className="text-[11px] text-destructive">{engineEntryErrors.tsn}</p> : null}
                           </div>
@@ -7444,70 +7819,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                               onChange={(event) => setEngineEntryCsn(event.target.value)}
                               placeholder="8421"
                               aria-label="Engine CSN input"
+                              className="transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-primary"
                             />
                             {engineEntryErrors.csn ? <p className="text-[11px] text-destructive">{engineEntryErrors.csn}</p> : null}
                           </div>
-                          <div className="md:col-span-5 flex items-center justify-between gap-2">
+                          <div className="md:col-span-5 flex flex-wrap items-center justify-between gap-2">
                             <p className="text-[11px] text-[hsl(var(--mdm-template-muted))]">
-                              Use this to validate engine identity and usage counters before creating work package tasks.
+                              Validate engine identity and usage counters before generating regulated maintenance tasks.
                             </p>
                             <Button type="submit" size="sm" disabled={engineEntrySubmitting} aria-busy={engineEntrySubmitting}>
                               {engineEntrySubmitting ? 'Validating…' : 'Validate Entry'}
                             </Button>
                           </div>
                         </form>
-                      </div>
-                      <div className="grid gap-2 text-[12px] md:grid-cols-3">
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
-                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Serialized Engine Tracking</p>
-                          {aircraftEngineSerializedTrackingRows.length === 0 ? (
-                            <p className="text-[hsl(var(--mdm-template-muted))]">No serialized engine records available.</p>
-                          ) : (
-                            aircraftEngineSerializedTrackingRows.map((row, index) => (
-                              <div key={`engine-serialized-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
-                                {String(row.engine_serial_number || row.serial_number || `Engine ${index + 1}`)} · {String(row.engine_position || 'position n/a')} · installed {String(row.installed_at || '').slice(0, 10) || '-'}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
-                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Thrust Rating Change Log</p>
-                          {aircraftEngineThrustRatingRows.length === 0 ? (
-                            <p className="text-[hsl(var(--mdm-template-muted))]">No thrust rating changes recorded.</p>
-                          ) : (
-                            aircraftEngineThrustRatingRows.map((row, index) => (
-                              <div key={`engine-thrust-rating-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
-                                {String(row.engine_serial_number || `Engine ${index + 1}`)} · thrust {String(row.rated_thrust ?? '-')} · {String(row.derate_mode || 'normal')} · effective {String(row.effective_from || '').slice(0, 10) || '-'}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                        <div className="space-y-1 rounded-md border border-[hsl(var(--mdm-template-border))] p-2">
-                          <p className="font-medium text-[hsl(var(--mdm-template-heading))]">On-Wing Lifecycle Timeline</p>
-                          {aircraftEngineOnWingLifecycleRows.length === 0 ? (
-                            <p className="text-[hsl(var(--mdm-template-muted))]">No on-wing lifecycle events posted.</p>
-                          ) : (
-                            aircraftEngineOnWingLifecycleRows.map((row, index) => (
-                              <div key={`engine-on-wing-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
-                                {String(row.engine_serial_number || row.asset || `Engine ${index + 1}`)} · {String(row.event_type || 'event')} · at {String(row.event_at || row.recorded_at || '').slice(0, 10) || '-'} · status {String(row.event_status || 'logged')}
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </div>
-                      <div className="space-y-1 text-[12px]">
-                        <p className="font-medium text-[hsl(var(--mdm-template-heading))]">Engine Drill-down</p>
-                        {aircraftEngineDefectDrivers.length === 0 ? (
-                          <p className="text-[hsl(var(--mdm-template-muted))]">No defect drivers in selected window.</p>
-                        ) : (
-                          aircraftEngineDefectDrivers.map((row, index) => (
-                            <div key={`engine-driver-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
-                              {String(row.title || 'Engine anomaly')} · {String(row.severity || 'medium')} · due {String(row.due_in_days ?? '-')}d
-                            </div>
-                          ))
-                        )}
-                      </div>
-                    </div>
+                      </section>
+                    </section>
                   ) : null}
                   {showAircraftComponentsWorkspace ? (
                     <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">

@@ -1,0 +1,6 @@
+issue_id,severity,theme,task_id,evidence,recommended_fix,owner,target_release,status
+ENG-ISS-001,high,Navigation Clarity,T2_engine_maintenance_next_due,,,,,open
+ENG-ISS-002,medium,Information Hierarchy,T1_engine_risk_scan,,,,,open
+ENG-ISS-003,medium,Compliance Visibility,T3_engine_compliance_readiness,,,,,open
+ENG-ISS-004,medium,Anomaly Interpretation,T4_engine_anomaly_review,,,,,open
+ENG-ISS-005,low,Form Microcopy,T5_engine_data_entry_validation,,,,,open
