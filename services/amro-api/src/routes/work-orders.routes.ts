@@ -209,6 +209,15 @@ router.post(
     }
 
     const v2Request = req.body as V2CreateWorkPackageRequest;
+    const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    if (interfaceName === 'create-work-package-template') {
+      res.status(404).json({
+        error: 'Interface create-work-package-template is handled by work-package-template routes',
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      } as ErrorResponse);
+      return;
+    }
     const request = mapV2CreatePayloadToV1Request(v2Request);
 
     if (!request.aircraft_id) {

@@ -45,6 +45,7 @@ import {
   transitionRuntimeWorkPackage,
   upsertRuntimeWorkPackage,
 } from './work-package-runtime-store';
+import masterDataEntityHandler from './master-data/[entity]';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -858,6 +859,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
     if (req.method === 'POST') {
       enforceAmroSequentialMilestoneForWorkPackageInterface(interfaceName);
+    }
+
+    if (req.method === 'POST' && interfaceName === 'create-work-package-template') {
+      const body = parseBody(req.body);
+      req.query = {
+        ...req.query,
+        entity: 'work_package_templates',
+      };
+      req.body = body;
+      return masterDataEntityHandler(req, res);
     }
 
     if (req.method === 'POST' && interfaceName === 'create-work-package') {
@@ -2127,7 +2138,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     if (req.method === 'POST') {
       return res.status(400).json({
-        error: 'Unsupported interface. Use create-work-package, save-work-package-view, transition-work-package, clone-template, assign-maintenance-slot, run-replan-simulation, confirm-replan, reserve-parts, process-shortage-response, sync-supplier-eta, trace-rotable-llp, run-inventory-optimization, sync-supplier-asn-erp, intelligent-plan, optimize-resources, simulate, or publish.',
+        error: 'Unsupported interface. Use create-work-package, create-work-package-template, save-work-package-view, transition-work-package, clone-template, assign-maintenance-slot, run-replan-simulation, confirm-replan, reserve-parts, process-shortage-response, sync-supplier-eta, trace-rotable-llp, run-inventory-optimization, sync-supplier-asn-erp, intelligent-plan, optimize-resources, simulate, or publish.',
         correlationId: ctx.correlationId,
         version: 'v2',
       });
