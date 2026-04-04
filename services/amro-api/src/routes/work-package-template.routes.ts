@@ -7,6 +7,13 @@ import { ErrorResponse } from '../types/amro.types';
 
 const router = Router();
 
+router.use((req, _res, next) => {
+  if (req.url.startsWith('/amro/work-package-templates')) {
+    req.url = req.url.replace('/amro/work-package-templates', '/work-package-templates');
+  }
+  next();
+});
+
 const supabaseUrl = String(
   process.env.AMRO_SUPABASE_URL ||
     process.env.SUPABASE_URL ||

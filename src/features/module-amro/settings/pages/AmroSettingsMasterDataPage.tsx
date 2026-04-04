@@ -2953,7 +2953,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] creating work package template request work_package_templates', {
           entity,
-          requestUrl: '/api/v2/amro/work-packages?interface=create-work-package-template',
+          requestUrl: '/api/v2/amro/work-package-templates?interface=create-work-package-template',
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
           maintenanceType: String(payload.maintenance_type || ''),
@@ -2964,7 +2964,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         });
       }
       const createEndpoint = entity === 'work_package_templates'
-        ? '/api/v2/amro/work-packages?interface=create-work-package-template'
+        ? '/api/v2/amro/work-package-templates?interface=create-work-package-template'
         : `/api/v2/amro/master-data/${entity}`;
       const response = await fetch(createEndpoint, {
         method: 'POST',
@@ -2981,7 +2981,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           : null;
         logger.info('[AMRO Master Data UI] work package template create response', {
           entity,
-          requestUrl: '/api/v2/amro/work-packages?interface=create-work-package-template',
+          requestUrl: '/api/v2/amro/work-package-templates?interface=create-work-package-template',
           status: response.status,
           ok: response.ok,
           responseError: String(responsePayload.error || ''),
@@ -3092,7 +3092,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] updating work package template request', {
           entity,
-          requestUrl: `/api/v2/amro/work_package_templates/${selectedId}`,
+          requestUrl: `/api/v2/amro/work-package-templates/${selectedId}`,
           workPackageTemplateId: String(selectedId || ''),
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
@@ -3104,7 +3104,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         });
       }
       const updateEndpoint = entity === 'work_package_templates'
-        ? `/api/v2/amro/work_package_templates/${selectedId}`
+        ? `/api/v2/amro/work-package-templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const response = await fetch(updateEndpoint, {
         method: 'PATCH',
@@ -3121,7 +3121,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           : null;
         logger.info('[AMRO Master Data UI] work package template update response', {
           entity,
-          requestUrl: `/api/v2/amro/work_package_templates/${selectedId}`,
+          requestUrl: `/api/v2/amro/work-package-templates/${selectedId}`,
           status: response.status,
           ok: response.ok,
           responseError: String(responsePayload.error || ''),
