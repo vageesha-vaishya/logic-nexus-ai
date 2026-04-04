@@ -91,6 +91,19 @@ export const APP_MENU: MenuModule[] = [
     ],
   },
   {
+    label: 'UIM',
+    items: [
+      { name: 'Overview', path: '/dashboard/uim', icon: Database, description: 'UIM module landing and rollout checkpoints', permissions: ['dashboards.view'] },
+      { name: 'Item Master', path: '/dashboard/uim/item-master', icon: PackageCheck, description: 'Catalog and SKU master shell', permissions: ['dashboards.view'] },
+      { name: 'Stock Ledger', path: '/dashboard/uim/stock-ledger', icon: FileText, description: 'Immutable inventory ledger timeline shell', permissions: ['dashboards.view'] },
+      { name: 'Reservations', path: '/dashboard/uim/reservations', icon: CheckSquare, description: 'Soft reservation lifecycle shell', permissions: ['dashboards.view'] },
+      { name: 'Issue & Consume', path: '/dashboard/uim/issue-consume', icon: ArrowRightLeft, description: 'Issue and consume execution shell', permissions: ['dashboards.view'] },
+      { name: 'Restock', path: '/dashboard/uim/restock', icon: TrendingUp, description: 'Dynamic restock evaluation shell', permissions: ['dashboards.view'] },
+      { name: 'Locations', path: '/dashboard/uim/locations', icon: MapPin, description: 'Location registry and transfer shell', permissions: ['dashboards.view'] },
+      { name: 'Analytics', path: '/dashboard/uim/analytics', icon: BarChart3, description: 'Inventory KPI and trend shell', permissions: ['dashboards.view'] },
+    ],
+  },
+  {
     label: 'AMRO',
     items: [
       { name: 'Overview', path: '/dashboard/amro/overview', icon: BarChart3, description: 'Maintenance overview and KPI shell', permissions: ['view_amro_dashboard'] },

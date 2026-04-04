@@ -180,6 +180,7 @@ const DebugConsole = lazy(() => import("./pages/dashboard/DebugConsole"));
 const Commodities = lazy(() => import("./pages/dashboard/Commodities"));
 const SalesPlaceholder = lazy(() => import("./pages/dashboard/SalesPlaceholder"));
 const SalesCommandCenter = lazy(() => import("./pages/dashboard/SalesCommandCenter"));
+const UimShell = lazy(() => import("./pages/dashboard/UimShell"));
 const AmroOverview = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroOverviewPage })));
 const AmroWorkPackages = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroWorkPackagesPage })));
 const AmroTaskExecution = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroTaskExecutionPage })));
@@ -918,6 +919,14 @@ const App = () => (
             <Route path="/dashboard/reports/reps" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/settings/teams" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/settings/activities" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><SalesPlaceholder /></ProtectedRoute>} />
+            <Route path="/dashboard/uim" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/item-master" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/stock-ledger" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/reservations" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/issue-consume" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/restock" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/locations" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/analytics" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
                         </Routes>

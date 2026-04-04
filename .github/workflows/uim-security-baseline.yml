@@ -1,0 +1,101 @@
+name: UIM Security Baseline
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'src/pages/api/v2/uim/**'
+      - 'supabase/migrations/*uim*.sql'
+      - '.github/workflows/uim-security-baseline.yml'
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'src/pages/api/v2/uim/**'
+      - 'supabase/migrations/*uim*.sql'
+      - '.github/workflows/uim-security-baseline.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  secret-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare security report directory
+        run: mkdir -p artifacts/mro/analysis
+
+      - name: Run gitleaks on UIM API sources
+        run: |
+          docker run --rm \
+            -v "$PWD:/repo" \
+            zricethezav/gitleaks:latest \
+            detect \
+            --source=/repo/src/pages/api/v2/uim \
+            --redact \
+            --exit-code=1 \
+            --report-format sarif \
+            --report-path=/repo/artifacts/mro/analysis/uim-gitleaks-api.sarif
+
+      - name: Run gitleaks on UIM migrations
+        run: |
+          mkdir -p .tmp-uim-migrations
+          find supabase/migrations -maxdepth 1 -type f -name '*uim*.sql' -exec cp {} .tmp-uim-migrations/ \;
+          if [ -n "$(ls -A .tmp-uim-migrations 2>/dev/null)" ]; then
+            docker run --rm \
+              -v "$PWD:/repo" \
+              zricethezav/gitleaks:latest \
+              detect \
+              --source=/repo/.tmp-uim-migrations \
+              --redact \
+              --exit-code=1 \
+              --report-format sarif \
+              --report-path=/repo/artifacts/mro/analysis/uim-gitleaks-migrations.sarif
+          else
+            echo "No UIM migration files detected for secret scan."
+            printf '{"runs":[]}' > artifacts/mro/analysis/uim-gitleaks-migrations.sarif
+          fi
+
+      - name: Upload secret-scan report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uim-gitleaks-report
+          path: |
+            artifacts/mro/analysis/uim-gitleaks-api.sarif
+            artifacts/mro/analysis/uim-gitleaks-migrations.sarif
+
+  sast-scan:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Prepare security report directory
+        run: mkdir -p artifacts/mro/analysis
+
+      - name: Run semgrep SAST on UIM sources
+        run: |
+          docker run --rm \
+            -v "$PWD:/src" \
+            returntocorp/semgrep:latest \
+            semgrep \
+            --config p/security-audit \
+            --config p/secrets \
+            --error \
+            --json \
+            --output /src/artifacts/mro/analysis/uim-semgrep.json \
+            /src/src/pages/api/v2/uim
+
+      - name: Upload SAST report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uim-semgrep-report
+          path: artifacts/mro/analysis/uim-semgrep.json

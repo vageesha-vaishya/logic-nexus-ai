@@ -1,0 +1,52 @@
+name: UIM Phase 1 Quality Gate
+
+on:
+  push:
+    branches: [main, master, develop]
+    paths:
+      - 'src/pages/api/v2/uim/**'
+      - 'supabase/migrations/*uim*.sql'
+      - '.github/workflows/uim-phase1-gate.yml'
+      - '.github/workflows/uim-security-baseline.yml'
+  pull_request:
+    branches: [main, master, develop]
+    paths:
+      - 'src/pages/api/v2/uim/**'
+      - 'supabase/migrations/*uim*.sql'
+      - '.github/workflows/uim-phase1-gate.yml'
+      - '.github/workflows/uim-security-baseline.yml'
+
+jobs:
+  uim-quality-gate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Enforce project rules
+        run: npm run rules:enforce
+
+      - name: Lint UIM API surface
+        run: npx eslint "src/pages/api/v2/uim/**/*.ts" --max-warnings=0
+
+      - name: Type check baseline
+        run: npm run typecheck
+
+      - name: Run UIM API tests
+        run: |
+          npx vitest run \
+            src/pages/api/v2/uim/items/query.test.ts \
+            src/pages/api/v2/uim/reservations/soft.test.ts \
+            'src/pages/api/v2/uim/reservations/[id]/status.test.ts'

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { 
   Search, 
@@ -65,6 +65,7 @@ const GROUP_STRIP_COLOR_TOKEN: Record<string, { cssVar: string; fallback: string
   sales: { cssVar: '--menu-strip-sales', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.sales },
   financials: { cssVar: '--menu-strip-financials', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.financials },
   logistics: { cssVar: '--menu-strip-logistics', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.logistics },
+  uim: { cssVar: '--menu-strip-uim', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.other },
   amro: { cssVar: '--menu-strip-amro', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.amro },
   admin: { cssVar: '--menu-strip-administration', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.administration },
   administration: { cssVar: '--menu-strip-administration', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.administration },
@@ -107,6 +108,15 @@ const GROUP_THEME: Record<string, { heading: string; trigger: string; item: stri
     iconActive: 'bg-amber-500/20 text-amber-900 dark:text-amber-100',
     panel: 'border-amber-500/10 bg-gradient-to-br from-amber-500/[0.06] via-transparent to-transparent',
   },
+  uim: {
+    heading: 'text-indigo-700 dark:text-indigo-300',
+    trigger: 'hover:bg-indigo-500/10 hover:text-indigo-900 dark:hover:text-indigo-100',
+    item: 'hover:bg-indigo-500/10',
+    active: 'border-indigo-500/30 bg-gradient-to-r from-indigo-500/20 to-indigo-500/5 text-indigo-900 dark:text-indigo-100',
+    icon: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
+    iconActive: 'bg-indigo-500/20 text-indigo-900 dark:text-indigo-100',
+    panel: 'border-indigo-500/10 bg-gradient-to-br from-indigo-500/[0.06] via-transparent to-transparent',
+  },
   amro: {
     heading: 'text-cyan-700 dark:text-cyan-300',
     trigger: 'hover:bg-cyan-500/10 hover:text-cyan-900 dark:hover:text-cyan-100',
@@ -136,6 +146,7 @@ const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
   '/dashboard/quotes/pipeline': () => import('@/pages/dashboard/QuotesPipeline'),
   '/dashboard/bookings': () => import('@/pages/dashboard/Bookings'),
   '/dashboard/shipments/pipeline': () => import('@/pages/dashboard/ShipmentsPipeline'),
+  '/dashboard/uim': () => import('@/pages/dashboard/UimShell'),
   '/dashboard/settings': () => import('@/pages/dashboard/Settings'),
 };
 
@@ -201,6 +212,7 @@ export function CommandCenterNav() {
       crm: true,
       sales: false,
       logistics: false,
+      uim: false,
       amro: false,
       financials: false,
       admin: false,
@@ -333,6 +345,7 @@ export function CommandCenterNav() {
 
     // Logistics
     const logisticsItems = mapModuleItems('Logistics');
+    const uimItems = mapModuleItems('UIM');
     const amroItems = hasAmroDomain
       ? mapModuleItems('AMRO').filter((item) => (amroRbacFixEnabled ? canAccessItem(item) : true))
       : [];
@@ -361,6 +374,7 @@ export function CommandCenterNav() {
       { id: 'sales', label: 'Sales', items: salesItems },
       { id: 'financials', label: 'Financials', items: financialItems },
       { id: 'logistics', label: 'Logistics', items: logisticsItems },
+      { id: 'uim', label: 'UIM', items: uimItems },
       { id: 'amro', label: 'AMRO', items: amroItems },
       { id: 'admin', label: 'Administration', items: adminItems },
     ].filter((group) => group.items.length > 0);
@@ -493,7 +507,7 @@ export function CommandCenterNav() {
         const isOpen = group.id === 'amro'
           ? isSearchActive || group.defaultOpen || (!amroGroupCollapsed && (openGroups[group.id] || hasActiveItem))
           : isSearchActive || openGroups[group.id] || group.defaultOpen || hasActiveItem;
-        const isLowFrequencyGroup = group.id === 'logistics' || group.id === 'financials' || group.id === 'admin' || group.id === 'amro';
+        const isLowFrequencyGroup = group.id === 'logistics' || group.id === 'uim' || group.id === 'financials' || group.id === 'admin' || group.id === 'amro';
         const isExpanded = !!expandedItems[group.id];
         const visibleItems =
           !isSearchActive && !collapsed && isLowFrequencyGroup && !isExpanded

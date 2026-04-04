@@ -11,6 +11,8 @@
 - Unit tests: Passed (`npx vitest run src/pages/api/v2/uim/items/query.test.ts src/pages/api/v2/uim/reservations/soft.test.ts`)
 - Integration tests: Passed (`npx vitest run src/pages/api/v2/uim/reservations/soft.test.ts 'src/pages/api/v2/uim/reservations/[id]/status.test.ts'`)
 - Validation contract tests: Passed (`npx vitest run src/pages/api/v2/uim/reservations/soft.test.ts 'src/pages/api/v2/uim/reservations/[id]/status.test.ts'`) for deterministic `422` (`UIM_VALIDATION_INVALID_QUANTITY`, `UIM_VALIDATION_INVALID_STATUS`, `UIM_RESERVATION_INVALID_TRANSITION`)
+- UIM CI quality gate workflow: Implemented (`.github/workflows/uim-phase1-gate.yml`) with rules enforcement, UIM lint, typecheck, and targeted tests
+- UIM security baseline workflow: Implemented (`.github/workflows/uim-security-baseline.yml`) with dedicated secret scan (gitleaks) and SAST (semgrep) for UIM scope
 - Security scan: Pending
 
 ## Evidence Links
@@ -22,6 +24,9 @@
 - Test evidence:
 - `src/pages/api/v2/uim/reservations/soft.test.ts`
 - `src/pages/api/v2/uim/reservations/[id]/status.test.ts`
+- CI/CD workflows:
+- `.github/workflows/uim-phase1-gate.yml`
+- `.github/workflows/uim-security-baseline.yml`
 - Migration skeleton:
 - `supabase/migrations/20260404143000_uim_core_schema_skeleton.sql`
 
