@@ -42,9 +42,16 @@ type WorkPackageTemplateRequest = {
   selected_task_template_ids?: string[];
 };
 
+type CreateWorkPackageTemplateTaskTemplateRequest = {
+  work_package_template_id?: string;
+  task_template_id?: string;
+  selected_task_template_ids?: string[];
+};
+
 type TemplateRecord = Record<string, unknown>;
 type RelationshipRecord = Record<string, unknown>;
 type TaskTemplateRecord = Record<string, unknown>;
+
 
 function getFranchiseId(req: AuthRequest): string | null {
   const fromHeader = String(req.header('x-franchise-id') || '').trim();
@@ -64,6 +71,13 @@ function normalizeTaskTemplateIds(input: unknown): string[] {
       .map((value) => String(value || '').trim())
       .filter((value) => value.length > 0),
   ));
+}
+
+function normalizeTaskTemplateRequestIds(input: CreateWorkPackageTemplateTaskTemplateRequest): string[] {
+  const direct = normalizeTaskTemplateIds(input.selected_task_template_ids);
+  if (direct.length > 0) return direct;
+  const single = String(input.task_template_id || '').trim();
+  return single ? [single] : [];
 }
 
 function toErrorResponse(error: string, code: string, statusCode: number): ErrorResponse {
@@ -204,6 +218,140 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
   const createdId = String((insertedTemplate as Record<string, unknown>).id || '').trim();
   const records = await buildTemplateListResponse(tenantId, franchiseId, createdId ? [createdId] : undefined);
   res.status(201).json({ data: records[0] || insertedTemplate || null });
+}
+
+async function createTemplateTaskRelationshipsFromRequest(
+  req: AuthRequest,
+  res: { status: (code: number) => { json: (body: unknown) => void } },
+): Promise<void> {
+  const tenantId = req.tenantId;
+  const userId = req.userId;
+  const franchiseId = getFranchiseId(req);
+  const { workPackageTemplateId } = req.params as { workPackageTemplateId: string };
+  if (!tenantId || !userId) {
+    res.status(401).json(toErrorResponse('Missing tenant or user context', 'MISSING_CONTEXT', 401));
+    return;
+  }
+
+  const request = (req.body || {}) as CreateWorkPackageTemplateTaskTemplateRequest;
+  const resolvedTemplateId = String(request.work_package_template_id || workPackageTemplateId || '').trim();
+  if (!resolvedTemplateId || !isUuid(resolvedTemplateId)) {
+    res.status(400).json(
+      toErrorResponse('Missing or invalid work_package_template_id', 'VALIDATION_ERROR', 400),
+    );
+    return;
+  }
+  const selectedTaskTemplateIds = normalizeTaskTemplateRequestIds(request);
+  if (selectedTaskTemplateIds.length === 0) {
+    res.status(400).json(
+      toErrorResponse('Missing required fields: task_template_id or selected_task_template_ids', 'VALIDATION_ERROR', 400),
+    );
+    return;
+  }
+  if (selectedTaskTemplateIds.some((value) => !isUuid(value))) {
+    res.status(422).json(
+      toErrorResponse('Validation failed: task_template_id values must be valid UUID', 'VALIDATION_ERROR', 422),
+    );
+    return;
+  }
+
+  logger.info('[AMRO Work Package Template] add task-template relationships request', {
+    tenantId,
+    franchiseId,
+    userId,
+    workPackageTemplateId: resolvedTemplateId,
+    taskTemplateCount: selectedTaskTemplateIds.length,
+  });
+
+  let templateQuery = supabase
+    .from('work_package_templates')
+    .select('id,tenant_id,franchise_id')
+    .eq('tenant_id', tenantId)
+    .eq('id', resolvedTemplateId);
+  if (franchiseId) {
+    templateQuery = templateQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+  }
+  const { data: templateRow, error: templateError } = await templateQuery.single();
+  if (templateError || !templateRow) {
+    res.status(404).json(toErrorResponse('Work package template not found', 'NOT_FOUND', 404));
+    return;
+  }
+
+  const validation = await validateTaskTemplateIds(tenantId, franchiseId, selectedTaskTemplateIds);
+  if (!validation.valid) {
+    if (validation.invalidIds.length > 0) {
+      res.status(422).json(toErrorResponse(`Invalid task_template_id values: ${validation.invalidIds.join(', ')}`, 'VALIDATION_ERROR', 422));
+      return;
+    }
+    res.status(422).json(toErrorResponse(`task_template_id not found: ${validation.missingIds.join(', ')}`, 'NOT_FOUND', 422));
+    return;
+  }
+
+  let modelQuery = supabase
+    .from('task_templates')
+    .select('id,assembly_models')
+    .eq('tenant_id', tenantId)
+    .in('id', selectedTaskTemplateIds);
+  if (franchiseId) {
+    modelQuery = modelQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+  }
+  const { data: taskRows, error: taskRowsError } = await modelQuery;
+  if (taskRowsError) {
+    const message = String(taskRowsError.message || '');
+    res.status(400).json(toErrorResponse(message, 'CREATE_FAILED', 400));
+    return;
+  }
+  const modelIds = Array.from(new Set(
+    (Array.isArray(taskRows) ? taskRows : [])
+      .map((row) => String((row as Record<string, unknown>).assembly_models || '').trim())
+      .filter((value) => value.length > 0),
+  ));
+  if (modelIds.length !== 1) {
+    res.status(422).json(
+      toErrorResponse(
+        'Validation failed: selected task templates belong to different or missing assembly_models',
+        'VALIDATION_ERROR',
+        422,
+      ),
+    );
+    return;
+  }
+  const resolvedModelId = modelIds[0];
+
+  const relationshipRows = selectedTaskTemplateIds.map((taskTemplateId) => ({
+    tenant_id: tenantId,
+    franchise_id: franchiseId,
+    work_package_template_id: resolvedTemplateId,
+    model_id: resolvedModelId,
+    task_template_id: taskTemplateId,
+    created_by: userId,
+    updated_by: userId,
+  }));
+  const { error: relationError } = await supabase
+    .from('work_package_template_task_templates')
+    .insert(relationshipRows);
+  if (relationError) {
+    const message = String(relationError.message || '');
+    const statusCode = /duplicate key/i.test(message) ? 409 : 400;
+    logger.error('[AMRO Work Package Template] add task-template relationships failed', {
+      tenantId,
+      workPackageTemplateId: resolvedTemplateId,
+      message,
+    });
+    res.status(statusCode).json(toErrorResponse(message, 'CREATE_FAILED', statusCode));
+    return;
+  }
+
+  logger.info('[AMRO Work Package Template] add task-template relationships success', {
+    tenantId,
+    workPackageTemplateId: resolvedTemplateId,
+    taskTemplateCount: selectedTaskTemplateIds.length,
+  });
+  const records = await buildTemplateListResponse(tenantId, franchiseId, [resolvedTemplateId]);
+  res.status(201).json({
+    data: records[0] || null,
+    added_task_template_ids: selectedTaskTemplateIds,
+  });
 }
 
 async function validateTaskTemplateIds(
@@ -352,9 +500,67 @@ router.post(
 );
 
 router.post(
+  '/amro/work-package-templates',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    await createWorkPackageTemplateFromRequest(req, res);
+    return;
+  }),
+);
+
+router.post(
   '/work-package-templates',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     await createWorkPackageTemplateFromRequest(req, res);
+    return;
+  }),
+);
+
+/**
+ * @openapi
+ * /api/v2/work-package-templates/{workPackageTemplateId}/task-templates:
+ *   post:
+ *     summary: Add task-template relationships to a work package template
+ *     tags: [Work Package Templates]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           examples:
+ *             bulk:
+ *               value:
+ *                 selected_task_template_ids:
+ *                   - "11a11111-2222-4333-9444-555555555555"
+ *                   - "22b22222-3333-4444-a555-666666666666"
+ *             single:
+ *               value:
+ *                 task_template_id: "11a11111-2222-4333-9444-555555555555"
+ *     responses:
+ *       201:
+ *         description: Relationships created
+ *         content:
+ *           application/json:
+ *             example:
+ *               data:
+ *                 id: "33333333-4444-4555-8666-777777777777"
+ *                 selected_task_template_ids:
+ *                   - "11a11111-2222-4333-9444-555555555555"
+ *               added_task_template_ids:
+ *                 - "11a11111-2222-4333-9444-555555555555"
+ *       400:
+ *         description: Validation error or constraint failure
+ *       401:
+ *         description: Missing tenant or user context
+ *       404:
+ *         description: Work package template not found
+ *       409:
+ *         description: Duplicate relationship already exists
+ *       422:
+ *         description: Invalid UUID or cross-model task selection
+ */
+router.post(
+  '/work-package-templates/:workPackageTemplateId/task-templates',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    await createTemplateTaskRelationshipsFromRequest(req, res);
     return;
   }),
 );
