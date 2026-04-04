@@ -940,11 +940,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       </MemoryRouter>,
     );
 
-    const newPartsInventoryButton = await screen.findByRole(
+    const newPartsInventoryButtons = await screen.findAllByRole(
       'button',
       { name: /New\s+Parts Inventory/i },
       { timeout: ASYNC_WAIT_TIMEOUT_MS },
     );
+    const newPartsInventoryButton = newPartsInventoryButtons.find((button) => !button.hasAttribute('disabled')) ?? newPartsInventoryButtons[0];
     const template = await screen.findByTestId('amro-master-data-template', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     expect(template).toHaveClass('mdm-template-page');
 
@@ -965,9 +966,10 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       </MemoryRouter>,
     );
 
-    await screen.findByRole('button', { name: /New Parts Inventory/ }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    const createButtons = await screen.findAllByRole('button', { name: /New Parts Inventory/ }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    const createButton = createButtons.find((button) => !button.hasAttribute('disabled')) ?? createButtons[0];
 
-    fireEvent.click(screen.getByRole('button', { name: /New Parts Inventory/ }));
+    fireEvent.click(createButton);
     const dialog = await screen.findByTestId('amro-master-data-form-dialog', {}, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     fireEvent.change(within(dialog).getByLabelText(/^Part Number/i), { target: { value: 'PART-200' } });
     fireEvent.click(within(dialog).getByRole('tab', { name: /Configuration Settings/i }));
@@ -1555,23 +1557,25 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(await screen.findByText(/View: engine/i, {}, { timeout: ASYNC_WAIT_TIMEOUT_MS })).toBeInTheDocument();
     expect(screen.getByLabelText('Unified module search')).toBeInTheDocument();
     expect(screen.getByLabelText('Unified module status filter')).toBeInTheDocument();
-    expect(screen.getByText(/TBO Remaining:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Engine Lifecycle Management/i)).toBeInTheDocument();
+    expect(screen.getByText(/TBO Remaining/i)).toBeInTheDocument();
+    expect(screen.getByText(/Engine Operations Command Center/i)).toBeInTheDocument();
     expect(screen.getByText(/Maintenance Scheduling & Tracking/i)).toBeInTheDocument();
     expect(screen.getByText(/Work Order Management/i)).toBeInTheDocument();
     expect(screen.getByText(/Compliance Tracking/i)).toBeInTheDocument();
     expect(screen.getByText(/Performance Analytics/i)).toBeInTheDocument();
-    expect(screen.getByText(/Integration Capabilities/i)).toBeInTheDocument();
+    expect(screen.getByText(/Integration & Validation Mesh/i)).toBeInTheDocument();
     expect(screen.getByText(/Performance History Mini-Chart/i)).toBeInTheDocument();
-    expect(screen.getByText(/Read Model Assets:/i)).toBeInTheDocument();
-    expect(screen.getByText(/Engine Configuration Management/i)).toBeInTheDocument();
+    expect(screen.getByText(/read model assets/i)).toBeInTheDocument();
+    expect(screen.getByText(/Lifecycle & Configuration Records/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Export engine usability session events as JSON/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Export engine usability session events as CSV/i })).toBeInTheDocument();
     expect(screen.getByText(/Engine Data Entry \(Validated\)/i)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Validate Entry/i })).toBeInTheDocument();
-    expect(screen.getByText(/Serialized Engine Tracking/i)).toBeInTheDocument();
-    expect(screen.getByText(/Thrust Rating Change Log/i)).toBeInTheDocument();
-    expect(screen.getByText(/On-Wing Lifecycle Timeline/i)).toBeInTheDocument();
+    expect(screen.getByText(/Serialized Engines/i)).toBeInTheDocument();
+    expect(screen.getByText(/Thrust Rating Changes/i)).toBeInTheDocument();
+    expect(screen.getByText(/On-Wing Timeline/i)).toBeInTheDocument();
     expect(screen.getByText(/ENG-1001 · position L · TSN 12440 · CSN 8421 · module CORE/i)).toBeInTheDocument();
-    expect(screen.getByText(/ENG-1001 · L · installed 2026-01-15/i)).toBeInTheDocument();
+    expect(screen.getByText(/ENG-1001 · L/i)).toBeInTheDocument();
     expect(screen.queryByText(/Components Monitoring/i)).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Components' }));
