@@ -2431,7 +2431,172 @@ Performance Targets:
   - <p95/p99 and throughput expectations>
 ```
 
-### 29.4 Module API Entries
+### 29.4 AUTO-0M3IJA Engine Seed Components
+
+```text
+Component Type: Table
+Component Name: public.engine_configuration_versions
+Purpose: Track versioned engine configuration snapshots for AUTO-0M3IJA and future tenant-scoped engine assets.
+Estimated Row Count: 3-20 per component
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - aircraft_id -> public.aircraft(id) ON DELETE CASCADE
+  - component_id -> public.components(id) ON DELETE CASCADE
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_engine_configuration_versions (tenant_id, aircraft_id, component_id, version_no)
+  - uq_engine_configuration_current partial unique (tenant_id, component_id) where is_current = true and deleted_at is null
+Check Constraints:
+  - ck_engine_configuration_versions_range (effective_to is null or effective_to >= effective_from)
+Defaults:
+  - id: gen_random_uuid()
+  - config_snapshot: '{}'::jsonb
+  - is_current: false
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_engine_configuration_versions_tenant_id(tenant_id)
+  - idx_engine_configuration_versions_aircraft_id(aircraft_id)
+  - idx_engine_configuration_versions_component_id(component_id)
+  - uq_engine_configuration_current(tenant_id, component_id) partial
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:-
+  - franchise_id | uuid | nullable:yes | default:null
+  - aircraft_id | uuid | nullable:no | default:-
+  - component_id | uuid | nullable:no | default:-
+  - version_no | integer | nullable:no | default:-
+  - change_summary | text | nullable:no | default:-
+  - config_snapshot | jsonb | nullable:no | default:'{}'::jsonb
+  - effective_from | timestamptz | nullable:no | default:-
+  - effective_to | timestamptz | nullable:yes | default:null
+  - is_current | boolean | nullable:no | default:false
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+  - deleted_at | timestamptz | nullable:yes | default:null
+  - created_by | uuid | nullable:yes | default:null
+  - updated_by | uuid | nullable:yes | default:null
+Security Considerations:
+  - RLS enabled with platform admin override and tenant/franchise scoped access checks.
+Implementation Notes:
+  - Migration: 20260404100000_amro_auto_0m3ija_engine_comprehensive_seed.sql
+```
+
+```text
+Component Type: Table
+Component Name: public.engine_parameter_history
+Purpose: Maintain high-volume engine parameter time series and effective-range history for seeded and operational engine analytics.
+Estimated Row Count: 1,000 per seed run; 50K-5M per tenant over time
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - aircraft_id -> public.aircraft(id) ON DELETE CASCADE
+  - component_id -> public.components(id) ON DELETE CASCADE
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - none
+Check Constraints:
+  - flight_phase in (takeoff, climb, cruise, descent, landing)
+  - quality_score between 0 and 100 when not null
+  - ck_engine_parameter_history_range (effective_to is null or effective_to >= effective_from)
+Defaults:
+  - id: gen_random_uuid()
+  - source: 'seed_rpc'
+  - metadata: '{}'::jsonb
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_engine_parameter_history_tenant_aircraft(tenant_id, aircraft_id, sample_time desc)
+  - idx_engine_parameter_history_component_param(component_id, parameter_name, sample_time desc)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:-
+  - franchise_id | uuid | nullable:yes | default:null
+  - aircraft_id | uuid | nullable:no | default:-
+  - component_id | uuid | nullable:no | default:-
+  - parameter_name | text | nullable:no | default:-
+  - parameter_value | numeric(14,4) | nullable:no | default:-
+  - unit | text | nullable:no | default:-
+  - flight_phase | text | nullable:no | default:-
+  - sample_time | timestamptz | nullable:no | default:-
+  - effective_from | timestamptz | nullable:no | default:-
+  - effective_to | timestamptz | nullable:yes | default:null
+  - source | text | nullable:no | default:'seed_rpc'
+  - quality_score | numeric(5,2) | nullable:yes | default:null
+  - metadata | jsonb | nullable:no | default:'{}'::jsonb
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+  - deleted_at | timestamptz | nullable:yes | default:null
+  - created_by | uuid | nullable:yes | default:null
+  - updated_by | uuid | nullable:yes | default:null
+Security Considerations:
+  - RLS enabled; tenant and franchise isolation required for all reads/writes.
+Implementation Notes:
+  - Migration: 20260404100000_amro_auto_0m3ija_engine_comprehensive_seed.sql
+```
+
+```text
+Component Type: SQL Function
+Component Name: public.seed_auto_0m3ija_engine_dataset(p_tenant_id uuid, p_franchise_id uuid, p_actor_user_id uuid, p_force boolean)
+Purpose: Execute end-to-end RPC seeding for AUTO-0M3IJA engine hierarchy, maintenance, performance, compliance, and audit benchmark rows.
+Input Parameters:
+  - p_tenant_id | uuid | nullable:yes
+  - p_franchise_id | uuid | nullable:yes
+  - p_actor_user_id | uuid | nullable:yes
+  - p_force | boolean | nullable:yes
+Output Contract:
+  - jsonb object with tenant_id, franchise_id, aircraft_id, execution_ms, and seeded row counts
+Dependencies:
+  - public.aircraft
+  - public.components
+  - public.maintenance_schedule
+  - public.work_packages
+  - public.flight_logs
+  - public.asset_health_signals
+  - public.engine_parameter_history
+  - public.maintenance_events
+  - public.compliance_obligations
+  - public.compliance_records
+  - public.engine_seed_audit_runs
+Security:
+  - Security Definer
+  - Tenant and franchise scope resolved through auth context and helper functions
+Performance:
+  - Expected p95 target <= 1.5s per single-aircraft seed execution in baseline remote region
+Validation:
+  - Enforces minimum row counts for parameter, maintenance, and performance datasets
+  - Uses trigger-backed validations for ranges, chronology, and identifier format
+```
+
+```text
+Component Type: SQL Function
+Component Name: public.verify_auto_0m3ija_engine_seed(p_tenant_id uuid)
+Purpose: Return machine-readable data integrity checks for AUTO-0M3IJA seeding outcomes.
+Input Parameters:
+  - p_tenant_id | uuid | nullable:yes
+Output Contract:
+  - setof(check_name text, check_passed boolean, observed_value numeric, required_value numeric, detail text)
+Dependencies:
+  - public.aircraft
+  - public.maintenance_events
+  - public.engine_parameter_history
+  - public.asset_health_signals
+  - public.components
+Security:
+  - Security Invoker
+  - Read scope follows existing RLS policies
+Performance:
+  - Expected p95 target <= 250ms for seeded single-aircraft verification
+Validation:
+  - Checks row count thresholds and hierarchy linkage minimums
+```
+
+### 29.5 Module API Entries
 
 ```text
 Component Type: Module API

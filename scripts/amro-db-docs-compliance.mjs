@@ -2,7 +2,11 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 const repoRoot = process.cwd();
-const lldPath = path.resolve(repoRoot, 'docs/AMRO_LOW_LEVEL_DESIGN.md');
+const lldPathCandidates = [
+  path.resolve(repoRoot, 'docs/AMRO_LOW_LEVEL_DESIGN.md'),
+  path.resolve(repoRoot, 'docs/AMRO/AMRO_LOW_LEVEL_DESIGN.md')
+];
+const lldPath = lldPathCandidates.find((candidate) => fs.existsSync(candidate));
 const migrations = [
   path.resolve(repoRoot, 'supabase/migrations/20260319143000_create_amro_schema.sql'),
   path.resolve(repoRoot, 'supabase/migrations/20260319143100_create_amro_audit_schema.sql'),
@@ -139,6 +143,12 @@ const parseDocumentedTables = (lldText) => {
 };
 
 const sqlText = migrations.map((filePath) => fs.readFileSync(filePath, 'utf8')).join('\n');
+if (!lldPath) {
+  throw new Error(
+    `AMRO LLD file not found. Checked: ${lldPathCandidates.join(', ')}`
+  );
+}
+
 const lldText = fs.readFileSync(lldPath, 'utf8');
 const actualTables = parseActualTables(sqlText);
 const documentedTables = parseDocumentedTables(lldText);

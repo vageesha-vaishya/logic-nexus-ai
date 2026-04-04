@@ -77,6 +77,7 @@
     "build:extension": "tsc -b nexus-connect-extension/tsconfig.json && vite build --config vite.extension.config.ts",
     "amro:db-docs:validate": "node scripts/amro-db-docs-compliance.mjs --strict",
     "amro:db-docs:report": "node scripts/amro-db-docs-compliance.mjs --report-only",
+    "benchmark:amro:auto-0m3ija": "node scripts/amro-auto-0m3ija-engine-benchmark.mjs",
     "rules:consult": "node scripts/project-rules-workflow.mjs consult",
     "rules:enforce": "node scripts/project-rules-workflow.mjs enforce",
     "rules:analyze": "node scripts/project-rules-workflow.mjs analyze",
