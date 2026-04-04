@@ -190,6 +190,76 @@ describe('work-package-template.routes create endpoint', () => {
     expect(response.body.relationship_count).toBe(1);
   });
 
+  it('creates relationships when selected ids are provided via tasks_json fallback', async () => {
+    const fromMock = jest
+      .fn()
+      .mockReturnValueOnce(createThenable({ data: [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }], error: null }))
+      .mockReturnValueOnce(createThenable({ data: [{ id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb', assembly_models: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc' }], error: null }))
+      .mockReturnValueOnce({
+        insert: jest.fn().mockReturnValue({
+          select: jest.fn().mockReturnValue({
+            single: jest.fn(async () => ({
+              data: { id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+              error: null,
+            })),
+          }),
+        }),
+      })
+      .mockReturnValueOnce(createInsert({ error: null }))
+      .mockReturnValueOnce(createThenable({
+        data: [{
+          id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          tenant_id: '11111111-1111-4111-8111-111111111111',
+          franchise_id: '33333333-3333-4333-8333-333333333333',
+          template_code: 'WP-LINE-001',
+          version: 1,
+          active: true,
+          template_name: 'Line Check Package',
+          maintenance_type: 'line',
+          scope_json: [],
+          tasks_json: [{ task_template_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }],
+          policy_snapshot_id: null,
+          created_at: '2026-04-04T00:00:00.000Z',
+          updated_at: '2026-04-04T00:00:00.000Z',
+        }],
+        error: null,
+      }))
+      .mockReturnValueOnce(createThenable({
+        data: [{
+          id: 'rel-1',
+          work_package_template_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          task_template_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          model_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        }],
+        error: null,
+      }))
+      .mockReturnValueOnce(createThenable({
+        data: [{
+          id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+          task_template_id: 'TT-1',
+          code_form_no: 'F-1',
+          ata_code: '21',
+          reference_amp: 'AMP-1',
+          description: 'Task',
+          assembly_models: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+        }],
+        error: null,
+      }));
+    const app = await createTestApp(fromMock);
+    const response = await request(app)
+      .post('/api/v2/work-package-templates')
+      .send({
+        template_code: 'WP-LINE-001',
+        template_name: 'Line Check Package',
+        maintenance_type: 'line',
+        aircraft_model: 'A320',
+        tasks_json: [{ task_template_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb' }],
+      })
+      .expect(201);
+
+    expect(response.body.relationship_count).toBe(1);
+  });
+
   it('rolls back template insert when relationship insert fails', async () => {
     const fromMock = jest
       .fn()
