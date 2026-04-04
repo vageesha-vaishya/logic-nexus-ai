@@ -285,7 +285,7 @@ Projection updates are idempotent and keyed by ledger event ID.
 
 ## 10. API Contract (Node.js + Supabase)
 
-Base route: `/api/v1/uim`
+Base route: `/api/v2/uim`
 
 ### 10.1 Hook 1 - Soft Reservation
 - Endpoint: `POST /reservations/soft`
