@@ -194,12 +194,18 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     res.status(statusCode).json(toErrorResponse(message, 'CREATE_FAILED', statusCode));
     return;
   }
+  const createdTemplateId = String((insertedTemplate as Record<string, unknown>).id || '').trim();
+  if (!createdTemplateId || !isUuid(createdTemplateId)) {
+    res.status(500).json(toErrorResponse('Failed to create work package template id', 'CREATE_FAILED', 500));
+    return;
+  }
+  let relationshipCount = 0;
 
   if (selectedTaskTemplateIds.length > 0 && resolvedModelId) {
     const relationshipRows = selectedTaskTemplateIds.map((taskTemplateId) => ({
       tenant_id: tenantId,
       franchise_id: franchiseId,
-      work_package_template_id: String((insertedTemplate as Record<string, unknown>).id || ''),
+      work_package_template_id: createdTemplateId,
       model_id: resolvedModelId,
       task_template_id: taskTemplateId,
       created_by: userId,
@@ -210,14 +216,40 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
       .insert(relationshipRows);
     if (relationError) {
       const message = String(relationError.message || '');
-      res.status(400).json(toErrorResponse(message, 'CREATE_FAILED', 400));
+      logger.error('[AMRO Work Package Template] create relationship failed; rolling back template', {
+        tenantId,
+        templateId: createdTemplateId,
+        message,
+      });
+      let rollbackQuery = supabase
+        .from('work_package_templates')
+        .delete()
+        .eq('tenant_id', tenantId)
+        .eq('id', createdTemplateId);
+      if (franchiseId) {
+        rollbackQuery = rollbackQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+      }
+      const { error: rollbackError } = await rollbackQuery;
+      if (rollbackError) {
+        logger.error('[AMRO Work Package Template] rollback failed after relationship insert failure', {
+          tenantId,
+          templateId: createdTemplateId,
+          rollbackError: String(rollbackError.message || ''),
+        });
+      }
+      const statusCode = /duplicate key/i.test(message) ? 409 : 400;
+      res.status(statusCode).json(toErrorResponse(message, 'CREATE_FAILED', statusCode));
       return;
     }
+    relationshipCount = relationshipRows.length;
   }
 
-  const createdId = String((insertedTemplate as Record<string, unknown>).id || '').trim();
-  const records = await buildTemplateListResponse(tenantId, franchiseId, createdId ? [createdId] : undefined);
-  res.status(201).json({ data: records[0] || insertedTemplate || null });
+  const records = await buildTemplateListResponse(tenantId, franchiseId, [createdTemplateId]);
+  res.status(201).json({
+    data: records[0] || insertedTemplate || null,
+    work_package_template_id: createdTemplateId,
+    relationship_count: relationshipCount,
+  });
 }
 
 async function createTemplateTaskRelationshipsFromRequest(
@@ -486,6 +518,37 @@ async function buildTemplateListResponse(
  *   post:
  *     summary: Create work package template with task-template relationships
  *     tags: [Work Package Templates]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             template_code: "WP-LINE-001"
+ *             template_name: "Line Check Package"
+ *             maintenance_type: "line"
+ *             aircraft_model: "A320"
+ *             selected_task_template_ids:
+ *               - "11a11111-2222-4333-9444-555555555555"
+ *               - "22b22222-3333-4444-a555-666666666666"
+ *     responses:
+ *       201:
+ *         description: Created with relationship rows
+ *         content:
+ *           application/json:
+ *             example:
+ *               data:
+ *                 id: "33333333-4444-4555-8666-777777777777"
+ *                 template_code: "WP-LINE-001"
+ *               work_package_template_id: "33333333-4444-4555-8666-777777777777"
+ *               relationship_count: 2
+ *       400:
+ *         description: Validation or insert failure (template or relationship)
+ *       401:
+ *         description: Missing tenant/user context
+ *       409:
+ *         description: Duplicate key conflict
+ *       422:
+ *         description: Invalid task templates or mixed assembly models
  */
 router.post(
   '/amro/work-packages',
