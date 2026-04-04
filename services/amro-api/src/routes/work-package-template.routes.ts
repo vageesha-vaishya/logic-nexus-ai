@@ -80,6 +80,21 @@ function normalizeTaskTemplateRequestIds(input: CreateWorkPackageTemplateTaskTem
   return single ? [single] : [];
 }
 
+function normalizeTemplateRequestTaskTemplateIds(input: WorkPackageTemplateRequest): string[] {
+  const direct = normalizeTaskTemplateIds(input.selected_task_template_ids);
+  if (direct.length > 0) return direct;
+  if (!Array.isArray(input.tasks_json)) return [];
+  return Array.from(new Set(
+    input.tasks_json
+      .map((entry) => {
+        if (!entry || typeof entry !== 'object') return '';
+        const row = entry as Record<string, unknown>;
+        return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
+      })
+      .filter((value) => value.length > 0),
+  ));
+}
+
 function toErrorResponse(error: string, code: string, statusCode: number): ErrorResponse {
   return { error, code, statusCode };
 }
@@ -110,7 +125,14 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     return;
   }
 
-  const selectedTaskTemplateIds = normalizeTaskTemplateIds(request.selected_task_template_ids);
+  const selectedTaskTemplateIds = normalizeTemplateRequestTaskTemplateIds(request);
+  logger.info('[AMRO Work Package Template] resolved selected task templates for create', {
+    tenantId,
+    templateCode: String(request.template_code || ''),
+    selectedTaskTemplateCount: selectedTaskTemplateIds.length,
+    fromSelectedIds: Array.isArray(request.selected_task_template_ids),
+    fromTasksJson: Array.isArray(request.tasks_json),
+  });
   const validation = await validateTaskTemplateIds(tenantId, franchiseId, selectedTaskTemplateIds);
   if (!validation.valid) {
     if (validation.invalidIds.length > 0) {
