@@ -1,23 +1,5 @@
 DO $migration$
 BEGIN
-  EXECUTE $sql$
-    CREATE TABLE IF NOT EXISTS public.amro_request_idempotency (
-      id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-      tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-      franchise_id uuid,
-      operation text NOT NULL,
-      correlation_id text NOT NULL,
-      response_payload jsonb NOT NULL DEFAULT '{}'::jsonb,
-      created_at timestamptz NOT NULL DEFAULT now(),
-      UNIQUE (tenant_id, operation, correlation_id)
-    )
-  $sql$;
-
-  EXECUTE $sql$
-    CREATE INDEX IF NOT EXISTS idx_amro_request_idempotency_tenant_operation
-      ON public.amro_request_idempotency(tenant_id,franchise_id, operation, created_at DESC)
-  $sql$;
-
   EXECUTE $fn$
     CREATE OR REPLACE FUNCTION public.amro_create_work_package_template_atomic(
       p_tenant_id uuid,

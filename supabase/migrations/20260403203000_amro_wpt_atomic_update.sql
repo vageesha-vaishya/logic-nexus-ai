@@ -108,7 +108,13 @@ BEGIN
         maintenance_type = COALESCE(NULLIF(p_payload->>'maintenance_type', ''), maintenance_type),
         scope_json = v_scope_json,
         tasks_json = v_tasks_json,
-        policy_snapshot_id = COALESCE(NULLIF(p_payload->>'policy_snapshot_id', ''), policy_snapshot_id),
+        policy_snapshot_id = CASE
+          WHEN NOT (p_payload ? 'policy_snapshot_id') THEN policy_snapshot_id
+          WHEN NULLIF(p_payload->>'policy_snapshot_id', '') IS NULL THEN NULL
+          WHEN (p_payload->>'policy_snapshot_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+            THEN (p_payload->>'policy_snapshot_id')::uuid
+          ELSE policy_snapshot_id
+        END,
         updated_by = p_user_id,
         updated_at = now()
       WHERE id = p_work_package_template_id

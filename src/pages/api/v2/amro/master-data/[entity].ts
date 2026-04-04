@@ -1623,6 +1623,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         ...insertPayload,
         tasks_json: normalizeJsonArray(insertPayload.tasks_json),
         scope_json: normalizeJsonArray(insertPayload.scope_json),
+        policy_snapshot_id: null,
       };
       logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-01 rpc-payload-prepared', {
         correlationId: ctx.correlationId,

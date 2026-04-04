@@ -1,6 +1,5 @@
 import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import crypto from 'crypto';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
 import { logger } from '../utils/logger';
@@ -100,7 +99,6 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     res.status(422).json(toErrorResponse(`task_template_id not found: ${validation.missingIds.join(', ')}`, 'NOT_FOUND', 422));
     return;
   }
-
   const payload = {
     template_code: String(request.template_code || '').trim(),
     version: Number(request.version || 1),
@@ -109,32 +107,96 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     maintenance_type: String(request.maintenance_type || '').trim(),
     scope_json: Array.isArray(request.scope_json) ? request.scope_json : [],
     tasks_json: selectedTaskTemplateIds.map((taskTemplateId) => ({ task_template_id: taskTemplateId })),
-    policy_snapshot_id: request.policy_snapshot_id || null,
+    policy_snapshot_id: null,
     aircraft_model: request.aircraft_model || null,
   };
+  let resolvedModelId: string | null = null;
+  if (selectedTaskTemplateIds.length > 0) {
+    let modelQuery = supabase
+      .from('task_templates')
+      .select('id,assembly_models')
+      .eq('tenant_id', tenantId)
+      .in('id', selectedTaskTemplateIds);
+    if (franchiseId) {
+      modelQuery = modelQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+    const { data: taskRows, error: taskRowsError } = await modelQuery;
+    if (taskRowsError) {
+      const message = String(taskRowsError.message || '');
+      res.status(400).json(toErrorResponse(message, 'CREATE_FAILED', 400));
+      return;
+    }
+    const modelIds = Array.from(new Set(
+      (Array.isArray(taskRows) ? taskRows : [])
+        .map((row) => String((row as Record<string, unknown>).assembly_models || '').trim())
+        .filter((value) => value.length > 0),
+    ));
+    if (modelIds.length !== 1) {
+      res.status(422).json(
+        toErrorResponse(
+          'Validation failed: selected task templates belong to different or missing assembly_models',
+          'VALIDATION_ERROR',
+          422,
+        ),
+      );
+      return;
+    }
+    resolvedModelId = modelIds[0];
+  }
 
-  const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_package_template_atomic', {
-    p_tenant_id: tenantId,
-    p_franchise_id: franchiseId,
-    p_user_id: userId,
-    p_correlation_id: String(req.header('x-correlation-id') || crypto.randomUUID()),
-    p_payload: payload,
-  });
-  if (atomicError) {
+  const insertPayload = {
+    tenant_id: tenantId,
+    franchise_id: franchiseId,
+    template_code: payload.template_code,
+    version: payload.version,
+    active: payload.active,
+    template_name: payload.template_name,
+    maintenance_type: payload.maintenance_type,
+    scope_json: payload.scope_json,
+    tasks_json: payload.tasks_json,
+    policy_snapshot_id: null,
+    created_by: userId,
+    updated_by: userId,
+  };
+  const { data: insertedTemplate, error: insertError } = await supabase
+    .from('work_package_templates')
+    .insert(insertPayload)
+    .select('*')
+    .single();
+  if (insertError) {
     logger.error('[WorkPackageTemplateRoutes] create failed', {
       tenantId,
-      message: String(atomicError.message || ''),
+      message: String(insertError.message || ''),
     });
-    const message = String(atomicError.message || '');
-    const statusCode = /validation failed/i.test(message) ? 422 : /duplicate key/i.test(message) ? 409 : 400;
+    const message = String(insertError.message || '');
+    const statusCode = /duplicate key/i.test(message) ? 409 : 400;
     res.status(statusCode).json(toErrorResponse(message, 'CREATE_FAILED', statusCode));
     return;
   }
 
-  const createdRecord = (atomicResult as Record<string, unknown> | null)?.record as Record<string, unknown> | undefined;
-  const createdId = String(createdRecord?.id || '').trim();
+  if (selectedTaskTemplateIds.length > 0 && resolvedModelId) {
+    const relationshipRows = selectedTaskTemplateIds.map((taskTemplateId) => ({
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      work_package_template_id: String((insertedTemplate as Record<string, unknown>).id || ''),
+      model_id: resolvedModelId,
+      task_template_id: taskTemplateId,
+      created_by: userId,
+      updated_by: userId,
+    }));
+    const { error: relationError } = await supabase
+      .from('work_package_template_task_templates')
+      .insert(relationshipRows);
+    if (relationError) {
+      const message = String(relationError.message || '');
+      res.status(400).json(toErrorResponse(message, 'CREATE_FAILED', 400));
+      return;
+    }
+  }
+
+  const createdId = String((insertedTemplate as Record<string, unknown>).id || '').trim();
   const records = await buildTemplateListResponse(tenantId, franchiseId, createdId ? [createdId] : undefined);
-  res.status(201).json({ data: records[0] || createdRecord || null });
+  res.status(201).json({ data: records[0] || insertedTemplate || null });
 }
 
 async function validateTaskTemplateIds(
