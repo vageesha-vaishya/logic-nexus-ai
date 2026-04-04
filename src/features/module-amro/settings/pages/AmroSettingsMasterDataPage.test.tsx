@@ -1562,7 +1562,11 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getByText(/Compliance Tracking/i)).toBeInTheDocument();
     expect(screen.getByText(/Performance Analytics/i)).toBeInTheDocument();
     expect(screen.getByText(/Integration Capabilities/i)).toBeInTheDocument();
+    expect(screen.getByText(/Performance History Mini-Chart/i)).toBeInTheDocument();
+    expect(screen.getByText(/Read Model Assets:/i)).toBeInTheDocument();
     expect(screen.getByText(/Engine Configuration Management/i)).toBeInTheDocument();
+    expect(screen.getByText(/Engine Data Entry \(Validated\)/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Validate Entry/i })).toBeInTheDocument();
     expect(screen.getByText(/Serialized Engine Tracking/i)).toBeInTheDocument();
     expect(screen.getByText(/Thrust Rating Change Log/i)).toBeInTheDocument();
     expect(screen.getByText(/On-Wing Lifecycle Timeline/i)).toBeInTheDocument();
