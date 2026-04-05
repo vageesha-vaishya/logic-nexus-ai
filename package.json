@@ -31,6 +31,7 @@
     "test:playwright:uim:visual": "playwright test tests/e2e/uim-visual-regression.spec.ts --project=chromium",
     "report:playwright:uim:visual": "node scripts/report-uim-playwright-visual.mjs",
     "test:uim:integration": "vitest run tests/integration/uim-command-projection-consistency.test.ts",
+    "test:uim:phase3:integration": "vitest run tests/integration/uim-phase3-orchestration.test.ts",
     "test:playwright:quotation": "playwright test tests/e2e/quotation/quotation-comprehensive.spec.ts",
     "test:playwright:quotation:headed": "playwright test tests/e2e/quotation/quotation-comprehensive.spec.ts --headed",
     "ci:lint": "eslint src --ext .ts,.tsx,.mdx",

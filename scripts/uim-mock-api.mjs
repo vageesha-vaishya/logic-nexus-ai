@@ -21,6 +21,37 @@ const reservations = new Map();
 const ledger = [];
 const commands = new Map();
 const projectionSnapshots = new Map();
+const webhookAdapters = new Map();
+
+const CONNECTOR_MANIFESTS = [
+  {
+    connector_id: 'freight-bridge',
+    connector_name: 'Freight Bridge Connector',
+    version: '0.6.0',
+    protocol: ['REST', 'Webhook'],
+    direction: 'bi-directional',
+    events: ['uim.command.applied.v1', 'uim.stock.threshold.breach.v1'],
+    sla: { p95_latency_ms: 250, availability_percent: 99.9 },
+  },
+  {
+    connector_id: 'amro-bridge',
+    connector_name: 'AMRO Connector',
+    version: '0.6.0',
+    protocol: ['REST', 'GraphQL', 'Webhook'],
+    direction: 'bi-directional',
+    events: ['uim.reservation.created.v1', 'uim.projection.replayed.v1', 'uim.command.applied.v1'],
+    sla: { p95_latency_ms: 300, availability_percent: 99.9 },
+  },
+  {
+    connector_id: 'marketplace-bridge',
+    connector_name: 'Marketplace Adapter',
+    version: '0.6.0',
+    protocol: ['REST', 'Webhook'],
+    direction: 'outbound',
+    events: ['uim.command.applied.v1'],
+    sla: { p95_latency_ms: 350, availability_percent: 99.5 },
+  },
+];
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -94,6 +125,134 @@ const server = createServer(async (req, res) => {
   const commandMatch = pathname.match(/^\/api\/v2\/uim\/commands$/);
   const replayMatch = pathname.match(/^\/api\/v2\/uim\/projections\/replay$/);
   const projectionItemsMatch = pathname.match(/^\/api\/v2\/uim\/projections\/items$/);
+  const restIntegrationMatch = pathname.match(/^\/api\/v2\/uim\/integrations\/rest$/);
+  const webhookMatch = pathname.match(/^\/api\/v2\/uim\/webhooks$/);
+  const connectorManifestMatch = pathname.match(/^\/api\/v2\/uim\/connectors\/manifests$/);
+
+  if (restIntegrationMatch && method === 'POST') {
+    const body = await parseBody(req);
+    const iface = String(body.interface || '').trim().toLowerCase();
+    if (iface === 'rest-hardening-audit') {
+      const expectedP95 = readNumber(body.expected_p95_ms) || 300;
+      const observedP95 = readNumber(body.observed_p95_ms);
+      const expectedAvailability = readNumber(body.expected_availability_percent) || 99.9;
+      const observedAvailability = readNumber(body.observed_availability_percent);
+      const status = observedP95 <= expectedP95 && observedAvailability >= expectedAvailability ? 'within_budget' : 'breach';
+      sendJson(res, 200, {
+        version: 'v2',
+        interface: 'uim-rest-hardening',
+        output: {
+          controls: {
+            idempotency_enabled: true,
+            schema_validation_enabled: true,
+            authz_validation_enabled: true,
+            compatibility_mode: 'strict-v2',
+          },
+          sla: {
+            expected_p95_ms: expectedP95,
+            observed_p95_ms: observedP95,
+            expected_availability_percent: expectedAvailability,
+            observed_availability_percent: observedAvailability,
+            error_budget_status: status,
+          },
+        },
+      });
+      return;
+    }
+    if (iface === 'contract-compatibility-report') {
+      const requested = String(body.requested_schema_version || 'v0.6');
+      const provided = String(body.provided_schema_version || 'v0.6');
+      sendJson(res, 200, {
+        version: 'v2',
+        interface: 'uim-rest-hardening',
+        output: {
+          consumer_module: String(body.consumer_module || 'unknown-consumer'),
+          requested_schema_version: requested,
+          provided_schema_version: provided,
+          compatibility_status: requested === provided ? 'compatible' : 'incompatible',
+          report_id: `report-${Date.now()}`,
+        },
+      });
+      return;
+    }
+    sendJson(res, 400, { error: 'Unsupported interface', code: 'BAD_REQUEST', statusCode: 400 });
+    return;
+  }
+
+  if (webhookMatch && method === 'GET') {
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-webhook-adapter-framework',
+      output: {
+        adapters: [...webhookAdapters.values()],
+      },
+    });
+    return;
+  }
+
+  if (webhookMatch && method === 'POST') {
+    const body = await parseBody(req);
+    const action = String(body.action || '').trim().toLowerCase();
+    if (action === 'register-adapter') {
+      const adapterId = String(body.adapter_id || '').trim();
+      const adapter = {
+        adapter_id: adapterId,
+        provider: String(body.provider || ''),
+        target_url: String(body.target_url || ''),
+        secret_ref: String(body.secret_ref || ''),
+        subscribed_events: Array.isArray(body.subscribed_events) ? body.subscribed_events.map((x) => String(x)) : [],
+        active: true,
+        created_at: new Date().toISOString(),
+      };
+      webhookAdapters.set(adapterId, adapter);
+      sendJson(res, 200, {
+        version: 'v2',
+        interface: 'uim-webhook-adapter-framework',
+        output: { action: 'register-adapter', adapter },
+      });
+      return;
+    }
+    if (action === 'dispatch-event') {
+      const adapterId = String(body.adapter_id || '').trim();
+      const eventType = String(body.event_type || '').trim();
+      const adapter = webhookAdapters.get(adapterId);
+      if (!adapter || !adapter.active) {
+        sendJson(res, 404, { error: 'adapter_id is not registered/active', code: 'ADAPTER_NOT_FOUND', statusCode: 404 });
+        return;
+      }
+      if (!adapter.subscribed_events.includes(eventType)) {
+        sendJson(res, 409, { error: 'adapter is not subscribed to event_type', code: 'EVENT_NOT_SUBSCRIBED', statusCode: 409 });
+        return;
+      }
+      sendJson(res, 200, {
+        version: 'v2',
+        interface: 'uim-webhook-adapter-framework',
+        output: {
+          action: 'dispatch-event',
+          dispatch_id: `${adapterId}-${Date.now()}`,
+          adapter_id: adapterId,
+          event_type: eventType,
+          status: 'queued',
+          target_url: adapter.target_url,
+          payload_size: JSON.stringify(body.payload || {}).length,
+        },
+      });
+      return;
+    }
+    sendJson(res, 400, { error: 'Unsupported action', code: 'BAD_REQUEST', statusCode: 400 });
+    return;
+  }
+
+  if (connectorManifestMatch && method === 'GET') {
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-connector-manifests',
+      output: {
+        connector_manifests: CONNECTOR_MANIFESTS,
+      },
+    });
+    return;
+  }
 
   if (commandMatch && method === 'POST') {
     const body = await parseBody(req);

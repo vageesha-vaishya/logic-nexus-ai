@@ -18,6 +18,22 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+vi.mock('@/components/ui/select', () => ({
+  Select: ({ value, onValueChange, children }: any) => (
+    <select
+      aria-label="Select field"
+      value={value ?? ''}
+      onChange={(event) => onValueChange?.(event.target.value)}
+    >
+      {children}
+    </select>
+  ),
+  SelectContent: ({ children }: any) => <>{children}</>,
+  SelectItem: ({ value, children }: any) => <option value={value}>{children}</option>,
+  SelectTrigger: ({ children }: any) => <>{children}</>,
+  SelectValue: () => null,
+}));
+
 const toastSpy = vi.fn();
 vi.mock('@/components/ui/use-toast', () => ({
   toast: (payload: unknown) => toastSpy(payload),
@@ -35,8 +51,14 @@ const forms = [
 ] as const;
 
 describe('UIM form suite', () => {
+  let consoleErrorSpy: ReturnType<typeof vi.spyOn> | null = null;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation((...args: unknown[]) => {
+      const joined = args.map((arg) => String(arg)).join(' ');
+      if (joined.includes('not wrapped in act(...)')) return;
+    });
     vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
       const method = String(init?.method || 'GET').toUpperCase();
       if (method === 'GET') {
@@ -56,6 +78,13 @@ describe('UIM form suite', () => {
         json: async () => ({ id: 'entity-1' }),
       } as Response;
     }));
+  });
+
+  afterEach(() => {
+    if (consoleErrorSpy) {
+      consoleErrorSpy.mockRestore();
+      consoleErrorSpy = null;
+    }
   });
 
   it.each(forms)('renders empty state for %s form', async (_name, FormComponent) => {
