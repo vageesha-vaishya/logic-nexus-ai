@@ -784,6 +784,55 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /api/v2/amro/inventory/sync:
+    get:
+      operationId: getAmroUimInventorySyncStatus
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: false
+          schema:
+            type: string
+            enum: [status, asset-movements]
+        - in: query
+          name: limit
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: AMRO-UIM integration read response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      operationId: postAmroUimInventorySync
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [sync-catalog-and-stock, sync-reservations]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: AMRO-UIM integration write response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/v2/amro/compliance/obligations:
     get:
       operationId: listAmroComplianceObligations

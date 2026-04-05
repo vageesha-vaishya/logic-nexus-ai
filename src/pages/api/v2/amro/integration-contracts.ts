@@ -9,6 +9,7 @@ export const AMRO_OVERVIEW_KPI_PATH = '/api/v2/amro/overview-kpi' as const;
 export const AMRO_MODULE_CATALOG_PATH = '/api/v2/amro/module-catalog' as const;
 export const AMRO_SCREEN_INVENTORY_PATH = '/api/v2/amro/screen-inventory' as const;
 export const AMRO_HEALTH_PATH = '/api/v2/amro/health' as const;
+export const AMRO_UIM_INVENTORY_SYNC_PATH = '/api/v2/amro/inventory/sync' as const;
 
 export const AMRO_INTEGRATION_CONTRACTS = {
   rest: {
@@ -23,6 +24,7 @@ export const AMRO_INTEGRATION_CONTRACTS = {
       '/api/v2/amro/tasks/{id}/evidence',
       '/api/v2/amro/inventory/reservations',
       '/api/v2/amro/inventory/availability',
+      AMRO_UIM_INVENTORY_SYNC_PATH,
       '/api/v2/amro/compliance/obligations',
       '/api/v2/amro/compliance/gates/evaluate',
       '/api/v2/amro/certifications/validate',
