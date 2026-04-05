@@ -53,3 +53,72 @@ export async function queryUimProjectionItems(limit = 50, offset = 0): Promise<{
     path: `/projections/items?limit=${encodeURIComponent(String(limit))}&offset=${encodeURIComponent(String(offset))}`,
   });
 }
+
+export async function queryUimAnalyticsKpis(lowStockThreshold?: number): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    low_stock_threshold: number;
+    kpis: {
+      total_tracked_items: number;
+      available_quantity: number;
+      reserved_quantity: number;
+      consumed_quantity: number;
+      in_transit_items: number;
+      low_stock_items: number;
+      inventory_turnover_ratio: number;
+    };
+    snapshot: {
+      replay_version: number;
+      generated_at: string;
+    };
+  };
+}> {
+  const threshold = Number.isFinite(Number(lowStockThreshold))
+    ? `?low_stock_threshold=${encodeURIComponent(String(Math.max(0, Math.floor(Number(lowStockThreshold)))))}` : '';
+  return uimApiRequest({
+    method: 'GET',
+    path: `/analytics/kpis${threshold}`,
+  });
+}
+
+export async function queryUimAnalyticsEtlStatus(): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    scheduler: {
+      running: boolean;
+      interval_ms: number;
+    };
+    queue: {
+      queued: number;
+      running: number;
+      retryScheduled: number;
+      completed: number;
+      failed: number;
+    };
+    telemetry: Record<string, unknown>;
+    runs: Array<Record<string, unknown>>;
+  };
+}> {
+  return uimApiRequest({
+    method: 'GET',
+    path: '/analytics/etl',
+  });
+}
+
+export async function executeUimAnalyticsEtlAction(input: {
+  action: 'schedule-run' | 'process-now' | 'start-scheduler' | 'stop-scheduler';
+  source?: string;
+  window_start?: string;
+  window_end?: string;
+  trigger?: 'manual' | 'scheduled';
+  max_attempts?: number;
+  interval_ms?: number;
+}): Promise<{ output: Record<string, unknown> }> {
+  return uimApiRequest({
+    method: 'POST',
+    path: '/analytics/etl',
+    body: input,
+  });
+}

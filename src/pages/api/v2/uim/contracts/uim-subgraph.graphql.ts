@@ -1,6 +1,6 @@
 import type { ApiRequest, ApiResponse } from '@/pages/api/_utils/types';
 
-const UIM_SUBGRAPH_SCHEMA = `
+export const UIM_SUBGRAPH_SCHEMA = `
 schema {
   query: Query
 }

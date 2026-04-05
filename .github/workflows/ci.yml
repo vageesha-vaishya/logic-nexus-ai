@@ -75,6 +75,9 @@ jobs:
     - name: Unit Tests
       run: npm run test
 
+    - name: UIM GraphQL Contract Snapshot
+      run: npm run test:uim:graphql:contract
+
     - name: Seed Integrity Check (QUO-260309-00001)
       env:
         SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}

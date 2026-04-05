@@ -15,6 +15,8 @@ export const UIM_CONNECTOR_MANIFESTS_PATH = '/api/v2/uim/connectors/manifests' a
 export const UIM_WEBHOOK_FRAMEWORK_PATH = '/api/v2/uim/webhooks' as const;
 export const UIM_GRAPHQL_PATH = '/api/v2/uim/graphql' as const;
 export const UIM_REST_HARDENING_PATH = '/api/v2/uim/integrations/rest' as const;
+export const UIM_ANALYTICS_KPIS_PATH = '/api/v2/uim/analytics/kpis' as const;
+export const UIM_ANALYTICS_ETL_PATH = '/api/v2/uim/analytics/etl' as const;
 
 export const UIM_INTEGRATION_CONTRACTS = {
   rest: {
@@ -26,6 +28,8 @@ export const UIM_INTEGRATION_CONTRACTS = {
       '/api/v2/uim/forms/{node}',
       '/api/v2/uim/forms/{node}/{id}',
       UIM_REST_HARDENING_PATH,
+      UIM_ANALYTICS_KPIS_PATH,
+      UIM_ANALYTICS_ETL_PATH,
       UIM_WEBHOOK_FRAMEWORK_PATH,
       UIM_CONNECTOR_MANIFESTS_PATH,
       '/api/v2/uim/health',
@@ -53,6 +57,26 @@ export const UIM_INTEGRATION_CONTRACTS = {
   connectors: {
     manifestPath: UIM_CONNECTOR_MANIFESTS_PATH,
     adapters: ['freight-bridge', 'amro-bridge', 'marketplace-bridge', 'erp-bridge'],
+  },
+  analytics: {
+    kpiPath: UIM_ANALYTICS_KPIS_PATH,
+    etlPath: UIM_ANALYTICS_ETL_PATH,
+    defaultLowStockThreshold: 5,
+    kpis: [
+      'total_tracked_items',
+      'available_quantity',
+      'reserved_quantity',
+      'consumed_quantity',
+      'in_transit_items',
+      'low_stock_items',
+      'inventory_turnover_ratio',
+    ],
+    etlActions: [
+      'schedule-run',
+      'process-now',
+      'start-scheduler',
+      'stop-scheduler',
+    ],
   },
 } as const;
 

@@ -8,18 +8,15 @@ import {
 } from '../../_utils/http';
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { resolveUimAccess } from './_shared';
-
-type WebhookAdapter = {
-  adapter_id: string;
-  provider: string;
-  target_url: string;
-  secret_ref: string;
-  subscribed_events: string[];
-  active: boolean;
-  created_at: string;
-};
-
-const adapters = new Map<string, WebhookAdapter>();
+import {
+  deactivateWebhookAdapter,
+  enqueueWebhookDelivery,
+  getWebhookQueueStats,
+  listDlqJobs,
+  listWebhookAdapters,
+  registerWebhookAdapter,
+  startWebhookWorker,
+} from '@/modules/uim/integration/webhookDeliveryQueue';
 
 function parseBody(body: unknown): Record<string, unknown> {
   if (body && typeof body === 'object') return body as Record<string, unknown>;
@@ -54,7 +51,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           tenant_id: access.tenantId,
-          adapters: [...adapters.values()],
+          adapters: listWebhookAdapters(),
+          queue: getWebhookQueueStats(),
+          dlq: listDlqJobs(),
         },
       });
       return;
@@ -79,7 +78,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const targetUrl = assertRequired(body.target_url, 'target_url');
       const secretRef = assertRequired(body.secret_ref, 'secret_ref');
       const subscribedEvents = parseEvents(body.subscribed_events);
-      const nextAdapter: WebhookAdapter = {
+      const nextAdapter = {
         adapter_id: adapterId,
         provider,
         target_url: targetUrl,
@@ -88,7 +87,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         active: true,
         created_at: new Date().toISOString(),
       };
-      adapters.set(adapterId, nextAdapter);
+      registerWebhookAdapter(nextAdapter);
+      startWebhookWorker();
       res.status(200).json({
         version: 'v2',
         interface: 'uim-webhook-adapter-framework',
@@ -104,21 +104,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (action === 'dispatch-event') {
       const adapterId = assertRequired(body.adapter_id, 'adapter_id');
       const eventType = assertRequired(body.event_type, 'event_type');
-      const adapter = adapters.get(adapterId);
-      if (!adapter || !adapter.active) throw new Error('adapter_id is not registered/active');
-      if (!adapter.subscribed_events.includes(eventType)) throw new Error('adapter is not subscribed to event_type');
       const payload = parseBody(body.payload);
+      const job = enqueueWebhookDelivery({
+        adapter_id: adapterId,
+        event_type: eventType,
+        payload,
+      });
+      startWebhookWorker();
+      const adapter = listWebhookAdapters().find((entry) => entry.adapter_id === adapterId);
       res.status(200).json({
         version: 'v2',
         interface: 'uim-webhook-adapter-framework',
         correlationId: ctx.correlationId,
         output: {
           action: 'dispatch-event',
-          dispatch_id: `${adapterId}-${Date.now()}`,
+          dispatch_id: job.job_id,
           adapter_id: adapterId,
           event_type: eventType,
           status: 'queued',
-          target_url: adapter.target_url,
+          target_url: String(adapter?.target_url || ''),
           payload_size: JSON.stringify(payload).length,
         },
       });
@@ -127,13 +131,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     if (action === 'deactivate-adapter') {
       const adapterId = assertRequired(body.adapter_id, 'adapter_id');
-      const adapter = adapters.get(adapterId);
-      if (!adapter) throw new Error('adapter_id is not registered');
-      const updated: WebhookAdapter = {
-        ...adapter,
-        active: false,
-      };
-      adapters.set(adapterId, updated);
+      const updated = deactivateWebhookAdapter(adapterId);
+      if (!updated) throw new Error('adapter_id is not registered');
       res.status(200).json({
         version: 'v2',
         interface: 'uim-webhook-adapter-framework',

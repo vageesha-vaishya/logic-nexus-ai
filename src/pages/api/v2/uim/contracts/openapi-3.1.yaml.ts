@@ -22,6 +22,14 @@ paths:
   /integrations/rest:
     post:
       summary: REST hardening audit and compatibility reporting
+  /analytics/kpis:
+    get:
+      summary: UIM analytics KPI model snapshot
+  /analytics/etl:
+    get:
+      summary: UIM ETL scheduler queue status and telemetry
+    post:
+      summary: UIM ETL scheduler actions (schedule/process/start/stop)
   /graphql:
     post:
       summary: GraphQL endpoint for projection and inventory read models

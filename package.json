@@ -32,6 +32,8 @@
     "report:playwright:uim:visual": "node scripts/report-uim-playwright-visual.mjs",
     "test:uim:integration": "vitest run tests/integration/uim-command-projection-consistency.test.ts",
     "test:uim:phase3:integration": "vitest run tests/integration/uim-phase3-orchestration.test.ts",
+    "test:uim:connectors:nightly": "vitest run tests/integration/uim-connectors-nightly-compatibility.test.ts",
+    "test:uim:graphql:contract": "vitest run src/pages/api/v2/uim/contracts/uim-subgraph.contract.test.ts",
     "test:playwright:quotation": "playwright test tests/e2e/quotation/quotation-comprehensive.spec.ts",
     "test:playwright:quotation:headed": "playwright test tests/e2e/quotation/quotation-comprehensive.spec.ts --headed",
     "ci:lint": "eslint src --ext .ts,.tsx,.mdx",
