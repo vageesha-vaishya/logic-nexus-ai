@@ -145,6 +145,217 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function normalizeSeedCount(value) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return 800;
+  const rounded = Math.floor(parsed);
+  if (rounded < 500) return 500;
+  if (rounded > 1000) return 1000;
+  return rounded;
+}
+
+function clearTenantSeedData(tenantId) {
+  for (const [id, record] of store.entries()) {
+    if (record?.tenant_id === tenantId) store.delete(id);
+  }
+  for (const [id, row] of catalog.entries()) {
+    if (row?.tenant_id === tenantId) catalog.delete(id);
+  }
+  for (const [id, row] of inventoryItems.entries()) {
+    if (row?.tenant_id === tenantId) inventoryItems.delete(id);
+  }
+  for (const [id, row] of reservations.entries()) {
+    if (row?.tenant_id === tenantId) reservations.delete(id);
+  }
+  for (let i = ledger.length - 1; i >= 0; i -= 1) {
+    if (ledger[i]?.tenant_id === tenantId) ledger.splice(i, 1);
+  }
+  for (const [id, row] of projectionSnapshots.entries()) {
+    if (row?.tenant_id === tenantId) projectionSnapshots.delete(id);
+  }
+}
+
+function createSeededFormRecord(nodeKey, tenantId, franchiseId, payload) {
+  const now = new Date().toISOString();
+  const id = randomUUID();
+  store.set(id, {
+    id,
+    tenant_id: tenantId,
+    franchise_id: franchiseId,
+    node_key: nodeKey,
+    payload,
+    metadata: { mode: 'dev-mock', seed_source: 'uim-mro-seeding' },
+    created_at: now,
+    updated_at: now,
+    deleted_at: null,
+  });
+}
+
+function seedTenantMroDataset({ tenantId, franchiseId, targetCount }) {
+  clearTenantSeedData(tenantId);
+  const count = normalizeSeedCount(targetCount);
+  const manufacturers = ['CFM', 'Honeywell', 'Collins', 'Safran', 'Parker', 'Liebherr'];
+  const ataChapters = ['21', '24', '27', '28', '29', '32', '49', '52', '71'];
+  const nowIso = new Date().toISOString();
+
+  createSeededFormRecord('overview', tenantId, franchiseId, {
+    tenant: tenantId,
+    summary: 'UIM MRO seed dataset ready',
+    seeded_records: count,
+    status: 'active',
+  });
+  createSeededFormRecord('analytics', tenantId, franchiseId, {
+    dashboard_seed: true,
+    status: 'active',
+    seeded_records: count,
+    note: 'MRO seed dataset applied via mock seeding endpoint',
+  });
+  createSeededFormRecord('locations', tenantId, franchiseId, {
+    primary_location: `${tenantId.toUpperCase()}-MRO-MAIN`,
+    line_location: `${tenantId.toUpperCase()}-LINE`,
+    quarantine_location: `${tenantId.toUpperCase()}-QUAR`,
+    status: 'active',
+  });
+
+  for (let i = 1; i <= count; i += 1) {
+    const category = ['rotable', 'consumable', 'tooling', 'equipment'][i % 4] || 'rotable';
+    const maintenanceCategory = i % 12 === 0 ? 'emergency-spare' : category;
+    const manufacturer = manufacturers[i % manufacturers.length] || 'CFM';
+    const ataChapter = ataChapters[i % ataChapters.length] || '21';
+    const availableQty = category === 'consumable' ? 10 + (i % 80) : 1;
+    const reservedQty = i % 11 === 0 ? 1 : 0;
+    const consumedQty = i % 13 === 0 ? 1 : 0;
+    const status = i % 25 === 0 ? 'in_transit' : 'available';
+    const sku = `UIM-MRO-${String(i).padStart(6, '0')}`;
+    const partNumber = `MRO-PN-${String(700000 + i).padStart(8, '0')}`;
+    const serialNumber = `SER-${String(900000 + i).padStart(8, '0')}`;
+    const inventoryId = `${tenantId}-item-${i}`;
+    const catalogId = `${tenantId}-catalog-${i}`;
+
+    catalog.set(catalogId, {
+      id: catalogId,
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      sku,
+      part_number: partNumber,
+      title: `MRO Component ${i}`,
+      category,
+      manufacturer_name: manufacturer,
+      ata_chapter_code: ataChapter,
+      created_at: nowIso,
+      updated_at: nowIso,
+    });
+
+    inventoryItems.set(inventoryId, {
+      id: inventoryId,
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      catalog_item_id: catalogId,
+      serial_number: serialNumber,
+      batch_lot_number: `LOT-${String(600000 + i).padStart(8, '0')}`,
+      quantity: availableQty,
+      status,
+      location_type: 'warehouse',
+      created_at: nowIso,
+      updated_at: nowIso,
+    });
+
+    projectionSnapshots.set(inventoryId, {
+      id: randomUUID(),
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      inventory_item_id: inventoryId,
+      projected_available_quantity: availableQty,
+      projected_reserved_quantity: reservedQty,
+      projected_consumed_quantity: consumedQty,
+      last_ledger_id: null,
+      last_ledger_at: nowIso,
+      replay_version: 2,
+      updated_at: nowIso,
+      // Enriched attributes consumed by UIM UI projection rendering
+      catalog_item_id: catalogId,
+      sku,
+      part_number: partNumber,
+      title: `MRO Component ${i}`,
+      category,
+      serial_number: serialNumber,
+      batch_lot_number: `LOT-${String(600000 + i).padStart(8, '0')}`,
+      inventory_status: status,
+      inventory_location_type: 'warehouse',
+      maintenance_category: maintenanceCategory,
+      ata_chapter_code: ataChapter,
+      ata_sub_chapter_code: String((i % 10) + 1).padStart(2, '0'),
+      ata_section_code: String((i % 7) + 1).padStart(2, '0'),
+      condition_code: i % 20 === 0 ? 'INSP' : 'SV',
+      certification_status: i % 18 === 0 ? 'expiring' : 'valid',
+      aog_priority: i % 12 === 0,
+    });
+
+    if (i <= 180) {
+      createSeededFormRecord('item-master', tenantId, franchiseId, {
+        sku,
+        part_number: partNumber,
+        manufacturer_name: manufacturer,
+        maintenance_category: maintenanceCategory,
+        ata_chapter_code: ataChapter,
+        condition_code: i % 20 === 0 ? 'INSP' : 'SV',
+        certification_status: i % 18 === 0 ? 'expiring' : 'valid',
+        status: 'active',
+      });
+    }
+    if (i <= 160) {
+      createSeededFormRecord('stock-ledger', tenantId, franchiseId, {
+        reference: `GRN-${String(1000 + i)}`,
+        part_number: partNumber,
+        transaction_type: 'RECEIVE',
+        quantity: availableQty,
+        status: 'posted',
+      });
+    }
+    if (i <= 120) {
+      const reservationId = `${tenantId}-res-${i}`;
+      reservations.set(reservationId, {
+        id: reservationId,
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        inventory_item_id: inventoryId,
+        catalog_item_id: catalogId,
+        reserved_quantity: reservedQty,
+        reservation_status: reservedQty > 0 ? 'active' : 'fulfilled',
+        reservation_token: `${tenantId}-resv-${i}`,
+      });
+      createSeededFormRecord('reservations', tenantId, franchiseId, {
+        reservation_token: `${tenantId}-resv-${i}`,
+        part_number: partNumber,
+        reserved_quantity: reservedQty,
+        status: reservedQty > 0 ? 'active' : 'fulfilled',
+      });
+      createSeededFormRecord('issue-consume', tenantId, franchiseId, {
+        reference: `WP-${String(2000 + i)}`,
+        part_number: partNumber,
+        transaction_type: 'CONSUME',
+        quantity: consumedQty || 1,
+        status: 'posted',
+      });
+      createSeededFormRecord('restock', tenantId, franchiseId, {
+        reference: `PO-${String(3000 + i)}`,
+        part_number: partNumber,
+        transaction_type: 'RECEIVE',
+        quantity: availableQty,
+        status: 'posted',
+      });
+    }
+  }
+
+  return {
+    count,
+    catalog_items: [...catalog.values()].filter((row) => row.tenant_id === tenantId).length,
+    inventory_items: [...inventoryItems.values()].filter((row) => row.tenant_id === tenantId).length,
+    profile_items: [...projectionSnapshots.values()].filter((row) => row.tenant_id === tenantId).length,
+    projection_snapshots: [...projectionSnapshots.values()].filter((row) => row.tenant_id === tenantId).length,
+  };
+}
+
 function seedMockFormRecords() {
   const now = new Date().toISOString();
   const seeds = [
@@ -204,6 +415,16 @@ function seedMockFormRecords() {
 }
 
 seedMockFormRecords();
+seedTenantMroDataset({
+  tenantId: MOCK_DECCAN_TENANT_ID,
+  franchiseId: MOCK_DECCAN_FRANCHISE_ID,
+  targetCount: 800,
+});
+seedTenantMroDataset({
+  tenantId: 'dev-tenant',
+  franchiseId: null,
+  targetCount: 800,
+});
 
 function readNumber(value) {
   const parsed = Number(value);
@@ -303,7 +524,66 @@ const server = createServer(async (req, res) => {
   const analyticsBiCubeMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/bi-cube$/);
   const analyticsQaSignoffMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/qa-signoff$/);
   const analyticsSlaEvidenceMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/sla-evidence$/);
+  const seedingMroMatch = pathname.match(/^\/api\/v2\/uim\/seeding\/mro$/);
   const platformDomainsMatch = pathname.match(/^\/api\/v1\/platform-domains$/);
+
+  if (seedingMroMatch && method === 'GET') {
+    const { tenantId, franchiseId } = resolveTenant(req);
+    const seeded = {
+      catalog_items: [...catalog.values()].filter((row) => row.tenant_id === tenantId).length,
+      inventory_items: [...inventoryItems.values()].filter((row) => row.tenant_id === tenantId).length,
+      profile_items: [...projectionSnapshots.values()].filter((row) => row.tenant_id === tenantId).length,
+      projection_snapshots: [...projectionSnapshots.values()].filter((row) => row.tenant_id === tenantId).length,
+    };
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-mro-seeding-status',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        seed_limits: { min: 500, max: 1000, default: 800 },
+        seeded,
+      },
+    });
+    return;
+  }
+
+  if (seedingMroMatch && method === 'POST') {
+    const body = await parseBody(req);
+    const { tenantId, franchiseId } = resolveTenant(req);
+    const targetCount = normalizeSeedCount(body.target_count);
+    const dryRun = String(body.dry_run || '').trim().toLowerCase() === 'true' || body.dry_run === true;
+    if (dryRun) {
+      const sample = Array.from({ length: 5 }).map((_, i) => ({
+        sku: `UIM-MRO-${String(i + 1).padStart(6, '0')}`,
+        part_number: `MRO-PN-${String(700001 + i).padStart(8, '0')}`,
+        maintenance_category: (i + 1) % 4 === 0 ? 'equipment' : 'rotable',
+      }));
+      sendJson(res, 200, {
+        version: 'v2',
+        interface: 'uim-mro-seeding-preview',
+        output: {
+          tenant_id: tenantId,
+          franchise_id: franchiseId,
+          target_count: targetCount,
+          sample,
+        },
+      });
+      return;
+    }
+    const seeded = seedTenantMroDataset({ tenantId, franchiseId, targetCount });
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-mro-seeding',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        seeded_count: seeded.count,
+        seeded,
+      },
+    });
+    return;
+  }
 
   if (platformDomainsMatch && method === 'GET') {
     sendJson(res, 200, {

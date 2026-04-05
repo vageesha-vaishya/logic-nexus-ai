@@ -54,6 +54,76 @@ export async function queryUimProjectionItems(limit = 50, offset = 0): Promise<{
   });
 }
 
+export async function queryUimExternalMroAvailability(partNumbers?: string[]): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    records: Array<Record<string, unknown>>;
+  };
+}> {
+  const query = Array.isArray(partNumbers) && partNumbers.length > 0
+    ? `?part_numbers=${encodeURIComponent(partNumbers.join(','))}`
+    : '';
+  return uimApiRequest({
+    method: 'GET',
+    path: `/integrations/external-mro-pipeline${query}`,
+  });
+}
+
+export async function executeUimExternalMroPipelineAction(input: {
+  action: 'reserve' | 'consume' | 'return' | 'sync-batch' | 'process-queue';
+  idempotency_key?: string;
+  part_number?: string;
+  reservation_id?: string;
+  maintenance_order_id?: string;
+  work_package_id?: string;
+  task_id?: string;
+  quantity?: number;
+  records?: Array<Record<string, unknown>>;
+}): Promise<{ output: Record<string, unknown> }> {
+  return uimApiRequest({
+    method: 'POST',
+    path: '/integrations/external-mro-pipeline',
+    body: input,
+  });
+}
+
+export const queryUimAmroAvailability = queryUimExternalMroAvailability;
+export const executeUimAmroPipelineAction = executeUimExternalMroPipelineAction;
+
+export async function queryUimMroSeedStatus(): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    seed_limits: {
+      min: number;
+      max: number;
+      default: number;
+    };
+    seeded: {
+      catalog_items: number;
+      profile_items: number;
+      inventory_items: number;
+    };
+  };
+}> {
+  return uimApiRequest({
+    method: 'GET',
+    path: '/seeding/mro',
+  });
+}
+
+export async function executeUimMroSeeding(input: {
+  target_count?: number;
+  dry_run?: boolean;
+}): Promise<{ output: Record<string, unknown> }> {
+  return uimApiRequest({
+    method: 'POST',
+    path: '/seeding/mro',
+    body: input,
+  });
+}
+
 export async function queryUimAnalyticsKpis(lowStockThreshold?: number): Promise<{
   output: {
     tenant_id: string;

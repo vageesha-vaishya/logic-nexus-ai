@@ -15,6 +15,8 @@ export const UIM_CONNECTOR_MANIFESTS_PATH = '/api/v2/uim/connectors/manifests' a
 export const UIM_WEBHOOK_FRAMEWORK_PATH = '/api/v2/uim/webhooks' as const;
 export const UIM_GRAPHQL_PATH = '/api/v2/uim/graphql' as const;
 export const UIM_REST_HARDENING_PATH = '/api/v2/uim/integrations/rest' as const;
+export const UIM_EXTERNAL_MRO_PIPELINE_PATH = '/api/v2/uim/integrations/external-mro-pipeline' as const;
+export const UIM_AMRO_PIPELINE_PATH_LEGACY = '/api/v2/uim/integrations/amro-pipeline' as const;
 export const UIM_ANALYTICS_KPIS_PATH = '/api/v2/uim/analytics/kpis' as const;
 export const UIM_ANALYTICS_ETL_PATH = '/api/v2/uim/analytics/etl' as const;
 export const UIM_ANALYTICS_RECONCILIATION_PATH = '/api/v2/uim/analytics/reconciliation' as const;
@@ -32,6 +34,9 @@ export const UIM_INTEGRATION_CONTRACTS = {
       '/api/v2/uim/forms/{node}',
       '/api/v2/uim/forms/{node}/{id}',
       UIM_REST_HARDENING_PATH,
+      UIM_EXTERNAL_MRO_PIPELINE_PATH,
+      UIM_AMRO_PIPELINE_PATH_LEGACY,
+      '/api/v2/uim/seeding/mro',
       UIM_ANALYTICS_KPIS_PATH,
       UIM_ANALYTICS_ETL_PATH,
       UIM_ANALYTICS_RECONCILIATION_PATH,
@@ -65,6 +70,19 @@ export const UIM_INTEGRATION_CONTRACTS = {
   connectors: {
     manifestPath: UIM_CONNECTOR_MANIFESTS_PATH,
     adapters: ['freight-bridge', 'amro-bridge', 'marketplace-bridge', 'erp-bridge'],
+  },
+  amroPipeline: {
+    path: UIM_EXTERNAL_MRO_PIPELINE_PATH,
+    compatibilityAliasPath: UIM_AMRO_PIPELINE_PATH_LEGACY,
+    actions: ['reserve', 'consume', 'return', 'sync-batch', 'process-queue'],
+    idempotency: 'tenant-scoped idempotency key with job replay',
+    queueTable: 'uim_amro_sync_jobs',
+    auditTable: 'uim_amro_sync_audit',
+  },
+  seeding: {
+    mroPath: '/api/v2/uim/seeding/mro',
+    targetRange: '500-1000',
+    defaultCount: 800,
   },
   analytics: {
     kpiPath: UIM_ANALYTICS_KPIS_PATH,

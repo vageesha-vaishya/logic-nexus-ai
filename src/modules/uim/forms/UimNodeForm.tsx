@@ -304,14 +304,26 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
             if (snapshots.length > 0) {
               loadedRecords = snapshots.map((row) => {
                 const rowRecord = row as Record<string, unknown>;
+                const partNumber = String(rowRecord.part_number || '').trim();
+                const title = String(rowRecord.title || '').trim();
+                const sku = String(rowRecord.sku || '').trim();
                 return {
                   id: String(rowRecord.inventory_item_id || rowRecord.id || ''),
                   updated_at: rowRecord.updated_at || rowRecord.last_ledger_at || '',
                   payload: {
+                    part_number: partNumber,
+                    title,
+                    sku,
+                    maintenance_category: rowRecord.maintenance_category || '',
+                    ata_chapter_code: rowRecord.ata_chapter_code || '',
+                    condition_code: rowRecord.condition_code || '',
+                    certification_status: rowRecord.certification_status || '',
+                    aog_priority: Boolean(rowRecord.aog_priority),
                     projected_available_quantity: rowRecord.projected_available_quantity || 0,
                     projected_reserved_quantity: rowRecord.projected_reserved_quantity || 0,
                     projected_consumed_quantity: rowRecord.projected_consumed_quantity || 0,
                     replay_version: rowRecord.replay_version || 0,
+                    summary: partNumber || title || sku || '',
                     status: readStatusValueFromProjection(rowRecord),
                   },
                   projection: rowRecord,

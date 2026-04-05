@@ -22,6 +22,21 @@ paths:
   /integrations/rest:
     post:
       summary: REST hardening audit and compatibility reporting
+  /integrations/external-mro-pipeline:
+    get:
+      summary: UIM external-MRO real-time availability query contract
+    post:
+      summary: UIM external-MRO reservation, consume, return, batch sync, and queue processing actions
+  /integrations/amro-pipeline:
+    get:
+      summary: Deprecated compatibility alias for external-MRO pipeline
+    post:
+      summary: Deprecated compatibility alias for external-MRO pipeline
+  /seeding/mro:
+    get:
+      summary: UIM MRO seeding status and seeded inventory counts
+    post:
+      summary: UIM MRO deterministic seed generation for 500-1000 aircraft maintenance items
   /analytics/kpis:
     get:
       summary: UIM analytics KPI model snapshot

@@ -163,4 +163,52 @@ describe('/api/v2/uim/forms/[node]', () => {
     expect(res.statusCode).toBe(503);
     expect((res.jsonBody as any)?.code).toBe('UIM_FORM_STORAGE_NOT_READY');
   });
+
+  it('derives overview records from canonical tables when form records are empty', async () => {
+    const formRange = vi.fn().mockResolvedValue({
+      data: [],
+      error: null,
+      count: 0,
+    });
+    const formOrder = vi.fn().mockReturnValue({ range: formRange });
+    const formIs = vi.fn().mockReturnValue({ order: formOrder });
+    const formEqNode = vi.fn().mockReturnValue({ is: formIs });
+    const formEqTenant = vi.fn().mockReturnValue({ eq: formEqNode });
+    const formSelect = vi.fn().mockReturnValue({ eq: formEqTenant });
+
+    const headCount = (count: number) => ({
+      eq: vi.fn().mockReturnValue({
+        is: vi.fn().mockResolvedValue({ count, error: null }),
+      }),
+    });
+
+    const from = vi.fn((table: string) => {
+      if (table === 'uim_form_records') return { select: formSelect };
+      if (table === 'uim_catalog_items') return { select: vi.fn().mockReturnValue(headCount(800)) };
+      if (table === 'uim_inventory_items') return { select: vi.fn().mockReturnValue(headCount(800)) };
+      if (table === 'uim_inventory_projection_snapshots') {
+        return {
+          select: vi.fn().mockReturnValue({
+            eq: vi.fn().mockResolvedValue({ count: 800, error: null }),
+          }),
+        };
+      }
+      throw new Error(`Unexpected table ${table}`);
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: { node: 'overview', limit: '10', offset: '0' },
+      headers: {},
+      body: {},
+    };
+    const res = createResponse();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.count).toBe(1);
+    expect((res.jsonBody as any)?.output?.records?.[0]?.metadata?.mode).toBe('derived-canonical');
+    expect((res.jsonBody as any)?.output?.records?.[0]?.payload?.notes).toContain('catalog=800');
+  });
 });

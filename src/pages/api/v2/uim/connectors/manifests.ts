@@ -27,7 +27,12 @@ const CONNECTOR_MANIFESTS = [
     protocol: ['REST', 'GraphQL', 'Webhook'],
     direction: 'bi-directional',
     source_systems: ['amro-core'],
-    events: ['uim.reservation.created.v1', 'uim.projection.replayed.v1'],
+    events: [
+      'uim.reservation.created.v1',
+      'uim.projection.replayed.v1',
+      'uim.amro.sync.requested.v1',
+      'uim.amro.sync.completed.v1',
+    ],
     sla: { p95_latency_ms: 300, availability_percent: 99.9 },
   },
   {
