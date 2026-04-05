@@ -742,6 +742,17 @@ router.get(
  *   put:
  *     summary: Update work package template and task-template relationships atomically
  *     tags: [Work Package Templates]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           example:
+ *             template_name: "Line Check Package - Rev A"
+ *             model_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
+ *             aircraft_model: "A320"
+ *             maintenance_type: "line"
+ *             selected_task_template_ids:
+ *               - "11a11111-2222-4333-9444-555555555555"
  */
 router.put(
   '/work-package-templates/:id',
@@ -756,7 +767,7 @@ router.put(
     }
 
     const request = (req.body || {}) as WorkPackageTemplateRequest;
-    const selectedTaskTemplateIds = normalizeTaskTemplateIds(request.selected_task_template_ids);
+    const selectedTaskTemplateIds = normalizeTemplateRequestTaskTemplateIds(request);
     const validation = await validateTaskTemplateIds(tenantId, franchiseId, selectedTaskTemplateIds);
     if (!validation.valid) {
       if (validation.invalidIds.length > 0) {
@@ -773,10 +784,58 @@ router.put(
       active: request.active,
       template_name: request.template_name,
       maintenance_type: request.maintenance_type,
+      model_id: String(request.model_id || '').trim() || null,
+      aircraft_model: request.aircraft_model || null,
       scope_json: Array.isArray(request.scope_json) ? request.scope_json : undefined,
       tasks_json: selectedTaskTemplateIds.map((taskTemplateId) => ({ task_template_id: taskTemplateId })),
       policy_snapshot_id: request.policy_snapshot_id || null,
     };
+    if (payload.model_id && !isUuid(payload.model_id)) {
+      res.status(400).json(toErrorResponse('Invalid model_id. Expected UUID.', 'VALIDATION_ERROR', 400));
+      return;
+    }
+    let resolvedModelId: string | null = null;
+    if (selectedTaskTemplateIds.length > 0) {
+      let modelQuery = supabase
+        .from('task_templates')
+        .select('id,assembly_models')
+        .eq('tenant_id', tenantId)
+        .in('id', selectedTaskTemplateIds);
+      if (franchiseId) {
+        modelQuery = modelQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+      }
+      const { data: taskRows, error: taskRowsError } = await modelQuery;
+      if (taskRowsError) {
+        const message = String(taskRowsError.message || '');
+        res.status(400).json(toErrorResponse(message, 'UPDATE_FAILED', 400));
+        return;
+      }
+      const modelIds = Array.from(new Set(
+        (Array.isArray(taskRows) ? taskRows : [])
+          .map((row) => String((row as Record<string, unknown>).assembly_models || '').trim())
+          .filter((value) => value.length > 0),
+      ));
+      if (modelIds.length !== 1) {
+        res.status(422).json(
+          toErrorResponse(
+            'Validation failed: selected task templates belong to different or missing assembly_models',
+            'VALIDATION_ERROR',
+            422,
+          ),
+        );
+        return;
+      }
+      resolvedModelId = modelIds[0];
+    }
+    if (payload.model_id && resolvedModelId && payload.model_id !== resolvedModelId) {
+      res.status(422).json(
+        toErrorResponse('Validation failed: selected task templates do not match selected model_id', 'VALIDATION_ERROR', 422),
+      );
+      return;
+    }
+    if (!payload.model_id && resolvedModelId) {
+      payload.model_id = resolvedModelId;
+    }
 
     const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_update_work_package_template_atomic', {
       p_tenant_id: tenantId,
