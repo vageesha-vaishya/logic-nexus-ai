@@ -15,6 +15,12 @@ const NODE_KEYS = new Set([
 ]);
 
 const store = new Map();
+const catalog = new Map();
+const inventoryItems = new Map();
+const reservations = new Map();
+const ledger = [];
+const commands = new Map();
+const projectionSnapshots = new Map();
 
 function setCors(res) {
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -39,6 +45,11 @@ function sendJson(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json');
   res.end(JSON.stringify(payload));
+}
+
+function readNumber(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
 }
 
 async function parseBody(req) {
@@ -80,6 +91,228 @@ const server = createServer(async (req, res) => {
 
   const listMatch = pathname.match(/^\/api\/v2\/uim\/forms\/([^/]+)$/);
   const recordMatch = pathname.match(/^\/api\/v2\/uim\/forms\/([^/]+)\/([^/]+)$/);
+  const commandMatch = pathname.match(/^\/api\/v2\/uim\/commands$/);
+  const replayMatch = pathname.match(/^\/api\/v2\/uim\/projections\/replay$/);
+  const projectionItemsMatch = pathname.match(/^\/api\/v2\/uim\/projections\/items$/);
+
+  if (commandMatch && method === 'POST') {
+    const body = await parseBody(req);
+    const commandType = String(body.command_type || '').toUpperCase();
+    const payload = body.command_payload && typeof body.command_payload === 'object' ? body.command_payload : {};
+    const idempotencyKey = String(body.idempotency_key || '').trim();
+    if (!['RECEIVE', 'MOVE', 'RESERVE', 'CONSUME'].includes(commandType)) {
+      sendJson(res, 422, { error: 'Unsupported command_type', code: 'INVALID_COMMAND' });
+      return;
+    }
+    if (idempotencyKey && commands.has(idempotencyKey)) {
+      sendJson(res, 200, {
+        version: 'v2',
+        interface: 'uim-command-handler',
+        output: {
+          replayed: true,
+          command: commands.get(idempotencyKey),
+        },
+      });
+      return;
+    }
+
+    const commandId = randomUUID();
+    const commandRecord = {
+      id: commandId,
+      command_type: commandType,
+      command_payload: payload,
+      command_status: 'applied',
+      applied_at: new Date().toISOString(),
+    };
+    if (idempotencyKey) commands.set(idempotencyKey, commandRecord);
+
+    let appliedOutput = {};
+    if (commandType === 'RECEIVE') {
+      const catalogId = String(payload.catalog_item_id || '').trim() || randomUUID();
+      if (!catalog.has(catalogId)) {
+        catalog.set(catalogId, {
+          id: catalogId,
+          sku: String(payload.sku || `SKU-${Date.now().toString(36)}`),
+          title: String(payload.title || payload.item_name || 'UIM Item'),
+        });
+      }
+      const itemId = randomUUID();
+      const quantity = Math.max(0, readNumber(payload.quantity));
+      inventoryItems.set(itemId, {
+        id: itemId,
+        catalog_item_id: catalogId,
+        quantity,
+        status: 'available',
+      });
+      ledger.push({
+        id: randomUUID(),
+        inventory_item_id: itemId,
+        transaction_type: 'RECEIVE',
+        quantity_changed: quantity,
+        created_at: new Date().toISOString(),
+      });
+      appliedOutput = { inventory_item_id: itemId, quantity };
+    } else if (commandType === 'MOVE') {
+      const itemId = String(payload.inventory_item_id || '').trim();
+      const existing = inventoryItems.get(itemId);
+      if (!existing) {
+        sendJson(res, 404, { error: 'Inventory item not found', code: 'INVENTORY_ITEM_NOT_FOUND' });
+        return;
+      }
+      const moved = {
+        ...existing,
+        location_id: payload.to_location_id || null,
+      };
+      inventoryItems.set(itemId, moved);
+      ledger.push({
+        id: randomUUID(),
+        inventory_item_id: itemId,
+        transaction_type: 'MOVE',
+        quantity_changed: 0,
+        created_at: new Date().toISOString(),
+      });
+      appliedOutput = { inventory_item_id: itemId, to_location_id: moved.location_id };
+    } else if (commandType === 'RESERVE') {
+      const itemId = String(payload.inventory_item_id || '').trim();
+      const item = inventoryItems.get(itemId);
+      if (!item) {
+        sendJson(res, 404, { error: 'Inventory item not found', code: 'INVENTORY_ITEM_NOT_FOUND' });
+        return;
+      }
+      const quantity = Math.max(0, readNumber(payload.quantity));
+      if (item.quantity < quantity) {
+        sendJson(res, 409, { error: 'Insufficient quantity', code: 'UIM_INSUFFICIENT_AVAILABLE_QUANTITY' });
+        return;
+      }
+      const reservationId = randomUUID();
+      reservations.set(reservationId, {
+        id: reservationId,
+        inventory_item_id: itemId,
+        catalog_item_id: payload.catalog_item_id || item.catalog_item_id || null,
+        reserved_quantity: quantity,
+        reservation_status: 'active',
+        reservation_token: String(payload.reservation_token || `uim-resv-${Date.now().toString(36)}`),
+      });
+      ledger.push({
+        id: randomUUID(),
+        inventory_item_id: itemId,
+        transaction_type: 'RESERVE',
+        quantity_changed: quantity,
+        reservation_id: reservationId,
+        created_at: new Date().toISOString(),
+      });
+      appliedOutput = { reservation_id: reservationId, reserved_quantity: quantity };
+    } else if (commandType === 'CONSUME') {
+      const itemId = String(payload.inventory_item_id || '').trim();
+      const item = inventoryItems.get(itemId);
+      if (!item) {
+        sendJson(res, 404, { error: 'Inventory item not found', code: 'INVENTORY_ITEM_NOT_FOUND' });
+        return;
+      }
+      const quantity = Math.max(0, readNumber(payload.quantity));
+      if (item.quantity < quantity) {
+        sendJson(res, 409, { error: 'Insufficient quantity', code: 'UIM_INSUFFICIENT_AVAILABLE_QUANTITY' });
+        return;
+      }
+      const remaining = Number((item.quantity - quantity).toFixed(4));
+      const updated = { ...item, quantity: remaining, status: remaining <= 0 ? 'consumed' : 'available' };
+      inventoryItems.set(itemId, updated);
+      const reservationId = String(payload.reservation_id || '').trim() || null;
+      if (reservationId && reservations.has(reservationId)) {
+        reservations.set(reservationId, {
+          ...reservations.get(reservationId),
+          reservation_status: 'fulfilled',
+        });
+      }
+      ledger.push({
+        id: randomUUID(),
+        inventory_item_id: itemId,
+        transaction_type: 'CONSUME',
+        quantity_changed: quantity,
+        reservation_id: reservationId,
+        created_at: new Date().toISOString(),
+      });
+      appliedOutput = { inventory_item_id: itemId, remaining_quantity: remaining };
+    }
+
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-command-handler',
+      output: {
+        command_id: commandId,
+        command_type: commandType,
+        command_status: 'applied',
+        applied_output: appliedOutput,
+      },
+    });
+    return;
+  }
+
+  if (replayMatch && method === 'POST') {
+    projectionSnapshots.clear();
+    for (const event of ledger) {
+      const itemId = String(event.inventory_item_id || '');
+      if (!itemId) continue;
+      const current = projectionSnapshots.get(itemId) || {
+        id: randomUUID(),
+        inventory_item_id: itemId,
+        projected_available_quantity: 0,
+        projected_reserved_quantity: 0,
+        projected_consumed_quantity: 0,
+        last_ledger_id: null,
+        last_ledger_at: null,
+        replay_version: Date.now(),
+        updated_at: new Date().toISOString(),
+      };
+      const quantity = readNumber(event.quantity_changed);
+      if (event.transaction_type === 'RECEIVE' || event.transaction_type === 'ADJUST' || event.transaction_type === 'RETURN') {
+        current.projected_available_quantity += quantity;
+      } else if (event.transaction_type === 'RESERVE') {
+        current.projected_available_quantity -= quantity;
+        current.projected_reserved_quantity += quantity;
+      } else if (event.transaction_type === 'RELEASE') {
+        current.projected_available_quantity += quantity;
+        current.projected_reserved_quantity -= quantity;
+      } else if (event.transaction_type === 'CONSUME') {
+        current.projected_reserved_quantity = Math.max(0, current.projected_reserved_quantity - quantity);
+        current.projected_consumed_quantity += quantity;
+      } else if (event.transaction_type === 'SCRAP') {
+        current.projected_available_quantity -= quantity;
+      }
+      current.last_ledger_id = event.id;
+      current.last_ledger_at = event.created_at;
+      current.updated_at = new Date().toISOString();
+      projectionSnapshots.set(itemId, current);
+    }
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-projection-replay',
+      output: {
+        replayed_events: ledger.length,
+        updated_snapshots: projectionSnapshots.size,
+      },
+    });
+    return;
+  }
+
+  if (projectionItemsMatch && method === 'GET') {
+    const limit = Math.min(Math.max(Number.parseInt(String(url.searchParams.get('limit') || '50'), 10) || 50, 1), 500);
+    const offset = Math.max(Number.parseInt(String(url.searchParams.get('offset') || '0'), 10) || 0, 0);
+    const snapshots = [...projectionSnapshots.values()];
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-projection-items-query',
+      output: {
+        pagination: {
+          limit,
+          offset,
+          total: snapshots.length,
+        },
+        snapshots: snapshots.slice(offset, offset + limit),
+      },
+    });
+    return;
+  }
 
   if (listMatch && method === 'GET') {
     const node = listMatch[1];

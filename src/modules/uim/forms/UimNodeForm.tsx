@@ -19,6 +19,7 @@ import { DimensionBlock } from './blocks/DimensionBlock';
 import { deleteUimEntity, getUimEntity, listUimEntities } from '@/services/uim/uimFormAdapters';
 import { UimDataList, type UimDataListColumn } from '@/modules/uim/components/UimDataList';
 import { UimApiError } from '@/services/uim/uimApi';
+import { queryUimProjectionItems, replayUimProjections } from '@/services/uim/uimCoreServices';
 
 type UimNodeFormProps = {
   node: UimNodeKey;
@@ -27,6 +28,7 @@ type UimNodeFormProps = {
 
 const AUTO_RETRY_INTERVAL_MS = 5000;
 const AUTO_RETRY_MAX_ATTEMPTS = 3;
+const PROJECTION_BACKED_NODES: UimNodeKey[] = ['item-master', 'stock-ledger', 'reservations', 'issue-consume', 'restock'];
 
 function numberFromEvent(value: string): number {
   const parsed = Number(value);
@@ -125,6 +127,8 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
   const [statusValue, setStatusValue] = useState('all');
   const [lastLoadDurationMs, setLastLoadDurationMs] = useState(0);
   const [autoRetryAttempt, setAutoRetryAttempt] = useState(0);
+  const [isReplayingProjection, setIsReplayingProjection] = useState(false);
+  const projectionBacked = PROJECTION_BACKED_NODES.includes(node);
 
   const { form, isSaving, submitError, submit, reset, isEditMode, lastSavedId, clearSubmitError } = useUimNodeForm({
     config,
@@ -137,19 +141,39 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     setRecordsError(null);
     const start = performance.now();
     try {
-      let response: Awaited<ReturnType<typeof listUimEntities>> | null = null;
+      let loadedRecords: Array<Record<string, unknown>> | null = null;
       let lastError: unknown = null;
       for (let attempt = 1; attempt <= 3; attempt += 1) {
         try {
-          response = await listUimEntities(node, 200, 0);
+          if (projectionBacked) {
+            const projectionResponse = await queryUimProjectionItems(200, 0);
+            const snapshots = Array.isArray(projectionResponse?.output?.snapshots) ? projectionResponse.output.snapshots : [];
+            loadedRecords = snapshots.map((row) => {
+              const rowRecord = row as Record<string, unknown>;
+              return {
+                id: String(rowRecord.inventory_item_id || rowRecord.id || ''),
+                updated_at: rowRecord.updated_at || rowRecord.last_ledger_at || '',
+                payload: {
+                  projected_available_quantity: rowRecord.projected_available_quantity || 0,
+                  projected_reserved_quantity: rowRecord.projected_reserved_quantity || 0,
+                  projected_consumed_quantity: rowRecord.projected_consumed_quantity || 0,
+                  replay_version: rowRecord.replay_version || 0,
+                  status: readStatusValueFromProjection(rowRecord),
+                },
+                projection: rowRecord,
+              };
+            });
+          } else {
+            const response = await listUimEntities(node, 200, 0);
+            loadedRecords = Array.isArray(response?.output?.records) ? response.output.records : [];
+          }
           break;
         } catch (error) {
           lastError = error;
           if (attempt < 3) await new Promise((resolve) => setTimeout(resolve, attempt * 250));
         }
       }
-      if (!response) throw lastError || new Error('Record load failed');
-      const loadedRecords = Array.isArray(response?.output?.records) ? response.output.records : [];
+      if (!loadedRecords) throw lastError || new Error('Record load failed');
       setRecords(loadedRecords);
       const duration = performance.now() - start;
       setLastLoadDurationMs(duration);
@@ -161,7 +185,9 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
         if (code === 'UIM_FORM_STORAGE_NOT_READY') {
           message = 'UIM storage is not ready. Run migration 20260404212000_uim_form_records_crud.sql.';
         } else if (error.status === 404) {
-          message = 'UIM forms API endpoint is not available. Verify /api/v2/uim/forms routes are deployed and VITE_UIM_API_BASE_URL is correct.';
+          message = projectionBacked
+            ? 'UIM projection API endpoint is not available. Verify /api/v2/uim/projections routes are deployed and the UIM backend is restarted.'
+            : 'UIM forms API endpoint is not available. Verify /api/v2/uim/forms routes are deployed and VITE_UIM_API_BASE_URL is correct.';
         } else if (error.status === 401 || error.status === 403) {
           message = 'You do not have permission to load records for this module.';
         } else if (error.status >= 500) {
@@ -179,7 +205,15 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     } finally {
       setIsLoadingRecords(false);
     }
-  }, [node]);
+  }, [node, projectionBacked]);
+
+  const readStatusValueFromProjection = (row: Record<string, unknown>): string => {
+    const available = Number(row.projected_available_quantity || 0);
+    const reserved = Number(row.projected_reserved_quantity || 0);
+    if (available <= 0 && reserved <= 0) return 'consumed';
+    if (reserved > 0) return 'reserved';
+    return 'available';
+  };
 
   useEffect(() => {
     setAutoRetryAttempt(0);
@@ -268,7 +302,15 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     reset();
   };
 
-  const handleSelectRecord = async (recordId: string) => {
+  const handleSelectRecord = async (recordId: string, record?: Record<string, unknown>) => {
+    if (projectionBacked && record) {
+      const payload = (record.payload || {}) as Record<string, unknown>;
+      setActiveRecord({
+        ...payload,
+        inventory_item_id: record.id || '',
+      });
+      return;
+    }
     try {
       const response = await getUimEntity(node, recordId);
       const selected = (response.output || {}) as Record<string, unknown>;
@@ -292,6 +334,27 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     }
   };
 
+  const handleReplayNow = async () => {
+    if (!projectionBacked) return;
+    setIsReplayingProjection(true);
+    try {
+      await replayUimProjections();
+      await loadRecords();
+      toast({
+        title: 'Projection replay complete',
+        description: 'Dense-grid snapshot data has been refreshed.',
+      });
+    } catch (error) {
+      toast({
+        title: 'Replay failed',
+        description: 'Unable to replay projection snapshots right now.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsReplayingProjection(false);
+    }
+  };
+
   return (
     <Card className="mdm-template-panel border-border/70 shadow-sm" data-testid={`uim-node-form-${node}`}>
       <CardHeader className="space-y-2">
@@ -312,9 +375,12 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
             setStatusValue('all');
           }}
           onCreate={handleCreate}
-          onRowClick={(record) => handleSelectRecord(String(record.id || ''))}
+          onRowClick={(record) => handleSelectRecord(String(record.id || ''), record)}
           columns={listColumns}
           exportFileName={`uim-${node}-records.csv`}
+          modeBadgeLabel={projectionBacked ? 'Projection Mode' : undefined}
+          onReplayNow={projectionBacked ? handleReplayNow : undefined}
+          replayLoading={isReplayingProjection}
         />
         <p className="text-xs text-muted-foreground">
           List load latency: {Math.round(lastLoadDurationMs)} ms

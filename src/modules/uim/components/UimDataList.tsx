@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download } from 'lucide-react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, RefreshCcw } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -28,6 +28,9 @@ type UimDataListProps<TRecord> = {
   columns: UimDataListColumn<TRecord>[];
   statusOptions?: Array<{ value: string; label: string }>;
   exportFileName: string;
+  modeBadgeLabel?: string;
+  onReplayNow?: () => void;
+  replayLoading?: boolean;
 };
 
 type SortState = { key: string; direction: 'asc' | 'desc' } | null;
@@ -55,6 +58,9 @@ export function UimDataList<TRecord>({
     { value: 'cancelled', label: 'Cancelled' },
   ],
   exportFileName,
+  modeBadgeLabel,
+  onReplayNow,
+  replayLoading = false,
 }: UimDataListProps<TRecord>) {
   const [sortState, setSortState] = useState<SortState>(null);
   const [page, setPage] = useState(1);
@@ -122,13 +128,22 @@ export function UimDataList<TRecord>({
         beforeContent={(
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[hsl(var(--mdm-template-border))] bg-background/60 px-3 py-2">
             <div className="flex items-center gap-2">
+              {modeBadgeLabel ? <Badge variant="secondary">{modeBadgeLabel}</Badge> : null}
               {searchValue ? <Badge variant="secondary">Query: {searchValue}</Badge> : null}
               {statusValue !== 'all' ? <Badge variant="secondary">Status: {statusValue}</Badge> : null}
             </div>
-            <Button type="button" size="sm" variant="outline" onClick={exportCsv}>
-              <Download className="mr-2 h-4 w-4" />
-              Export
-            </Button>
+            <div className="flex items-center gap-2">
+              {onReplayNow ? (
+                <Button type="button" size="sm" variant="outline" onClick={onReplayNow} disabled={replayLoading}>
+                  <RefreshCcw className="mr-2 h-4 w-4" />
+                  {replayLoading ? 'Replaying...' : 'Replay Now'}
+                </Button>
+              ) : null}
+              <Button type="button" size="sm" variant="outline" onClick={exportCsv}>
+                <Download className="mr-2 h-4 w-4" />
+                Export
+              </Button>
+            </div>
           </div>
         )}
       >
