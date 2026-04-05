@@ -24,6 +24,7 @@ type SelectOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  modelCode?: string;
 };
 
 type ScopeContext = {
@@ -167,7 +168,8 @@ export function WorkPackageTemplateCreateSection({
       }
       const options = (Array.isArray(data) ? data : [])
         .map((record) => {
-          const value = String(record.model_code || record.name || record.id || '').trim();
+          const modelId = String(record.id || '').trim();
+          const value = modelId;
           if (!value) {
             return null;
           }
@@ -178,9 +180,9 @@ export function WorkPackageTemplateCreateSection({
           if (!active) {
             return null;
           }
-          return { value, label };
+          return { value, label, modelCode: code || name || modelId };
         })
-        .filter((option): option is SelectOption => Boolean(option));
+        .filter(Boolean) as SelectOption[];
       setWorkPackageTemplateAircraftModelOptions(options);
     } catch (error) {
       setWorkPackageTemplateAircraftModelOptions([]);
@@ -270,30 +272,44 @@ export function WorkPackageTemplateCreateSection({
   ]);
 
   const workPackageTemplateAircraftModelSelectOptions = useMemo<SelectOption[]>(() => {
-    const selectedModel = String(formValues.aircraft_model ?? '').trim();
-    if (!selectedModel) {
+    const selectedModelId = String(formValues.model_id ?? '').trim();
+    const selectedModelToken = String(formValues.aircraft_model ?? '').trim();
+    if (!selectedModelId && !selectedModelToken) {
       return workPackageTemplateAircraftModelOptions;
     }
-    if (workPackageTemplateAircraftModelOptions.some((option) => option.value === selectedModel)) {
+    if (selectedModelId && workPackageTemplateAircraftModelOptions.some((option) => option.value === selectedModelId)) {
       return workPackageTemplateAircraftModelOptions;
     }
-    return [{ value: selectedModel, label: selectedModel }, ...workPackageTemplateAircraftModelOptions];
-  }, [formValues.aircraft_model, workPackageTemplateAircraftModelOptions]);
+    const matchByToken = selectedModelToken
+      ? workPackageTemplateAircraftModelOptions.find((option) => {
+        const optionCode = String(option.modelCode || '').trim().toLowerCase();
+        const optionLabel = String(option.label || '').trim().toLowerCase();
+        const normalizedToken = selectedModelToken.toLowerCase();
+        return optionCode === normalizedToken || optionLabel === normalizedToken;
+      })
+      : null;
+    if (matchByToken) {
+      return workPackageTemplateAircraftModelOptions;
+    }
+    const fallbackValue = selectedModelId || selectedModelToken;
+    return [{ value: fallbackValue, label: selectedModelToken || selectedModelId, modelCode: selectedModelToken || selectedModelId }, ...workPackageTemplateAircraftModelOptions];
+  }, [formValues.aircraft_model, formValues.model_id, workPackageTemplateAircraftModelOptions]);
 
   useEffect(() => {
     if (!modalOpen) {
       return;
     }
-    const currentModel = String(formValues.aircraft_model ?? '').trim();
-    if (currentModel) {
+    const currentModelId = String(formValues.model_id ?? '').trim();
+    if (currentModelId) {
       return;
     }
     const firstOption = workPackageTemplateAircraftModelSelectOptions[0];
     if (!firstOption?.value) {
       return;
     }
-    setFieldValue('aircraft_model', firstOption.value);
-  }, [formValues.aircraft_model, modalOpen, setFieldValue, workPackageTemplateAircraftModelSelectOptions]);
+    setFieldValue('model_id', firstOption.value);
+    setFieldValue('aircraft_model', firstOption.modelCode || firstOption.label || firstOption.value);
+  }, [formValues.model_id, modalOpen, setFieldValue, workPackageTemplateAircraftModelSelectOptions]);
 
   const selectedWorkPackageAircraftModelTaskItems = useMemo(() => {
     const selectedModelValue = String(formValues.aircraft_model ?? '').trim().toLowerCase();
@@ -559,13 +575,18 @@ export function WorkPackageTemplateCreateSection({
               <Label htmlFor="wpt-aircraft-model" className="text-[12px] font-medium text-slate-700">Aircraft Model</Label>
               <select
                 id="wpt-aircraft-model"
-                value={String(formValues.aircraft_model ?? '')}
-                onChange={(event) => setFieldValue('aircraft_model', event.target.value)}
+                value={String(formValues.model_id ?? '')}
+                onChange={(event) => {
+                  const selectedModelId = String(event.target.value || '').trim();
+                  const option = workPackageTemplateAircraftModelSelectOptions.find((entry) => entry.value === selectedModelId);
+                  setFieldValue('model_id', selectedModelId);
+                  setFieldValue('aircraft_model', option?.modelCode || option?.label || selectedModelId);
+                }}
                 className={cn(
                   'h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800',
-                  formErrors.aircraft_model && 'border-destructive',
+                  (formErrors.aircraft_model || formErrors.model_id) && 'border-destructive',
                 )}
-                aria-invalid={Boolean(formErrors.aircraft_model)}
+                aria-invalid={Boolean(formErrors.aircraft_model || formErrors.model_id)}
                 disabled={workPackageTemplateAircraftModelOptionsLoading}
               >
                 <option value="" hidden />
@@ -581,6 +602,7 @@ export function WorkPackageTemplateCreateSection({
               ) : null}
               {workPackageTemplateAircraftModelOptionsError ? <p className="mdm-template-danger">{workPackageTemplateAircraftModelOptionsError}</p> : null}
               {formErrors.aircraft_model ? <p className="mdm-template-danger">{formErrors.aircraft_model}</p> : null}
+              {formErrors.model_id ? <p className="mdm-template-danger">{formErrors.model_id}</p> : null}
             </div>
             <div className="space-y-1">
               <Label htmlFor="wpt-maintenance-type" className="text-[12px] font-medium text-slate-700">Maintenance Type</Label>
