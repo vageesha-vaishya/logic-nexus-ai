@@ -41,20 +41,42 @@ type UimDataListProps<TRecord> = {
   modeBadgeLabel?: string;
   onReplayNow?: () => void;
   replayLoading?: boolean;
+  defaultVisibleColumnKeys?: string[];
+  showFieldSelector?: boolean;
 };
 
 type SortState = { key: string; direction: 'asc' | 'desc' };
 
-function loadVisibleColumns(storageKey: string, columns: UimDataListColumn<any>[]): string[] {
+function loadVisibleColumns(
+  storageKey: string,
+  columns: UimDataListColumn<any>[],
+  defaultVisibleColumnKeys?: string[],
+): string[] {
   if (typeof window === 'undefined') return columns.map((column) => column.key);
   try {
     const parsed = JSON.parse(window.localStorage.getItem(storageKey) || 'null');
-    if (!Array.isArray(parsed)) return columns.map((column) => column.key);
+    if (!Array.isArray(parsed)) {
+      const known = new Set(columns.map((column) => column.key));
+      const defaults = (defaultVisibleColumnKeys || []).filter((key) => known.has(key));
+      return defaults.length > 0 ? defaults : columns.map((column) => column.key);
+    }
     const known = new Set(columns.map((column) => column.key));
     const filtered = parsed.map((key) => String(key)).filter((key) => known.has(key));
     return filtered.length > 0 ? filtered : columns.map((column) => column.key);
   } catch {
-    return columns.map((column) => column.key);
+    const known = new Set(columns.map((column) => column.key));
+    const defaults = (defaultVisibleColumnKeys || []).filter((key) => known.has(key));
+    return defaults.length > 0 ? defaults : columns.map((column) => column.key);
+  }
+}
+
+function loadManualSelectionFlag(storageKey: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(`${storageKey}:meta`) || 'null');
+    return Boolean(parsed?.manual);
+  } catch {
+    return false;
   }
 }
 
@@ -85,24 +107,27 @@ export function UimDataList<TRecord>({
   modeBadgeLabel,
   onReplayNow,
   replayLoading = false,
+  defaultVisibleColumnKeys = [],
+  showFieldSelector = true,
 }: UimDataListProps<TRecord>) {
   const [sortStates, setSortStates] = useState<SortState[]>([]);
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
   const [columnSelectionError, setColumnSelectionError] = useState<string | null>(null);
-  const columnStorageKey = `uim-data-list-visible-columns:${exportFileName}`;
+  const columnStorageKey = `uim-data-list-visible-columns:v3:${exportFileName}`;
   const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(
-    () => loadVisibleColumns(columnStorageKey, columns),
+    () => loadVisibleColumns(columnStorageKey, columns, defaultVisibleColumnKeys),
+  );
+  const [hasManualColumnSelection, setHasManualColumnSelection] = useState<boolean>(
+    () => loadManualSelectionFlag(columnStorageKey),
   );
 
   useEffect(() => {
     const known = new Set(columns.map((column) => column.key));
     const filtered = visibleColumnKeys.filter((key) => known.has(key));
-    const fallback = columns.map((column) => column.key);
-    const hasStoredSelection = typeof window !== 'undefined'
-      ? window.localStorage.getItem(columnStorageKey) !== null
-      : false;
-    const normalized = hasStoredSelection
+    const configuredDefaults = defaultVisibleColumnKeys.filter((key) => known.has(key));
+    const fallback = configuredDefaults.length > 0 ? configuredDefaults : columns.map((column) => column.key);
+    const normalized = hasManualColumnSelection
       ? (filtered.length > 0 ? filtered : fallback)
       : fallback;
     const hasChanged = normalized.length !== visibleColumnKeys.length
@@ -113,7 +138,7 @@ export function UimDataList<TRecord>({
         window.localStorage.setItem(columnStorageKey, JSON.stringify(normalized));
       }
     }
-  }, [columns, visibleColumnKeys, columnStorageKey]);
+  }, [columns, visibleColumnKeys, columnStorageKey, defaultVisibleColumnKeys, hasManualColumnSelection]);
 
   const visibleColumns = useMemo(
     () => columns.filter((column) => visibleColumnKeys.includes(column.key)),
@@ -170,8 +195,10 @@ export function UimDataList<TRecord>({
     }
     setColumnSelectionError(null);
     setVisibleColumnKeys(sanitized);
+    setHasManualColumnSelection(true);
     if (typeof window !== 'undefined') {
       window.localStorage.setItem(columnStorageKey, JSON.stringify(sanitized));
+      window.localStorage.setItem(`${columnStorageKey}:meta`, JSON.stringify({ manual: true }));
     }
   };
 
@@ -208,54 +235,56 @@ export function UimDataList<TRecord>({
               {statusValue !== 'all' ? <Badge variant="secondary">Status: {statusValue}</Badge> : null}
             </div>
             <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button type="button" variant="outline" size="sm" className="h-8">
-                    <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                    Fields
-                    <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-[10px]">
-                      {selectedCount}/{totalCount}
-                    </Badge>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-[320px]">
-                  <DropdownMenuLabel>Select visible fields</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  {columns.map((column) => {
-                    const checked = visibleColumnKeys.includes(column.key);
-                    return (
-                      <DropdownMenuCheckboxItem
-                        key={column.key}
-                        checked={checked}
-                        onCheckedChange={(nextChecked) => {
-                          const nextKeys = nextChecked === true
-                            ? [...visibleColumnKeys, column.key]
-                            : visibleColumnKeys.filter((key) => key !== column.key);
-                          applyColumnSelection(nextKeys);
-                        }}
-                        onSelect={(event) => event.preventDefault()}
-                      >
-                        {column.header}
-                      </DropdownMenuCheckboxItem>
-                    );
-                  })}
-                  {columnSelectionError ? (
-                    <>
-                      <DropdownMenuSeparator />
-                      <div className="px-2 py-1 text-xs text-destructive">{columnSelectionError}</div>
-                    </>
-                  ) : null}
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onSelect={(event) => {
-                      event.preventDefault();
-                      applyColumnSelection(columns.map((column) => column.key));
-                    }}
-                  >
-                    Reset to default fields
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
+              {showFieldSelector ? (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="h-8">
+                      <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                      Fields
+                      <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-[10px]">
+                        {selectedCount}/{totalCount}
+                      </Badge>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-[320px]">
+                    <DropdownMenuLabel>Select visible fields</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {columns.map((column) => {
+                      const checked = visibleColumnKeys.includes(column.key);
+                      return (
+                        <DropdownMenuCheckboxItem
+                          key={column.key}
+                          checked={checked}
+                          onCheckedChange={(nextChecked) => {
+                            const nextKeys = nextChecked === true
+                              ? [...visibleColumnKeys, column.key]
+                              : visibleColumnKeys.filter((key) => key !== column.key);
+                            applyColumnSelection(nextKeys);
+                          }}
+                          onSelect={(event) => event.preventDefault()}
+                        >
+                          {column.header}
+                        </DropdownMenuCheckboxItem>
+                      );
+                    })}
+                    {columnSelectionError ? (
+                      <>
+                        <DropdownMenuSeparator />
+                        <div className="px-2 py-1 text-xs text-destructive">{columnSelectionError}</div>
+                      </>
+                    ) : null}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onSelect={(event) => {
+                        event.preventDefault();
+                        applyColumnSelection(columns.map((column) => column.key));
+                      }}
+                    >
+                      Reset to default fields
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              ) : null}
               {onReplayNow ? (
                 <Button type="button" size="sm" variant="outline" onClick={onReplayNow} disabled={replayLoading}>
                   <RefreshCcw className="mr-2 h-4 w-4" />

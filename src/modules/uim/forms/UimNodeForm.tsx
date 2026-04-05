@@ -810,19 +810,6 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     return current;
   };
 
-  const collectPayloadPaths = (payload: Record<string, unknown>): string[] => {
-    const keys = new Set<string>();
-    for (const [key, value] of Object.entries(payload)) {
-      keys.add(key);
-      if (value && typeof value === 'object' && !Array.isArray(value)) {
-        for (const childKey of Object.keys(value as Record<string, unknown>)) {
-          keys.add(`${key}.${childKey}`);
-        }
-      }
-    }
-    return [...keys];
-  };
-
   const filteredRecords = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
     return records.filter((record) => {
@@ -845,16 +832,10 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
       widthClassName: 'w-[140px]',
       render: (record) => String(record.id || '').slice(0, 8),
     }];
-    const payloadFieldSet = new Set<string>();
-    for (const record of records) {
-      const payload = (record.payload || {}) as Record<string, unknown>;
-      for (const key of collectPayloadPaths(payload)) payloadFieldSet.add(key);
-    }
-
     const fromCatalog = (moduleColumnCatalog || []).filter((column) => {
       if (column.key === 'id' || column.key === 'updated_at') return false;
       if (column.key === 'status') return true;
-      return payloadFieldSet.has(column.key) || records.length === 0;
+      return true;
     }).map<UimDataListColumn<Record<string, unknown>>>((column) => ({
       key: column.key,
       header: column.header,
@@ -902,6 +883,25 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
 
     return [...baseColumns, ...statusAndUpdated, ...fromCatalog, ...fallbackSummary];
   }, [records, moduleColumnCatalog]);
+
+  const defaultVisibleColumnKeys = useMemo(() => {
+    const keys = listColumns.map((column) => column.key);
+    const has = (key: string) => keys.includes(key);
+    const moduleDefaults: Record<UimNodeKey, string[]> = {
+      overview: ['module_name', 'owner_email', 'rollout_phase', 'target_go_live_date', 'status', 'updated_at'],
+      'item-master': ['sku', 'part_number', 'item_name', 'category', 'status', 'updated_at'],
+      'stock-ledger': ['item_id', 'transaction_type', 'quantity_delta', 'referenced_module', 'status', 'updated_at'],
+      reservations: ['reservation_token', 'item_id', 'requested_quantity', 'reservation_status', 'expected_use_date', 'updated_at'],
+      'issue-consume': ['item_id', 'transaction_type', 'quantity_delta', 'reference', 'status', 'updated_at'],
+      restock: ['item_id', 'transaction_type', 'quantity_delta', 'reference', 'status', 'updated_at'],
+      locations: ['location_code', 'location_name', 'location_type', 'quantity', 'status', 'updated_at'],
+      analytics: ['report_name', 'metric_group', 'catalog_items', 'inventory_items', 'projection_snapshots', 'updated_at'],
+    };
+    const configured = (moduleDefaults[node] || []).filter(has);
+    if (configured.length >= 6) return configured.slice(0, 6);
+    const append = keys.filter((key) => !configured.includes(key));
+    return [...configured, ...append].slice(0, Math.min(6, keys.length));
+  }, [listColumns, node]);
 
   const analyticsPhase4Prep = analyticsKpiPayload?.phase4_prep || null;
   const analyticsSequence = analyticsPhase4Prep?.sequence || [];
@@ -1074,6 +1074,7 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
           onRowDoubleClick={(record) => handleSelectRecord(String(record.id || ''), record, 'double')}
           columns={listColumns}
           exportFileName={`uim-${node}-records.csv`}
+          defaultVisibleColumnKeys={defaultVisibleColumnKeys}
           modeBadgeLabel={projectionBacked ? 'Projection Mode' : undefined}
           onReplayNow={projectionBacked ? handleReplayNow : undefined}
           replayLoading={isReplayingProjection}

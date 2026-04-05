@@ -234,8 +234,18 @@ function collectPayloadKeys(payload) {
   return [...keys];
 }
 
-function schemaDrivenCatalog(records) {
-  const keys = new Set(['id', 'tenant_id', 'franchise_id', 'updated_at']);
+function schemaDrivenCatalog(records, node) {
+  const baselineByNode = {
+    overview: ['module_name', 'owner_email', 'rollout_phase', 'target_go_live_date', 'status', 'updated_at'],
+    'item-master': ['sku', 'part_number', 'item_name', 'category', 'status', 'updated_at'],
+    'stock-ledger': ['item_id', 'transaction_type', 'quantity_delta', 'referenced_module', 'status', 'updated_at'],
+    reservations: ['reservation_token', 'item_id', 'requested_quantity', 'reservation_status', 'expected_use_date', 'updated_at'],
+    'issue-consume': ['item_id', 'transaction_type', 'quantity_delta', 'reference', 'status', 'updated_at'],
+    restock: ['item_id', 'transaction_type', 'quantity_delta', 'reference', 'status', 'updated_at'],
+    locations: ['location_code', 'location_name', 'location_type', 'quantity', 'status', 'updated_at'],
+    analytics: ['report_name', 'metric_group', 'catalog_items', 'inventory_items', 'projection_snapshots', 'updated_at'],
+  };
+  const keys = new Set(['id', 'tenant_id', 'franchise_id', 'updated_at', ...(baselineByNode[node] || [])]);
   for (const record of (records || [])) {
     for (const key of collectPayloadKeys(record.payload || {})) keys.add(key);
   }
@@ -253,7 +263,7 @@ async function listDatabaseBackedUimFormRecords(req, node, limit, offset) {
     limit,
     offset,
     source,
-    column_catalog: schemaDrivenCatalog(records || []),
+    column_catalog: schemaDrivenCatalog(records || [], node),
     records,
   });
 
