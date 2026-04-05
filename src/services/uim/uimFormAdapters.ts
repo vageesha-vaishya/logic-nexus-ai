@@ -35,6 +35,12 @@ export async function listUimEntities(node: UimNodeKey, limit = 25, offset = 0):
     limit: number;
     offset: number;
     node_key: UimNodeKey;
+    source?: 'canonical' | 'form-storage';
+    column_catalog?: Array<{
+      key: string;
+      header: string;
+      sortable?: boolean;
+    }>;
   };
 }> {
   return uimApiRequest({

@@ -1,7 +1,16 @@
-import { useMemo, useState } from 'react';
-import { ArrowDown, ArrowUp, ArrowUpDown, Download, RefreshCcw } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, Download, RefreshCcw, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import {
+  DropdownMenu,
+  DropdownMenuCheckboxItem,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { AircraftDataTableFrame } from '@/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftDataTableFrame';
 import { AircraftListingControls } from '@/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftListingControls';
@@ -25,6 +34,7 @@ type UimDataListProps<TRecord> = {
   onClearFilters: () => void;
   onCreate: () => void;
   onRowClick: (record: TRecord) => void;
+  onRowDoubleClick?: (record: TRecord) => void;
   columns: UimDataListColumn<TRecord>[];
   statusOptions?: Array<{ value: string; label: string }>;
   exportFileName: string;
@@ -33,7 +43,20 @@ type UimDataListProps<TRecord> = {
   replayLoading?: boolean;
 };
 
-type SortState = { key: string; direction: 'asc' | 'desc' } | null;
+type SortState = { key: string; direction: 'asc' | 'desc' };
+
+function loadVisibleColumns(storageKey: string, columns: UimDataListColumn<any>[]): string[] {
+  if (typeof window === 'undefined') return columns.map((column) => column.key);
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(storageKey) || 'null');
+    if (!Array.isArray(parsed)) return columns.map((column) => column.key);
+    const known = new Set(columns.map((column) => column.key));
+    const filtered = parsed.map((key) => String(key)).filter((key) => known.has(key));
+    return filtered.length > 0 ? filtered : columns.map((column) => column.key);
+  } catch {
+    return columns.map((column) => column.key);
+  }
+}
 
 function normalize(value: string): string {
   return String(value || '').toLowerCase();
@@ -50,6 +73,7 @@ export function UimDataList<TRecord>({
   onClearFilters,
   onCreate,
   onRowClick,
+  onRowDoubleClick,
   columns,
   statusOptions = [
     { value: 'all', label: 'All' },
@@ -62,31 +86,66 @@ export function UimDataList<TRecord>({
   onReplayNow,
   replayLoading = false,
 }: UimDataListProps<TRecord>) {
-  const [sortState, setSortState] = useState<SortState>(null);
+  const [sortStates, setSortStates] = useState<SortState[]>([]);
   const [page, setPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(25);
+  const [columnSelectionError, setColumnSelectionError] = useState<string | null>(null);
+  const columnStorageKey = `uim-data-list-visible-columns:${exportFileName}`;
+  const [visibleColumnKeys, setVisibleColumnKeys] = useState<string[]>(
+    () => loadVisibleColumns(columnStorageKey, columns),
+  );
+
+  useEffect(() => {
+    const known = new Set(columns.map((column) => column.key));
+    const filtered = visibleColumnKeys.filter((key) => known.has(key));
+    const fallback = columns.map((column) => column.key);
+    const hasStoredSelection = typeof window !== 'undefined'
+      ? window.localStorage.getItem(columnStorageKey) !== null
+      : false;
+    const normalized = hasStoredSelection
+      ? (filtered.length > 0 ? filtered : fallback)
+      : fallback;
+    const hasChanged = normalized.length !== visibleColumnKeys.length
+      || normalized.some((key, index) => key !== visibleColumnKeys[index]);
+    if (hasChanged) {
+      setVisibleColumnKeys(normalized);
+      if (typeof window !== 'undefined') {
+        window.localStorage.setItem(columnStorageKey, JSON.stringify(normalized));
+      }
+    }
+  }, [columns, visibleColumnKeys, columnStorageKey]);
+
+  const visibleColumns = useMemo(
+    () => columns.filter((column) => visibleColumnKeys.includes(column.key)),
+    [columns, visibleColumnKeys],
+  );
 
   const sorted = useMemo(() => {
-    if (!sortState) return records;
-    const targetColumn = columns.find((column) => column.key === sortState.key);
-    if (!targetColumn) return records;
+    if (sortStates.length === 0) return records;
     const sortedRecords = [...records].sort((left, right) => {
-      const l = normalize(targetColumn.render(left));
-      const r = normalize(targetColumn.render(right));
-      if (l === r) return 0;
-      return l > r ? 1 : -1;
+      for (const state of sortStates) {
+        const targetColumn = columns.find((column) => column.key === state.key);
+        if (!targetColumn) continue;
+        const l = normalize(targetColumn.render(left));
+        const r = normalize(targetColumn.render(right));
+        if (l === r) continue;
+        const cmp = l > r ? 1 : -1;
+        return state.direction === 'desc' ? cmp * -1 : cmp;
+      }
+      return 0;
     });
-    return sortState.direction === 'desc' ? sortedRecords.reverse() : sortedRecords;
-  }, [records, sortState, columns]);
+    return sortedRecords;
+  }, [records, sortStates, columns]);
 
   const maxPage = Math.max(1, Math.ceil(sorted.length / pageSize));
   const clampedPage = Math.min(page, maxPage);
   const paged = sorted.slice((clampedPage - 1) * pageSize, clampedPage * pageSize);
 
   const exportCsv = () => {
-    const headerLine = columns.map((column) => `"${column.header.replace(/"/g, '""')}"`).join(',');
+    const targetColumns = visibleColumns.length > 0 ? visibleColumns : columns;
+    const headerLine = targetColumns.map((column) => `"${column.header.replace(/"/g, '""')}"`).join(',');
     const body = sorted.map((record) =>
-      columns.map((column) => `"${column.render(record).replace(/"/g, '""')}"`).join(','),
+      targetColumns.map((column) => `"${column.render(record).replace(/"/g, '""')}"`).join(','),
     );
     const csv = [headerLine, ...body].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' });
@@ -99,6 +158,22 @@ export function UimDataList<TRecord>({
   };
 
   const summaryText = `${sorted.length}/${total} records`;
+  const selectedCount = (visibleColumns.length > 0 ? visibleColumns.length : columns.length);
+  const totalCount = columns.length;
+
+  const applyColumnSelection = (nextKeys: string[]) => {
+    const known = new Set(columns.map((column) => column.key));
+    const sanitized = nextKeys.filter((key) => known.has(key));
+    if (sanitized.length === 0) {
+      setColumnSelectionError('At least one field must remain visible.');
+      return;
+    }
+    setColumnSelectionError(null);
+    setVisibleColumnKeys(sanitized);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(columnStorageKey, JSON.stringify(sanitized));
+    }
+  };
 
   return (
     <div data-testid="uim-data-list">
@@ -133,6 +208,54 @@ export function UimDataList<TRecord>({
               {statusValue !== 'all' ? <Badge variant="secondary">Status: {statusValue}</Badge> : null}
             </div>
             <div className="flex items-center gap-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="h-8">
+                    <SlidersHorizontal className="mr-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                    Fields
+                    <Badge variant="secondary" className="ml-2 px-1.5 py-0 text-[10px]">
+                      {selectedCount}/{totalCount}
+                    </Badge>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-[320px]">
+                  <DropdownMenuLabel>Select visible fields</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {columns.map((column) => {
+                    const checked = visibleColumnKeys.includes(column.key);
+                    return (
+                      <DropdownMenuCheckboxItem
+                        key={column.key}
+                        checked={checked}
+                        onCheckedChange={(nextChecked) => {
+                          const nextKeys = nextChecked === true
+                            ? [...visibleColumnKeys, column.key]
+                            : visibleColumnKeys.filter((key) => key !== column.key);
+                          applyColumnSelection(nextKeys);
+                        }}
+                        onSelect={(event) => event.preventDefault()}
+                      >
+                        {column.header}
+                      </DropdownMenuCheckboxItem>
+                    );
+                  })}
+                  {columnSelectionError ? (
+                    <>
+                      <DropdownMenuSeparator />
+                      <div className="px-2 py-1 text-xs text-destructive">{columnSelectionError}</div>
+                    </>
+                  ) : null}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onSelect={(event) => {
+                      event.preventDefault();
+                      applyColumnSelection(columns.map((column) => column.key));
+                    }}
+                  >
+                    Reset to default fields
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               {onReplayNow ? (
                 <Button type="button" size="sm" variant="outline" onClick={onReplayNow} disabled={replayLoading}>
                   <RefreshCcw className="mr-2 h-4 w-4" />
@@ -150,9 +273,11 @@ export function UimDataList<TRecord>({
         <Table>
           <TableHeader>
             <TableRow>
-              {columns.map((column) => {
-                const isSorted = sortState?.key === column.key;
-                const icon = !column.sortable ? null : !isSorted ? <ArrowUpDown className="h-3.5 w-3.5" /> : sortState?.direction === 'asc'
+              {(visibleColumns.length > 0 ? visibleColumns : columns).map((column) => {
+                const sortIndex = sortStates.findIndex((state) => state.key === column.key);
+                const isSorted = sortIndex >= 0;
+                const direction = isSorted ? sortStates[sortIndex]?.direction : null;
+                const icon = !column.sortable ? null : !isSorted ? <ArrowUpDown className="h-3.5 w-3.5" /> : direction === 'asc'
                   ? <ArrowUp className="h-3.5 w-3.5" />
                   : <ArrowDown className="h-3.5 w-3.5" />;
                 return (
@@ -160,16 +285,22 @@ export function UimDataList<TRecord>({
                     <button
                       type="button"
                       className={`inline-flex items-center gap-1 ${column.sortable ? 'hover:text-foreground' : ''}`}
-                      onClick={() => {
+                      onClick={(event) => {
                         if (!column.sortable) return;
-                        setSortState((current) => {
-                          if (!current || current.key !== column.key) return { key: column.key, direction: 'asc' };
-                          return { key: column.key, direction: current.direction === 'asc' ? 'desc' : 'asc' };
+                        setSortStates((current) => {
+                          const existing = current.find((state) => state.key === column.key);
+                          const nextDirection: 'asc' | 'desc' = existing?.direction === 'asc' ? 'desc' : 'asc';
+                          if (event.shiftKey) {
+                            const without = current.filter((state) => state.key !== column.key);
+                            return [...without, { key: column.key, direction: nextDirection }];
+                          }
+                          return [{ key: column.key, direction: nextDirection }];
                         });
                       }}
                     >
                       <span>{column.header}</span>
                       {icon}
+                      {isSorted ? <span className="text-[10px] text-muted-foreground">#{sortIndex + 1}</span> : null}
                     </button>
                   </TableHead>
                 );
@@ -179,7 +310,7 @@ export function UimDataList<TRecord>({
           <TableBody>
             {paged.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={columns.length} className="text-sm text-muted-foreground">
+                <TableCell colSpan={(visibleColumns.length > 0 ? visibleColumns : columns).length} className="text-sm text-muted-foreground">
                   {loading ? 'Loading records...' : 'No records found'}
                 </TableCell>
               </TableRow>
@@ -188,8 +319,9 @@ export function UimDataList<TRecord>({
                 key={`record-${index}`}
                 className="cursor-pointer hover:bg-primary/5"
                 onClick={() => onRowClick(record)}
+                onDoubleClick={() => onRowDoubleClick?.(record)}
               >
-                {columns.map((column) => (
+                {(visibleColumns.length > 0 ? visibleColumns : columns).map((column) => (
                   <TableCell key={column.key}>{column.render(record)}</TableCell>
                 ))}
               </TableRow>
@@ -197,9 +329,25 @@ export function UimDataList<TRecord>({
           </TableBody>
         </Table>
         <div className="flex items-center justify-between border-t border-[hsl(var(--mdm-template-border))] px-3 py-2">
-          <span className="text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs text-muted-foreground">
             Page {clampedPage} of {maxPage}
-          </span>
+            <span>|</span>
+            <label className="inline-flex items-center gap-1">
+              <span>Rows</span>
+              <select
+                className="rounded border bg-background px-1 py-0.5 text-xs"
+                value={pageSize}
+                onChange={(event) => {
+                  setPage(1);
+                  setPageSize(Number(event.target.value));
+                }}
+              >
+                {[10, 25, 50, 100].map((size) => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </label>
+          </div>
           <div className="flex items-center gap-2">
             <Button type="button" size="sm" variant="outline" onClick={() => setPage((p) => Math.max(1, p - 1))} disabled={clampedPage <= 1}>
               Prev

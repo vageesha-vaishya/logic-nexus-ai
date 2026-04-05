@@ -260,6 +260,7 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
   const config = useMemo(() => uimNodeConfigs[node], [node]);
   const [activeRecord, setActiveRecord] = useState<Record<string, unknown> | null>(existingEntity || null);
   const [records, setRecords] = useState<Array<Record<string, unknown>>>([]);
+  const [moduleColumnCatalog, setModuleColumnCatalog] = useState<Array<{ key: string; header: string; sortable?: boolean }>>([]);
   const [isLoadingRecords, setIsLoadingRecords] = useState(false);
   const [recordsError, setRecordsError] = useState<string | null>(null);
   const [searchValue, setSearchValue] = useState('');
@@ -267,6 +268,7 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
   const [lastLoadDurationMs, setLastLoadDurationMs] = useState(0);
   const [autoRetryAttempt, setAutoRetryAttempt] = useState(0);
   const [isReplayingProjection, setIsReplayingProjection] = useState(false);
+  const [isOpeningRecord, setIsOpeningRecord] = useState(false);
   const [analyticsLoading, setAnalyticsLoading] = useState(false);
   const [analyticsError, setAnalyticsError] = useState<string | null>(null);
   const [analyticsKpiPayload, setAnalyticsKpiPayload] = useState<UimAnalyticsKpiResponsePayload | null>(null);
@@ -288,6 +290,68 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     existingEntity: activeRecord,
   });
   const formErrors = Object.values(form.formState.errors).map((error) => String(error?.message || '')).filter(Boolean);
+  const itemIdValue = String(form.watch('item_id') || '');
+
+  const itemOptions = useMemo(() => {
+    const map = new Map<string, { id: string; label: string; available: number; reorderPoint: number }>();
+    for (const record of records) {
+      const id = String(record.id || '').trim();
+      if (!id) continue;
+      const payload = (record.payload || {}) as Record<string, unknown>;
+      const label = [
+        String(payload.part_number || '').trim(),
+        String(payload.item_name || payload.title || '').trim(),
+        String(payload.sku || '').trim(),
+      ].filter(Boolean).join(' | ') || id;
+      const available = Number(payload.available_quantity || payload.projected_available_quantity || payload.current_quantity || 0);
+      const reorderPoint = Number(payload.reorder_point || 0);
+      map.set(id, { id, label, available, reorderPoint });
+    }
+    return [...map.values()];
+  }, [records]);
+
+  const dynamicFields = useMemo(() => {
+    const itemFieldNodes: UimNodeKey[] = ['stock-ledger', 'reservations', 'issue-consume', 'restock'];
+    return config.fields.map((field) => {
+      if (field.name === 'item_id' && itemFieldNodes.includes(node)) {
+        return {
+          ...field,
+          type: 'select' as const,
+          options: itemOptions.map((option) => ({
+            value: option.id,
+            labelKey: `uim.forms.dynamic.item.${option.id}`,
+            labelDefault: option.label,
+          })),
+        };
+      }
+      return field;
+    });
+  }, [config.fields, itemOptions, node]);
+
+  useEffect(() => {
+    if (!itemIdValue) return;
+    const selected = itemOptions.find((option) => option.id === itemIdValue);
+    if (!selected) return;
+    if (node === 'reservations') {
+      form.setValue('available_quantity', selected.available, { shouldValidate: true, shouldDirty: true });
+    }
+    if (node === 'issue-consume') {
+      form.setValue('available_before_issue', selected.available, { shouldValidate: true, shouldDirty: true });
+    }
+    if (node === 'restock') {
+      form.setValue('current_quantity', selected.available, { shouldValidate: true, shouldDirty: true });
+      if (Number(form.getValues('reorder_point') || 0) <= 0 && selected.reorderPoint > 0) {
+        form.setValue('reorder_point', selected.reorderPoint, { shouldValidate: true, shouldDirty: true });
+      }
+    }
+  }, [itemIdValue, itemOptions, node, form]);
+
+  const fkValidationFailed = useMemo(() => {
+    const itemFieldNodes: UimNodeKey[] = ['stock-ledger', 'reservations', 'issue-consume', 'restock'];
+    if (!itemFieldNodes.includes(node)) return false;
+    if (!itemIdValue) return false;
+    return !itemOptions.some((option) => option.id === itemIdValue);
+  }, [node, itemIdValue, itemOptions]);
 
   const loadRecords = useCallback(async () => {
     setIsLoadingRecords(true);
@@ -302,6 +366,21 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
             const projectionResponse = await queryUimProjectionItems(200, 0);
             const snapshots = Array.isArray(projectionResponse?.output?.snapshots) ? projectionResponse.output.snapshots : [];
             if (snapshots.length > 0) {
+              const projectionColumnCatalog = [
+                { key: 'id', header: 'Inventory ID', sortable: true },
+                { key: 'part_number', header: 'Part Number', sortable: true },
+                { key: 'title', header: 'Title', sortable: true },
+                { key: 'sku', header: 'SKU', sortable: true },
+                { key: 'maintenance_category', header: 'Maintenance Category', sortable: true },
+                { key: 'ata_chapter_code', header: 'ATA Chapter', sortable: true },
+                { key: 'condition_code', header: 'Condition', sortable: true },
+                { key: 'certification_status', header: 'Certification', sortable: true },
+                { key: 'projected_available_quantity', header: 'Available Qty', sortable: true },
+                { key: 'projected_reserved_quantity', header: 'Reserved Qty', sortable: true },
+                { key: 'projected_consumed_quantity', header: 'Consumed Qty', sortable: true },
+                { key: 'updated_at', header: 'Updated At', sortable: true },
+              ];
+              setModuleColumnCatalog(projectionColumnCatalog);
               loadedRecords = snapshots.map((row) => {
                 const rowRecord = row as Record<string, unknown>;
                 const partNumber = String(rowRecord.part_number || '').trim();
@@ -332,10 +411,12 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
             } else {
               // Fallback to form-record source when franchise-scoped snapshots are not available yet.
               const response = await listUimEntities(node, 200, 0);
+              setModuleColumnCatalog(response?.output?.column_catalog || []);
               loadedRecords = Array.isArray(response?.output?.records) ? response.output.records : [];
             }
           } else {
             const response = await listUimEntities(node, 200, 0);
+            setModuleColumnCatalog(response?.output?.column_catalog || []);
             loadedRecords = Array.isArray(response?.output?.records) ? response.output.records : [];
           }
           break;
@@ -718,6 +799,30 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     return String(value || 'active');
   };
 
+  const readPayloadPathValue = (payload: Record<string, unknown>, path: string): unknown => {
+    if (!path.includes('.')) return payload[path];
+    const parts = path.split('.');
+    let current: unknown = payload;
+    for (const part of parts) {
+      if (!current || typeof current !== 'object') return undefined;
+      current = (current as Record<string, unknown>)[part];
+    }
+    return current;
+  };
+
+  const collectPayloadPaths = (payload: Record<string, unknown>): string[] => {
+    const keys = new Set<string>();
+    for (const [key, value] of Object.entries(payload)) {
+      keys.add(key);
+      if (value && typeof value === 'object' && !Array.isArray(value)) {
+        for (const childKey of Object.keys(value as Record<string, unknown>)) {
+          keys.add(`${key}.${childKey}`);
+        }
+      }
+    }
+    return [...keys];
+  };
+
   const filteredRecords = useMemo(() => {
     const query = searchValue.trim().toLowerCase();
     return records.filter((record) => {
@@ -732,39 +837,71 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     });
   }, [records, searchValue, statusValue]);
 
-  const listColumns = useMemo<UimDataListColumn<Record<string, unknown>>[]>(() => ([
-    {
+  const listColumns = useMemo<UimDataListColumn<Record<string, unknown>>[]>(() => {
+    const baseColumns: UimDataListColumn<Record<string, unknown>>[] = [{
       key: 'id',
       header: 'Record ID',
       sortable: true,
       widthClassName: 'w-[140px]',
       render: (record) => String(record.id || '').slice(0, 8),
-    },
-    {
-      key: 'status',
-      header: 'Status',
-      sortable: true,
-      widthClassName: 'w-[140px]',
-      render: (record) => readStatusValue(record),
-    },
-    {
-      key: 'updated_at',
-      header: 'Updated',
-      sortable: true,
-      widthClassName: 'w-[220px]',
-      render: (record) => String(record.updated_at || '-'),
-    },
-    {
-      key: 'summary',
-      header: 'Summary',
-      sortable: false,
+    }];
+    const payloadFieldSet = new Set<string>();
+    for (const record of records) {
+      const payload = (record.payload || {}) as Record<string, unknown>;
+      for (const key of collectPayloadPaths(payload)) payloadFieldSet.add(key);
+    }
+
+    const fromCatalog = (moduleColumnCatalog || []).filter((column) => {
+      if (column.key === 'id' || column.key === 'updated_at') return false;
+      if (column.key === 'status') return true;
+      return payloadFieldSet.has(column.key) || records.length === 0;
+    }).map<UimDataListColumn<Record<string, unknown>>>((column) => ({
+      key: column.key,
+      header: column.header,
+      sortable: column.sortable !== false,
       render: (record) => {
+        if (column.key === 'updated_at') return String(record.updated_at || '-');
+        if (column.key === 'status') return readStatusValue(record);
         const payload = (record.payload || {}) as Record<string, unknown>;
-        const display = Object.values(payload).find((value) => String(value || '').trim().length > 0);
-        return String(display || '-');
+        const value = readPayloadPathValue(payload, column.key);
+        if (value === null || value === undefined || value === '') return '-';
+        if (typeof value === 'object') return JSON.stringify(value);
+        return String(value);
       },
-    },
-  ]), []);
+    }));
+
+    const statusAndUpdated = [
+      {
+        key: 'status',
+        header: 'Status',
+        sortable: true,
+        widthClassName: 'w-[140px]',
+        render: (record: Record<string, unknown>) => readStatusValue(record),
+      },
+      {
+        key: 'updated_at',
+        header: 'Updated',
+        sortable: true,
+        widthClassName: 'w-[220px]',
+        render: (record: Record<string, unknown>) => String(record.updated_at || '-'),
+      },
+    ].filter((column) => !fromCatalog.some((entry) => entry.key === column.key));
+
+    const fallbackSummary: UimDataListColumn<Record<string, unknown>>[] = fromCatalog.length > 0
+      ? []
+      : [{
+        key: 'summary',
+        header: 'Summary',
+        sortable: false,
+        render: (record) => {
+          const payload = (record.payload || {}) as Record<string, unknown>;
+          const display = Object.values(payload).find((value) => String(value || '').trim().length > 0);
+          return String(display || '-');
+        },
+      }];
+
+    return [...baseColumns, ...statusAndUpdated, ...fromCatalog, ...fallbackSummary];
+  }, [records, moduleColumnCatalog]);
 
   const analyticsPhase4Prep = analyticsKpiPayload?.phase4_prep || null;
   const analyticsSequence = analyticsPhase4Prep?.sequence || [];
@@ -840,13 +977,25 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     reset();
   };
 
-  const handleSelectRecord = async (recordId: string, record?: Record<string, unknown>) => {
+  const handleSelectRecord = async (
+    recordId: string,
+    record?: Record<string, unknown>,
+    openMode: 'single' | 'double' = 'single',
+  ) => {
+    if (openMode === 'double') setIsOpeningRecord(true);
     if (projectionBacked && record) {
       const payload = (record.payload || {}) as Record<string, unknown>;
       setActiveRecord({
         ...payload,
         inventory_item_id: record.id || '',
       });
+      if (openMode === 'double') {
+        toast({
+          title: 'Record opened in edit mode',
+          description: 'The selected record is ready for updates.',
+        });
+      }
+      setIsOpeningRecord(false);
       return;
     }
     try {
@@ -854,8 +1003,16 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
       const selected = (response.output || {}) as Record<string, unknown>;
       const payload = (selected.payload || {}) as Record<string, unknown>;
       setActiveRecord({ id: selected.id, ...payload });
+      if (openMode === 'double') {
+        toast({
+          title: 'Record opened in edit mode',
+          description: 'The selected record is ready for updates.',
+        });
+      }
     } catch (error) {
       setRecordsError('Unable to open selected record.');
+    } finally {
+      setIsOpeningRecord(false);
     }
   };
 
@@ -914,6 +1071,7 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
           }}
           onCreate={handleCreate}
           onRowClick={(record) => handleSelectRecord(String(record.id || ''), record)}
+          onRowDoubleClick={(record) => handleSelectRecord(String(record.id || ''), record, 'double')}
           columns={listColumns}
           exportFileName={`uim-${node}-records.csv`}
           modeBadgeLabel={projectionBacked ? 'Projection Mode' : undefined}
@@ -923,6 +1081,13 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
         <p className="text-xs text-muted-foreground">
           List load latency: {Math.round(lastLoadDurationMs)} ms
         </p>
+        {isOpeningRecord ? <Progress value={45} aria-label="Opening record" /> : null}
+        {records.some((record) => {
+          const metadata = ((record.metadata || {}) as Record<string, unknown>);
+          return String(metadata.mode || '') === 'derived-canonical';
+        }) ? (
+          <Badge variant="secondary">Derived from canonical inventory</Badge>
+        ) : null}
 
         {analyticsNodeActive ? (
           <div className="grid gap-4 md:grid-cols-2">
@@ -1170,7 +1335,7 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
         <Form {...form}>
           <form className="space-y-4" onSubmit={submit} noValidate>
             <div className="grid gap-4 md:grid-cols-2">
-              {config.fields.map((fieldConfig) => (
+              {dynamicFields.map((fieldConfig) => (
                 <FieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} control={form.control} t={t} />
               ))}
             </div>
@@ -1179,7 +1344,7 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
             {config.includesAddressBlock ? <AddressBlock control={form.control} /> : null}
 
             <div className="flex flex-wrap gap-2">
-              <Button type="submit" disabled={isSaving}>
+              <Button type="submit" disabled={isSaving || fkValidationFailed}>
                 <Save className="mr-2 h-4 w-4" />
                 {isEditMode ? t('uim.forms.actions.update', { defaultValue: 'Update' }) : t('uim.forms.actions.create', { defaultValue: 'Create' })}
               </Button>

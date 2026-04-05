@@ -1,7 +1,25 @@
 import { createServer } from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { createClient } from '@supabase/supabase-js';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 const PORT = Number(process.env.PORT || 3000);
+const UIM_MOCK_AUTO_SEED = String(process.env.UIM_MOCK_AUTO_SEED || '').toLowerCase() === 'true';
+const UIM_MOCK_SOURCE = String(
+  process.env.UIM_MOCK_SOURCE || (
+    process.env.VITE_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY ? 'database' : 'memory'
+  ),
+).toLowerCase();
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const supabaseAdmin = (
+  UIM_MOCK_SOURCE === 'database'
+  && process.env.VITE_SUPABASE_URL
+  && process.env.SUPABASE_SERVICE_ROLE_KEY
+) ? createClient(process.env.VITE_SUPABASE_URL, process.env.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } }) : null;
+
+let databaseTenantCache = null;
 
 const NODE_KEYS = new Set([
   'overview',
@@ -136,6 +154,391 @@ function resolveTenant(req) {
   const tenantId = String(getHeader(req, 'x-tenant-id') || 'dev-tenant');
   const franchiseId = String(getHeader(req, 'x-franchise-id') || '').trim() || null;
   return { tenantId, franchiseId };
+}
+
+async function resolveDatabaseScope(req) {
+  if (!supabaseAdmin) return resolveTenant(req);
+  const incomingTenant = String(getHeader(req, 'x-tenant-id') || '').trim();
+  const incomingFranchise = String(getHeader(req, 'x-franchise-id') || '').trim();
+  if (incomingTenant && UUID_REGEX.test(incomingTenant)) {
+    return { tenantId: incomingTenant, franchiseId: UUID_REGEX.test(incomingFranchise) ? incomingFranchise : null };
+  }
+  if (incomingTenant && !UUID_REGEX.test(incomingTenant)) {
+    const tenantByName = await supabaseAdmin
+      .from('tenants')
+      .select('id')
+      .ilike('name', incomingTenant)
+      .limit(1)
+      .maybeSingle();
+    if (tenantByName.data?.id) {
+      let franchiseId = null;
+      if (incomingFranchise) {
+        const franchiseByName = await supabaseAdmin
+          .from('franchises')
+          .select('id')
+          .eq('tenant_id', tenantByName.data.id)
+          .ilike('name', incomingFranchise)
+          .limit(1)
+          .maybeSingle();
+        if (franchiseByName.data?.id) franchiseId = String(franchiseByName.data.id);
+      }
+      return { tenantId: String(tenantByName.data.id), franchiseId };
+    }
+  }
+  if (databaseTenantCache) return databaseTenantCache;
+  const { data: tenantRow } = await supabaseAdmin
+    .from('tenants')
+    .select('id')
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  const tenantId = String(tenantRow?.id || '');
+  if (!tenantId) return { tenantId: 'deccan', franchiseId: null };
+  const { data: franchiseRow } = await supabaseAdmin
+    .from('franchises')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  databaseTenantCache = { tenantId, franchiseId: franchiseRow?.id ? String(franchiseRow.id) : null };
+  return databaseTenantCache;
+}
+
+function toIso(value) {
+  const parsed = Date.parse(String(value || ''));
+  return Number.isFinite(parsed) ? new Date(parsed).toISOString() : new Date().toISOString();
+}
+
+function toHeaderLabel(key) {
+  return String(key)
+    .replace(/\./g, ' ')
+    .replace(/_/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .split(' ')
+    .map((part) => (part ? `${part[0].toUpperCase()}${part.slice(1)}` : ''))
+    .join(' ');
+}
+
+function collectPayloadKeys(payload) {
+  const keys = new Set();
+  for (const [key, value] of Object.entries(payload || {})) {
+    keys.add(key);
+    if (value && typeof value === 'object' && !Array.isArray(value)) {
+      for (const childKey of Object.keys(value)) {
+        keys.add(`${key}.${childKey}`);
+      }
+    }
+  }
+  return [...keys];
+}
+
+function schemaDrivenCatalog(records) {
+  const keys = new Set(['id', 'tenant_id', 'franchise_id', 'updated_at']);
+  for (const record of (records || [])) {
+    for (const key of collectPayloadKeys(record.payload || {})) keys.add(key);
+  }
+  return [...keys].map((key) => ({ key, header: toHeaderLabel(key), sortable: true }));
+}
+
+async function listDatabaseBackedUimFormRecords(req, node, limit, offset) {
+  if (!supabaseAdmin) return null;
+  const scope = await resolveDatabaseScope(req);
+  const tenantId = scope.tenantId;
+  const franchiseId = scope.franchiseId || null;
+  const wrap = (records, total, source = 'canonical') => ({
+    node_key: node,
+    count: Number(total || 0),
+    limit,
+    offset,
+    source,
+    column_catalog: schemaDrivenCatalog(records || []),
+    records,
+  });
+
+  if (node === 'item-master') {
+    const { data, count, error } = await supabaseAdmin
+      .from('uim_catalog_items')
+      .select('id, sku, part_number, title, category, unit_of_measure, attributes, updated_at', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (!error && Number(count || 0) > 0) {
+      return wrap((data || []).map((row) => ({
+        id: String(row.id),
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        node_key: node,
+        payload: {
+          ...row,
+          item_name: row.title || '',
+          sku: row.sku || '',
+          part_number: row.part_number || '',
+          category: row.category || '',
+          uom: row.unit_of_measure || 'EA',
+          maintenance_category: (row.attributes || {}).maintenance_category || '',
+          ata_chapter_code: (row.attributes || {}).ata_chapter_code || '',
+          status: 'active',
+        },
+        metadata: { mode: 'derived-canonical', source: 'uim_catalog_items' },
+        created_at: toIso(row.updated_at),
+        updated_at: toIso(row.updated_at),
+      })), count);
+    }
+  }
+
+  if (node === 'stock-ledger' || node === 'issue-consume' || node === 'restock') {
+    const { data, count, error } = await supabaseAdmin
+      .from('uim_inventory_ledger')
+      .select('id, inventory_item_id, transaction_type, quantity_changed, created_at, metadata', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (!error) {
+      const filtered = (data || []).filter((row) => {
+        const tx = String(row.transaction_type || '').toUpperCase();
+        if (node === 'issue-consume') return tx === 'CONSUME';
+        if (node === 'restock') return tx === 'RECEIVE' || tx === 'ADJUST' || tx === 'RETURN';
+        return true;
+      });
+      return wrap(filtered.map((row) => ({
+        id: String(row.id),
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        node_key: node,
+        payload: {
+          ...row,
+          item_id: row.inventory_item_id || '',
+          transaction_type: row.transaction_type || '',
+          quantity_delta: Number(row.quantity_changed || 0),
+          reference: (row.metadata || {}).reference || '',
+          issued_at: toIso(row.created_at),
+          status: 'active',
+        },
+        metadata: { mode: 'derived-canonical', source: 'uim_inventory_ledger' },
+        created_at: toIso(row.created_at),
+        updated_at: toIso(row.created_at),
+      })), count);
+    }
+  }
+
+  if (node === 'reservations') {
+    const { data, count, error } = await supabaseAdmin
+      .from('uim_inventory_reservations')
+      .select('id, inventory_item_id, reserved_quantity, reservation_status, reservation_token, expected_use_date, metadata, updated_at', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (!error) {
+      return wrap((data || []).map((row) => ({
+        id: String(row.id),
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        node_key: node,
+        payload: {
+          ...row,
+          item_id: row.inventory_item_id || '',
+          requested_quantity: Number(row.reserved_quantity || 0),
+          reservation_status: row.reservation_status || 'active',
+          consumer_reference: (row.metadata || {}).consumer_reference || '',
+          expected_use_date: row.expected_use_date || '',
+          reservation_token: row.reservation_token || '',
+        },
+        metadata: { mode: 'derived-canonical', source: 'uim_inventory_reservations' },
+        created_at: toIso(row.updated_at),
+        updated_at: toIso(row.updated_at),
+      })), count);
+    }
+  }
+
+  if (node === 'locations') {
+    const { data, count, error } = await supabaseAdmin
+      .from('uim_inventory_items')
+      .select('id, location_type, metadata, updated_at', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .order('updated_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+    if (!error) {
+      return wrap((data || []).map((row, index) => ({
+        id: String(row.id || `loc-${index}`),
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        node_key: node,
+        payload: {
+          ...row,
+          location_code: String((row.metadata || {}).location_code || `UIM-${String(index + 1).padStart(4, '0')}`),
+          location_name: String((row.metadata || {}).location_name || row.location_type || 'Warehouse Location'),
+          city: String((row.metadata || {}).city || ''),
+          state_region: String((row.metadata || {}).state_region || ''),
+          country_code: String((row.metadata || {}).country_code || ''),
+        },
+        metadata: { mode: 'derived-canonical', source: 'uim_inventory_items' },
+        created_at: toIso(row.updated_at),
+        updated_at: toIso(row.updated_at),
+      })), count);
+    }
+  }
+
+  if (node === 'overview' || node === 'analytics') {
+    const [catalogCount, inventoryCount, reservationCount, projectionCount] = await Promise.all([
+      supabaseAdmin.from('uim_catalog_items').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+      supabaseAdmin.from('uim_inventory_items').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+      supabaseAdmin.from('uim_inventory_reservations').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+      supabaseAdmin.from('uim_inventory_projection_snapshots').select('id', { count: 'exact', head: true }).eq('tenant_id', tenantId),
+    ]);
+    const record = {
+      id: `${node}-${tenantId}`,
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      node_key: node,
+      payload: node === 'overview' ? {
+        module_name: 'Universal Inventory Management',
+        rollout_phase: 'phase_4',
+        notes: `catalog=${Number(catalogCount.count || 0)} inventory=${Number(inventoryCount.count || 0)} projections=${Number(projectionCount.count || 0)}`,
+      } : {
+        report_name: 'Derived UIM Tenant Snapshot',
+        metric_group: 'inventory_health',
+        catalog_items: Number(catalogCount.count || 0),
+        inventory_items: Number(inventoryCount.count || 0),
+        reservations: Number(reservationCount.count || 0),
+        projection_snapshots: Number(projectionCount.count || 0),
+      },
+      metadata: { mode: 'derived-canonical', source: 'uim_* aggregate counts' },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    return wrap([record], 1);
+  }
+
+  return wrap([], 0);
+}
+
+async function getDatabaseBackedUimFormRecord(req, node, id) {
+  if (!supabaseAdmin) return null;
+  const scope = await resolveDatabaseScope(req);
+  const tenantId = scope.tenantId;
+  const franchiseId = scope.franchiseId || null;
+
+  if (node === 'item-master') {
+    const { data, error } = await supabaseAdmin
+      .from('uim_catalog_items')
+      .select('id, sku, part_number, title, category, unit_of_measure, attributes, updated_at, created_at')
+      .eq('tenant_id', tenantId)
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      id: String(data.id),
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      node_key: node,
+      payload: {
+        item_name: data.title || '',
+        sku: data.sku || '',
+        part_number: data.part_number || '',
+        category: data.category || '',
+        uom: data.unit_of_measure || 'EA',
+        maintenance_category: (data.attributes || {}).maintenance_category || '',
+        ata_chapter_code: (data.attributes || {}).ata_chapter_code || '',
+        status: 'active',
+      },
+      metadata: { mode: 'derived-canonical', source: 'uim_catalog_items' },
+      created_at: toIso(data.created_at || data.updated_at),
+      updated_at: toIso(data.updated_at),
+    };
+  }
+
+  if (node === 'stock-ledger' || node === 'issue-consume' || node === 'restock') {
+    const { data, error } = await supabaseAdmin
+      .from('uim_inventory_ledger')
+      .select('id, inventory_item_id, transaction_type, quantity_changed, created_at, metadata')
+      .eq('tenant_id', tenantId)
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      id: String(data.id),
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      node_key: node,
+      payload: {
+        item_id: data.inventory_item_id || '',
+        transaction_type: data.transaction_type || '',
+        quantity_delta: Number(data.quantity_changed || 0),
+        reference: (data.metadata || {}).reference || '',
+        issued_at: toIso(data.created_at),
+        status: 'active',
+      },
+      metadata: { mode: 'derived-canonical', source: 'uim_inventory_ledger' },
+      created_at: toIso(data.created_at),
+      updated_at: toIso(data.created_at),
+    };
+  }
+
+  if (node === 'reservations') {
+    const { data, error } = await supabaseAdmin
+      .from('uim_inventory_reservations')
+      .select('id, inventory_item_id, reserved_quantity, reservation_status, reservation_token, expected_use_date, metadata, created_at, updated_at')
+      .eq('tenant_id', tenantId)
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      id: String(data.id),
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      node_key: node,
+      payload: {
+        item_id: data.inventory_item_id || '',
+        requested_quantity: Number(data.reserved_quantity || 0),
+        reservation_status: data.reservation_status || 'active',
+        reservation_token: data.reservation_token || '',
+        expected_use_date: data.expected_use_date || '',
+        consumer_reference: (data.metadata || {}).consumer_reference || '',
+      },
+      metadata: { mode: 'derived-canonical', source: 'uim_inventory_reservations' },
+      created_at: toIso(data.created_at || data.updated_at),
+      updated_at: toIso(data.updated_at || data.created_at),
+    };
+  }
+
+  if (node === 'locations') {
+    const { data, error } = await supabaseAdmin
+      .from('uim_inventory_items')
+      .select('id, location_type, metadata, created_at, updated_at')
+      .eq('tenant_id', tenantId)
+      .eq('id', id)
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return null;
+    return {
+      id: String(data.id),
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      node_key: node,
+      payload: {
+        location_code: String((data.metadata || {}).location_code || data.id),
+        location_name: String((data.metadata || {}).location_name || data.location_type || 'Warehouse Location'),
+        city: String((data.metadata || {}).city || ''),
+        state_region: String((data.metadata || {}).state_region || ''),
+        country_code: String((data.metadata || {}).country_code || ''),
+      },
+      metadata: { mode: 'derived-canonical', source: 'uim_inventory_items' },
+      created_at: toIso(data.created_at || data.updated_at),
+      updated_at: toIso(data.updated_at || data.created_at),
+    };
+  }
+
+  if (node === 'overview' || node === 'analytics') {
+    const list = await listDatabaseBackedUimFormRecords(req, node, 1, 0);
+    return list?.records?.[0] || null;
+  }
+
+  return null;
 }
 
 function sendJson(res, status, payload) {
@@ -414,17 +817,19 @@ function seedMockFormRecords() {
   });
 }
 
-seedMockFormRecords();
-seedTenantMroDataset({
-  tenantId: MOCK_DECCAN_TENANT_ID,
-  franchiseId: MOCK_DECCAN_FRANCHISE_ID,
-  targetCount: 800,
-});
-seedTenantMroDataset({
-  tenantId: 'dev-tenant',
-  franchiseId: null,
-  targetCount: 800,
-});
+if (UIM_MOCK_AUTO_SEED) {
+  seedMockFormRecords();
+  seedTenantMroDataset({
+    tenantId: MOCK_DECCAN_TENANT_ID,
+    franchiseId: MOCK_DECCAN_FRANCHISE_ID,
+    targetCount: 800,
+  });
+  seedTenantMroDataset({
+    tenantId: 'dev-tenant',
+    franchiseId: null,
+    targetCount: 800,
+  });
+}
 
 function readNumber(value) {
   const parsed = Number(value);
@@ -1224,6 +1629,18 @@ paths:
     const limit = Math.min(Math.max(Number.parseInt(String(url.searchParams.get('limit') || '25'), 10) || 25, 1), 200);
     const offset = Math.max(Number.parseInt(String(url.searchParams.get('offset') || '0'), 10) || 0, 0);
     const { tenantId, franchiseId } = resolveTenant(req);
+    if (UIM_MOCK_SOURCE === 'database' && supabaseAdmin) {
+      const dbOutput = await listDatabaseBackedUimFormRecords(req, node, limit, offset);
+      if (dbOutput) {
+        sendJson(res, 200, {
+          version: 'v2',
+          interface: 'uim-form-records-list',
+          correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
+          output: dbOutput,
+        });
+        return;
+      }
+    }
     let records = [...store.values()]
       .filter((record) => record.deleted_at === null)
       .filter((record) => record.tenant_id === tenantId)
@@ -1275,6 +1692,13 @@ paths:
 
   if (recordMatch && method === 'GET') {
     const [_, node, id] = recordMatch;
+    if (UIM_MOCK_SOURCE === 'database' && supabaseAdmin) {
+      const dbRecord = await getDatabaseBackedUimFormRecord(req, node, id);
+      if (dbRecord) {
+        sendJson(res, 200, { version: 'v2', interface: 'uim-form-record-read', output: dbRecord });
+        return;
+      }
+    }
     const existing = store.get(id);
     if (!existing || existing.deleted_at !== null || existing.node_key !== node) {
       sendJson(res, 404, { error: 'UIM form record not found', code: 'UIM_FORM_RECORD_NOT_FOUND', version: 'v2' });

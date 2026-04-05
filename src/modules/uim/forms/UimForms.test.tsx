@@ -170,4 +170,120 @@ describe('UIM form suite', () => {
     expect(screen.getByRole('link', { name: 'Open OpenAPI YAML' })).toBeInTheDocument();
     expect(screen.getByText('Error Details')).toBeInTheDocument();
   });
+
+  it('shows canonical-derived badge when list records are provided via canonical fallback', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({
+            output: {
+              records: [
+                {
+                  id: 'derived-1',
+                  payload: { part_number: 'MRO-PN-1', status: 'active' },
+                  metadata: { mode: 'derived-canonical' },
+                },
+              ],
+              count: 1,
+              limit: 25,
+              offset: 0,
+              node_key: 'item-master',
+            },
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ id: 'entity-1' }),
+      } as Response;
+    }));
+
+    render(<UimItemMasterForm />);
+    expect(await screen.findByText('Derived from canonical inventory')).toBeInTheDocument();
+  });
+
+  it('does not show canonical-derived badge when records originate from form storage', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({
+            output: {
+              records: [
+                {
+                  id: 'form-1',
+                  payload: { part_number: 'MRO-PN-1', status: 'active' },
+                  metadata: { mode: 'form-storage' },
+                },
+              ],
+              count: 1,
+              limit: 25,
+              offset: 0,
+              node_key: 'item-master',
+            },
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ id: 'entity-1' }),
+      } as Response;
+    }));
+
+    render(<UimItemMasterForm />);
+    await screen.findByText(/Item Master/i);
+    expect(screen.queryByText('Derived from canonical inventory')).not.toBeInTheDocument();
+  });
+
+  it('renders fields selector trigger in aircraft-style with selected/total count', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({
+            output: {
+              records: [
+                {
+                  id: 'item-1',
+                  payload: {
+                    sku: 'UIM-MRO-000001',
+                    part_number: 'MRO-PN-70000001',
+                    item_name: 'Hydraulic Pump',
+                    status: 'active',
+                  },
+                  metadata: { mode: 'canonical' },
+                  updated_at: '2026-04-07T12:00:00.000Z',
+                },
+              ],
+              count: 1,
+              limit: 25,
+              offset: 0,
+              node_key: 'item-master',
+              source: 'canonical',
+              column_catalog: [
+                { key: 'id', header: 'Record ID', sortable: true },
+                { key: 'sku', header: 'SKU', sortable: true },
+                { key: 'part_number', header: 'Part Number', sortable: true },
+                { key: 'item_name', header: 'Item Name', sortable: true },
+              ],
+            },
+          }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ id: 'entity-1' }),
+      } as Response;
+    }));
+
+    render(<UimItemMasterForm />);
+    const fieldsButton = await screen.findByRole('button', { name: /fields/i });
+    expect(fieldsButton).toBeInTheDocument();
+    expect(fieldsButton.textContent || '').toMatch(/Fields/i);
+    expect(fieldsButton.textContent || '').toMatch(/\d+\/\d+/);
+  });
 });
