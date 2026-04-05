@@ -833,6 +833,80 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /api/v2/amro/inventory/work-order-sync:
+    get:
+      operationId: getAmroWorkOrderInventoryReconcile
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [reconcile]
+      responses:
+        '200':
+          description: AMRO work-order inventory reconciliation response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      operationId: postAmroWorkOrderInventorySync
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: interface
+          required: true
+          schema:
+            type: string
+            enum: [reserve, consume, release]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: AMRO work-order inventory transaction response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v2/amro/inventory/scan:
+    post:
+      operationId: postAmroInventoryScan
+      tags: [AMRO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [scan_mode, event_type, scan_code]
+              properties:
+                scan_mode:
+                  type: string
+                  enum: [barcode, rfid, manual]
+                event_type:
+                  type: string
+                  enum: [receive, issue, transfer, audit, reserve, release]
+                scan_code:
+                  type: string
+                quantity:
+                  type: number
+      responses:
+        '200':
+          description: AMRO inventory scan response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/v2/amro/compliance/obligations:
     get:
       operationId: listAmroComplianceObligations
