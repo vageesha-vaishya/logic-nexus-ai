@@ -8,7 +8,7 @@ import {
 } from '../../../../_utils/http';
 import { sendErrorResponse } from '../../../../_utils/errorHandler';
 import { getSupabaseAdminClient } from '../../../../_utils/supabaseAdmin';
-import { parseNodeKey, parsePayload, parsePositiveInt, resolveUimFormAccess } from '../_shared';
+import { parseNodeKey, parsePayload, parsePositiveInt, resolveUimFormAccess, tryHandleUimFormStorageError } from '../_shared';
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'POST', 'OPTIONS'] });
@@ -103,6 +103,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       message: 'UIM form record created successfully',
     });
   } catch (error) {
+    if (tryHandleUimFormStorageError(res, error, ctx.correlationId)) return;
     sendErrorResponse(res, error, ctx.correlationId, { apiVersion: 'v2' });
   }
 }

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { toast } from '@/components/ui/use-toast';
@@ -29,6 +29,11 @@ export function useUimNodeForm({ config, existingEntity }: UseUimNodeFormOptions
   const [isSaving, setIsSaving] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const previousSnapshotRef = useRef<Record<string, unknown>>(defaults);
+  const [lastSavedId, setLastSavedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    form.reset(defaults);
+  }, [defaults, form]);
 
   const submit = form.handleSubmit(async (values) => {
     setSubmitError(null);
@@ -38,9 +43,11 @@ export function useUimNodeForm({ config, existingEntity }: UseUimNodeFormOptions
     try {
       const entityId = typeof existingEntity?.id === 'string' ? existingEntity.id : '';
       if (entityId) {
-        await updateUimEntity(config.key, entityId, values as Record<string, unknown>);
+        const updated = await updateUimEntity(config.key, entityId, values as Record<string, unknown>);
+        setLastSavedId(String(updated.id || entityId));
       } else {
-        await createUimEntity(config.key, values as Record<string, unknown>);
+        const created = await createUimEntity(config.key, values as Record<string, unknown>);
+        setLastSavedId(String(created.id || ''));
       }
 
       toast({
@@ -67,5 +74,7 @@ export function useUimNodeForm({ config, existingEntity }: UseUimNodeFormOptions
     submit,
     reset: () => form.reset(defaults),
     isEditMode: Boolean(existingEntity?.id),
+    lastSavedId,
+    clearSubmitError: () => setSubmitError(null),
   };
 }

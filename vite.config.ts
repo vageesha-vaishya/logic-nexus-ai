@@ -51,6 +51,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const crmApiProxyTarget = process.env.VITE_CRM_API_PROXY_TARGET || env.VITE_CRM_API_PROXY_TARGET || 'http://localhost:3011';
   const amroApiProxyTarget = process.env.VITE_AMRO_API_PROXY_TARGET || env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
+  const uimApiProxyTarget = process.env.VITE_UIM_API_PROXY_TARGET || env.VITE_UIM_API_PROXY_TARGET || 'http://localhost:3000';
   const tenantBrandingProxyTarget =
     process.env.VITE_TENANT_BRANDING_PROXY_TARGET ||
     env.VITE_TENANT_BRANDING_PROXY_TARGET ||
@@ -70,6 +71,13 @@ export default defineConfig(({ mode }) => {
     target: amroApiProxyTarget,
     targetEnvVar: 'VITE_AMRO_API_PROXY_TARGET',
     healthPathHint: '/health',
+  });
+  const uimProxy = createServiceProxy({
+    serviceName: 'UIM API',
+    startCommand: 'set VITE_UIM_API_PROXY_TARGET to a reachable backend (e.g. Next/Vercel API host)',
+    target: uimApiProxyTarget,
+    targetEnvVar: 'VITE_UIM_API_PROXY_TARGET',
+    healthPathHint: '/api/v2/uim/health',
   });
   const tenantBrandingProxy = createServiceProxy({
     serviceName: 'Tenant Branding API',
@@ -135,6 +143,7 @@ export default defineConfig(({ mode }) => {
       '/api/v1/tenant-branding': tenantBrandingProxy,
       '/api/v1': amroProxy,
       '/api/v2/amro': amroProxy,
+      '/api/v2/uim': uimProxy,
       '/api/amro': {
         ...amroProxy,
         rewrite: (path: string) => path.replace(/^\/api\/amro/, ''),
@@ -144,7 +153,7 @@ export default defineConfig(({ mode }) => {
         changeOrigin: true,
         secure: false,
         configure: (proxy: any, _options: any) => {
-          proxy.on('proxyReq', (proxyReq: any, req: any, _res: any) => {
+          proxy.on('proxyReq', (proxyReq: any, _req: any, _res: any) => {
             // Remove Origin header to bypass CORS checks on Supabase
             proxyReq.removeHeader('Origin');
           });
@@ -162,6 +171,7 @@ export default defineConfig(({ mode }) => {
       '/api/v1/tenant-branding': tenantBrandingProxy,
       '/api/v1': amroProxy,
       '/api/v2/amro': amroProxy,
+      '/api/v2/uim': uimProxy,
       '/api/amro': {
         ...amroProxy,
         rewrite: (path: string) => path.replace(/^\/api\/amro/, ''),

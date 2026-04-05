@@ -136,4 +136,31 @@ describe('/api/v2/uim/forms/[node]', () => {
     expect((res.jsonBody as any)?.code).toBe('UIM_FORM_NODE_NOT_FOUND');
     expect(sendErrorResponse).not.toHaveBeenCalled();
   });
+
+  it('returns storage-not-ready code when table does not exist', async () => {
+    const range = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'relation "uim_form_records" does not exist' },
+      count: 0,
+    });
+    const order = vi.fn().mockReturnValue({ range });
+    const isDeleted = vi.fn().mockReturnValue({ order });
+    const eqNode = vi.fn().mockReturnValue({ is: isDeleted });
+    const eqTenant = vi.fn().mockReturnValue({ eq: eqNode });
+    const select = vi.fn().mockReturnValue({ eq: eqTenant });
+    const from = vi.fn().mockReturnValue({ select });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: { node: 'overview' },
+      headers: {},
+      body: {},
+    };
+    const res = createResponse();
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(503);
+    expect((res.jsonBody as any)?.code).toBe('UIM_FORM_STORAGE_NOT_READY');
+  });
 });

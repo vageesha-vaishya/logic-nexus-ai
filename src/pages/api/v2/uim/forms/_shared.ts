@@ -1,4 +1,5 @@
 import type { ApiRequest } from '../../../_utils/types';
+import type { ApiResponse } from '../../../_utils/types';
 import {
   authenticateRequest,
   enforceAnyPermission,
@@ -52,4 +53,32 @@ export async function resolveUimFormAccess(req: ApiRequest, ctx: ApiContext): Pr
     tenantId,
     franchiseId,
   };
+}
+
+export function tryHandleUimFormStorageError(
+  res: ApiResponse,
+  error: unknown,
+  correlationId: string,
+): boolean {
+  const message = error instanceof Error ? error.message : String(error || '');
+  const normalized = message.toLowerCase();
+  if (normalized.includes('uim_form_records') && normalized.includes('does not exist')) {
+    res.status(503).json({
+      error: 'UIM form storage is not ready. Run migration 20260404212000_uim_form_records_crud.sql.',
+      code: 'UIM_FORM_STORAGE_NOT_READY',
+      correlationId,
+      version: 'v2',
+    });
+    return true;
+  }
+  if (normalized.includes('permission denied') && normalized.includes('uim_form_records')) {
+    res.status(403).json({
+      error: 'Insufficient permissions for UIM form storage.',
+      code: 'UIM_FORM_STORAGE_PERMISSION_DENIED',
+      correlationId,
+      version: 'v2',
+    });
+    return true;
+  }
+  return false;
 }

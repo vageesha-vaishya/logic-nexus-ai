@@ -8,7 +8,7 @@ import {
 } from '../../../../_utils/http';
 import { sendErrorResponse } from '../../../../_utils/errorHandler';
 import { getSupabaseAdminClient } from '../../../../_utils/supabaseAdmin';
-import { parseNodeKey, parsePayload, resolveUimFormAccess } from '../_shared';
+import { parseNodeKey, parsePayload, resolveUimFormAccess, tryHandleUimFormStorageError } from '../_shared';
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'PATCH', 'DELETE', 'OPTIONS'] });
@@ -130,6 +130,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       message: 'UIM form record deleted successfully',
     });
   } catch (error) {
+    if (tryHandleUimFormStorageError(res, error, ctx.correlationId)) return;
     sendErrorResponse(res, error, ctx.correlationId, { apiVersion: 'v2' });
   }
 }

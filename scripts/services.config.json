@@ -33,6 +33,22 @@
       "dependsOn": []
     },
     {
+      "id": "uim",
+      "name": "UIM API",
+      "command": "node scripts/uim-mock-api.mjs",
+      "urlEnv": "VITE_UIM_API_PROXY_TARGET",
+      "defaultUrl": "http://localhost:3000",
+      "remoteUrlEnv": "VITE_UIM_API_PROXY_TARGET_REMOTE",
+      "remoteDefaultUrl": "",
+      "preferEndpoint": "local",
+      "healthPath": "/api/v2/uim/health",
+      "okStatus": [200],
+      "required": false,
+      "requiredWhenRemote": true,
+      "retry": { "attempts": 12, "baseDelayMs": 500, "timeoutMs": 30000 },
+      "dependsOn": []
+    },
+    {
       "id": "tenantBranding",
       "name": "Tenant Branding API",
       "command": null,

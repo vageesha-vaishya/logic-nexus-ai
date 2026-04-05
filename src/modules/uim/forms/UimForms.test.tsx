@@ -37,22 +37,37 @@ const forms = [
 describe('UIM form suite', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({
-      ok: true,
-      json: async () => ({ id: 'entity-1' }),
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+      const method = String(init?.method || 'GET').toUpperCase();
+      if (method === 'GET') {
+        return {
+          ok: true,
+          json: async () => ({ output: { records: [], count: 0, limit: 25, offset: 0, node_key: 'overview' } }),
+        } as Response;
+      }
+      if (method === 'DELETE') {
+        return {
+          ok: true,
+          json: async () => ({ id: 'entity-1', message: 'deleted' }),
+        } as Response;
+      }
+      return {
+        ok: true,
+        json: async () => ({ id: 'entity-1' }),
+      } as Response;
     }));
   });
 
   it.each(forms)('renders empty state for %s form', async (_name, FormComponent) => {
     render(<FormComponent />);
-    expect(screen.getByRole('button', { name: /Create/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Create$/i })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /Reset/i })).toBeInTheDocument();
   });
 
   it('shows inline validation and summary banner for invalid item master submission', async () => {
     render(<UimItemMasterForm />);
 
-    fireEvent.click(screen.getByRole('button', { name: /Create/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
 
     await waitFor(() => {
       expect(screen.getAllByRole('alert').length).toBeGreaterThan(0);
@@ -67,7 +82,7 @@ describe('UIM form suite', () => {
     fireEvent.change(screen.getByLabelText(/Owner email/i), { target: { value: 'ops@example.com' } });
     fireEvent.change(screen.getByLabelText(/Target go-live date/i), { target: { value: '2026-06-20' } });
 
-    fireEvent.click(screen.getByRole('button', { name: /Create/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
 
     await waitFor(() => {
       expect(fetch).toHaveBeenCalled();
@@ -77,9 +92,9 @@ describe('UIM form suite', () => {
 
   it('supports edit mode and uses update submit label', async () => {
     render(<UimOverviewForm existingEntity={{ id: '550e8400-e29b-41d4-a716-446655440000', module_name: 'Existing', owner_email: 'a@b.com', rollout_phase: 'phase_1', target_go_live_date: '2026-08-01', notes: '' }} />);
-    expect(screen.getByRole('button', { name: /Update/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Update$/i })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: /Update/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Update$/i }));
     await waitFor(() => {
       expect(fetch).toHaveBeenCalledWith(
         expect.stringContaining('/forms/overview/550e8400-e29b-41d4-a716-446655440000'),
@@ -99,7 +114,7 @@ describe('UIM form suite', () => {
     fireEvent.change(screen.getByLabelText(/Module name/i), { target: { value: 'Will fail' } });
     fireEvent.change(screen.getByLabelText(/Owner email/i), { target: { value: 'ops@example.com' } });
     fireEvent.change(screen.getByLabelText(/Target go-live date/i), { target: { value: '2026-06-20' } });
-    fireEvent.click(screen.getByRole('button', { name: /Create/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^Create$/i }));
 
     await waitFor(() => {
       expect(screen.getByText(/we could not save your changes/i)).toBeInTheDocument();
