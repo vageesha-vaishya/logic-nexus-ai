@@ -47,7 +47,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const limit = parsePositiveInt(req.query.limit, 25);
       const offset = parsePositiveInt(req.query.offset, 0);
       const end = offset + Math.min(limit, 100) - 1;
-      let query = supabase
+      const tenantScopedBase = supabase
         .from('uim_form_records')
         .select('id, tenant_id, franchise_id, node_key, payload, metadata, created_at, updated_at', { count: 'exact' })
         .eq('tenant_id', access.tenantId)
@@ -55,16 +55,40 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         .is('deleted_at', null)
         .order('updated_at', { ascending: false })
         .range(offset, end);
-      if (access.franchiseId) query = query.eq('franchise_id', access.franchiseId);
-      const { data, error, count } = await query;
-      if (error) throw new Error(`Failed to load UIM form records: ${error.message}`);
+
+      let data: Array<Record<string, unknown>> | null = null;
+      let count: number | null = null;
+
+      if (access.franchiseId) {
+        const franchiseScoped = await supabase
+          .from('uim_form_records')
+          .select('id, tenant_id, franchise_id, node_key, payload, metadata, created_at, updated_at', { count: 'exact' })
+          .eq('tenant_id', access.tenantId)
+          .eq('franchise_id', access.franchiseId)
+          .eq('node_key', nodeKey)
+          .is('deleted_at', null)
+          .order('updated_at', { ascending: false })
+          .range(offset, end);
+        if (franchiseScoped.error) throw new Error(`Failed to load franchise-scoped UIM form records: ${franchiseScoped.error.message}`);
+        data = franchiseScoped.data as Array<Record<string, unknown>> | null;
+        count = Number(franchiseScoped.count || 0);
+      }
+
+      // Fallback: if franchise scope is empty, return tenant-level records.
+      if (!access.franchiseId || (count || 0) === 0) {
+        const tenantScoped = await tenantScopedBase;
+        if (tenantScoped.error) throw new Error(`Failed to load tenant-scoped UIM form records: ${tenantScoped.error.message}`);
+        data = tenantScoped.data as Array<Record<string, unknown>> | null;
+        count = Number(tenantScoped.count || 0);
+      }
+
       res.status(200).json({
         version: 'v2',
         interface: 'uim-form-records-list',
         correlationId: ctx.correlationId,
         output: {
           node_key: nodeKey,
-          count: count || 0,
+          count: Number(count || 0),
           limit: Math.min(limit, 100),
           offset,
           records: data || [],

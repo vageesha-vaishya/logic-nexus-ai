@@ -1,3 +1,5 @@
+import { supabase } from '@/integrations/supabase/client';
+
 export type UimHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 
 export class UimApiError extends Error {
@@ -25,15 +27,29 @@ type RequestOptions<TBody> = {
   signal?: AbortSignal;
 };
 
+async function buildUimRequestHeaders(): Promise<Record<string, string>> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
+    'Accept-Version': 'v1',
+    'X-API-Version': 'v1',
+  };
+
+  const { data } = await supabase.auth.getSession();
+  const accessToken = String(data?.session?.access_token || '').trim();
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  return headers;
+}
+
 export async function uimApiRequest<TResponse, TBody = unknown>(options: RequestOptions<TBody>): Promise<TResponse> {
+  const headers = await buildUimRequestHeaders();
   const requestInit: RequestInit = {
     method: options.method,
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'application/json',
-      'Accept-Version': 'v1',
-      'X-API-Version': 'v1',
-    },
+    credentials: 'include',
+    headers,
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
   };

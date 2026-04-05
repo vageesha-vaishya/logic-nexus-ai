@@ -139,6 +139,66 @@ BEGIN
   END IF;
   SELECT id INTO v_actor FROM auth.users ORDER BY created_at ASC LIMIT 1;
 
+  IF v_actor IS NOT NULL AND to_regclass('public.profiles') IS NOT NULL THEN
+    INSERT INTO public.profiles (id, email, first_name, last_name, is_active)
+    SELECT
+      u.id,
+      COALESCE(NULLIF(u.email, ''), format('deccan-user-%s@example.local', left(u.id::text, 8))),
+      'Deccan',
+      'AMRO',
+      true
+    FROM auth.users u
+    WHERE u.id = v_actor
+    ON CONFLICT (id) DO UPDATE SET
+      email = EXCLUDED.email,
+      first_name = EXCLUDED.first_name,
+      last_name = EXCLUDED.last_name,
+      is_active = true,
+      updated_at = now();
+  END IF;
+
+  IF v_actor IS NOT NULL AND to_regclass('public.user_roles') IS NOT NULL THEN
+    UPDATE public.user_roles
+    SET
+      tenant_id = v_tenant_id,
+      franchise_id = NULL,
+      assigned_by = v_actor
+    WHERE user_id = v_actor AND role = 'tenant_admin';
+    IF NOT FOUND THEN
+      INSERT INTO public.user_roles (user_id, role, tenant_id, franchise_id, assigned_by)
+      VALUES (v_actor, 'tenant_admin', v_tenant_id, NULL, v_actor)
+      ON CONFLICT DO NOTHING;
+    END IF;
+
+    UPDATE public.user_roles
+    SET
+      tenant_id = v_tenant_id,
+      franchise_id = v_franchise_id,
+      assigned_by = v_actor
+    WHERE user_id = v_actor AND role = 'franchise_admin';
+    IF NOT FOUND THEN
+      INSERT INTO public.user_roles (user_id, role, tenant_id, franchise_id, assigned_by)
+      VALUES (v_actor, 'franchise_admin', v_tenant_id, v_franchise_id, v_actor)
+      ON CONFLICT DO NOTHING;
+    END IF;
+  END IF;
+
+  IF v_actor IS NOT NULL AND to_regclass('public.user_preferences') IS NOT NULL THEN
+    UPDATE public.user_preferences
+    SET
+      tenant_id = v_tenant_id,
+      franchise_id = v_franchise_id,
+      admin_override_enabled = true,
+      updated_at = now()
+    WHERE user_id = v_actor;
+
+    IF NOT FOUND THEN
+      INSERT INTO public.user_preferences (user_id, tenant_id, franchise_id, admin_override_enabled)
+      VALUES (v_actor, v_tenant_id, v_franchise_id, true)
+      ON CONFLICT DO NOTHING;
+    END IF;
+  END IF;
+
   INSERT INTO public.uim_inventory_categories (tenant_id, franchise_id, category_code, category_name, is_hazardous, regulatory_classification, metadata)
   VALUES
     (v_tenant_id, v_franchise_id, 'AMRO-ROT', 'AMRO Rotable Components', false, 'ATA-ROT', jsonb_build_object('source', 'amro-seed')),
@@ -381,9 +441,9 @@ BEGIN
       updated_at = now();
   END IF;
 
-  IF to_regclass('public.uim_projection_snapshots') IS NOT NULL THEN
-    INSERT INTO public.uim_projection_snapshots (
-      tenant_id, franchise_id, inventory_item_id, projected_available_quantity, projected_reserved_quantity, projected_consumed_quantity, replay_version, source_event_id
+  IF to_regclass('public.uim_inventory_projection_snapshots') IS NOT NULL THEN
+    INSERT INTO public.uim_inventory_projection_snapshots (
+      tenant_id, franchise_id, inventory_item_id, projected_available_quantity, projected_reserved_quantity, projected_consumed_quantity, replay_version
     )
     VALUES
       (
@@ -393,8 +453,7 @@ BEGIN
         40,
         5,
         0,
-        1,
-        gen_random_uuid()
+        1
       ),
       (
         v_tenant_id,
@@ -403,8 +462,7 @@ BEGIN
         6,
         0,
         0,
-        1,
-        gen_random_uuid()
+        1
       )
     ON CONFLICT (tenant_id, inventory_item_id) DO UPDATE SET
       projected_available_quantity = EXCLUDED.projected_available_quantity,
@@ -412,6 +470,96 @@ BEGIN
       projected_consumed_quantity = EXCLUDED.projected_consumed_quantity,
       replay_version = EXCLUDED.replay_version,
       updated_at = now();
+  END IF;
+
+  IF to_regclass('public.uim_form_records') IS NOT NULL THEN
+    INSERT INTO public.uim_form_records (
+      tenant_id, franchise_id, node_key, payload, metadata, created_by, updated_by
+    )
+    SELECT
+      v_tenant_id,
+      v_franchise_id,
+      x.node_key,
+      x.payload,
+      jsonb_build_object('seed_source', 'amro-uim-phase5', 'tenant_slug', 'deccan'),
+      v_actor,
+      v_actor
+    FROM (
+      VALUES
+        (
+          'overview',
+          jsonb_build_object(
+            'tenant', 'Deccan',
+            'summary', 'AMRO inventory overview seeded for Deccan',
+            'active_modules', jsonb_build_array('item-master','stock-ledger','reservations','issue-consume','restock','locations','analytics')
+          )
+        ),
+        (
+          'item-master',
+          jsonb_build_object(
+            'sku', 'DECCAN-AMRO-PUMP-001',
+            'part_number', 'DCC-PN-1001',
+            'description', 'Deccan Hydraulic Pump',
+            'uom', 'pcs'
+          )
+        ),
+        (
+          'stock-ledger',
+          jsonb_build_object(
+            'reference', 'DECCAN-GRN-0001',
+            'transaction_type', 'RECEIVE',
+            'quantity_changed', 2
+          )
+        ),
+        (
+          'reservations',
+          jsonb_build_object(
+            'reservation_token', 'deccan-amro-reservation-001',
+            'reserved_quantity', 5
+          )
+        ),
+        (
+          'issue-consume',
+          jsonb_build_object(
+            'reference', 'DECCAN-WP-0001',
+            'transaction_type', 'CONSUME',
+            'quantity_changed', -5
+          )
+        ),
+        (
+          'restock',
+          jsonb_build_object(
+            'reference', 'DECCAN-GRN-0001',
+            'transaction_type', 'RECEIVE',
+            'quantity_changed', 2
+          )
+        ),
+        (
+          'locations',
+          jsonb_build_object(
+            'primary_location', 'DECCAN-MRO-MAIN',
+            'line_location', 'DECCAN-LINE',
+            'quarantine_location', 'DECCAN-QUAR'
+          )
+        ),
+        (
+          'analytics',
+          jsonb_build_object(
+            'dashboard_seed', true,
+            'kpi_hint', 'deccan-amro-inventory',
+            'latency_target_ms', 2200
+          )
+        )
+    ) AS x(node_key, payload)
+    WHERE NOT EXISTS (
+      SELECT 1
+      FROM public.uim_form_records existing
+      WHERE existing.tenant_id = v_tenant_id
+        AND existing.franchise_id IS NOT DISTINCT FROM v_franchise_id
+        AND existing.node_key = x.node_key
+        AND COALESCE(existing.metadata->>'seed_source', '') = 'amro-uim-phase5'
+        AND existing.deleted_at IS NULL
+    );
   END IF;
 
   INSERT INTO public.amro_uim_inventory_sync_events (
