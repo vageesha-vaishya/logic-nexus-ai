@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, type RefObject, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Users } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -23,6 +24,7 @@ type SelectOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  modelCode?: string;
 };
 
 type ScopeContext = {
@@ -36,6 +38,8 @@ type WorkPackageTemplateCreateSectionProps = {
   setFieldValue: (fieldKey: string, value: unknown) => void;
   firstFieldRef: RefObject<HTMLInputElement>;
   modalOpen: boolean;
+  modalMode: 'create' | 'update';
+  selectedTemplateId: string | null;
   scopedDb: unknown;
   scope: ScopeContext;
 };
@@ -64,6 +68,8 @@ export function WorkPackageTemplateCreateSection({
   setFieldValue,
   firstFieldRef,
   modalOpen,
+  modalMode,
+  selectedTemplateId,
   scopedDb,
   scope,
 }: WorkPackageTemplateCreateSectionProps) {
@@ -74,6 +80,7 @@ export function WorkPackageTemplateCreateSection({
   const [workPackageTemplateAircraftModelOptionsLoading, setWorkPackageTemplateAircraftModelOptionsLoading] = useState(false);
   const [workPackageTemplateAircraftModelOptionsError, setWorkPackageTemplateAircraftModelOptionsError] = useState('');
   const [workPackageTemplateSelectedTaskIds, setWorkPackageTemplateSelectedTaskIds] = useState<string[]>([]);
+  const [workPackageTemplateSelectionInitialized, setWorkPackageTemplateSelectionInitialized] = useState(false);
   const [workPackageTemplateTaskSortColumn, setWorkPackageTemplateTaskSortColumn] = useState<WorkPackageTaskSortColumn>('task_id');
   const [workPackageTemplateTaskSortDirection, setWorkPackageTemplateTaskSortDirection] = useState<SortDirection>('asc');
   const [workPackageTemplateTaskFilters, setWorkPackageTemplateTaskFilters] = useState<Record<WorkPackageTaskSortColumn, string>>(
@@ -81,6 +88,34 @@ export function WorkPackageTemplateCreateSection({
   );
   const resolveWorkPackageTaskTemplateId = useCallback((taskTemplate: Record<string, unknown>): string => {
     return String(taskTemplate.id || '').trim();
+  }, []);
+
+  const parseTaskTemplateIdsFromTasksJson = useCallback((raw: unknown): string[] => {
+    const normalized = (() => {
+      if (Array.isArray(raw)) return raw;
+      if (typeof raw === 'string') {
+        const trimmed = raw.trim();
+        if (!trimmed) return [];
+        try {
+          const parsed = JSON.parse(trimmed);
+          return Array.isArray(parsed) ? parsed : [];
+        } catch {
+          return [];
+        }
+      }
+      return [];
+    })();
+    return Array.from(
+      new Set(
+        normalized
+          .map((entry) => {
+            if (!entry || typeof entry !== 'object') return '';
+            const row = entry as Record<string, unknown>;
+            return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
+          })
+          .filter((value) => value.length > 0),
+      ),
+    );
   }, []);
 
   const loadWorkPackageTemplateTaskTemplates = useCallback(async () => {
@@ -133,7 +168,8 @@ export function WorkPackageTemplateCreateSection({
       }
       const options = (Array.isArray(data) ? data : [])
         .map((record) => {
-          const value = String(record.model_code || record.name || record.id || '').trim();
+          const modelId = String(record.id || '').trim();
+          const value = modelId;
           if (!value) {
             return null;
           }
@@ -144,9 +180,9 @@ export function WorkPackageTemplateCreateSection({
           if (!active) {
             return null;
           }
-          return { value, label };
+          return { value, label, modelCode: code || name || modelId };
         })
-        .filter((option): option is SelectOption => Boolean(option));
+        .filter(Boolean) as SelectOption[];
       setWorkPackageTemplateAircraftModelOptions(options);
     } catch (error) {
       setWorkPackageTemplateAircraftModelOptions([]);
@@ -164,31 +200,116 @@ export function WorkPackageTemplateCreateSection({
     void loadWorkPackageTemplateAircraftModelOptions();
   }, [loadWorkPackageTemplateAircraftModelOptions, loadWorkPackageTemplateTaskTemplates, modalOpen]);
 
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+    const bootstrapSelectionFromForm = () => {
+      const fromTasksJson = parseTaskTemplateIdsFromTasksJson(formValues.tasks_json);
+      const fromSelectedList = (() => {
+        const raw = formValues.selected_task_template_ids;
+        if (!Array.isArray(raw)) return [] as string[];
+        return raw
+          .map((value) => String(value || '').trim())
+          .filter((value) => value.length > 0);
+      })();
+      const nextSelection = Array.from(new Set([...fromSelectedList, ...fromTasksJson]));
+      setWorkPackageTemplateSelectedTaskIds(nextSelection);
+      setWorkPackageTemplateSelectionInitialized(true);
+    };
+
+    if (modalMode !== 'update' || !selectedTemplateId || !scope.tenantId || !scopedDb) {
+      bootstrapSelectionFromForm();
+      return;
+    }
+
+    let cancelled = false;
+    const loadSelectedTaskTemplateIds = async () => {
+      try {
+        let query = (scopedDb as any)
+          .from('work_package_template_task_templates')
+          .select('task_template_id')
+          .eq('tenant_id', scope.tenantId)
+          .eq('work_package_template_id', selectedTemplateId);
+        if (scope.franchiseId) {
+          query = query.or(`franchise_id.is.null,franchise_id.eq.${scope.franchiseId}`);
+        } else {
+          query = query.is('franchise_id', null);
+        }
+        const { data, error } = await query;
+        if (error) {
+          throw new Error(String(error.message || 'Failed to load selected task templates'));
+        }
+        const relationIds = (Array.isArray(data) ? data : [])
+          .map((row) => String((row as Record<string, unknown>).task_template_id || '').trim())
+          .filter((value) => value.length > 0);
+        const fallbackIds = parseTaskTemplateIdsFromTasksJson(formValues.tasks_json);
+        const nextSelection = Array.from(new Set([...relationIds, ...fallbackIds]));
+        if (!cancelled) {
+          setWorkPackageTemplateSelectedTaskIds(nextSelection);
+          setWorkPackageTemplateSelectionInitialized(true);
+        }
+      } catch {
+        if (!cancelled) {
+          bootstrapSelectionFromForm();
+        }
+      }
+    };
+    void loadSelectedTaskTemplateIds();
+    return () => {
+      cancelled = true;
+    };
+  }, [
+    formValues.selected_task_template_ids,
+    formValues.tasks_json,
+    modalMode,
+    modalOpen,
+    parseTaskTemplateIdsFromTasksJson,
+    scope.franchiseId,
+    scope.tenantId,
+    scopedDb,
+    selectedTemplateId,
+  ]);
+
   const workPackageTemplateAircraftModelSelectOptions = useMemo<SelectOption[]>(() => {
-    const selectedModel = String(formValues.aircraft_model ?? '').trim();
-    if (!selectedModel) {
+    const selectedModelId = String(formValues.model_id ?? '').trim();
+    const selectedModelToken = String(formValues.aircraft_model ?? '').trim();
+    if (!selectedModelId && !selectedModelToken) {
       return workPackageTemplateAircraftModelOptions;
     }
-    if (workPackageTemplateAircraftModelOptions.some((option) => option.value === selectedModel)) {
+    if (selectedModelId && workPackageTemplateAircraftModelOptions.some((option) => option.value === selectedModelId)) {
       return workPackageTemplateAircraftModelOptions;
     }
-    return [{ value: selectedModel, label: selectedModel }, ...workPackageTemplateAircraftModelOptions];
-  }, [formValues.aircraft_model, workPackageTemplateAircraftModelOptions]);
+    const matchByToken = selectedModelToken
+      ? workPackageTemplateAircraftModelOptions.find((option) => {
+        const optionCode = String(option.modelCode || '').trim().toLowerCase();
+        const optionLabel = String(option.label || '').trim().toLowerCase();
+        const normalizedToken = selectedModelToken.toLowerCase();
+        return optionCode === normalizedToken || optionLabel === normalizedToken;
+      })
+      : null;
+    if (matchByToken) {
+      return workPackageTemplateAircraftModelOptions;
+    }
+    const fallbackValue = selectedModelId || selectedModelToken;
+    return [{ value: fallbackValue, label: selectedModelToken || selectedModelId, modelCode: selectedModelToken || selectedModelId }, ...workPackageTemplateAircraftModelOptions];
+  }, [formValues.aircraft_model, formValues.model_id, workPackageTemplateAircraftModelOptions]);
 
   useEffect(() => {
     if (!modalOpen) {
       return;
     }
-    const currentModel = String(formValues.aircraft_model ?? '').trim();
-    if (currentModel) {
+    const currentModelId = String(formValues.model_id ?? '').trim();
+    if (currentModelId) {
       return;
     }
     const firstOption = workPackageTemplateAircraftModelSelectOptions[0];
     if (!firstOption?.value) {
       return;
     }
-    setFieldValue('aircraft_model', firstOption.value);
-  }, [formValues.aircraft_model, modalOpen, setFieldValue, workPackageTemplateAircraftModelSelectOptions]);
+    setFieldValue('model_id', firstOption.value);
+    setFieldValue('aircraft_model', firstOption.modelCode || firstOption.label || firstOption.value);
+  }, [formValues.model_id, modalOpen, setFieldValue, workPackageTemplateAircraftModelSelectOptions]);
 
   const selectedWorkPackageAircraftModelTaskItems = useMemo(() => {
     const selectedModelValue = String(formValues.aircraft_model ?? '').trim().toLowerCase();
@@ -248,6 +369,13 @@ export function WorkPackageTemplateCreateSection({
       });
     });
     return [...filtered].sort((left, right) => {
+      const leftId = resolveWorkPackageTaskTemplateId(left);
+      const rightId = resolveWorkPackageTaskTemplateId(right);
+      const leftSelected = leftId.length > 0 && workPackageTemplateSelectedTaskIds.includes(leftId);
+      const rightSelected = rightId.length > 0 && workPackageTemplateSelectedTaskIds.includes(rightId);
+      if (leftSelected !== rightSelected) {
+        return leftSelected ? -1 : 1;
+      }
       const leftValue = workPackageTemplateTaskSortColumn === 'is_mandatory'
         ? String(typeof left.is_mandatory === 'boolean' ? left.is_mandatory : '').toLowerCase()
         : workPackageTemplateTaskSortColumn === 'task_id'
@@ -264,7 +392,14 @@ export function WorkPackageTemplateCreateSection({
       const result = leftValue.localeCompare(rightValue, undefined, { numeric: true, sensitivity: 'base' });
       return workPackageTemplateTaskSortDirection === 'asc' ? result : -result;
     });
-  }, [selectedWorkPackageAircraftModelTaskItems, workPackageTemplateTaskFilters, workPackageTemplateTaskSortColumn, workPackageTemplateTaskSortDirection]);
+  }, [
+    resolveWorkPackageTaskTemplateId,
+    selectedWorkPackageAircraftModelTaskItems,
+    workPackageTemplateSelectedTaskIds,
+    workPackageTemplateTaskFilters,
+    workPackageTemplateTaskSortColumn,
+    workPackageTemplateTaskSortDirection,
+  ]);
 
   const selectedWorkPackageAircraftModelTaskRowIds = useMemo(
     () => selectedWorkPackageAircraftModelTaskRows
@@ -350,6 +485,9 @@ export function WorkPackageTemplateCreateSection({
   }, [resolveSelectedWorkPackageTaskPayload, workPackageTemplateSelectedTaskIds]);
 
   useEffect(() => {
+    if (!workPackageTemplateSelectionInitialized) {
+      return;
+    }
     const nextValue = JSON.stringify(selectedWorkPackageTaskPayload);
     const currentValue = (() => {
       const raw = formValues.tasks_json;
@@ -368,11 +506,12 @@ export function WorkPackageTemplateCreateSection({
     if (nextValue !== currentValue) {
       setFieldValue('tasks_json', nextValue);
     }
-  }, [formValues.tasks_json, selectedWorkPackageTaskPayload, setFieldValue]);
+  }, [formValues.tasks_json, selectedWorkPackageTaskPayload, setFieldValue, workPackageTemplateSelectionInitialized]);
 
   useEffect(() => {
     if (!modalOpen) {
       setWorkPackageTemplateSelectedTaskIds([]);
+      setWorkPackageTemplateSelectionInitialized(false);
       setWorkPackageTemplateTaskSortColumn('task_id');
       setWorkPackageTemplateTaskSortDirection('asc');
       setWorkPackageTemplateTaskFilters(DEFAULT_WORK_PACKAGE_TASK_FILTERS);
@@ -436,13 +575,18 @@ export function WorkPackageTemplateCreateSection({
               <Label htmlFor="wpt-aircraft-model" className="text-[12px] font-medium text-slate-700">Aircraft Model</Label>
               <select
                 id="wpt-aircraft-model"
-                value={String(formValues.aircraft_model ?? '')}
-                onChange={(event) => setFieldValue('aircraft_model', event.target.value)}
+                value={String(formValues.model_id ?? '')}
+                onChange={(event) => {
+                  const selectedModelId = String(event.target.value || '').trim();
+                  const option = workPackageTemplateAircraftModelSelectOptions.find((entry) => entry.value === selectedModelId);
+                  setFieldValue('model_id', selectedModelId);
+                  setFieldValue('aircraft_model', option?.modelCode || option?.label || selectedModelId);
+                }}
                 className={cn(
                   'h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800',
-                  formErrors.aircraft_model && 'border-destructive',
+                  (formErrors.aircraft_model || formErrors.model_id) && 'border-destructive',
                 )}
-                aria-invalid={Boolean(formErrors.aircraft_model)}
+                aria-invalid={Boolean(formErrors.aircraft_model || formErrors.model_id)}
                 disabled={workPackageTemplateAircraftModelOptionsLoading}
               >
                 <option value="" hidden />
@@ -458,6 +602,7 @@ export function WorkPackageTemplateCreateSection({
               ) : null}
               {workPackageTemplateAircraftModelOptionsError ? <p className="mdm-template-danger">{workPackageTemplateAircraftModelOptionsError}</p> : null}
               {formErrors.aircraft_model ? <p className="mdm-template-danger">{formErrors.aircraft_model}</p> : null}
+              {formErrors.model_id ? <p className="mdm-template-danger">{formErrors.model_id}</p> : null}
             </div>
             <div className="space-y-1">
               <Label htmlFor="wpt-maintenance-type" className="text-[12px] font-medium text-slate-700">Maintenance Type</Label>
@@ -603,16 +748,22 @@ export function WorkPackageTemplateCreateSection({
                     if (!rowId) {
                       return null;
                     }
+                    const selected = workPackageTemplateSelectedTaskIds.includes(rowId);
                     return (
-                    <tr key={rowId} className="border-t border-slate-100 text-slate-700">
+                    <tr key={rowId} className={cn('border-t border-slate-100 text-slate-700', selected && 'bg-sky-50/60')}>
                       <td className="px-2 py-1.5">
                         <Checkbox
-                          checked={workPackageTemplateSelectedTaskIds.includes(rowId)}
+                          checked={selected}
                           onCheckedChange={(checked) => toggleWorkPackageTemplateTaskSelection(rowId, Boolean(checked))}
                           aria-label={`Select task row ${String(taskTemplate.task_template_id || taskTemplate.task_id || rowId)}`}
                         />
                       </td>
-                      <td className="px-2 py-1.5">{String(taskTemplate.task_template_id || taskTemplate.task_id || '-')}</td>
+                      <td className="px-2 py-1.5">
+                        <div className="inline-flex items-center gap-1">
+                          <span>{String(taskTemplate.task_template_id || taskTemplate.task_id || '-')}</span>
+                          {selected ? <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Selected</Badge> : null}
+                        </div>
+                      </td>
                       <td className="px-2 py-1.5">{String(taskTemplate.code_form_no || '-')}</td>
                       <td className="px-2 py-1.5">{String(taskTemplate.ata_code || '-')}</td>
                       <td className="px-2 py-1.5">{String(taskTemplate.reference_amp || '-')}</td>

@@ -8953,6 +8953,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   setFieldValue={setFieldValue}
                   firstFieldRef={firstFieldRef}
                   modalOpen={modalOpen}
+                  modalMode={modalMode}
+                  selectedTemplateId={selectedId}
                   scopedDb={scopedDb}
                   scope={scope}
                 />

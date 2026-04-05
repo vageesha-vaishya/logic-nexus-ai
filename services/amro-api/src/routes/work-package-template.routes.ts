@@ -35,6 +35,7 @@ type WorkPackageTemplateRequest = {
   active?: boolean;
   template_name?: string;
   maintenance_type?: string;
+  model_id?: string;
   scope_json?: unknown[];
   tasks_json?: unknown[];
   policy_snapshot_id?: string | null;
@@ -148,6 +149,7 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     active: request.active !== false,
     template_name: String(request.template_name || '').trim(),
     maintenance_type: String(request.maintenance_type || '').trim(),
+    model_id: String(request.model_id || '').trim() || null,
     scope_json: Array.isArray(request.scope_json) ? request.scope_json : [],
     tasks_json: selectedTaskTemplateIds.map((taskTemplateId) => ({ task_template_id: taskTemplateId })),
     policy_snapshot_id: null,
@@ -186,6 +188,23 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     }
     resolvedModelId = modelIds[0];
   }
+  if (payload.model_id && !isUuid(payload.model_id)) {
+    res.status(400).json(toErrorResponse('Invalid model_id. Expected UUID.', 'VALIDATION_ERROR', 400));
+    return;
+  }
+  const persistedModelId = payload.model_id || resolvedModelId;
+  if (!persistedModelId) {
+    res.status(422).json(
+      toErrorResponse('Missing model_id. Select an aircraft model before saving template.', 'VALIDATION_ERROR', 422),
+    );
+    return;
+  }
+  if (payload.model_id && resolvedModelId && payload.model_id !== resolvedModelId) {
+    res.status(422).json(
+      toErrorResponse('Validation failed: selected task templates do not match selected model_id', 'VALIDATION_ERROR', 422),
+    );
+    return;
+  }
 
   const insertPayload = {
     tenant_id: tenantId,
@@ -195,6 +214,7 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     active: payload.active,
     template_name: payload.template_name,
     maintenance_type: payload.maintenance_type,
+    model_id: persistedModelId,
     scope_json: payload.scope_json,
     tasks_json: payload.tasks_json,
     policy_snapshot_id: null,
@@ -319,7 +339,7 @@ async function createTemplateTaskRelationshipsFromRequest(
 
   let templateQuery = supabase
     .from('work_package_templates')
-    .select('id,tenant_id,franchise_id')
+    .select('id,tenant_id,franchise_id,model_id')
     .eq('tenant_id', tenantId)
     .eq('id', resolvedTemplateId);
   if (franchiseId) {
@@ -371,6 +391,17 @@ async function createTemplateTaskRelationshipsFromRequest(
     return;
   }
   const resolvedModelId = modelIds[0];
+  const templateModelId = String((templateRow as Record<string, unknown>)?.model_id || '').trim();
+  if (templateModelId && templateModelId !== resolvedModelId) {
+    res.status(422).json(
+      toErrorResponse(
+        'Validation failed: selected task templates do not match template model_id',
+        'VALIDATION_ERROR',
+        422,
+      ),
+    );
+    return;
+  }
 
   const relationshipRows = selectedTaskTemplateIds.map((taskTemplateId) => ({
     tenant_id: tenantId,
@@ -548,6 +579,7 @@ async function buildTemplateListResponse(
  *             template_code: "WP-LINE-001"
  *             template_name: "Line Check Package"
  *             maintenance_type: "line"
+ *             model_id: "cccccccc-cccc-4ccc-8ccc-cccccccccccc"
  *             aircraft_model: "A320"
  *             selected_task_template_ids:
  *               - "11a11111-2222-4333-9444-555555555555"
