@@ -155,4 +155,19 @@ describe('UIM form suite', () => {
     const result = await axe.run(container);
     expect(result.violations).toHaveLength(0);
   });
+
+  it('renders phase 4 analytics card layer in analytics workspace', async () => {
+    render(<UimAnalyticsForm />);
+    expect(await screen.findByText('Phase 4 Sequence')).toBeInTheDocument();
+    expect(screen.getByText('KPI Model Definitions')).toBeInTheDocument();
+    expect(screen.getByText('BI Semantic Cube')).toBeInTheDocument();
+    expect(screen.getByText('ETL and Reconciliation Status')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /retry analytics metadata/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /submit qa sign-off/i })).toBeInTheDocument();
+    expect(screen.getByText(/Dashboard latency target/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open API Health' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open API Contracts' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: 'Open OpenAPI YAML' })).toBeInTheDocument();
+    expect(screen.getByText('Error Details')).toBeInTheDocument();
+  });
 });

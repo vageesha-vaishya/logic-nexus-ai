@@ -1,0 +1,199 @@
+name: UIM Phase5 Hardening
+
+on:
+  workflow_dispatch:
+    inputs:
+      run_chaos:
+        description: "Run chaos experiments"
+        type: boolean
+        required: false
+        default: true
+      run_security:
+        description: "Run security remediation gate"
+        type: boolean
+        required: false
+        default: true
+      run_reliability:
+        description: "Run reliability regression cycle"
+        type: boolean
+        required: false
+        default: true
+      reliability_cycles:
+        description: "Reliability regression cycles"
+        required: false
+        default: "2"
+
+jobs:
+  chaos-experiments:
+    if: inputs.run_chaos == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start UIM mock API
+        run: |
+          node scripts/uim-mock-api.mjs > /tmp/uim-mock-chaos.log 2>&1 &
+          echo $! > /tmp/uim-mock-chaos.pid
+          sleep 2
+
+      - name: Run chaos harness
+        env:
+          UIM_CHAOS_BASE_URL: http://localhost:3000
+        run: npm run phase5:chaos
+
+      - name: Upload chaos artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uim-phase5-chaos-artifacts
+          path: |
+            artifacts/mro/analysis/chaos/uim-phase5-chaos-log.json
+            artifacts/mro/analysis/chaos/uim-phase5-chaos-log.md
+            /tmp/uim-mock-chaos.log
+
+      - name: Stop UIM mock API
+        if: always()
+        run: |
+          if [ -f /tmp/uim-mock-chaos.pid ]; then
+            kill "$(cat /tmp/uim-mock-chaos.pid)" || true
+          fi
+
+  security-remediation:
+    if: inputs.run_security == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run security remediation report
+        run: npm run phase5:security:remediation
+
+      - name: Upload security closure artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uim-phase5-security-closure-artifacts
+          path: |
+            artifacts/mro/analysis/security/uim-phase5-vulnerability-closure-report.json
+            artifacts/mro/analysis/security/uim-phase5-vulnerability-closure-report.md
+
+  reliability-regression:
+    if: inputs.run_reliability == true
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start UIM mock API
+        run: |
+          node scripts/uim-mock-api.mjs > /tmp/uim-mock-reliability.log 2>&1 &
+          echo $! > /tmp/uim-mock-reliability.pid
+          sleep 2
+
+      - name: Run reliability regression
+        env:
+          UIM_RELIABILITY_CYCLES: ${{ inputs.reliability_cycles }}
+        run: npm run phase5:reliability:regression
+
+      - name: Upload reliability artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uim-phase5-reliability-artifacts
+          path: |
+            artifacts/mro/analysis/reliability/uim-phase5-reliability-regression.json
+            artifacts/mro/analysis/reliability/uim-phase5-reliability-regression.md
+            /tmp/uim-mock-reliability.log
+
+      - name: Stop UIM mock API
+        if: always()
+        run: |
+          if [ -f /tmp/uim-mock-reliability.pid ]; then
+            kill "$(cat /tmp/uim-mock-reliability.pid)" || true
+          fi
+
+  phase5-gate-summary:
+    needs: [chaos-experiments, security-remediation, reliability-regression]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Download chaos artifacts
+        if: inputs.run_chaos == true
+        uses: actions/download-artifact@v4
+        with:
+          name: uim-phase5-chaos-artifacts
+          path: artifacts/mro/analysis/chaos
+
+      - name: Download security artifacts
+        if: inputs.run_security == true
+        uses: actions/download-artifact@v4
+        with:
+          name: uim-phase5-security-closure-artifacts
+          path: artifacts/mro/analysis/security
+
+      - name: Download reliability artifacts
+        if: inputs.run_reliability == true
+        uses: actions/download-artifact@v4
+        with:
+          name: uim-phase5-reliability-artifacts
+          path: artifacts/mro/analysis/reliability
+
+      - name: Download performance artifacts (optional)
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          pattern: uim-phase5-performance-*-artifacts
+          merge-multiple: true
+          path: artifacts/mro/analysis/performance
+
+      - name: Generate phase5 gate summary
+        run: npm run phase5:gate:summary
+
+      - name: Upload phase5 gate summary
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uim-phase5-gate-summary
+          path: |
+            artifacts/mro/analysis/phase5/uim-phase5-gate-summary.json
+            artifacts/mro/analysis/phase5/uim-phase5-gate-summary.md

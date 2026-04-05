@@ -1,0 +1,35 @@
+{
+  "generated_at": "2026-04-05T05:00:51.672Z",
+  "phase": "phase5",
+  "version_gate": "v0.9",
+  "overall_status": "fail",
+  "gates": {
+    "p95_sla_compliance": {
+      "pass": false,
+      "measured_p95_ms": -1,
+      "target_ms": 2200,
+      "source": "missing"
+    },
+    "chaos_resilience": {
+      "pass": true,
+      "source": "chaos log"
+    },
+    "zero_critical_cves": {
+      "pass": true,
+      "critical_count": 0,
+      "source": "security closure report"
+    },
+    "reliability_regression": {
+      "pass": true,
+      "failed_runs": 0,
+      "source": "reliability regression report"
+    }
+  },
+  "input_presence": {
+    "performance_summary": false,
+    "chaos_log": true,
+    "security_closure_report": true,
+    "reliability_regression_report": true
+  },
+  "recommendation": "One or more gates failed/missing. Complete remediation and rerun gates."
+}

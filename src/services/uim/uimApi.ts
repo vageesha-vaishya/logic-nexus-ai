@@ -12,7 +12,11 @@ export class UimApiError extends Error {
   }
 }
 
-const API_BASE = import.meta.env.VITE_UIM_API_BASE_URL || '/api/v2/uim';
+const FALLBACK_API_BASE = '/api/v2/uim';
+
+function getApiBase(): string {
+  return import.meta.env.VITE_UIM_API_BASE_URL || FALLBACK_API_BASE;
+}
 
 type RequestOptions<TBody> = {
   method: UimHttpMethod;
@@ -22,7 +26,7 @@ type RequestOptions<TBody> = {
 };
 
 export async function uimApiRequest<TResponse, TBody = unknown>(options: RequestOptions<TBody>): Promise<TResponse> {
-  const response = await fetch(`${API_BASE}${options.path}`, {
+  const requestInit: RequestInit = {
     method: options.method,
     headers: {
       'Content-Type': 'application/json',
@@ -32,9 +36,22 @@ export async function uimApiRequest<TResponse, TBody = unknown>(options: Request
     },
     body: options.body ? JSON.stringify(options.body) : undefined,
     signal: options.signal,
-  });
+  };
+  const apiBase = getApiBase();
+  const primaryUrl = `${apiBase}${options.path}`;
+  let response = await fetch(primaryUrl, requestInit);
+  let payload = await response.json().catch(() => ({}));
 
-  const payload = await response.json().catch(() => ({}));
+  // If configured API base does not yet expose new analytics routes, retry same-origin UIM API.
+  const shouldRetryAnalytics404 = !response.ok
+    && response.status === 404
+    && options.path.startsWith('/analytics/')
+    && primaryUrl !== `${FALLBACK_API_BASE}${options.path}`;
+  if (shouldRetryAnalytics404) {
+    response = await fetch(`${FALLBACK_API_BASE}${options.path}`, requestInit);
+    payload = await response.json().catch(() => ({}));
+  }
+
   if (!response.ok) {
     const fallbackMessage = `UIM API request failed with status ${response.status}`;
     const message = typeof payload?.error === 'string' ? payload.error : fallbackMessage;

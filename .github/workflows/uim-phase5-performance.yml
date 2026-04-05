@@ -1,0 +1,82 @@
+name: UIM Phase5 Performance
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Performance profile to run"
+        type: choice
+        options:
+          - smoke
+          - baseline
+        required: false
+        default: smoke
+  schedule:
+    - cron: "0 3 * * *"
+
+jobs:
+  phase5-performance:
+    if: >
+      (github.event_name == 'schedule' && matrix.profile == 'smoke') ||
+      (github.event_name == 'workflow_dispatch' && matrix.profile == inputs.profile)
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        profile: [smoke, baseline]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Start UIM mock API
+        run: |
+          node scripts/uim-mock-api.mjs > /tmp/uim-mock-${{ matrix.profile }}.log 2>&1 &
+          echo $! > /tmp/uim-mock-${{ matrix.profile }}.pid
+          sleep 2
+
+      - name: Verify UIM health
+        run: |
+          curl -fsS http://localhost:3000/api/v2/uim/health
+
+      - name: Setup k6 binary
+        uses: grafana/setup-k6-action@v1
+
+      - name: Run k6 profile
+        env:
+          K6_UIM_MODE: ${{ matrix.profile }}
+          K6_UIM_BASE_URL: http://localhost:3000
+          K6_UIM_TENANT_ID: ci-tenant
+        run: npm run perf:uim:k6:${{ matrix.profile }}
+
+      - name: Generate SLA markdown report
+        env:
+          K6_UIM_MODE: ${{ matrix.profile }}
+        run: |
+          node scripts/generate-uim-phase5-sla-report.mjs
+
+      - name: Upload performance artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: uim-phase5-performance-${{ matrix.profile }}-artifacts
+          path: |
+            artifacts/mro/analysis/performance/uim-phase5-k6-summary.json
+            artifacts/mro/analysis/performance/uim-phase5-sla-report.md
+            /tmp/uim-mock-${{ matrix.profile }}.log
+
+      - name: Stop UIM mock API
+        if: always()
+        run: |
+          if [ -f /tmp/uim-mock-${{ matrix.profile }}.pid ]; then
+            kill "$(cat /tmp/uim-mock-${{ matrix.profile }}.pid)" || true
+          fi

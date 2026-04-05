@@ -11,12 +11,22 @@ import { resolveUimAccess } from '../_shared';
 import {
   computeUimAnalyticsKpis,
   UIM_ANALYTICS_DEFAULT_LOW_STOCK_THRESHOLD,
+  UIM_ANALYTICS_KPI_MODEL_DEFINITIONS,
+  UIM_ANALYTICS_SEMANTIC_DICTIONARY,
 } from '@/services/uim/uimAnalyticsService';
 import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
+
+const DEFAULT_DASHBOARD_LATENCY_TARGET_MS = 2200;
 
 function parseThreshold(value: unknown): number {
   const parsed = Number(value);
   if (!Number.isFinite(parsed) || parsed < 0) return UIM_ANALYTICS_DEFAULT_LOW_STOCK_THRESHOLD;
+  return Math.floor(parsed);
+}
+
+function parseDashboardLatencyTarget(value: unknown): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return DEFAULT_DASHBOARD_LATENCY_TARGET_MS;
   return Math.floor(parsed);
 }
 
@@ -40,6 +50,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     enforceRateLimit(req);
     const access = await resolveUimAccess(req, ctx);
     const threshold = parseThreshold(req.query.low_stock_threshold);
+    const dashboardLatencyTargetMs = parseDashboardLatencyTarget(
+      process.env.UIM_ANALYTICS_DASHBOARD_LATENCY_TARGET_MS,
+    );
     const supabase = getSupabaseAdminClient();
     const output = await computeUimAnalyticsKpis(supabase, access, { lowStockThreshold: threshold });
 
@@ -51,6 +64,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         tenant_id: access.tenantId,
         franchise_id: access.franchiseId || null,
         low_stock_threshold: threshold,
+        phase4_prep: {
+          sequence: [
+            'kpi-model-definitions',
+            'etl-jobs',
+            'dashboard-fe',
+            'bi-semantic-cube-and-data-dictionary',
+            'reporting-qa-and-reconciliation',
+          ],
+          kpi_model_definitions: UIM_ANALYTICS_KPI_MODEL_DEFINITIONS,
+          semantic_dictionary: UIM_ANALYTICS_SEMANTIC_DICTIONARY,
+          performance_targets: {
+            dashboard_latency_target_ms: dashboardLatencyTargetMs,
+            source: process.env.UIM_ANALYTICS_DASHBOARD_LATENCY_TARGET_MS ? 'environment' : 'default',
+          },
+        },
         ...output,
       },
     });

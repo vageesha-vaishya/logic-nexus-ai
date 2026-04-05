@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { toast } from '@/components/ui/use-toast';
@@ -19,15 +20,153 @@ import { DimensionBlock } from './blocks/DimensionBlock';
 import { deleteUimEntity, getUimEntity, listUimEntities } from '@/services/uim/uimFormAdapters';
 import { UimDataList, type UimDataListColumn } from '@/modules/uim/components/UimDataList';
 import { UimApiError } from '@/services/uim/uimApi';
-import { queryUimProjectionItems, replayUimProjections } from '@/services/uim/uimCoreServices';
+import {
+  queryUimAnalyticsBiCube,
+  queryUimAnalyticsEtlStatus,
+  queryUimAnalyticsKpis,
+  queryUimAnalyticsQaSignoff,
+  queryUimAnalyticsReconciliation,
+  queryUimAnalyticsSlaEvidence,
+  queryUimProjectionItems,
+  replayUimProjections,
+  submitUimAnalyticsQaSignoff,
+} from '@/services/uim/uimCoreServices';
 
 type UimNodeFormProps = {
   node: UimNodeKey;
   existingEntity?: Record<string, unknown> | null;
 };
 
+type UimAnalyticsPhase4PrepPayload = {
+  sequence: string[];
+  kpi_model_definitions: Array<{
+    key: string;
+    label: string;
+    description: string;
+    formula: string;
+    unit: string;
+    owner_role: string;
+  }>;
+  semantic_dictionary?: {
+    cube_name?: string;
+    version?: string;
+    dimensions?: Array<{
+      key: string;
+      source: string;
+      grain: string;
+      description: string;
+    }>;
+    measures?: Array<{
+      key: string;
+      source: string;
+      aggregation: string;
+      description: string;
+    }>;
+  };
+  performance_targets?: {
+    dashboard_latency_target_ms?: number;
+    source?: string;
+  };
+};
+
+type UimAnalyticsKpiResponsePayload = {
+  low_stock_threshold?: number;
+  kpis?: Record<string, number>;
+  snapshot?: {
+    replay_version?: number;
+    generated_at?: string;
+  };
+  phase4_prep?: UimAnalyticsPhase4PrepPayload;
+};
+
+type UimAnalyticsEtlResponsePayload = {
+  queue?: {
+    queued?: number;
+    running?: number;
+    retryScheduled?: number;
+    completed?: number;
+    failed?: number;
+  };
+  telemetry?: {
+    completed_runs?: number;
+    failed_runs?: number;
+    success_rate?: number;
+  };
+};
+
+type UimAnalyticsReconciliationPayload = {
+  readiness?: {
+    status?: 'ready' | 'pending';
+    score?: number;
+    checks?: Array<{
+      key: string;
+      label: string;
+      passed: boolean;
+      details: string;
+    }>;
+  };
+  snapshot?: {
+    replay_version?: number;
+    generated_at?: string;
+    etl_completed_runs?: number;
+    etl_failed_runs?: number;
+  };
+};
+
+type UimAnalyticsBiCubePayload = {
+  deployment_artifact?: {
+    artifact_id?: string;
+    artifact_hash?: string;
+    artifact_version?: string;
+    published_at?: string;
+    deployment_target?: string;
+  };
+  data_dictionary?: {
+    publication_status?: string;
+    dimensions?: Array<Record<string, unknown>>;
+    measures?: Array<Record<string, unknown>>;
+    kpi_model_definitions?: Array<Record<string, unknown>>;
+  };
+};
+
+type UimAnalyticsQaSignoffPayload = {
+  latest?: {
+    signoff_id?: string;
+    signoff_status?: 'signed_off' | 'revoked';
+    signed_off_by?: string;
+    signed_off_role?: string;
+    signed_off_at?: string;
+  } | null;
+  records?: Array<Record<string, unknown>>;
+};
+
+type UimAnalyticsSlaEvidencePayload = {
+  gate?: string;
+  status?: 'ready' | 'pending';
+  readiness_score?: number;
+  performance_targets?: {
+    dashboard_latency_target_ms?: number;
+  };
+};
+
+type UimAnalyticsEndpointStatus = {
+  key: string;
+  label: string;
+  status: 'ok' | 'error';
+  detail: string;
+};
+
+const ANALYTICS_PHASE4_SEQUENCE_FALLBACK = [
+  'kpi-model-definitions',
+  'etl-jobs',
+  'dashboard-fe',
+  'bi-semantic-cube-and-data-dictionary',
+  'reporting-qa-and-reconciliation',
+];
+
 const AUTO_RETRY_INTERVAL_MS = 5000;
 const AUTO_RETRY_MAX_ATTEMPTS = 3;
+const ANALYTICS_DASHBOARD_LATENCY_TARGET_MS_FALLBACK = 2200;
 const PROJECTION_BACKED_NODES: UimNodeKey[] = ['item-master', 'stock-ledger', 'reservations', 'issue-consume', 'restock'];
 
 function numberFromEvent(value: string): number {
@@ -128,7 +267,21 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
   const [lastLoadDurationMs, setLastLoadDurationMs] = useState(0);
   const [autoRetryAttempt, setAutoRetryAttempt] = useState(0);
   const [isReplayingProjection, setIsReplayingProjection] = useState(false);
+  const [analyticsLoading, setAnalyticsLoading] = useState(false);
+  const [analyticsError, setAnalyticsError] = useState<string | null>(null);
+  const [analyticsKpiPayload, setAnalyticsKpiPayload] = useState<UimAnalyticsKpiResponsePayload | null>(null);
+  const [analyticsEtlPayload, setAnalyticsEtlPayload] = useState<UimAnalyticsEtlResponsePayload | null>(null);
+  const [analyticsReconciliationPayload, setAnalyticsReconciliationPayload] = useState<UimAnalyticsReconciliationPayload | null>(null);
+  const [analyticsBiCubePayload, setAnalyticsBiCubePayload] = useState<UimAnalyticsBiCubePayload | null>(null);
+  const [analyticsQaSignoffPayload, setAnalyticsQaSignoffPayload] = useState<UimAnalyticsQaSignoffPayload | null>(null);
+  const [analyticsSlaEvidencePayload, setAnalyticsSlaEvidencePayload] = useState<UimAnalyticsSlaEvidencePayload | null>(null);
+  const [analyticsEndpointStatuses, setAnalyticsEndpointStatuses] = useState<UimAnalyticsEndpointStatus[]>([]);
+  const [analyticsCompatibilityNotice, setAnalyticsCompatibilityNotice] = useState<string | null>(null);
+  const [isQaSignoffSubmitting, setIsQaSignoffSubmitting] = useState(false);
+  const [analyticsLatencyMs, setAnalyticsLatencyMs] = useState(0);
+  const [analyticsLatencySamples, setAnalyticsLatencySamples] = useState<number[]>([]);
   const projectionBacked = PROJECTION_BACKED_NODES.includes(node);
+  const analyticsNodeActive = node === 'analytics';
 
   const { form, isSaving, submitError, submit, reset, isEditMode, lastSavedId, clearSubmitError } = useUimNodeForm({
     config,
@@ -225,6 +378,305 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     loadRecords();
   }, [lastSavedId, loadRecords]);
 
+  const loadAnalytics = useCallback(async () => {
+    if (!analyticsNodeActive) return;
+    setAnalyticsLoading(true);
+    setAnalyticsError(null);
+    setAnalyticsCompatibilityNotice(null);
+    const startedAt = performance.now();
+    try {
+      const [kpisResponse, etlResponse, reconciliationResponse, biCubeResponse, qaSignoffResponse, slaEvidenceResponse] = await Promise.allSettled([
+        queryUimAnalyticsKpis(),
+        queryUimAnalyticsEtlStatus(),
+        queryUimAnalyticsReconciliation(),
+        queryUimAnalyticsBiCube(),
+        queryUimAnalyticsQaSignoff(),
+        queryUimAnalyticsSlaEvidence(),
+      ]);
+      const nextKpiPayload = kpisResponse.status === 'fulfilled'
+        ? (kpisResponse.value?.output || null) as UimAnalyticsKpiResponsePayload | null
+        : null;
+      const nextEtlPayload = etlResponse.status === 'fulfilled'
+        ? (etlResponse.value?.output || null) as UimAnalyticsEtlResponsePayload | null
+        : null;
+      const nextReconciliationPayload = reconciliationResponse.status === 'fulfilled'
+        ? (reconciliationResponse.value?.output || null) as UimAnalyticsReconciliationPayload | null
+        : null;
+      const nextBiCubePayload = biCubeResponse.status === 'fulfilled'
+        ? (biCubeResponse.value?.output || null) as UimAnalyticsBiCubePayload | null
+        : null;
+      const nextQaSignoffPayload = qaSignoffResponse.status === 'fulfilled'
+        ? (qaSignoffResponse.value?.output || null) as UimAnalyticsQaSignoffPayload | null
+        : null;
+      const nextSlaEvidencePayload = slaEvidenceResponse.status === 'fulfilled'
+        ? (slaEvidenceResponse.value?.output || null) as UimAnalyticsSlaEvidencePayload | null
+        : null;
+      const toEndpointStatus = (
+        key: string,
+        label: string,
+        result: PromiseSettledResult<unknown>,
+      ): UimAnalyticsEndpointStatus => {
+        if (result.status === 'fulfilled') {
+          return {
+            key,
+            label,
+            status: 'ok',
+            detail: 'Loaded successfully',
+          };
+        }
+        const reason = result.reason;
+        if (reason instanceof UimApiError) {
+          return {
+            key,
+            label,
+            status: 'error',
+            detail: `HTTP ${reason.status}: ${reason.message || 'Request failed'}`,
+          };
+        }
+        if (reason instanceof TypeError && String(reason.message || '').toLowerCase().includes('fetch')) {
+          return {
+            key,
+            label,
+            status: 'error',
+            detail: 'Network fetch failed',
+          };
+        }
+        return {
+          key,
+          label,
+          status: 'error',
+          detail: String((reason as { message?: unknown } | null)?.message || reason || 'Unknown error'),
+        };
+      };
+      setAnalyticsEndpointStatuses([
+        toEndpointStatus('kpis', 'KPI', kpisResponse),
+        toEndpointStatus('etl', 'ETL', etlResponse),
+        toEndpointStatus('reconciliation', 'Reconciliation', reconciliationResponse),
+        toEndpointStatus('bi-cube', 'BI Cube', biCubeResponse),
+        toEndpointStatus('qa-signoff', 'QA Sign-off', qaSignoffResponse),
+        toEndpointStatus('sla-evidence', 'SLA Evidence', slaEvidenceResponse),
+      ]);
+
+      // Keep UI usable even when one analytics endpoint is temporarily unavailable.
+      setAnalyticsKpiPayload(nextKpiPayload || {
+        low_stock_threshold: 0,
+        kpis: {},
+        snapshot: {
+          replay_version: 0,
+          generated_at: '',
+        },
+        phase4_prep: {
+          sequence: ANALYTICS_PHASE4_SEQUENCE_FALLBACK,
+          kpi_model_definitions: [],
+          semantic_dictionary: {
+            cube_name: '',
+            version: '',
+            dimensions: [],
+            measures: [],
+          },
+          performance_targets: {
+            dashboard_latency_target_ms: ANALYTICS_DASHBOARD_LATENCY_TARGET_MS_FALLBACK,
+            source: 'fallback',
+          },
+        },
+      });
+      setAnalyticsEtlPayload(nextEtlPayload || {
+        queue: {
+          queued: 0,
+          running: 0,
+          retryScheduled: 0,
+          completed: 0,
+          failed: 0,
+        },
+        telemetry: {
+          completed_runs: 0,
+          failed_runs: 0,
+          success_rate: 0,
+        },
+      });
+      setAnalyticsReconciliationPayload(nextReconciliationPayload || {
+        readiness: {
+          status: 'pending',
+          score: 0,
+          checks: [],
+        },
+        snapshot: {
+          replay_version: 0,
+          generated_at: '',
+          etl_completed_runs: 0,
+          etl_failed_runs: 0,
+        },
+      });
+      setAnalyticsBiCubePayload(nextBiCubePayload || {
+        deployment_artifact: {
+          artifact_id: '',
+          artifact_hash: '',
+          artifact_version: '',
+          published_at: '',
+          deployment_target: '',
+        },
+        data_dictionary: {
+          publication_status: 'pending',
+          dimensions: [],
+          measures: [],
+          kpi_model_definitions: [],
+        },
+      });
+      setAnalyticsQaSignoffPayload(nextQaSignoffPayload || {
+        latest: null,
+        records: [],
+      });
+      setAnalyticsSlaEvidencePayload(nextSlaEvidencePayload || {
+        gate: 'v0.8-phase-4-exit',
+        status: 'pending',
+        readiness_score: 0,
+        performance_targets: {
+          dashboard_latency_target_ms: ANALYTICS_DASHBOARD_LATENCY_TARGET_MS_FALLBACK,
+        },
+      });
+
+      const rejectionReasons = [
+        kpisResponse,
+        etlResponse,
+        reconciliationResponse,
+        biCubeResponse,
+        qaSignoffResponse,
+        slaEvidenceResponse,
+      ]
+        .filter((result) => result.status === 'rejected')
+        .map((result) => (result as PromiseRejectedResult).reason);
+      const allRejectedAre404 = rejectionReasons.length === 6
+        && rejectionReasons.every((reason) => reason instanceof UimApiError && reason.status === 404);
+
+      const resolveAnalyticsErrorMessage = (reasons: unknown[]): string => {
+        if (reasons.some((reason) => reason instanceof UimApiError && (reason.status === 401 || reason.status === 403))) {
+          return 'Analytics endpoints are reachable, but your session is unauthorized for this module. Re-authenticate and retry.';
+        }
+        if (reasons.some((reason) => reason instanceof UimApiError && reason.status === 404)) {
+          return 'Some analytics endpoints are not deployed in this environment yet. Deploy `/api/v2/uim/analytics/*` routes and retry.';
+        }
+        if (reasons.some((reason) => reason instanceof TypeError && String(reason.message || '').toLowerCase().includes('fetch'))) {
+          return 'Unable to reach UIM analytics service. Check network connectivity and API base URL configuration.';
+        }
+        return 'Analytics endpoints are currently unavailable; showing fallback metadata.';
+      };
+
+      if (!nextKpiPayload && !nextEtlPayload && !nextReconciliationPayload && !nextBiCubePayload && !nextQaSignoffPayload && !nextSlaEvidencePayload) {
+        if (allRejectedAre404) {
+          setAnalyticsCompatibilityNotice('Running in compatibility mode: this backend profile does not expose advanced analytics routes yet. Fallback metadata is active.');
+          setAnalyticsError(null);
+        } else {
+          setAnalyticsError(resolveAnalyticsErrorMessage(rejectionReasons));
+        }
+      } else if (!nextKpiPayload || !nextEtlPayload || !nextReconciliationPayload || !nextBiCubePayload || !nextQaSignoffPayload || !nextSlaEvidencePayload) {
+        setAnalyticsError('Partial analytics metadata loaded. Some readiness fields are temporarily unavailable.');
+      }
+    } catch (error) {
+      setAnalyticsKpiPayload({
+        low_stock_threshold: 0,
+        kpis: {},
+        snapshot: {
+          replay_version: 0,
+          generated_at: '',
+        },
+        phase4_prep: {
+          sequence: ANALYTICS_PHASE4_SEQUENCE_FALLBACK,
+          kpi_model_definitions: [],
+          semantic_dictionary: {
+            cube_name: '',
+            version: '',
+            dimensions: [],
+            measures: [],
+          },
+          performance_targets: {
+            dashboard_latency_target_ms: ANALYTICS_DASHBOARD_LATENCY_TARGET_MS_FALLBACK,
+            source: 'fallback',
+          },
+        },
+      });
+      setAnalyticsEtlPayload({
+        queue: {
+          queued: 0,
+          running: 0,
+          retryScheduled: 0,
+          completed: 0,
+          failed: 0,
+        },
+        telemetry: {
+          completed_runs: 0,
+          failed_runs: 0,
+          success_rate: 0,
+        },
+      });
+      setAnalyticsReconciliationPayload({
+        readiness: {
+          status: 'pending',
+          score: 0,
+          checks: [],
+        },
+        snapshot: {
+          replay_version: 0,
+          generated_at: '',
+          etl_completed_runs: 0,
+          etl_failed_runs: 0,
+        },
+      });
+      setAnalyticsBiCubePayload({
+        deployment_artifact: {
+          artifact_id: '',
+          artifact_hash: '',
+          artifact_version: '',
+          published_at: '',
+          deployment_target: '',
+        },
+        data_dictionary: {
+          publication_status: 'pending',
+          dimensions: [],
+          measures: [],
+          kpi_model_definitions: [],
+        },
+      });
+      setAnalyticsQaSignoffPayload({
+        latest: null,
+        records: [],
+      });
+      setAnalyticsSlaEvidencePayload({
+        gate: 'v0.8-phase-4-exit',
+        status: 'pending',
+        readiness_score: 0,
+        performance_targets: {
+          dashboard_latency_target_ms: ANALYTICS_DASHBOARD_LATENCY_TARGET_MS_FALLBACK,
+        },
+      });
+      setAnalyticsEndpointStatuses([
+        { key: 'kpis', label: 'KPI', status: 'error', detail: 'Fallback mode active' },
+        { key: 'etl', label: 'ETL', status: 'error', detail: 'Fallback mode active' },
+        { key: 'reconciliation', label: 'Reconciliation', status: 'error', detail: 'Fallback mode active' },
+        { key: 'bi-cube', label: 'BI Cube', status: 'error', detail: 'Fallback mode active' },
+        { key: 'qa-signoff', label: 'QA Sign-off', status: 'error', detail: 'Fallback mode active' },
+        { key: 'sla-evidence', label: 'SLA Evidence', status: 'error', detail: 'Fallback mode active' },
+      ]);
+      setAnalyticsError('Analytics endpoints are currently unavailable; showing fallback metadata.');
+    } finally {
+      const elapsedMs = Math.max(0, Math.round(performance.now() - startedAt));
+      setAnalyticsLatencyMs(elapsedMs);
+      setAnalyticsLatencySamples((current) => {
+        const next = [...current, elapsedMs];
+        return next.slice(-5);
+      });
+      setAnalyticsLoading(false);
+    }
+  }, [analyticsNodeActive]);
+
+  useEffect(() => {
+    void loadAnalytics();
+  }, [loadAnalytics]);
+
+  useEffect(() => {
+    if (!lastSavedId) return;
+    void loadAnalytics();
+  }, [lastSavedId, loadAnalytics]);
+
   useEffect(() => {
     if (!recordsError || isLoadingRecords) return;
     if (autoRetryAttempt >= AUTO_RETRY_MAX_ATTEMPTS) return;
@@ -295,6 +747,74 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
       },
     },
   ]), []);
+
+  const analyticsPhase4Prep = analyticsKpiPayload?.phase4_prep || null;
+  const analyticsSequence = analyticsPhase4Prep?.sequence || [];
+  const analyticsKpiDefinitions = analyticsPhase4Prep?.kpi_model_definitions || [];
+  const analyticsDimensions = analyticsPhase4Prep?.semantic_dictionary?.dimensions || [];
+  const analyticsMeasures = analyticsPhase4Prep?.semantic_dictionary?.measures || [];
+  const analyticsDashboardLatencyTargetMs = Number(
+    analyticsPhase4Prep?.performance_targets?.dashboard_latency_target_ms
+      || ANALYTICS_DASHBOARD_LATENCY_TARGET_MS_FALLBACK,
+  );
+  const analyticsLatencyTargetSource = String(
+    analyticsPhase4Prep?.performance_targets?.source || 'fallback',
+  );
+  const analyticsCubeName = String(analyticsPhase4Prep?.semantic_dictionary?.cube_name || '');
+  const analyticsCubeVersion = String(analyticsPhase4Prep?.semantic_dictionary?.version || '');
+  const analyticsSnapshotVersion = Number(analyticsKpiPayload?.snapshot?.replay_version || 0);
+  const analyticsQueue = analyticsEtlPayload?.queue || {};
+  const analyticsTelemetry = analyticsEtlPayload?.telemetry || {};
+  const analyticsReconciliationStatus = String(analyticsReconciliationPayload?.readiness?.status || 'pending');
+  const analyticsReconciliationScore = Number(analyticsReconciliationPayload?.readiness?.score || 0);
+  const analyticsReconciliationChecks = analyticsReconciliationPayload?.readiness?.checks || [];
+  const analyticsReconciliationReady = analyticsReconciliationStatus === 'ready';
+  const analyticsLatencyAverageMs = analyticsLatencySamples.length > 0
+    ? Math.round(analyticsLatencySamples.reduce((acc, value) => acc + value, 0) / analyticsLatencySamples.length)
+    : 0;
+  const analyticsLatencyWithinTarget = analyticsLatencyAverageMs > 0
+    ? analyticsLatencyAverageMs <= analyticsDashboardLatencyTargetMs
+    : analyticsLatencyMs <= analyticsDashboardLatencyTargetMs;
+  const analyticsApiBase = import.meta.env.VITE_UIM_API_BASE_URL || '/api/v2/uim';
+  const analyticsHealthUrl = `${analyticsApiBase}/health`;
+  const analyticsContractsUrl = `${analyticsApiBase}/integration-contracts`;
+  const analyticsOpenApiUrl = `${analyticsApiBase}/contracts/openapi-3.1.yaml`;
+  const analyticsBiArtifactId = String(analyticsBiCubePayload?.deployment_artifact?.artifact_id || '-');
+  const analyticsDictionaryPublished = String(analyticsBiCubePayload?.data_dictionary?.publication_status || 'pending') === 'published';
+  const analyticsQaSignoffLatest = analyticsQaSignoffPayload?.latest || null;
+  const analyticsQaSignoffDone = String(analyticsQaSignoffLatest?.signoff_status || '') === 'signed_off';
+  const analyticsSlaGate = String(analyticsSlaEvidencePayload?.gate || 'v0.8-phase-4-exit');
+  const analyticsSlaReadiness = Number(analyticsSlaEvidencePayload?.readiness_score || 0);
+  const analyticsSlaStatus = String(analyticsSlaEvidencePayload?.status || 'pending');
+
+  const handleQaSignoff = async () => {
+    setIsQaSignoffSubmitting(true);
+    try {
+      await submitUimAnalyticsQaSignoff({
+        signoff_status: 'signed_off',
+        signed_off_by: 'system.user@uim.local',
+        signed_off_role: 'qa_lead',
+        reconciliation_verified: analyticsReconciliationReady,
+        latency_target_met: analyticsLatencyWithinTarget,
+        data_dictionary_published: analyticsDictionaryPublished,
+        bi_cube_deployed: analyticsBiArtifactId !== '-',
+        notes: 'Phase 4 QA sign-off submitted from analytics workspace.',
+      });
+      await loadAnalytics();
+      toast({
+        title: 'QA sign-off submitted',
+        description: 'Reporting QA reconciliation workflow has been updated.',
+      });
+    } catch (error) {
+      toast({
+        title: 'QA sign-off failed',
+        description: 'Unable to submit QA sign-off right now.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsQaSignoffSubmitting(false);
+    }
+  };
 
   const handleCreate = () => {
     clearSubmitError();
@@ -385,6 +905,203 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
         <p className="text-xs text-muted-foreground">
           List load latency: {Math.round(lastLoadDurationMs)} ms
         </p>
+
+        {analyticsNodeActive ? (
+          <div className="grid gap-4 md:grid-cols-2">
+            <Card className="border-border/70">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <CardTitle className="text-base">Phase 4 Sequence</CardTitle>
+                    <CardDescription>Implementation order from design specification.</CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      void loadAnalytics();
+                    }}
+                    disabled={analyticsLoading}
+                    aria-label="Retry analytics metadata"
+                  >
+                    <RefreshCcw className="mr-2 h-4 w-4" />
+                    {analyticsLoading ? 'Refreshing...' : 'Retry Analytics Metadata'}
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {analyticsSequence.length > 0 ? (
+                  <ol className="list-decimal space-y-1 pl-4">
+                    {analyticsSequence.map((step) => (
+                      <li key={step}>{step}</li>
+                    ))}
+                  </ol>
+                ) : (
+                  <p className="text-muted-foreground">Phase sequence metadata is not available yet.</p>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  Reconciliation readiness: {analyticsReconciliationReady ? 'ready' : 'pending'} ({analyticsReconciliationScore}%)
+                </p>
+                <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                  <span>Dashboard latency target: ≤ {analyticsDashboardLatencyTargetMs} ms</span>
+                  <Badge variant={analyticsLatencyWithinTarget ? 'secondary' : 'destructive'}>
+                    {analyticsLatencyWithinTarget ? 'Latency: within target' : 'Latency: above target'}
+                  </Badge>
+                </div>
+                <p className="text-xs text-muted-foreground">Latency target source: {analyticsLatencyTargetSource}</p>
+                <p className="text-xs text-muted-foreground">
+                  Replay version: {analyticsSnapshotVersion || 0} | ETL failed runs: {Number(analyticsQueue.failed || 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  SLA Gate: {analyticsSlaGate} | Status: {analyticsSlaStatus} ({analyticsSlaReadiness}%)
+                </p>
+                <div className="flex flex-wrap items-center gap-2 text-xs">
+                  <a
+                    href={analyticsHealthUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline underline-offset-2"
+                  >
+                    Open API Health
+                  </a>
+                  <a
+                    href={analyticsContractsUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline underline-offset-2"
+                  >
+                    Open API Contracts
+                  </a>
+                  <a
+                    href={analyticsOpenApiUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-primary underline underline-offset-2"
+                  >
+                    Open OpenAPI YAML
+                  </a>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/70">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">KPI Model Definitions</CardTitle>
+                <CardDescription>Formulas and ownership for analytics KPIs.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                {analyticsKpiDefinitions.length > 0 ? (
+                  <div className="space-y-2">
+                    {analyticsKpiDefinitions.map((definition) => (
+                      <div key={definition.key} className="rounded-md border border-border/70 p-2">
+                        <p className="font-medium">{definition.label} ({definition.key})</p>
+                        <p className="text-xs text-muted-foreground">{definition.description}</p>
+                        <p className="text-xs">Formula: {definition.formula}</p>
+                        <p className="text-xs">Unit: {definition.unit} | Owner: {definition.owner_role}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-muted-foreground">KPI metadata is not available yet.</p>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/70">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">BI Semantic Cube</CardTitle>
+                <CardDescription>Cube and dictionary metadata for downstream BI.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p>Cube: {analyticsCubeName || '-'}</p>
+                <p>Version: {analyticsCubeVersion || '-'}</p>
+                <p>Artifact: {analyticsBiArtifactId}</p>
+                <p className="text-xs text-muted-foreground">
+                  Dictionary publication: {analyticsDictionaryPublished ? 'published' : 'pending'}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Dimensions: {analyticsDimensions.length} | Measures: {analyticsMeasures.length}
+                </p>
+                <div className="space-y-1">
+                  {analyticsDimensions.slice(0, 4).map((dimension) => (
+                    <p key={`dim-${dimension.key}`} className="text-xs">
+                      Dimension {dimension.key}: {dimension.source} ({dimension.grain})
+                    </p>
+                  ))}
+                  {analyticsMeasures.slice(0, 4).map((measure) => (
+                    <p key={`measure-${measure.key}`} className="text-xs">
+                      Measure {measure.key}: {measure.source} [{measure.aggregation}]
+                    </p>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-border/70">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-base">ETL and Reconciliation Status</CardTitle>
+                <CardDescription>Phase 4 reporting QA readiness indicators.</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2 text-sm">
+                <p>
+                  Queue - queued: {Number(analyticsQueue.queued || 0)}, running: {Number(analyticsQueue.running || 0)}, retry: {Number(analyticsQueue.retryScheduled || 0)}, completed: {Number(analyticsQueue.completed || 0)}, failed: {Number(analyticsQueue.failed || 0)}
+                </p>
+                <p>
+                  Telemetry - completed runs: {Number(analyticsTelemetry.completed_runs || 0)}, failed runs: {Number(analyticsTelemetry.failed_runs || 0)}, success rate: {Number(analyticsTelemetry.success_rate || 0)}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Last analytics refresh: {analyticsLatencyMs} ms | rolling avg (last {analyticsLatencySamples.length || 1}): {analyticsLatencyAverageMs || analyticsLatencyMs} ms
+                </p>
+                <div className="space-y-1">
+                  {analyticsReconciliationChecks.slice(0, 5).map((check) => (
+                    <p key={check.key} className="text-xs">
+                      {check.passed ? 'PASS' : 'PENDING'} - {check.label}: {check.details}
+                    </p>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Low stock threshold: {Number(analyticsKpiPayload?.low_stock_threshold || 0)}
+                </p>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant={analyticsQaSignoffDone ? 'secondary' : 'default'}
+                    onClick={() => {
+                      void handleQaSignoff();
+                    }}
+                    disabled={isQaSignoffSubmitting || analyticsLoading}
+                  >
+                    {isQaSignoffSubmitting
+                      ? 'Submitting QA Sign-off...'
+                      : analyticsQaSignoffDone
+                        ? 'QA Sign-off Submitted'
+                        : 'Submit QA Sign-off'}
+                  </Button>
+                  {analyticsQaSignoffLatest ? (
+                    <p className="text-xs text-muted-foreground">
+                      Latest by {String(analyticsQaSignoffLatest.signed_off_by || 'unknown')}
+                    </p>
+                  ) : null}
+                </div>
+                {analyticsLoading ? <p className="text-xs text-muted-foreground">Refreshing analytics metadata...</p> : null}
+                {analyticsError ? <p className="text-xs text-destructive">{analyticsError}</p> : null}
+                {analyticsCompatibilityNotice ? <p className="text-xs text-muted-foreground">{analyticsCompatibilityNotice}</p> : null}
+                <details className="rounded-md border border-border/70 p-2 text-xs">
+                  <summary className="cursor-pointer font-medium">Error Details</summary>
+                  <div className="mt-2 space-y-1">
+                    {analyticsEndpointStatuses.map((endpoint) => (
+                      <p key={endpoint.key}>
+                        {endpoint.status === 'ok' ? 'OK' : 'ERR'} - {endpoint.label}: {endpoint.detail}
+                      </p>
+                    ))}
+                  </div>
+                </details>
+              </CardContent>
+            </Card>
+          </div>
+        ) : null}
 
         {recordsError ? (
           <Alert variant="destructive" aria-live="assertive" role="alert">

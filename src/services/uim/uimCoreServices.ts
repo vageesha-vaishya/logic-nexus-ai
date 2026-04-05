@@ -59,6 +59,37 @@ export async function queryUimAnalyticsKpis(lowStockThreshold?: number): Promise
     tenant_id: string;
     franchise_id: string | null;
     low_stock_threshold: number;
+    phase4_prep: {
+      sequence: string[];
+      kpi_model_definitions: Array<{
+        key: string;
+        label: string;
+        description: string;
+        formula: string;
+        unit: string;
+        owner_role: string;
+      }>;
+      semantic_dictionary: {
+        cube_name: string;
+        version: string;
+        dimensions: Array<{
+          key: string;
+          source: string;
+          grain: string;
+          description: string;
+        }>;
+        measures: Array<{
+          key: string;
+          source: string;
+          aggregation: string;
+          description: string;
+        }>;
+      };
+      performance_targets?: {
+        dashboard_latency_target_ms: number;
+        source: string;
+      };
+    };
     kpis: {
       total_tracked_items: number;
       available_quantity: number;
@@ -120,5 +151,120 @@ export async function executeUimAnalyticsEtlAction(input: {
     method: 'POST',
     path: '/analytics/etl',
     body: input,
+  });
+}
+
+export async function queryUimAnalyticsReconciliation(): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    readiness: {
+      status: 'ready' | 'pending';
+      score: number;
+      checks: Array<{
+        key: string;
+        label: string;
+        passed: boolean;
+        details: string;
+      }>;
+    };
+    snapshot: {
+      replay_version: number;
+      generated_at: string;
+      etl_completed_runs: number;
+      etl_failed_runs: number;
+    };
+  };
+}> {
+  return uimApiRequest({
+    method: 'GET',
+    path: '/analytics/reconciliation',
+  });
+}
+
+export async function queryUimAnalyticsBiCube(): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    deployment_artifact: {
+      artifact_id: string;
+      artifact_hash: string;
+      artifact_version: string;
+      published_at: string;
+      deployment_target: string;
+    };
+    data_dictionary: {
+      cube_name: string;
+      publication_status: string;
+      dimensions: Array<Record<string, unknown>>;
+      measures: Array<Record<string, unknown>>;
+      kpi_model_definitions: Array<Record<string, unknown>>;
+    };
+  };
+}> {
+  return uimApiRequest({
+    method: 'GET',
+    path: '/analytics/bi-cube',
+  });
+}
+
+export async function queryUimAnalyticsQaSignoff(): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    latest: Record<string, unknown> | null;
+    records: Array<Record<string, unknown>>;
+  };
+}> {
+  return uimApiRequest({
+    method: 'GET',
+    path: '/analytics/qa-signoff',
+  });
+}
+
+export async function submitUimAnalyticsQaSignoff(input: {
+  signoff_status?: 'signed_off' | 'revoked';
+  signed_off_by: string;
+  signed_off_role: string;
+  reconciliation_verified: boolean;
+  latency_target_met: boolean;
+  data_dictionary_published: boolean;
+  bi_cube_deployed: boolean;
+  notes?: string;
+}): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    signoff: Record<string, unknown>;
+  };
+}> {
+  return uimApiRequest({
+    method: 'POST',
+    path: '/analytics/qa-signoff',
+    body: input,
+  });
+}
+
+export async function queryUimAnalyticsSlaEvidence(): Promise<{
+  output: {
+    tenant_id: string;
+    franchise_id: string | null;
+    gate: string;
+    generated_at: string;
+    performance_targets: {
+      dashboard_latency_target_ms: number;
+    };
+    evidence_checks: Array<{
+      key: string;
+      passed: boolean;
+      details: string;
+    }>;
+    readiness_score: number;
+    status: 'ready' | 'pending';
+  };
+}> {
+  return uimApiRequest({
+    method: 'GET',
+    path: '/analytics/sla-evidence',
   });
 }

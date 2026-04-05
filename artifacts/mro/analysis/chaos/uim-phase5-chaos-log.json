@@ -1,0 +1,41 @@
+{
+  "generated_at": "2026-04-05T04:54:35.115Z",
+  "base_url": "http://localhost:3000",
+  "passed": 3,
+  "total": 4,
+  "status": "pass",
+  "experiments": [
+    {
+      "id": "CH-001",
+      "title": "Dependency timeout simulation",
+      "started_at": "2026-04-05T04:54:35.005Z",
+      "passed": true,
+      "details": "Timeout/connection error captured: TypeError",
+      "finished_at": "2026-04-05T04:54:35.049Z"
+    },
+    {
+      "id": "CH-002",
+      "title": "ETL queue burst and drain",
+      "started_at": "2026-04-05T04:54:35.049Z",
+      "passed": true,
+      "details": "process status=200, queued=0",
+      "finished_at": "2026-04-05T04:54:35.107Z"
+    },
+    {
+      "id": "CH-003",
+      "title": "Reconciliation under scheduler stop/start",
+      "started_at": "2026-04-05T04:54:35.107Z",
+      "passed": true,
+      "details": "reconciliation status=200",
+      "finished_at": "2026-04-05T04:54:35.113Z"
+    },
+    {
+      "id": "CH-004",
+      "title": "Invalid payload rejection",
+      "started_at": "2026-04-05T04:54:35.113Z",
+      "passed": false,
+      "details": "status=200",
+      "finished_at": "2026-04-05T04:54:35.115Z"
+    }
+  ]
+}

@@ -22,6 +22,55 @@ const ledger = [];
 const commands = new Map();
 const projectionSnapshots = new Map();
 const webhookAdapters = new Map();
+const qaSignoffRecords = [];
+
+const UIM_ANALYTICS_KPI_MODEL_DEFINITIONS = [
+  { key: 'total_tracked_items', label: 'Total tracked items', formula: 'COUNT(items)' },
+  { key: 'available_quantity', label: 'Available quantity', formula: 'SUM(projected_available_quantity)' },
+  { key: 'reserved_quantity', label: 'Reserved quantity', formula: 'SUM(projected_reserved_quantity)' },
+  { key: 'consumed_quantity', label: 'Consumed quantity', formula: 'SUM(projected_consumed_quantity)' },
+  { key: 'in_transit_items', label: 'In transit items', formula: "COUNT(status='in_transit')" },
+  { key: 'low_stock_items', label: 'Low stock items', formula: 'COUNT(projected_available_quantity <= threshold)' },
+  { key: 'inventory_turnover_ratio', label: 'Inventory turnover ratio', formula: 'consumed/(available+reserved)' },
+];
+
+const UIM_ANALYTICS_SEMANTIC_DICTIONARY = {
+  cube_name: 'uim_inventory_analytics_cube',
+  version: 'phase4-prep-v1',
+  dimensions: [
+    { key: 'tenant_id', source: 'uim_inventory_projection_snapshots.tenant_id', grain: 'tenant' },
+    { key: 'inventory_item_id', source: 'uim_inventory_projection_snapshots.inventory_item_id', grain: 'inventory_item' },
+    { key: 'snapshot_date', source: 'DATE(uim_inventory_projection_snapshots.updated_at)', grain: 'projection_snapshot' },
+  ],
+  measures: [
+    { key: 'available_quantity', source: 'projected_available_quantity', aggregation: 'sum' },
+    { key: 'reserved_quantity', source: 'projected_reserved_quantity', aggregation: 'sum' },
+    { key: 'consumed_quantity', source: 'projected_consumed_quantity', aggregation: 'sum' },
+    { key: 'replay_version', source: 'replay_version', aggregation: 'max' },
+  ],
+};
+
+const etlState = {
+  scheduler_running: false,
+  queue: {
+    queued: 0,
+    running: 0,
+    retryScheduled: 0,
+    completed: 0,
+    failed: 0,
+  },
+  telemetry: {
+    total_runs: 0,
+    completed_runs: 0,
+    failed_runs: 0,
+    retry_scheduled_runs: 0,
+    retry_events: 0,
+    average_duration_ms: 120,
+    success_rate: 1,
+    latest_completed_at: null,
+    last_error: null,
+  },
+};
 
 const CONNECTOR_MANIFESTS = [
   {
@@ -83,6 +132,46 @@ function readNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
+function computeAnalyticsKpis(lowStockThreshold = 5) {
+  const snapshots = [...projectionSnapshots.values()];
+  const totalTrackedItems = inventoryItems.size;
+  let available = 0;
+  let reserved = 0;
+  let consumed = 0;
+  let lowStock = 0;
+  let replayVersion = 0;
+  snapshots.forEach((snapshot) => {
+    const a = readNumber(snapshot.projected_available_quantity);
+    const r = readNumber(snapshot.projected_reserved_quantity);
+    const c = readNumber(snapshot.projected_consumed_quantity);
+    available += a;
+    reserved += r;
+    consumed += c;
+    if (a <= lowStockThreshold) lowStock += 1;
+    replayVersion = Math.max(replayVersion, readNumber(snapshot.replay_version));
+  });
+  let inTransit = 0;
+  for (const item of inventoryItems.values()) {
+    if (String(item.status || '') === 'in_transit') inTransit += 1;
+  }
+  const ratio = Number((consumed / Math.max(1, available + reserved)).toFixed(4));
+  return {
+    kpis: {
+      total_tracked_items: totalTrackedItems,
+      available_quantity: available,
+      reserved_quantity: reserved,
+      consumed_quantity: consumed,
+      in_transit_items: inTransit,
+      low_stock_items: lowStock,
+      inventory_turnover_ratio: ratio,
+    },
+    snapshot: {
+      replay_version: replayVersion,
+      generated_at: new Date().toISOString(),
+    },
+  };
+}
+
 async function parseBody(req) {
   const chunks = [];
   for await (const chunk of req) {
@@ -128,6 +217,14 @@ const server = createServer(async (req, res) => {
   const restIntegrationMatch = pathname.match(/^\/api\/v2\/uim\/integrations\/rest$/);
   const webhookMatch = pathname.match(/^\/api\/v2\/uim\/webhooks$/);
   const connectorManifestMatch = pathname.match(/^\/api\/v2\/uim\/connectors\/manifests$/);
+  const integrationContractsMatch = pathname.match(/^\/api\/v2\/uim\/integration-contracts$/);
+  const openapiMatch = pathname.match(/^\/api\/v2\/uim\/contracts\/openapi-3\.1\.yaml$/);
+  const analyticsKpisMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/kpis$/);
+  const analyticsEtlMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/etl$/);
+  const analyticsReconciliationMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/reconciliation$/);
+  const analyticsBiCubeMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/bi-cube$/);
+  const analyticsQaSignoffMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/qa-signoff$/);
+  const analyticsSlaEvidenceMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/sla-evidence$/);
 
   if (restIntegrationMatch && method === 'POST') {
     const body = await parseBody(req);
@@ -249,6 +346,278 @@ const server = createServer(async (req, res) => {
       interface: 'uim-connector-manifests',
       output: {
         connector_manifests: CONNECTOR_MANIFESTS,
+      },
+    });
+    return;
+  }
+
+  if (integrationContractsMatch && method === 'GET') {
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-integration-contracts',
+      output: {
+        analytics: {
+          kpiPath: '/api/v2/uim/analytics/kpis',
+          etlPath: '/api/v2/uim/analytics/etl',
+          reconciliationPath: '/api/v2/uim/analytics/reconciliation',
+          biCubePath: '/api/v2/uim/analytics/bi-cube',
+          qaSignoffPath: '/api/v2/uim/analytics/qa-signoff',
+          slaEvidencePath: '/api/v2/uim/analytics/sla-evidence',
+        },
+      },
+    });
+    return;
+  }
+
+  if (openapiMatch && method === 'GET') {
+    setCors(res);
+    res.statusCode = 200;
+    res.setHeader('Content-Type', 'text/yaml; charset=utf-8');
+    res.end(`openapi: 3.1.0
+info:
+  title: UIM Integration API
+  version: 0.8.0
+paths:
+  /analytics/kpis:
+    get:
+      summary: UIM analytics KPI model snapshot
+  /analytics/etl:
+    get:
+      summary: UIM ETL scheduler queue status and telemetry
+  /analytics/reconciliation:
+    get:
+      summary: UIM reporting reconciliation readiness checks
+  /analytics/bi-cube:
+    get:
+      summary: UIM BI cube deployment artifact and published data dictionary
+  /analytics/qa-signoff:
+    get:
+      summary: UIM reporting QA sign-off workflow state
+  /analytics/sla-evidence:
+    get:
+      summary: UIM Phase 4 v0.8 latency and SLA evidence package
+`);
+    return;
+  }
+
+  if (analyticsKpisMatch && method === 'GET') {
+    const threshold = Math.max(0, Number.parseInt(String(url.searchParams.get('low_stock_threshold') || '5'), 10) || 5);
+    const kpiOutput = computeAnalyticsKpis(threshold);
+    const { tenantId, franchiseId } = resolveTenant(req);
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-analytics-kpis',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        low_stock_threshold: threshold,
+        phase4_prep: {
+          sequence: [
+            'kpi-model-definitions',
+            'etl-jobs',
+            'dashboard-fe',
+            'bi-semantic-cube-and-data-dictionary',
+            'reporting-qa-and-reconciliation',
+          ],
+          kpi_model_definitions: UIM_ANALYTICS_KPI_MODEL_DEFINITIONS,
+          semantic_dictionary: UIM_ANALYTICS_SEMANTIC_DICTIONARY,
+          performance_targets: {
+            dashboard_latency_target_ms: 2200,
+            source: 'mock-default',
+          },
+        },
+        ...kpiOutput,
+      },
+    });
+    return;
+  }
+
+  if (analyticsEtlMatch && method === 'GET') {
+    const { tenantId, franchiseId } = resolveTenant(req);
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-analytics-etl',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        scheduler_running: etlState.scheduler_running,
+        queue: etlState.queue,
+        telemetry: etlState.telemetry,
+      },
+    });
+    return;
+  }
+
+  if (analyticsEtlMatch && method === 'POST') {
+    const body = await parseBody(req);
+    const action = String(body.action || '').trim().toLowerCase();
+    if (action === 'start-scheduler') etlState.scheduler_running = true;
+    if (action === 'stop-scheduler') etlState.scheduler_running = false;
+    if (action === 'schedule-run') etlState.queue.queued += 1;
+    if (action === 'process-now') {
+      etlState.queue.completed += etlState.queue.queued;
+      etlState.telemetry.total_runs += 1;
+      etlState.telemetry.completed_runs += 1;
+      etlState.telemetry.latest_completed_at = new Date().toISOString();
+      etlState.queue.queued = 0;
+    }
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-analytics-etl',
+      output: {
+        action,
+        scheduler_running: etlState.scheduler_running,
+        queue: etlState.queue,
+        telemetry: etlState.telemetry,
+      },
+    });
+    return;
+  }
+
+  if (analyticsReconciliationMatch && method === 'GET') {
+    const { tenantId, franchiseId } = resolveTenant(req);
+    const kpiOutput = computeAnalyticsKpis(5);
+    const checks = [
+      {
+        key: 'projection_replay_checkpoint',
+        label: 'Projection replay checkpoint present',
+        passed: Number(kpiOutput.snapshot.replay_version || 0) > 0,
+        details: `Replay version ${Number(kpiOutput.snapshot.replay_version || 0)}`,
+      },
+      {
+        key: 'etl_failure_clear',
+        label: 'ETL failure queue clear',
+        passed: Number(etlState.telemetry.failed_runs || 0) === 0,
+        details: `Failed runs ${Number(etlState.telemetry.failed_runs || 0)}`,
+      },
+    ];
+    const passCount = checks.filter((x) => x.passed).length;
+    const score = Math.round((passCount / checks.length) * 100);
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-analytics-reconciliation',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        readiness: {
+          status: passCount === checks.length ? 'ready' : 'pending',
+          score,
+          checks,
+        },
+        snapshot: {
+          replay_version: Number(kpiOutput.snapshot.replay_version || 0),
+          generated_at: kpiOutput.snapshot.generated_at,
+          etl_completed_runs: Number(etlState.telemetry.completed_runs || 0),
+          etl_failed_runs: Number(etlState.telemetry.failed_runs || 0),
+        },
+      },
+    });
+    return;
+  }
+
+  if (analyticsBiCubeMatch && method === 'GET') {
+    const { tenantId, franchiseId } = resolveTenant(req);
+    const publishedAt = new Date().toISOString();
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-analytics-bi-cube',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        deployment_artifact: {
+          artifact_id: `uim-bi-cube-${Date.now()}`,
+          artifact_hash: `${Date.now().toString(16)}mock`,
+          artifact_version: UIM_ANALYTICS_SEMANTIC_DICTIONARY.version,
+          published_at: publishedAt,
+          deployment_target: 'uim_inventory_analytics_cube',
+        },
+        data_dictionary: {
+          ...UIM_ANALYTICS_SEMANTIC_DICTIONARY,
+          kpi_model_definitions: UIM_ANALYTICS_KPI_MODEL_DEFINITIONS,
+          publication_status: 'published',
+        },
+      },
+    });
+    return;
+  }
+
+  if (analyticsQaSignoffMatch && method === 'GET') {
+    const { tenantId, franchiseId } = resolveTenant(req);
+    const records = qaSignoffRecords
+      .filter((record) => record.tenant_id === tenantId && (franchiseId ? record.franchise_id === franchiseId : true))
+      .sort((a, b) => (a.signed_off_at < b.signed_off_at ? 1 : -1));
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-analytics-qa-signoff',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        latest: records[0] || null,
+        records,
+      },
+    });
+    return;
+  }
+
+  if (analyticsQaSignoffMatch && method === 'POST') {
+    const { tenantId, franchiseId } = resolveTenant(req);
+    const body = await parseBody(req);
+    const record = {
+      signoff_id: `uim-signoff-${Date.now()}`,
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      signoff_status: String(body.signoff_status || '').trim().toLowerCase() === 'revoked' ? 'revoked' : 'signed_off',
+      signed_off_by: String(body.signed_off_by || 'system.user@uim.local'),
+      signed_off_role: String(body.signed_off_role || 'qa_lead'),
+      signed_off_at: new Date().toISOString(),
+      checklist: {
+        reconciliation_verified: Boolean(body.reconciliation_verified),
+        latency_target_met: Boolean(body.latency_target_met),
+        data_dictionary_published: Boolean(body.data_dictionary_published),
+        bi_cube_deployed: Boolean(body.bi_cube_deployed),
+      },
+      notes: String(body.notes || ''),
+    };
+    qaSignoffRecords.push(record);
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-analytics-qa-signoff',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        signoff: record,
+      },
+    });
+    return;
+  }
+
+  if (analyticsSlaEvidenceMatch && method === 'GET') {
+    const { tenantId, franchiseId } = resolveTenant(req);
+    const latestSignoff = [...qaSignoffRecords]
+      .filter((record) => record.tenant_id === tenantId && (franchiseId ? record.franchise_id === franchiseId : true))
+      .sort((a, b) => (a.signed_off_at < b.signed_off_at ? 1 : -1))[0] || null;
+    const checks = [
+      { key: 'kpi_model_complete', passed: UIM_ANALYTICS_KPI_MODEL_DEFINITIONS.length >= 7, details: 'kpi defs loaded' },
+      { key: 'semantic_dictionary_complete', passed: true, details: 'dictionary published' },
+      { key: 'etl_failures_clear', passed: Number(etlState.telemetry.failed_runs || 0) === 0, details: `failed_runs=${etlState.telemetry.failed_runs}` },
+      { key: 'qa_signoff_present', passed: Boolean(latestSignoff && latestSignoff.signoff_status === 'signed_off'), details: latestSignoff ? latestSignoff.signoff_status : 'none' },
+    ];
+    const passCount = checks.filter((x) => x.passed).length;
+    const score = Math.round((passCount / checks.length) * 100);
+    sendJson(res, 200, {
+      version: 'v2',
+      interface: 'uim-analytics-sla-evidence',
+      output: {
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        gate: 'v0.8-phase-4-exit',
+        generated_at: new Date().toISOString(),
+        performance_targets: {
+          dashboard_latency_target_ms: 2200,
+        },
+        evidence_checks: checks,
+        readiness_score: score,
+        status: score === 100 ? 'ready' : 'pending',
       },
     });
     return;

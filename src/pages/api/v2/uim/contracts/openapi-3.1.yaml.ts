@@ -4,9 +4,9 @@ const OPENAPI_YAML = `
 openapi: 3.1.0
 info:
   title: UIM Integration API
-  version: 0.6.0
+  version: 0.8.0
   description: >
-    Phase 3 channel integration contracts for UIM core inventory services.
+    Phase 4 analytics and reporting contracts for UIM unified inventory services.
 servers:
   - url: /api/v2/uim
 paths:
@@ -30,6 +30,20 @@ paths:
       summary: UIM ETL scheduler queue status and telemetry
     post:
       summary: UIM ETL scheduler actions (schedule/process/start/stop)
+  /analytics/reconciliation:
+    get:
+      summary: UIM reporting reconciliation readiness checks
+  /analytics/bi-cube:
+    get:
+      summary: UIM BI cube deployment artifact and published data dictionary
+  /analytics/qa-signoff:
+    get:
+      summary: UIM reporting QA sign-off workflow state
+    post:
+      summary: Submit UIM reporting QA sign-off decision
+  /analytics/sla-evidence:
+    get:
+      summary: UIM Phase 4 v0.8 latency and SLA evidence package
   /graphql:
     post:
       summary: GraphQL endpoint for projection and inventory read models

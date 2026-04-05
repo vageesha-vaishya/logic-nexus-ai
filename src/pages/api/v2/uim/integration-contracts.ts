@@ -17,6 +17,10 @@ export const UIM_GRAPHQL_PATH = '/api/v2/uim/graphql' as const;
 export const UIM_REST_HARDENING_PATH = '/api/v2/uim/integrations/rest' as const;
 export const UIM_ANALYTICS_KPIS_PATH = '/api/v2/uim/analytics/kpis' as const;
 export const UIM_ANALYTICS_ETL_PATH = '/api/v2/uim/analytics/etl' as const;
+export const UIM_ANALYTICS_RECONCILIATION_PATH = '/api/v2/uim/analytics/reconciliation' as const;
+export const UIM_ANALYTICS_BI_CUBE_PATH = '/api/v2/uim/analytics/bi-cube' as const;
+export const UIM_ANALYTICS_QA_SIGNOFF_PATH = '/api/v2/uim/analytics/qa-signoff' as const;
+export const UIM_ANALYTICS_SLA_EVIDENCE_PATH = '/api/v2/uim/analytics/sla-evidence' as const;
 
 export const UIM_INTEGRATION_CONTRACTS = {
   rest: {
@@ -30,6 +34,10 @@ export const UIM_INTEGRATION_CONTRACTS = {
       UIM_REST_HARDENING_PATH,
       UIM_ANALYTICS_KPIS_PATH,
       UIM_ANALYTICS_ETL_PATH,
+      UIM_ANALYTICS_RECONCILIATION_PATH,
+      UIM_ANALYTICS_BI_CUBE_PATH,
+      UIM_ANALYTICS_QA_SIGNOFF_PATH,
+      UIM_ANALYTICS_SLA_EVIDENCE_PATH,
       UIM_WEBHOOK_FRAMEWORK_PATH,
       UIM_CONNECTOR_MANIFESTS_PATH,
       '/api/v2/uim/health',
@@ -61,6 +69,10 @@ export const UIM_INTEGRATION_CONTRACTS = {
   analytics: {
     kpiPath: UIM_ANALYTICS_KPIS_PATH,
     etlPath: UIM_ANALYTICS_ETL_PATH,
+    reconciliationPath: UIM_ANALYTICS_RECONCILIATION_PATH,
+    biCubePath: UIM_ANALYTICS_BI_CUBE_PATH,
+    qaSignoffPath: UIM_ANALYTICS_QA_SIGNOFF_PATH,
+    slaEvidencePath: UIM_ANALYTICS_SLA_EVIDENCE_PATH,
     defaultLowStockThreshold: 5,
     kpis: [
       'total_tracked_items',

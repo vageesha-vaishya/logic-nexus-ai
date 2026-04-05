@@ -1,0 +1,105 @@
+{
+  "generated_at": "2026-04-05T04:55:36.348Z",
+  "cycles_requested": 2,
+  "total_runs": 12,
+  "failed_runs": 0,
+  "status": "pass",
+  "runs": [
+    {
+      "cycle": 1,
+      "suite": "src/pages/api/v2/uim/analytics/kpis.test.ts",
+      "ok": true,
+      "elapsed_ms": 5175,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/kpis.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/kpis.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 9\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:24:52\n\u001b[2m   Duration \u001b[22m 3.39s\u001b[2m (transform 253ms, setup 793ms, import 607ms, tests 9ms, environment 1.71s)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 1,
+      "suite": "src/pages/api/v2/uim/analytics/etl.test.ts",
+      "ok": true,
+      "elapsed_ms": 3095,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/etl.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/etl.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:24:56\n\u001b[2m   Duration \u001b[22m 1.86s\u001b[2m (transform 225ms, setup 383ms, import 473ms, tests 7ms, environment 765ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 1,
+      "suite": "src/pages/api/v2/uim/analytics/reconciliation.test.ts",
+      "ok": true,
+      "elapsed_ms": 3032,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/reconciliation.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/reconciliation.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:24:59\n\u001b[2m   Duration \u001b[22m 1.83s\u001b[2m (transform 242ms, setup 378ms, import 440ms, tests 7ms, environment 762ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 1,
+      "suite": "src/pages/api/v2/uim/analytics/qa-signoff.test.ts",
+      "ok": true,
+      "elapsed_ms": 3057,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/qa-signoff.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/qa-signoff.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:02\n\u001b[2m   Duration \u001b[22m 1.86s\u001b[2m (transform 215ms, setup 375ms, import 443ms, tests 6ms, environment 796ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 1,
+      "suite": "src/pages/api/v2/uim/analytics/sla-evidence.test.ts",
+      "ok": true,
+      "elapsed_ms": 3101,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/sla-evidence.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/sla-evidence.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:05\n\u001b[2m   Duration \u001b[22m 1.81s\u001b[2m (transform 242ms, setup 371ms, import 436ms, tests 7ms, environment 765ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 1,
+      "suite": "src/modules/uim/forms/UimForms.test.tsx",
+      "ok": true,
+      "elapsed_ms": 6621,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/modules/uim/forms/UimForms.test.tsx\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/modules/uim/forms/UimForms.test.tsx \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 3258\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders empty state for Overview form \u001b[33m 498\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m passes axe accessibility audit with zero violations \u001b[33m 366\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m14 passed\u001b[39m\u001b[22m\u001b[90m (14)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:09\n\u001b[2m   Duration \u001b[22m 5.41s\u001b[2m (transform 458ms, setup 373ms, import 785ms, tests 3.26s, environment 762ms)\u001b[22m\n\n",
+      "stderr_tail": " that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at UimNodeForm (/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai/src/modules/uim/forms/UimNodeForm.tsx:202:24)\n    at UimAnalyticsForm (/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai/src/modules/uim/forms/UimForms.tsx:62:29)\nWarning: An update to UimNodeForm inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at UimNodeForm (/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai/src/modules/uim/forms/UimNodeForm.tsx:202:24)\n    at UimAnalyticsForm (/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai/src/modules/uim/forms/UimForms.tsx:62:29)\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n"
+    },
+    {
+      "cycle": 2,
+      "suite": "src/pages/api/v2/uim/analytics/kpis.test.ts",
+      "ok": true,
+      "elapsed_ms": 3058,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/kpis.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/kpis.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:15\n\u001b[2m   Duration \u001b[22m 1.81s\u001b[2m (transform 229ms, setup 368ms, import 417ms, tests 7ms, environment 789ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 2,
+      "suite": "src/pages/api/v2/uim/analytics/etl.test.ts",
+      "ok": true,
+      "elapsed_ms": 3047,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/etl.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/etl.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:18\n\u001b[2m   Duration \u001b[22m 1.85s\u001b[2m (transform 227ms, setup 369ms, import 473ms, tests 7ms, environment 769ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 2,
+      "suite": "src/pages/api/v2/uim/analytics/reconciliation.test.ts",
+      "ok": true,
+      "elapsed_ms": 3034,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/reconciliation.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/reconciliation.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:21\n\u001b[2m   Duration \u001b[22m 1.84s\u001b[2m (transform 249ms, setup 376ms, import 442ms, tests 7ms, environment 779ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 2,
+      "suite": "src/pages/api/v2/uim/analytics/qa-signoff.test.ts",
+      "ok": true,
+      "elapsed_ms": 3019,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/qa-signoff.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/qa-signoff.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 6\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:24\n\u001b[2m   Duration \u001b[22m 1.82s\u001b[2m (transform 214ms, setup 366ms, import 437ms, tests 6ms, environment 775ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 2,
+      "suite": "src/pages/api/v2/uim/analytics/sla-evidence.test.ts",
+      "ok": true,
+      "elapsed_ms": 3018,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/pages/api/v2/uim/analytics/sla-evidence.test.ts\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/pages/api/v2/uim/analytics/sla-evidence.test.ts \u001b[2m(\u001b[22m\u001b[2m1 test\u001b[22m\u001b[2m)\u001b[22m\u001b[32m 7\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:27\n\u001b[2m   Duration \u001b[22m 1.81s\u001b[2m (transform 243ms, setup 368ms, import 437ms, tests 7ms, environment 768ms)\u001b[22m\n\n",
+      "stderr_tail": ""
+    },
+    {
+      "cycle": 2,
+      "suite": "src/modules/uim/forms/UimForms.test.tsx",
+      "ok": true,
+      "elapsed_ms": 6686,
+      "stdout_tail": "\n> vite_react_shadcn_ts@0.0.0 test\n> vitest run src/modules/uim/forms/UimForms.test.tsx\n\n\n\u001b[1m\u001b[46m RUN \u001b[49m\u001b[22m \u001b[36mv4.0.16 \u001b[39m\u001b[90m/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai\u001b[39m\n\n \u001b[32m✓\u001b[39m src/modules/uim/forms/UimForms.test.tsx \u001b[2m(\u001b[22m\u001b[2m14 tests\u001b[22m\u001b[2m)\u001b[22m\u001b[33m 3405\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m renders empty state for Overview form \u001b[33m 491\u001b[2mms\u001b[22m\u001b[39m\n     \u001b[33m\u001b[2m✓\u001b[22m\u001b[39m passes axe accessibility audit with zero violations \u001b[33m 446\u001b[2mms\u001b[22m\u001b[39m\n\n\u001b[2m Test Files \u001b[22m \u001b[1m\u001b[32m1 passed\u001b[39m\u001b[22m\u001b[90m (1)\u001b[39m\n\u001b[2m      Tests \u001b[22m \u001b[1m\u001b[32m14 passed\u001b[39m\u001b[22m\u001b[90m (14)\u001b[39m\n\u001b[2m   Start at \u001b[22m 10:25:30\n\u001b[2m   Duration \u001b[22m 5.47s\u001b[2m (transform 433ms, setup 372ms, import 688ms, tests 3.41s, environment 765ms)\u001b[22m\n\n",
+      "stderr_tail": " that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at UimNodeForm (/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai/src/modules/uim/forms/UimNodeForm.tsx:202:24)\n    at UimAnalyticsForm (/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai/src/modules/uim/forms/UimForms.tsx:62:29)\nWarning: An update to UimNodeForm inside a test was not wrapped in act(...).\n\nWhen testing, code that causes React state updates should be wrapped into act(...):\n\nact(() => {\n  /* fire events that update state */\n});\n/* assert on the output */\n\nThis ensures that you're testing the behavior the user would see in the browser. Learn more at https://reactjs.org/link/wrap-tests-with-act\n    at UimNodeForm (/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai/src/modules/uim/forms/UimNodeForm.tsx:202:24)\n    at UimAnalyticsForm (/Users/user/Downloads/Vimal/Development Projects/Trae/SOS-Nexues/logic-nexus-ai/src/modules/uim/forms/UimForms.tsx:62:29)\n\nNot implemented: HTMLCanvasElement's getContext() method: without installing the canvas npm package\n"
+    }
+  ]
+}
