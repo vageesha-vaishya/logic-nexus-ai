@@ -218,6 +218,23 @@ async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDoma
     tenantDomains = normalizeDomainRows(tenantFallbackRows || []);
   }
 
+  if (tenantDomains.length === 0) {
+    try {
+      const activeDomains = await loadActivePlatformDomainsClientSide();
+      tenantDomains = normalizeDomainRows(activeDomains || []);
+    } catch {
+      // noop: keep fallback path below
+    }
+  }
+
+  if (tenantDomains.length === 0) {
+    // Local-dev safety net: avoid domain-resolution deadlock when API routes are not hosted.
+    tenantDomains = [
+      { id: 'local-amro', code: 'AMRO', name: 'AMRO', description: 'Local fallback AMRO domain', is_active: true },
+      { id: 'local-logistics', code: 'LOGISTICS', name: 'Logistics', description: 'Local fallback Logistics domain', is_active: true },
+    ];
+  }
+
   const tenantDomainCount = tenantDomains.length;
   const isPlatformAdmin = await resolveClientSidePlatformAdminState();
   if (isPlatformAdmin) {
@@ -521,12 +538,21 @@ export const DomainService = {
       } catch {
         parsedMessage = fallbackMessage;
       }
-      logger.error('[DomainService] authorized domains request failed', {
-        component: 'DomainService',
-        status: response.status,
-        correlationId,
-        message: parsedMessage,
-      });
+      if (response.status === 404) {
+        logger.warn('[DomainService] authorized domains request failed', {
+          component: 'DomainService',
+          status: response.status,
+          correlationId,
+          message: parsedMessage,
+        });
+      } else {
+        logger.error('[DomainService] authorized domains request failed', {
+          component: 'DomainService',
+          status: response.status,
+          correlationId,
+          message: parsedMessage,
+        });
+      }
       const shouldFallback =
         response.status === 401
         || response.status === 404

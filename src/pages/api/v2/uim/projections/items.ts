@@ -45,19 +45,36 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const offset = parseOffset(req.query.offset);
     const supabase = getSupabaseAdminClient();
 
-    let query = supabase
-      .from('uim_inventory_projection_snapshots')
-      .select(
-        'id, inventory_item_id, projected_available_quantity, projected_reserved_quantity, projected_consumed_quantity, last_ledger_id, last_ledger_at, replay_version, updated_at',
-        { count: 'exact' },
-      )
-      .eq('tenant_id', access.tenantId)
-      .order('updated_at', { ascending: false })
-      .range(offset, offset + limit - 1);
-    if (access.franchiseId) query = query.eq('franchise_id', access.franchiseId);
+    const projectionSelect = 'id, inventory_item_id, projected_available_quantity, projected_reserved_quantity, projected_consumed_quantity, last_ledger_id, last_ledger_at, replay_version, updated_at';
 
-    const { data, error, count } = await query;
-    if (error) throw new Error(`Failed to query projection snapshots: ${error.message}`);
+    let data: Array<Record<string, unknown>> | null = null;
+    let count: number | null = null;
+
+    if (access.franchiseId) {
+      const franchiseScoped = await supabase
+        .from('uim_inventory_projection_snapshots')
+        .select(projectionSelect, { count: 'exact' })
+        .eq('tenant_id', access.tenantId)
+        .eq('franchise_id', access.franchiseId)
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+      if (franchiseScoped.error) throw new Error(`Failed to query franchise-scoped projection snapshots: ${franchiseScoped.error.message}`);
+      data = franchiseScoped.data as Array<Record<string, unknown>> | null;
+      count = Number(franchiseScoped.count || 0);
+    }
+
+    // Fallback: if franchise scope is empty, return tenant-level snapshots.
+    if (!access.franchiseId || (count || 0) === 0) {
+      const tenantScoped = await supabase
+        .from('uim_inventory_projection_snapshots')
+        .select(projectionSelect, { count: 'exact' })
+        .eq('tenant_id', access.tenantId)
+        .order('updated_at', { ascending: false })
+        .range(offset, offset + limit - 1);
+      if (tenantScoped.error) throw new Error(`Failed to query tenant-scoped projection snapshots: ${tenantScoped.error.message}`);
+      data = tenantScoped.data as Array<Record<string, unknown>> | null;
+      count = Number(tenantScoped.count || 0);
+    }
 
     res.status(200).json({
       version: 'v2',
@@ -67,7 +84,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         pagination: {
           limit,
           offset,
-          total: count || 0,
+          total: Number(count || 0),
         },
         snapshots: data || [],
       },

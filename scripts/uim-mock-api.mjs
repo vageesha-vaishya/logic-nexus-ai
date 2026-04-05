@@ -23,6 +23,24 @@ const commands = new Map();
 const projectionSnapshots = new Map();
 const webhookAdapters = new Map();
 const qaSignoffRecords = [];
+const MOCK_DECCAN_TENANT_ID = 'deccan';
+const MOCK_DECCAN_FRANCHISE_ID = 'deccan-franchise-1';
+const MOCK_PLATFORM_DOMAINS = [
+  {
+    id: 'domain-amro',
+    code: 'AMRO',
+    name: 'AMRO',
+    description: 'Airline Maintenance, Repair and Overhaul',
+    is_active: true,
+  },
+  {
+    id: 'domain-logistics',
+    code: 'LOGISTICS',
+    name: 'Logistics',
+    description: 'Core logistics operations',
+    is_active: true,
+  },
+];
 
 const UIM_ANALYTICS_KPI_MODEL_DEFINITIONS = [
   { key: 'total_tracked_items', label: 'Total tracked items', formula: 'COUNT(items)' },
@@ -127,6 +145,66 @@ function sendJson(res, status, payload) {
   res.end(JSON.stringify(payload));
 }
 
+function seedMockFormRecords() {
+  const now = new Date().toISOString();
+  const seeds = [
+    ['overview', { tenant: 'Deccan', summary: 'AMRO inventory overview', status: 'active' }],
+    ['item-master', { sku: 'DECCAN-AMRO-PUMP-001', part_number: 'DCC-PN-1001', status: 'active' }],
+    ['stock-ledger', { reference: 'DECCAN-GRN-0001', transaction_type: 'RECEIVE', status: 'active' }],
+    ['reservations', { reservation_token: 'deccan-amro-reservation-001', reserved_quantity: 5, status: 'active' }],
+    ['issue-consume', { reference: 'DECCAN-WP-0001', transaction_type: 'CONSUME', status: 'active' }],
+    ['restock', { reference: 'DECCAN-GRN-0001', transaction_type: 'RECEIVE', status: 'active' }],
+    ['locations', { primary_location: 'DECCAN-MRO-MAIN', line_location: 'DECCAN-LINE', status: 'active' }],
+    ['analytics', { dashboard_seed: true, kpi_hint: 'deccan-amro-inventory', status: 'active' }],
+  ];
+
+  for (const [nodeKey, payload] of seeds) {
+    const idTenant = randomUUID();
+    store.set(idTenant, {
+      id: idTenant,
+      tenant_id: MOCK_DECCAN_TENANT_ID,
+      franchise_id: MOCK_DECCAN_FRANCHISE_ID,
+      node_key: nodeKey,
+      payload,
+      metadata: { mode: 'dev-mock', seed_source: 'uim-mock-api', tenant: 'deccan' },
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    });
+
+    // Keep a second "dev-tenant" copy so local requests without headers still return data.
+    const idDev = randomUUID();
+    store.set(idDev, {
+      id: idDev,
+      tenant_id: 'dev-tenant',
+      franchise_id: null,
+      node_key: nodeKey,
+      payload,
+      metadata: { mode: 'dev-mock', seed_source: 'uim-mock-api', tenant: 'dev-tenant' },
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+    });
+  }
+
+  const projectionNow = new Date().toISOString();
+  projectionSnapshots.set('deccan-item-1', {
+    id: randomUUID(),
+    tenant_id: MOCK_DECCAN_TENANT_ID,
+    franchise_id: MOCK_DECCAN_FRANCHISE_ID,
+    inventory_item_id: 'deccan-item-1',
+    projected_available_quantity: 55,
+    projected_reserved_quantity: 5,
+    projected_consumed_quantity: 7,
+    last_ledger_id: null,
+    last_ledger_at: projectionNow,
+    replay_version: 2,
+    updated_at: projectionNow,
+  });
+}
+
+seedMockFormRecords();
+
 function readNumber(value) {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -225,6 +303,21 @@ const server = createServer(async (req, res) => {
   const analyticsBiCubeMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/bi-cube$/);
   const analyticsQaSignoffMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/qa-signoff$/);
   const analyticsSlaEvidenceMatch = pathname.match(/^\/api\/v2\/uim\/analytics\/sla-evidence$/);
+  const platformDomainsMatch = pathname.match(/^\/api\/v1\/platform-domains$/);
+
+  if (platformDomainsMatch && method === 'GET') {
+    sendJson(res, 200, {
+      data: {
+        domains: MOCK_PLATFORM_DOMAINS,
+        tenantDomainCount: MOCK_PLATFORM_DOMAINS.length,
+        tenantId: MOCK_DECCAN_TENANT_ID,
+        isPlatformAdmin: true,
+      },
+      correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
+      version: 'v1',
+    });
+    return;
+  }
 
   if (restIntegrationMatch && method === 'POST') {
     const body = await parseBody(req);
@@ -851,12 +944,20 @@ paths:
     const limit = Math.min(Math.max(Number.parseInt(String(url.searchParams.get('limit') || '25'), 10) || 25, 1), 200);
     const offset = Math.max(Number.parseInt(String(url.searchParams.get('offset') || '0'), 10) || 0, 0);
     const { tenantId, franchiseId } = resolveTenant(req);
-    const records = [...store.values()]
+    let records = [...store.values()]
       .filter((record) => record.deleted_at === null)
       .filter((record) => record.tenant_id === tenantId)
       .filter((record) => record.node_key === node)
       .filter((record) => !franchiseId || record.franchise_id === franchiseId)
       .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+
+    if (records.length === 0) {
+      // Local mock fallback: return node records even if tenant/franchise headers do not match seed values.
+      records = [...store.values()]
+        .filter((record) => record.deleted_at === null)
+        .filter((record) => record.node_key === node)
+        .sort((a, b) => (a.updated_at < b.updated_at ? 1 : -1));
+    }
     sendJson(res, 200, {
       version: 'v2',
       interface: 'uim-form-records-list',

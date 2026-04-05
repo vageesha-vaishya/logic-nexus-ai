@@ -301,21 +301,27 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
           if (projectionBacked) {
             const projectionResponse = await queryUimProjectionItems(200, 0);
             const snapshots = Array.isArray(projectionResponse?.output?.snapshots) ? projectionResponse.output.snapshots : [];
-            loadedRecords = snapshots.map((row) => {
-              const rowRecord = row as Record<string, unknown>;
-              return {
-                id: String(rowRecord.inventory_item_id || rowRecord.id || ''),
-                updated_at: rowRecord.updated_at || rowRecord.last_ledger_at || '',
-                payload: {
-                  projected_available_quantity: rowRecord.projected_available_quantity || 0,
-                  projected_reserved_quantity: rowRecord.projected_reserved_quantity || 0,
-                  projected_consumed_quantity: rowRecord.projected_consumed_quantity || 0,
-                  replay_version: rowRecord.replay_version || 0,
-                  status: readStatusValueFromProjection(rowRecord),
-                },
-                projection: rowRecord,
-              };
-            });
+            if (snapshots.length > 0) {
+              loadedRecords = snapshots.map((row) => {
+                const rowRecord = row as Record<string, unknown>;
+                return {
+                  id: String(rowRecord.inventory_item_id || rowRecord.id || ''),
+                  updated_at: rowRecord.updated_at || rowRecord.last_ledger_at || '',
+                  payload: {
+                    projected_available_quantity: rowRecord.projected_available_quantity || 0,
+                    projected_reserved_quantity: rowRecord.projected_reserved_quantity || 0,
+                    projected_consumed_quantity: rowRecord.projected_consumed_quantity || 0,
+                    replay_version: rowRecord.replay_version || 0,
+                    status: readStatusValueFromProjection(rowRecord),
+                  },
+                  projection: rowRecord,
+                };
+              });
+            } else {
+              // Fallback to form-record source when franchise-scoped snapshots are not available yet.
+              const response = await listUimEntities(node, 200, 0);
+              loadedRecords = Array.isArray(response?.output?.records) ? response.output.records : [];
+            }
           } else {
             const response = await listUimEntities(node, 200, 0);
             loadedRecords = Array.isArray(response?.output?.records) ? response.output.records : [];
