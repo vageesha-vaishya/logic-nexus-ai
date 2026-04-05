@@ -19,7 +19,12 @@ function createQuery(result: QueryResult) {
   };
 }
 
-function createScopedDb() {
+function createScopedDb(options?: {
+  relationRows?: Array<Record<string, unknown>>;
+  assemblyModelRows?: Array<Record<string, unknown>>;
+}) {
+  const relationRows = options?.relationRows ?? [{ task_template_id: '33333333-3333-4333-8333-333333333333', model_id: 'amodel-2' }];
+  const assemblyModelRows = options?.assemblyModelRows ?? [{ id: 'amodel-2', name: 'A320-200', model_code: 'A320-200', is_active: true }];
   return {
     from: (table: string) => {
       if (table === 'task_templates') {
@@ -34,13 +39,13 @@ function createScopedDb() {
       }
       if (table === 'assembly_models') {
         return createQuery({
-          data: [{ id: 'model-1', name: 'A320', model_code: 'A320', is_active: true }],
+          data: assemblyModelRows,
           error: null,
         });
       }
       if (table === 'work_package_template_task_templates') {
         return createQuery({
-          data: [{ task_template_id: '33333333-3333-4333-8333-333333333333' }],
+          data: relationRows,
           error: null,
         });
       }
@@ -49,14 +54,19 @@ function createScopedDb() {
   };
 }
 
-function TestHarness() {
+function TestHarness(props?: {
+  scopedDb?: unknown;
+  initialFormValues?: Record<string, unknown>;
+}) {
   const [formValues, setFormValues] = useState<Record<string, unknown>>({
     template_code: 'TMP-1',
     template_name: 'Template 1',
-    aircraft_model: 'A320',
+    aircraft_model: '',
+    model_id: '',
     maintenance_type: 'line',
     tasks_json: '[]',
     selected_task_template_ids: [],
+    ...(props?.initialFormValues || {}),
   });
   return (
     <WorkPackageTemplateCreateSection
@@ -67,7 +77,7 @@ function TestHarness() {
       modalOpen
       modalMode="update"
       selectedTemplateId="d4ebb1de-50eb-4442-84be-1c9d8dd73cfe"
-      scopedDb={createScopedDb()}
+      scopedDb={props?.scopedDb || createScopedDb()}
       scope={{ tenantId: 'tenant-1', franchiseId: 'franchise-1' }}
     />
   );
@@ -105,5 +115,33 @@ describe('WorkPackageTemplateCreateSection', () => {
       const checkboxes = getRowCheckboxes();
       expect(checkboxes[0]).toHaveAttribute('aria-label', 'Select task row TT-003');
     });
+  });
+
+  it('resolves and auto-selects aircraft model from template task relationship model_id in update mode', async () => {
+    render(<TestHarness />);
+
+    await waitFor(() => {
+      const modelSelect = screen.getByLabelText('Aircraft Model') as HTMLSelectElement;
+      expect(modelSelect.value).toBe('amodel-2');
+    });
+
+    expect(screen.getByLabelText('Aircraft Model')).toBeDisabled();
+    expect(screen.queryByText('Aircraft Model could not be resolved for this template.')).not.toBeInTheDocument();
+  });
+
+  it('shows graceful resolution error when model is missing in update mode', async () => {
+    render(
+      <TestHarness
+        scopedDb={createScopedDb({
+          relationRows: [{ task_template_id: '33333333-3333-4333-8333-333333333333' }],
+          assemblyModelRows: [],
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(screen.getByText('Aircraft Model could not be resolved for this template.')).toBeInTheDocument();
+    });
+    expect(screen.getByLabelText('Aircraft Model')).toBeDisabled();
   });
 });

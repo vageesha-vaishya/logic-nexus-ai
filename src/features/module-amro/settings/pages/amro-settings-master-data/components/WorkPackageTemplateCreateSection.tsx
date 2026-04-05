@@ -228,7 +228,7 @@ export function WorkPackageTemplateCreateSection({
       try {
         let query = (scopedDb as any)
           .from('work_package_template_task_templates')
-          .select('task_template_id')
+          .select('task_template_id,model_id')
           .eq('tenant_id', scope.tenantId)
           .eq('work_package_template_id', selectedTemplateId);
         if (scope.franchiseId) {
@@ -243,9 +243,23 @@ export function WorkPackageTemplateCreateSection({
         const relationIds = (Array.isArray(data) ? data : [])
           .map((row) => String((row as Record<string, unknown>).task_template_id || '').trim())
           .filter((value) => value.length > 0);
+        const relationModelIds = Array.from(new Set(
+          (Array.isArray(data) ? data : [])
+            .map((row) => String((row as Record<string, unknown>).model_id || '').trim())
+            .filter((value) => value.length > 0),
+        ));
+        const relationModelId = relationModelIds.length === 1 ? relationModelIds[0] : '';
         const fallbackIds = parseTaskTemplateIdsFromTasksJson(formValues.tasks_json);
         const nextSelection = Array.from(new Set([...relationIds, ...fallbackIds]));
         if (!cancelled) {
+          const currentModelId = String(formValues.model_id ?? '').trim();
+          if (!currentModelId && relationModelId) {
+            const mappedOption = workPackageTemplateAircraftModelOptions.find((option) => option.value === relationModelId);
+            setFieldValue('model_id', relationModelId);
+            if (!String(formValues.aircraft_model ?? '').trim()) {
+              setFieldValue('aircraft_model', mappedOption?.modelCode || mappedOption?.label || relationModelId);
+            }
+          }
           setWorkPackageTemplateSelectedTaskIds(nextSelection);
           setWorkPackageTemplateSelectionInitialized(true);
         }
@@ -269,6 +283,8 @@ export function WorkPackageTemplateCreateSection({
     scope.tenantId,
     scopedDb,
     selectedTemplateId,
+    setFieldValue,
+    workPackageTemplateAircraftModelOptions,
   ]);
 
   const workPackageTemplateAircraftModelSelectOptions = useMemo<SelectOption[]>(() => {
@@ -303,13 +319,35 @@ export function WorkPackageTemplateCreateSection({
     if (currentModelId) {
       return;
     }
+    const currentModelToken = String(formValues.aircraft_model ?? '').trim().toLowerCase();
+    if (currentModelToken) {
+      const resolvedOption = workPackageTemplateAircraftModelSelectOptions.find((option) => {
+        const optionId = String(option.value || '').trim().toLowerCase();
+        const optionCode = String(option.modelCode || '').trim().toLowerCase();
+        const optionLabel = String(option.label || '').trim().toLowerCase();
+        return optionId === currentModelToken || optionCode === currentModelToken || optionLabel === currentModelToken;
+      });
+      if (resolvedOption?.value) {
+        setFieldValue('model_id', resolvedOption.value);
+        if (!String(formValues.aircraft_model ?? '').trim()) {
+          setFieldValue('aircraft_model', resolvedOption.modelCode || resolvedOption.label || resolvedOption.value);
+        }
+        return;
+      }
+      if (modalMode === 'update') {
+        return;
+      }
+    }
+    if (modalMode === 'update') {
+      return;
+    }
     const firstOption = workPackageTemplateAircraftModelSelectOptions[0];
     if (!firstOption?.value) {
       return;
     }
     setFieldValue('model_id', firstOption.value);
     setFieldValue('aircraft_model', firstOption.modelCode || firstOption.label || firstOption.value);
-  }, [formValues.model_id, modalOpen, setFieldValue, workPackageTemplateAircraftModelSelectOptions]);
+  }, [formValues.aircraft_model, formValues.model_id, modalMode, modalOpen, setFieldValue, workPackageTemplateAircraftModelSelectOptions]);
 
   const selectedWorkPackageAircraftModelTaskItems = useMemo(() => {
     const selectedModelValue = String(formValues.aircraft_model ?? '').trim().toLowerCase();
@@ -337,7 +375,7 @@ export function WorkPackageTemplateCreateSection({
       const compact = normalized.replace(/[^a-z0-9]/g, '');
       return normalizedTokens.some((token) => token && compact.includes(token));
     };
-    return workPackageTemplateTaskTemplates.filter((taskTemplate) => {
+    const filtered = workPackageTemplateTaskTemplates.filter((taskTemplate) => {
       const taskText = (() => {
         try {
           return JSON.stringify(taskTemplate);
@@ -347,6 +385,7 @@ export function WorkPackageTemplateCreateSection({
       })();
       return matchesToken(taskText);
     });
+    return filtered.length > 0 ? filtered : workPackageTemplateTaskTemplates;
   }, [formValues.aircraft_model, workPackageTemplateAircraftModelOptions, workPackageTemplateTaskTemplates]);
 
   const selectedWorkPackageAircraftModelTaskRows = useMemo(() => {
@@ -587,7 +626,7 @@ export function WorkPackageTemplateCreateSection({
                   (formErrors.aircraft_model || formErrors.model_id) && 'border-destructive',
                 )}
                 aria-invalid={Boolean(formErrors.aircraft_model || formErrors.model_id)}
-                disabled={workPackageTemplateAircraftModelOptionsLoading}
+                disabled={workPackageTemplateAircraftModelOptionsLoading || modalMode === 'update'}
               >
                 <option value="" hidden />
                 {workPackageTemplateAircraftModelSelectOptions.map((option) => (
@@ -603,6 +642,9 @@ export function WorkPackageTemplateCreateSection({
               {workPackageTemplateAircraftModelOptionsError ? <p className="mdm-template-danger">{workPackageTemplateAircraftModelOptionsError}</p> : null}
               {formErrors.aircraft_model ? <p className="mdm-template-danger">{formErrors.aircraft_model}</p> : null}
               {formErrors.model_id ? <p className="mdm-template-danger">{formErrors.model_id}</p> : null}
+              {modalMode === 'update' && !String(formValues.model_id ?? '').trim() ? (
+                <p className="mdm-template-danger">Aircraft Model could not be resolved for this template.</p>
+              ) : null}
             </div>
             <div className="space-y-1">
               <Label htmlFor="wpt-maintenance-type" className="text-[12px] font-medium text-slate-700">Maintenance Type</Label>

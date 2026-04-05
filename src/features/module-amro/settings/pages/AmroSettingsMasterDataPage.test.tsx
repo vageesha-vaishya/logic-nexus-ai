@@ -512,6 +512,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       id: 'wpt-1',
                       template_code: 'WP-LINE-001',
                       template_name: 'Line Check Package',
+                      model_id: 'amodel-2',
+                      aircraft_model: 'A320-200',
                       maintenance_type: 'line',
                       version: 1,
                       active: true,
@@ -526,6 +528,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       id: 'wpt-2',
                       template_code: 'WP-BASE-002',
                       template_name: 'Base Check Package',
+                      model_id: 'amodel-3',
+                      aircraft_model: 'B737-800',
                       maintenance_type: 'base',
                       version: 2,
                       active: true,
@@ -1945,6 +1949,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getByLabelText('Template Name')).toHaveValue('Line Check Package');
     expect(screen.getAllByText('05-20').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Scheduled Maintenance Checks').length).toBeGreaterThan(0);
+    const aircraftModelSelect = screen.getByLabelText('Aircraft Model') as HTMLSelectElement;
+    expect(aircraftModelSelect).toHaveValue('amodel-2');
+    expect(aircraftModelSelect).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });
