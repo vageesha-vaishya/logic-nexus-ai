@@ -877,6 +877,102 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
   });
 
+  it('roundtrips model_id and aircraft_model in work package template create flow', async () => {
+    const rpcMock = vi.fn().mockResolvedValue({
+      data: {
+        record: {
+          id: 'wpt-model-1',
+          template_code: 'WP-MODEL-001',
+          template_name: 'Model Context Package',
+          maintenance_type: 'line',
+          tasks_json: [{ task_template_id: '11111111-1111-4111-8111-111111111111' }],
+        },
+        created_relationships: [
+          {
+            work_package_template_id: 'wpt-model-1',
+            task_template_id: '11111111-1111-4111-8111-111111111111',
+            tenant_id: 'tenant-1',
+            model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          },
+        ],
+      },
+      error: null,
+    });
+    const linkEqTemplateMock = vi.fn().mockResolvedValue({
+      data: [{ task_template_id: '11111111-1111-4111-8111-111111111111' }],
+      error: null,
+    });
+    const linkEqTenantMock = vi.fn().mockReturnValue({ eq: linkEqTemplateMock });
+    const linkSelectMock = vi.fn().mockReturnValue({ eq: linkEqTenantMock });
+    const patchMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'wpt-model-1',
+        template_code: 'WP-MODEL-001',
+        template_name: 'Model Context Package',
+        maintenance_type: 'line',
+        model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        aircraft_model: 'A320neo',
+      },
+      error: null,
+    });
+    const patchQuery: any = {
+      eq: vi.fn(),
+      select: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: patchMaybeSingleMock,
+    };
+    patchQuery.eq.mockReturnValue(patchQuery);
+    patchQuery.select.mockReturnValue(patchQuery);
+    patchQuery.limit.mockReturnValue(patchQuery);
+    const patchUpdateMock = vi.fn().mockReturnValue(patchQuery);
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'work_package_template_task_templates') {
+        return { select: linkSelectMock };
+      }
+      if (table === 'work_package_templates') {
+        return { update: patchUpdateMock };
+      }
+      if (table === 'maintenance_events') {
+        return { insert: auditInsertMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock, rpc: rpcMock } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { entity: 'work_package_templates' },
+      body: {
+        template_code: 'WP-MODEL-001',
+        version: 1,
+        active: true,
+        template_name: 'Model Context Package',
+        maintenance_type: 'line',
+        model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        aircraft_model: 'A320neo',
+        scope_json: [],
+        tasks_json: [{ task_template_id: '11111111-1111-4111-8111-111111111111' }],
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(201);
+    const rpcArgs = rpcMock.mock.calls[0]?.[1] as Record<string, unknown>;
+    const rpcPayload = (rpcArgs?.p_payload || {}) as Record<string, unknown>;
+    expect(rpcPayload.model_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(rpcPayload.aircraft_model).toBe('A320neo');
+    expect(patchUpdateMock).toHaveBeenCalledWith({
+      model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      aircraft_model: 'A320neo',
+    });
+    expect((res.jsonBody as any)?.output?.record?.model_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect((res.jsonBody as any)?.output?.record?.aircraft_model).toBe('A320neo');
+  });
+
   it('rolls back atomic create when task_template_id does not exist', async () => {
     const rpcMock = vi.fn().mockResolvedValue({
       data: null,

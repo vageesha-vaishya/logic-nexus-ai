@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { action } from 'storybook/actions';
+import { action } from '@storybook/addon-actions';
 import { useEffect, useState, type MouseEvent, type PropsWithChildren } from 'react';
 import { DispatcherDashboard } from './DispatcherDashboard';
 import { BrowserRouter, useLocation, useNavigationType } from 'react-router-dom';

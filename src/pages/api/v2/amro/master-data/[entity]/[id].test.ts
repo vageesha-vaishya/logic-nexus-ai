@@ -354,6 +354,8 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
         id: 'wpt-1',
         tenant_id: 'tenant-1',
         template_name: 'Line Check Updated',
+        model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        aircraft_model: 'A320neo',
         tasks_json: [{ task_template_id: '22222222-2222-4222-8222-222222222222' }],
       },
       error: null,
@@ -386,6 +388,14 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     });
     const taskTemplatesEqMock = vi.fn().mockReturnValue({ in: taskTemplatesInMock });
     const taskTemplatesSelectMock = vi.fn().mockReturnValue({ eq: taskTemplatesEqMock });
+    const assemblyModelsLimitMock = vi.fn().mockResolvedValue({
+      data: [{ id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', franchise_id: null, model_code: 'A320neo', name: 'A320neo', primary_model: 'A320neo' }],
+      error: null,
+    });
+    const assemblyModelsOrSecondaryMock = vi.fn().mockReturnValue({ limit: assemblyModelsLimitMock });
+    const assemblyModelsOrPrimaryMock = vi.fn().mockReturnValue({ limit: assemblyModelsLimitMock, or: assemblyModelsOrSecondaryMock });
+    const assemblyModelsEqMock = vi.fn().mockReturnValue({ or: assemblyModelsOrPrimaryMock });
+    const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqMock });
     const fromMock = vi.fn((table: string) => {
       if (table === 'work_package_templates') {
         if (fromMock.mock.calls.length === 1) {
@@ -399,6 +409,9 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       if (table === 'task_templates') {
         return { select: taskTemplatesSelectMock };
       }
+      if (table === 'assembly_models') {
+        return { select: assemblyModelsSelectMock };
+      }
       if (table === 'maintenance_events') {
         return { insert: auditInsertMock };
       }
@@ -411,6 +424,8 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       query: { entity: 'work_package_templates', id: 'wpt-1' },
       body: {
         template_name: 'Line Check Updated',
+        model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        aircraft_model: 'A320neo',
         tasks_json: [{ task_template_id: '22222222-2222-4222-8222-222222222222' }],
       },
       headers: {},
@@ -420,6 +435,11 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
+    const updatePayload = (updateMock.mock.calls[0]?.[0] || {}) as Record<string, unknown>;
+    expect(updatePayload.model_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(updatePayload.aircraft_model).toBe('A320neo');
+    expect((res.jsonBody as any)?.output?.record?.model_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect((res.jsonBody as any)?.output?.record?.aircraft_model).toBe('A320neo');
     expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
     expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
   });
