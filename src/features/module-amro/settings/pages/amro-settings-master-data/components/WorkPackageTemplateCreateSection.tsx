@@ -30,6 +30,7 @@ type SelectOption = {
 type ScopeContext = {
   tenantId: string;
   franchiseId: string;
+  isTenantAdmin?: boolean;
 };
 
 type WorkPackageTemplateCreateSectionProps = {
@@ -131,9 +132,9 @@ export function WorkPackageTemplateCreateSection({
         .from('task_templates')
         .select('id,task_template_id,tenant_id,franchise_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,task_template_scope_json')
         .eq('tenant_id', scope.tenantId);
-      if (scope.franchiseId) {
+      if (!scope.isTenantAdmin && scope.franchiseId) {
         query = query.eq('franchise_id', scope.franchiseId);
-      } else {
+      } else if (!scope.isTenantAdmin) {
         query = query.is('franchise_id', null);
       }
       const { data, error } = await query.order('task_template_id', { ascending: true });
@@ -147,7 +148,7 @@ export function WorkPackageTemplateCreateSection({
     } finally {
       setWorkPackageTemplateTaskTemplatesLoading(false);
     }
-  }, [scope.franchiseId, scope.tenantId, scopedDb]);
+  }, [scope.franchiseId, scope.isTenantAdmin, scope.tenantId, scopedDb]);
 
   const loadWorkPackageTemplateAircraftModelOptions = useCallback(async () => {
     if (!scopedDb || !scope.tenantId) {
@@ -158,11 +159,16 @@ export function WorkPackageTemplateCreateSection({
     setWorkPackageTemplateAircraftModelOptionsLoading(true);
     setWorkPackageTemplateAircraftModelOptionsError('');
     try {
-      const { data, error } = await (scopedDb as any)
+      let query = (scopedDb as any)
         .from('assembly_models')
         .select('id,name,model_code,is_active,tenant_id')
-        .eq('tenant_id', scope.tenantId)
-        .order('name', { ascending: true });
+        .eq('tenant_id', scope.tenantId);
+      if (!scope.isTenantAdmin && scope.franchiseId) {
+        query = query.eq('franchise_id', scope.franchiseId);
+      } else if (!scope.isTenantAdmin) {
+        query = query.is('franchise_id', null);
+      }
+      const { data, error } = await query.order('name', { ascending: true });
       if (error) {
         throw new Error(String(error.message || 'Failed to load aircraft models'));
       }
@@ -231,9 +237,9 @@ export function WorkPackageTemplateCreateSection({
           .select('task_template_id,model_id')
           .eq('tenant_id', scope.tenantId)
           .eq('work_package_template_id', selectedTemplateId);
-        if (scope.franchiseId) {
-          query = query.or(`franchise_id.is.null,franchise_id.eq.${scope.franchiseId}`);
-        } else {
+        if (!scope.isTenantAdmin && scope.franchiseId) {
+          query = query.eq('franchise_id', scope.franchiseId);
+        } else if (!scope.isTenantAdmin) {
           query = query.is('franchise_id', null);
         }
         const { data, error } = await query;
@@ -280,6 +286,7 @@ export function WorkPackageTemplateCreateSection({
     modalOpen,
     parseTaskTemplateIdsFromTasksJson,
     scope.franchiseId,
+    scope.isTenantAdmin,
     scope.tenantId,
     scopedDb,
     selectedTemplateId,

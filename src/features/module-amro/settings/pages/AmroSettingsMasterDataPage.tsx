@@ -1569,8 +1569,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       tenantId: context.tenantId,
       franchiseId: context.franchiseId,
       userId: context.userId,
+      isTenantAdmin: context.isTenantAdmin,
     }),
-    [context.franchiseId, context.tenantId, context.userId],
+    [context.franchiseId, context.isTenantAdmin, context.tenantId, context.userId],
   );
   const sessionAccessToken = useMemo(() => String(session?.access_token || '').trim(), [session?.access_token]);
   const aircraftColumnPreferenceStorageKey = useMemo(
