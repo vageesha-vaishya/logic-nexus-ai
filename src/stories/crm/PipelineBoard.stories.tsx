@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { action } from 'storybook/actions';
+import { action } from '@storybook/addon-actions';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
 

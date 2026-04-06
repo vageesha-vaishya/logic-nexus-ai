@@ -1680,6 +1680,33 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const createdRelationships = createdRelationshipsRaw
         .filter((item) => item && typeof item === 'object')
         .map((item) => item as Record<string, unknown>);
+      const requestedModelId = asNullableString(insertPayload.model_id);
+      const requestedAircraftModel = asNullableString(insertPayload.aircraft_model);
+      let effectiveCreatedRecord = createdRecord;
+      if (requestedModelId || requestedAircraftModel) {
+        const patchPayload: Record<string, unknown> = {};
+        if (requestedModelId) patchPayload.model_id = requestedModelId;
+        if (requestedAircraftModel) patchPayload.aircraft_model = requestedAircraftModel;
+        if (Object.keys(patchPayload).length > 0) {
+          const { data: patchedRecord, error: patchError } = await supabase
+            .from('work_package_templates')
+            .update(patchPayload)
+            .eq('tenant_id', tenantId)
+            .eq('id', createdTemplateId)
+            .select(entityConfig.listColumns)
+            .limit(1)
+            .maybeSingle();
+          if (patchError) {
+            logger.warn('[AMRO WORK PACKAGE TEMPLATE CREATE] post-create model context patch skipped', {
+              correlationId: ctx.correlationId,
+              createdTemplateId,
+              message: String(patchError.message || ''),
+            });
+          } else if (patchedRecord && typeof patchedRecord === 'object') {
+            effectiveCreatedRecord = patchedRecord as Record<string, unknown>;
+          }
+        }
+      }
       logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-06 atomic-function-succeeded', {
         correlationId: ctx.correlationId,
         createdTemplateId,
@@ -1734,14 +1761,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         entity,
         action: 'create',
         entityId: createdTemplateId,
-        afterData: createdRecord,
+        afterData: effectiveCreatedRecord,
       });
       res.status(201).json({
         version: 'v2',
         correlationId: ctx.correlationId,
         output: {
           entity,
-          record: createdRecord,
+          record: effectiveCreatedRecord,
           created_task_relationships: createdRelationships,
           relationship_count: createdRelationships.length,
           requested_task_count: requestedTaskCount,

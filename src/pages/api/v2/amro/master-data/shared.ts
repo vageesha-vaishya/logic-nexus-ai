@@ -291,9 +291,9 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
   },
   work_package_templates: {
     table: 'work_package_templates',
-    searchableColumns: ['template_code', 'template_name', 'maintenance_type'],
+    searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'aircraft_model', 'model_id'],
     listColumns:
-      'id,tenant_id,franchise_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
+      'id,tenant_id,franchise_id,template_code,version,active,template_name,maintenance_type,model_id,aircraft_model,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
     requiredCreateFields: ['template_code', 'version', 'template_name', 'maintenance_type'],
     writeAllowedFields: [
       'template_code',
@@ -301,6 +301,8 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'active',
       'template_name',
       'maintenance_type',
+      'model_id',
+      'aircraft_model',
       'scope_json',
       'tasks_json',
       'policy_snapshot_id',
@@ -646,6 +648,8 @@ function normalizeWorkPackageTemplate(payload: Record<string, unknown>) {
     active: asBoolean(payload.active, true),
     template_name: asString(payload.template_name),
     maintenance_type: asString(payload.maintenance_type),
+    model_id: asNullableString(payload.model_id),
+    aircraft_model: asNullableString(payload.aircraft_model),
     scope_json: asJsonArray(payload.scope_json),
     tasks_json: asJsonArray(payload.tasks_json),
     policy_snapshot_id: asNullableString(payload.policy_snapshot_id),
@@ -861,6 +865,13 @@ export function validatePayload(entity: AmroMasterDataEntity, payload: Record<st
       issues.push({
         field: 'version',
         message: 'version must be greater than zero',
+      });
+    }
+    const modelId = asNullableString(payload.model_id);
+    if (modelId && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(modelId)) {
+      issues.push({
+        field: 'model_id',
+        message: 'model_id must be a valid UUID',
       });
     }
     if (!Array.isArray(payload.scope_json)) {
