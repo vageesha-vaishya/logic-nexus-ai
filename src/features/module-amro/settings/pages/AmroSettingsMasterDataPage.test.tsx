@@ -889,6 +889,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
     vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
   });
 
   it('renders all ten master data modules with shared list layout controls', async () => {
@@ -1954,6 +1955,36 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(aircraftModelSelect).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('keeps legacy work package form path when standard template flag is off', async () => {
+    vi.stubEnv('VITE_AMRO_WPT_STANDARD_TEMPLATE', 'false');
+    renderWorkPackageTemplatesPage();
+
+    const table = await screen.findByRole('table');
+    const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
+    fireEvent.doubleClick(dataRows[0]);
+
+    expect(await screen.findByRole('heading', { name: 'Update Work Package Templates' })).toBeInTheDocument();
+    expect(screen.queryByTestId('amro-wpt-standard-template')).not.toBeInTheDocument();
+    expect(screen.getByText('Work Package Details')).toBeInTheDocument();
+  });
+
+  it('uses standard template adapter for work package form when feature flag is on', async () => {
+    vi.stubEnv('VITE_AMRO_WPT_STANDARD_TEMPLATE', 'true');
+    renderWorkPackageTemplatesPage();
+
+    const table = await screen.findByRole('table');
+    const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
+    fireEvent.doubleClick(dataRows[0]);
+
+    expect(await screen.findByRole('heading', { name: 'Update Work Package Templates' })).toBeInTheDocument();
+    expect(screen.getByTestId('amro-wpt-standard-template')).toBeInTheDocument();
+    expect(screen.getByLabelText('Template Code (Standard)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Template Name (Standard)')).toBeInTheDocument();
+    expect(screen.getByText('Work Package Details')).toBeInTheDocument();
+    expect(screen.getByText('Selected Tasks')).toBeInTheDocument();
+    expect(screen.getByText('Scope Definition')).toBeInTheDocument();
   });
 
   it('shows navigation error toast when double-clicked work package row has no record id', async () => {

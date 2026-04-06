@@ -130,6 +130,7 @@ import { AircraftDataTableFrame } from './amro-settings-master-data/components/A
 import { AircraftListingControls } from './amro-settings-master-data/components/AircraftListingControls';
 import { AircraftWorkPackageCreateDialog } from './amro-settings-master-data/components/AircraftWorkPackageCreateDialog';
 import { WorkPackageTemplateCreateSection } from './amro-settings-master-data/components/WorkPackageTemplateCreateSection';
+import { AmroWorkPackageTemplateAdapter } from '@/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter';
 import {
   filterUnifiedModuleRows,
   type AircraftUnifiedFilterOption,
@@ -1534,6 +1535,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const selectionAnchorRef = useRef<string | null>(null);
   const aircraftSnapshotAuthToastShownRef = useRef(false);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
+  const workPackageTemplateStandardEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_WPT_STANDARD_TEMPLATE, false);
   const aircraftFormDraftKey = useMemo(
     () => `amro:aircraft-form-draft:${modalMode}:${selectedId || 'new'}`,
     [modalMode, selectedId],
@@ -8947,17 +8949,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   </div>
                 </div>
               ) : entity === 'work_package_templates' ? (
-                <WorkPackageTemplateCreateSection
-                  formValues={formValues}
-                  formErrors={formErrors}
-                  setFieldValue={setFieldValue}
-                  firstFieldRef={firstFieldRef}
-                  modalOpen={modalOpen}
-                  modalMode={modalMode}
-                  selectedTemplateId={selectedId}
-                  scopedDb={scopedDb}
-                  scope={scope}
-                />
+                workPackageTemplateStandardEnabled ? (
+                  <AmroWorkPackageTemplateAdapter
+                    mode={modalMode}
+                    loading={false}
+                    formValues={formValues}
+                    formErrors={formErrors}
+                    setFieldValue={setFieldValue}
+                    firstFieldRef={firstFieldRef}
+                    modalOpen={modalOpen}
+                    modalMode={modalMode}
+                    selectedTemplateId={selectedId}
+                    scopedDb={scopedDb}
+                    scope={scope}
+                  />
+                ) : (
+                  <WorkPackageTemplateCreateSection
+                    formValues={formValues}
+                    formErrors={formErrors}
+                    setFieldValue={setFieldValue}
+                    firstFieldRef={firstFieldRef}
+                    modalOpen={modalOpen}
+                    modalMode={modalMode}
+                    selectedTemplateId={selectedId}
+                    scopedDb={scopedDb}
+                    scope={scope}
+                  />
+                )
               ) : (
                 <>
                   <div
