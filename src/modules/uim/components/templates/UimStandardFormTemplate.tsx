@@ -22,6 +22,13 @@ export type UimTemplateListConfig = {
   defaultVisibleColumnKeys?: string[];
   showFieldSelector?: boolean;
   statusOptions?: Array<{ value: string; label: string }>;
+  searchValue?: string;
+  onSearchChange?: (value: string) => void;
+  statusValue?: string;
+  onStatusChange?: (value: string) => void;
+  onClearFilters?: () => void;
+  onRowClick?: (record: Record<string, unknown>) => void;
+  onRowDoubleClick?: (record: Record<string, unknown>) => void;
 };
 
 export type UimStandardFormTemplateProps = {
@@ -40,6 +47,7 @@ export type UimStandardFormTemplateProps = {
   footerSlot?: ReactNode;
   onCreate?: () => void;
   onReplayNow?: () => void;
+  replayLoading?: boolean;
 };
 
 export function UimStandardFormTemplate({
@@ -58,9 +66,18 @@ export function UimStandardFormTemplate({
   footerSlot,
   onCreate = () => undefined,
   onReplayNow,
+  replayLoading = false,
 }: UimStandardFormTemplateProps) {
-  const [searchValue, setSearchValue] = useState('');
-  const [statusValue, setStatusValue] = useState('all');
+  const [internalSearchValue, setInternalSearchValue] = useState('');
+  const [internalStatusValue, setInternalStatusValue] = useState('all');
+  const searchValue = list.searchValue ?? internalSearchValue;
+  const statusValue = list.statusValue ?? internalStatusValue;
+  const onSearchChange = list.onSearchChange ?? setInternalSearchValue;
+  const onStatusChange = list.onStatusChange ?? setInternalStatusValue;
+  const onClearFilters = list.onClearFilters ?? (() => {
+    setInternalSearchValue('');
+    setInternalStatusValue('all');
+  });
 
   const filteredRecords = useMemo(() => {
     const q = searchValue.trim().toLowerCase();
@@ -127,22 +144,20 @@ export function UimStandardFormTemplate({
           total={effectiveTotal}
           loading={loading}
           searchValue={searchValue}
-          onSearchChange={setSearchValue}
+          onSearchChange={onSearchChange}
           statusValue={statusValue}
-          onStatusChange={setStatusValue}
-          onClearFilters={() => {
-            setSearchValue('');
-            setStatusValue('all');
-          }}
+          onStatusChange={onStatusChange}
+          onClearFilters={onClearFilters}
           onCreate={onCreate}
-          onRowClick={() => undefined}
-          onRowDoubleClick={() => undefined}
+          onRowClick={list.onRowClick || (() => undefined)}
+          onRowDoubleClick={list.onRowDoubleClick || (() => undefined)}
           columns={list.columns}
           statusOptions={list.statusOptions}
           exportFileName={list.exportFileName}
           defaultVisibleColumnKeys={list.defaultVisibleColumnKeys}
           showFieldSelector={list.showFieldSelector !== false}
           onReplayNow={onReplayNow}
+          replayLoading={replayLoading}
         />
 
         <Card>

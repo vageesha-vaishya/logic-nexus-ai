@@ -19,6 +19,7 @@ import { AddressBlock } from './blocks/AddressBlock';
 import { DimensionBlock } from './blocks/DimensionBlock';
 import { deleteUimEntity, getUimEntity, listUimEntities } from '@/services/uim/uimFormAdapters';
 import { UimDataList, type UimDataListColumn } from '@/modules/uim/components/UimDataList';
+import { UimStandardFormTemplate } from '@/modules/uim/components/templates/UimStandardFormTemplate';
 import { UimApiError } from '@/services/uim/uimApi';
 import {
   queryUimAnalyticsBiCube,
@@ -1049,6 +1050,304 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
       setIsReplayingProjection(false);
     }
   };
+
+  const itemMasterFormSlot = (
+    <div className="space-y-4">
+      {recordsError ? (
+        <Alert variant="destructive" aria-live="assertive" role="alert">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>Records Error</AlertTitle>
+          <AlertDescription className="space-y-2">
+            <p>{recordsError}</p>
+            <div>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  setAutoRetryAttempt(0);
+                  void loadRecords();
+                }}
+                disabled={isLoadingRecords}
+              >
+                <RefreshCcw className="mr-2 h-4 w-4" />
+                {isLoadingRecords ? 'Reconnecting...' : 'Reconnect'}
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
+      ) : null}
+
+      {(formErrors.length > 0 || submitError) && (
+        <Alert variant="destructive" aria-live="assertive" role="alert">
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>{t('uim.forms.errorSummary.title', { defaultValue: 'Please resolve the following errors' })}</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc pl-4">
+              {submitError ? <li>{submitError}</li> : null}
+              {formErrors.map((errorMessage, index) => (
+                <li key={`${errorMessage}-${index}`}>{errorMessage}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {isSaving ? <Progress value={65} aria-label={t('uim.forms.saving', { defaultValue: 'Saving' })} /> : null}
+
+      <Form {...form}>
+        <form className="space-y-4" onSubmit={submit} noValidate>
+          <div className="grid gap-4 md:grid-cols-2">
+            {dynamicFields.map((fieldConfig) => (
+              <FieldRenderer key={fieldConfig.name} fieldConfig={fieldConfig} control={form.control} t={t} />
+            ))}
+          </div>
+
+          {config.includesDimensionBlock ? <DimensionBlock control={form.control} /> : null}
+          {config.includesAddressBlock ? <AddressBlock control={form.control} /> : null}
+
+          <div className="flex flex-wrap gap-2">
+            <Button type="submit" disabled={isSaving || fkValidationFailed}>
+              <Save className="mr-2 h-4 w-4" />
+              {isEditMode ? t('uim.forms.actions.update', { defaultValue: 'Update' }) : t('uim.forms.actions.create', { defaultValue: 'Create' })}
+            </Button>
+            <Button type="button" variant="outline" onClick={handleCreate} disabled={isSaving}>
+              {t('uim.forms.actions.cancel', { defaultValue: 'Cancel' })}
+            </Button>
+            <Button type="button" variant="destructive" onClick={handleDelete} disabled={isSaving || !isEditMode}>
+              <Trash2 className="mr-2 h-4 w-4" />
+              {t('uim.forms.actions.delete', { defaultValue: 'Delete' })}
+            </Button>
+            <Button type="button" variant="outline" onClick={reset} disabled={isSaving}>
+              <RotateCcw className="mr-2 h-4 w-4" />
+              {t('uim.forms.actions.reset', { defaultValue: 'Reset' })}
+            </Button>
+          </div>
+        </form>
+      </Form>
+    </div>
+  );
+
+  const analyticsTemplateFooter = analyticsNodeActive ? (
+    <div className="grid gap-4 md:grid-cols-2">
+      <Card className="border-border/70">
+        <CardHeader className="pb-2">
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <CardTitle className="text-base">Phase 4 Sequence</CardTitle>
+              <CardDescription>Implementation order from design specification.</CardDescription>
+            </div>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                void loadAnalytics();
+              }}
+              disabled={analyticsLoading}
+              aria-label="Retry analytics metadata"
+            >
+              <RefreshCcw className="mr-2 h-4 w-4" />
+              {analyticsLoading ? 'Refreshing...' : 'Retry Analytics Metadata'}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {analyticsSequence.length > 0 ? (
+            <ol className="list-decimal space-y-1 pl-4">
+              {analyticsSequence.map((step) => (
+                <li key={step}>{step}</li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-muted-foreground">Phase sequence metadata is not available yet.</p>
+          )}
+          <p className="text-xs text-muted-foreground">
+            Reconciliation readiness: {analyticsReconciliationReady ? 'ready' : 'pending'} ({analyticsReconciliationScore}%)
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">KPI Model Definitions</CardTitle>
+          <CardDescription>Formulas and ownership for analytics KPIs.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          {analyticsKpiDefinitions.length > 0 ? (
+            <div className="space-y-2">
+              {analyticsKpiDefinitions.map((definition) => (
+                <div key={definition.key} className="rounded-md border border-border/70 p-2">
+                  <p className="font-medium">{definition.label} ({definition.key})</p>
+                  <p className="text-xs text-muted-foreground">{definition.description}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground">KPI metadata is not available yet.</p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/70">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">BI Semantic Cube</CardTitle>
+          <CardDescription>Cube and dictionary metadata for downstream BI.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p>Cube: {analyticsCubeName || '-'}</p>
+          <p>Version: {analyticsCubeVersion || '-'}</p>
+          <p>Artifact: {analyticsBiArtifactId}</p>
+          <p className="text-xs text-muted-foreground">
+            Dimensions: {analyticsDimensions.length} | Measures: {analyticsMeasures.length}
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="border-border/70 md:col-span-2">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">ETL and Reconciliation Status</CardTitle>
+          <CardDescription>Phase 4 reporting QA readiness indicators.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-2 text-sm">
+          <p>
+            Queue - queued: {Number(analyticsQueue.queued || 0)}, running: {Number(analyticsQueue.running || 0)}, retry: {Number(analyticsQueue.retryScheduled || 0)}, completed: {Number(analyticsQueue.completed || 0)}, failed: {Number(analyticsQueue.failed || 0)}
+          </p>
+          <p>
+            Telemetry - completed runs: {Number(analyticsTelemetry.completed_runs || 0)}, failed runs: {Number(analyticsTelemetry.failed_runs || 0)}, success rate: {Number(analyticsTelemetry.success_rate || 0)}
+          </p>
+          <p className="text-xs text-muted-foreground">
+            Dashboard latency target: ≤ {analyticsDashboardLatencyTargetMs} ms
+          </p>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <a
+              href={analyticsHealthUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              Open API Health
+            </a>
+            <a
+              href={analyticsContractsUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              Open API Contracts
+            </a>
+            <a
+              href={analyticsOpenApiUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="text-primary underline underline-offset-2"
+            >
+              Open OpenAPI YAML
+            </a>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant={analyticsQaSignoffDone ? 'secondary' : 'default'}
+            onClick={() => {
+              void handleQaSignoff();
+            }}
+            disabled={isQaSignoffSubmitting || analyticsLoading}
+          >
+            {isQaSignoffSubmitting
+              ? 'Submitting QA Sign-off...'
+              : analyticsQaSignoffDone
+                ? 'QA Sign-off Submitted'
+                : 'Submit QA Sign-off'}
+          </Button>
+          {analyticsError ? <p className="text-xs text-destructive">{analyticsError}</p> : null}
+          <details className="rounded-md border border-border/70 p-2 text-xs">
+            <summary className="cursor-pointer font-medium">Error Details</summary>
+            <div className="mt-2 space-y-1">
+              {analyticsEndpointStatuses.map((endpoint) => (
+                <p key={endpoint.key}>
+                  {endpoint.status === 'ok' ? 'OK' : 'ERR'} - {endpoint.label}: {endpoint.detail}
+                </p>
+              ))}
+            </div>
+          </details>
+        </CardContent>
+      </Card>
+    </div>
+  ) : null;
+
+  if (
+    node === 'overview'
+    || node === 'item-master'
+    || node === 'stock-ledger'
+    || node === 'reservations'
+    || node === 'issue-consume'
+    || node === 'restock'
+    || node === 'locations'
+    || node === 'analytics'
+  ) {
+    const templateState = recordsError
+      ? 'error'
+      : isLoadingRecords
+        ? 'loading'
+        : filteredRecords.length === 0
+          ? 'empty'
+          : 'ready';
+    const breadcrumbByNode: Record<UimNodeKey, string[]> = {
+      overview: ['UIM', 'Forms', 'Overview'],
+      'item-master': ['UIM', 'Forms', 'Item Master'],
+      'stock-ledger': ['UIM', 'Forms', 'Stock Ledger'],
+      reservations: ['UIM', 'Forms', 'Reservations'],
+      'issue-consume': ['UIM', 'Forms', 'Issue & Consume'],
+      restock: ['UIM', 'Forms', 'Restock'],
+      locations: ['UIM', 'Forms', 'Locations'],
+      analytics: ['UIM', 'Forms', 'Analytics'],
+    };
+
+    return (
+      <UimStandardFormTemplate
+        moduleTitle={t(config.titleKey, { defaultValue: config.titleDefault })}
+        moduleDescription={t(config.subtitleKey, { defaultValue: config.subtitleDefault })}
+        moduleKey={node}
+        mode={isEditMode ? 'edit' : 'create'}
+        state={templateState}
+        statusBadge={records.some((record) => {
+          const metadata = ((record.metadata || {}) as Record<string, unknown>);
+          return String(metadata.mode || '') === 'derived-canonical';
+        }) ? 'Derived from canonical inventory' : undefined}
+        breadcrumbs={breadcrumbByNode[node]}
+        list={{
+          records: filteredRecords,
+          total: records.length,
+          columns: listColumns,
+          exportFileName: `uim-${node}-records.csv`,
+          defaultVisibleColumnKeys,
+          showFieldSelector: true,
+          searchValue,
+          onSearchChange: setSearchValue,
+          statusValue,
+          onStatusChange: setStatusValue,
+          onClearFilters: () => {
+            setSearchValue('');
+            setStatusValue('all');
+          },
+          onRowClick: (record) => handleSelectRecord(String(record.id || ''), record),
+          onRowDoubleClick: (record) => handleSelectRecord(String(record.id || ''), record, 'double'),
+        }}
+        onCreate={handleCreate}
+        onReplayNow={projectionBacked ? handleReplayNow : undefined}
+        replayLoading={isReplayingProjection}
+        formSlot={itemMasterFormSlot}
+        sidePanelSlot={(
+          <div className="space-y-2 text-xs text-muted-foreground">
+            <p>List load latency: {Math.round(lastLoadDurationMs)} ms</p>
+            {isOpeningRecord ? <Progress value={45} aria-label="Opening record" /> : null}
+          </div>
+        )}
+        footerSlot={analyticsTemplateFooter}
+      />
+    );
+  }
 
   return (
     <Card className="mdm-template-panel border-border/70 shadow-sm" data-testid={`uim-node-form-${node}`}>

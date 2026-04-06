@@ -234,7 +234,7 @@ describe('UIM form suite', () => {
     }));
 
     render(<UimItemMasterForm />);
-    await screen.findByText(/Item Master/i);
+    await screen.findByRole('heading', { name: /Item Master/i });
     expect(screen.queryByText('Derived from canonical inventory')).not.toBeInTheDocument();
   });
 
@@ -285,5 +285,56 @@ describe('UIM form suite', () => {
     expect(fieldsButton).toBeInTheDocument();
     expect(fieldsButton.textContent || '').toMatch(/Fields/i);
     expect(fieldsButton.textContent || '').toMatch(/\d+\/\d+/);
+  });
+
+  it('renders item-master using UIM standard form template container', async () => {
+    render(<UimItemMasterForm />);
+    expect(await screen.findByText('Form Panel')).toBeInTheDocument();
+    expect(screen.getByText('UIM / Forms / Item Master')).toBeInTheDocument();
+  });
+
+  it('renders stock-ledger using UIM standard form template container', async () => {
+    render(<UimStockLedgerForm />);
+    expect(await screen.findByText('Form Panel')).toBeInTheDocument();
+    expect(screen.getByText('UIM / Forms / Stock Ledger')).toBeInTheDocument();
+  });
+
+  it('renders reservations using UIM standard form template container', async () => {
+    render(<UimReservationsForm />);
+    expect(await screen.findByText('Form Panel')).toBeInTheDocument();
+    expect(screen.getByText('UIM / Forms / Reservations')).toBeInTheDocument();
+  });
+
+  it('renders issue-consume using UIM standard form template container', async () => {
+    render(<UimIssueConsumeForm />);
+    expect(await screen.findByText('Form Panel')).toBeInTheDocument();
+    expect(screen.getByText('UIM / Forms / Issue & Consume')).toBeInTheDocument();
+  });
+
+  it('renders restock using UIM standard form template container', async () => {
+    render(<UimRestockForm />);
+    expect(await screen.findByText('Form Panel')).toBeInTheDocument();
+    expect(screen.getByText('UIM / Forms / Restock')).toBeInTheDocument();
+  });
+
+  it('renders overview using UIM standard form template container', async () => {
+    render(<UimOverviewForm />);
+    expect(await screen.findByText('Form Panel')).toBeInTheDocument();
+    expect(screen.getByText('UIM / Forms / Overview')).toBeInTheDocument();
+  });
+
+  it('renders locations using UIM standard form template container', async () => {
+    render(<UimLocationsForm />);
+    expect(await screen.findByText('Form Panel')).toBeInTheDocument();
+    expect(screen.getByText('UIM / Forms / Locations')).toBeInTheDocument();
+  });
+
+  it('renders analytics using UIM standard form template container', async () => {
+    render(<UimAnalyticsForm />);
+    expect(await screen.findByText('Form Panel')).toBeInTheDocument();
+    expect(screen.getByText('UIM / Forms / Analytics')).toBeInTheDocument();
+    expect(screen.getByText('Phase 4 Sequence')).toBeInTheDocument();
+    expect(screen.getByText('KPI Model Definitions')).toBeInTheDocument();
+    expect(screen.getByText('Error Details')).toBeInTheDocument();
   });
 });
