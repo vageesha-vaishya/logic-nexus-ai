@@ -216,40 +216,36 @@ export function AmroStandardFormTemplate({
             <CardDescription>Standardized AMRO form sections</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {formBodySlot ? (
-              <div>{formBodySlot}</div>
-            ) : (
-              <>
-                {sectionMap.map((section) => (
-                  <section key={section.id} className="space-y-2">
-                    <div>
-                      <h3 className="text-sm font-semibold">{section.title}</h3>
-                      {section.description ? <p className="text-xs text-muted-foreground">{section.description}</p> : null}
+            {sectionMap.map((section) => (
+              <section key={section.id} className="space-y-2">
+                <div>
+                  <h3 className="text-sm font-semibold">{section.title}</h3>
+                  {section.description ? <p className="text-xs text-muted-foreground">{section.description}</p> : null}
+                </div>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {section.fields.map((field) => (
+                    <div key={field.key} className={cn(field.span === 2 ? 'md:col-span-2' : undefined)}>
+                      {renderField(field)}
                     </div>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {section.fields.map((field) => (
-                        <div key={field.key} className={cn(field.span === 2 ? 'md:col-span-2' : undefined)}>
-                          {renderField(field)}
-                        </div>
-                      ))}
-                    </div>
-                  </section>
-                ))}
+                  ))}
+                </div>
+              </section>
+            ))}
 
-                {uncategorizedFields.length > 0 ? (
-                  <section className="space-y-2">
-                    <h3 className="text-sm font-semibold">Additional Fields</h3>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      {uncategorizedFields.map((field) => (
-                        <div key={field.key} className={cn(field.span === 2 ? 'md:col-span-2' : undefined)}>
-                          {renderField(field)}
-                        </div>
-                      ))}
+            {uncategorizedFields.length > 0 ? (
+              <section className="space-y-2">
+                <h3 className="text-sm font-semibold">Additional Fields</h3>
+                <div className="grid gap-3 md:grid-cols-2">
+                  {uncategorizedFields.map((field) => (
+                    <div key={field.key} className={cn(field.span === 2 ? 'md:col-span-2' : undefined)}>
+                      {renderField(field)}
                     </div>
-                  </section>
-                ) : null}
-              </>
-            )}
+                  ))}
+                </div>
+              </section>
+            ) : null}
+
+            {formBodySlot ? <div>{formBodySlot}</div> : null}
 
             <div className="flex flex-wrap gap-2">
               {primaryActions.map((action) => (

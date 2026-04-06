@@ -39,6 +39,6 @@ describe('AmroWorkPackageTemplateAdapter', () => {
     );
 
     expect(screen.getByText('Validation Errors')).toBeInTheDocument();
-    expect(screen.getByText('Template Code is required')).toBeInTheDocument();
+    expect(screen.getAllByText('Template Code is required').length).toBeGreaterThan(0);
   });
 });
