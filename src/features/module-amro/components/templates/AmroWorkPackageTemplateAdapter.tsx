@@ -1,4 +1,4 @@
-import type { ComponentProps } from 'react';
+import { useEffect, useMemo, useState, type ComponentProps } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
@@ -26,14 +26,76 @@ export function AmroWorkPackageTemplateAdapter({
   formErrors,
   ...props
 }: AmroWorkPackageTemplateAdapterProps) {
+  const [aircraftModelOptions, setAircraftModelOptions] = useState<Array<{ value: string; label: string; modelCode: string }>>([]);
+  const [aircraftModelOptionsLoading, setAircraftModelOptionsLoading] = useState(false);
+  const [aircraftModelOptionsError, setAircraftModelOptionsError] = useState('');
+
+  useEffect(() => {
+    const loadAircraftModels = async () => {
+      if (
+        !props.scopedDb
+        || typeof (props.scopedDb as any).from !== 'function'
+        || !props.scope?.tenantId
+      ) {
+        setAircraftModelOptions([]);
+        setAircraftModelOptionsError('');
+        return;
+      }
+      setAircraftModelOptionsLoading(true);
+      setAircraftModelOptionsError('');
+      try {
+        let query = (props.scopedDb as any)
+          .from('assembly_models')
+          .select('id,name,model_code,is_active,tenant_id,franchise_id')
+          .eq('tenant_id', props.scope.tenantId);
+        if (!props.scope.isTenantAdmin && props.scope.franchiseId) {
+          query = query.eq('franchise_id', props.scope.franchiseId);
+        } else if (!props.scope.isTenantAdmin) {
+          query = query.is('franchise_id', null);
+        }
+        const { data, error } = await query.order('name', { ascending: true });
+        if (error) throw new Error(String(error.message || 'Failed to load aircraft models'));
+        const options = (Array.isArray(data) ? data : [])
+          .map((record) => {
+            const value = String(record.id || '').trim();
+            if (!value) return null;
+            const name = String(record.name || '').trim();
+            const code = String(record.model_code || '').trim();
+            const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
+            if (!active) return null;
+            return {
+              value,
+              label: name && code && name !== code ? `${name} (${code})` : name || code || value,
+              modelCode: code || name || value,
+            };
+          })
+          .filter(Boolean) as Array<{ value: string; label: string; modelCode: string }>;
+        setAircraftModelOptions(options);
+      } catch (error) {
+        setAircraftModelOptions([]);
+        setAircraftModelOptionsError(String((error as Error).message || 'Failed to load aircraft models'));
+      } finally {
+        setAircraftModelOptionsLoading(false);
+      }
+    };
+    void loadAircraftModels();
+  }, [props.scopedDb, props.scope?.franchiseId, props.scope?.isTenantAdmin, props.scope?.tenantId]);
+
   const messages = Object.values(formErrors || {}).filter(Boolean).map((value) => String(value));
   const validation: AmroTemplateValidationState = messages.length > 0
     ? { level: 'error', messages }
     : { level: 'ok', messages: [] };
+  const selectedAircraftModelId = String(props.formValues.model_id ?? '').trim();
+  const selectedAircraftModelLabel = useMemo(() => {
+    const option = aircraftModelOptions.find((entry) => entry.value === selectedAircraftModelId);
+    return option?.label || String(props.formValues.aircraft_model ?? '').trim();
+  }, [aircraftModelOptions, props.formValues.aircraft_model, selectedAircraftModelId]);
+
   const standardFields: AmroTemplateFieldDefinition[] = [
     { key: 'template_code', label: 'Template Code (Standard)', required: true },
     { key: 'template_name', label: 'Template Name (Standard)', required: true },
     { key: 'version', label: 'Version (Standard)', required: true },
+    { key: 'model_id', label: 'Aircraft Model (Standard)', required: true },
     { key: 'maintenance_type', label: 'Maintenance Type (Standard)', required: true },
     { key: 'policy_snapshot_id', label: 'Policy Snapshot ID (Standard)' },
     { key: 'active', label: 'Active (Standard)' },
@@ -41,9 +103,9 @@ export function AmroWorkPackageTemplateAdapter({
   const standardSections: AmroTemplateSection[] = [
     {
       id: 'core',
-      title: 'Standardized Core Fields',
+      title: 'Work Package Details',
       description: 'Adapter-managed standard fields (feature-flag path).',
-      fieldKeys: ['template_code', 'template_name', 'version', 'maintenance_type', 'policy_snapshot_id', 'active'],
+      fieldKeys: ['template_code', 'template_name', 'version', 'model_id', 'maintenance_type', 'policy_snapshot_id', 'active'],
     },
   ];
 
@@ -81,6 +143,47 @@ export function AmroWorkPackageTemplateAdapter({
                 </SelectContent>
               </Select>
               {error ? <p className="mdm-template-danger">{error}</p> : null}
+            </div>
+          );
+        }
+        if (field.key === 'model_id') {
+          const modelError = String(formErrors.model_id || formErrors.aircraft_model || '');
+          return (
+            <div className="space-y-1">
+              <Label htmlFor="amro-wpt-standard-aircraft-model">{field.label}</Label>
+              <Select
+                value={selectedAircraftModelId}
+                onValueChange={(nextValue) => {
+                  const option = aircraftModelOptions.find((entry) => entry.value === nextValue);
+                  props.setFieldValue('model_id', nextValue);
+                  props.setFieldValue('aircraft_model', option?.modelCode || option?.label || nextValue);
+                }}
+                disabled={aircraftModelOptionsLoading || mode === 'update'}
+              >
+                <SelectTrigger
+                  id="amro-wpt-standard-aircraft-model"
+                  className={cn(modelError && 'border-destructive')}
+                  aria-invalid={Boolean(modelError)}
+                >
+                  <SelectValue placeholder={aircraftModelOptionsLoading ? 'Loading aircraft models...' : 'Select aircraft model'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {aircraftModelOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {selectedAircraftModelLabel && mode === 'update' ? (
+                <p className="text-[11px] text-muted-foreground">Resolved Model: {selectedAircraftModelLabel}</p>
+              ) : null}
+              {!aircraftModelOptionsLoading && !aircraftModelOptionsError && aircraftModelOptions.length === 0 ? (
+                <p className="text-[11px] text-muted-foreground">No aircraft models available</p>
+              ) : null}
+              {aircraftModelOptionsError ? <p className="mdm-template-danger">{aircraftModelOptionsError}</p> : null}
+              {modelError ? <p className="mdm-template-danger">{modelError}</p> : null}
+              {mode === 'update' && !selectedAircraftModelId ? (
+                <p className="mdm-template-danger">Aircraft Model could not be resolved for this template.</p>
+              ) : null}
             </div>
           );
         }
@@ -125,6 +228,7 @@ export function AmroWorkPackageTemplateAdapter({
           <WorkPackageTemplateCreateSection
             {...props}
             formErrors={formErrors}
+            hideCoreDetailsSection
           />
         </div>
       )}

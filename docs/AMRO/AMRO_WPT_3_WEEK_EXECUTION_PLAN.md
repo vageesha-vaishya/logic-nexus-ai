@@ -190,3 +190,7 @@
   - Compliance Manager
 - Required approvals before Week-3 full rollout:
   - Joint Go/No-Go sign-off from all roles above.
+
+## Implementation Reference Links
+- Component migration matrix (field-by-field and block-by-block):
+  - [AMRO_WPT_COMPONENT_MIGRATION_MATRIX.md](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/docs/AMRO/AMRO_WPT_COMPONENT_MIGRATION_MATRIX.md)

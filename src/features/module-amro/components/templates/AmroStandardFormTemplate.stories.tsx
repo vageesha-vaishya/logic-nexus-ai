@@ -331,6 +331,11 @@ export const WorkPackageTemplates_ProductionParity: Story = {
     docs: {
       description: {
         story: `
+**State Switch Guide**
+- \`WorkPackageTemplates_ProductionParity\` = ready state (no validation errors expected)
+- \`WorkPackageTemplates_ProductionParity_ValidationError\` = validation state (error summary + 2 expected messages)
+- QA rule: both stories must keep the same field/block layout; only validation state should differ.
+
 **Visual Sign-off Checklist (QA)**
 1. Confirm all 6 standardized fields are visible with exact labels.
 2. Confirm legacy parity blocks are visible: Work Package Details, Selected Tasks, Scope Definition.
@@ -408,6 +413,23 @@ export const WorkPackageTemplates_ProductionParity: Story = {
 
 export const WorkPackageTemplates_ProductionParity_ValidationError: Story = {
   name: 'WorkPackageTemplates_ProductionParity_ValidationError',
+  parameters: {
+    docs: {
+      description: {
+        story: `
+**State Switch Guide**
+- \`WorkPackageTemplates_ProductionParity\` = ready state (no validation errors expected)
+- \`WorkPackageTemplates_ProductionParity_ValidationError\` = expected validation summary state
+- QA rule: both stories must keep the same field/block layout; only validation state should differ.
+
+**Expected Validation Output**
+- Validation Errors
+- Template Code (Standard) is required.
+- Version (Standard) must be greater than zero.
+`,
+      },
+    },
+  },
   render: WorkPackageTemplates_ProductionParity.render,
   args: {
     ...WorkPackageTemplates_ProductionParity.args,

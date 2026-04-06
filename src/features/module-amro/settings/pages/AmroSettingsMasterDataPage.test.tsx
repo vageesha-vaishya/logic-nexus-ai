@@ -1982,9 +1982,39 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getByTestId('amro-wpt-standard-template')).toBeInTheDocument();
     expect(screen.getByLabelText('Template Code (Standard)')).toBeInTheDocument();
     expect(screen.getByLabelText('Template Name (Standard)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Aircraft Model (Standard)')).toBeInTheDocument();
     expect(screen.getByText('Work Package Details')).toBeInTheDocument();
     expect(screen.getByText('Selected Tasks')).toBeInTheDocument();
     expect(screen.getByText('Scope Definition')).toBeInTheDocument();
+  });
+
+  it('keeps selected tasks header/filter UI parity with sort and summary behavior', async () => {
+    vi.stubEnv('VITE_AMRO_WPT_STANDARD_TEMPLATE', 'true');
+    renderWorkPackageTemplatesPage();
+
+    const table = await screen.findByRole('table');
+    const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
+    fireEvent.doubleClick(dataRows[0]);
+
+    expect(await screen.findByRole('heading', { name: 'Update Work Package Templates' })).toBeInTheDocument();
+    expect(screen.getByTestId('wpt-selected-tasks-header-row')).toBeInTheDocument();
+    expect(screen.getByTestId('wpt-selected-tasks-filter-row')).toBeInTheDocument();
+
+    for (const header of ['Task ID', 'Code Form No', 'ATA Code', 'Reference AMP', 'Description', 'Category Code', 'Estimated Man Hours', 'Is Mandatory', 'JSON_Details']) {
+      expect(screen.getByRole('columnheader', { name: new RegExp(header.replace('_', '[_ ]'), 'i') })).toBeInTheDocument();
+    }
+
+    const taskSortButton = screen.getByRole('button', { name: /Sort Task ID \(asc\)/i });
+    fireEvent.click(taskSortButton);
+    expect(screen.getByRole('button', { name: /Sort Task ID \(desc\)/i })).toBeInTheDocument();
+
+    const taskFilterInput = screen.getByLabelText('Filter Task ID');
+    fireEvent.change(taskFilterInput, { target: { value: 'NO-MATCH-TASK-ID' } });
+    expect(screen.getByText('No task rows available for selected aircraft model')).toBeInTheDocument();
+
+    const summary = screen.getByTestId('wpt-selected-tasks-summary');
+    expect(summary).toBeInTheDocument();
+    expect(summary.textContent || '').toMatch(/Selection Summary: Checked \d+ \| Records: \d+/);
   });
 
   it('shows navigation error toast when double-clicked work package row has no record id', async () => {

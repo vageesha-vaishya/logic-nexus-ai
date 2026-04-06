@@ -1535,7 +1535,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const selectionAnchorRef = useRef<string | null>(null);
   const aircraftSnapshotAuthToastShownRef = useRef(false);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
-  const workPackageTemplateStandardEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_WPT_STANDARD_TEMPLATE, false);
+  const workPackageTemplateStandardDefault = import.meta.env.DEV && import.meta.env.MODE !== 'test';
+  const workPackageTemplateStandardEnabled = normalizeFeatureFlag(
+    import.meta.env.VITE_AMRO_WPT_STANDARD_TEMPLATE,
+    workPackageTemplateStandardDefault,
+  );
   const aircraftFormDraftKey = useMemo(
     () => `amro:aircraft-form-draft:${modalMode}:${selectedId || 'new'}`,
     [modalMode, selectedId],

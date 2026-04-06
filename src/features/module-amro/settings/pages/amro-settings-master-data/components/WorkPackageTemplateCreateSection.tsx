@@ -43,6 +43,7 @@ type WorkPackageTemplateCreateSectionProps = {
   selectedTemplateId: string | null;
   scopedDb: unknown;
   scope: ScopeContext;
+  hideCoreDetailsSection?: boolean;
 };
 
 const MAINTENANCE_TYPE_OPTIONS: SelectOption[] = [
@@ -73,6 +74,7 @@ export function WorkPackageTemplateCreateSection({
   selectedTemplateId,
   scopedDb,
   scope,
+  hideCoreDetailsSection = false,
 }: WorkPackageTemplateCreateSectionProps) {
   const [workPackageTemplateTaskTemplates, setWorkPackageTemplateTaskTemplates] = useState<Record<string, unknown>[]>([]);
   const [workPackageTemplateTaskTemplatesLoading, setWorkPackageTemplateTaskTemplatesLoading] = useState(false);
@@ -473,6 +475,11 @@ export function WorkPackageTemplateCreateSection({
     setWorkPackageTemplateTaskFilters((previous) => ({ ...previous, [column]: value }));
   }, []);
 
+  const getWorkPackageTaskSortAriaLabel = useCallback((column: WorkPackageTaskSortColumn, label: string) => {
+    const state = workPackageTemplateTaskSortColumn === column ? workPackageTemplateTaskSortDirection : 'none';
+    return `Sort ${label} (${state})`;
+  }, [workPackageTemplateTaskSortColumn, workPackageTemplateTaskSortDirection]);
+
   const taskTemplateById = useMemo(() => {
     return workPackageTemplateTaskTemplates.reduce((map, taskTemplate) => {
       const id = resolveWorkPackageTaskTemplateId(taskTemplate);
@@ -575,6 +582,7 @@ export function WorkPackageTemplateCreateSection({
         </div>
       </div>
       <div className="grid gap-3">
+        {!hideCoreDetailsSection ? (
         <section className="overflow-hidden rounded bg-white">
           <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Work Package Details</div>
           <div className="grid gap-2 p-3 lg:grid-cols-2">
@@ -698,13 +706,14 @@ export function WorkPackageTemplateCreateSection({
             </div>
           </div>
         </section>
+        ) : null}
         <section className="overflow-hidden rounded bg-white">
           <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Selected Tasks</div>
           <div className="space-y-2 p-3">
             <div className="overflow-x-auto border border-slate-200">
               <table className="w-full text-[12px]">
-                <thead className="bg-slate-50 text-left text-slate-600">
-                  <tr>
+                <thead className="bg-slate-50 text-left text-slate-700">
+                  <tr className="border-b border-slate-200" data-testid="wpt-selected-tasks-header-row">
                     <th className="px-2 py-1.5 font-semibold">
                       <Checkbox
                         checked={allWorkPackageTemplateTasksSelected ? true : someWorkPackageTemplateTasksSelected ? 'indeterminate' : false}
@@ -713,7 +722,12 @@ export function WorkPackageTemplateCreateSection({
                       />
                     </th>
                     <th className="px-2 py-1.5 font-semibold">
-                      <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('task_id')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+                        onClick={() => toggleWorkPackageTemplateTaskSort('task_id')}
+                        aria-label={getWorkPackageTaskSortAriaLabel('task_id', 'Task ID')}
+                      >
                         Task ID
                         {workPackageTemplateTaskSortColumn === 'task_id' ? (
                           workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -721,7 +735,12 @@ export function WorkPackageTemplateCreateSection({
                       </button>
                     </th>
                     <th className="px-2 py-1.5 font-semibold">
-                      <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('code_form_no')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+                        onClick={() => toggleWorkPackageTemplateTaskSort('code_form_no')}
+                        aria-label={getWorkPackageTaskSortAriaLabel('code_form_no', 'Code Form No')}
+                      >
                         Code Form No
                         {workPackageTemplateTaskSortColumn === 'code_form_no' ? (
                           workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -729,7 +748,12 @@ export function WorkPackageTemplateCreateSection({
                       </button>
                     </th>
                     <th className="px-2 py-1.5 font-semibold">
-                      <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('ata_code')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+                        onClick={() => toggleWorkPackageTemplateTaskSort('ata_code')}
+                        aria-label={getWorkPackageTaskSortAriaLabel('ata_code', 'ATA Code')}
+                      >
                         ATA Code
                         {workPackageTemplateTaskSortColumn === 'ata_code' ? (
                           workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -737,7 +761,12 @@ export function WorkPackageTemplateCreateSection({
                       </button>
                     </th>
                     <th className="px-2 py-1.5 font-semibold">
-                      <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('reference_amp')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+                        onClick={() => toggleWorkPackageTemplateTaskSort('reference_amp')}
+                        aria-label={getWorkPackageTaskSortAriaLabel('reference_amp', 'Reference AMP')}
+                      >
                         Reference AMP
                         {workPackageTemplateTaskSortColumn === 'reference_amp' ? (
                           workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -745,7 +774,12 @@ export function WorkPackageTemplateCreateSection({
                       </button>
                     </th>
                     <th className="px-2 py-1.5 font-semibold">
-                      <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('description')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+                        onClick={() => toggleWorkPackageTemplateTaskSort('description')}
+                        aria-label={getWorkPackageTaskSortAriaLabel('description', 'Description')}
+                      >
                         Description
                         {workPackageTemplateTaskSortColumn === 'description' ? (
                           workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -753,7 +787,12 @@ export function WorkPackageTemplateCreateSection({
                       </button>
                     </th>
                     <th className="px-2 py-1.5 font-semibold">
-                      <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('category_code')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+                        onClick={() => toggleWorkPackageTemplateTaskSort('category_code')}
+                        aria-label={getWorkPackageTaskSortAriaLabel('category_code', 'Category Code')}
+                      >
                         Category Code
                         {workPackageTemplateTaskSortColumn === 'category_code' ? (
                           workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -761,7 +800,12 @@ export function WorkPackageTemplateCreateSection({
                       </button>
                     </th>
                     <th className="px-2 py-1.5 font-semibold">
-                      <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('estimated_man_hours')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+                        onClick={() => toggleWorkPackageTemplateTaskSort('estimated_man_hours')}
+                        aria-label={getWorkPackageTaskSortAriaLabel('estimated_man_hours', 'Estimated Man Hours')}
+                      >
                         Estimated Man Hours
                         {workPackageTemplateTaskSortColumn === 'estimated_man_hours' ? (
                           workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -769,7 +813,12 @@ export function WorkPackageTemplateCreateSection({
                       </button>
                     </th>
                     <th className="px-2 py-1.5 font-semibold">
-                      <button type="button" className="inline-flex items-center gap-1" onClick={() => toggleWorkPackageTemplateTaskSort('is_mandatory')}>
+                      <button
+                        type="button"
+                        className="inline-flex items-center gap-1 rounded px-1 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-700 hover:bg-slate-100"
+                        onClick={() => toggleWorkPackageTemplateTaskSort('is_mandatory')}
+                        aria-label={getWorkPackageTaskSortAriaLabel('is_mandatory', 'Is Mandatory')}
+                      >
                         Is Mandatory
                         {workPackageTemplateTaskSortColumn === 'is_mandatory' ? (
                           workPackageTemplateTaskSortDirection === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />
@@ -778,9 +827,9 @@ export function WorkPackageTemplateCreateSection({
                     </th>
                     <th className="px-2 py-1.5 font-semibold">JSON_Details</th>
                   </tr>
-                  <tr className="border-t border-slate-200">
-                    <th className="px-2 py-1.5 text-[11px] font-medium text-slate-500">Filter</th>
-                    <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.task_id} onChange={(event) => setWorkPackageTemplateTaskFilterValue('task_id', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Task ID" /></th>
+                  <tr className="border-t border-slate-200 bg-slate-100/60" data-testid="wpt-selected-tasks-filter-row">
+                    <th className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Filter</th>
+                    <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.task_id} onChange={(event) => setWorkPackageTemplateTaskFilterValue('task_id', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Task ID" aria-label="Filter Task ID" /></th>
                     <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.code_form_no} onChange={(event) => setWorkPackageTemplateTaskFilterValue('code_form_no', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Code" /></th>
                     <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.ata_code} onChange={(event) => setWorkPackageTemplateTaskFilterValue('ata_code', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter ATA" /></th>
                     <th className="px-2 py-1.5"><Input value={workPackageTemplateTaskFilters.reference_amp} onChange={(event) => setWorkPackageTemplateTaskFilterValue('reference_amp', event.target.value)} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Reference" /></th>
@@ -831,7 +880,7 @@ export function WorkPackageTemplateCreateSection({
                 </tbody>
               </table>
             </div>
-            <div className="text-[11px] text-slate-500">
+            <div className="text-[11px] text-slate-500" data-testid="wpt-selected-tasks-summary">
               Selection Summary: Checked {workPackageTemplateSelectedTaskIds.length} | Records: {selectedWorkPackageAircraftModelTaskRows.length}
             </div>
             {workPackageTemplateTaskTemplatesError ? <p className="mdm-template-danger">{workPackageTemplateTaskTemplatesError}</p> : null}

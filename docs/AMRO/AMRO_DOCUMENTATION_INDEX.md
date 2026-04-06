@@ -20,6 +20,9 @@
 | **Timeline and phases** | [AMRO_IMPLEMENTATION_ROADMAP.md](#implementation-roadmap) | 26-week timeline with week-by-week tasks |
 | **Deployment procedures** | [AMRO_DEPLOYMENT_PROCEDURES.md](#deployment-procedures) | Step-by-step deployment and rollback guides |
 | **3-week WPT execution governance** | [AMRO_WPT_3_WEEK_EXECUTION_PLAN.md](#wpt-3-week-execution-governance-plan) | Week-by-week governance, gates, rollback, KPI targets |
+| **WPT component migration matrix** | [AMRO_WPT_COMPONENT_MIGRATION_MATRIX.md](#wpt-component-migration-matrix) | Field/block-level migration map with parity and rollback criteria |
+| **WPT module analysis + storybook reference** | [AMRO_WPT_MODULE_ANALYSIS_AND_STORYBOOK_REFERENCE.md](#wpt-module-analysis-and-storybook-reference) | Functional audit, UX/accessibility findings, enterprise story options |
+| **WPT QA runbook checklist** | [AMRO_WPT_QA_RUNBOOK_CHECKLIST.md](#wpt-qa-runbook-checklist) | Week-1 QA execution checklist, parity and rollback verification |
 | **Business requirements** | [amro-plugin-requirements-spec-v1.0.md](#requirements-specification) | Requirements and acceptance criteria |
 | **Task details** | [2026-03-19-amro-plugin-implementation.md](#implementation-plan) | 13-week Phase A with granular task breakdown |
 | **API reference** | [2026-03-19-amro-plugin-implementation-reference.md](#implementation-reference) | API contracts and schema definitions |
@@ -150,6 +153,60 @@
 - Documentation versioning and stakeholder approval workflow
 
 **Best for:** Program governance, release management, phase-gate decisions
+
+---
+
+### WPT Component Migration Matrix
+**File:** `docs/AMRO/AMRO_WPT_COMPONENT_MIGRATION_MATRIX.md`
+**Version:** 1.0
+**Status:** Implementation Reference
+**Owner:** AMRO FE Lead
+**Update Frequency:** Per migration phase
+
+**Contents:**
+- Field-by-field migration table (`template_code`, `version`, `maintenance_type`, etc.)
+- Block-by-block migration table (`Work Package Details`, `Selected Tasks`, `Scope Definition`)
+- Task-row subcomponent mapping and parity requirements
+- Phase A/B/C acceptance criteria and dependencies
+- Test matrix, rollback triggers, and owner mapping
+
+**Best for:** FE implementation clarity, QA parity execution, phased migration control
+
+---
+
+### WPT Module Analysis and Storybook Reference
+**File:** `docs/AMRO/AMRO_WPT_MODULE_ANALYSIS_AND_STORYBOOK_REFERENCE.md`
+**Version:** 1.0
+**Status:** Architecture + UX Reference
+**Owner:** AMRO Product + FE Architecture
+**Update Frequency:** Per release train
+
+**Contents:**
+- Current module functionality/layout/field and workflow analysis
+- Interaction patterns, visual design findings, accessibility assessment
+- Performance/scalability observations and metrics recommendations
+- Enterprise Storybook reference architecture and story variants
+- Usage guidelines, code example, and implementation best practices
+
+**Best for:** Product planning, FE implementation strategy, UX review, architecture governance
+
+---
+
+### WPT QA Runbook Checklist
+**File:** `docs/AMRO/AMRO_WPT_QA_RUNBOOK_CHECKLIST.md`
+**Version:** 1.0
+**Status:** QA Execution Checklist
+**Owner:** QA Lead (AMRO)
+**Update Frequency:** Weekly during rollout
+
+**Contents:**
+- Mandatory Storybook sign-off order and expected outcomes
+- Enterprise story CI gate checks (RTL/contrast/workflow/offline)
+- Runtime functional parity checks and ON/OFF flag parity
+- Accessibility checks and Week-1 exit criteria
+- Rollback procedure for critical parity regressions
+
+**Best for:** QA execution, release gate validation, rollback readiness
 
 ---
 
