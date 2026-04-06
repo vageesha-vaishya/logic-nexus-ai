@@ -72,6 +72,7 @@ export type AmroStandardFormTemplateProps = {
   listSlot?: AmroTemplateListSlot;
   sidePanelSlot?: ReactNode;
   footerSlot?: ReactNode;
+  contentGridClassName?: string;
   primaryActions?: AmroTemplateAction[];
   secondaryActions?: AmroTemplateAction[];
   successMessage?: string;
@@ -99,6 +100,7 @@ export function AmroStandardFormTemplate({
   listSlot,
   sidePanelSlot,
   footerSlot,
+  contentGridClassName,
   primaryActions = [],
   secondaryActions = [],
   successMessage = 'Saved successfully.',
@@ -209,7 +211,7 @@ export function AmroStandardFormTemplate({
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+      <div className={cn('grid gap-4 xl:grid-cols-[2fr_1fr]', contentGridClassName)}>
         <Card>
           <CardHeader>
             <CardTitle>Form</CardTitle>

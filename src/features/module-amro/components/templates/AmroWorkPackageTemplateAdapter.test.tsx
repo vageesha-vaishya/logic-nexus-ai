@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AmroWorkPackageTemplateAdapter } from './AmroWorkPackageTemplateAdapter';
 
@@ -10,7 +10,7 @@ describe('AmroWorkPackageTemplateAdapter', () => {
   const baseProps = {
     mode: 'update' as const,
     loading: false,
-    formValues: { template_code: 'WP-001' },
+    formValues: { template_code: 'WP-001', scope_json: '[{"phase":"inspection"}]', tasks_json: '[{"task":"T-1"}]' },
     formErrors: {},
     setFieldValue: vi.fn(),
     firstFieldRef: { current: null },
@@ -28,6 +28,8 @@ describe('AmroWorkPackageTemplateAdapter', () => {
     expect(screen.getByTestId('legacy-work-package-section')).toBeInTheDocument();
     expect(screen.getByLabelText('Template Code (Standard)')).toBeInTheDocument();
     expect(screen.getByLabelText('Template Name (Standard)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Scope JSON (Standard)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tasks JSON (Standard)')).toBeInTheDocument();
   });
 
   it('surfaces validation errors from legacy formErrors', () => {
@@ -40,5 +42,29 @@ describe('AmroWorkPackageTemplateAdapter', () => {
 
     expect(screen.getByText('Validation Errors')).toBeInTheDocument();
     expect(screen.getAllByText('Template Code is required').length).toBeGreaterThan(0);
+  });
+
+  it('updates scope/tasks json through existing setFieldValue handlers and surfaces errors', () => {
+    const setFieldValue = vi.fn();
+    render(
+      <AmroWorkPackageTemplateAdapter
+        {...baseProps}
+        setFieldValue={setFieldValue}
+        formErrors={{
+          scope_json: 'Scope JSON is invalid',
+          tasks_json: 'Tasks JSON is invalid',
+        }}
+      />,
+    );
+
+    const scopeInput = screen.getByLabelText('Scope JSON (Standard)');
+    const tasksInput = screen.getByLabelText('Tasks JSON (Standard)');
+    fireEvent.change(scopeInput, { target: { value: '[{"phase":"line"}]' } });
+    fireEvent.change(tasksInput, { target: { value: '[{"task":"T-2"}]' } });
+
+    expect(setFieldValue).toHaveBeenCalledWith('scope_json', '[{"phase":"line"}]');
+    expect(setFieldValue).toHaveBeenCalledWith('tasks_json', '[{"task":"T-2"}]');
+    expect(screen.getAllByText('Scope JSON is invalid').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Tasks JSON is invalid').length).toBeGreaterThan(0);
   });
 });

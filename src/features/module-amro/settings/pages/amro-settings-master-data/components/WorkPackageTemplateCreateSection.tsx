@@ -44,6 +44,9 @@ type WorkPackageTemplateCreateSectionProps = {
   scopedDb: unknown;
   scope: ScopeContext;
   hideCoreDetailsSection?: boolean;
+  embeddedInStandardTemplate?: boolean;
+  hideScopeAndTasksJsonSections?: boolean;
+  hideSelectedTasksSection?: boolean;
 };
 
 const MAINTENANCE_TYPE_OPTIONS: SelectOption[] = [
@@ -75,6 +78,9 @@ export function WorkPackageTemplateCreateSection({
   scopedDb,
   scope,
   hideCoreDetailsSection = false,
+  embeddedInStandardTemplate = false,
+  hideScopeAndTasksJsonSections = false,
+  hideSelectedTasksSection = false,
 }: WorkPackageTemplateCreateSectionProps) {
   const [workPackageTemplateTaskTemplates, setWorkPackageTemplateTaskTemplates] = useState<Record<string, unknown>[]>([]);
   const [workPackageTemplateTaskTemplatesLoading, setWorkPackageTemplateTaskTemplatesLoading] = useState(false);
@@ -572,15 +578,20 @@ export function WorkPackageTemplateCreateSection({
   }, [modalOpen]);
 
   return (
-    <div className="space-y-3 rounded-md bg-[#08a8bd] p-3 text-[12px]">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-white">
-        <p className="font-semibold">Work Package Template Registry</p>
-        <div className="flex items-center gap-2 text-[11px]">
-          <Users className="h-3.5 w-3.5" />
-          <span>Template authoring mode</span>
-          <span>CRUD active</span>
+    <div className={cn(
+      'space-y-3 text-[12px]',
+      embeddedInStandardTemplate ? '' : 'rounded-md bg-[#08a8bd] p-3',
+    )}>
+      {!embeddedInStandardTemplate ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 text-white">
+          <p className="font-semibold">Work Package Template Registry</p>
+          <div className="flex items-center gap-2 text-[11px]">
+            <Users className="h-3.5 w-3.5" />
+            <span>Template authoring mode</span>
+            <span>CRUD active</span>
+          </div>
         </div>
-      </div>
+      ) : null}
       <div className="grid gap-3">
         {!hideCoreDetailsSection ? (
         <section className="overflow-hidden rounded bg-white">
@@ -707,6 +718,7 @@ export function WorkPackageTemplateCreateSection({
           </div>
         </section>
         ) : null}
+        {!hideSelectedTasksSection ? (
         <section className="overflow-hidden rounded bg-white">
           <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Selected Tasks</div>
           <div className="space-y-2 p-3">
@@ -886,7 +898,9 @@ export function WorkPackageTemplateCreateSection({
             {workPackageTemplateTaskTemplatesError ? <p className="mdm-template-danger">{workPackageTemplateTaskTemplatesError}</p> : null}
           </div>
         </section>
+        ) : null}
       </div>
+      {!hideScopeAndTasksJsonSections ? (
       <div className="grid gap-3 lg:grid-cols-2">
         <section className="overflow-hidden rounded bg-white">
           <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Scope Definition</div>
@@ -925,6 +939,7 @@ export function WorkPackageTemplateCreateSection({
           </div>
         </section>
       </div>
+      ) : null}
     </div>
   );
 }

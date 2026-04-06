@@ -68,6 +68,7 @@ function legacySlot(options?: {
 const meta: Meta<typeof AmroStandardFormTemplate> = {
   title: 'AMRO/Templates/WorkPackageTemplatesEnterprise',
   component: AmroStandardFormTemplate,
+  tags: ['autodocs'],
   parameters: {
     layout: 'padded',
     docs: {
@@ -87,6 +88,16 @@ Implementation Best Practices:
 `,
       },
     },
+  },
+  argTypes: {
+    mode: { control: 'inline-radio', options: ['create', 'edit', 'readonly'] },
+    state: { control: 'inline-radio', options: ['ready', 'loading', 'error', 'success'] },
+    title: { control: 'text' },
+    subtitle: { control: 'text' },
+    breadcrumbs: { control: 'object' },
+    statusBadges: { control: 'object' },
+    validation: { control: 'object' },
+    values: { control: 'object' },
   },
 };
 
@@ -277,5 +288,55 @@ export const ApprovalWorkflowAndAudit: Story = {
         throw new Error(`Workflow/audit gate failed: missing "${expected}"`);
       }
     }
+  },
+};
+
+export const EmptyStateReference: Story = {
+  name: 'EmptyStateReference',
+  parameters: {
+    docs: {
+      description: {
+        story: 'Reference state for newly initialized templates with no selected tasks yet.',
+      },
+    },
+  },
+  args: {
+    ...baseArgs,
+    state: 'ready',
+    values: {
+      template_code: '',
+      template_name: '',
+      version: '',
+      maintenance_type: '',
+      aircraft_model: '',
+      policy_snapshot_id: '',
+      active: '',
+    },
+    formBodySlot: legacySlot({
+      taskCount: 0,
+      selectedCount: 0,
+      threshold: '0',
+      horizon: '0',
+      note: 'No selected task rows available. Start by selecting Aircraft Model and task templates.',
+    }),
+    validation: {
+      level: 'warning',
+      messages: ['Template is in empty draft state. Required fields are not yet complete.'],
+    },
+  },
+};
+
+export const SuccessStateReference: Story = {
+  name: 'SuccessStateReference',
+  parameters: {
+    docs: {
+      description: {
+        story: 'Reference state for successful save and post-submit confirmation behavior.',
+      },
+    },
+  },
+  args: {
+    ...baseArgs,
+    state: 'success',
   },
 };

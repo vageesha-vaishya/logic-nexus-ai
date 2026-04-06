@@ -1983,9 +1983,22 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getByLabelText('Template Code (Standard)')).toBeInTheDocument();
     expect(screen.getByLabelText('Template Name (Standard)')).toBeInTheDocument();
     expect(screen.getByLabelText('Aircraft Model (Standard)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Scope JSON (Standard)')).toBeInTheDocument();
+    expect(screen.getByLabelText('Tasks JSON (Standard)')).toBeInTheDocument();
+    expect(screen.getByText('Related Records')).toBeInTheDocument();
+    expect(screen.getByText('Selected Tasks (live runtime table)')).toBeInTheDocument();
+    expect(screen.getByText('Details')).toBeInTheDocument();
+    expect(screen.getByText('Runtime Metadata')).toBeInTheDocument();
+    expect(screen.queryByText('Work Package Template Registry')).not.toBeInTheDocument();
     expect(screen.getByText('Work Package Details')).toBeInTheDocument();
     expect(screen.getByText('Selected Tasks')).toBeInTheDocument();
     expect(screen.getByText('Scope Definition')).toBeInTheDocument();
+    const scopeJsonInput = screen.getByLabelText('Scope JSON (Standard)');
+    const tasksJsonInput = screen.getByLabelText('Tasks JSON (Standard)');
+    fireEvent.change(scopeJsonInput, { target: { value: '[{"phase":"line"}]' } });
+    fireEvent.change(tasksJsonInput, { target: { value: '[{"task_number":"01-00"}]' } });
+    expect((scopeJsonInput as HTMLTextAreaElement).value).toBe('[{"phase":"line"}]');
+    expect((tasksJsonInput as HTMLTextAreaElement).value).toMatch(/^\[/);
   });
 
   it('keeps selected tasks header/filter UI parity with sort and summary behavior', async () => {

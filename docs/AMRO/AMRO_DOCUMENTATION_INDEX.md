@@ -23,6 +23,8 @@
 | **WPT component migration matrix** | [AMRO_WPT_COMPONENT_MIGRATION_MATRIX.md](#wpt-component-migration-matrix) | Field/block-level migration map with parity and rollback criteria |
 | **WPT module analysis + storybook reference** | [AMRO_WPT_MODULE_ANALYSIS_AND_STORYBOOK_REFERENCE.md](#wpt-module-analysis-and-storybook-reference) | Functional audit, UX/accessibility findings, enterprise story options |
 | **WPT QA runbook checklist** | [AMRO_WPT_QA_RUNBOOK_CHECKLIST.md](#wpt-qa-runbook-checklist) | Week-1 QA execution checklist, parity and rollback verification |
+| **WPT Storybook gap analysis** | [AMRO_WPT_STORYBOOK_GAP_ANALYSIS.md](#wpt-storybook-gap-analysis) | Gap matrix of current implementation vs Storybook enterprise requirements |
+| **WPT Storybook migration guide** | [AMRO_WPT_STORYBOOK_MIGRATION_GUIDE.md](#wpt-storybook-migration-guide) | Story-to-module mapping, rollout, rollback, and implementation best practices |
 | **Business requirements** | [amro-plugin-requirements-spec-v1.0.md](#requirements-specification) | Requirements and acceptance criteria |
 | **Task details** | [2026-03-19-amro-plugin-implementation.md](#implementation-plan) | 13-week Phase A with granular task breakdown |
 | **API reference** | [2026-03-19-amro-plugin-implementation-reference.md](#implementation-reference) | API contracts and schema definitions |
@@ -207,6 +209,40 @@
 - Rollback procedure for critical parity regressions
 
 **Best for:** QA execution, release gate validation, rollback readiness
+
+---
+
+### WPT Storybook Gap Analysis
+**File:** `docs/AMRO/AMRO_WPT_STORYBOOK_GAP_ANALYSIS.md`
+**Version:** 1.0
+**Status:** Completed Analysis
+**Owner:** AMRO FE Architecture
+**Update Frequency:** Per major Storybook update
+
+**Contents:**
+- Current story coverage inventory
+- Requirement-to-implementation gap matrix
+- Accessibility/responsive/control/documentation findings
+- Remaining opportunities and recommendation
+
+**Best for:** Architecture decisions, planning, quality sign-off context
+
+---
+
+### WPT Storybook Migration Guide
+**File:** `docs/AMRO/AMRO_WPT_STORYBOOK_MIGRATION_GUIDE.md`
+**Version:** 1.0
+**Status:** Implementation Guide
+**Owner:** AMRO FE Lead
+**Update Frequency:** Per rollout phase
+
+**Contents:**
+- Story-to-runtime mapping
+- Baseline and enterprise reference usage
+- Step-by-step migration path
+- Rollback and evidence checklist
+
+**Best for:** FE execution, QA/UAT rollout operations, release handoff
 
 ---
 
