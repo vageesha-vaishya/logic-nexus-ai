@@ -93,6 +93,80 @@ const meta: Meta<typeof AmroStandardFormTemplate> = {
 export default meta;
 type Story = StoryObj<typeof AmroStandardFormTemplate>;
 
+const wptFields: AmroTemplateFieldDefinition[] = [
+  { key: 'template_code', label: 'Template Code (Standard)', required: true },
+  { key: 'template_name', label: 'Template Name (Standard)', required: true },
+  { key: 'version', label: 'Version (Standard)', required: true },
+  { key: 'maintenance_type', label: 'Maintenance Type (Standard)', required: true },
+  { key: 'policy_snapshot_id', label: 'Policy Snapshot ID (Standard)' },
+  { key: 'active', label: 'Active (Standard)' },
+];
+
+const wptSections: AmroTemplateSection[] = [
+  {
+    id: 'wpt-standard-core',
+    title: 'Standardized Core Fields',
+    description: 'Exact adapter field parity for production sign-off.',
+    fieldKeys: [
+      'template_code',
+      'template_name',
+      'version',
+      'maintenance_type',
+      'policy_snapshot_id',
+      'active',
+    ],
+  },
+];
+
+function renderWptField(field: AmroTemplateFieldDefinition, values: Record<string, unknown>) {
+  const value = values[field.key];
+  return (
+    <div className="space-y-1">
+      <Label htmlFor={`wpt-${field.key}`}>{field.label}{field.required ? ' *' : ''}</Label>
+      <Input
+        id={`wpt-${field.key}`}
+        defaultValue={String(value ?? '')}
+        placeholder={field.label}
+      />
+    </div>
+  );
+}
+
+function buildWptLegacyParitySlot(options?: {
+  tasks?: string[];
+  scopeValues?: { threshold?: string; planning_horizon_days?: string };
+  policySnapshotLabel?: string;
+  reorderHint?: string;
+}) {
+  const tasks = options?.tasks || ['TASK-1001 A-check visual inspection', 'TASK-2004 hydraulic pressure check'];
+  const scopeThreshold = options?.scopeValues?.threshold || '10';
+  const planningHorizon = options?.scopeValues?.planning_horizon_days || '45';
+  const policySnapshot = options?.policySnapshotLabel || 'POL-2026-Q2';
+  const reorderHint = options?.reorderHint || 'Simulated reorder: drag TASK-2004 above TASK-1001';
+  return (
+    <div className="space-y-3 rounded-md border border-border/70 bg-muted/10 p-3 text-sm" data-testid="wpt-production-parity-legacy-slot">
+      <div>
+        <p className="font-medium">Work Package Details</p>
+        <p className="text-xs text-muted-foreground">Policy Snapshot: {policySnapshot}</p>
+      </div>
+      <div>
+        <p className="font-medium">Selected Tasks</p>
+        <ul className="list-disc pl-4 text-xs text-muted-foreground">
+          {tasks.map((task) => <li key={task}>{task}</li>)}
+        </ul>
+        <p className="mt-1 text-xs text-muted-foreground">Task remove simulation: remove first task action available.</p>
+        <p className="text-xs text-muted-foreground">{reorderHint}</p>
+      </div>
+      <div>
+        <p className="font-medium">Scope Definition</p>
+        <p className="text-xs text-muted-foreground">
+          Threshold: {scopeThreshold}% | Planning Horizon: {planningHorizon} days
+        </p>
+      </div>
+    </div>
+  );
+}
+
 export const AircraftRecordsVariant: Story = {
   args: {
     moduleKey: 'aircraft-records',
@@ -248,5 +322,190 @@ export const FormStandardContract: Story = {
         Contract checklist: naming conventions, slot usage, state handling, validation parity, and regression tests.
       </div>
     ),
+  },
+};
+
+export const WorkPackageTemplates_ProductionParity: Story = {
+  name: 'WorkPackageTemplates_ProductionParity',
+  parameters: {
+    docs: {
+      description: {
+        story: `
+**Visual Sign-off Checklist (QA)**
+1. Confirm all 6 standardized fields are visible with exact labels.
+2. Confirm legacy parity blocks are visible: Work Package Details, Selected Tasks, Scope Definition.
+3. Confirm task interaction simulation notes are present: add/remove/reorder.
+4. Confirm policy snapshot and scope values are visible.
+5. Confirm keyboard navigation reaches field inputs and error summary container.
+6. Confirm validation state surfaces both summary and contextual messaging.
+
+**Accessibility Notes**
+- Keyboard path: header actions -> standard fields -> legacy parity blocks.
+- Error summary behavior: validation alert remains visible at top and should be announced by assistive tech in runtime app.
+`,
+      },
+    },
+  },
+  render: (args) => {
+    const values = args.values as Record<string, unknown>;
+    return (
+      <AmroStandardFormTemplate
+        {...args}
+        fields={wptFields}
+        sections={wptSections}
+        renderField={(field) => renderWptField(field, values)}
+        formBodySlot={buildWptLegacyParitySlot({
+          tasks: ['TASK-1001 A-check visual inspection', 'TASK-2004 hydraulic pressure check', 'TASK-3020 avionics health check'],
+          scopeValues: { threshold: '12', planning_horizon_days: '60' },
+          policySnapshotLabel: String(values.policy_snapshot_id || 'POL-2026-Q2'),
+          reorderHint: 'Reorder simulation: TASK-3020 moved above TASK-1001',
+        })}
+      />
+    );
+  },
+  args: {
+    moduleKey: 'work_package_templates',
+    title: 'Work Package Templates - Production Parity',
+    subtitle: 'Exact visual parity contract for adapter-standardized rollout path.',
+    mode: 'edit',
+    state: 'ready',
+    breadcrumbs: ['AMRO', 'Master Data', 'Work Package Templates'],
+    statusBadges: ['Feature Flag ON', 'Production Parity'],
+    values: {
+      template_code: 'WPT-1001',
+      template_name: 'A320 A-CHECK BASE',
+      version: '3',
+      maintenance_type: 'base',
+      policy_snapshot_id: 'POL-2026-Q2',
+      active: 'true',
+    },
+    primaryActions: [{ id: 'save', label: 'Save', onClick: noop }],
+    secondaryActions: [{ id: 'cancel', label: 'Cancel', onClick: noop }],
+  },
+  play: async ({ canvasElement }) => {
+    const labels = Array.from(canvasElement.querySelectorAll('label')).map((node) => node.textContent || '');
+    const pageText = canvasElement.textContent || '';
+    const requiredLabels = [
+      'Template Code (Standard) *',
+      'Template Name (Standard) *',
+      'Version (Standard) *',
+      'Maintenance Type (Standard) *',
+      'Policy Snapshot ID (Standard)',
+      'Active (Standard)',
+    ];
+    for (const label of requiredLabels) {
+      if (!labels.some((candidate) => candidate.includes(label))) {
+        throw new Error(`Production parity assertion failed: missing label "${label}"`);
+      }
+    }
+    for (const section of ['Work Package Details', 'Selected Tasks', 'Scope Definition']) {
+      if (!pageText.includes(section)) {
+        throw new Error(`Production parity assertion failed: missing legacy block "${section}"`);
+      }
+    }
+  },
+};
+
+export const WorkPackageTemplates_ProductionParity_ValidationError: Story = {
+  name: 'WorkPackageTemplates_ProductionParity_ValidationError',
+  render: WorkPackageTemplates_ProductionParity.render,
+  args: {
+    ...WorkPackageTemplates_ProductionParity.args,
+    state: 'ready',
+    validation: {
+      level: 'error',
+      messages: [
+        'Template Code (Standard) is required.',
+        'Version (Standard) must be greater than zero.',
+      ],
+    },
+  },
+  play: async ({ canvasElement }) => {
+    const labels = Array.from(canvasElement.querySelectorAll('label')).map((node) => node.textContent || '');
+    const pageText = canvasElement.textContent || '';
+
+    // Error summary + expected messages
+    for (const expected of [
+      'Validation Errors',
+      'Template Code (Standard) is required.',
+      'Version (Standard) must be greater than zero.',
+    ]) {
+      if (!pageText.includes(expected)) {
+        throw new Error(`Validation parity assertion failed: missing "${expected}"`);
+      }
+    }
+
+    // 6 standard fields should still render in error state
+    const requiredLabels = [
+      'Template Code (Standard) *',
+      'Template Name (Standard) *',
+      'Version (Standard) *',
+      'Maintenance Type (Standard) *',
+      'Policy Snapshot ID (Standard)',
+      'Active (Standard)',
+    ];
+    for (const label of requiredLabels) {
+      if (!labels.some((candidate) => candidate.includes(label))) {
+        throw new Error(`Validation parity assertion failed: missing label "${label}"`);
+      }
+    }
+
+    // Legacy parity blocks should still render in error state
+    for (const section of ['Work Package Details', 'Selected Tasks', 'Scope Definition']) {
+      if (!pageText.includes(section)) {
+        throw new Error(`Validation parity assertion failed: missing legacy block "${section}"`);
+      }
+    }
+  },
+};
+
+export const WorkPackageTemplates_ProductionParity_Loading: Story = {
+  name: 'WorkPackageTemplates_ProductionParity_Loading',
+  render: WorkPackageTemplates_ProductionParity.render,
+  args: {
+    ...WorkPackageTemplates_ProductionParity.args,
+    state: 'loading',
+  },
+};
+
+export const WorkPackageTemplates_ProductionParity_FeatureFlagOffFallback: Story = {
+  name: 'WorkPackageTemplates_ProductionParity_FeatureFlagOffFallback',
+  parameters: {
+    docs: {
+      description: {
+        story: 'Represents legacy fallback visualization when `VITE_AMRO_WPT_STANDARD_TEMPLATE=false`.',
+      },
+    },
+  },
+  render: (args) => (
+    <div className="space-y-3">
+      <AmroStandardFormTemplate
+        {...args}
+        fields={[]}
+        sections={[]}
+        renderField={() => null}
+        formBodySlot={buildWptLegacyParitySlot({
+          tasks: ['TASK-1001 A-check visual inspection', 'TASK-2004 hydraulic pressure check'],
+          scopeValues: { threshold: '10', planning_horizon_days: '45' },
+          policySnapshotLabel: 'Legacy policy snapshot binding',
+          reorderHint: 'Legacy drag/drop reorder behavior retained',
+        })}
+      />
+      <div className="rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
+        Feature flag fallback mode: standard fields hidden, legacy section path only.
+      </div>
+    </div>
+  ),
+  args: {
+    moduleKey: 'work_package_templates',
+    title: 'Work Package Templates - Legacy Fallback',
+    subtitle: 'Feature flag OFF fallback reference',
+    mode: 'edit',
+    state: 'ready',
+    breadcrumbs: ['AMRO', 'Master Data', 'Work Package Templates'],
+    statusBadges: ['Feature Flag OFF'],
+    values: {},
+    primaryActions: [{ id: 'save', label: 'Save', onClick: noop }],
+    secondaryActions: [{ id: 'cancel', label: 'Cancel', onClick: noop }],
   },
 };

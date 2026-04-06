@@ -5,7 +5,7 @@
 **Version:** 1.0.0
 **Date:** 2026-03-19
 **Purpose:** Central navigation hub for all AMRO documentation
-**Last Updated:** 2026-03-19
+**Last Updated:** 2026-04-06
 
 ---
 
@@ -19,6 +19,7 @@
 | **Complete design spec** | [AMRO_COMPREHENSIVE_DESIGN_SPECIFICATION.md](#comprehensive-design-specification) | Full system design, UI/UX, traceability, phases |
 | **Timeline and phases** | [AMRO_IMPLEMENTATION_ROADMAP.md](#implementation-roadmap) | 26-week timeline with week-by-week tasks |
 | **Deployment procedures** | [AMRO_DEPLOYMENT_PROCEDURES.md](#deployment-procedures) | Step-by-step deployment and rollback guides |
+| **3-week WPT execution governance** | [AMRO_WPT_3_WEEK_EXECUTION_PLAN.md](#wpt-3-week-execution-governance-plan) | Week-by-week governance, gates, rollback, KPI targets |
 | **Business requirements** | [amro-plugin-requirements-spec-v1.0.md](#requirements-specification) | Requirements and acceptance criteria |
 | **Task details** | [2026-03-19-amro-plugin-implementation.md](#implementation-plan) | 13-week Phase A with granular task breakdown |
 | **API reference** | [2026-03-19-amro-plugin-implementation-reference.md](#implementation-reference) | API contracts and schema definitions |
@@ -130,6 +131,25 @@
 - Contact information & escalation
 
 **Best for:** DevOps, SRE, operations, incident response
+
+---
+
+### WPT 3-Week Execution Governance Plan
+**File:** `docs/AMRO/AMRO_WPT_3_WEEK_EXECUTION_PLAN.md`
+**Version:** 1.0
+**Status:** Draft for Stakeholder Approval
+**Owner:** AMRO Product + Engineering
+**Update Frequency:** Weekly during rollout
+
+**Contents:**
+- Governance structure and RACI ownership (FE/BE/QA/UX/DevOps/Compliance)
+- Week 1/2/3 execution breakdown (deliverables, milestones, dependencies)
+- Entry/exit gates per week
+- Rollback checkpoints and Go/No-Go decision criteria
+- KPI targets for parity and rollout stability
+- Documentation versioning and stakeholder approval workflow
+
+**Best for:** Program governance, release management, phase-gate decisions
 
 ---
 
@@ -462,7 +482,7 @@ Before publishing, verify:
 ---
 
 **Document Status:** Approved
-**Last Updated:** 2026-03-19
+**Last Updated:** 2026-04-06
 **Next Review:** 2026-03-30 (after Phase 1 kickoff)
 
 ---

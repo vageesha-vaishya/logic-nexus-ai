@@ -82,3 +82,9 @@
 - **Accessibility checks**:
   - Keyboard focus order across task-row controls.
   - ARIA labels for row-level actions and error summaries.
+
+## Program Plan Reference
+- Execution plan (dated Week 1/2/3 with governance, gates, rollback, KPI thresholds):
+  - [AMRO_WPT_3_WEEK_EXECUTION_PLAN.md](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/docs/AMRO/AMRO_WPT_3_WEEK_EXECUTION_PLAN.md)
+- Stakeholder approval workflow:
+  - Follow the "Documentation and Approval Workflow" section in the execution plan before each phase gate.
