@@ -56,3 +56,29 @@
   1. Set `VITE_AMRO_WPT_STANDARD_TEMPLATE=false`
   2. Restart runtime
   3. Module immediately falls back to existing `WorkPackageTemplateCreateSection` path
+
+## Step 3: Task Row Block Standardization (Hybrid)
+- **Current implementation**:
+  - Standardized core fields are rendered by `AmroStandardFormTemplate` through adapter field/section config.
+  - Complex task-row behavior (`Selected Tasks`, scope controls, task cards, sequencing) continues to run from legacy section logic.
+  - This provides visible standardization without changing existing mutation/query handlers.
+- **Recommended next migration sequence**:
+  1. Move task row header and summary chips into adapter config slots.
+  2. Move task row presentational cells (code/title/interval badges) to standardized row renderer.
+  3. Keep action handlers (`remove/reorder/edit`) in legacy controller until parity tests pass.
+  4. Switch task row interactions to template callbacks only after parity is green for create/update/delete.
+- **Parity checkpoints (must pass before expanding scope)**:
+  - Task add/remove behavior unchanged.
+  - Scope selector and planning values persist unchanged.
+  - Save/update payload shape exactly matches legacy output.
+  - Validation errors appear in both field-level and summary contexts.
+  - Double-click/edit flows remain stable with the feature flag on/off.
+
+## Related Sections To Update During Step 3+
+- **Stories**:
+  - Add `WorkPackageTaskRowsVariant` and `TaskRowValidationVariant` in `AmroStandardFormTemplate.stories.tsx`.
+- **Tests**:
+  - Add parity tests for task-row ordering, duplicate prevention, and payload integrity.
+- **Accessibility checks**:
+  - Keyboard focus order across task-row controls.
+  - ARIA labels for row-level actions and error summaries.
