@@ -1,4 +1,4 @@
-import type { Dispatch, SetStateAction } from 'react';
+import { useMemo, useState, type Dispatch, type SetStateAction } from 'react';
 import { ArrowDown, CalendarDays, Users } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -100,6 +100,18 @@ type AircraftWorkPackageRecordSummary = {
   tasks: AircraftWorkPackageTaskListItem[];
 };
 
+type AircraftTemplateAssociatedTaskRow = {
+  id: string;
+  codeFormNo: string;
+  ataCode: string;
+  referenceAmp: string;
+  description: string;
+  categoryCode: string;
+  estimatedManHours: string;
+  isMandatory: boolean;
+  jsonDetails: string;
+};
+
 type AircraftWorkPackageCreateDialogProps = {
   aircraftWorkPackageDialogOpen: boolean;
   setAircraftWorkPackageDialogOpen: (open: boolean) => void;
@@ -135,6 +147,9 @@ type AircraftWorkPackageCreateDialogProps = {
   aircraftWorkPackageSubmitting: boolean;
   handleAircraftWorkPackageSubmit: (action: WorkPackageCreateAction) => Promise<void> | void;
   canCreateWorkPackageFromTemplate: boolean;
+  associatedTemplateTasks: AircraftTemplateAssociatedTaskRow[];
+  associatedTemplateTasksLoading: boolean;
+  associatedTemplateTasksError: string;
 };
 
 export function AircraftWorkPackageCreateDialog({
@@ -172,7 +187,41 @@ export function AircraftWorkPackageCreateDialog({
   aircraftWorkPackageSubmitting,
   handleAircraftWorkPackageSubmit,
   canCreateWorkPackageFromTemplate,
+  associatedTemplateTasks,
+  associatedTemplateTasksLoading,
+  associatedTemplateTasksError,
 }: AircraftWorkPackageCreateDialogProps) {
+  const [associatedTaskFilters, setAssociatedTaskFilters] = useState({
+    codeFormNo: '',
+    ataCode: '',
+    referenceAmp: '',
+    description: '',
+    categoryCode: '',
+    estimatedManHours: '',
+    isMandatory: '',
+  });
+
+  const filteredAssociatedTemplateTasks = useMemo(() => {
+    const filterToken = (value: string) => value.trim().toLowerCase();
+    const codeFormNoToken = filterToken(associatedTaskFilters.codeFormNo);
+    const ataCodeToken = filterToken(associatedTaskFilters.ataCode);
+    const referenceAmpToken = filterToken(associatedTaskFilters.referenceAmp);
+    const descriptionToken = filterToken(associatedTaskFilters.description);
+    const categoryCodeToken = filterToken(associatedTaskFilters.categoryCode);
+    const estimatedManHoursToken = filterToken(associatedTaskFilters.estimatedManHours);
+    const isMandatoryToken = filterToken(associatedTaskFilters.isMandatory);
+    return associatedTemplateTasks.filter((task) => {
+      if (codeFormNoToken && !String(task.codeFormNo || '').toLowerCase().includes(codeFormNoToken)) return false;
+      if (ataCodeToken && !String(task.ataCode || '').toLowerCase().includes(ataCodeToken)) return false;
+      if (referenceAmpToken && !String(task.referenceAmp || '').toLowerCase().includes(referenceAmpToken)) return false;
+      if (descriptionToken && !String(task.description || '').toLowerCase().includes(descriptionToken)) return false;
+      if (categoryCodeToken && !String(task.categoryCode || '').toLowerCase().includes(categoryCodeToken)) return false;
+      if (estimatedManHoursToken && !String(task.estimatedManHours || '').toLowerCase().includes(estimatedManHoursToken)) return false;
+      if (isMandatoryToken && !String(task.isMandatory ? 'true' : 'false').includes(isMandatoryToken)) return false;
+      return true;
+    });
+  }, [associatedTaskFilters, associatedTemplateTasks]);
+
   return (
     <Dialog open={aircraftWorkPackageDialogOpen} onOpenChange={setAircraftWorkPackageDialogOpen}>
       <DialogContent className="mdm-template-dialog mdm-template-dialog-large h-[96vh] w-[98.5vw] max-h-[96vh] max-w-[1840px] overflow-hidden p-0" data-testid="amro-aircraft-work-package-dialog">
@@ -621,7 +670,7 @@ export function AircraftWorkPackageCreateDialog({
                 </div>
                 <div className="rounded-sm border border-[#efefef] bg-white px-3 py-2">
                   <p className="text-[10px] uppercase tracking-wide text-[#8a8a8a]">Tasks</p>
-                  <p className="text-[12px] font-semibold text-[#4f4f4f]">{selectedWorkPackageTemplate?.taskRows.length || 0}</p>
+                  <p className="text-[12px] font-semibold text-[#4f4f4f]">{associatedTemplateTasks.length || selectedWorkPackageTemplate?.taskRows.length || 0}</p>
                 </div>
               </div>
               <div className="flex items-center justify-end">
@@ -641,6 +690,64 @@ export function AircraftWorkPackageCreateDialog({
                     ? `${selectedWorkPackageTemplate.templateName || selectedWorkPackageTemplate.templateCode} selected. Open "Selected task" to review and adjust mapped tasks before creating the new work package.`
                     : 'Choose a template to prefill maintenance type, scope, and task selections.'}
                 </p>
+              </div>
+              <div className="overflow-x-auto border border-[#e9e9e9] bg-white">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-b border-[#ededed] bg-[#f9f9f9]">
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">TASK ID</TableHead>
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">CODE FORM NO</TableHead>
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">ATA CODE</TableHead>
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">REFERENCE AMP</TableHead>
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">DESCRIPTION</TableHead>
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">CATEGORY CODE</TableHead>
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">ESTIMATED MAN HOURS</TableHead>
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">IS MANDATORY</TableHead>
+                      <TableHead className="h-[30px] px-2 text-[12px] font-semibold text-[#4f4f4f]">JSON_Details</TableHead>
+                    </TableRow>
+                    <TableRow className="border-b border-[#ededed] bg-white">
+                      <TableHead className="h-[34px] px-2"><Input value="Filter T" readOnly className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] text-[#6a6a6a] shadow-none" /></TableHead>
+                      <TableHead className="h-[34px] px-2"><Input value={associatedTaskFilters.codeFormNo} onChange={(event) => setAssociatedTaskFilters((previous) => ({ ...previous, codeFormNo: event.target.value }))} placeholder="Filter C" className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] shadow-none" /></TableHead>
+                      <TableHead className="h-[34px] px-2"><Input value={associatedTaskFilters.ataCode} onChange={(event) => setAssociatedTaskFilters((previous) => ({ ...previous, ataCode: event.target.value }))} placeholder="Filter A1" className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] shadow-none" /></TableHead>
+                      <TableHead className="h-[34px] px-2"><Input value={associatedTaskFilters.referenceAmp} onChange={(event) => setAssociatedTaskFilters((previous) => ({ ...previous, referenceAmp: event.target.value }))} placeholder="Filter Reference" className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] shadow-none" /></TableHead>
+                      <TableHead className="h-[34px] px-2"><Input value={associatedTaskFilters.description} onChange={(event) => setAssociatedTaskFilters((previous) => ({ ...previous, description: event.target.value }))} placeholder="Filter Description" className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] shadow-none" /></TableHead>
+                      <TableHead className="h-[34px] px-2"><Input value={associatedTaskFilters.categoryCode} onChange={(event) => setAssociatedTaskFilters((previous) => ({ ...previous, categoryCode: event.target.value }))} placeholder="Filter Category" className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] shadow-none" /></TableHead>
+                      <TableHead className="h-[34px] px-2"><Input value={associatedTaskFilters.estimatedManHours} onChange={(event) => setAssociatedTaskFilters((previous) => ({ ...previous, estimatedManHours: event.target.value }))} placeholder="Filter Hours" className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] shadow-none" /></TableHead>
+                      <TableHead className="h-[34px] px-2"><Input value={associatedTaskFilters.isMandatory} onChange={(event) => setAssociatedTaskFilters((previous) => ({ ...previous, isMandatory: event.target.value }))} placeholder="true / false" className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] shadow-none" /></TableHead>
+                      <TableHead className="h-[34px] px-2"><Input value="-" readOnly className="h-7 rounded-none border-[#e7e7e7] px-2 text-[11px] text-[#6a6a6a] shadow-none" /></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {associatedTemplateTasksLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-[12px] text-[#6a6a6a]">Loading associated task templates…</TableCell>
+                      </TableRow>
+                    ) : null}
+                    {!associatedTemplateTasksLoading && associatedTemplateTasksError ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-[12px] text-destructive">{associatedTemplateTasksError}</TableCell>
+                      </TableRow>
+                    ) : null}
+                    {!associatedTemplateTasksLoading && !associatedTemplateTasksError && filteredAssociatedTemplateTasks.map((task) => (
+                      <TableRow key={task.id} className={cn('h-[30px] border-b border-[#f0f0f0]', aircraftWorkPackageSelectedTaskIds.includes(task.id) && 'bg-[#e8f8f8]')}>
+                        <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.id}</TableCell>
+                        <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.codeFormNo || '-'}</TableCell>
+                        <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.ataCode || '-'}</TableCell>
+                        <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.referenceAmp || '-'}</TableCell>
+                        <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.description || '-'}</TableCell>
+                        <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.categoryCode || '-'}</TableCell>
+                        <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.estimatedManHours || '-'}</TableCell>
+                        <TableCell className="px-2 py-1 text-[12px] text-[#5a5a5a]">{task.isMandatory ? 'true' : 'false'}</TableCell>
+                        <TableCell className="max-w-[260px] px-2 py-1 text-[12px] text-[#5a5a5a]"><div className="max-h-[82px] overflow-auto whitespace-pre-wrap">{task.jsonDetails || '-'}</div></TableCell>
+                      </TableRow>
+                    ))}
+                    {!associatedTemplateTasksLoading && !associatedTemplateTasksError && filteredAssociatedTemplateTasks.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={9} className="text-center text-muted-foreground">No associated task templates found for selected template.</TableCell>
+                      </TableRow>
+                    ) : null}
+                  </TableBody>
+                </Table>
               </div>
             </TabsContent>
             <TabsContent value="existing-wp" className="space-y-3 rounded-md border border-[#efefef] bg-white p-4">

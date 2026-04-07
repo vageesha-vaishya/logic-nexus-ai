@@ -687,6 +687,18 @@ type AircraftWorkPackageTaskListItem = {
   parentWorkPackageNumber?: string;
 };
 
+type AircraftTemplateAssociatedTaskRow = {
+  id: string;
+  codeFormNo: string;
+  ataCode: string;
+  referenceAmp: string;
+  description: string;
+  categoryCode: string;
+  estimatedManHours: string;
+  isMandatory: boolean;
+  jsonDetails: string;
+};
+
 type AircraftDashboardKpis = {
   fleet_size: number;
   open_work_packages: number;
@@ -1481,6 +1493,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [workPackageTemplateRegistryLoading, setWorkPackageTemplateRegistryLoading] = useState(false);
   const [workPackageTemplateRegistryError, setWorkPackageTemplateRegistryError] = useState('');
   const [selectedWorkPackageTemplateId, setSelectedWorkPackageTemplateId] = useState('');
+  const [aircraftTemplateAssociatedTasks, setAircraftTemplateAssociatedTasks] = useState<AircraftTemplateAssociatedTaskRow[]>([]);
+  const [aircraftTemplateAssociatedTasksLoading, setAircraftTemplateAssociatedTasksLoading] = useState(false);
+  const [aircraftTemplateAssociatedTasksError, setAircraftTemplateAssociatedTasksError] = useState('');
   const [flightLogDialogOpen, setFlightLogDialogOpen] = useState(false);
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
   const [flightLogMode, setFlightLogMode] = useState<FlightLogFormMode>('add');
@@ -4598,6 +4613,120 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
   }, [canCreateWorkPackage, entity, scope, sessionAccessToken, trackWorkPackageTemplateAdoption]);
 
+  const loadAircraftTemplateAssociatedTasks = useCallback(async (templateId: string) => {
+    const normalizedTemplateId = String(templateId || '').trim();
+    if (!normalizedTemplateId || !scope.tenantId || !scopedDb) {
+      setAircraftTemplateAssociatedTasks([]);
+      setAircraftTemplateAssociatedTasksError('');
+      setAircraftTemplateAssociatedTasksLoading(false);
+      return;
+    }
+    setAircraftTemplateAssociatedTasksLoading(true);
+    setAircraftTemplateAssociatedTasksError('');
+    try {
+      const isMissingFranchiseColumnError = (error: unknown) => {
+        const message = String((error as { message?: string })?.message || '').toLowerCase();
+        return message.includes('franchise_id') && (message.includes('column') || message.includes('does not exist'));
+      };
+      const queryRelationships = async (withFranchiseScope: boolean) => {
+        let query = (scopedDb as any)
+          .from('work_package_template_task_templates')
+          .select('task_template_id')
+          .eq('tenant_id', scope.tenantId)
+          .eq('work_package_template_id', normalizedTemplateId);
+        if (withFranchiseScope && scope.franchiseId) {
+          query = query.or(`franchise_id.is.null,franchise_id.eq.${scope.franchiseId}`);
+        }
+        return query;
+      };
+      let { data: relationshipRows, error: relationshipError } = await queryRelationships(true);
+      if (relationshipError && isMissingFranchiseColumnError(relationshipError) && scope.franchiseId) {
+        ({ data: relationshipRows, error: relationshipError } = await queryRelationships(false));
+      }
+      if (relationshipError) {
+        throw new Error(String(relationshipError.message || 'Failed to load template associations'));
+      }
+      const taskTemplateIds = Array.from(new Set(
+        (Array.isArray(relationshipRows) ? relationshipRows : [])
+          .map((row) => String((row as Record<string, unknown>).task_template_id || '').trim())
+          .filter((value) => value.length > 0),
+      ));
+      if (taskTemplateIds.length === 0) {
+        setAircraftTemplateAssociatedTasks([]);
+        return;
+      }
+      const queryTaskTemplates = async (columnName: 'id' | 'task_template_id', withFranchiseScope: boolean) => {
+        let query = (scopedDb as any)
+          .from('task_templates')
+          .select('id,task_template_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json')
+          .eq('tenant_id', scope.tenantId)
+          .in(columnName, taskTemplateIds);
+        if (withFranchiseScope && scope.franchiseId) {
+          query = query.or(`franchise_id.is.null,franchise_id.eq.${scope.franchiseId}`);
+        }
+        return query;
+      };
+      let { data: taskRowsById, error: taskRowsByIdError } = await queryTaskTemplates('id', true);
+      if (taskRowsByIdError && isMissingFranchiseColumnError(taskRowsByIdError) && scope.franchiseId) {
+        ({ data: taskRowsById, error: taskRowsByIdError } = await queryTaskTemplates('id', false));
+      }
+      if (taskRowsByIdError) {
+        throw new Error(String(taskRowsByIdError.message || 'Failed to load associated task templates'));
+      }
+      let taskRows = Array.isArray(taskRowsById) ? [...taskRowsById] : [];
+      const matchedById = new Set(taskRows.map((row) => String((row as Record<string, unknown>).id || '').trim()));
+      const unmatchedIds = taskTemplateIds.filter((id) => !matchedById.has(id));
+      if (unmatchedIds.length > 0) {
+        let { data: taskRowsByTemplateId, error: taskRowsByTemplateIdError } = await queryTaskTemplates('task_template_id', true);
+        if (taskRowsByTemplateIdError && isMissingFranchiseColumnError(taskRowsByTemplateIdError) && scope.franchiseId) {
+          ({ data: taskRowsByTemplateId, error: taskRowsByTemplateIdError } = await queryTaskTemplates('task_template_id', false));
+        }
+        if (!taskRowsByTemplateIdError && Array.isArray(taskRowsByTemplateId)) {
+          taskRows = [...taskRows, ...taskRowsByTemplateId];
+        }
+      }
+      const byId = new Map<string, AircraftTemplateAssociatedTaskRow>();
+      taskRows.forEach((row) => {
+        const record = row as Record<string, unknown>;
+        const id = String(record.id || record.task_template_id || '').trim();
+        if (!id || byId.has(id)) {
+          return;
+        }
+        byId.set(id, {
+          id,
+          codeFormNo: String(record.code_form_no || '').trim(),
+          ataCode: String(record.ata_code || '').trim(),
+          referenceAmp: String(record.reference_amp || '').trim(),
+          description: String(record.description || '').trim(),
+          categoryCode: String(record.category_code || '').trim(),
+          estimatedManHours: String(record.estimated_man_hours || '').trim(),
+          isMandatory: Boolean(record.is_mandatory),
+          jsonDetails: (() => {
+            const detailPayload = record.task_template_detail_json;
+            if (typeof detailPayload === 'string') return detailPayload;
+            if (detailPayload == null) return '';
+            try {
+              return JSON.stringify(detailPayload);
+            } catch {
+              return '';
+            }
+          })(),
+        });
+      });
+      const orderedRows = taskTemplateIds
+        .map((taskTemplateId) => byId.get(taskTemplateId) || null)
+        .filter((row): row is AircraftTemplateAssociatedTaskRow => Boolean(row));
+      setAircraftTemplateAssociatedTasks(orderedRows);
+      setAircraftWorkPackageSelectedTaskIds(orderedRows.map((row) => row.id));
+      setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '' }));
+    } catch (error) {
+      setAircraftTemplateAssociatedTasks([]);
+      setAircraftTemplateAssociatedTasksError(String((error as Error).message || 'Failed to load associated task templates'));
+    } finally {
+      setAircraftTemplateAssociatedTasksLoading(false);
+    }
+  }, [scope.franchiseId, scope.tenantId, scopedDb]);
+
 
   useEffect(() => {
     void loadAircraftWorkPackageSnapshot();
@@ -4755,6 +4884,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftExistingWorkPackages([]);
     setAircraftExistingWorkPackagesError('');
     setAircraftSelectedExistingWorkPackageId('');
+    setAircraftTemplateAssociatedTasks([]);
+    setAircraftTemplateAssociatedTasksLoading(false);
+    setAircraftTemplateAssociatedTasksError('');
     setSelectedWorkPackageTemplateId((previous) => previous || '');
     setAircraftWorkPackageDialogOpen(true);
     trackWorkPackageTemplateAdoption('dialog_opened', {
@@ -4793,8 +4925,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const handleAircraftWorkPackageTemplateSelect = useCallback(
     (templateId: string) => {
       setSelectedWorkPackageTemplateId(templateId);
+      setAircraftTemplateAssociatedTasks([]);
+      setAircraftTemplateAssociatedTasksError('');
       const template = workPackageTemplateRegistry.find((item) => item.id === templateId);
       if (!template) {
+        setAircraftWorkPackageSelectedTaskIds([]);
         return;
       }
       setAircraftWorkPackageValues((previous) => {
@@ -4810,11 +4945,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           selectedTaskDescription: firstTask?.description || previous.selectedTaskDescription,
         };
       });
-      if (template.taskRows.length > 0) {
-        setAircraftWorkPackageSelectedTaskIds(template.taskRows.map((task) => task.id));
-      } else {
-        setAircraftWorkPackageSelectedTaskIds([]);
-      }
+      setAircraftWorkPackageSelectedTaskIds(template.taskRows.length > 0 ? template.taskRows.map((task) => task.id) : []);
+      void loadAircraftTemplateAssociatedTasks(template.id);
       setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '', scopeItemsText: '' }));
       trackWorkPackageTemplateAdoption('template_selected', {
         templateId: template.id,
@@ -4822,7 +4954,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         taskCount: template.taskRows.length,
       });
     },
-    [trackWorkPackageTemplateAdoption, workPackageTemplateRegistry],
+    [loadAircraftTemplateAssociatedTasks, trackWorkPackageTemplateAdoption, workPackageTemplateRegistry],
   );
 
   useEffect(() => {
@@ -5132,7 +5264,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   );
 
   const aircraftWorkPackageSelectedTasks = useMemo(() => {
-    const templateRows = selectedWorkPackageTemplate?.taskRows || [];
+    const templateRows = aircraftTemplateAssociatedTasks.length > 0
+      ? aircraftTemplateAssociatedTasks.map((task) => ({
+          id: task.id,
+          taskNumber: task.codeFormNo || task.id,
+          ataCode: task.ataCode,
+          serialNumber: '',
+          partNumber: '',
+          description: task.description,
+        }))
+      : (selectedWorkPackageTemplate?.taskRows || []);
     const scopeRows = aircraftWorkPackageValues.scopeItemsText
       .split('\n')
       .map((item) => item.trim())
@@ -5174,7 +5315,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }
     });
     return merged;
-  }, [aircraftWorkPackageValues, selectedWorkPackageTemplate]);
+  }, [aircraftTemplateAssociatedTasks, aircraftWorkPackageValues, selectedWorkPackageTemplate]);
 
   const aircraftWorkPackageFilteredTasks = useMemo(() => {
     const normalizedSearch = aircraftWorkPackageTaskSearch.trim().toLowerCase();
@@ -5238,7 +5379,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
 
   const aircraftAllWorkPackageTasks = useMemo(() => {
     const merged = new Map<string, AircraftWorkPackageTaskListItem>();
-    selectedWorkPackageTemplate?.taskRows.forEach((item, index) => {
+    const templateRows = aircraftTemplateAssociatedTasks.length > 0
+      ? aircraftTemplateAssociatedTasks.map((task) => ({
+          id: task.id,
+          taskNumber: task.codeFormNo || task.id,
+          ataCode: task.ataCode,
+          serialNumber: '',
+          partNumber: '',
+          description: task.description,
+        }))
+      : (selectedWorkPackageTemplate?.taskRows || []);
+    templateRows.forEach((item, index) => {
       const id = item.id || `template-${index + 1}`;
       merged.set(id, {
         id,
@@ -5277,7 +5428,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }
     });
     return Array.from(merged.values());
-  }, [aircraftExistingWorkPackages, aircraftWorkPackageSelectedTasks, selectedWorkPackageTemplate]);
+  }, [aircraftExistingWorkPackages, aircraftTemplateAssociatedTasks, aircraftWorkPackageSelectedTasks, selectedWorkPackageTemplate]);
 
   const aircraftTaskGridRows = useMemo<AircraftWorkPackageTaskListItem[]>(() => {
     if (aircraftWorkPackageActiveTab === 'non-performed-tasks') {
@@ -8743,6 +8894,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           aircraftWorkPackageSubmitting={aircraftWorkPackageSubmitting}
           handleAircraftWorkPackageSubmit={handleAircraftWorkPackageSubmit}
           canCreateWorkPackageFromTemplate={canCreateWorkPackageFromTemplate}
+          associatedTemplateTasks={aircraftTemplateAssociatedTasks}
+          associatedTemplateTasksLoading={aircraftTemplateAssociatedTasksLoading}
+          associatedTemplateTasksError={aircraftTemplateAssociatedTasksError}
         />
         <Dialog open={flightLogDialogOpen} onOpenChange={setFlightLogDialogOpen}>
           <DialogContent className="mdm-template-dialog mdm-template-dialog-large">
