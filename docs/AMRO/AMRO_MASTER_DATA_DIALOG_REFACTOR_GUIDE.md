@@ -3,6 +3,7 @@
 ## Scope
 - Refactor target: extract the `Create Aircraft` dialog content from [AmroSettingsMasterDataPage.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx) into a reusable component while preserving existing behavior.
 - New component: [AircraftCreateDialogSection.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftCreateDialogSection.tsx).
+- Follow-up extraction: `Create/Update Aircraft Template` dialog moved into [AircraftTemplateDialog.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftTemplateDialog.tsx).
 
 ## Dialog Inventory Analysis (Current)
 - **Master data create/update dialog** (`modalOpen`)
@@ -19,7 +20,8 @@
 - **Flight log detail dialog**
   - Read-only detail modal near [AmroSettingsMasterDataPage.tsx#L9138](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L9138)
 - **Aircraft template create/update dialog**
-  - Dialog near [AmroSettingsMasterDataPage.tsx#L9205](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L9205)
+  - Extracted component: [AircraftTemplateDialog.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftTemplateDialog.tsx)
+  - Mounted in page near [AmroSettingsMasterDataPage.tsx#L8820](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L8820)
 - **Aircraft template delete confirmation**
   - Alert dialog near [AmroSettingsMasterDataPage.tsx#L9326](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L9326)
 - **Generic delete confirmation dialog**

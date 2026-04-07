@@ -130,6 +130,7 @@ import { AircraftDataTableFrame } from './amro-settings-master-data/components/A
 import { AircraftListingControls } from './amro-settings-master-data/components/AircraftListingControls';
 import { AircraftWorkPackageCreateDialog } from './amro-settings-master-data/components/AircraftWorkPackageCreateDialog';
 import { AircraftCreateDialogSection } from './amro-settings-master-data/components/AircraftCreateDialogSection';
+import { AircraftTemplateDialog } from './amro-settings-master-data/components/AircraftTemplateDialog';
 import { WorkPackageTemplateCreateSection } from './amro-settings-master-data/components/WorkPackageTemplateCreateSection';
 import { AmroWorkPackageTemplateAdapter } from '@/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter';
 import {
@@ -8817,127 +8818,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
           </DialogContent>
         </Dialog>
-        <Dialog
+        <AircraftTemplateDialog
           open={aircraftTemplateDialogOpen}
-          onOpenChange={(open) => {
-            if (!open) {
-              resetAircraftTemplateDialog();
-              return;
-            }
-            setAircraftTemplateDialogOpen(true);
-          }}
-        >
-          <DialogContent className="mdm-template-dialog mdm-template-dialog-large">
-            <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
-              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                {aircraftTemplateDialogMode === 'create' ? 'Create Aircraft Template' : 'Update Aircraft Template'}
-              </DialogTitle>
-              <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
-                Maintain reusable aircraft template metadata for creation workflows.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4 px-6 pb-6 pt-4">
-              <div className="grid gap-3 md:grid-cols-2">
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-template-name" className="mdm-template-label">Template Name</Label>
-                  <Input
-                    id="aircraft-template-name"
-                    value={aircraftTemplateFormValues.template_name}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setAircraftTemplateFormValues((previous) => ({ ...previous, template_name: value }));
-                      if (aircraftTemplateFormErrors.template_name) {
-                        setAircraftTemplateFormErrors((previous) => ({ ...previous, template_name: '' }));
-                      }
-                    }}
-                    className={cn('mdm-template-input', aircraftTemplateFormErrors.template_name && 'border-destructive')}
-                    aria-invalid={Boolean(aircraftTemplateFormErrors.template_name)}
-                  />
-                  {aircraftTemplateFormErrors.template_name ? <p className="mdm-template-danger">{aircraftTemplateFormErrors.template_name}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-template-type" className="mdm-template-label">Aircraft Type</Label>
-                  <Input
-                    id="aircraft-template-type"
-                    value={aircraftTemplateFormValues.aircraft_type}
-                    onChange={(event) => {
-                      const value = event.target.value;
-                      setAircraftTemplateFormValues((previous) => ({ ...previous, aircraft_type: value }));
-                      if (aircraftTemplateFormErrors.aircraft_type) {
-                        setAircraftTemplateFormErrors((previous) => ({ ...previous, aircraft_type: '' }));
-                      }
-                    }}
-                    className={cn('mdm-template-input', aircraftTemplateFormErrors.aircraft_type && 'border-destructive')}
-                    aria-invalid={Boolean(aircraftTemplateFormErrors.aircraft_type)}
-                  />
-                  {aircraftTemplateFormErrors.aircraft_type ? <p className="mdm-template-danger">{aircraftTemplateFormErrors.aircraft_type}</p> : null}
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-template-manufacturer" className="mdm-template-label">Manufacturer</Label>
-                  <Input
-                    id="aircraft-template-manufacturer"
-                    value={aircraftTemplateFormValues.manufacturer}
-                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, manufacturer: event.target.value }))}
-                    className="mdm-template-input"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-template-manufacturer-id" className="mdm-template-label">Manufacturer ID</Label>
-                  <Input
-                    id="aircraft-template-manufacturer-id"
-                    value={aircraftTemplateFormValues.manufacturer_id}
-                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, manufacturer_id: event.target.value }))}
-                    className="mdm-template-input"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-template-model" className="mdm-template-label">Aircraft Model</Label>
-                  <Input
-                    id="aircraft-template-model"
-                    value={aircraftTemplateFormValues.aircraft_model}
-                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, aircraft_model: event.target.value }))}
-                    className="mdm-template-input"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-template-program" className="mdm-template-label">Maintenance Program</Label>
-                  <Input
-                    id="aircraft-template-program"
-                    value={aircraftTemplateFormValues.maintenance_program}
-                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, maintenance_program: event.target.value }))}
-                    className="mdm-template-input"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-template-revision" className="mdm-template-label">Revision Number</Label>
-                  <Input
-                    id="aircraft-template-revision"
-                    value={aircraftTemplateFormValues.revision_number}
-                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, revision_number: event.target.value }))}
-                    className="mdm-template-input"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-template-amendment" className="mdm-template-label">Amendment Number</Label>
-                  <Input
-                    id="aircraft-template-amendment"
-                    value={aircraftTemplateFormValues.amendment_number}
-                    onChange={(event) => setAircraftTemplateFormValues((previous) => ({ ...previous, amendment_number: event.target.value }))}
-                    className="mdm-template-input"
-                  />
-                </div>
-              </div>
-              <div className="flex justify-end gap-2 border-t border-[hsl(var(--mdm-template-border))] pt-4">
-                <Button type="button" variant="outline" onClick={resetAircraftTemplateDialog}>
-                  Cancel
-                </Button>
-                <Button type="button" onClick={() => void submitAircraftTemplateDialog()} disabled={aircraftTemplateDialogSubmitting}>
-                  {aircraftTemplateDialogSubmitting ? 'Saving...' : aircraftTemplateDialogMode === 'create' ? 'Create Template' : 'Save Changes'}
-                </Button>
-              </div>
-            </div>
-          </DialogContent>
-        </Dialog>
+          mode={aircraftTemplateDialogMode}
+          submitting={aircraftTemplateDialogSubmitting}
+          formValues={aircraftTemplateFormValues}
+          formErrors={aircraftTemplateFormErrors}
+          setFormValues={setAircraftTemplateFormValues}
+          setFormErrors={setAircraftTemplateFormErrors}
+          onClose={resetAircraftTemplateDialog}
+          onSubmit={submitAircraftTemplateDialog}
+          setOpen={setAircraftTemplateDialogOpen}
+        />
         <AlertDialog open={aircraftTemplateDeleteDialogOpen} onOpenChange={setAircraftTemplateDeleteDialogOpen}>
           <AlertDialogContent>
             <AlertDialogHeader>
