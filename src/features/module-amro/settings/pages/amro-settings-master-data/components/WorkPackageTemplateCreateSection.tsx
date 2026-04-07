@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
 type WorkPackageTaskSortColumn =
@@ -92,6 +93,22 @@ export function WorkPackageTemplateCreateSection({
   const [workPackageTemplateSelectionInitialized, setWorkPackageTemplateSelectionInitialized] = useState(false);
   const [workPackageTemplateTaskSortColumn, setWorkPackageTemplateTaskSortColumn] = useState<WorkPackageTaskSortColumn>('task_id');
   const [workPackageTemplateTaskSortDirection, setWorkPackageTemplateTaskSortDirection] = useState<SortDirection>('asc');
+
+  const buildAuthHeaders = useCallback(async () => {
+    const headers: Record<string, string> = {};
+    const { data } = await supabase.auth.getSession();
+    const token = String(data.session?.access_token || '').trim();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    if (scope.tenantId) {
+      headers['x-tenant-id'] = scope.tenantId;
+    }
+    if (scope.franchiseId) {
+      headers['x-franchise-id'] = scope.franchiseId;
+    }
+    return headers;
+  }, [scope.franchiseId, scope.tenantId]);
   const [workPackageTemplateTaskFilters, setWorkPackageTemplateTaskFilters] = useState<Record<WorkPackageTaskSortColumn, string>>(
     DEFAULT_WORK_PACKAGE_TASK_FILTERS,
   );
@@ -159,7 +176,7 @@ export function WorkPackageTemplateCreateSection({
   }, [scope.franchiseId, scope.isTenantAdmin, scope.tenantId, scopedDb]);
 
   const loadWorkPackageTemplateAircraftModelOptions = useCallback(async () => {
-    if (!scopedDb || !scope.tenantId) {
+    if (!scope.tenantId) {
       setWorkPackageTemplateAircraftModelOptions([]);
       setWorkPackageTemplateAircraftModelOptionsError('');
       return;
@@ -167,20 +184,20 @@ export function WorkPackageTemplateCreateSection({
     setWorkPackageTemplateAircraftModelOptionsLoading(true);
     setWorkPackageTemplateAircraftModelOptionsError('');
     try {
-      let query = (scopedDb as any)
-        .from('assembly_models')
-        .select('id,name,model_code,is_active,tenant_id')
-        .eq('tenant_id', scope.tenantId);
-      if (!scope.isTenantAdmin && scope.franchiseId) {
-        query = query.eq('franchise_id', scope.franchiseId);
-      } else if (!scope.isTenantAdmin) {
-        query = query.is('franchise_id', null);
+      const response = await fetch('/api/v2/amro/work-package-templates/model-options', {
+        method: 'GET',
+        headers: await buildAuthHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to load aircraft models (status ${response.status})`);
       }
-      const { data, error } = await query.order('name', { ascending: true });
-      if (error) {
-        throw new Error(String(error.message || 'Failed to load aircraft models'));
-      }
-      const options = (Array.isArray(data) ? data : [])
+      const payload = (await response.json()) as Record<string, unknown>;
+      const records = Array.isArray(payload.data)
+        ? (payload.data as Record<string, unknown>[])
+        : payload.output && typeof payload.output === 'object' && Array.isArray((payload.output as Record<string, unknown>).records)
+          ? ((payload.output as Record<string, unknown>).records as Record<string, unknown>[])
+          : [];
+      const options = records
         .map((record) => {
           const modelId = String(record.id || '').trim();
           const value = modelId;
@@ -204,7 +221,7 @@ export function WorkPackageTemplateCreateSection({
     } finally {
       setWorkPackageTemplateAircraftModelOptionsLoading(false);
     }
-  }, [scope.tenantId, scopedDb]);
+  }, [buildAuthHeaders, scope.tenantId]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -246,7 +263,7 @@ export function WorkPackageTemplateCreateSection({
           .eq('tenant_id', scope.tenantId)
           .eq('work_package_template_id', selectedTemplateId);
         if (!scope.isTenantAdmin && scope.franchiseId) {
-          query = query.eq('franchise_id', scope.franchiseId);
+          query = query.or(`franchise_id.eq.${scope.franchiseId},franchise_id.is.null`);
         } else if (!scope.isTenantAdmin) {
           query = query.is('franchise_id', null);
         }

@@ -25,6 +25,7 @@
 | **WPT QA runbook checklist** | [AMRO_WPT_QA_RUNBOOK_CHECKLIST.md](#wpt-qa-runbook-checklist) | Week-1 QA execution checklist, parity and rollback verification |
 | **WPT Storybook gap analysis** | [AMRO_WPT_STORYBOOK_GAP_ANALYSIS.md](#wpt-storybook-gap-analysis) | Gap matrix of current implementation vs Storybook enterprise requirements |
 | **WPT Storybook migration guide** | [AMRO_WPT_STORYBOOK_MIGRATION_GUIDE.md](#wpt-storybook-migration-guide) | Story-to-module mapping, rollout, rollback, and implementation best practices |
+| **WPT aircraft model dropdown RCA** | [AMRO_WPT_AIRCRAFT_MODEL_DROPDOWN_RCA.md](#wpt-aircraft-model-dropdown-rca) | Root-cause analysis and deterministic scope-based fix for Aircraft Model options |
 | **Business requirements** | [amro-plugin-requirements-spec-v1.0.md](#requirements-specification) | Requirements and acceptance criteria |
 | **Task details** | [2026-03-19-amro-plugin-implementation.md](#implementation-plan) | 13-week Phase A with granular task breakdown |
 | **API reference** | [2026-03-19-amro-plugin-implementation-reference.md](#implementation-reference) | API contracts and schema definitions |
@@ -243,6 +244,24 @@
 - Rollback and evidence checklist
 
 **Best for:** FE execution, QA/UAT rollout operations, release handoff
+
+---
+
+### WPT Aircraft Model Dropdown RCA
+**File:** `docs/AMRO/AMRO_WPT_AIRCRAFT_MODEL_DROPDOWN_RCA.md`
+**Version:** 1.0
+**Status:** Resolved
+**Owner:** AMRO FE + Platform API
+**Update Frequency:** When scope logic changes
+
+**Contents:**
+- Problem summary and root-cause breakdown
+- Scope-rule alignment to project rules
+- Dedicated endpoint design and UI integration
+- Error handling/logging behavior
+- Validation notes and compatibility impact
+
+**Best for:** Incident remediation traceability and future maintenance handoff
 
 ---
 

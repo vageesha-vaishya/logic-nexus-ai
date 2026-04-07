@@ -565,6 +565,72 @@ async function buildTemplateListResponse(
   });
 }
 
+async function loadWorkPackageTemplateModelOptions(
+  tenantId: string,
+  franchiseId: string | null,
+): Promise<Array<Record<string, unknown>>> {
+  const runQuery = async (includeFranchiseColumn: boolean, includeGlobalTenantRows: boolean) => {
+    let query = supabase
+      .from('assembly_models')
+      .select(includeFranchiseColumn
+        ? 'id,name,model_code,is_active,tenant_id,franchise_id'
+        : 'id,name,model_code,is_active,tenant_id')
+      .eq('is_active', true)
+      .order('name', { ascending: true });
+    query = includeGlobalTenantRows ? query.is('tenant_id', null) : query.eq('tenant_id', tenantId);
+    if (franchiseId && includeFranchiseColumn) {
+      query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+    return query;
+  };
+
+  const loadScopeRows = async (includeFranchiseColumn: boolean) => {
+    const tenantResult = await runQuery(includeFranchiseColumn, false);
+    if (tenantResult.error) {
+      return tenantResult;
+    }
+    const globalResult = await runQuery(includeFranchiseColumn, true);
+    if (globalResult.error) {
+      return globalResult;
+    }
+    const merged = [
+      ...(Array.isArray(tenantResult.data) ? tenantResult.data : []),
+      ...(Array.isArray(globalResult.data) ? globalResult.data : []),
+    ] as unknown as Array<Record<string, unknown>>;
+    const deduped = Array.from(new Map(
+      merged.map((row) => [String(row.id || ''), row]),
+    ).values());
+    return { data: deduped, error: null };
+  };
+
+  let { data, error } = await loadScopeRows(true);
+  if (error && String(error.message || '').toLowerCase().includes('franchise_id')) {
+    logger.warn('[AMRO Work Package Template] model options franchise column unavailable, retrying tenant/global scope', {
+      tenantId,
+      franchiseId,
+      message: String(error.message || ''),
+    });
+    ({ data, error } = await loadScopeRows(false));
+  }
+  if (error) throw error;
+
+  const rows = (Array.isArray(data) ? data : []) as unknown as Array<Record<string, unknown>>;
+  const normalized = rows.map((row) => ({
+    id: String(row.id || ''),
+    name: String(row.name || ''),
+    model_code: String(row.model_code || ''),
+    is_active: Boolean(row.is_active),
+    tenant_id: String(row.tenant_id || ''),
+    franchise_id: row.franchise_id ? String(row.franchise_id || '') : null,
+  }));
+  logger.info('[AMRO Work Package Template] loaded model options', {
+    tenantId,
+    franchiseId,
+    count: normalized.length,
+  });
+  return normalized;
+}
+
 /**
  * @openapi
  * /api/v2/work-package-templates:
@@ -704,6 +770,21 @@ router.get(
       return;
     }
     const records = await buildTemplateListResponse(tenantId, franchiseId);
+    res.json({ data: records, count: records.length });
+    return;
+  }),
+);
+
+router.get(
+  '/work-package-templates/model-options',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
+    if (!tenantId) {
+      res.status(401).json(toErrorResponse('Missing tenant context', 'MISSING_TENANT', 401));
+      return;
+    }
+    const records = await loadWorkPackageTemplateModelOptions(tenantId, franchiseId);
     res.json({ data: records, count: records.length });
     return;
   }),
