@@ -404,10 +404,19 @@ export function AmroWorkPackageTemplateAdapter({
                 value={effectiveAircraftModelId}
                 onValueChange={(nextValue) => {
                   const option = effectiveAircraftModelOptions.find((entry) => entry.value === nextValue);
+                  const currentModelId = String(props.formValues.model_id ?? '').trim();
+                  const nextModelId = String(nextValue || '').trim();
+                  const isModelChanged = currentModelId !== nextModelId;
                   props.setFieldValue('model_id', nextValue);
                   props.setFieldValue('aircraft_model', option?.modelCode || option?.label || nextValue);
+                  if (isModelChanged) {
+                    // Prevent cross-model validation failures by resetting selected tasks
+                    // whenever model changes in create/update flows.
+                    props.setFieldValue('tasks_json', '[]');
+                    props.setFieldValue('selected_task_template_ids', []);
+                  }
                 }}
-                disabled={aircraftModelOptionsLoading || mode === 'update'}
+                disabled={aircraftModelOptionsLoading}
               >
                 <SelectTrigger
                   id="amro-wpt-standard-aircraft-model"

@@ -1952,7 +1952,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(screen.getAllByText('Scheduled Maintenance Checks').length).toBeGreaterThan(0);
     const aircraftModelSelect = screen.getByLabelText('Aircraft Model') as HTMLSelectElement;
     expect(aircraftModelSelect).toHaveValue('amodel-2');
-    expect(aircraftModelSelect).toBeDisabled();
+    expect(aircraftModelSelect).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Save Changes' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });

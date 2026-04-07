@@ -65,6 +65,16 @@ function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
+function isMissingWorkPackageTemplateFranchiseColumnError(errorLike: unknown): boolean {
+  const message = String(
+    (errorLike as { message?: unknown })?.message
+      || (errorLike as string)
+      || '',
+  ).toLowerCase();
+  return message.includes('work_package_templates.franchise_id')
+    || (message.includes('franchise_id') && message.includes('work_package_templates'));
+}
+
 function normalizeTaskTemplateIds(input: unknown): string[] {
   if (!Array.isArray(input)) return [];
   return Array.from(new Set(
@@ -201,7 +211,11 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
   }
   if (payload.model_id && resolvedModelId && payload.model_id !== resolvedModelId) {
     res.status(422).json(
-      toErrorResponse('Validation failed: selected task templates do not match selected model_id', 'VALIDATION_ERROR', 422),
+      toErrorResponse(
+        `Validation failed: selected task templates resolve to model_id=${resolvedModelId}, but request model_id=${payload.model_id}`,
+        'VALIDATION_ERROR',
+        422,
+      ),
     );
     return;
   }
@@ -337,15 +351,21 @@ async function createTemplateTaskRelationshipsFromRequest(
     taskTemplateCount: selectedTaskTemplateIds.length,
   });
 
-  let templateQuery = supabase
-    .from('work_package_templates')
-    .select('id,tenant_id,franchise_id,model_id')
-    .eq('tenant_id', tenantId)
-    .eq('id', resolvedTemplateId);
-  if (franchiseId) {
-    templateQuery = templateQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+  const runTemplateQuery = async (includeFranchiseColumn: boolean) => {
+    let query = supabase
+      .from('work_package_templates')
+      .select(includeFranchiseColumn ? 'id,tenant_id,franchise_id,model_id' : 'id,tenant_id,model_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', resolvedTemplateId);
+    if (franchiseId && includeFranchiseColumn) {
+      query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+    return query.single();
+  };
+  let { data: templateRow, error: templateError } = await runTemplateQuery(true);
+  if (templateError && isMissingWorkPackageTemplateFranchiseColumnError(templateError)) {
+    ({ data: templateRow, error: templateError } = await runTemplateQuery(false));
   }
-  const { data: templateRow, error: templateError } = await templateQuery.single();
   if (templateError || !templateRow) {
     res.status(404).json(toErrorResponse('Work package template not found', 'NOT_FOUND', 404));
     return;
@@ -391,7 +411,7 @@ async function createTemplateTaskRelationshipsFromRequest(
     return;
   }
   const resolvedModelId = modelIds[0];
-  const templateModelId = String((templateRow as Record<string, unknown>)?.model_id || '').trim();
+  const templateModelId = String(((templateRow as unknown as Record<string, unknown>)?.model_id) || '').trim();
   if (templateModelId && templateModelId !== resolvedModelId) {
     res.status(422).json(
       toErrorResponse(
@@ -478,12 +498,9 @@ async function buildTemplateListResponse(
 ): Promise<Array<Record<string, unknown>>> {
   let templatesQuery = supabase
     .from('work_package_templates')
-    .select('id,tenant_id,franchise_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at')
+    .select('id,tenant_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at')
     .eq('tenant_id', tenantId)
     .order('updated_at', { ascending: false });
-  if (franchiseId) {
-    templatesQuery = templatesQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
-  }
   if (Array.isArray(templateIds) && templateIds.length > 0) {
     templatesQuery = templatesQuery.in('id', templateIds);
   }
@@ -629,6 +646,101 @@ async function loadWorkPackageTemplateModelOptions(
     count: normalized.length,
   });
   return normalized;
+}
+
+async function updateWorkPackageTemplateWithoutAtomicRpc(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  userId: string;
+  templateId: string;
+  payload: {
+    template_code?: string;
+    version?: number;
+    active?: boolean;
+    template_name?: string;
+    maintenance_type?: string;
+    model_id?: string | null;
+    scope_json?: unknown[];
+    tasks_json?: unknown[];
+    policy_snapshot_id?: string | null;
+  };
+  selectedTaskTemplateIds: string[];
+  resolvedModelId: string | null;
+}): Promise<{ ok: true } | { ok: false; statusCode: number; message: string }> {
+  const {
+    tenantId,
+    franchiseId,
+    templateId,
+    payload,
+    selectedTaskTemplateIds,
+    resolvedModelId,
+  } = params;
+
+  const runUpdateQuery = async (withFranchiseScope: boolean) => {
+    let query = supabase
+      .from('work_package_templates')
+      .update({
+        template_code: payload.template_code,
+        version: payload.version,
+        active: payload.active,
+        template_name: payload.template_name,
+        maintenance_type: payload.maintenance_type,
+        model_id: payload.model_id || null,
+        scope_json: Array.isArray(payload.scope_json) ? payload.scope_json : [],
+        tasks_json: Array.isArray(payload.tasks_json) ? payload.tasks_json : [],
+        policy_snapshot_id: payload.policy_snapshot_id || null,
+      })
+      .eq('tenant_id', tenantId)
+      .eq('id', templateId)
+      .select('id')
+      .limit(1);
+    if (withFranchiseScope && franchiseId) {
+      query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+    return query;
+  };
+  let { data: updatedRows, error: updateError } = await runUpdateQuery(Boolean(franchiseId));
+  if (updateError && isMissingWorkPackageTemplateFranchiseColumnError(updateError) && franchiseId) {
+    ({ data: updatedRows, error: updateError } = await runUpdateQuery(false));
+  }
+  if (updateError) {
+    return { ok: false, statusCode: 400, message: String(updateError.message || 'Update failed') };
+  }
+  if (!Array.isArray(updatedRows) || updatedRows.length === 0) {
+    return { ok: false, statusCode: 404, message: 'Work package template not found' };
+  }
+
+  let deleteRelationsQuery = supabase
+    .from('work_package_template_task_templates')
+    .delete()
+    .eq('tenant_id', tenantId)
+    .eq('work_package_template_id', templateId);
+  if (franchiseId) {
+    deleteRelationsQuery = deleteRelationsQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+  }
+  const { error: deleteRelationsError } = await deleteRelationsQuery;
+  if (deleteRelationsError) {
+    return { ok: false, statusCode: 400, message: String(deleteRelationsError.message || 'Failed to reset relationships') };
+  }
+
+  const targetModelId = payload.model_id || resolvedModelId;
+  if (selectedTaskTemplateIds.length > 0 && targetModelId) {
+    const rows = selectedTaskTemplateIds.map((taskTemplateId) => ({
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      work_package_template_id: templateId,
+      model_id: targetModelId,
+      task_template_id: taskTemplateId,
+    }));
+    const { error: insertRelationsError } = await supabase
+      .from('work_package_template_task_templates')
+      .insert(rows);
+    if (insertRelationsError) {
+      return { ok: false, statusCode: 400, message: String(insertRelationsError.message || 'Failed to write relationships') };
+    }
+  }
+
+  return { ok: true };
 }
 
 /**
@@ -848,7 +960,7 @@ router.put(
     }
 
     const request = (req.body || {}) as WorkPackageTemplateRequest;
-    const selectedTaskTemplateIds = normalizeTemplateRequestTaskTemplateIds(request);
+    let selectedTaskTemplateIds = normalizeTemplateRequestTaskTemplateIds(request);
     const validation = await validateTaskTemplateIds(tenantId, franchiseId, selectedTaskTemplateIds);
     if (!validation.valid) {
       if (validation.invalidIds.length > 0) {
@@ -909,10 +1021,16 @@ router.put(
       resolvedModelId = modelIds[0];
     }
     if (payload.model_id && resolvedModelId && payload.model_id !== resolvedModelId) {
-      res.status(422).json(
-        toErrorResponse('Validation failed: selected task templates do not match selected model_id', 'VALIDATION_ERROR', 422),
-      );
-      return;
+      logger.warn('[AMRO Work Package Template] model changed with stale selected tasks; clearing task links for update', {
+        tenantId,
+        templateId: id,
+        requestModelId: payload.model_id,
+        resolvedModelId,
+        selectedTaskTemplateCount: selectedTaskTemplateIds.length,
+      });
+      selectedTaskTemplateIds = [];
+      resolvedModelId = null;
+      payload.tasks_json = [];
     }
     if (!payload.model_id && resolvedModelId) {
       payload.model_id = resolvedModelId;
@@ -928,18 +1046,31 @@ router.put(
     if (atomicError) {
       const message = String(atomicError.message || '');
       if (/does not exist|undefined function/i.test(message)) {
-        res.status(500).json(
-          toErrorResponse(
-            'Atomic update function is missing in database. Apply latest Supabase migrations.',
-            'ATOMIC_FUNCTION_MISSING',
-            500,
-          ),
-        );
+        logger.warn('[AMRO Work Package Template] atomic update RPC missing, using fallback update path', {
+          tenantId,
+          templateId: id,
+          message,
+        });
+        const fallbackResult = await updateWorkPackageTemplateWithoutAtomicRpc({
+          tenantId,
+          franchiseId,
+          userId,
+          templateId: id,
+          payload,
+          selectedTaskTemplateIds,
+          resolvedModelId,
+        });
+        if (!fallbackResult.ok) {
+          res.status(fallbackResult.statusCode).json(
+            toErrorResponse(fallbackResult.message, 'UPDATE_FAILED', fallbackResult.statusCode),
+          );
+          return;
+        }
+      } else {
+        const statusCode = /validation failed/i.test(message) ? 422 : /not found/i.test(message) ? 404 : /duplicate key/i.test(message) ? 409 : 400;
+        res.status(statusCode).json(toErrorResponse(message, 'UPDATE_FAILED', statusCode));
         return;
       }
-      const statusCode = /validation failed/i.test(message) ? 422 : /not found/i.test(message) ? 404 : /duplicate key/i.test(message) ? 409 : 400;
-      res.status(statusCode).json(toErrorResponse(message, 'UPDATE_FAILED', statusCode));
-      return;
     }
 
     const updatedRecord = (atomicResult as Record<string, unknown> | null)?.record as Record<string, unknown> | undefined;
@@ -973,15 +1104,21 @@ router.delete(
       return;
     }
 
-    let query = supabase
-      .from('work_package_templates')
-      .delete()
-      .eq('tenant_id', tenantId)
-      .eq('id', id);
-    if (franchiseId) {
-      query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    const runDeleteQuery = async (withFranchiseScope: boolean) => {
+      let query = supabase
+        .from('work_package_templates')
+        .delete()
+        .eq('tenant_id', tenantId)
+        .eq('id', id);
+      if (withFranchiseScope && franchiseId) {
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+      }
+      return query;
+    };
+    let { error } = await runDeleteQuery(Boolean(franchiseId));
+    if (error && isMissingWorkPackageTemplateFranchiseColumnError(error) && franchiseId) {
+      ({ error } = await runDeleteQuery(false));
     }
-    const { error } = await query;
     if (error) {
       const message = String(error.message || '');
       const statusCode = /not found/i.test(message) ? 404 : 400;

@@ -83,6 +83,24 @@ export function WorkPackageTemplateCreateSection({
   hideScopeAndTasksJsonSections = false,
   hideSelectedTasksSection = false,
 }: WorkPackageTemplateCreateSectionProps) {
+  const applyFranchiseScope = useCallback((query: any) => {
+    if (scope.isTenantAdmin) {
+      return query;
+    }
+    if (scope.franchiseId) {
+      if (typeof query?.or === 'function') {
+        return query.or(`franchise_id.eq.${scope.franchiseId},franchise_id.is.null`);
+      }
+      if (typeof query?.eq === 'function') {
+        return query.eq('franchise_id', scope.franchiseId);
+      }
+      return query;
+    }
+    if (typeof query?.is === 'function') {
+      return query.is('franchise_id', null);
+    }
+    return query;
+  }, [scope.franchiseId, scope.isTenantAdmin]);
   const [workPackageTemplateTaskTemplates, setWorkPackageTemplateTaskTemplates] = useState<Record<string, unknown>[]>([]);
   const [workPackageTemplateTaskTemplatesLoading, setWorkPackageTemplateTaskTemplatesLoading] = useState(false);
   const [workPackageTemplateTaskTemplatesError, setWorkPackageTemplateTaskTemplatesError] = useState('');
@@ -157,11 +175,7 @@ export function WorkPackageTemplateCreateSection({
         .from('task_templates')
         .select('id,task_template_id,tenant_id,franchise_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,task_template_scope_json')
         .eq('tenant_id', scope.tenantId);
-      if (!scope.isTenantAdmin && scope.franchiseId) {
-        query = query.eq('franchise_id', scope.franchiseId);
-      } else if (!scope.isTenantAdmin) {
-        query = query.is('franchise_id', null);
-      }
+      query = applyFranchiseScope(query);
       const { data, error } = await query.order('task_template_id', { ascending: true });
       if (error) {
         throw new Error(String(error.message || 'Failed to load task templates'));
@@ -173,7 +187,7 @@ export function WorkPackageTemplateCreateSection({
     } finally {
       setWorkPackageTemplateTaskTemplatesLoading(false);
     }
-  }, [scope.franchiseId, scope.isTenantAdmin, scope.tenantId, scopedDb]);
+  }, [applyFranchiseScope, scope.tenantId, scopedDb]);
 
   const loadWorkPackageTemplateAircraftModelOptions = useCallback(async () => {
     if (!scope.tenantId) {
@@ -262,11 +276,7 @@ export function WorkPackageTemplateCreateSection({
           .select('task_template_id,model_id')
           .eq('tenant_id', scope.tenantId)
           .eq('work_package_template_id', selectedTemplateId);
-        if (!scope.isTenantAdmin && scope.franchiseId) {
-          query = query.or(`franchise_id.eq.${scope.franchiseId},franchise_id.is.null`);
-        } else if (!scope.isTenantAdmin) {
-          query = query.is('franchise_id', null);
-        }
+        query = applyFranchiseScope(query);
         const { data, error } = await query;
         if (error) {
           throw new Error(String(error.message || 'Failed to load selected task templates'));
@@ -281,9 +291,12 @@ export function WorkPackageTemplateCreateSection({
         ));
         const relationModelId = relationModelIds.length === 1 ? relationModelIds[0] : '';
         const fallbackIds = parseTaskTemplateIdsFromTasksJson(formValues.tasks_json);
-        const nextSelection = Array.from(new Set([...relationIds, ...fallbackIds]));
+        const currentModelId = String(formValues.model_id ?? '').trim();
+        const modelChangedFromRelation = Boolean(currentModelId && relationModelId && currentModelId !== relationModelId);
+        const nextSelection = modelChangedFromRelation
+          ? Array.from(new Set([...fallbackIds]))
+          : Array.from(new Set([...relationIds, ...fallbackIds]));
         if (!cancelled) {
-          const currentModelId = String(formValues.model_id ?? '').trim();
           if (!currentModelId && relationModelId) {
             const mappedOption = workPackageTemplateAircraftModelOptions.find((option) => option.value === relationModelId);
             setFieldValue('model_id', relationModelId);
@@ -317,6 +330,7 @@ export function WorkPackageTemplateCreateSection({
     selectedTemplateId,
     setFieldValue,
     workPackageTemplateAircraftModelOptions,
+    applyFranchiseScope,
   ]);
 
   const workPackageTemplateAircraftModelSelectOptions = useMemo<SelectOption[]>(() => {
@@ -661,15 +675,23 @@ export function WorkPackageTemplateCreateSection({
                 onChange={(event) => {
                   const selectedModelId = String(event.target.value || '').trim();
                   const option = workPackageTemplateAircraftModelSelectOptions.find((entry) => entry.value === selectedModelId);
+                  const currentModelId = String(formValues.model_id ?? '').trim();
+                  const isModelChanged = currentModelId !== selectedModelId;
                   setFieldValue('model_id', selectedModelId);
                   setFieldValue('aircraft_model', option?.modelCode || option?.label || selectedModelId);
+                  if (isModelChanged) {
+                    // Reset selected tasks when model changes to avoid cross-model validation errors on save.
+                    setWorkPackageTemplateSelectedTaskIds([]);
+                    setFieldValue('tasks_json', '[]');
+                    setFieldValue('selected_task_template_ids', []);
+                  }
                 }}
                 className={cn(
                   'h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800',
                   (formErrors.aircraft_model || formErrors.model_id) && 'border-destructive',
                 )}
                 aria-invalid={Boolean(formErrors.aircraft_model || formErrors.model_id)}
-                disabled={workPackageTemplateAircraftModelOptionsLoading || modalMode === 'update'}
+                disabled={workPackageTemplateAircraftModelOptionsLoading}
               >
                 <option value="" hidden />
                 {workPackageTemplateAircraftModelSelectOptions.map((option) => (

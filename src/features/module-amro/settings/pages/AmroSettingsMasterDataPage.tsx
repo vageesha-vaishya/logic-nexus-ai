@@ -3112,8 +3112,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const updateEndpoint = entity === 'work_package_templates'
         ? `/api/v2/amro/work-package-templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
+      const updateMethod = entity === 'work_package_templates' ? 'PUT' : 'PATCH';
       const response = await fetch(updateEndpoint, {
-        method: 'PATCH',
+        method: updateMethod,
         headers,
         body: JSON.stringify(payload),
       });
@@ -3167,7 +3168,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (!selectedId) return;
     try {
       const headers = await buildApiHeaders(scope);
-      const response = await fetch(`/api/v2/amro/master-data/${entity}/${selectedId}`, {
+      const deleteEndpoint = entity === 'work_package_templates'
+        ? `/api/v2/amro/work-package-templates/${selectedId}`
+        : `/api/v2/amro/master-data/${entity}/${selectedId}`;
+      const response = await fetch(deleteEndpoint, {
         method: 'DELETE',
         headers,
       });
