@@ -71,6 +71,9 @@ export function AmroWorkPackageTemplateAdapter({
       ? (payload.data as Record<string, unknown>)
       : null;
     if (data) {
+      if (Object.prototype.hasOwnProperty.call(data, 'model_id') || Object.prototype.hasOwnProperty.call(data, 'aircraft_model')) {
+        return data;
+      }
       const dataRecord = data.record && typeof data.record === 'object'
         ? (data.record as Record<string, unknown>)
         : null;
@@ -386,7 +389,7 @@ export function AmroWorkPackageTemplateAdapter({
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {['line', 'base', 'hangar', 'shop'].map((option) => (
+                  {['line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification'].map((option) => (
                     <SelectItem key={option} value={option}>{option}</SelectItem>
                   ))}
                 </SelectContent>

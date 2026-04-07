@@ -53,8 +53,12 @@ type WorkPackageTemplateCreateSectionProps = {
 const MAINTENANCE_TYPE_OPTIONS: SelectOption[] = [
   { value: 'line', label: 'line' },
   { value: 'base', label: 'base' },
-  { value: 'hangar', label: 'hangar' },
-  { value: 'shop', label: 'shop' },
+  { value: 'component', label: 'component' },
+  { value: 'inspection', label: 'inspection' },
+  { value: 'overhaul', label: 'overhaul' },
+  { value: 'repair', label: 'repair' },
+  { value: 'upgrade', label: 'upgrade' },
+  { value: 'modification', label: 'modification' },
 ];
 
 const DEFAULT_WORK_PACKAGE_TASK_FILTERS: Record<WorkPackageTaskSortColumn, string> = {

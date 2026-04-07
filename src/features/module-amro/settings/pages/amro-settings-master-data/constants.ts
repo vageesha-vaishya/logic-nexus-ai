@@ -257,7 +257,7 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'template_name', label: 'Template Name', type: 'text', required: true },
     { key: 'model_id', label: 'Model ID', type: 'text' },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
-    { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['line', 'base', 'hangar', 'shop'] },
+    { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification'] },
     { key: 'version', label: 'Version', type: 'number', required: true, min: 1 },
     { key: 'active', label: 'Active', type: 'boolean' },
     { key: 'policy_snapshot_id', label: 'Policy Snapshot ID', type: 'text' },

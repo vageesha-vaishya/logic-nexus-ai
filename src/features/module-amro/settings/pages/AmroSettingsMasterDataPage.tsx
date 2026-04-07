@@ -1164,7 +1164,7 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'template_code', label: 'Template Code', type: 'text', required: true },
     { key: 'template_name', label: 'Template Name', type: 'text', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select' },
-    { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['line', 'base', 'hangar', 'shop'] },
+    { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification'] },
     { key: 'version', label: 'Version', type: 'number', required: true, min: 1 },
     { key: 'active', label: 'Active', type: 'boolean' },
     { key: 'policy_snapshot_id', label: 'Policy Snapshot ID', type: 'text' },
@@ -3112,7 +3112,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const updateEndpoint = entity === 'work_package_templates'
         ? `/api/v2/amro/work-package-templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
-      const updateMethod = entity === 'work_package_templates' ? 'PUT' : 'PATCH';
+      const updateMethod = 'PATCH';
       const response = await fetch(updateEndpoint, {
         method: updateMethod,
         headers,

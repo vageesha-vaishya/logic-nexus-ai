@@ -53,6 +53,21 @@ type TemplateRecord = Record<string, unknown>;
 type RelationshipRecord = Record<string, unknown>;
 type TaskTemplateRecord = Record<string, unknown>;
 
+const MAINTENANCE_TYPE_ALLOWED = new Set([
+  'line',
+  'base',
+  'component',
+  'inspection',
+  'overhaul',
+  'repair',
+  'upgrade',
+  'modification',
+]);
+
+const MAINTENANCE_TYPE_ALIASES: Record<string, string> = {
+  hangar: 'base',
+  shop: 'component',
+};
 
 function getFranchiseId(req: AuthRequest): string | null {
   const fromHeader = String(req.header('x-franchise-id') || '').trim();
@@ -63,6 +78,13 @@ function getFranchiseId(req: AuthRequest): string | null {
 
 function isUuid(value: string): boolean {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+function normalizeMaintenanceType(value: unknown): string {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return '';
+  const aliased = MAINTENANCE_TYPE_ALIASES[normalized] || normalized;
+  return MAINTENANCE_TYPE_ALLOWED.has(aliased) ? aliased : '';
 }
 
 function isMissingWorkPackageTemplateFranchiseColumnError(errorLike: unknown): boolean {
@@ -125,10 +147,11 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
   }
 
   const request = (req.body || {}) as WorkPackageTemplateRequest;
-  if (!request.template_code || !request.template_name || !request.maintenance_type || !request.aircraft_model) {
+  const normalizedMaintenanceType = normalizeMaintenanceType(request.maintenance_type);
+  if (!request.template_code || !request.template_name || !normalizedMaintenanceType || !request.aircraft_model) {
     res.status(400).json(
       toErrorResponse(
-        'Missing required fields: template_code, template_name, maintenance_type, aircraft_model',
+        'Missing/invalid required fields: template_code, template_name, maintenance_type, aircraft_model',
         'VALIDATION_ERROR',
         400,
       ),
@@ -158,7 +181,7 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     version: Number(request.version || 1),
     active: request.active !== false,
     template_name: String(request.template_name || '').trim(),
-    maintenance_type: String(request.maintenance_type || '').trim(),
+    maintenance_type: normalizedMaintenanceType,
     model_id: String(request.model_id || '').trim() || null,
     scope_json: Array.isArray(request.scope_json) ? request.scope_json : [],
     tasks_json: selectedTaskTemplateIds.map((taskTemplateId) => ({ task_template_id: taskTemplateId })),
@@ -498,7 +521,7 @@ async function buildTemplateListResponse(
 ): Promise<Array<Record<string, unknown>>> {
   let templatesQuery = supabase
     .from('work_package_templates')
-    .select('id,tenant_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at')
+    .select('id,tenant_id,model_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at')
     .eq('tenant_id', tenantId)
     .order('updated_at', { ascending: false });
   if (Array.isArray(templateIds) && templateIds.length > 0) {
@@ -971,12 +994,24 @@ router.put(
       return;
     }
 
+    const normalizedMaintenanceType = normalizeMaintenanceType(request.maintenance_type);
+    if (!normalizedMaintenanceType) {
+      res.status(422).json(
+        toErrorResponse(
+          'Validation failed: maintenance_type must be one of line, base, component, inspection, overhaul, repair, upgrade, modification',
+          'VALIDATION_ERROR',
+          422,
+        ),
+      );
+      return;
+    }
+
     const payload = {
       template_code: request.template_code,
       version: request.version,
       active: request.active,
       template_name: request.template_name,
-      maintenance_type: request.maintenance_type,
+      maintenance_type: normalizedMaintenanceType,
       model_id: String(request.model_id || '').trim() || null,
       aircraft_model: request.aircraft_model || null,
       scope_json: Array.isArray(request.scope_json) ? request.scope_json : undefined,
@@ -1036,46 +1071,33 @@ router.put(
       payload.model_id = resolvedModelId;
     }
 
-    const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_update_work_package_template_atomic', {
-      p_tenant_id: tenantId,
-      p_franchise_id: franchiseId,
-      p_user_id: userId,
-      p_work_package_template_id: id,
-      p_payload: payload,
-    });
-    if (atomicError) {
-      const message = String(atomicError.message || '');
-      if (/does not exist|undefined function/i.test(message)) {
-        logger.warn('[AMRO Work Package Template] atomic update RPC missing, using fallback update path', {
-          tenantId,
-          templateId: id,
-          message,
-        });
-        const fallbackResult = await updateWorkPackageTemplateWithoutAtomicRpc({
-          tenantId,
-          franchiseId,
-          userId,
-          templateId: id,
-          payload,
-          selectedTaskTemplateIds,
-          resolvedModelId,
-        });
-        if (!fallbackResult.ok) {
-          res.status(fallbackResult.statusCode).json(
-            toErrorResponse(fallbackResult.message, 'UPDATE_FAILED', fallbackResult.statusCode),
-          );
-          return;
-        }
-      } else {
-        const statusCode = /validation failed/i.test(message) ? 422 : /not found/i.test(message) ? 404 : /duplicate key/i.test(message) ? 409 : 400;
-        res.status(statusCode).json(toErrorResponse(message, 'UPDATE_FAILED', statusCode));
-        return;
+    const runFallbackUpdate = async () => {
+      const fallbackResult = await updateWorkPackageTemplateWithoutAtomicRpc({
+        tenantId,
+        franchiseId,
+        userId,
+        templateId: id,
+        payload,
+        selectedTaskTemplateIds,
+        resolvedModelId,
+      });
+      if (!fallbackResult.ok) {
+        res.status(fallbackResult.statusCode).json(
+          toErrorResponse(fallbackResult.message, 'UPDATE_FAILED', fallbackResult.statusCode),
+        );
+        return false;
       }
+      return true;
+    };
+
+    // Always use deterministic direct update path for now.
+    // RPC implementations vary across environments and can silently skip fields,
+    // which causes "save succeeded but data did not change" behavior.
+    if (!(await runFallbackUpdate())) {
+      return;
     }
 
-    const updatedRecord = (atomicResult as Record<string, unknown> | null)?.record as Record<string, unknown> | undefined;
-    const updatedId = String(updatedRecord?.id || id);
-    const records = await buildTemplateListResponse(tenantId, franchiseId, [updatedId]);
+    const records = await buildTemplateListResponse(tenantId, franchiseId, [id]);
     if (!records[0]) {
       res.status(404).json(toErrorResponse('Work package template not found', 'NOT_FOUND', 404));
       return;
