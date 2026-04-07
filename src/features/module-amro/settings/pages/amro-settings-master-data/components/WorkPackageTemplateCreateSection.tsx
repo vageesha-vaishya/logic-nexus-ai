@@ -113,6 +113,8 @@ export function WorkPackageTemplateCreateSection({
   const [workPackageTemplateAircraftModelOptionsError, setWorkPackageTemplateAircraftModelOptionsError] = useState('');
   const [workPackageTemplateSelectedTaskIds, setWorkPackageTemplateSelectedTaskIds] = useState<string[]>([]);
   const [workPackageTemplateSelectionInitialized, setWorkPackageTemplateSelectionInitialized] = useState(false);
+  const [workPackageTemplateAssociationsLoading, setWorkPackageTemplateAssociationsLoading] = useState(false);
+  const [workPackageTemplateAssociationsError, setWorkPackageTemplateAssociationsError] = useState('');
   const [workPackageTemplateTaskSortColumn, setWorkPackageTemplateTaskSortColumn] = useState<WorkPackageTaskSortColumn>('task_id');
   const [workPackageTemplateTaskSortDirection, setWorkPackageTemplateTaskSortDirection] = useState<SortDirection>('asc');
 
@@ -135,7 +137,7 @@ export function WorkPackageTemplateCreateSection({
     DEFAULT_WORK_PACKAGE_TASK_FILTERS,
   );
   const resolveWorkPackageTaskTemplateId = useCallback((taskTemplate: Record<string, unknown>): string => {
-    return String(taskTemplate.id || '').trim();
+    return String(taskTemplate.task_template_id || taskTemplate.id || '').trim();
   }, []);
 
   const parseTaskTemplateIdsFromTasksJson = useCallback((raw: unknown): string[] => {
@@ -264,6 +266,7 @@ export function WorkPackageTemplateCreateSection({
       })();
       const nextSelection = Array.from(new Set([...fromSelectedList, ...fromTasksJson]));
       setWorkPackageTemplateSelectedTaskIds(nextSelection);
+      setFieldValue('selected_task_template_ids', nextSelection);
       setWorkPackageTemplateSelectionInitialized(true);
     };
 
@@ -272,16 +275,32 @@ export function WorkPackageTemplateCreateSection({
       return;
     }
 
+    const isMissingFranchiseColumnError = (error: unknown) => {
+      const message = String((error as { message?: string })?.message || '').toLowerCase();
+      return message.includes('franchise_id') && (message.includes('column') || message.includes('does not exist'));
+    };
+
     let cancelled = false;
     const loadSelectedTaskTemplateIds = async () => {
+      setWorkPackageTemplateAssociationsLoading(true);
+      setWorkPackageTemplateAssociationsError('');
       try {
-        let query = (scopedDb as any)
-          .from('work_package_template_task_templates')
-          .select('task_template_id,model_id')
-          .eq('tenant_id', scope.tenantId)
-          .eq('work_package_template_id', selectedTemplateId);
-        query = applyFranchiseScope(query);
-        const { data, error } = await query;
+        const runQuery = async (withFranchiseScope: boolean) => {
+          let query = (scopedDb as any)
+            .from('work_package_template_task_templates')
+            .select('task_template_id,model_id')
+            .eq('tenant_id', scope.tenantId)
+            .eq('work_package_template_id', selectedTemplateId);
+          if (withFranchiseScope) {
+            query = applyFranchiseScope(query);
+          }
+          return query;
+        };
+
+        let { data, error } = await runQuery(true);
+        if (error && isMissingFranchiseColumnError(error) && scope.franchiseId) {
+          ({ data, error } = await runQuery(false));
+        }
         if (error) {
           throw new Error(String(error.message || 'Failed to load selected task templates'));
         }
@@ -309,11 +328,17 @@ export function WorkPackageTemplateCreateSection({
             }
           }
           setWorkPackageTemplateSelectedTaskIds(nextSelection);
+          setFieldValue('selected_task_template_ids', nextSelection);
           setWorkPackageTemplateSelectionInitialized(true);
         }
-      } catch {
+      } catch (error) {
         if (!cancelled) {
+          setWorkPackageTemplateAssociationsError(String((error as Error).message || 'Failed to load task associations'));
           bootstrapSelectionFromForm();
+        }
+      } finally {
+        if (!cancelled) {
+          setWorkPackageTemplateAssociationsLoading(false);
         }
       }
     };
@@ -560,6 +585,7 @@ export function WorkPackageTemplateCreateSection({
         ? (previous.includes(rowId) ? previous : [...previous, rowId])
         : previous.filter((id) => id !== rowId);
       setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
+      setFieldValue('selected_task_template_ids', nextSelectedIds);
       return nextSelectedIds;
     });
   }, [resolveSelectedWorkPackageTaskPayload, setFieldValue]);
@@ -570,6 +596,7 @@ export function WorkPackageTemplateCreateSection({
         ? Array.from(new Set([...previous, ...selectedWorkPackageAircraftModelTaskRowIds]))
         : previous.filter((id) => !selectedWorkPackageAircraftModelTaskRowIds.includes(id));
       setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
+      setFieldValue('selected_task_template_ids', nextSelectedIds);
       return nextSelectedIds;
     });
   }, [resolveSelectedWorkPackageTaskPayload, selectedWorkPackageAircraftModelTaskRowIds, setFieldValue]);
@@ -606,6 +633,8 @@ export function WorkPackageTemplateCreateSection({
     if (!modalOpen) {
       setWorkPackageTemplateSelectedTaskIds([]);
       setWorkPackageTemplateSelectionInitialized(false);
+      setWorkPackageTemplateAssociationsLoading(false);
+      setWorkPackageTemplateAssociationsError('');
       setWorkPackageTemplateTaskSortColumn('task_id');
       setWorkPackageTemplateTaskSortDirection('asc');
       setWorkPackageTemplateTaskFilters(DEFAULT_WORK_PACKAGE_TASK_FILTERS);
@@ -938,6 +967,10 @@ export function WorkPackageTemplateCreateSection({
             <div className="text-[11px] text-slate-500" data-testid="wpt-selected-tasks-summary">
               Selection Summary: Checked {workPackageTemplateSelectedTaskIds.length} | Records: {selectedWorkPackageAircraftModelTaskRows.length}
             </div>
+            {workPackageTemplateAssociationsLoading ? (
+              <p className="text-[11px] text-slate-500">Loading linked task template associations…</p>
+            ) : null}
+            {workPackageTemplateAssociationsError ? <p className="mdm-template-danger">{workPackageTemplateAssociationsError}</p> : null}
             {workPackageTemplateTaskTemplatesError ? <p className="mdm-template-danger">{workPackageTemplateTaskTemplatesError}</p> : null}
           </div>
         </section>

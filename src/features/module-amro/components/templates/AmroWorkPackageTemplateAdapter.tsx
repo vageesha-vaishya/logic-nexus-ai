@@ -314,7 +314,7 @@ export function AmroWorkPackageTemplateAdapter({
           return dedupeOptions(
             aircraftModelOptions.map((entry) => (
               entry.value === selectedAircraftModelId
-                ? { ...entry, label: `${resolvedModelDisplayLabel} (current)` }
+                ? { ...entry, label: resolvedModelDisplayLabel }
                 : entry
             )),
           );
@@ -322,7 +322,7 @@ export function AmroWorkPackageTemplateAdapter({
         return [
           {
             value: selectedAircraftModelId,
-            label: `${resolvedModelDisplayLabel} (current)`,
+            label: resolvedModelDisplayLabel,
             modelCode: resolvedModelDisplayLabel,
           },
           ...dedupeOptions(aircraftModelOptions),
@@ -334,7 +334,7 @@ export function AmroWorkPackageTemplateAdapter({
       return dedupeOptions([
         {
           value: `legacy:${selectedAircraftModelText}`,
-          label: `${selectedAircraftModelText} (current)`,
+          label: selectedAircraftModelText,
           modelCode: selectedAircraftModelText,
         },
         ...aircraftModelOptions,
@@ -361,7 +361,7 @@ export function AmroWorkPackageTemplateAdapter({
     return dedupeOptions([
       {
         value: selectedAircraftModelId,
-        label: `${selectedAircraftModelText} (current)`,
+        label: selectedAircraftModelText,
         modelCode: selectedAircraftModelText,
       },
       ...aircraftModelOptions,
@@ -464,7 +464,7 @@ export function AmroWorkPackageTemplateAdapter({
                     props.setFieldValue('selected_task_template_ids', []);
                   }
                 }}
-                disabled={aircraftModelOptionsLoading}
+                disabled={aircraftModelOptionsLoading || mode === 'update'}
               >
                 <SelectTrigger
                   id="amro-wpt-standard-aircraft-model"

@@ -81,7 +81,7 @@ describe('AmroWorkPackageTemplateAdapter', () => {
     );
 
     expect(screen.queryByText('Aircraft Model could not be resolved for this template.')).not.toBeInTheDocument();
-    expect(screen.getByText(/A320-200 \(current\)/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('Aircraft Model (Standard)')).toBeInTheDocument();
+    expect(screen.queryByText(/A320-200 \(current\)/i)).not.toBeInTheDocument();
+    expect(screen.getByLabelText('Aircraft Model (Standard)')).toBeDisabled();
   });
 });
