@@ -67,4 +67,21 @@ describe('AmroWorkPackageTemplateAdapter', () => {
     expect(screen.getAllByText('Scope JSON is invalid').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Tasks JSON is invalid').length).toBeGreaterThan(0);
   });
+
+  it('keeps model resolved when model_id is missing but aircraft_model exists', () => {
+    render(
+      <AmroWorkPackageTemplateAdapter
+        {...baseProps}
+        formValues={{
+          ...baseProps.formValues,
+          model_id: '',
+          aircraft_model: 'A320-200',
+        }}
+      />,
+    );
+
+    expect(screen.queryByText('Aircraft Model could not be resolved for this template.')).not.toBeInTheDocument();
+    expect(screen.getByText(/A320-200 \(current\)/i)).toBeInTheDocument();
+    expect(screen.getByLabelText('Aircraft Model (Standard)')).toBeInTheDocument();
+  });
 });

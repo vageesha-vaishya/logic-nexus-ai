@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState, type ComponentProps } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { WorkPackageTemplateCreateSection } from '@/features/module-amro/settings/pages/amro-settings-master-data/components/WorkPackageTemplateCreateSection';
 import {
@@ -27,6 +28,65 @@ export function AmroWorkPackageTemplateAdapter({
   formErrors,
   ...props
 }: AmroWorkPackageTemplateAdapterProps) {
+  const isUuidLike = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
+  const extractRecordFromPayload = (payload: Record<string, unknown> | null): Record<string, unknown> | null => {
+    if (!payload || typeof payload !== 'object') return null;
+    const directRecord = payload.record && typeof payload.record === 'object'
+      ? (payload.record as Record<string, unknown>)
+      : null;
+    if (directRecord) return directRecord;
+    const directRecords = Array.isArray(payload.records) ? payload.records as Record<string, unknown>[] : [];
+    if (directRecords[0]) return directRecords[0];
+    const output = payload.output && typeof payload.output === 'object'
+      ? (payload.output as Record<string, unknown>)
+      : null;
+    if (output) {
+      const outputRecord = output.record && typeof output.record === 'object'
+        ? (output.record as Record<string, unknown>)
+        : null;
+      if (outputRecord) return outputRecord;
+      const outputRecords = Array.isArray(output.records) ? output.records as Record<string, unknown>[] : [];
+      if (outputRecords[0]) return outputRecords[0];
+      if (Object.prototype.hasOwnProperty.call(output, 'model_id') || Object.prototype.hasOwnProperty.call(output, 'aircraft_model')) {
+        return output;
+      }
+    }
+    const data = payload.data && typeof payload.data === 'object'
+      ? (payload.data as Record<string, unknown>)
+      : null;
+    if (data) {
+      const dataRecord = data.record && typeof data.record === 'object'
+        ? (data.record as Record<string, unknown>)
+        : null;
+      if (dataRecord) return dataRecord;
+      const dataRecords = Array.isArray(data.records) ? data.records as Record<string, unknown>[] : [];
+      if (dataRecords[0]) return dataRecords[0];
+    }
+    return null;
+  };
+  const modelHydrationAttemptedRef = useRef<string | null>(null);
+  const [modelHydrationDebug, setModelHydrationDebug] = useState('idle');
+  const [resolvedModelDisplayLabel, setResolvedModelDisplayLabel] = useState('');
+
+  const buildAuthHeaders = async () => {
+    const headers: Record<string, string> = {};
+    const { data } = await supabase.auth.getSession();
+    const token = String(data.session?.access_token || '').trim();
+    if (token) {
+      headers.Authorization = `Bearer ${token}`;
+    }
+    if (props.scope?.tenantId) {
+      headers['x-tenant-id'] = props.scope.tenantId;
+    }
+    if (props.scope?.franchiseId) {
+      headers['x-franchise-id'] = props.scope.franchiseId;
+    }
+    const scopeUserId = String((props.scope as Record<string, unknown>)?.userId || '').trim();
+    if (scopeUserId) {
+      headers['x-user-id'] = scopeUserId;
+    }
+    return headers;
+  };
   const [aircraftModelOptions, setAircraftModelOptions] = useState<Array<{ value: string; label: string; modelCode: string }>>([]);
   const [aircraftModelOptionsLoading, setAircraftModelOptionsLoading] = useState(false);
   const [aircraftModelOptionsError, setAircraftModelOptionsError] = useState('');
@@ -50,7 +110,8 @@ export function AmroWorkPackageTemplateAdapter({
           .select('id,name,model_code,is_active,tenant_id,franchise_id')
           .eq('tenant_id', props.scope.tenantId);
         if (!props.scope.isTenantAdmin && props.scope.franchiseId) {
-          query = query.eq('franchise_id', props.scope.franchiseId);
+          // Include franchise-specific and tenant-global models (franchise_id is null).
+          query = query.or(`franchise_id.eq.${props.scope.franchiseId},franchise_id.is.null`);
         } else if (!props.scope.isTenantAdmin) {
           query = query.is('franchise_id', null);
         }
@@ -87,10 +148,179 @@ export function AmroWorkPackageTemplateAdapter({
     ? { level: 'error', messages }
     : { level: 'ok', messages: [] };
   const selectedAircraftModelId = String(props.formValues.model_id ?? '').trim();
+  const selectedAircraftModelText = String(props.formValues.aircraft_model ?? '').trim();
+
+  useEffect(() => {
+    const shouldResolveById =
+      Boolean(selectedAircraftModelId)
+      && (!selectedAircraftModelText || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(selectedAircraftModelText));
+    if (!shouldResolveById) {
+      setResolvedModelDisplayLabel('');
+      return;
+    }
+    const resolveModelLabel = async () => {
+      try {
+        let label = '';
+        if (props.scopedDb && typeof (props.scopedDb as any).from === 'function') {
+          const { data } = await (props.scopedDb as any)
+            .from('assembly_models')
+            .select('id,name,model_code')
+            .eq('id', selectedAircraftModelId)
+            .maybeSingle();
+          if (data && typeof data === 'object') {
+            const name = String((data as Record<string, unknown>).name ?? '').trim();
+            const code = String((data as Record<string, unknown>).model_code ?? '').trim();
+            label = name && code && name !== code ? `${name} (${code})` : name || code;
+          }
+        }
+        if (!label) {
+          const response = await fetch(`/api/v2/amro/master-data/assembly_models/${selectedAircraftModelId}`, {
+            method: 'GET',
+            headers: await buildAuthHeaders(),
+          });
+          if (response.ok) {
+            const payload = (await response.json()) as Record<string, unknown>;
+            const record = extractRecordFromPayload(payload);
+            const name = String(record?.name ?? '').trim();
+            const code = String(record?.model_code ?? '').trim();
+            label = name && code && name !== code ? `${name} (${code})` : name || code;
+          }
+        }
+        setResolvedModelDisplayLabel(label || '');
+      } catch {
+        setResolvedModelDisplayLabel('');
+      }
+    };
+    void resolveModelLabel();
+  }, [props.scopedDb, selectedAircraftModelId, selectedAircraftModelText]);
+
+  useEffect(() => {
+    const shouldHydrate =
+      mode === 'update'
+      && Boolean(props.selectedTemplateId)
+      && !selectedAircraftModelId
+      && !selectedAircraftModelText
+      && modelHydrationAttemptedRef.current !== String(props.selectedTemplateId);
+    if (!shouldHydrate) {
+      return;
+    }
+    const hydrateModelFromTemplate = async () => {
+      try {
+        setModelHydrationDebug('hydrate:start');
+        let hydratedRecord: Record<string, unknown> | null = null;
+        if (props.scopedDb && typeof (props.scopedDb as any).from === 'function') {
+          const { data } = await (props.scopedDb as any)
+            .from('work_package_templates')
+            .select('model_id,aircraft_model')
+            .eq('id', props.selectedTemplateId)
+            .maybeSingle();
+          if (data && typeof data === 'object') {
+            hydratedRecord = data as Record<string, unknown>;
+            setModelHydrationDebug('hydrate:scopedDb-hit');
+          }
+        }
+        if (!hydratedRecord) {
+          // scopedDb can miss records under franchise scope mismatch; fallback to API by id.
+          const response = await fetch(`/api/v2/amro/work-package-templates/${props.selectedTemplateId}`, {
+            method: 'GET',
+            headers: await buildAuthHeaders(),
+          });
+          if (response.ok) {
+            const payload = (await response.json()) as Record<string, unknown>;
+            hydratedRecord = extractRecordFromPayload(payload);
+            setModelHydrationDebug(hydratedRecord ? 'hydrate:api-hit' : 'hydrate:api-empty');
+          } else {
+            setModelHydrationDebug(`hydrate:api-status-${response.status}`);
+          }
+        }
+        if (hydratedRecord) {
+          const modelId = String(hydratedRecord.model_id ?? '').trim();
+          const aircraftModel = String(hydratedRecord.aircraft_model ?? '').trim();
+          setModelHydrationDebug(`hydrate:resolved model_id=${modelId || 'none'} aircraft_model=${aircraftModel || 'none'}`);
+          if (modelId) {
+            props.setFieldValue('model_id', modelId);
+          }
+          if (aircraftModel) {
+            props.setFieldValue('aircraft_model', aircraftModel);
+          }
+          if (modelId || aircraftModel) {
+            modelHydrationAttemptedRef.current = String(props.selectedTemplateId);
+          }
+        } else if (modelHydrationDebug === 'hydrate:start' || modelHydrationDebug.endsWith('-empty')) {
+          setModelHydrationDebug('hydrate:no-record');
+        }
+      } catch (error) {
+        setModelHydrationDebug(`hydrate:error ${(error as Error).message || 'unknown'}`);
+        // Keep current UX fallback behavior; unresolved warning remains if model truly absent.
+      }
+    };
+    void hydrateModelFromTemplate();
+  }, [
+    mode,
+    props.scopedDb,
+    props.selectedTemplateId,
+    props.setFieldValue,
+    selectedAircraftModelId,
+    selectedAircraftModelText,
+  ]);
+
+  const effectiveAircraftModelId = selectedAircraftModelId || (selectedAircraftModelText ? `legacy:${selectedAircraftModelText}` : '');
+  const effectiveAircraftModelOptions = useMemo(() => {
+    if (!selectedAircraftModelText) {
+      if (selectedAircraftModelId && resolvedModelDisplayLabel) {
+        return [
+          {
+            value: selectedAircraftModelId,
+            label: `${resolvedModelDisplayLabel} (current)`,
+            modelCode: resolvedModelDisplayLabel,
+          },
+          ...aircraftModelOptions,
+        ];
+      }
+      return aircraftModelOptions;
+    }
+    if (!selectedAircraftModelId) {
+      return [
+        {
+          value: `legacy:${selectedAircraftModelText}`,
+          label: `${selectedAircraftModelText} (current)`,
+          modelCode: selectedAircraftModelText,
+        },
+        ...aircraftModelOptions,
+      ];
+    }
+    const existingOption = aircraftModelOptions.find((entry) => entry.value === selectedAircraftModelId);
+    const preferredDisplayLabel = resolvedModelDisplayLabel
+      || (!isUuidLike(selectedAircraftModelText) ? selectedAircraftModelText : '');
+    const shouldReplaceExistingLabel =
+      Boolean(existingOption)
+      && Boolean(preferredDisplayLabel)
+      && (isUuidLike(String(existingOption?.label || '')) || String(existingOption?.label || '').trim() === selectedAircraftModelId);
+    if (shouldReplaceExistingLabel && existingOption) {
+      return aircraftModelOptions.map((entry) => (
+        entry.value === selectedAircraftModelId
+          ? { ...entry, label: `${preferredDisplayLabel} (current)` }
+          : entry
+      ));
+    }
+    const exists = Boolean(existingOption);
+    if (exists) {
+      return aircraftModelOptions;
+    }
+    return [
+      {
+        value: selectedAircraftModelId,
+        label: `${selectedAircraftModelText} (current)`,
+        modelCode: selectedAircraftModelText,
+      },
+      ...aircraftModelOptions,
+    ];
+  }, [aircraftModelOptions, resolvedModelDisplayLabel, selectedAircraftModelId, selectedAircraftModelText]);
+
   const selectedAircraftModelLabel = useMemo(() => {
-    const option = aircraftModelOptions.find((entry) => entry.value === selectedAircraftModelId);
-    return option?.label || String(props.formValues.aircraft_model ?? '').trim();
-  }, [aircraftModelOptions, props.formValues.aircraft_model, selectedAircraftModelId]);
+    const option = effectiveAircraftModelOptions.find((entry) => entry.value === selectedAircraftModelId);
+    return option?.label || selectedAircraftModelText;
+  }, [effectiveAircraftModelOptions, selectedAircraftModelId, selectedAircraftModelText]);
 
   const standardFields: AmroTemplateFieldDefinition[] = [
     { key: 'template_code', label: 'Template Code (Standard)', required: true },
@@ -168,9 +398,9 @@ export function AmroWorkPackageTemplateAdapter({
             <div className="space-y-1">
               <Label htmlFor="amro-wpt-standard-aircraft-model">{field.label}</Label>
               <Select
-                value={selectedAircraftModelId}
+                value={effectiveAircraftModelId}
                 onValueChange={(nextValue) => {
-                  const option = aircraftModelOptions.find((entry) => entry.value === nextValue);
+                  const option = effectiveAircraftModelOptions.find((entry) => entry.value === nextValue);
                   props.setFieldValue('model_id', nextValue);
                   props.setFieldValue('aircraft_model', option?.modelCode || option?.label || nextValue);
                 }}
@@ -184,7 +414,7 @@ export function AmroWorkPackageTemplateAdapter({
                   <SelectValue placeholder={aircraftModelOptionsLoading ? 'Loading aircraft models...' : 'Select aircraft model'} />
                 </SelectTrigger>
                 <SelectContent>
-                  {aircraftModelOptions.map((option) => (
+                  {effectiveAircraftModelOptions.map((option) => (
                     <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -192,12 +422,15 @@ export function AmroWorkPackageTemplateAdapter({
               {selectedAircraftModelLabel && mode === 'update' ? (
                 <p className="text-[11px] text-muted-foreground">Resolved Model: {selectedAircraftModelLabel}</p>
               ) : null}
-              {!aircraftModelOptionsLoading && !aircraftModelOptionsError && aircraftModelOptions.length === 0 ? (
+              {!aircraftModelOptionsLoading
+              && !aircraftModelOptionsError
+              && effectiveAircraftModelOptions.length === 0
+              && mode !== 'update' ? (
                 <p className="text-[11px] text-muted-foreground">No aircraft models available</p>
               ) : null}
               {aircraftModelOptionsError ? <p className="mdm-template-danger">{aircraftModelOptionsError}</p> : null}
               {modelError ? <p className="mdm-template-danger">{modelError}</p> : null}
-              {mode === 'update' && !selectedAircraftModelId ? (
+              {mode === 'update' && !selectedAircraftModelId && !selectedAircraftModelText ? (
                 <p className="mdm-template-danger">Aircraft Model could not be resolved for this template.</p>
               ) : null}
             </div>
@@ -277,7 +510,9 @@ export function AmroWorkPackageTemplateAdapter({
           <p>Mode: {mode}</p>
           <p>Template State: {loading ? 'loading' : 'ready'}</p>
           <p>Model Resolved: {selectedAircraftModelLabel || 'not-resolved'}</p>
+          <p>Model Value (raw): {selectedAircraftModelId || selectedAircraftModelText || 'empty'}</p>
           <p>Model Options: {aircraftModelOptionsLoading ? 'loading...' : String(aircraftModelOptions.length)}</p>
+          <p>Model Hydration Debug: {modelHydrationDebug}</p>
           {aircraftModelOptionsError ? <p className="text-destructive">Model Load Error: {aircraftModelOptionsError}</p> : null}
           <p>Validation Errors: {messages.length}</p>
           <p>Scope JSON Size: {String(props.formValues.scope_json ?? '').length}</p>

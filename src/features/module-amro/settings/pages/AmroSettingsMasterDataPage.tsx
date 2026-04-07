@@ -527,7 +527,7 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   assembly_models: ['id', 'model_code', 'name', 'manufacturer_id', 'assembly_type_id', 'is_active', 'updated_at'],
   regulator_profiles: ['id', 'regulator_code', 'regulator_name', 'jurisdiction', 'policy_version', 'effective_from', 'is_active', 'updated_at'],
   shift_calendars: ['id', 'station_code', 'shift_name', 'shift_start_time', 'shift_end_time', 'capacity', 'is_active', 'updated_at'],
-  work_package_templates: ['id', 'template_code', 'template_name', 'maintenance_type', 'version', 'active', 'updated_at'],
+  work_package_templates: ['id', 'template_code', 'template_name', 'model_id', 'aircraft_model', 'maintenance_type', 'version', 'active', 'updated_at'],
 };
 
 const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
@@ -1782,28 +1782,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, []);
 
   const fetchAircraftTempOptions = useCallback(async (headers: Headers): Promise<AircraftTempOption[]> => {
-    let records: Record<string, unknown>[] = [];
-    if (scopedDb) {
-      const { data, error } = await (scopedDb as any)
-        .from('aircraft_template')
-        .select('id,template_name,aircraft_type,manufacturer_id,manufacturer,aircraft_model,maintenance_program,revision_number,amendment_number')
-        .order('template_name', { ascending: true });
-      if (!error && Array.isArray(data)) {
-        records = data as Record<string, unknown>[];
-      }
-    }
-    if (records.length === 0) {
-      const query = new URLSearchParams({
-        page: '1',
-        page_size: '200',
-        sort_by: 'template_name',
-        sort_dir: 'asc',
-      });
-      const response = await fetch(`/api/v2/amro/master-data/aircraft_template?${query.toString()}`, { method: 'GET', headers });
-      const payload = await parseApiPayload(response);
-      if (!response.ok) throw new Error(String(payload.error || 'Failed to load aircraft templates'));
-      records = getPayloadRecords(payload);
-    }
+    // Always use API for aircraft templates; direct scoped DB access can fail on
+    // environments where aircraft_template does not expose franchise_id.
+    const query = new URLSearchParams({
+      page: '1',
+      page_size: '200',
+      sort_by: 'template_name',
+      sort_dir: 'asc',
+    });
+    const response = await fetch(`/api/v2/amro/master-data/aircraft_template?${query.toString()}`, { method: 'GET', headers });
+    const payload = await parseApiPayload(response);
+    if (!response.ok) throw new Error(String(payload.error || 'Failed to load aircraft templates'));
+    const records = getPayloadRecords(payload);
     const seen = new Set<string>();
     return records
       .map((record) => {
@@ -1826,7 +1816,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       })
       .filter((option): option is AircraftTempOption => Boolean(option))
       .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
-  }, [scopedDb]);
+  }, []);
 
   const fetchAircraftTemplateCounterRows = useCallback(
     async (templateId: string): Promise<AircraftCounterRow[]> => {
