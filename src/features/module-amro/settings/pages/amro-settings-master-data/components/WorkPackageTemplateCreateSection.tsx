@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, type RefObject, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type RefObject, useState } from 'react';
 import { ArrowDown, ArrowUp, ArrowUpDown, Users } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
@@ -108,6 +108,7 @@ export function WorkPackageTemplateCreateSection({
   const [workPackageTemplateTaskTemplates, setWorkPackageTemplateTaskTemplates] = useState<Record<string, unknown>[]>([]);
   const [workPackageTemplateTaskTemplatesLoading, setWorkPackageTemplateTaskTemplatesLoading] = useState(false);
   const [workPackageTemplateTaskTemplatesError, setWorkPackageTemplateTaskTemplatesError] = useState('');
+  const taskTemplateOptionsCacheRef = useRef(new Map<string, Record<string, unknown>[]>());
   const [workPackageTemplateAircraftModelOptions, setWorkPackageTemplateAircraftModelOptions] = useState<SelectOption[]>([]);
   const [workPackageTemplateAircraftModelOptionsLoading, setWorkPackageTemplateAircraftModelOptionsLoading] = useState(false);
   const [workPackageTemplateAircraftModelOptionsError, setWorkPackageTemplateAircraftModelOptionsError] = useState('');
@@ -135,7 +136,7 @@ export function WorkPackageTemplateCreateSection({
     DEFAULT_WORK_PACKAGE_TASK_FILTERS,
   );
   const resolveWorkPackageTaskTemplateId = useCallback((taskTemplate: Record<string, unknown>): string => {
-    return String(taskTemplate.id || '').trim();
+    return String(taskTemplate.task_template_id || taskTemplate.id || '').trim();
   }, []);
 
   const parseTaskTemplateIdsFromTasksJson = useCallback((raw: unknown): string[] => {
@@ -166,32 +167,58 @@ export function WorkPackageTemplateCreateSection({
     );
   }, []);
 
-  const loadWorkPackageTemplateTaskTemplates = useCallback(async () => {
-    if (!scopedDb || !scope.tenantId) {
+  const loadWorkPackageTemplateTaskTemplates = useCallback(async (aircraftModelId: string) => {
+    const normalizedModelId = String(aircraftModelId || '').trim();
+    if (!scope.tenantId || !normalizedModelId) {
       setWorkPackageTemplateTaskTemplates([]);
+      setWorkPackageTemplateTaskTemplatesError('');
+      return;
+    }
+    const cacheKey = `${scope.tenantId}:${scope.isTenantAdmin ? 'tenant-all' : (scope.franchiseId || 'franchise-null')}:${normalizedModelId}`;
+    const cachedRows = taskTemplateOptionsCacheRef.current.get(cacheKey);
+    if (cachedRows) {
+      setWorkPackageTemplateTaskTemplates(cachedRows);
       setWorkPackageTemplateTaskTemplatesError('');
       return;
     }
     setWorkPackageTemplateTaskTemplatesLoading(true);
     setWorkPackageTemplateTaskTemplatesError('');
     try {
-      let query = (scopedDb as any)
-        .from('task_templates')
-        .select('id,task_template_id,tenant_id,franchise_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,task_template_scope_json')
-        .eq('tenant_id', scope.tenantId);
-      query = applyFranchiseScope(query);
-      const { data, error } = await query.order('task_template_id', { ascending: true });
-      if (error) {
-        throw new Error(String(error.message || 'Failed to load task templates'));
+      const query = new URLSearchParams({
+        tenant_id: scope.tenantId,
+        aircraft_model_id: normalizedModelId,
+      });
+      const response = await fetch(`/api/v2/amro/work-package-templates/task-template-options?${query.toString()}`, {
+        method: 'GET',
+        headers: await buildAuthHeaders(),
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to load task templates (status ${response.status})`);
       }
-      setWorkPackageTemplateTaskTemplates(Array.isArray(data) ? (data as Record<string, unknown>[]) : []);
+      const payload = (await response.json()) as Record<string, unknown>;
+      const output = payload.output && typeof payload.output === 'object' ? (payload.output as Record<string, unknown>) : {};
+      const rows = (() => {
+        if (Array.isArray(output.records)) {
+          return output.records as Record<string, unknown>[];
+        }
+        if (Array.isArray(payload.data)) {
+          return payload.data as Record<string, unknown>[];
+        }
+        if (Array.isArray(payload.records)) {
+          return payload.records as Record<string, unknown>[];
+        }
+        return [];
+      })();
+      taskTemplateOptionsCacheRef.current.set(cacheKey, rows);
+      setWorkPackageTemplateTaskTemplates(rows);
+      setWorkPackageTemplateTaskTemplatesError('');
     } catch (error) {
       setWorkPackageTemplateTaskTemplates([]);
       setWorkPackageTemplateTaskTemplatesError(String((error as Error).message || 'Failed to load task templates'));
     } finally {
       setWorkPackageTemplateTaskTemplatesLoading(false);
     }
-  }, [applyFranchiseScope, scope.tenantId, scopedDb]);
+  }, [buildAuthHeaders, scope.franchiseId, scope.isTenantAdmin, scope.tenantId]);
 
   const loadWorkPackageTemplateAircraftModelOptions = useCallback(async () => {
     if (!scope.tenantId) {
@@ -245,9 +272,21 @@ export function WorkPackageTemplateCreateSection({
     if (!modalOpen) {
       return;
     }
-    void loadWorkPackageTemplateTaskTemplates();
     void loadWorkPackageTemplateAircraftModelOptions();
-  }, [loadWorkPackageTemplateAircraftModelOptions, loadWorkPackageTemplateTaskTemplates, modalOpen]);
+  }, [loadWorkPackageTemplateAircraftModelOptions, modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+    const currentModelId = String(formValues.model_id ?? '').trim();
+    if (!currentModelId) {
+      setWorkPackageTemplateTaskTemplates([]);
+      setWorkPackageTemplateTaskTemplatesError('');
+      return;
+    }
+    void loadWorkPackageTemplateTaskTemplates(currentModelId);
+  }, [formValues.model_id, loadWorkPackageTemplateTaskTemplates, modalOpen]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -532,6 +571,24 @@ export function WorkPackageTemplateCreateSection({
     }, new Map<string, Record<string, unknown>>());
   }, [resolveWorkPackageTaskTemplateId, workPackageTemplateTaskTemplates]);
 
+  useEffect(() => {
+    if (!workPackageTemplateSelectionInitialized) {
+      return;
+    }
+    const validIds = new Set(taskTemplateById.keys());
+    if (validIds.size === 0) {
+      return;
+    }
+    setWorkPackageTemplateSelectedTaskIds((previous) => {
+      const nextSelectedIds = previous.filter((id) => validIds.has(id));
+      if (nextSelectedIds.length === previous.length) {
+        return previous;
+      }
+      setFieldValue('selected_task_template_ids', nextSelectedIds);
+      return nextSelectedIds;
+    });
+  }, [setFieldValue, taskTemplateById, workPackageTemplateSelectionInitialized]);
+
   const resolveSelectedWorkPackageTaskPayload = useCallback((selectedIds: string[]) => {
     return selectedIds
       .map((id) => String(id || '').trim())
@@ -560,6 +617,7 @@ export function WorkPackageTemplateCreateSection({
         ? (previous.includes(rowId) ? previous : [...previous, rowId])
         : previous.filter((id) => id !== rowId);
       setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
+      setFieldValue('selected_task_template_ids', nextSelectedIds);
       return nextSelectedIds;
     });
   }, [resolveSelectedWorkPackageTaskPayload, setFieldValue]);
@@ -570,6 +628,7 @@ export function WorkPackageTemplateCreateSection({
         ? Array.from(new Set([...previous, ...selectedWorkPackageAircraftModelTaskRowIds]))
         : previous.filter((id) => !selectedWorkPackageAircraftModelTaskRowIds.includes(id));
       setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
+      setFieldValue('selected_task_template_ids', nextSelectedIds);
       return nextSelectedIds;
     });
   }, [resolveSelectedWorkPackageTaskPayload, selectedWorkPackageAircraftModelTaskRowIds, setFieldValue]);
@@ -600,7 +659,21 @@ export function WorkPackageTemplateCreateSection({
     if (nextValue !== currentValue) {
       setFieldValue('tasks_json', nextValue);
     }
-  }, [formValues.tasks_json, selectedWorkPackageTaskPayload, setFieldValue, workPackageTemplateSelectionInitialized]);
+    const existingSelectedIds = (() => {
+      const raw = formValues.selected_task_template_ids;
+      if (!Array.isArray(raw)) {
+        return [];
+      }
+      return raw
+        .map((item) => String(item || '').trim())
+        .filter((item) => item.length > 0);
+    })();
+    const existingSignature = existingSelectedIds.join('|');
+    const nextSignature = workPackageTemplateSelectedTaskIds.join('|');
+    if (existingSignature !== nextSignature) {
+      setFieldValue('selected_task_template_ids', workPackageTemplateSelectedTaskIds);
+    }
+  }, [formValues.selected_task_template_ids, formValues.tasks_json, selectedWorkPackageTaskPayload, setFieldValue, workPackageTemplateSelectionInitialized, workPackageTemplateSelectedTaskIds]);
 
   useEffect(() => {
     if (!modalOpen) {

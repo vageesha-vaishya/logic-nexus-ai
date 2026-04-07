@@ -671,6 +671,88 @@ async function loadWorkPackageTemplateModelOptions(
   return normalized;
 }
 
+async function loadTaskTemplateOptionsByModel(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  aircraftModelId: string;
+  isTenantAdmin: boolean;
+}): Promise<Array<Record<string, unknown>>> {
+  const { tenantId, franchiseId, aircraftModelId, isTenantAdmin } = params;
+
+  const runQuery = async (
+    modelColumn: 'assembly_models' | 'model_id',
+    includeFranchiseColumn: boolean,
+    includeGlobalTenantRows: boolean,
+  ) => {
+    let query = supabase
+      .from('task_templates')
+      .select(includeFranchiseColumn
+        ? 'id,task_template_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id,franchise_id'
+        : 'id,task_template_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id')
+      .eq(modelColumn, aircraftModelId)
+      .order('task_template_id', { ascending: true });
+
+    query = includeGlobalTenantRows ? query.is('tenant_id', null) : query.eq('tenant_id', tenantId);
+
+    if (includeFranchiseColumn && !isTenantAdmin && franchiseId) {
+      query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+    return query;
+  };
+
+  const loadScopeRows = async (modelColumn: 'assembly_models' | 'model_id', includeFranchiseColumn: boolean) => {
+    const tenantResult = await runQuery(modelColumn, includeFranchiseColumn, false);
+    if (tenantResult.error) {
+      return tenantResult;
+    }
+    const globalResult = await runQuery(modelColumn, includeFranchiseColumn, true);
+    if (globalResult.error) {
+      return globalResult;
+    }
+    const merged = [
+      ...(Array.isArray(tenantResult.data) ? tenantResult.data : []),
+      ...(Array.isArray(globalResult.data) ? globalResult.data : []),
+    ] as unknown as Array<Record<string, unknown>>;
+    const deduped = Array.from(new Map(
+      merged.map((row) => [String(row.id || row.task_template_id || ''), row]),
+    ).values());
+    return { data: deduped, error: null };
+  };
+
+  const isMissingColumnError = (error: unknown, columnName: string) => {
+    const message = String((error as { message?: string })?.message || '').toLowerCase();
+    return message.includes(columnName.toLowerCase()) && (message.includes('column') || message.includes('does not exist'));
+  };
+
+  let { data, error } = await loadScopeRows('assembly_models', true);
+  if (error && isMissingColumnError(error, 'assembly_models')) {
+    ({ data, error } = await loadScopeRows('model_id', true));
+  }
+  if (error && isMissingColumnError(error, 'franchise_id')) {
+    ({ data, error } = await loadScopeRows('assembly_models', false));
+    if (error && isMissingColumnError(error, 'assembly_models')) {
+      ({ data, error } = await loadScopeRows('model_id', false));
+    }
+  }
+  if (error) throw error;
+
+  const rows = (Array.isArray(data) ? data : []) as unknown as Array<Record<string, unknown>>;
+  return rows.map((row) => ({
+    id: String(row.id || ''),
+    task_template_id: String(row.task_template_id || ''),
+    code_form_no: String(row.code_form_no || ''),
+    ata_code: String(row.ata_code || ''),
+    reference_amp: String(row.reference_amp || ''),
+    description: String(row.description || ''),
+    category_code: String(row.category_code || ''),
+    estimated_man_hours: row.estimated_man_hours ?? null,
+    is_mandatory: Boolean(row.is_mandatory),
+    task_template_detail_json: row.task_template_detail_json ?? null,
+    tenant_id: String(row.tenant_id || ''),
+    franchise_id: row.franchise_id ? String(row.franchise_id || '') : null,
+  }));
+}
+
 async function updateWorkPackageTemplateWithoutAtomicRpc(params: {
   tenantId: string;
   franchiseId: string | null;
@@ -920,6 +1002,39 @@ router.get(
       return;
     }
     const records = await loadWorkPackageTemplateModelOptions(tenantId, franchiseId);
+    res.json({ data: records, count: records.length });
+    return;
+  }),
+);
+
+router.get(
+  '/work-package-templates/task-template-options',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
+    const requestRole = String((req.user as Record<string, unknown> | undefined)?.role || '').trim().toLowerCase();
+    const isTenantAdmin = requestRole === 'tenant_admin';
+    const tenantIdFromQuery = String(req.query.tenant_id || '').trim();
+    const aircraftModelId = String(req.query.aircraft_model_id || '').trim();
+    if (!tenantId) {
+      res.status(401).json(toErrorResponse('Missing tenant context', 'MISSING_TENANT', 401));
+      return;
+    }
+    if (tenantIdFromQuery && tenantIdFromQuery !== tenantId) {
+      res.status(403).json(toErrorResponse('tenant_id does not match access scope', 'FORBIDDEN', 403));
+      return;
+    }
+    if (!isUuid(aircraftModelId)) {
+      res.status(400).json(toErrorResponse('Invalid aircraft_model_id. Expected UUID.', 'VALIDATION_ERROR', 400));
+      return;
+    }
+    const records = await loadTaskTemplateOptionsByModel({
+      tenantId,
+      franchiseId,
+      aircraftModelId,
+      isTenantAdmin,
+    });
+    res.setHeader('Cache-Control', 'private, max-age=60');
     res.json({ data: records, count: records.length });
     return;
   }),
