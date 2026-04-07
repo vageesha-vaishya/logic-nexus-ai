@@ -1,0 +1,13 @@
+flowchart TD
+  A[Quotation Creation] --> B[General Information]
+  B --> C[Composer Setup]
+  C --> D[Option Generation]
+  D --> E[Option Comparison]
+  E --> F[Charge and Margin Adjustments]
+  F --> G{Approval Required?}
+  G -->|Yes| H[Approval Workflow]
+  G -->|No| I[Finalize]
+  H --> I
+  I --> J[Save Version]
+  J --> K[Generate PDF]
+  K --> L[Send / Convert to Booking]

@@ -1,0 +1,12 @@
+flowchart TD
+  A[Create Quote] --> B{Standalone?}
+  B -->|Yes| C[Guest fields + billing]
+  B -->|No| D[Opportunity/Account/Contact linkage]
+  C --> E[Transport + Cargo Setup]
+  D --> E
+  E --> F[Get Rates / Build Options]
+  F --> G[Edit Legs + Charges]
+  G --> H[Save Quote Atomic]
+  H --> I[Version Save]
+  I --> J[Generate PDF]
+  J --> K[Optional: Convert to Booking]

@@ -1,0 +1,2153 @@
+<h1 id="quotation-module-product-requirements-document-prd">Quotation
+Module Product Requirements Document (PRD)</h1>
+<h2
+id="comprehensive-audit-and-target-state-specification">Comprehensive
+Audit and Target-State Specification</h2>
+<ul>
+<li>Document Version: <code>1.0</code></li>
+<li>Date: <code>2026-04-07</code></li>
+<li>Authoring Method:
+<code>Codebase Audit + Existing Technical Artifact Synthesis</code></li>
+<li>Scope:
+<code>Quotation and Quote Composer ecosystem (UI, APIs, services, schema, integrations, governance)</code></li>
+</ul>
+<hr />
+<h2 id="executive-summary">0) Executive Summary</h2>
+<p>This PRD is built from a systematic audit of the current Quotation
+implementation. It documents:</p>
+<ol type="1">
+<li>Full inventory of modules and dependencies across routes,
+components, services, APIs, RPCs, edge functions, and data schema.</li>
+<li>Section-level behavior for each primary module, including
+interaction models and conditional logic.</li>
+<li>Field-level contract documentation for key entities, including
+validations, defaults, formulas, and persistence mapping.</li>
+<li>General information requirements: role/permission hierarchy, audit
+trail standards, integration APIs, and compliance.</li>
+<li>Detailed Quotation Composer specifications (current + target), with
+visual and interaction requirements.</li>
+<li>Current-state analysis, screenshots, flowcharts, and gap
+matrixes.</li>
+<li>Future-state roadmap and architecture proposals with scalability and
+resilience controls.</li>
+<li>Persona-driven stories with explicit acceptance criteria.</li>
+<li>MoSCoW prioritization with estimates and staffing guidance.</li>
+</ol>
+<hr />
+<h2 id="systematic-audit-baseline">1) Systematic Audit Baseline</h2>
+<h3 id="audited-sources-primary-evidence">1.1 Audited Sources (Primary
+Evidence)</h3>
+<ul>
+<li>UI routes and pages:
+<ul>
+<li><code>src/pages/dashboard/QuoteNew.tsx</code></li>
+<li><code>src/pages/dashboard/QuoteDetail.tsx</code></li>
+<li><code>src/pages/dashboard/Quotes.tsx</code></li>
+<li><code>src/pages/dashboard/QuotesImportExport.tsx</code></li>
+<li><code>src/pages/dashboard/QuoteTemplates.tsx</code></li>
+<li><code>src/pages/dashboard/QuoteBookingMapper.tsx</code></li>
+</ul></li>
+<li>Core composer and form modules:
+<ul>
+<li><code>src/components/sales/unified-composer/UnifiedQuoteComposer.tsx</code></li>
+<li><code>src/components/sales/unified-composer/FormZone.tsx</code></li>
+<li><code>src/components/sales/unified-composer/ResultsZone.tsx</code></li>
+<li><code>src/components/sales/unified-composer/FinalizeSection.tsx</code></li>
+<li><code>src/components/sales/unified-composer/schema.ts</code></li>
+<li><code>src/components/sales/quote-form/*</code></li>
+</ul></li>
+<li>Services and domain logic:
+<ul>
+<li><code>src/services/quotation/*</code></li>
+<li><code>src/services/QuoteOptionService.ts</code></li>
+<li><code>src/services/pricing.service.ts</code></li>
+</ul></li>
+<li>API and integration contracts:
+<ul>
+<li><code>src/pages/api/v2/quotations/import.ts</code></li>
+<li><code>src/pages/api/v2/quotations/export.ts</code></li>
+<li><code>docs/api/quote-mapping-api.yaml</code></li>
+</ul></li>
+<li>Database contracts and migration evolution:
+<ul>
+<li><code>supabase/migrations/20251005170000_quotation_core.sql</code></li>
+<li><code>supabase/migrations/20251108115738_69577924-736f-40dd-9d24-0a104675c62e.sql</code></li>
+<li><code>supabase/migrations/20260122090000_enhance_quote_schema.sql</code></li>
+<li><code>supabase/migrations/20260201170001_enterprise_quote_architecture.sql</code></li>
+<li><code>supabase/migrations/20260215000000_quote_cargo_configurations.sql</code></li>
+<li><code>supabase/migrations/20260227000002_enhance_quotation_module.sql</code></li>
+<li><code>supabase/migrations/20260303120000_update_save_quote_atomic_locations.sql</code></li>
+<li><code>supabase/migrations/20260306180000_update_quote_templates_schema.sql</code></li>
+</ul></li>
+<li>Role and access model:
+<ul>
+<li><code>src/config/permissions.ts</code></li>
+</ul></li>
+<li>Existing analysis and performance evidence:
+<ul>
+<li><code>docs/quote-data-pipeline.md</code></li>
+<li><code>docs/quote-generation-workflow.md</code></li>
+<li><code>docs/quick-quote-integration-spec.md</code></li>
+<li><code>docs/technical_specs/quotation_engine_architecture.md</code></li>
+<li><code>tests/e2e/quotation/quotation-e2e-review-and-traceability.md</code></li>
+</ul></li>
+</ul>
+<h3 id="current-product-posture-as-is">1.2 Current Product Posture
+(As-Is)</h3>
+<ul>
+<li>The platform supports end-to-end quotation lifecycle: create,
+enrich, compare, persist versions, generate PDFs, import/export, and map
+quote to booking.</li>
+<li>Core persistence centers around <code>quotes</code>,
+<code>quotation_versions</code>, <code>quotation_version_options</code>,
+<code>quotation_version_option_legs</code>, <code>quote_charges</code>,
+and cargo/item extensions.</li>
+<li>Composer already supports complex multimodal option editing and
+financial recalculation, but collaborative editing and true
+drag-and-drop layout composition are not fully realized in the quotation
+creation flow.</li>
+<li>Quote template and PDF-generation ecosystem is mature and
+schema-driven; visual-template designer capability is partially
+implemented and partially planned.</li>
+</ul>
+<hr />
+<h2 id="quotation-system-architecture-inventory">2) Quotation System
+Architecture Inventory</h2>
+<h3 id="module-inventory">2.1 Module Inventory</h3>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Module</th>
+<th>Responsibility</th>
+<th>Key Dependencies</th>
+<th>Integration Touchpoints</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Route</td>
+<td><code>QuoteNew</code></td>
+<td>New quote orchestration, quick/smart quote conversion, option
+generation</td>
+<td><code>QuoteFormRefactored</code>, <code>UnifiedQuoteComposer</code>,
+<code>QuoteOptionService</code> patterns</td>
+<td>Supabase tables, RPC <code>save_quote_atomic</code>, rate payload
+mapping</td>
+</tr>
+<tr>
+<td>Route</td>
+<td><code>QuoteDetail</code></td>
+<td>Version management, save/restore version, detail visualization</td>
+<td>Version panels, option cards, comparison components</td>
+<td>Edge functions <code>save-quotation-version</code>,
+<code>restore-quotation-version</code></td>
+</tr>
+<tr>
+<td>Route</td>
+<td><code>Quotes</code></td>
+<td>Quote list/search/filter actions</td>
+<td>data hooks, table/list components</td>
+<td>CRUD endpoints and direct data reads</td>
+</tr>
+<tr>
+<td>Route</td>
+<td><code>QuotesImportExport</code></td>
+<td>Batch import/export entry UI</td>
+<td>API routes v2, permission checks</td>
+<td><code>/api/v2/quotations/import</code>,
+<code>/api/v2/quotations/export</code></td>
+</tr>
+<tr>
+<td>Route</td>
+<td><code>QuoteTemplates</code></td>
+<td>Template list/editor and quote creation from template</td>
+<td>template components + auth context</td>
+<td><code>quote_templates</code>, <code>quotes</code> insert</td>
+</tr>
+<tr>
+<td>Route</td>
+<td><code>QuoteBookingMapper</code></td>
+<td>Quote-to-booking conversion workflow</td>
+<td><code>QuoteSelectionGrid</code>,
+<code>QuoteMappingPreview</code></td>
+<td>RPC <code>validate_quote_for_booking</code>,
+<code>convert_quote_to_booking</code></td>
+</tr>
+<tr>
+<td>Component</td>
+<td><code>UnifiedQuoteComposer</code></td>
+<td>Main composer shell (tabs/phases), save, calculate, generate
+PDF</td>
+<td><code>FormZone</code>, <code>ResultsZone</code>,
+<code>FinalizeSection</code>, schema</td>
+<td>RPC <code>save_quote_atomic</code>, Edge
+<code>generate-quote-pdf</code></td>
+</tr>
+<tr>
+<td>Component</td>
+<td><code>QuoteFormRefactored</code></td>
+<td>Structured quote editor (header/logistics/cargo/financials)</td>
+<td><code>QuoteHeader</code>, <code>QuoteLogistics</code>,
+<code>QuoteLineItems</code>, <code>QuoteFinancials</code></td>
+<td><code>useQuoteRepository</code>, scoped DB writes</td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>QuoteOptionService</code></td>
+<td>Option, leg, charge normalization and persistence</td>
+<td><code>PricingService</code>, mappers, charge matching utils</td>
+<td><code>quotation_version_options</code>,
+<code>quotation_version_option_legs</code>,
+<code>quote_charges</code></td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>QuotationVersionService</code></td>
+<td>Create/list/set active/restore logic</td>
+<td>DB wrapper and version policies</td>
+<td><code>quotation_versions</code>,
+<code>quotes.current_version_id</code></td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>QuotationOptionCrudService</code></td>
+<td>Option-level delete/update wrappers</td>
+<td>DB RPC abstraction</td>
+<td>RPC <code>delete_quote_option_safe</code></td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>QuotationConfigurationService</code></td>
+<td>Tenant-level composer defaults and smart mode controls</td>
+<td>tenant context</td>
+<td><code>quotation_configuration</code></td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>QuotationRankingService</code></td>
+<td>Option scoring and recommendation</td>
+<td>scoring criteria and metadata</td>
+<td>rank fields in <code>quotation_version_options</code></td>
+</tr>
+<tr>
+<td>Service</td>
+<td><code>PricingService</code></td>
+<td>margin rules, financial calculations, realtime subscriptions</td>
+<td><code>margin_rules</code>, <code>service_pricing_tiers</code>,
+<code>services</code></td>
+<td>RPC <code>calculate_service_price</code>, client fallback</td>
+</tr>
+<tr>
+<td>DB Core</td>
+<td><code>quotes</code> + related</td>
+<td>Header-level quote contract</td>
+<td>contacts/accounts/service types/currency</td>
+<td>CRUD and version linkage</td>
+</tr>
+<tr>
+<td>DB Versioning</td>
+<td><code>quotation_versions</code></td>
+<td>immutable-ish state progression and snapshots</td>
+<td>quote FK, template snapshot</td>
+<td>save/restore workflows</td>
+</tr>
+<tr>
+<td>DB Options</td>
+<td><code>quotation_version_options</code></td>
+<td>carrier options and ranking metadata</td>
+<td>version FK + carrier/reference data</td>
+<td>compare/rank/select flows</td>
+</tr>
+<tr>
+<td>DB Legs</td>
+<td><code>quotation_version_option_legs</code></td>
+<td>multimodal route legs and transit detail</td>
+<td>ports/carrier/service type FKs</td>
+<td>per-leg charge mapping and UI route breakdown</td>
+</tr>
+<tr>
+<td>DB Charges</td>
+<td><code>quote_charges</code></td>
+<td>buy/sell financial lines</td>
+<td>bases/categories/currency/sides</td>
+<td>final totals, reconciliation, margin</td>
+</tr>
+<tr>
+<td>DB Cargo</td>
+<td><code>quote_cargo_configurations</code></td>
+<td>structured cargo setup by transport mode</td>
+<td>package and dimensional metadata</td>
+<td>pricing, operational planning</td>
+</tr>
+<tr>
+<td>DB Governance</td>
+<td><code>quote_approval_rules</code>, <code>quote_approvals</code>,
+<code>quote_pricing_logs</code>, <code>quote_events</code></td>
+<td>approvals + auditability</td>
+<td>user/tenant context</td>
+<td>compliance, enterprise controls</td>
+</tr>
+</tbody>
+</table>
+<h3 id="dependency-diagram">2.2 Dependency Diagram</h3>
+<figure>
+<img src="_mermaid_exports/mermaid-01.png" alt="Mermaid Diagram 1" />
+<figcaption aria-hidden="true">Mermaid Diagram 1</figcaption>
+</figure>
+<h3 id="data-flow-diagrams">2.3 Data Flow Diagrams</h3>
+<h4 id="a-quicksmart-quote-to-composer">A) Quick/Smart Quote to
+Composer</h4>
+<figure>
+<img src="_mermaid_exports/mermaid-02.png" alt="Mermaid Diagram 2" />
+<figcaption aria-hidden="true">Mermaid Diagram 2</figcaption>
+</figure>
+<h4 id="b-pdf-generation">B) PDF Generation</h4>
+<figure>
+<img src="_mermaid_exports/mermaid-03.png" alt="Mermaid Diagram 3" />
+<figcaption aria-hidden="true">Mermaid Diagram 3</figcaption>
+</figure>
+<hr />
+<h2 id="section-level-functional-decomposition">3) Section-Level
+Functional Decomposition</h2>
+<h3 id="quotenew-primary-sections">3.1 <code>QuoteNew</code> Primary
+Sections</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th>Section</th>
+<th>Purpose</th>
+<th>User Interactions</th>
+<th>Business Logic</th>
+<th>Conditional Rendering</th>
+<th>Performance Expectations</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Initialization</td>
+<td>Resolve navigation payload and startup data</td>
+<td>enter page / convert flow</td>
+<td>validates transfer payload, creates quote header/version</td>
+<td>shows failure UI when tenant/version missing</td>
+<td>initial load under 1s for standard form</td>
+</tr>
+<tr>
+<td>Generation Progress</td>
+<td>show conversion from selected rates</td>
+<td>view progress and errors</td>
+<td>parallel option insertion and timeout handling</td>
+<td>visible only when selected rates exist</td>
+<td>4 options target ~1-3s</td>
+</tr>
+<tr>
+<td>Composer Launch</td>
+<td>route to detailed editing</td>
+<td>edit options / legs / charges</td>
+<td>binds generated data to composer state</td>
+<td>appears once version/options exist</td>
+<td>smooth transition without hard reload</td>
+</tr>
+</tbody>
+</table>
+<h3 id="unifiedquotecomposer-sections">3.2
+<code>UnifiedQuoteComposer</code> Sections</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th>Section</th>
+<th>Purpose</th>
+<th>User Interactions</th>
+<th>Business Logic</th>
+<th>Conditional Rendering</th>
+<th>Performance Requirements</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>General Information tab</td>
+<td>CRM/guest context and core quote header</td>
+<td>select opp/account/contact, standalone toggle</td>
+<td>cross-field synchronization and validation</td>
+<td>guest fields only in standalone</td>
+<td>under 100ms field-response</td>
+</tr>
+<tr>
+<td>FormZone</td>
+<td>route and cargo intake</td>
+<td>choose mode, origin/destination, cargo, attachments</td>
+<td>mode-specific required fields and schema validation</td>
+<td>air/ocean/rail-specific controls</td>
+<td>autocomplete lookup &lt;300ms perceived</td>
+</tr>
+<tr>
+<td>ResultsZone</td>
+<td>option review and editing</td>
+<td>compare options, adjust charges/margins</td>
+<td>ranking, charge aggregation, smart suggestions</td>
+<td>only after rates/options available</td>
+<td>list/grid rendering should stay &lt;16ms/frame</td>
+</tr>
+<tr>
+<td>FinalizeSection</td>
+<td>save/version/pdf actions</td>
+<td>save draft/final, generate pdf</td>
+<td>payload normalization then <code>save_quote_atomic</code></td>
+<td>enabled when form validity passes</td>
+<td>save RPC robust retry and clear error taxonomy</td>
+</tr>
+<tr>
+<td>Error handling surface</td>
+<td>resilience to RPC/schema mismatches</td>
+<td>user retries with guidance</td>
+<td>maps backend error signatures to user-readable remediation</td>
+<td>shown only on failure</td>
+<td>no hard crash; recoverable fallback path</td>
+</tr>
+</tbody>
+</table>
+<h3 id="quoteformrefactored-sections">3.3
+<code>QuoteFormRefactored</code> Sections</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+<col style="width: 16%" />
+</colgroup>
+<thead>
+<tr>
+<th>Section</th>
+<th>Purpose</th>
+<th>User Interactions</th>
+<th>Business Logic</th>
+<th>Conditional Rendering</th>
+<th>Performance Requirements</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>QuoteHeader</code></td>
+<td>quote identity + CRM linkage</td>
+<td>set title/status/dates and link entities</td>
+<td>auto-populate account/contact from opportunity</td>
+<td>standalone guest block toggled</td>
+<td>reactive updates with no full re-render</td>
+</tr>
+<tr>
+<td><code>QuoteLogistics</code></td>
+<td>service/carrier/route configuration</td>
+<td>select service type/level/carrier/ports</td>
+<td>mode normalization + leg-derived placeholders</td>
+<td>multi-leg rows only when legs exist</td>
+<td>lookup + select under 200ms</td>
+</tr>
+<tr>
+<td><code>QuoteLineItems</code></td>
+<td>cargo/commercial line management</td>
+<td>add/remove/edit items</td>
+<td>maps nested cargo object to flat form state</td>
+<td>empty state card when no items</td>
+<td>virtualization for large item lists</td>
+</tr>
+<tr>
+<td><code>QuoteFinancials</code></td>
+<td>pricing, taxes, terms, notes</td>
+<td>calculate estimate, apply totals, verify server</td>
+<td>margin-rule application + reconciliation</td>
+<td>warning only when items exist and total is zero</td>
+<td>calculation feedback &lt;2s target</td>
+</tr>
+</tbody>
+</table>
+<h3 id="versioningapprovaltemplate-sections">3.4
+Versioning/Approval/Template Sections</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Module</th>
+<th>Sections</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>quotation-versions/*</code></td>
+<td>history, comparison, actions, PDF generation, approval workflow</td>
+<td>supports save/restore and enterprise governance controls</td>
+</tr>
+<tr>
+<td><code>QuoteTemplates</code></td>
+<td>list, editor, selection/create-from-template</td>
+<td>schema-backed template content with quote instantiation</td>
+</tr>
+<tr>
+<td><code>QuoteBookingMapper</code></td>
+<td>selection and preview/validation</td>
+<td>quote conversion guardrails and audit mapping</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="comprehensive-field-level-documentation">4) Comprehensive
+Field-Level Documentation</h2>
+<p>Note: Length semantics are inferred from schema and DB type. For
+<code>text</code> columns, practical limits are product-defined rather
+than DB hard caps.</p>
+<h3 id="quote-header-contract-quotes-form-schema">4.1 Quote Header
+Contract (<code>quotes</code> + form schema)</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type / Length</th>
+<th>Required</th>
+<th>Default</th>
+<th>Validation / Rule</th>
+<th>Formula / Dependency</th>
+<th>DB Mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>title</code></td>
+<td>string, variable text</td>
+<td>Yes</td>
+<td>none</td>
+<td>min length 1</td>
+<td>base identity field</td>
+<td><code>quotes.title</code></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>string text</td>
+<td>No</td>
+<td>null</td>
+<td>none</td>
+<td>optional context note</td>
+<td><code>quotes.description</code></td>
+</tr>
+<tr>
+<td><code>quote_number</code></td>
+<td>string &lt;= 32 (composer path)</td>
+<td>Optional/manual</td>
+<td>auto generated when blank</td>
+<td>regex <code>[A-Za-z0-9._-]*</code></td>
+<td>uniqueness in sequence policy</td>
+<td><code>quotes.quote_number</code></td>
+</tr>
+<tr>
+<td><code>status</code></td>
+<td>enum-like text</td>
+<td>Yes</td>
+<td><code>draft</code></td>
+<td>UI set (<code>draft/sent/accepted/rejected</code>)</td>
+<td>drives available actions</td>
+<td><code>quotes.status</code></td>
+</tr>
+<tr>
+<td><code>account_id</code></td>
+<td>UUID</td>
+<td>Conditional</td>
+<td>null</td>
+<td>required unless standalone or opportunity used</td>
+<td>syncs contact/opportunity filtering</td>
+<td><code>quotes.account_id</code></td>
+</tr>
+<tr>
+<td><code>contact_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>must align to account if account selected</td>
+<td>auto-filled from opportunity/contact</td>
+<td><code>quotes.contact_id</code></td>
+</tr>
+<tr>
+<td><code>opportunity_id</code></td>
+<td>UUID</td>
+<td>Conditional</td>
+<td>null</td>
+<td>required in non-standalone when account absent</td>
+<td>backfills account/contact</td>
+<td><code>quotes.opportunity_id</code></td>
+</tr>
+<tr>
+<td><code>service_type_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>selected from service types</td>
+<td>filters service list and carrier mode</td>
+<td><code>quotes.service_type_id</code></td>
+</tr>
+<tr>
+<td><code>service_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>must belong to selected service type</td>
+<td>dependency on <code>service_type_id</code></td>
+<td><code>quotes.service_id</code></td>
+</tr>
+<tr>
+<td><code>incoterms</code></td>
+<td>string</td>
+<td>No</td>
+<td>null</td>
+<td>selected from allowed incoterms list</td>
+<td>impacts pricing/compliance context</td>
+<td><code>quotes.incoterms</code></td>
+</tr>
+<tr>
+<td><code>currency_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>selected from currency master</td>
+<td>used in charge and totals display</td>
+<td><code>quotes.currency_id</code></td>
+</tr>
+<tr>
+<td><code>origin_port_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>selected from locations</td>
+<td>used by routing and leg derivation</td>
+<td><code>quotes.origin_port_id</code></td>
+</tr>
+<tr>
+<td><code>destination_port_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>selected from locations</td>
+<td>used by routing and leg derivation</td>
+<td><code>quotes.destination_port_id</code></td>
+</tr>
+<tr>
+<td><code>pickup_date</code></td>
+<td>date/string</td>
+<td>No</td>
+<td>null</td>
+<td>date input; downstream chronology checks</td>
+<td>paired with delivery deadline</td>
+<td><code>quotes.pickup_date</code></td>
+</tr>
+<tr>
+<td><code>delivery_deadline</code></td>
+<td>date/string</td>
+<td>No</td>
+<td>null</td>
+<td>optional date</td>
+<td>should be &gt;= pickup in ops process</td>
+<td><code>quotes.delivery_deadline</code></td>
+</tr>
+<tr>
+<td><code>vehicle_type</code></td>
+<td>string</td>
+<td>No</td>
+<td>null</td>
+<td>free text</td>
+<td>used in logistics and docs</td>
+<td><code>quotes.vehicle_type</code></td>
+</tr>
+<tr>
+<td><code>special_handling</code></td>
+<td>string/json</td>
+<td>No</td>
+<td>null</td>
+<td>free text / structured in RPC payload</td>
+<td>compliance and execution hints</td>
+<td><code>quotes.special_handling</code></td>
+</tr>
+<tr>
+<td><code>tax_percent</code></td>
+<td>numeric-string</td>
+<td>No</td>
+<td><code>0</code></td>
+<td>non-negative</td>
+<td>total = shipping + tax</td>
+<td><code>quotes.tax_percent</code></td>
+</tr>
+<tr>
+<td><code>shipping_amount</code></td>
+<td>numeric-string</td>
+<td>No</td>
+<td><code>0</code></td>
+<td>non-negative</td>
+<td>subtotal input for financials</td>
+<td><code>quotes.shipping_amount</code></td>
+</tr>
+<tr>
+<td><code>terms_conditions</code></td>
+<td>text</td>
+<td>No</td>
+<td>null</td>
+<td>none</td>
+<td>shown in outbound quote docs</td>
+<td><code>quotes.terms_conditions</code></td>
+</tr>
+<tr>
+<td><code>notes</code></td>
+<td>text</td>
+<td>No</td>
+<td>null</td>
+<td>internal use</td>
+<td>non-customer-facing</td>
+<td><code>quotes.notes</code></td>
+</tr>
+<tr>
+<td><code>billing_address</code></td>
+<td>jsonb</td>
+<td>No</td>
+<td><code>{}</code></td>
+<td>standalone mode requires key fields</td>
+<td>used for guest quote mode</td>
+<td><code>quotes.billing_address</code></td>
+</tr>
+<tr>
+<td><code>shipping_address</code></td>
+<td>jsonb</td>
+<td>No</td>
+<td><code>{}</code></td>
+<td>optional</td>
+<td>address output in docs</td>
+<td><code>quotes.shipping_address</code></td>
+</tr>
+<tr>
+<td><code>tenant_id</code></td>
+<td>UUID</td>
+<td>Yes</td>
+<td>context-derived</td>
+<td>must match scoped tenant</td>
+<td>multitenant isolation</td>
+<td><code>quotes.tenant_id</code></td>
+</tr>
+<tr>
+<td><code>franchise_id</code></td>
+<td>UUID</td>
+<td>Conditional</td>
+<td>context-derived</td>
+<td>org hierarchy dependent</td>
+<td>franchise partitioning</td>
+<td><code>quotes.franchise_id</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cargo-item-contract-items---quote_items_core-extension">4.2
+Cargo Item Contract (<code>items</code> -&gt;
+<code>quote_items_core</code> + extension)</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Validation</th>
+<th>Formula/Dependency</th>
+<th>DB Mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>type</code></td>
+<td>enum <code>loose/container/unit</code></td>
+<td>Yes</td>
+<td><code>loose</code></td>
+<td>enum constraint</td>
+<td>drives container fields requirement</td>
+<td><code>logistics.quote_items_extension.type</code></td>
+</tr>
+<tr>
+<td><code>product_name</code></td>
+<td>string</td>
+<td>Yes</td>
+<td>none</td>
+<td>min length 1</td>
+<td>basis for commodity description</td>
+<td><code>quote_items_core.product_name</code></td>
+</tr>
+<tr>
+<td><code>description</code></td>
+<td>string</td>
+<td>No</td>
+<td>null</td>
+<td>none</td>
+<td>can mirror product name</td>
+<td><code>quote_items_core.description</code></td>
+</tr>
+<tr>
+<td><code>quantity</code></td>
+<td>number</td>
+<td>Yes</td>
+<td><code>1</code></td>
+<td>min 1</td>
+<td>line total calc</td>
+<td><code>quote_items_core.quantity</code></td>
+</tr>
+<tr>
+<td><code>unit_price</code></td>
+<td>number</td>
+<td>Yes</td>
+<td><code>0</code></td>
+<td>min 0</td>
+<td>line total calc</td>
+<td><code>quote_items_core.unit_price</code></td>
+</tr>
+<tr>
+<td><code>discount_percent</code></td>
+<td>number</td>
+<td>No</td>
+<td><code>0</code></td>
+<td>min 0 max 100</td>
+<td>discount amount derivation</td>
+<td><code>quote_items_core.discount_percent</code></td>
+</tr>
+<tr>
+<td><code>commodity_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>optional lookup</td>
+<td>commodity master link</td>
+<td><code>quote_items_core.commodity_id</code></td>
+</tr>
+<tr>
+<td><code>aes_hts_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>optional lookup</td>
+<td>trade compliance linkage</td>
+<td><code>quote_items_core.aes_hts_id</code></td>
+</tr>
+<tr>
+<td><code>attributes.weight</code></td>
+<td>number</td>
+<td>No</td>
+<td>0</td>
+<td>non-negative</td>
+<td>logistics calculations</td>
+<td><code>logistics.quote_items_extension.weight_kg</code></td>
+</tr>
+<tr>
+<td><code>attributes.volume</code></td>
+<td>number</td>
+<td>No</td>
+<td>0</td>
+<td>non-negative</td>
+<td>logistics calculations</td>
+<td><code>logistics.quote_items_extension.volume_cbm</code></td>
+</tr>
+<tr>
+<td><code>attributes.length/width/height</code></td>
+<td>number</td>
+<td>No</td>
+<td>0</td>
+<td>non-negative</td>
+<td>dimensional weight contexts</td>
+<td><code>logistics.quote_items_extension.attributes</code></td>
+</tr>
+<tr>
+<td><code>attributes.hs_code</code></td>
+<td>string</td>
+<td>No</td>
+<td>null</td>
+<td>optional</td>
+<td>customs mapping</td>
+<td><code>logistics.quote_items_extension.attributes</code></td>
+</tr>
+<tr>
+<td><code>attributes.hazmat</code></td>
+<td>object</td>
+<td>No</td>
+<td>null</td>
+<td>optional structured</td>
+<td>hazmat compliance</td>
+<td><code>logistics.quote_items_extension.attributes</code></td>
+</tr>
+<tr>
+<td><code>container_type_id</code></td>
+<td>UUID</td>
+<td>Conditional</td>
+<td>null</td>
+<td>required for container type</td>
+<td>mode/type dependent</td>
+<td><code>logistics.quote_items_extension.container_type_id</code></td>
+</tr>
+<tr>
+<td><code>container_size_id</code></td>
+<td>UUID</td>
+<td>Conditional</td>
+<td>null</td>
+<td>required for container type</td>
+<td>mode/type dependent</td>
+<td><code>logistics.quote_items_extension.container_size_id</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="cargo-configuration-contract-quote_cargo_configurations">4.3
+Cargo Configuration Contract
+(<code>quote_cargo_configurations</code>)</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Validation</th>
+<th>Dependency</th>
+<th>DB Mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>transport_mode</code></td>
+<td>text enum-like</td>
+<td>Yes</td>
+<td>none</td>
+<td>one of ocean/air/road/rail</td>
+<td>drives downstream logic</td>
+<td><code>quote_cargo_configurations.transport_mode</code></td>
+</tr>
+<tr>
+<td><code>cargo_type</code></td>
+<td>text enum-like</td>
+<td>Yes</td>
+<td>none</td>
+<td>one of FCL/LCL/Breakbulk/RoRo</td>
+<td>impacts container and pricing logic</td>
+<td><code>quote_cargo_configurations.cargo_type</code></td>
+</tr>
+<tr>
+<td><code>container_type</code></td>
+<td>text</td>
+<td>No</td>
+<td>null</td>
+<td>mode dependent</td>
+<td>linked with type_id</td>
+<td><code>quote_cargo_configurations.container_type</code></td>
+</tr>
+<tr>
+<td><code>container_size</code></td>
+<td>text</td>
+<td>No</td>
+<td>null</td>
+<td>mode dependent</td>
+<td>linked with size_id</td>
+<td><code>quote_cargo_configurations.container_size</code></td>
+</tr>
+<tr>
+<td><code>container_type_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>optional FK</td>
+<td>references master</td>
+<td><code>quote_cargo_configurations.container_type_id</code></td>
+</tr>
+<tr>
+<td><code>container_size_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>optional FK</td>
+<td>references master</td>
+<td><code>quote_cargo_configurations.container_size_id</code></td>
+</tr>
+<tr>
+<td><code>quantity</code></td>
+<td>integer</td>
+<td>Yes</td>
+<td>1</td>
+<td>min 1</td>
+<td>primary volume multiplier</td>
+<td><code>quote_cargo_configurations.quantity</code></td>
+</tr>
+<tr>
+<td><code>unit_weight_kg</code></td>
+<td>numeric</td>
+<td>No</td>
+<td>null</td>
+<td>non-negative</td>
+<td>pricing + routing weight</td>
+<td><code>quote_cargo_configurations.unit_weight_kg</code></td>
+</tr>
+<tr>
+<td><code>unit_volume_cbm</code></td>
+<td>numeric</td>
+<td>No</td>
+<td>null</td>
+<td>non-negative</td>
+<td>pricing + stowage</td>
+<td><code>quote_cargo_configurations.unit_volume_cbm</code></td>
+</tr>
+<tr>
+<td><code>length_cm/width_cm/height_cm</code></td>
+<td>numeric</td>
+<td>No</td>
+<td>null</td>
+<td>non-negative</td>
+<td>used in OOG/LCL handling</td>
+<td>corresponding columns</td>
+</tr>
+<tr>
+<td><code>is_hazardous</code></td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>boolean</td>
+<td>enables hazardous fields</td>
+<td><code>quote_cargo_configurations.is_hazardous</code></td>
+</tr>
+<tr>
+<td><code>hazardous_class</code></td>
+<td>text</td>
+<td>Conditional</td>
+<td>null</td>
+<td>required if hazardous</td>
+<td>hazmat rule dependency</td>
+<td><code>quote_cargo_configurations.hazardous_class</code></td>
+</tr>
+<tr>
+<td><code>un_number</code></td>
+<td>text</td>
+<td>Conditional</td>
+<td>null</td>
+<td>required if hazardous</td>
+<td>hazmat rule dependency</td>
+<td><code>quote_cargo_configurations.un_number</code></td>
+</tr>
+<tr>
+<td><code>is_temperature_controlled</code></td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>boolean</td>
+<td>enables temperature fields</td>
+<td><code>quote_cargo_configurations.is_temperature_controlled</code></td>
+</tr>
+<tr>
+<td><code>temperature_min/max</code></td>
+<td>numeric</td>
+<td>Conditional</td>
+<td>null</td>
+<td>numeric range expectation</td>
+<td>temp-control dependency</td>
+<td>corresponding columns</td>
+</tr>
+<tr>
+<td><code>temperature_unit</code></td>
+<td>text</td>
+<td>No</td>
+<td><code>C</code></td>
+<td>expected C/F</td>
+<td>temp-control dependency</td>
+<td><code>quote_cargo_configurations.temperature_unit</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="option-leg-charge-contract">4.4 Option / Leg / Charge
+Contract</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+<col style="width: 14%" />
+</colgroup>
+<thead>
+<tr>
+<th>Entity.Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Validation</th>
+<th>Formula/Dependency</th>
+<th>DB Mapping</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>option.option_name</code></td>
+<td>text</td>
+<td>No</td>
+<td>generated label</td>
+<td>none</td>
+<td>fallback uses carrier+tier</td>
+<td><code>quotation_version_options.option_name</code></td>
+</tr>
+<tr>
+<td><code>option.total_amount</code></td>
+<td>numeric</td>
+<td>Yes</td>
+<td>0</td>
+<td>non-negative expected</td>
+<td>reconciled from sell charges</td>
+<td><code>quotation_version_options.total_amount</code></td>
+</tr>
+<tr>
+<td><code>option.total_buy</code></td>
+<td>numeric</td>
+<td>Derived</td>
+<td>0</td>
+<td>computed</td>
+<td>sum of buy-side charges</td>
+<td><code>quotation_version_options.total_buy</code></td>
+</tr>
+<tr>
+<td><code>option.total_sell</code></td>
+<td>numeric</td>
+<td>Derived</td>
+<td>0</td>
+<td>computed</td>
+<td>sum of sell-side charges</td>
+<td><code>quotation_version_options.total_sell</code></td>
+</tr>
+<tr>
+<td><code>option.margin_amount</code></td>
+<td>numeric</td>
+<td>Derived</td>
+<td>0</td>
+<td>computed</td>
+<td><code>total_sell - total_buy</code></td>
+<td><code>quotation_version_options.margin_amount</code></td>
+</tr>
+<tr>
+<td><code>option.margin_percentage</code></td>
+<td>numeric</td>
+<td>Derived</td>
+<td>0</td>
+<td>computed</td>
+<td><code>(margin / buy)*100</code></td>
+<td><code>quotation_version_options.margin_percentage</code></td>
+</tr>
+<tr>
+<td><code>option.rank_score</code></td>
+<td>numeric</td>
+<td>No</td>
+<td>null</td>
+<td>optional scoring</td>
+<td>ranking service driven</td>
+<td><code>quotation_version_options.rank_score</code></td>
+</tr>
+<tr>
+<td><code>option.is_recommended</code></td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>boolean</td>
+<td>ranking heuristic output</td>
+<td><code>quotation_version_options.is_recommended</code></td>
+</tr>
+<tr>
+<td><code>leg.sort_order</code></td>
+<td>integer</td>
+<td>Yes</td>
+<td>sequential</td>
+<td>&gt;0</td>
+<td>ordered route sequence</td>
+<td><code>quotation_version_option_legs.sort_order</code></td>
+</tr>
+<tr>
+<td><code>leg.transport_mode</code></td>
+<td>text</td>
+<td>Yes</td>
+<td>derived</td>
+<td>expected mode code</td>
+<td>affects charge matching + carriers</td>
+<td><code>quotation_version_option_legs.transport_mode</code></td>
+</tr>
+<tr>
+<td><code>leg.origin_location_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>FK optional</td>
+<td>resolved from name/port mapping</td>
+<td><code>quotation_version_option_legs.origin_location_id</code></td>
+</tr>
+<tr>
+<td><code>leg.destination_location_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>null</td>
+<td>FK optional</td>
+<td>resolved from name/port mapping</td>
+<td><code>quotation_version_option_legs.destination_location_id</code></td>
+</tr>
+<tr>
+<td><code>leg.transit_time_days</code></td>
+<td>number UI</td>
+<td>No</td>
+<td>0</td>
+<td>non-negative</td>
+<td>converted to hours in DB writes</td>
+<td>mapped to <code>transit_time_hours</code></td>
+</tr>
+<tr>
+<td><code>charge.category_id</code></td>
+<td>UUID</td>
+<td>Yes</td>
+<td>fallback category</td>
+<td>must resolve category</td>
+<td>keyword/fuzzy mapping fallback chain</td>
+<td><code>quote_charges.category_id</code></td>
+</tr>
+<tr>
+<td><code>charge.basis_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>per_shipment fallback</td>
+<td>mapped via basis/unit</td>
+<td>fallback to default basis</td>
+<td><code>quote_charges.basis_id</code></td>
+</tr>
+<tr>
+<td><code>charge.currency_id</code></td>
+<td>UUID</td>
+<td>No</td>
+<td>USD mapping</td>
+<td>mapped via currency code</td>
+<td>fallback to quote currency</td>
+<td><code>quote_charges.currency_id</code></td>
+</tr>
+<tr>
+<td><code>charge.quantity</code></td>
+<td>numeric</td>
+<td>Yes</td>
+<td>1</td>
+<td>non-negative</td>
+<td>amount = rate * quantity</td>
+<td><code>quote_charges.quantity</code></td>
+</tr>
+<tr>
+<td><code>charge.rate</code></td>
+<td>numeric</td>
+<td>Yes</td>
+<td>computed</td>
+<td>non-negative</td>
+<td>pricing service output</td>
+<td><code>quote_charges.rate</code></td>
+</tr>
+<tr>
+<td><code>charge.amount</code></td>
+<td>numeric</td>
+<td>Yes</td>
+<td>computed</td>
+<td>non-negative</td>
+<td>pair buy/sell insertion</td>
+<td><code>quote_charges.amount</code></td>
+</tr>
+<tr>
+<td><code>charge.charge_side_id</code></td>
+<td>UUID</td>
+<td>Yes</td>
+<td>n/a</td>
+<td>must resolve buy/sell side</td>
+<td>mandatory side records check</td>
+<td><code>quote_charges.charge_side_id</code></td>
+</tr>
+</tbody>
+</table>
+<h3 id="quotation-configuration-and-template-fields">4.5 Quotation
+Configuration and Template Fields</h3>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Field</th>
+<th>Type</th>
+<th>Required</th>
+<th>Default</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>quotation_configuration.default_module</code></td>
+<td>text</td>
+<td>Yes</td>
+<td><code>composer</code></td>
+<td>check: <code>composer/legacy/smart</code></td>
+</tr>
+<tr>
+<td><code>quotation_configuration.smart_mode_enabled</code></td>
+<td>boolean</td>
+<td>No</td>
+<td>false</td>
+<td>toggles smart features</td>
+</tr>
+<tr>
+<td><code>quotation_configuration.smart_mode_settings</code></td>
+<td>jsonb</td>
+<td>No</td>
+<td><code>{}</code></td>
+<td>tenant-scoped tuning</td>
+</tr>
+<tr>
+<td><code>quotation_configuration.multi_option_enabled</code></td>
+<td>boolean</td>
+<td>No</td>
+<td>true</td>
+<td>controls option multiplicity</td>
+</tr>
+<tr>
+<td><code>quotation_configuration.auto_ranking_criteria</code></td>
+<td>jsonb</td>
+<td>No</td>
+<td>weighted cost/time/reliability</td>
+<td>ranking inputs</td>
+</tr>
+<tr>
+<td><code>quote_templates.content</code></td>
+<td>jsonb</td>
+<td>Yes</td>
+<td>none</td>
+<td>template body schema-validated</td>
+</tr>
+<tr>
+<td><code>quote_templates.template_name</code></td>
+<td>text</td>
+<td>No</td>
+<td>null</td>
+<td>named template variants</td>
+</tr>
+<tr>
+<td><code>quote_templates.rate_options</code></td>
+<td>jsonb array</td>
+<td>No</td>
+<td><code>[]</code></td>
+<td>MGL template extension</td>
+</tr>
+<tr>
+<td><code>quote_templates.transport_modes</code></td>
+<td>jsonb array</td>
+<td>No</td>
+<td><code>[]</code></td>
+<td>MGL template extension</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="general-information-requirements">5) General Information
+Requirements</h2>
+<h3 id="user-roles-and-permission-hierarchy-quotation-relevant">5.1 User
+Roles and Permission Hierarchy (Quotation-Relevant)</h3>
+<table style="width:100%;">
+<colgroup>
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+<col style="width: 11%" />
+</colgroup>
+<thead>
+<tr>
+<th>Role</th>
+<th>View</th>
+<th>Create</th>
+<th>Edit</th>
+<th>Delete</th>
+<th>Import/Export</th>
+<th>Sensitive Export</th>
+<th>Templates Manage</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>platform_admin</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>full platform scope</td>
+</tr>
+<tr>
+<td><code>super_admin</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>enterprise-wide</td>
+</tr>
+<tr>
+<td><code>tenant_admin</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>tenant export only</td>
+<td>Yes</td>
+<td>tenant scope</td>
+</tr>
+<tr>
+<td><code>franchise_admin</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>franchise scope</td>
+</tr>
+<tr>
+<td><code>user</code></td>
+<td>Yes</td>
+<td>Yes</td>
+<td>limited</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+<td>No</td>
+<td>standard sales operations</td>
+</tr>
+</tbody>
+</table>
+<p>Permission source slugs include: <code>quotes.view</code>,
+<code>quotes.create</code>, <code>quotes.edit</code>,
+<code>quotes.delete</code>, <code>quotes.import_export</code>,
+<code>quotes.analytics</code>, <code>quotes.export_sensitive</code>,
+<code>quotes.templates.manage</code>, <code>import_quotation</code>,
+<code>export_quotation</code>,
+<code>export_quotation_sensitive</code>.</p>
+<h3 id="audit-trail-requirements">5.2 Audit Trail Requirements</h3>
+<p>Mandatory audit points:</p>
+<ul>
+<li>Quote lifecycle events: create/update/status transitions
+(<code>quote_events</code>).</li>
+<li>Versioning events: save, restore, active version change
+(<code>quotation_versions</code> + route actions).</li>
+<li>Pricing provenance: automatic rule application and overrides
+(<code>quote_pricing_logs</code>).</li>
+<li>Approval traces: request/approve/reject with actor and rationale
+(<code>quote_approvals</code>).</li>
+<li>Mapping actions: quote-to-booking validation and conversion
+logs.</li>
+</ul>
+<h3 id="integration-apis-and-rpc-matrix">5.3 Integration APIs and RPC
+Matrix</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Interface</th>
+<th>Type</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>/api/v2/quotations/import</code></td>
+<td>REST API route</td>
+<td>bulk import orchestration</td>
+</tr>
+<tr>
+<td><code>/api/v2/quotations/export</code></td>
+<td>REST API route</td>
+<td>export with permission and sensitivity controls</td>
+</tr>
+<tr>
+<td><code>save_quote_atomic</code></td>
+<td>PostgreSQL RPC</td>
+<td>atomic persistence of quote + items + cargo + options + legs +
+charges</td>
+</tr>
+<tr>
+<td><code>delete_quote_option_safe</code></td>
+<td>PostgreSQL RPC</td>
+<td>safe option deletion with integrity rules</td>
+</tr>
+<tr>
+<td><code>validate_quote_for_booking</code></td>
+<td>PostgreSQL RPC</td>
+<td>pre-conversion business rule validation</td>
+</tr>
+<tr>
+<td><code>convert_quote_to_booking</code></td>
+<td>PostgreSQL RPC</td>
+<td>quote-to-booking conversion with audit continuity</td>
+</tr>
+<tr>
+<td><code>generate-quote-pdf</code></td>
+<td>Edge Function</td>
+<td>schema-safe PDF generation</td>
+</tr>
+<tr>
+<td><code>save-quotation-version</code> /
+<code>restore-quotation-version</code></td>
+<td>Edge Functions</td>
+<td>version snapshots and restore path</td>
+</tr>
+<tr>
+<td><code>calculate-quote-financials</code></td>
+<td>Edge Function</td>
+<td>server-side financial verification</td>
+</tr>
+<tr>
+<td><code>calculate_service_price</code></td>
+<td>PostgreSQL RPC</td>
+<td>service-tier pricing calculation</td>
+</tr>
+</tbody>
+</table>
+<h3 id="compliance-standards-required">5.4 Compliance Standards
+(Required)</h3>
+<ul>
+<li>Multitenant data isolation via
+<code>tenant_id</code>/<code>franchise_id</code> + RLS.</li>
+<li>Scoped access patterns for all quote data operations.</li>
+<li>Schema-first validation using Zod for form and payload
+contracts.</li>
+<li>Safe-context PDF rendering to prevent data exfiltration.</li>
+<li>Auditability for pricing decisions and approval workflows.</li>
+<li>Backward-compatible schema evolution and version-aware payload
+normalization.</li>
+</ul>
+<hr />
+<h2 id="quotation-composer-detailed-specification">6) Quotation
+Composer: Detailed Specification</h2>
+<h3 id="uiux-wireframe-specification-desktop">6.1 UI/UX Wireframe
+Specification (Desktop)</h3>
+<pre class="text"><code>+--------------------------------------------------------------------------------------+
+| Header / Breadcrumb / Domain / Actions                                               |
++--------------------------------------------------------------------------------------+
+| Tabs: [General Information] [Quotation Composer]                                     |
++--------------------------------------------------------------------------------------+
+| Left/Primary (70%)                                            | Right/Secondary (30%)|
+| - FormZone                                                     | - Option summary      |
+|   - Mode / Route / Cargo                                       | - Ranking badges      |
+|   - Carrier preference                                         | - Totals              |
+|   - Validation hints                                           | - Save/Version actions|
+| - ResultsZone (option table/cards/list)                        |                      |
+| - FinalizeSection (notes/margin/pdf/send)                      |                      |
++--------------------------------------------------------------------------------------+</code></pre>
+<h3 id="responsive-requirements">6.2 Responsive Requirements</h3>
+<ul>
+<li>Desktop (<code>&gt;=1280</code>): full two-zone composition,
+persistent action rail.</li>
+<li>Tablet (<code>768-1279</code>): stacked sections with sticky action
+bar.</li>
+<li>Mobile (<code>&lt;768</code>): single-column wizard behavior,
+collapsible detail groups.</li>
+<li>Accessibility:
+<ul>
+<li>keyboard navigable section controls;</li>
+<li>visible focus rings;</li>
+<li>semantic labels for all select/input/button elements.</li>
+</ul></li>
+</ul>
+<h3 id="drag-and-drop-functional-requirements">6.3 Drag-and-Drop
+Functional Requirements</h3>
+<p>Current: - Option and charge editing is primarily form-driven; no
+complete drag-and-drop layout composer for quote-building sections.</p>
+<p>Required: - Drag to reorder legs, charge groups, and optional summary
+blocks. - Drag constraints: - non-removable mandatory sections pinned; -
+route continuity validator blocks invalid drops. - Interaction
+standards: - ghost element + insertion indicator; - keyboard-accessible
+reorder controls; - undo stack integration.</p>
+<h3 id="real-time-calculation-engine-requirements">6.4 Real-Time
+Calculation Engine Requirements</h3>
+<p>Current: - Uses <code>PricingService</code> with cached margin rules
+and <code>calculateFinancials</code>. - Supports estimate generation and
+optional server verification.</p>
+<p>Required: - deterministic calc pipeline per option: - input
+normalization; - category/basis/currency resolution; - buy/sell pair
+synthesis; - discrepancy-balancing logic; - reconciliation writeback. -
+SLA targets: - single option recalc &lt;200ms client-side; - full
+save+reconcile &lt;1.5s p95 for &lt;=10 options.</p>
+<h3 id="version-control-and-collaborative-editing">6.5 Version Control
+and Collaborative Editing</h3>
+<p>Current: - version save/restore exists; - active/current version
+semantics supported.</p>
+<p>Required: - soft-locking with collaborator presence indicator; -
+conflict resolution: - field-level last-writer metadata; - diff preview
+before overwrite; - manual merge assistant for critical financial
+fields. - timeline model: - draft checkpoints; - published snapshots; -
+immutable PDF/version pairing.</p>
+<h3 id="interactive-prototype-specifications-target">6.6 Interactive
+Prototype Specifications (Target)</h3>
+<ul>
+<li>Prototype scope:
+<ul>
+<li>quote creation from scratch;</li>
+<li>quick quote conversion;</li>
+<li>option comparison/edit;</li>
+<li>approval trigger path;</li>
+<li>PDF generation and booking conversion.</li>
+</ul></li>
+<li>Prototype fidelity:
+<ul>
+<li>stateful controls for conditional fields;</li>
+<li>simulated async states (loading/error/partial success);</li>
+<li>keyboard-only path validation.</li>
+</ul></li>
+</ul>
+<hr />
+<h2 id="current-state-visual-documentation-and-gap-analysis">7)
+Current-State Visual Documentation and Gap Analysis</h2>
+<h3 id="screenshot-inventory-current-state">7.1 Screenshot Inventory
+(Current State)</h3>
+<ul>
+<li>Desktop snapshot:
+<ul>
+<li><code>tests/e2e/quotation/quotation-comprehensive.spec.ts-snapshots/quotation-composer-visual-chromium-darwin.png</code></li>
+</ul></li>
+<li>Mobile snapshot:
+<ul>
+<li><code>tests/e2e/quotation/quotation-comprehensive.spec.ts-snapshots/quotation-composer-visual-ios-mobile-darwin.png</code></li>
+</ul></li>
+<li>Browser parity snapshots:
+<ul>
+<li>chromium, chrome-latest, firefox, webkit variants in same
+folder.</li>
+</ul></li>
+</ul>
+<h3 id="annotated-screenshot-legend">7.2 Annotated Screenshot
+Legend</h3>
+<ol type="1">
+<li>Header and breadcrumb indicate context and route
+(<code>Create Quote</code>).</li>
+<li>Top tabset separates General Information and Quotation Composer
+surfaces.</li>
+<li>CRM-linked mode toggle controls standalone vs CRM-dependent
+entry.</li>
+<li>Context selectors (opportunity/account/contact) drive
+auto-population logic.</li>
+<li>Transport mode chips change required cargo constraints and
+downstream pricing behavior.</li>
+<li>Commodity and cargo block contains container configuration +
+dimensions + hazmat controls.</li>
+<li>Attachments and draft action indicate save pipeline and document
+input support.</li>
+</ol>
+<h3 id="current-workflow-diagram-as-is">7.3 Current Workflow Diagram
+(As-Is)</h3>
+<figure>
+<img src="_mermaid_exports/mermaid-04.png" alt="Mermaid Diagram 4" />
+<figcaption aria-hidden="true">Mermaid Diagram 4</figcaption>
+</figure>
+<h3 id="gap-analysis-matrix-existing-vs-required">7.4 Gap Analysis
+Matrix (Existing vs Required)</h3>
+<table>
+<colgroup>
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+<col style="width: 20%" />
+</colgroup>
+<thead>
+<tr>
+<th>Capability</th>
+<th>Existing State</th>
+<th>Required State</th>
+<th>Gap Severity</th>
+<th>Priority</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Section-level drag-and-drop</td>
+<td>partial/not universal</td>
+<td>full DnD for legs/charges/layout blocks</td>
+<td>High</td>
+<td>Must</td>
+</tr>
+<tr>
+<td>Collaborative editing</td>
+<td>none/minimal</td>
+<td>realtime presence + conflict handling</td>
+<td>High</td>
+<td>Must</td>
+</tr>
+<tr>
+<td>Field governance registry</td>
+<td>split across schemas/migrations</td>
+<td>unified machine-readable field catalog</td>
+<td>High</td>
+<td>Must</td>
+</tr>
+<tr>
+<td>Approval orchestration in composer UX</td>
+<td>backend tables exist, UX not fully unified</td>
+<td>inline approval trigger/escalation flows</td>
+<td>Medium</td>
+<td>Should</td>
+</tr>
+<tr>
+<td>Performance SLO telemetry</td>
+<td>partial docs and logs</td>
+<td>p95 dashboards by tenant/workflow</td>
+<td>Medium</td>
+<td>Should</td>
+</tr>
+<tr>
+<td>Accessibility automation</td>
+<td>basic standards used</td>
+<td>WCAG assertion suite + CI gate</td>
+<td>Medium</td>
+<td>Should</td>
+</tr>
+<tr>
+<td>Visual prototype coverage</td>
+<td>fragmented</td>
+<td>full end-to-end prototype spec and assets</td>
+<td>Medium</td>
+<td>Should</td>
+</tr>
+<tr>
+<td>Predictive ranking explainability</td>
+<td>rank fields present</td>
+<td>per-option explainability card + trace</td>
+<td>Medium</td>
+<td>Could</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="future-state-requirements-and-architecture-proposal">8)
+Future-State Requirements and Architecture Proposal</h2>
+<h3 id="target-architecture-to-be">8.1 Target Architecture (To-Be)</h3>
+<figure>
+<img src="_mermaid_exports/mermaid-05.png" alt="Mermaid Diagram 5" />
+<figcaption aria-hidden="true">Mermaid Diagram 5</figcaption>
+</figure>
+<h3 id="scalability-requirements">8.2 Scalability Requirements</h3>
+<ul>
+<li>Multi-option save throughput:
+<ul>
+<li>support 50 options with 5 legs and 40 charges per option under
+controlled batching.</li>
+</ul></li>
+<li>Resilience:
+<ul>
+<li>idempotent save tokens;</li>
+<li>dead-letter handling for failed async steps (PDF/webhook).</li>
+</ul></li>
+<li>Data growth:
+<ul>
+<li>partition or archive strategy for pricing/audit logs.</li>
+</ul></li>
+<li>Query performance:
+<ul>
+<li>indexed paths for quote-id, version-id, tenant-id, and status
+transitions.</li>
+</ul></li>
+</ul>
+<h3 id="prioritized-feature-roadmap">8.3 Prioritized Feature
+Roadmap</h3>
+<table>
+<colgroup>
+<col style="width: 33%" />
+<col style="width: 33%" />
+<col style="width: 33%" />
+</colgroup>
+<thead>
+<tr>
+<th>Phase</th>
+<th>Timeline</th>
+<th>Outcomes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Phase 1</td>
+<td>4 weeks</td>
+<td>unified field dictionary, save flow hardening, error taxonomy,
+telemetry baseline</td>
+</tr>
+<tr>
+<td>Phase 2</td>
+<td>6 weeks</td>
+<td>collaborative editing MVP, drag-and-drop leg/charge reordering,
+approval UX integration</td>
+</tr>
+<tr>
+<td>Phase 3</td>
+<td>5 weeks</td>
+<td>projection cache, advanced ranking explainability, accessibility CI
+and performance gates</td>
+</tr>
+<tr>
+<td>Phase 4</td>
+<td>4 weeks</td>
+<td>enterprise scaling controls, audit dashboards, rollout hardening and
+migration support</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="user-stories-personas-and-acceptance-criteria">9) User Stories,
+Personas, and Acceptance Criteria</h2>
+<h3 id="persona-a-sales-executive-fast-quote-creation">Persona A: Sales
+Executive (Fast Quote Creation)</h3>
+<ul>
+<li>Story: As a sales executive, I want to convert selected quick quote
+rates into an editable quotation in one step.</li>
+<li>Acceptance Criteria:
+<ul>
+<li>selected rates create quote options automatically;</li>
+<li>progress and failures are visible per-rate;</li>
+<li>partial success preserves completed options.</li>
+</ul></li>
+</ul>
+<h3 id="persona-b-pricing-analyst-charge-and-margin-control">Persona B:
+Pricing Analyst (Charge and Margin Control)</h3>
+<ul>
+<li>Story: As a pricing analyst, I need to inspect and adjust buy/sell
+charges per leg with transparent margin math.</li>
+<li>Acceptance Criteria:
+<ul>
+<li>per-leg charge edit updates totals instantly;</li>
+<li>reconciliation detects mismatches &gt;0.01 and flags anomalies;</li>
+<li>applied margin rules are explainable.</li>
+</ul></li>
+</ul>
+<h3 id="persona-c-sales-manager-governance-and-approval">Persona C:
+Sales Manager (Governance and Approval)</h3>
+<ul>
+<li>Story: As a manager, I need low-margin or high-value quotes routed
+for approval before sending.</li>
+<li>Acceptance Criteria:
+<ul>
+<li>trigger rules execute on save/finalize;</li>
+<li>approval status is visible in quote header and version panels;</li>
+<li>approved/rejected actions are auditable with actor and
+timestamp.</li>
+</ul></li>
+</ul>
+<h3 id="persona-d-operations-planner-route-and-cargo-accuracy">Persona
+D: Operations Planner (Route and Cargo Accuracy)</h3>
+<ul>
+<li>Story: As operations, I need leg-level route and cargo details to be
+complete and consistent before booking conversion.</li>
+<li>Acceptance Criteria:
+<ul>
+<li>origin/destination continuity across legs is enforced;</li>
+<li>hazardous and temperature fields are validated when applicable;</li>
+<li>quote-to-booking validation blocks conversion on critical gaps.</li>
+</ul></li>
+</ul>
+<h3
+id="persona-e-tenant-admin-template-and-configuration-governance">Persona
+E: Tenant Admin (Template and Configuration Governance)</h3>
+<ul>
+<li>Story: As tenant admin, I need control over default composer
+behavior and templates.</li>
+<li>Acceptance Criteria:
+<ul>
+<li>tenant-specific quotation configuration is editable with RBAC;</li>
+<li>template versions can be managed without data leakage across
+tenants;</li>
+<li>default module behavior (<code>composer/legacy/smart</code>) is
+applied consistently.</li>
+</ul></li>
+</ul>
+<hr />
+<h2 id="moscow-priorities-estimates-and-resource-requirements">10)
+MoSCoW Priorities, Estimates, and Resource Requirements</h2>
+<h3 id="moscow-matrix">10.1 MoSCoW Matrix</h3>
+<table>
+<colgroup>
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+<col style="width: 25%" />
+</colgroup>
+<thead>
+<tr>
+<th>Priority</th>
+<th>Feature</th>
+<th>Estimate</th>
+<th>Roles Needed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Must</td>
+<td>unified field registry + schema governance checks</td>
+<td>2.5 weeks</td>
+<td>1 BE, 1 FE, 1 QA</td>
+</tr>
+<tr>
+<td>Must</td>
+<td>collaborative edit locking + conflict resolution MVP</td>
+<td>4 weeks</td>
+<td>1 FE, 1 BE, 1 QA</td>
+</tr>
+<tr>
+<td>Must</td>
+<td>drag-and-drop leg/charge ordering with validation</td>
+<td>3 weeks</td>
+<td>2 FE, 1 QA</td>
+</tr>
+<tr>
+<td>Must</td>
+<td>approval flow integration in composer and detail pages</td>
+<td>3 weeks</td>
+<td>1 FE, 1 BE, 1 QA</td>
+</tr>
+<tr>
+<td>Should</td>
+<td>projection cache/read optimization</td>
+<td>2 weeks</td>
+<td>1 BE</td>
+</tr>
+<tr>
+<td>Should</td>
+<td>accessibility CI assertions and UX hardening</td>
+<td>1.5 weeks</td>
+<td>1 FE, 1 QA</td>
+</tr>
+<tr>
+<td>Should</td>
+<td>performance dashboards (p95 by workflow)</td>
+<td>1.5 weeks</td>
+<td>1 BE, 1 DevOps</td>
+</tr>
+<tr>
+<td>Could</td>
+<td>explainable ranking cards and what-if simulation</td>
+<td>2 weeks</td>
+<td>1 FE, 1 BE</td>
+</tr>
+<tr>
+<td>Could</td>
+<td>advanced template marketplace workflow</td>
+<td>3 weeks</td>
+<td>1 FE, 1 BE, 1 PM</td>
+</tr>
+<tr>
+<td>Won’t (current cycle)</td>
+<td>full offline composer mode</td>
+<td>deferred</td>
+<td>backlog</td>
+</tr>
+</tbody>
+</table>
+<h3 id="aggregate-delivery-estimate">10.2 Aggregate Delivery
+Estimate</h3>
+<ul>
+<li>Total estimated effort (Must + Should):
+<code>~17.5 engineering weeks</code>.</li>
+<li>Suggested squad: <code>2 FE</code>, <code>2 BE</code>,
+<code>1 QA</code>, <code>0.5 DevOps</code>, <code>0.5 PM/BA</code>.</li>
+<li>Suggested rollout: feature-flagged per tenant tier, with pilot
+tenants before broad release.</li>
+</ul>
+<hr />
+<h2 id="visual-documentation-package-requirements-composer-focused">11)
+Visual Documentation Package Requirements (Composer-Focused)</h2>
+<h3 id="annotated-screenshots-of-every-interface-element">11.1 Annotated
+Screenshots of Every Interface Element</h3>
+<ul>
+<li>Required captures:
+<ul>
+<li>General Information tab (desktop/mobile);</li>
+<li>FormZone mode variants (air/ocean/road/rail);</li>
+<li>ResultsZone in card/list/grid modes;</li>
+<li>FinalizeSection save/version/pdf states;</li>
+<li>error and timeout states.</li>
+</ul></li>
+<li>Annotation standard:
+<ul>
+<li>numeric hotspot IDs;</li>
+<li>field key names;</li>
+<li>interaction outcome notes.</li>
+</ul></li>
+</ul>
+<h3 id="pixel-perfect-mockups-modulesectionrowcolumn">11.2 Pixel-Perfect
+Mockups (Module/Section/Row/Column)</h3>
+<ul>
+<li>Breakpoints:
+<ul>
+<li>Desktop <code>1440x900</code>;</li>
+<li>Tablet <code>1024x1366</code>;</li>
+<li>Mobile <code>390x844</code>.</li>
+</ul></li>
+<li>Grid standards:
+<ul>
+<li>12-column desktop layout;</li>
+<li>8-column tablet;</li>
+<li>4-column mobile.</li>
+</ul></li>
+<li>Tokenized spacing:
+<ul>
+<li>container padding <code>24/16/12</code>;</li>
+<li>section spacing <code>24</code>;</li>
+<li>control height <code>40</code> standard;</li>
+<li>card radius <code>8</code>.</li>
+</ul></li>
+</ul>
+<h3 id="comprehensive-field-mapping-diagram">11.3 Comprehensive Field
+Mapping Diagram</h3>
+<figure>
+<img src="_mermaid_exports/mermaid-06.png" alt="Mermaid Diagram 6" />
+<figcaption aria-hidden="true">Mermaid Diagram 6</figcaption>
+</figure>
+<h3 id="interactive-prototype-journey-coverage">11.4 Interactive
+Prototype Journey Coverage</h3>
+<ul>
+<li>Journey set:
+<ul>
+<li>create quote from CRM;</li>
+<li>create standalone quote;</li>
+<li>convert quick quote to composer;</li>
+<li>edit options/charges and recalculate;</li>
+<li>trigger approval and finalize;</li>
+<li>generate pdf and map to booking.</li>
+</ul></li>
+</ul>
+<h3 id="visual-workflow-diagrams">11.5 Visual Workflow Diagrams</h3>
+<figure>
+<img src="_mermaid_exports/mermaid-07.png" alt="Mermaid Diagram 7" />
+<figcaption aria-hidden="true">Mermaid Diagram 7</figcaption>
+</figure>
+<hr />
+<h2 id="non-functional-requirements-cross-cutting">12) Non-Functional
+Requirements (Cross-Cutting)</h2>
+<ul>
+<li>Performance:
+<ul>
+<li>quote open p95 &lt; 1.5s;</li>
+<li>save quote p95 &lt; 1.5s for standard payload;</li>
+<li>compare options render &lt; 250ms for 20-option set.</li>
+</ul></li>
+<li>Reliability:
+<ul>
+<li>transactional integrity for quote+option+leg+charge save;</li>
+<li>recoverable failures with user-safe retries.</li>
+</ul></li>
+<li>Security:
+<ul>
+<li>strict tenant/franchise isolation;</li>
+<li>RBAC enforcement for template/config/export-sensitive paths.</li>
+</ul></li>
+<li>Observability:
+<ul>
+<li>structured logs keyed by <code>quote_id</code>,
+<code>version_id</code>, <code>tenant_id</code>;</li>
+<li>error categories for schema, RPC, timeout, integration.</li>
+</ul></li>
+<li>Backward compatibility:
+<ul>
+<li>additive schema changes only;</li>
+<li>versioned API behavior for contract changes.</li>
+</ul></li>
+</ul>
+<hr />
+<h2 id="implementation-readiness-checklist">13) Implementation Readiness
+Checklist</h2>
+<ul class="task-list">
+<li><label><input type="checkbox" />Consolidate field dictionary from
+schema + migration deltas into machine-readable artifact.</label></li>
+<li><label><input type="checkbox" />Define collaboration lock model and
+conflict policy.</label></li>
+<li><label><input type="checkbox" />Add composer drag-and-drop
+interaction contract and keyboard parity.</label></li>
+<li><label><input type="checkbox" />Finalize approval UX and integration
+hooks.</label></li>
+<li><label><input type="checkbox" />Formalize performance/error SLO
+dashboards.</label></li>
+<li><label><input type="checkbox" />Complete visual prototype package
+with all required annotated states.</label></li>
+<li><label><input type="checkbox" />Execute regression suite
+(unit/integration/e2e) and attach evidence.</label></li>
+</ul>
+<hr />
+<h2 id="conclusion">14) Conclusion</h2>
+<p>The Quotation module already provides a strong operational baseline
+with robust data structures, multimodal routing, financial logic, and
+version controls. The highest-value next steps are collaboration,
+interaction maturity (drag-and-drop), governance unification (field
+registry + approval UX), and scalable observability. This PRD provides
+the complete reference needed for execution planning, architecture
+review, and phased delivery.</p>

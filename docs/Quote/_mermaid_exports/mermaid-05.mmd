@@ -1,0 +1,10 @@
+flowchart LR
+  UI[Composer UI] --> API[Quote Orchestration BFF]
+  API --> WR[Write Model: save_quote_atomic_v2]
+  API --> RD[Read Model: Quote Projection Cache]
+  WR --> EVT[Domain Events: quote.updated/versioned/approved]
+  EVT --> ANA[Analytics + Audit Pipeline]
+  EVT --> NOTIF[Collaboration/Notification Service]
+  RD --> UI
+  WR --> DB[(Supabase Core Tables)]
+  UI --> RT[Realtime Channel: presence + locking]

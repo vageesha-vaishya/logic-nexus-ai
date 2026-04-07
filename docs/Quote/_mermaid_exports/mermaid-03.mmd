@@ -1,0 +1,11 @@
+sequenceDiagram
+  participant UI as Quote UI
+  participant EF as generate-quote-pdf
+  participant CTX as Safe Context Builder
+  participant REN as PDF Renderer
+
+  UI->>EF: invoke(quoteId, engine_v2=true)
+  EF->>EF: Fetch quote + items + charges + branding
+  EF->>CTX: sanitize + validate
+  CTX->>REN: SafeContext + Template
+  REN-->>UI: PDF binary / url

@@ -1,0 +1,16 @@
+sequenceDiagram
+  participant U as User
+  participant QQ as Quick/Smart Quote
+  participant QN as QuoteNew
+  participant DB as Supabase
+  participant UC as UnifiedQuoteComposer
+
+  U->>QQ: Select rates
+  QQ->>QN: navigate(state:selectedRates + route/cargo)
+  QN->>QN: Validate QuoteTransferSchema
+  QN->>DB: create quote header
+  QN->>DB: ensure/create quotation version
+  QN->>DB: insert options + legs + charges (parallelized)
+  QN->>UC: Open composer with generated options
+  UC->>DB: save_quote_atomic (edits)
+  UC->>DB: fetch/reconcile totals

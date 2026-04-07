@@ -1,0 +1,21 @@
+flowchart LR
+  A[QuoteNew / QuoteDetail / QuoteForm] --> B[UnifiedQuoteComposer]
+  A --> C[QuoteOptionService]
+  B --> D[save_quote_atomic RPC]
+  B --> E[generate-quote-pdf Edge Function]
+  C --> F[PricingService]
+  C --> G[quotation_version_options]
+  C --> H[quotation_version_option_legs]
+  C --> I[quote_charges]
+  D --> J[quotes]
+  D --> K[quotation_versions]
+  D --> G
+  D --> H
+  D --> I
+  A --> L[QuotationVersionService]
+  L --> K
+  A --> M[QuotationConfigurationService]
+  M --> N[quotation_configuration]
+  A --> O[Quote Mapping]
+  O --> P[validate_quote_for_booking RPC]
+  O --> Q[convert_quote_to_booking RPC]
