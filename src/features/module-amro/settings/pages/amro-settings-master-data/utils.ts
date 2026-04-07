@@ -436,6 +436,9 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       next[field.key] = normalizeFormValue(field, row[field.key]);
     }
   });
+  if (entity === 'work_package_templates' && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
+    next.model_id = String(row.model_id ?? '').trim();
+  }
   return next;
 }
 
@@ -643,6 +646,13 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
         payload[key] = parsed;
       }
     });
+  }
+
+  if (entity === 'work_package_templates') {
+    const modelId = String(values.model_id ?? '').trim();
+    if (modelId) {
+      payload.model_id = modelId;
+    }
   }
 
   return { payload, errors };
