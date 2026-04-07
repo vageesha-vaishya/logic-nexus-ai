@@ -39,6 +39,10 @@ function normalizeManufacturerToken(value: string): string {
   return value.trim().toLowerCase();
 }
 
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
 type ManufacturerRecord = {
   id: string;
   manufacturer_code: string | null;
@@ -336,9 +340,73 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       .eq('id', id)
       .eq('tenant_id', tenantId)
       .limit(1);
-    const { data: existing, error: existingError } = await existingQuery.maybeSingle();
+    const { data: initialExisting, error: existingError } = await existingQuery.maybeSingle();
+    let existing = initialExisting;
     if (existingError) throw new HttpError(existingError.message, 400);
-    if (!existing) throw new HttpError('Record not found', 404);
+    if (!existing) {
+      if (entity === 'work_package_templates') {
+        const { data: crossScopeRecord } = await supabase
+          .from(entityConfig.table)
+          .select('id,tenant_id,franchise_id')
+          .eq('id', id)
+          .limit(1)
+          .maybeSingle();
+        if (crossScopeRecord) {
+          const crossTenantId = String((crossScopeRecord as Record<string, unknown>).tenant_id || '').trim();
+          const claimPayload: Record<string, unknown> = {
+            tenant_id: tenantId,
+            updated_by: auth.userId,
+          };
+          if (franchiseId) {
+            claimPayload.franchise_id = franchiseId;
+          }
+          const adoptionQuery = supabase
+            .from(entityConfig.table)
+            .update(claimPayload)
+            .eq('id', id);
+          const { error: claimError } = !crossTenantId
+            ? await adoptionQuery.is('tenant_id', null)
+            : await adoptionQuery.eq('tenant_id', crossTenantId);
+          if (claimError) {
+            throw new HttpError(
+              `Record exists outside current scope and adoption failed (${claimError.message}).`,
+              409,
+            );
+          }
+          logger.warn('[AMRO Master Data API] adopted work package template into request scope', {
+            correlationId: ctx.correlationId,
+            workPackageTemplateId: id,
+            previousTenantId: crossTenantId || null,
+            adoptedTenantId: tenantId,
+            adoptedFranchiseId: franchiseId || null,
+          });
+          const claimed = await existingQuery.maybeSingle();
+          if (claimed.error) {
+            throw new HttpError(claimed.error.message, 400);
+          }
+          if (claimed.data) {
+            existing = claimed.data;
+          }
+        }
+        if (!existing && crossScopeRecord) {
+          const crossTenantId = String((crossScopeRecord as Record<string, unknown>).tenant_id || '').trim();
+          const crossFranchiseId = String((crossScopeRecord as Record<string, unknown>).franchise_id || '').trim();
+          throw new HttpError(
+            `Record exists but is outside current scope (record tenant=${crossTenantId || 'null'}, record franchise=${crossFranchiseId || 'null'}, request tenant=${tenantId || 'null'}, request franchise=${franchiseId || 'null'}).`,
+            409,
+          );
+        }
+        logger.warn('[AMRO Master Data API] work package template update target not found in current scope', {
+          correlationId: ctx.correlationId,
+          workPackageTemplateId: id,
+          requestTenantId: tenantId,
+          requestFranchiseId: franchiseId || null,
+          requestMethod: req.method,
+          apiPath: `/api/v2/amro/master-data/${entity}/${id}`,
+        });
+      }
+      throw new HttpError('Record not found', 404);
+    }
     const existingRecord = existing as unknown as Record<string, unknown>;
     const existingFranchiseId = String(existingRecord.franchise_id || '').trim();
     if (franchiseId && existingFranchiseId && existingFranchiseId !== franchiseId) {
@@ -414,6 +482,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       if (payload.tasks_json === undefined || payload.tasks_json === null) {
         payload.tasks_json = Array.isArray(existingTasks) ? existingTasks : [];
       }
+      if (Object.prototype.hasOwnProperty.call(payload, 'policy_snapshot_id')) {
+        payload.policy_snapshot_id = asNullableString(payload.policy_snapshot_id);
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'model_id')) {
+        payload.model_id = asNullableString(payload.model_id);
+      }
     }
     let manufacturerIssues: { field: string; message: string }[] = [];
     let aircraftModelIssues: { field: string; message: string }[] = [];
@@ -451,7 +525,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         effectiveAssemblyTypeId,
       );
     }
-    const issues = [...manufacturerIssues, ...aircraftModelIssues, ...assemblyModelIssues, ...validatePayload(entity, payload)];
+    const workPackageTemplateIssues: { field: string; message: string }[] = [];
+    if (entity === 'work_package_templates') {
+      const policySnapshotId = asNullableString(payload.policy_snapshot_id);
+      const modelId = asNullableString(payload.model_id);
+      if (policySnapshotId && !isUuid(policySnapshotId)) {
+        workPackageTemplateIssues.push({
+          field: 'policy_snapshot_id',
+          message: 'Policy Snapshot ID must be a valid UUID.',
+        });
+      }
+      if (modelId && !isUuid(modelId)) {
+        workPackageTemplateIssues.push({
+          field: 'model_id',
+          message: 'Aircraft Model reference must be a valid UUID.',
+        });
+      }
+    }
+    const issues = [...manufacturerIssues, ...aircraftModelIssues, ...assemblyModelIssues, ...workPackageTemplateIssues, ...validatePayload(entity, payload)];
     if (validationOnly) {
       res.status(200).json({
         version: 'v2',
@@ -512,7 +603,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       .eq('id', id)
       .select(entityConfig.listColumns)
       .limit(1);
-    const { data, error } = await updateBaseQuery.eq('tenant_id', tenantId).maybeSingle();
+    const { data: initialData, error } = await updateBaseQuery.eq('tenant_id', tenantId).maybeSingle();
+    let data = initialData;
     if (error) {
       if (entity === 'work_package_templates') {
         logger.error('[AMRO Master Data API] failed to update work package template', {
@@ -551,6 +643,43 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         });
         throw relationshipError;
       }
+
+      // Make these fields authoritative after relationship sync to avoid stale/stateful overwrite paths.
+      const finalPatch: Record<string, unknown> = {};
+      if (Object.prototype.hasOwnProperty.call(payload, 'model_id')) {
+        finalPatch.model_id = asNullableString(payload.model_id);
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'aircraft_model')) {
+        finalPatch.aircraft_model = asNullableString(payload.aircraft_model);
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'policy_snapshot_id')) {
+        finalPatch.policy_snapshot_id = asNullableString(payload.policy_snapshot_id);
+      }
+      if (Object.keys(finalPatch).length > 0) {
+        const { data: finalData, error: finalError } = await supabase
+          .from(entityConfig.table)
+          .update({
+            ...finalPatch,
+            updated_by: auth.userId,
+          })
+          .eq('id', id)
+          .eq('tenant_id', tenantId)
+          .select(entityConfig.listColumns)
+          .limit(1)
+          .maybeSingle();
+        if (finalError) {
+          logger.error('[AMRO Master Data API] failed to apply final authoritative WPT field patch', {
+            correlationId: ctx.correlationId,
+            workPackageTemplateId: id,
+            message: String(finalError.message || ''),
+            finalPatch,
+          });
+          throw new HttpError(finalError.message, 400);
+        }
+        if (finalData) {
+          data = finalData;
+        }
+      }
     }
     await writeAuditRecord({
       tenantId,
@@ -571,6 +700,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       },
     });
   } catch (error) {
+    if (String(req.query.entity || '') === 'work_package_templates') {
+      logger.error('[AMRO Master Data API] work package template update failed', {
+        correlationId: ctx.correlationId,
+        workPackageTemplateId: String(req.query.id || ''),
+        requestMethod: req.method,
+        apiPath: `/api/v2/amro/master-data/${String(req.query.entity || '')}/${String(req.query.id || '')}`,
+        message: String((error as Error)?.message || error),
+      });
+    }
     sendError(res, error, ctx.correlationId);
   }
 }

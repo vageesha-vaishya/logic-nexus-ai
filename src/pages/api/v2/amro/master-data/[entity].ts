@@ -1319,7 +1319,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new HttpError(errorMessage, 400);
       }
 
-      if (tenantId && finalData.length === 0) {
+      const allowTenantNullFallback = entity !== 'work_package_templates';
+      if (tenantId && finalData.length === 0 && allowTenantNullFallback) {
         let fallbackData: unknown[] = [];
         let fallbackCount = 0;
         let fallbackSortBy = currentSortBy;
@@ -1533,15 +1534,41 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       aircraftModelIssues = validation.get(0) || [];
     }
     const payload = sanitizeWritePayload(entity, resolvedBody, { requireCreateFields: entity !== 'aircraft' });
+    if (entity === 'work_package_templates') {
+      if (Object.prototype.hasOwnProperty.call(payload, 'policy_snapshot_id')) {
+        payload.policy_snapshot_id = asNullableString(payload.policy_snapshot_id);
+      }
+      if (Object.prototype.hasOwnProperty.call(payload, 'model_id')) {
+        payload.model_id = asNullableString(payload.model_id);
+      }
+    }
     let assemblyModelIssues: { field: string; message: string }[] = [];
     if (entity === 'assembly_models') {
       const validation = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, [payload]);
       assemblyModelIssues = validation.get(0) || [];
     }
+    const workPackageTemplateIssues: { field: string; message: string }[] = [];
+    if (entity === 'work_package_templates') {
+      const policySnapshotId = asNullableString(payload.policy_snapshot_id);
+      const modelId = asNullableString(payload.model_id);
+      if (policySnapshotId && !isUuid(policySnapshotId)) {
+        workPackageTemplateIssues.push({
+          field: 'policy_snapshot_id',
+          message: 'Policy Snapshot ID must be a valid UUID.',
+        });
+      }
+      if (modelId && !isUuid(modelId)) {
+        workPackageTemplateIssues.push({
+          field: 'model_id',
+          message: 'Aircraft Model reference must be a valid UUID.',
+        });
+      }
+    }
     const issues = [
       ...manufacturerIssues,
       ...aircraftModelIssues,
       ...assemblyModelIssues,
+      ...workPackageTemplateIssues,
       ...buildRequiredFieldIssues(entity, payload),
       ...validatePayload(entity, payload),
     ];

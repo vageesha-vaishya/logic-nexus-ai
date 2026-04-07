@@ -2734,6 +2734,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [columnFilters, entity, flightAircraftFilter, flightDateFrom, flightDateTo, flightPilotFilter, flightRegistrationFilter, flightNumberFilter, page, pageSize, search, searchParams, selectedId, setSearchParams, sortColumn, sortDirection, statusFilter]);
 
   useEffect(() => {
+    if (modalOpen) {
+      return;
+    }
     const selectedFromUrl = searchParams.get('selected');
     if (!selectedFromUrl || !rows.length) {
       return;
@@ -2743,7 +2746,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setSelectedId(matched.id);
       setFormValues(pickFormValuesFromRow(entity, matched));
     }
-  }, [entity, rows, searchParams]);
+  }, [entity, modalOpen, rows, searchParams]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -2959,7 +2962,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] creating work package template request work_package_templates', {
           entity,
-          requestUrl: '/api/v2/amro/work-package-templates?interface=create-work-package-template',
+          requestUrl: '/api/v2/amro/master-data/work_package_templates',
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
           maintenanceType: String(payload.maintenance_type || ''),
@@ -2970,7 +2973,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         });
       }
       const createEndpoint = entity === 'work_package_templates'
-        ? '/api/v2/amro/work-package-templates?interface=create-work-package-template'
+        ? '/api/v2/amro/master-data/work_package_templates'
         : `/api/v2/amro/master-data/${entity}`;
       const response = await fetch(createEndpoint, {
         method: 'POST',
@@ -2987,7 +2990,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           : null;
         logger.info('[AMRO Master Data UI] work package template create response', {
           entity,
-          requestUrl: '/api/v2/amro/work-package-templates?interface=create-work-package-template',
+          requestUrl: '/api/v2/amro/master-data/work_package_templates',
           status: response.status,
           ok: response.ok,
           responseError: String(responsePayload.error || ''),
@@ -3098,7 +3101,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] updating work package template request', {
           entity,
-          requestUrl: `/api/v2/amro/work-package-templates/${selectedId}`,
+          requestUrl: `/api/v2/amro/master-data/work_package_templates/${selectedId}`,
           workPackageTemplateId: String(selectedId || ''),
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
@@ -3110,7 +3113,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         });
       }
       const updateEndpoint = entity === 'work_package_templates'
-        ? `/api/v2/amro/work-package-templates/${selectedId}`
+        ? `/api/v2/amro/master-data/work_package_templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const updateMethod = 'PATCH';
       const response = await fetch(updateEndpoint, {
@@ -3128,7 +3131,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           : null;
         logger.info('[AMRO Master Data UI] work package template update response', {
           entity,
-          requestUrl: `/api/v2/amro/work-package-templates/${selectedId}`,
+          requestUrl: `/api/v2/amro/master-data/work_package_templates/${selectedId}`,
           status: response.status,
           ok: response.ok,
           responseError: String(responsePayload.error || ''),
@@ -3140,7 +3143,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         if (Object.keys(validationErrors).length > 0) {
           setFormErrors((previous) => ({ ...previous, ...validationErrors }));
         }
-        throw new Error(String(responsePayload.error || 'Update failed'));
+        const baseError = String(responsePayload.error || 'Update failed');
+        const correlationId = String(responsePayload.correlationId || '').trim();
+        if (entity === 'work_package_templates' && /outside current scope/i.test(baseError)) {
+          await loadRecords();
+          throw new Error(
+            `WPT update target is not available in your current scope. Reloaded records; reselect the template and retry.${correlationId ? ` Correlation ID: ${correlationId}` : ''}`,
+          );
+        }
+        throw new Error(`${baseError}${correlationId ? ` (Correlation ID: ${correlationId})` : ''}`);
       }
       toast.success(`${ENTITY_LABEL[entity]} record updated`);
       setFormErrors({});
@@ -3169,7 +3180,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     try {
       const headers = await buildApiHeaders(scope);
       const deleteEndpoint = entity === 'work_package_templates'
-        ? `/api/v2/amro/work-package-templates/${selectedId}`
+        ? `/api/v2/amro/master-data/work_package_templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const response = await fetch(deleteEndpoint, {
         method: 'DELETE',

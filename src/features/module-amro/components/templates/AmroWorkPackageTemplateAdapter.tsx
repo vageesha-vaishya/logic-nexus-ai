@@ -84,8 +84,10 @@ export function AmroWorkPackageTemplateAdapter({
     return null;
   };
   const modelHydrationAttemptedRef = useRef<string | null>(null);
+  const userChangedModelRef = useRef<boolean>(false);
   const [modelHydrationDebug, setModelHydrationDebug] = useState('idle');
   const [resolvedModelDisplayLabel, setResolvedModelDisplayLabel] = useState('');
+  const [hydratedModelId, setHydratedModelId] = useState('');
 
   const buildAuthHeaders = async () => {
     const headers: Record<string, string> = {};
@@ -164,6 +166,11 @@ export function AmroWorkPackageTemplateAdapter({
   const selectedAircraftModelText = String(props.formValues.aircraft_model ?? '').trim();
 
   useEffect(() => {
+    userChangedModelRef.current = false;
+    setHydratedModelId('');
+  }, [props.selectedTemplateId]);
+
+  useEffect(() => {
     const shouldResolveById =
       Boolean(selectedAircraftModelId)
       && (!selectedAircraftModelText || /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(selectedAircraftModelText));
@@ -201,11 +208,20 @@ export function AmroWorkPackageTemplateAdapter({
   }, [aircraftModelOptions, selectedAircraftModelId, selectedAircraftModelText]);
 
   useEffect(() => {
+    if (
+      mode === 'update'
+      && !props.selectedTemplateId
+      && !selectedAircraftModelId
+      && !selectedAircraftModelText
+    ) {
+      setModelHydrationDebug('hydrate:missing-template-id');
+    }
+  }, [mode, props.selectedTemplateId, selectedAircraftModelId, selectedAircraftModelText]);
+
+  useEffect(() => {
     const shouldHydrate =
       mode === 'update'
       && Boolean(props.selectedTemplateId)
-      && !selectedAircraftModelId
-      && !selectedAircraftModelText
       && modelHydrationAttemptedRef.current !== String(props.selectedTemplateId);
     if (!shouldHydrate) {
       return;
@@ -242,12 +258,22 @@ export function AmroWorkPackageTemplateAdapter({
         if (hydratedRecord) {
           const modelId = String(hydratedRecord.model_id ?? '').trim();
           const aircraftModel = String(hydratedRecord.aircraft_model ?? '').trim();
+          const policySnapshotId = String(hydratedRecord.policy_snapshot_id ?? '').trim();
           setModelHydrationDebug(`hydrate:resolved model_id=${modelId || 'none'} aircraft_model=${aircraftModel || 'none'}`);
-          if (modelId) {
+          setHydratedModelId(modelId);
+          if (modelId && modelId !== selectedAircraftModelId) {
             props.setFieldValue('model_id', modelId);
           }
           if (aircraftModel) {
             props.setFieldValue('aircraft_model', aircraftModel);
+          } else if (modelId) {
+            // Prevent stale aircraft_model tokens from prior state/rows when backend record only has model_id.
+            // Keep display resolution driven by model_id + options.
+            const mappedOption = aircraftModelOptions.find((option) => option.value === modelId);
+            props.setFieldValue('aircraft_model', mappedOption?.modelCode || mappedOption?.label || '');
+          }
+          if (policySnapshotId || String(props.formValues.policy_snapshot_id ?? '').trim()) {
+            props.setFieldValue('policy_snapshot_id', policySnapshotId);
           }
           if (modelId || aircraftModel) {
             modelHydrationAttemptedRef.current = String(props.selectedTemplateId);
@@ -266,34 +292,82 @@ export function AmroWorkPackageTemplateAdapter({
     props.scopedDb,
     props.selectedTemplateId,
     props.setFieldValue,
+    props.formValues.policy_snapshot_id,
     selectedAircraftModelId,
-    selectedAircraftModelText,
+    aircraftModelOptions,
+  ]);
+
+  useEffect(() => {
+    if (
+      mode !== 'update'
+      || !props.selectedTemplateId
+      || !hydratedModelId
+      || userChangedModelRef.current
+    ) {
+      return;
+    }
+    const currentModelId = String(props.formValues.model_id ?? '').trim();
+    if (currentModelId === hydratedModelId) {
+      return;
+    }
+    const mappedOption = aircraftModelOptions.find((option) => option.value === hydratedModelId);
+    props.setFieldValue('model_id', hydratedModelId);
+    props.setFieldValue('aircraft_model', mappedOption?.modelCode || mappedOption?.label || '');
+  }, [
+    aircraftModelOptions,
+    hydratedModelId,
+    mode,
+    props.formValues.model_id,
+    props.selectedTemplateId,
+    props.setFieldValue,
   ]);
 
   const effectiveAircraftModelId = selectedAircraftModelId || (selectedAircraftModelText ? `legacy:${selectedAircraftModelText}` : '');
   const effectiveAircraftModelOptions = useMemo(() => {
+    const dedupeByValue = (options: Array<{ value: string; label: string; modelCode?: string }>) => {
+      const map = new Map<string, { value: string; label: string; modelCode?: string }>();
+      options.forEach((entry) => {
+        const key = String(entry.value || '').trim();
+        if (!key) return;
+        if (!map.has(key)) {
+          map.set(key, entry);
+        }
+      });
+      return Array.from(map.values());
+    };
+
     if (!selectedAircraftModelText) {
       if (selectedAircraftModelId && resolvedModelDisplayLabel) {
-        return [
+        const existing = aircraftModelOptions.find((entry) => entry.value === selectedAircraftModelId);
+        if (existing) {
+          return dedupeByValue(
+            aircraftModelOptions.map((entry) => (
+              entry.value === selectedAircraftModelId
+                ? { ...entry, label: `${resolvedModelDisplayLabel} (current)` }
+                : entry
+            )),
+          );
+        }
+        return dedupeByValue([
           {
             value: selectedAircraftModelId,
             label: `${resolvedModelDisplayLabel} (current)`,
             modelCode: resolvedModelDisplayLabel,
           },
           ...aircraftModelOptions,
-        ];
+        ]);
       }
-      return aircraftModelOptions;
+      return dedupeByValue(aircraftModelOptions);
     }
     if (!selectedAircraftModelId) {
-      return [
+      return dedupeByValue([
         {
           value: `legacy:${selectedAircraftModelText}`,
           label: `${selectedAircraftModelText} (current)`,
           modelCode: selectedAircraftModelText,
         },
         ...aircraftModelOptions,
-      ];
+      ]);
     }
     const existingOption = aircraftModelOptions.find((entry) => entry.value === selectedAircraftModelId);
     const preferredDisplayLabel = resolvedModelDisplayLabel
@@ -311,16 +385,16 @@ export function AmroWorkPackageTemplateAdapter({
     }
     const exists = Boolean(existingOption);
     if (exists) {
-      return aircraftModelOptions;
+      return dedupeByValue(aircraftModelOptions);
     }
-    return [
+    return dedupeByValue([
       {
         value: selectedAircraftModelId,
         label: `${selectedAircraftModelText} (current)`,
         modelCode: selectedAircraftModelText,
       },
       ...aircraftModelOptions,
-    ];
+    ]);
   }, [aircraftModelOptions, resolvedModelDisplayLabel, selectedAircraftModelId, selectedAircraftModelText]);
 
   const selectedAircraftModelLabel = useMemo(() => {
@@ -406,6 +480,7 @@ export function AmroWorkPackageTemplateAdapter({
               <Select
                 value={effectiveAircraftModelId}
                 onValueChange={(nextValue) => {
+                  userChangedModelRef.current = true;
                   const option = effectiveAircraftModelOptions.find((entry) => entry.value === nextValue);
                   const currentModelId = String(props.formValues.model_id ?? '').trim();
                   const nextModelId = String(nextValue || '').trim();
