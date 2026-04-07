@@ -1,12 +1,11 @@
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Users2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
+import { ArrowDownAZ, ArrowUpAZ, Plus, RotateCcw, Users2, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useCRM } from '@/hooks/useCRM';
 import { PermissionGuard } from '@/lib/auth/PermissionGuard';
@@ -15,6 +14,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { RoleService } from '@/lib/api/roles';
 import { invokeFunction } from '@/lib/supabase-functions';
+import { Input } from '@/components/ui/input';
+import { cn } from '@/lib/utils';
 
 export default function Users() {
   const navigate = useNavigate();
@@ -51,6 +52,21 @@ export default function Users() {
   const [resetMode, setResetMode] = useState<'set' | 'link'>('set');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [filterInputs, setFilterInputs] = useState({
+    name: '',
+    email: '',
+    phone: '',
+    role: '',
+    tenant: '',
+    franchise: '',
+    status: '',
+    created: '',
+  });
+  const [filters, setFilters] = useState(filterInputs);
+  const [sortState, setSortState] = useState<{
+    key: 'name' | 'email' | 'phone' | 'role' | 'tenant' | 'franchise' | 'status' | 'created';
+    direction: 'asc' | 'desc';
+  }>({ key: 'created', direction: 'desc' });
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -142,6 +158,118 @@ export default function Users() {
     scopedDb.from('franchises').select('id,name').then(({ data }) => setFranchises(data || []));
   }, [fetchUsers, scopedDb]);
 
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => {
+      setFilters(filterInputs);
+    }, 250);
+    return () => window.clearTimeout(timeoutId);
+  }, [filterInputs]);
+
+  const activeFilterCount = useMemo(
+    () => Object.values(filters).filter((value) => String(value || '').trim().length > 0).length,
+    [filters],
+  );
+
+  const filteredAndSortedUsers = useMemo(() => {
+    const normalize = (value: unknown) => String(value ?? '').toLowerCase();
+    const hasToken = (value: unknown, token: string) => normalize(value).includes(token.toLowerCase());
+    const rows = users.filter((user) => {
+      const roleLabel = (user.user_roles || []).map((role) => role.role.replace(/_/g, ' ')).join(', ');
+      const tenantLabel = user.user_roles?.[0]?.tenant_name || '';
+      const franchiseLabel = user.user_roles?.[0]?.franchise_name || '';
+      const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
+      if (filters.name && !hasToken(fullName, filters.name)) return false;
+      if (filters.email && !hasToken(user.email, filters.email)) return false;
+      if (filters.phone && !hasToken(user.phone || '', filters.phone)) return false;
+      if (filters.role && !hasToken(roleLabel, filters.role)) return false;
+      if (filters.tenant && !hasToken(tenantLabel, filters.tenant)) return false;
+      if (filters.franchise && !hasToken(franchiseLabel, filters.franchise)) return false;
+      if (filters.status && normalize(user.is_active ? 'active' : 'inactive') !== normalize(filters.status)) return false;
+      if (filters.created) {
+        const createdDate = new Date(user.created_at);
+        if (Number.isNaN(createdDate.getTime())) return false;
+        const isoDate = createdDate.toISOString().slice(0, 10);
+        if (isoDate !== filters.created) return false;
+      }
+      return true;
+    });
+
+    const sorted = [...rows].sort((left, right) => {
+      const leftRole = (left.user_roles || []).map((role) => role.role).join(',');
+      const rightRole = (right.user_roles || []).map((role) => role.role).join(',');
+      const leftTenant = left.user_roles?.[0]?.tenant_name || '';
+      const rightTenant = right.user_roles?.[0]?.tenant_name || '';
+      const leftFranchise = left.user_roles?.[0]?.franchise_name || '';
+      const rightFranchise = right.user_roles?.[0]?.franchise_name || '';
+      const leftName = `${left.first_name || ''} ${left.last_name || ''}`.trim();
+      const rightName = `${right.first_name || ''} ${right.last_name || ''}`.trim();
+      const leftCreated = new Date(left.created_at).getTime();
+      const rightCreated = new Date(right.created_at).getTime();
+
+      const compareString = (a: string, b: string) => a.localeCompare(b, undefined, { sensitivity: 'base' });
+      const compareNumber = (a: number, b: number) => a - b;
+
+      let value = 0;
+      switch (sortState.key) {
+        case 'name':
+          value = compareString(leftName, rightName);
+          break;
+        case 'email':
+          value = compareString(left.email || '', right.email || '');
+          break;
+        case 'phone':
+          value = compareString(left.phone || '', right.phone || '');
+          break;
+        case 'role':
+          value = compareString(leftRole, rightRole);
+          break;
+        case 'tenant':
+          value = compareString(leftTenant, rightTenant);
+          break;
+        case 'franchise':
+          value = compareString(leftFranchise, rightFranchise);
+          break;
+        case 'status':
+          value = compareString(left.is_active ? 'active' : 'inactive', right.is_active ? 'active' : 'inactive');
+          break;
+        case 'created':
+          value = compareNumber(leftCreated || 0, rightCreated || 0);
+          break;
+      }
+      return sortState.direction === 'asc' ? value : -value;
+    });
+
+    return sorted;
+  }, [filters, sortState.direction, sortState.key, users]);
+
+  const handleSort = useCallback((key: typeof sortState.key) => {
+    setSortState((previous) => {
+      if (previous.key === key) {
+        return { key, direction: previous.direction === 'asc' ? 'desc' : 'asc' };
+      }
+      return { key, direction: 'asc' };
+    });
+  }, []);
+
+  const clearFilter = useCallback((key: keyof typeof filterInputs) => {
+    setFilterInputs((previous) => ({ ...previous, [key]: '' }));
+  }, []);
+
+  const clearAllFilters = useCallback(() => {
+    const emptyFilters = {
+      name: '',
+      email: '',
+      phone: '',
+      role: '',
+      tenant: '',
+      franchise: '',
+      status: '',
+      created: '',
+    };
+    setFilterInputs(emptyFilters);
+    setFilters(emptyFilters);
+  }, []);
+
   return (
     <DashboardLayout>
       <div className="space-y-6">
@@ -178,30 +306,144 @@ export default function Users() {
                 No users found. Create your first user to get started.
               </div>
             ) : (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs text-muted-foreground">
+                  <span>Showing {filteredAndSortedUsers.length} of {users.length} users</span>
+                  <div className="flex items-center gap-2">
+                    {activeFilterCount > 0 ? (
+                      <Badge variant="secondary" className="text-xs">Filters active: {activeFilterCount}</Badge>
+                    ) : null}
+                    <Button variant="outline" size="sm" className="h-7 gap-1 text-xs" onClick={clearAllFilters}>
+                      <RotateCcw className="h-3 w-3" />
+                      Reset Filters
+                    </Button>
+                  </div>
+                </div>
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-12">
                       <Checkbox
-                        checked={selectedIds.length > 0 && selectedIds.length === users.length}
+                        checked={selectedIds.length > 0 && selectedIds.length === filteredAndSortedUsers.length}
                         onCheckedChange={(val) => {
-                          setSelectedIds(val ? users.map(u => u.id) : []);
+                          setSelectedIds(val ? filteredAndSortedUsers.map(u => u.id) : []);
                         }}
                       />
                     </TableHead>
-                    <TableHead>Name</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Phone</TableHead>
-                    <TableHead>Role</TableHead>
-                    <TableHead>Tenant</TableHead>
-                    <TableHead>Franchise</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Created</TableHead>
+                    <TableHead>
+                      <Button variant="ghost" size="sm" className="h-7 px-0 font-semibold" onClick={() => handleSort('name')}>
+                        Name
+                        {sortState.key === 'name' ? (sortState.direction === 'asc' ? <ArrowUpAZ className="ml-1 h-3.5 w-3.5" /> : <ArrowDownAZ className="ml-1 h-3.5 w-3.5" />) : null}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" size="sm" className="h-7 px-0 font-semibold" onClick={() => handleSort('email')}>
+                        Email
+                        {sortState.key === 'email' ? (sortState.direction === 'asc' ? <ArrowUpAZ className="ml-1 h-3.5 w-3.5" /> : <ArrowDownAZ className="ml-1 h-3.5 w-3.5" />) : null}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" size="sm" className="h-7 px-0 font-semibold" onClick={() => handleSort('phone')}>
+                        Phone
+                        {sortState.key === 'phone' ? (sortState.direction === 'asc' ? <ArrowUpAZ className="ml-1 h-3.5 w-3.5" /> : <ArrowDownAZ className="ml-1 h-3.5 w-3.5" />) : null}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" size="sm" className="h-7 px-0 font-semibold" onClick={() => handleSort('role')}>
+                        Role
+                        {sortState.key === 'role' ? (sortState.direction === 'asc' ? <ArrowUpAZ className="ml-1 h-3.5 w-3.5" /> : <ArrowDownAZ className="ml-1 h-3.5 w-3.5" />) : null}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" size="sm" className="h-7 px-0 font-semibold" onClick={() => handleSort('tenant')}>
+                        Tenant
+                        {sortState.key === 'tenant' ? (sortState.direction === 'asc' ? <ArrowUpAZ className="ml-1 h-3.5 w-3.5" /> : <ArrowDownAZ className="ml-1 h-3.5 w-3.5" />) : null}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" size="sm" className="h-7 px-0 font-semibold" onClick={() => handleSort('franchise')}>
+                        Franchise
+                        {sortState.key === 'franchise' ? (sortState.direction === 'asc' ? <ArrowUpAZ className="ml-1 h-3.5 w-3.5" /> : <ArrowDownAZ className="ml-1 h-3.5 w-3.5" />) : null}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" size="sm" className="h-7 px-0 font-semibold" onClick={() => handleSort('status')}>
+                        Status
+                        {sortState.key === 'status' ? (sortState.direction === 'asc' ? <ArrowUpAZ className="ml-1 h-3.5 w-3.5" /> : <ArrowDownAZ className="ml-1 h-3.5 w-3.5" />) : null}
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button variant="ghost" size="sm" className="h-7 px-0 font-semibold" onClick={() => handleSort('created')}>
+                        Created
+                        {sortState.key === 'created' ? (sortState.direction === 'asc' ? <ArrowUpAZ className="ml-1 h-3.5 w-3.5" /> : <ArrowDownAZ className="ml-1 h-3.5 w-3.5" />) : null}
+                      </Button>
+                    </TableHead>
                     <TableHead>Actions</TableHead>
+                  </TableRow>
+                  <TableRow>
+                    <TableHead className="w-12" />
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <Input value={filterInputs.name} onChange={(event) => setFilterInputs((previous) => ({ ...previous, name: event.target.value }))} className={cn('h-7 text-xs', filterInputs.name && 'border-primary')} placeholder="Filter name" />
+                        {filterInputs.name ? <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearFilter('name')}><X className="h-3 w-3" /></Button> : null}
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <Input value={filterInputs.email} onChange={(event) => setFilterInputs((previous) => ({ ...previous, email: event.target.value }))} className={cn('h-7 text-xs', filterInputs.email && 'border-primary')} placeholder="Filter email" />
+                        {filterInputs.email ? <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearFilter('email')}><X className="h-3 w-3" /></Button> : null}
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <Input value={filterInputs.phone} onChange={(event) => setFilterInputs((previous) => ({ ...previous, phone: event.target.value }))} className={cn('h-7 text-xs', filterInputs.phone && 'border-primary')} placeholder="Filter phone" />
+                        {filterInputs.phone ? <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearFilter('phone')}><X className="h-3 w-3" /></Button> : null}
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <Input value={filterInputs.role} onChange={(event) => setFilterInputs((previous) => ({ ...previous, role: event.target.value }))} className={cn('h-7 text-xs', filterInputs.role && 'border-primary')} placeholder="Filter role" />
+                        {filterInputs.role ? <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearFilter('role')}><X className="h-3 w-3" /></Button> : null}
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <Input value={filterInputs.tenant} onChange={(event) => setFilterInputs((previous) => ({ ...previous, tenant: event.target.value }))} className={cn('h-7 text-xs', filterInputs.tenant && 'border-primary')} placeholder="Filter tenant" />
+                        {filterInputs.tenant ? <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearFilter('tenant')}><X className="h-3 w-3" /></Button> : null}
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <Input value={filterInputs.franchise} onChange={(event) => setFilterInputs((previous) => ({ ...previous, franchise: event.target.value }))} className={cn('h-7 text-xs', filterInputs.franchise && 'border-primary')} placeholder="Filter franchise" />
+                        {filterInputs.franchise ? <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearFilter('franchise')}><X className="h-3 w-3" /></Button> : null}
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <Select value={filterInputs.status || '__all__'} onValueChange={(value) => setFilterInputs((previous) => ({ ...previous, status: value === '__all__' ? '' : value }))}>
+                          <SelectTrigger className={cn('h-7 text-xs', filterInputs.status && 'border-primary')}>
+                            <SelectValue placeholder="All" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="__all__">All</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
+                          </SelectContent>
+                        </Select>
+                        {filterInputs.status ? <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearFilter('status')}><X className="h-3 w-3" /></Button> : null}
+                      </div>
+                    </TableHead>
+                    <TableHead>
+                      <div className="flex items-center gap-1">
+                        <Input type="date" value={filterInputs.created} onChange={(event) => setFilterInputs((previous) => ({ ...previous, created: event.target.value }))} className={cn('h-7 text-xs', filterInputs.created && 'border-primary')} />
+                        {filterInputs.created ? <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => clearFilter('created')}><X className="h-3 w-3" /></Button> : null}
+                      </div>
+                    </TableHead>
+                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {users.map((user) => (
+                  {filteredAndSortedUsers.map((user) => (
                     <TableRow
                       key={user.id}
                       className="cursor-pointer"
@@ -265,8 +507,16 @@ export default function Users() {
                       </TableCell>
                     </TableRow>
                   ))}
+                  {!loading && filteredAndSortedUsers.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={10} className="text-center text-sm text-muted-foreground">
+                        No users match the active filters.
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
                 </TableBody>
               </Table>
+              </div>
             )}
           </CardContent>
         </Card>
