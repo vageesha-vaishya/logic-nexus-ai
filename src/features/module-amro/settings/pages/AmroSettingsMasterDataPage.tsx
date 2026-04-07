@@ -128,9 +128,9 @@ import { AircraftLeadsManager, type AircraftLeadsTab } from './amro-settings-mas
 import { AircraftActionPalette, type AircraftPaletteAction } from './amro-settings-master-data/components/AircraftActionPalette';
 import { AircraftDataTableFrame } from './amro-settings-master-data/components/AircraftDataTableFrame';
 import { AircraftListingControls } from './amro-settings-master-data/components/AircraftListingControls';
-import { AircraftWorkPackageCreateDialog } from './amro-settings-master-data/components/AircraftWorkPackageCreateDialog';
 import { AircraftCreateDialogSection } from './amro-settings-master-data/components/AircraftCreateDialogSection';
 import { AircraftTemplateDialog } from './amro-settings-master-data/components/AircraftTemplateDialog';
+import { AddWorkPackageDialog } from './amro-settings-master-data/components/AddWorkPackageDialog';
 import { WorkPackageTemplateCreateSection } from './amro-settings-master-data/components/WorkPackageTemplateCreateSection';
 import { AmroWorkPackageTemplateAdapter } from '@/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter';
 import {
@@ -8693,7 +8693,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
           </DialogContent>
         </Dialog>
-        <AircraftWorkPackageCreateDialog
+        <AddWorkPackageDialog
           aircraftWorkPackageDialogOpen={aircraftWorkPackageDialogOpen}
           setAircraftWorkPackageDialogOpen={setAircraftWorkPackageDialogOpen}
           aircraftWorkPackageActiveTab={aircraftWorkPackageActiveTab}
