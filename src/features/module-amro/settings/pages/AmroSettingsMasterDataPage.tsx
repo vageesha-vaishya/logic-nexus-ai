@@ -699,6 +699,8 @@ type AircraftTemplateAssociatedTaskRow = {
   jsonDetails: string;
 };
 
+const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
 type AircraftDashboardKpis = {
   fleet_size: number;
   open_work_packages: number;
@@ -1337,6 +1339,7 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
   work_package_templates: {
     template_code: '',
     template_name: '',
+    model_id: '',
     aircraft_model: '',
     maintenance_type: 'line',
     version: 1,
@@ -2967,6 +2970,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
       }
       if (entity === 'work_package_templates') {
+        const currentModelId = String(payload.model_id || '').trim();
+        const currentAircraftModel = String(payload.aircraft_model || '').trim();
+        const resolvedAssemblyModel = assemblyModelOptions.find((option) => {
+          const optionId = String(option.id || '').trim();
+          const optionCode = String(option.modelValue || '').trim();
+          const optionName = String(option.label || '').trim();
+          const token = currentAircraftModel.toLowerCase();
+          return optionId === currentAircraftModel
+            || optionCode.toLowerCase() === token
+            || optionName.toLowerCase() === token;
+        });
+        const resolvedModelId = currentModelId
+          || String(resolvedAssemblyModel?.id || '').trim()
+          || (isUuid(currentAircraftModel) ? currentAircraftModel : '');
+        if (!resolvedModelId) {
+          setFormErrors((previous) => ({
+            ...previous,
+            model_id: 'Aircraft Model is required',
+            aircraft_model: previous.aircraft_model || 'Aircraft Model is required',
+          }));
+          toast.error('Select an Aircraft Model before saving template');
+          return false;
+        }
+        payload.model_id = resolvedModelId;
+        if (resolvedAssemblyModel && isUuid(currentAircraftModel)) {
+          payload.aircraft_model = String(resolvedAssemblyModel.modelValue || resolvedAssemblyModel.label || currentAircraftModel).trim();
+        }
         const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
         const selectedTaskTemplateIds = tasksJson
           .map((entry) => {
@@ -2977,7 +3007,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] creating work package template request work_package_templates', {
           entity,
-          requestUrl: '/api/v2/amro/master-data/work_package_templates',
+          requestUrl: '/api/v2/amro/work-package-templates',
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
           maintenanceType: String(payload.maintenance_type || ''),
@@ -2988,7 +3018,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         });
       }
       const createEndpoint = entity === 'work_package_templates'
-        ? '/api/v2/amro/master-data/work_package_templates'
+        ? '/api/v2/amro/work-package-templates'
         : `/api/v2/amro/master-data/${entity}`;
       const response = await fetch(createEndpoint, {
         method: 'POST',
@@ -3005,7 +3035,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           : null;
         logger.info('[AMRO Master Data UI] work package template create response', {
           entity,
-          requestUrl: '/api/v2/amro/master-data/work_package_templates',
+          requestUrl: '/api/v2/amro/work-package-templates',
           status: response.status,
           ok: response.ok,
           responseError: String(responsePayload.error || ''),
@@ -3033,7 +3063,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error(message);
       return false;
     }
-  }, [aircraftTemplateModel, entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, systemTemplateModelOptions]);
+  }, [aircraftTemplateModel, assemblyModelOptions, entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, systemTemplateModelOptions]);
 
   const handleUpdate = useCallback(async () => {
     if (!selectedId) {
@@ -3106,6 +3136,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
       }
       if (entity === 'work_package_templates') {
+        const currentModelId = String(payload.model_id || '').trim();
+        const currentAircraftModel = String(payload.aircraft_model || '').trim();
+        const resolvedAssemblyModel = assemblyModelOptions.find((option) => {
+          const optionId = String(option.id || '').trim();
+          const optionCode = String(option.modelValue || '').trim();
+          const optionName = String(option.label || '').trim();
+          const token = currentAircraftModel.toLowerCase();
+          return optionId === currentAircraftModel
+            || optionCode.toLowerCase() === token
+            || optionName.toLowerCase() === token;
+        });
+        const resolvedModelId = currentModelId
+          || String(resolvedAssemblyModel?.id || '').trim()
+          || (isUuid(currentAircraftModel) ? currentAircraftModel : '');
+        if (!resolvedModelId) {
+          setFormErrors((previous) => ({
+            ...previous,
+            model_id: 'Aircraft Model is required',
+            aircraft_model: previous.aircraft_model || 'Aircraft Model is required',
+          }));
+          toast.error('Select an Aircraft Model before saving template');
+          return false;
+        }
+        payload.model_id = resolvedModelId;
+        if (resolvedAssemblyModel && isUuid(currentAircraftModel)) {
+          payload.aircraft_model = String(resolvedAssemblyModel.modelValue || resolvedAssemblyModel.label || currentAircraftModel).trim();
+        }
         const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
         const selectedTaskTemplateIds = tasksJson
           .map((entry) => {
@@ -3116,7 +3173,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] updating work package template request', {
           entity,
-          requestUrl: `/api/v2/amro/master-data/work_package_templates/${selectedId}`,
+          requestUrl: `/api/v2/amro/work-package-templates/${selectedId}`,
           workPackageTemplateId: String(selectedId || ''),
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
@@ -3128,7 +3185,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         });
       }
       const updateEndpoint = entity === 'work_package_templates'
-        ? `/api/v2/amro/master-data/work_package_templates/${selectedId}`
+        ? `/api/v2/amro/work-package-templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const updateMethod = 'PATCH';
       const response = await fetch(updateEndpoint, {
@@ -3146,7 +3203,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           : null;
         logger.info('[AMRO Master Data UI] work package template update response', {
           entity,
-          requestUrl: `/api/v2/amro/master-data/work_package_templates/${selectedId}`,
+          requestUrl: `/api/v2/amro/work-package-templates/${selectedId}`,
           status: response.status,
           ok: response.ok,
           responseError: String(responsePayload.error || ''),
@@ -3180,7 +3237,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error(message);
       return false;
     }
-  }, [entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, selectedId]);
+  }, [assemblyModelOptions, entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, selectedId]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedId) {
@@ -3195,7 +3252,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     try {
       const headers = await buildApiHeaders(scope);
       const deleteEndpoint = entity === 'work_package_templates'
-        ? `/api/v2/amro/master-data/work_package_templates/${selectedId}`
+        ? `/api/v2/amro/work-package-templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const response = await fetch(deleteEndpoint, {
         method: 'DELETE',
