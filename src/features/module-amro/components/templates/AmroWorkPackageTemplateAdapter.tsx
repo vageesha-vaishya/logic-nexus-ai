@@ -89,6 +89,7 @@ export function AmroWorkPackageTemplateAdapter({
 
   const buildAuthHeaders = async () => {
     const headers: Record<string, string> = {};
+    const scopeIsTenantAdmin = Boolean((props.scope as Record<string, unknown>)?.isTenantAdmin);
     const { data } = await supabase.auth.getSession();
     const token = String(data.session?.access_token || '').trim();
     if (token) {
@@ -97,7 +98,7 @@ export function AmroWorkPackageTemplateAdapter({
     if (props.scope?.tenantId) {
       headers['x-tenant-id'] = props.scope.tenantId;
     }
-    if (props.scope?.franchiseId) {
+    if (props.scope?.franchiseId && !scopeIsTenantAdmin) {
       headers['x-franchise-id'] = props.scope.franchiseId;
     }
     const scopeUserId = String((props.scope as Record<string, unknown>)?.userId || '').trim();
@@ -112,6 +113,9 @@ export function AmroWorkPackageTemplateAdapter({
 
   useEffect(() => {
     const loadAircraftModels = async () => {
+      if (!props.modalOpen) {
+        return;
+      }
       if (!props.scope?.tenantId) {
         setAircraftModelOptions([]);
         setAircraftModelOptionsError('');
@@ -154,7 +158,29 @@ export function AmroWorkPackageTemplateAdapter({
       }
     };
     void loadAircraftModels();
-  }, [props.scope?.tenantId]);
+  }, [props.modalOpen, props.scope?.franchiseId, props.scope?.tenantId, (props.scope as Record<string, unknown>)?.isTenantAdmin]);
+
+  useEffect(() => {
+    if (mode !== 'update') {
+      return;
+    }
+    const currentModelId = String(props.formValues.model_id ?? '').trim();
+    const currentModelText = String(props.formValues.aircraft_model ?? '').trim();
+    if (currentModelId || !currentModelText) {
+      return;
+    }
+    const normalizedText = currentModelText.toLowerCase();
+    const matchedOption = aircraftModelOptions.find((entry) => {
+      const byCode = String(entry.modelCode || '').trim().toLowerCase();
+      const byLabel = String(entry.label || '').trim().toLowerCase();
+      return byCode === normalizedText || byLabel === normalizedText;
+    });
+    if (!matchedOption?.value) {
+      return;
+    }
+    props.setFieldValue('model_id', matchedOption.value);
+    props.setFieldValue('aircraft_model', matchedOption.modelCode || currentModelText);
+  }, [aircraftModelOptions, mode, props.formValues.aircraft_model, props.formValues.model_id, props.setFieldValue]);
 
   const messages = Object.values(formErrors || {}).filter(Boolean).map((value) => String(value));
   const validation: AmroTemplateValidationState = messages.length > 0
@@ -272,28 +298,47 @@ export function AmroWorkPackageTemplateAdapter({
 
   const effectiveAircraftModelId = selectedAircraftModelId || (selectedAircraftModelText ? `legacy:${selectedAircraftModelText}` : '');
   const effectiveAircraftModelOptions = useMemo(() => {
+    const dedupeOptions = (options: Array<{ value: string; label: string; modelCode: string }>) => {
+      const byValue = new Map<string, { value: string; label: string; modelCode: string }>();
+      options.forEach((option) => {
+        if (!byValue.has(option.value)) {
+          byValue.set(option.value, option);
+        }
+      });
+      return Array.from(byValue.values());
+    };
     if (!selectedAircraftModelText) {
       if (selectedAircraftModelId && resolvedModelDisplayLabel) {
+        const existingOption = aircraftModelOptions.find((entry) => entry.value === selectedAircraftModelId);
+        if (existingOption) {
+          return dedupeOptions(
+            aircraftModelOptions.map((entry) => (
+              entry.value === selectedAircraftModelId
+                ? { ...entry, label: `${resolvedModelDisplayLabel} (current)` }
+                : entry
+            )),
+          );
+        }
         return [
           {
             value: selectedAircraftModelId,
             label: `${resolvedModelDisplayLabel} (current)`,
             modelCode: resolvedModelDisplayLabel,
           },
-          ...aircraftModelOptions,
+          ...dedupeOptions(aircraftModelOptions),
         ];
       }
-      return aircraftModelOptions;
+      return dedupeOptions(aircraftModelOptions);
     }
     if (!selectedAircraftModelId) {
-      return [
+      return dedupeOptions([
         {
           value: `legacy:${selectedAircraftModelText}`,
           label: `${selectedAircraftModelText} (current)`,
           modelCode: selectedAircraftModelText,
         },
         ...aircraftModelOptions,
-      ];
+      ]);
     }
     const existingOption = aircraftModelOptions.find((entry) => entry.value === selectedAircraftModelId);
     const preferredDisplayLabel = resolvedModelDisplayLabel
@@ -311,16 +356,16 @@ export function AmroWorkPackageTemplateAdapter({
     }
     const exists = Boolean(existingOption);
     if (exists) {
-      return aircraftModelOptions;
+      return dedupeOptions(aircraftModelOptions);
     }
-    return [
+    return dedupeOptions([
       {
         value: selectedAircraftModelId,
         label: `${selectedAircraftModelText} (current)`,
         modelCode: selectedAircraftModelText,
       },
       ...aircraftModelOptions,
-    ];
+    ]);
   }, [aircraftModelOptions, resolvedModelDisplayLabel, selectedAircraftModelId, selectedAircraftModelText]);
 
   const selectedAircraftModelLabel = useMemo(() => {
