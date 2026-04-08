@@ -31,6 +31,10 @@ export type PartInventoryRecord = {
     condition_code: 'SV' | 'AR' | 'INSP' | 'OH' | 'SCRAP' | 'QUAR';
     aog_priority: boolean;
     tags: string[];
+    item_master_id?: string;
+    item_master_part_number?: string;
+    linkage_source?: string;
+    linked_at?: string;
   };
 };
 

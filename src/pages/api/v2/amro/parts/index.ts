@@ -135,6 +135,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       criticality: (String(payload.criticality || 'normal') as any),
       ataChapter: String(payload.ata_chapter || payload.ataChapter || '') || null,
     });
+    if (payload.metadata && typeof payload.metadata === 'object' && !Array.isArray(payload.metadata)) {
+      mapped.metadata = {
+        ...(mapped.metadata || {}),
+        ...(payload.metadata as Record<string, unknown>),
+      };
+    }
     const issues = validatePartsRecordInput(mapped);
     if (issues.length > 0) {
       res.status(400).json({ error: 'Validation failed', issues, version: 'v2', correlationId: ctx.correlationId });

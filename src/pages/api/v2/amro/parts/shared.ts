@@ -29,6 +29,17 @@ export type PartsTemplateRecord = {
   supplierName?: string | null;
   criticality?: 'critical' | 'high' | 'normal' | 'low';
   ataChapter?: string | null;
+  metadata?: {
+    barcodeValue?: string | null;
+    rfidTag?: string | null;
+    conditionCode?: 'SV' | 'AR' | 'INSP' | 'OH' | 'SCRAP' | 'QUAR' | null;
+    aogPriority?: boolean;
+    tags?: string[] | null;
+    itemMasterId?: string | null;
+    itemMasterPartNumber?: string | null;
+    linkageSource?: string | null;
+    linkedAt?: string | null;
+  };
 };
 
 export type PartsInventoryRow = {
@@ -121,6 +132,22 @@ export function mapPartsInventoryRowToTemplate(row: Record<string, unknown>): Pa
     supplierName: toNullableText(row.supplier_name),
     criticality: (normalizeText(row.criticality || 'normal').toLowerCase() as PartsTemplateRecord['criticality']),
     ataChapter: toNullableText(row.ata_chapter),
+    metadata: (() => {
+      const metadata = row.metadata && typeof row.metadata === 'object'
+        ? row.metadata as Record<string, unknown>
+        : {};
+      return {
+        barcodeValue: toNullableText(metadata.barcode_value),
+        rfidTag: toNullableText(metadata.rfid_tag),
+        conditionCode: toNullableText(metadata.condition_code) as PartsTemplateRecord['metadata']['conditionCode'],
+        aogPriority: Boolean(metadata.aog_priority),
+        tags: Array.isArray(metadata.tags) ? metadata.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+        itemMasterId: toNullableText(metadata.item_master_id),
+        itemMasterPartNumber: toNullableText(metadata.item_master_part_number),
+        linkageSource: toNullableText(metadata.linkage_source),
+        linkedAt: toNullableText(metadata.linked_at),
+      };
+    })(),
   };
 }
 

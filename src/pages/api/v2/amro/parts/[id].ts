@@ -39,6 +39,7 @@ const INVENTORY_ALLOWED_KEYS = new Set([
   'quantity_on_hand',
   'quantity_reserved',
   'warehouse_location',
+  'metadata',
 ]);
 
 function normalizeInventoryPatchPayload(payload: Record<string, unknown>): Record<string, unknown> {
@@ -70,6 +71,12 @@ function normalizeInventoryPatchPayload(payload: Record<string, unknown>): Recor
     }
     if (key === 'quantity_on_hand' || key === 'quantity_reserved') {
       normalized[key] = Number(value ?? 0);
+      continue;
+    }
+    if (key === 'metadata') {
+      normalized[key] = value && typeof value === 'object' && !Array.isArray(value)
+        ? value
+        : {};
       continue;
     }
     normalized[key] = value;

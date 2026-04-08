@@ -16,6 +16,8 @@ import * as XLSX from 'xlsx';
 import { useAmroWorkspaceState } from '../hooks/useAmroWorkspaceState';
 import type { AmroAuthorityLevel, AmroAssetType } from '../workspace/amroWorkspaceModel';
 import { AmroPartsInventoryWorkbench } from './parts/AmroPartsInventoryWorkbench';
+import { AmroItemMasterCatalogPanel } from './parts/AmroItemMasterCatalogPanel';
+import type { ItemMasterRecord } from './parts/itemMasterCatalogApi';
 import {
   createAmroPartRecord,
   createAmroPartsCatalogApi,
@@ -407,6 +409,7 @@ export function AmroOwnedWorkspace({
   const [partsEditOpen, setPartsEditOpen] = useState(false);
   const [partsDeleteOpen, setPartsDeleteOpen] = useState(false);
   const [partsSubmitting, setPartsSubmitting] = useState(false);
+  const [partsCreateItemMasterLink, setPartsCreateItemMasterLink] = useState<{ id: string; partNumber: string } | null>(null);
   const [partsApiDiagnosticRunning, setPartsApiDiagnosticRunning] = useState(false);
   const [partsApiDiagnosticMessage, setPartsApiDiagnosticMessage] = useState<string | null>(null);
   const [partsTargetRecord, setPartsTargetRecord] = useState<PartInventoryRecord | null>(null);
@@ -501,9 +504,29 @@ export function AmroOwnedWorkspace({
 
   const openCreatePartDialog = useCallback(() => {
     setPartsTargetRecord(null);
+    setPartsCreateItemMasterLink(null);
     resetPartsForm();
     setPartsCreateOpen(true);
   }, [resetPartsForm]);
+
+  const openCreatePartDialogFromItemMaster = useCallback((record: ItemMasterRecord) => {
+    setPartsTargetRecord(null);
+    setPartsCreateItemMasterLink({ id: record.id, partNumber: record.partNumber });
+    setPartsForm({
+      part_number: record.partNumber,
+      serial_number: '',
+      description: record.description || '',
+      status: 'available',
+      lifecycle_status: record.lifecycleStatus || 'serviceable',
+      quantity_on_hand: 0,
+      quantity_reserved: 0,
+      warehouse_location: '',
+      supplier_name: record.manufacturerName || '',
+      criticality: 'normal',
+      ata_chapter: '',
+    });
+    setPartsCreateOpen(true);
+  }, []);
 
   const openEditPartDialog = useCallback((record: PartInventoryRecord) => {
     setPartsTargetRecord(record);
@@ -531,8 +554,20 @@ export function AmroOwnedWorkspace({
   const submitCreatePart = useCallback(async () => {
     setPartsSubmitting(true);
     try {
-      await createAmroPartRecord(partsForm, fetch, partsApiScope);
+      const createPayload: PartsMutationPayload = partsCreateItemMasterLink
+        ? {
+          ...partsForm,
+          metadata: {
+            item_master_id: partsCreateItemMasterLink.id,
+            item_master_part_number: partsCreateItemMasterLink.partNumber,
+            linkage_source: 'amro_item_master',
+            linked_at: new Date().toISOString(),
+          },
+        }
+        : partsForm;
+      await createAmroPartRecord(createPayload, fetch, partsApiScope);
       setPartsCreateOpen(false);
+      setPartsCreateItemMasterLink(null);
       resetPartsForm();
       toast.success('Part created successfully.');
       await partsCatalog.refresh();
@@ -541,7 +576,7 @@ export function AmroOwnedWorkspace({
     } finally {
       setPartsSubmitting(false);
     }
-  }, [partsApiScope, partsCatalog, partsForm, resetPartsForm]);
+  }, [partsApiScope, partsCatalog, partsCreateItemMasterLink, partsForm, resetPartsForm]);
 
   const submitUpdatePart = useCallback(async () => {
     if (!partsTargetRecord?.id) return;
@@ -3503,6 +3538,11 @@ export function AmroOwnedWorkspace({
             onUpdateRecord={openEditPartDialog}
             onDeleteRecord={openDeletePartDialog}
           />
+          <AmroItemMasterCatalogPanel
+            apiScope={partsApiScope}
+            onCreatePart={openCreatePartDialog}
+            onCreatePartFromItemMaster={openCreatePartDialogFromItemMaster}
+          />
         </div>
         ) : null}
 
@@ -3586,6 +3626,11 @@ export function AmroOwnedWorkspace({
           <DialogHeader>
             <DialogTitle>Create Part Inventory Record</DialogTitle>
           </DialogHeader>
+          {partsCreateItemMasterLink ? (
+          <p className="rounded-md border border-blue-300 bg-blue-50 px-3 py-2 text-xs text-blue-900">
+            Prefilled from Item Master: {partsCreateItemMasterLink.partNumber}
+          </p>
+          ) : null}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
             {PARTS_FORM_CORE_FIELDS.map((field) => renderPartsFormField(field, 'create'))}
             {PARTS_FORM_ADVANCED_FIELDS.length > 0 ? (

@@ -88,7 +88,26 @@ export function AmroPartsInventoryWorkbench({
   const [statusFilter, setStatusFilter] = useState<(typeof PARTS_STATUS_FILTER_OPTIONS)[number]>('all');
 
   const columns = useMemo<GridColumnDefinition<PartInventoryRecord>[]>(() => [
-    { key: 'part_number', header: 'Part Number', sortable: true, filterable: true, groupable: true, resizable: true, dataType: 'text', width: 160 },
+    {
+      key: 'part_number',
+      header: 'Part Number',
+      sortable: true,
+      filterable: true,
+      groupable: true,
+      resizable: true,
+      dataType: 'text',
+      width: 220,
+      render: (row) => (
+        <div className="flex items-center gap-2">
+          <span>{row.part_number}</span>
+          {row.metadata.item_master_id ? (
+            <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+              Linked Item Master
+            </Badge>
+          ) : null}
+        </div>
+      ),
+    },
     { key: 'serial_number', header: 'Serial', sortable: true, filterable: true, groupable: false, resizable: true, dataType: 'text', width: 150 },
     { key: 'description', header: 'Description', sortable: true, filterable: true, groupable: false, resizable: true, dataType: 'text', width: 240 },
     { key: 'item_type', header: 'Type', sortable: true, filterable: true, groupable: true, resizable: true, dataType: 'text', width: 120 },

@@ -32,12 +32,18 @@ describe('live parts catalog api adapter', () => {
       supplierName: 'AeroLink',
       criticality: 'high',
       ataChapter: '27',
+      metadata: {
+        itemMasterId: 'item-1',
+        itemMasterPartNumber: 'AMRO-ITEM-001',
+      },
     });
     expect(mapped.part_number).toBe('AMRO-PN-1');
     expect(mapped.quantity_available).toBe(7);
     expect(mapped.status).toBe('low_stock');
     expect(mapped.lifecycle_status).toBe('inspection_due');
     expect(mapped.criticality).toBe('high');
+    expect(mapped.metadata.item_master_id).toBe('item-1');
+    expect(mapped.metadata.item_master_part_number).toBe('AMRO-ITEM-001');
   });
 
   it('loads and maps records from /api/v2/amro/parts endpoint', async () => {
@@ -92,6 +98,10 @@ describe('live parts catalog api adapter', () => {
       quantity_reserved: 0,
       warehouse_location: 'WH-A-01',
       criticality: 'normal',
+      metadata: {
+        item_master_id: 'item-1',
+        item_master_part_number: 'AMRO-ITEM-001',
+      },
     }, fetchMock as never);
     await updateAmroPartRecord('inv-3', { status: 'reserved', serial_number: '' }, fetchMock as never);
     await deleteAmroPartRecord('inv-3', fetchMock as never);
@@ -102,6 +112,7 @@ describe('live parts catalog api adapter', () => {
     expect(createBody.criticality).toBeUndefined();
     expect(createBody.ata_chapter).toBeUndefined();
     expect(createBody.part_number).toBe('AMRO-PN-3');
+    expect(createBody.metadata.item_master_id).toBe('item-1');
     expect(updateBody.serial_number).toBeNull();
   });
 

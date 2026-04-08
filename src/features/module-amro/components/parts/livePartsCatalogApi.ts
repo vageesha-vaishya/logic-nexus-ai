@@ -34,6 +34,10 @@ type ApiRecord = {
     conditionCode?: string | null;
     aogPriority?: boolean;
     tags?: string[] | null;
+    itemMasterId?: string | null;
+    itemMasterPartNumber?: string | null;
+    linkageSource?: string | null;
+    linkedAt?: string | null;
   } | null;
 };
 
@@ -79,6 +83,7 @@ export type PartsMutationPayload = {
   supplier_name?: string | null;
   criticality?: PartCriticality;
   ata_chapter?: string | null;
+  metadata?: Record<string, unknown>;
 };
 
 const INVENTORY_MUTATION_KEYS = new Set<keyof PartsMutationPayload>([
@@ -90,6 +95,7 @@ const INVENTORY_MUTATION_KEYS = new Set<keyof PartsMutationPayload>([
   'quantity_on_hand',
   'quantity_reserved',
   'warehouse_location',
+  'metadata',
 ]);
 
 function sanitizeInventoryMutationPayload(
@@ -124,6 +130,12 @@ function sanitizeInventoryMutationPayload(
     }
     if (key === 'quantity_on_hand' || key === 'quantity_reserved') {
       (sanitized as Record<string, unknown>)[key] = Number(value ?? 0);
+      continue;
+    }
+    if (key === 'metadata') {
+      (sanitized as Record<string, unknown>)[key] = (value && typeof value === 'object' && !Array.isArray(value))
+        ? value
+        : {};
       continue;
     }
     (sanitized as Record<string, unknown>)[key] = value;
@@ -295,6 +307,10 @@ export function mapLiveApiRecordToPartInventoryRecord(record: ApiRecord): PartIn
         : 'SV',
       aog_priority: Boolean(metadata?.aogPriority),
       tags: Array.isArray(metadata?.tags) ? metadata.tags.filter((tag): tag is string => typeof tag === 'string') : [],
+      item_master_id: String(metadata?.itemMasterId || '').trim(),
+      item_master_part_number: String(metadata?.itemMasterPartNumber || '').trim(),
+      linkage_source: String(metadata?.linkageSource || '').trim(),
+      linked_at: String(metadata?.linkedAt || '').trim(),
     },
   };
 }

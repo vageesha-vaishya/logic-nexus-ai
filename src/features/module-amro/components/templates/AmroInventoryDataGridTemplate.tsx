@@ -178,6 +178,17 @@ function inferFieldType(value: unknown, key: string): InventoryDataType {
   return 'text';
 }
 
+function resolveLinkedItemMasterPill(record: Record<string, unknown>): { partNumber: string | null; itemMasterId: string | null } | null {
+  const metadata = record.metadata && typeof record.metadata === 'object'
+    ? record.metadata as Record<string, unknown>
+    : null;
+  if (!metadata) return null;
+  const itemMasterId = String(metadata.item_master_id || '').trim() || null;
+  const partNumber = String(metadata.item_master_part_number || '').trim() || null;
+  if (!itemMasterId && !partNumber) return null;
+  return { partNumber, itemMasterId };
+}
+
 function toInputDateValue(value: unknown): string {
   if (value == null) return '';
   const date = value instanceof Date ? value : new Date(String(value));
@@ -1530,6 +1541,17 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
               </div>
               {selectedRecord ? (
                 <div className="h-full overflow-auto overflow-x-hidden pr-1">
+                  {(() => {
+                    const linked = resolveLinkedItemMasterPill(selectedRecord);
+                    if (!linked) return null;
+                    return (
+                      <div className="mb-2">
+                        <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+                          Linked Item Master: {linked.partNumber || linked.itemMasterId}
+                        </Badge>
+                      </div>
+                    );
+                  })()}
                   {renderDetail ? renderDetail(selectedRecord) : renderDefaultDetail(selectedRecord)}
                 </div>
               ) : (
