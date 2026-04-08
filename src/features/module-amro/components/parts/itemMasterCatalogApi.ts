@@ -154,6 +154,12 @@ function toMutationPayload(record: ItemMasterMutationPayload): Record<string, un
 async function assertOk(response: Response, fallback: string): Promise<void> {
   if (response.ok) return;
   const payload = await parseApiResponseShape(response);
+  if (response.status === 404) {
+    throw new Error(
+      `${fallback} (404) - Item Master API route is unavailable on current AMRO backend target. ` +
+      'Deploy/enable /api/v2/amro/item-master (AMRO_ITEM_MASTER_V2_ENABLED=true) and verify VITE_AMRO_API_PROXY_TARGET.'
+    );
+  }
   const issue = payload.issues?.[0];
   if (issue?.field || issue?.message) {
     throw new Error(`${fallback} (${response.status}) - ${String(issue.field || 'payload')}: ${String(issue.message || 'validation failed')}`);

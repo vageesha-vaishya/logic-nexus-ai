@@ -110,6 +110,18 @@ describe('itemMasterCatalogApi', () => {
     }, fetchMock as never)).rejects.toThrow(/part_number/);
   });
 
+  it('surfaces actionable hint when item master endpoint is not deployed', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 404,
+      json: async () => ({
+        error: 'Not Found',
+      }),
+    });
+    await expect(listItemMasterRecords({ page: 1, pageSize: 20 }, fetchMock as never))
+      .rejects.toThrow(/Item Master API route is unavailable/);
+  });
+
   it('updates records', async () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
