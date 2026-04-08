@@ -54,7 +54,7 @@ export type PartsInventoryRow = {
 };
 
 const PART_NUMBER_PATTERN = /^[A-Za-z0-9-]{3,64}$/;
-const SERIAL_PATTERN = /^[A-Za-z0-9-]{0,64}$/;
+const SERIAL_PATTERN = /^[A-Z0-9-]{0,64}$/;
 const ALLOWED_STATUS = new Set(['available', 'reserved', 'low_stock', 'quarantined', 'unserviceable']);
 const ALLOWED_LIFECYCLE = new Set<LifecycleStatus>([
   'serviceable',
@@ -89,7 +89,7 @@ export function mapTemplateToPartsInventoryRow(
   const qtyReserved = Math.max(0, Math.round(toFiniteNumber(template.quantityReserved, 0)));
   return {
     part_number: normalizeText(template.partNumber).toUpperCase(),
-    serial_number: toNullableText(template.serialNumber),
+    serial_number: toNullableText(template.serialNumber)?.toUpperCase() || null,
     description: toNullableText(template.description),
     status: normalizeText(template.status).toLowerCase(),
     lifecycle_status: (template.lifecycleStatus || mapStatusToLifecycle(template.status)) as LifecycleStatus,

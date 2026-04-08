@@ -32,6 +32,11 @@ function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {};
 }
 
+function asNullableUpperSerial(value: unknown): string | null {
+  const normalized = String(value || '').trim().toUpperCase();
+  return normalized || null;
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'POST', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -119,7 +124,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const payload = asObject(req.body);
     const mapped = mapTemplateToPartsInventoryRow({
       partNumber: String(payload.part_number || payload.partNumber || ''),
-      serialNumber: String(payload.serial_number || payload.serialNumber || '') || null,
+      serialNumber: asNullableUpperSerial(payload.serial_number || payload.serialNumber),
       description: String(payload.description || '') || null,
       status: String(payload.status || 'available').toLowerCase() as any,
       lifecycleStatus: (String(payload.lifecycle_status || payload.lifecycleStatus || '') || undefined) as any,

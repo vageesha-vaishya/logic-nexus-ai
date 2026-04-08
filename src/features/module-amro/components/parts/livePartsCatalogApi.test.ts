@@ -36,6 +36,7 @@ describe('live parts catalog api adapter', () => {
     expect(mapped.part_number).toBe('AMRO-PN-1');
     expect(mapped.quantity_available).toBe(7);
     expect(mapped.status).toBe('low_stock');
+    expect(mapped.lifecycle_status).toBe('inspection_due');
     expect(mapped.criticality).toBe('high');
   });
 
@@ -92,9 +93,16 @@ describe('live parts catalog api adapter', () => {
       warehouse_location: 'WH-A-01',
       criticality: 'normal',
     }, fetchMock as never);
-    await updateAmroPartRecord('inv-3', { status: 'reserved' }, fetchMock as never);
+    await updateAmroPartRecord('inv-3', { status: 'reserved', serial_number: '' }, fetchMock as never);
     await deleteAmroPartRecord('inv-3', fetchMock as never);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+    const createBody = JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body || '{}'));
+    const updateBody = JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body || '{}'));
+    expect(createBody.supplier_name).toBeUndefined();
+    expect(createBody.criticality).toBeUndefined();
+    expect(createBody.ata_chapter).toBeUndefined();
+    expect(createBody.part_number).toBe('AMRO-PN-3');
+    expect(updateBody.serial_number).toBeNull();
   });
 
   it('exposes auth diagnostics when API responds with 401', async () => {
@@ -117,5 +125,52 @@ describe('live parts catalog api adapter', () => {
     });
     await expect(api.listParts({ page: 1, pageSize: 20, status: 'all', criticality: 'all' }))
       .rejects.toBeInstanceOf(PartsApiError);
+  });
+
+  it('maps fallback auth diagnostics from code when auth_diagnostics is absent', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        error: 'Missing or malformed Authorization header',
+        code: 'MISSING_TOKEN',
+      }),
+    });
+    const api = createAmroPartsCatalogApi(fetchMock as never);
+    await expect(api.listParts({ page: 1, pageSize: 20, status: 'all', criticality: 'all' }))
+      .rejects.toMatchObject({
+        status: 401,
+        authDiagnostics: {
+          reasonCode: 'missing_token',
+        },
+      });
+  });
+
+  it('surfaces mutation validation issue details in update error messages', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: 'Validation failed',
+        issues: [{ field: 'serial_number', message: 'serial_number must match /^[A-Z0-9-]{0,64}$/' }],
+      }),
+    });
+    await expect(updateAmroPartRecord('inv-4', { serial_number: 'bad serial' }, fetchMock as never))
+      .rejects.toThrow(/serial_number/);
+  });
+
+  it('surfaces unsupported field diagnostics from API details', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: async () => ({
+        error: 'Payload contains unsupported fields for inventory-only AMRO parts route',
+        details: {
+          rejected_non_inventory_fields: ['supplier_name'],
+        },
+      }),
+    });
+    await expect(updateAmroPartRecord('inv-5', { supplier_name: 'X' }, fetchMock as never))
+      .rejects.toThrow(/unsupported fields: supplier_name/);
   });
 });

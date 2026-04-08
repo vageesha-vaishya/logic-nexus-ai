@@ -7,7 +7,7 @@ import { Button, Checkbox, Input, Input as TextInput, Label, Select, SelectConte
 import { CRMDatePicker as DatePicker } from '@/design-system/components/molecules';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
-import { ArrowDownUp, ChevronDown, ChevronUp, Copy, Download, Eye, GripVertical, PauseCircle, PlayCircle, Trash2 } from 'lucide-react';
+import { ArrowDownUp, ChevronDown, ChevronUp, Copy, Download, Eye, GripVertical, PauseCircle, PlayCircle, RefreshCw, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
@@ -407,6 +407,8 @@ export function AmroOwnedWorkspace({
   const [partsEditOpen, setPartsEditOpen] = useState(false);
   const [partsDeleteOpen, setPartsDeleteOpen] = useState(false);
   const [partsSubmitting, setPartsSubmitting] = useState(false);
+  const [partsApiDiagnosticRunning, setPartsApiDiagnosticRunning] = useState(false);
+  const [partsApiDiagnosticMessage, setPartsApiDiagnosticMessage] = useState<string | null>(null);
   const [partsTargetRecord, setPartsTargetRecord] = useState<PartInventoryRecord | null>(null);
   const [partsForm, setPartsForm] = useState<PartsMutationPayload>({
     part_number: '',
@@ -510,7 +512,7 @@ export function AmroOwnedWorkspace({
       serial_number: record.serial_number,
       description: record.description,
       status: record.status,
-      lifecycle_status: 'serviceable',
+      lifecycle_status: record.lifecycle_status || 'serviceable',
       quantity_on_hand: record.quantity_on_hand,
       quantity_reserved: record.quantity_reserved,
       warehouse_location: record.warehouse_location,
@@ -572,6 +574,60 @@ export function AmroOwnedWorkspace({
       setPartsSubmitting(false);
     }
   }, [partsApiScope, partsCatalog, partsTargetRecord]);
+
+  const runPartsLiveApiDiagnostics = useCallback(async () => {
+    setPartsApiDiagnosticRunning(true);
+    setPartsApiDiagnosticMessage(null);
+    try {
+      const tokenPresent = Boolean(String(partsApiScope.accessToken || '').trim());
+      const tenantPresent = Boolean(String(partsApiScope.tenantId || '').trim());
+      const franchisePresent = Boolean(String(partsApiScope.franchiseId || '').trim());
+      const userPresent = Boolean(String(partsApiScope.userId || '').trim());
+      const headers: Record<string, string> = {
+        Accept: 'application/json',
+        ...(tokenPresent ? { Authorization: `Bearer ${String(partsApiScope.accessToken).trim()}` } : {}),
+        ...(tenantPresent ? { 'x-tenant-id': String(partsApiScope.tenantId).trim() } : {}),
+        ...(franchisePresent ? { 'x-franchise-id': String(partsApiScope.franchiseId).trim() } : {}),
+        ...(userPresent ? { 'x-user-id': String(partsApiScope.userId).trim() } : {}),
+        'x-domain-id': 'AMRO',
+      };
+      const response = await fetch('/api/v2/amro/parts?page=1&page_size=1', {
+        method: 'GET',
+        headers,
+        credentials: 'include',
+      });
+      let payload: Record<string, unknown> = {};
+      try {
+        const parsed = await response.json();
+        if (parsed && typeof parsed === 'object') payload = parsed as Record<string, unknown>;
+      } catch {
+        payload = {};
+      }
+      const code = String(payload.code || '');
+      const error = String(payload.error || '');
+      const authDiagnostics = payload.auth_diagnostics && typeof payload.auth_diagnostics === 'object'
+        ? payload.auth_diagnostics as Record<string, unknown>
+        : null;
+      const reasonCode = String(authDiagnostics?.reason_code || code || '').trim();
+      const statusLine = `status=${response.status}`;
+      const headerLine = `token=${tokenPresent ? 'yes' : 'no'}, tenant=${tenantPresent ? 'yes' : 'no'}, franchise=${franchisePresent ? 'yes' : 'no'}, user=${userPresent ? 'yes' : 'no'}`;
+      const reasonLine = reasonCode ? `reason=${reasonCode}` : '';
+      const errorLine = error ? `error=${error}` : '';
+      const message = [statusLine, headerLine, reasonLine, errorLine].filter(Boolean).join(' | ');
+      setPartsApiDiagnosticMessage(message);
+      if (response.ok) {
+        toast.success(`Live API diagnostic passed: ${message}`);
+      } else {
+        toast.error(`Live API diagnostic failed: ${message}`);
+      }
+    } catch (error) {
+      const message = `status=network_error | ${error instanceof Error ? error.message : 'unknown failure'}`;
+      setPartsApiDiagnosticMessage(message);
+      toast.error(`Live API diagnostic failed: ${message}`);
+    } finally {
+      setPartsApiDiagnosticRunning(false);
+    }
+  }, [partsApiScope.accessToken, partsApiScope.franchiseId, partsApiScope.tenantId, partsApiScope.userId]);
   const moduleActionBarTitle = moduleKey
     ? moduleKey.replace(/-/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase())
     : 'AMRO';
@@ -3408,6 +3464,25 @@ export function AmroOwnedWorkspace({
               remediation: {partsCatalog.fallbackAuthDiagnostics.remediation}
             </p>
             ) : null}
+            {partsApiDiagnosticMessage ? (
+            <p className="mt-1 text-xs">
+              diagnostic: {partsApiDiagnosticMessage}
+            </p>
+            ) : null}
+            <div className="mt-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={partsApiDiagnosticRunning}
+                onClick={() => {
+                  void runPartsLiveApiDiagnostics();
+                }}
+              >
+                {partsApiDiagnosticRunning ? <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+                Reconnect Live API
+              </Button>
+            </div>
           </div>
           ) : null}
           <AmroPartsInventoryWorkbench

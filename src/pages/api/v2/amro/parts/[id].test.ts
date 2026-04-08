@@ -244,6 +244,67 @@ describe('/api/v2/amro/parts/[id]', () => {
     expect(res.statusCode).toBe(404);
   });
 
+  it('returns 404 when update affects no row after lookup', async () => {
+    const supabase: any = {
+      from: vi.fn((table: string) => {
+        if (table === 'parts_inventory') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  limit: vi.fn(() => ({
+                    maybeSingle: vi.fn().mockResolvedValue({
+                      data: {
+                        id: 'inv-1',
+                        tenant_id: 'tenant-1',
+                        franchise_id: 'fr-1',
+                        part_number: 'AMRO-PN-1',
+                        status: 'available',
+                        quantity_on_hand: 9,
+                        quantity_reserved: 1,
+                        warehouse_location: 'WH-A-001',
+                      },
+                      error: null,
+                    }),
+                  })),
+                })),
+              })),
+            })),
+            update: vi.fn(() => ({
+              eq: vi.fn(() => ({
+                eq: vi.fn(() => ({
+                  select: vi.fn(() => ({
+                    limit: vi.fn(() => ({
+                      maybeSingle: vi.fn().mockResolvedValue({
+                        data: null,
+                        error: null,
+                      }),
+                    })),
+                  })),
+                })),
+              })),
+            })),
+          };
+        }
+        if (table === 'audit_logs') return { insert: vi.fn().mockResolvedValue({ error: null }) };
+        if (table === 'amro_parts_mro_workflow_events') return { insert: vi.fn().mockResolvedValue({ error: null }) };
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabase);
+
+    const req: ApiRequest = {
+      method: 'PATCH',
+      query: { id: 'inv-1' },
+      headers: {},
+      body: { status: 'reserved' },
+    };
+    const res = createResponse();
+    await handler(req, res);
+    expect(res.statusCode).toBe(404);
+    expect((res.jsonBody as any)?.issues?.[0]?.field).toBe('id');
+  });
+
   it('returns 404 when feature flag is disabled', async () => {
     process.env.AMRO_PARTS_REALTIME_V2_ENABLED = 'false';
     const req: ApiRequest = { method: 'GET', query: { id: 'inv-1' }, headers: {} };
@@ -435,7 +496,8 @@ describe('/api/v2/amro/parts/[id]', () => {
     };
     const res = createResponse();
     await handler(req, res);
-    expect(res.statusCode).toBe(200);
+    expect(res.statusCode).toBe(400);
+    expect((res.jsonBody as any)?.issues?.[0]?.field).toBe('payload');
   });
 
   it('delegates to error handler for delete/update Supabase failures', async () => {

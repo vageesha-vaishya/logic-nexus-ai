@@ -30,6 +30,53 @@ function asObject(value: unknown): Record<string, unknown> {
   return value && typeof value === 'object' ? value as Record<string, unknown> : {};
 }
 
+const INVENTORY_ALLOWED_KEYS = new Set([
+  'part_number',
+  'serial_number',
+  'description',
+  'status',
+  'lifecycle_status',
+  'quantity_on_hand',
+  'quantity_reserved',
+  'warehouse_location',
+]);
+
+function normalizeInventoryPatchPayload(payload: Record<string, unknown>): Record<string, unknown> {
+  const normalized: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(payload)) {
+    if (!INVENTORY_ALLOWED_KEYS.has(key)) continue;
+    if (value === undefined) continue;
+    if (key === 'part_number') {
+      normalized[key] = String(value || '').trim().toUpperCase();
+      continue;
+    }
+    if (key === 'serial_number') {
+      const serial = String(value || '').trim().toUpperCase();
+      normalized[key] = serial || null;
+      continue;
+    }
+    if (key === 'description') {
+      const description = String(value || '').trim();
+      normalized[key] = description || null;
+      continue;
+    }
+    if (key === 'status' || key === 'lifecycle_status') {
+      normalized[key] = String(value || '').trim().toLowerCase();
+      continue;
+    }
+    if (key === 'warehouse_location') {
+      normalized[key] = String(value || '').trim();
+      continue;
+    }
+    if (key === 'quantity_on_hand' || key === 'quantity_reserved') {
+      normalized[key] = Number(value ?? 0);
+      continue;
+    }
+    normalized[key] = value;
+  }
+  return normalized;
+}
+
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'PATCH', 'DELETE', 'OPTIONS'] });
   if (handlePreflight(req, res)) return;
@@ -129,7 +176,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       return;
     }
 
-    const payload = asObject(req.body);
+    const payload = normalizeInventoryPatchPayload(asObject(req.body));
     const patch = {
       ...payload,
       part_number: payload.part_number ?? existing.part_number,
@@ -151,6 +198,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       updated_by: auth.userId,
       updated_at: new Date().toISOString(),
     };
+    if (Object.keys(payload).length === 0) {
+      res.status(400).json({
+        error: 'Validation failed',
+        issues: [{ field: 'payload', message: 'No inventory fields provided for update' }],
+        version: 'v2',
+        correlationId: ctx.correlationId,
+      });
+      return;
+    }
     const { data: updated, error: updateError } = await supabase
       .from('parts_inventory')
       .update(updatePayload)
@@ -159,7 +215,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       .select('id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,quantity_available,warehouse_location,supplier_name,criticality,ata_chapter,reorder_level,created_at,updated_at')
       .limit(1)
       .maybeSingle();
-    if (updateError) throw new Error(`Failed to update part record: ${updateError.message}`);
+    if (updateError) {
+      res.status(400).json({
+        error: 'Failed to update part record',
+        issues: [{ field: 'payload', message: updateError.message }],
+        version: 'v2',
+        correlationId: ctx.correlationId,
+      });
+      return;
+    }
+    if (!updated) {
+      res.status(404).json({
+        error: 'Record not found after update attempt',
+        issues: [{ field: 'id', message: 'No matching part record was updated' }],
+        version: 'v2',
+        correlationId: ctx.correlationId,
+      });
+      return;
+    }
 
     const workflowEvents = resolveWorkflowTriggers({
       previous: existing as Record<string, unknown>,

@@ -40,6 +40,13 @@ type ApiRecord = {
 type ApiResponseShape = {
   correlationId?: string;
   error?: string;
+  code?: string;
+  message?: string;
+  issues?: Array<{ field?: string; message?: string }>;
+  details?: {
+    rejected_non_inventory_fields?: string[];
+    rejected_unknown_fields?: string[];
+  };
   auth_diagnostics?: {
     failure_category?: string;
     reason_code?: string;
@@ -74,6 +81,56 @@ export type PartsMutationPayload = {
   ata_chapter?: string | null;
 };
 
+const INVENTORY_MUTATION_KEYS = new Set<keyof PartsMutationPayload>([
+  'part_number',
+  'serial_number',
+  'description',
+  'status',
+  'lifecycle_status',
+  'quantity_on_hand',
+  'quantity_reserved',
+  'warehouse_location',
+]);
+
+function sanitizeInventoryMutationPayload(
+  payload: Partial<PartsMutationPayload>,
+): Partial<PartsMutationPayload> {
+  const sanitized: Partial<PartsMutationPayload> = {};
+  for (const key of Object.keys(payload) as Array<keyof PartsMutationPayload>) {
+    if (!INVENTORY_MUTATION_KEYS.has(key)) continue;
+    const value = payload[key];
+    if (value === undefined) continue;
+    if (key === 'part_number') {
+      (sanitized as Record<string, unknown>)[key] = String(value || '').trim().toUpperCase();
+      continue;
+    }
+    if (key === 'warehouse_location') {
+      (sanitized as Record<string, unknown>)[key] = String(value || '').trim();
+      continue;
+    }
+    if (key === 'serial_number' || key === 'description') {
+      if (key === 'serial_number') {
+        const normalizedSerial = String(value || '').trim().toUpperCase();
+        (sanitized as Record<string, unknown>)[key] = normalizedSerial || null;
+        continue;
+      }
+      const normalized = String(value || '').trim();
+      (sanitized as Record<string, unknown>)[key] = normalized || null;
+      continue;
+    }
+    if (key === 'status' || key === 'lifecycle_status') {
+      (sanitized as Record<string, unknown>)[key] = String(value || '').trim().toLowerCase();
+      continue;
+    }
+    if (key === 'quantity_on_hand' || key === 'quantity_reserved') {
+      (sanitized as Record<string, unknown>)[key] = Number(value ?? 0);
+      continue;
+    }
+    (sanitized as Record<string, unknown>)[key] = value;
+  }
+  return sanitized;
+}
+
 export type PartsApiAuthDiagnostics = {
   failureCategory: string | null;
   reasonCode: string | null;
@@ -101,13 +158,37 @@ async function parseApiResponseShape(response: Response): Promise<ApiResponseSha
   }
 }
 
+async function buildMutationErrorMessage(response: Response, fallback: string): Promise<string> {
+  const payload = await parseApiResponseShape(response);
+  const issues = payload.issues || [];
+  if (issues.length > 0) {
+    const first = issues[0];
+    const field = String(first?.field || 'payload');
+    const message = String(first?.message || 'validation failed');
+    return `${fallback} (${response.status}) - ${field}: ${message}`;
+  }
+  const rejectedNonInventory = payload.details?.rejected_non_inventory_fields || [];
+  if (rejectedNonInventory.length > 0) {
+    return `${fallback} (${response.status}) - unsupported fields: ${rejectedNonInventory.join(', ')}`;
+  }
+  const rejectedUnknown = payload.details?.rejected_unknown_fields || [];
+  if (rejectedUnknown.length > 0) {
+    return `${fallback} (${response.status}) - unknown fields: ${rejectedUnknown.join(', ')}`;
+  }
+  const topLevelMessage = String(payload.message || '').trim();
+  if (topLevelMessage) return `${fallback} (${response.status}) - ${topLevelMessage}`;
+  const topLevelError = String(payload.error || '').trim();
+  if (topLevelError) return `${fallback} (${response.status}) - ${topLevelError}`;
+  return `${fallback} (${response.status})`;
+}
+
 function normalizeAuthDiagnostics(payload: ApiResponseShape): PartsApiAuthDiagnostics | null {
   const diagnostics = payload.auth_diagnostics;
-  if (!diagnostics) return null;
+  if (!diagnostics && !payload.code) return null;
   return {
-    failureCategory: diagnostics.failure_category ? String(diagnostics.failure_category) : null,
-    reasonCode: diagnostics.reason_code ? String(diagnostics.reason_code) : null,
-    remediation: diagnostics.remediation ? String(diagnostics.remediation) : null,
+    failureCategory: diagnostics?.failure_category ? String(diagnostics.failure_category) : 'token',
+    reasonCode: diagnostics?.reason_code ? String(diagnostics.reason_code) : (payload.code ? String(payload.code).toLowerCase() : null),
+    remediation: diagnostics?.remediation ? String(diagnostics.remediation) : (payload.error ? String(payload.error) : null),
   };
 }
 
@@ -151,11 +232,31 @@ function normalizeCriticality(criticality: string | undefined): PartCriticality 
   return 'normal';
 }
 
+function normalizeLifecycleStatus(lifecycleStatus: string | undefined, fallbackStatus: PartInventoryStatus): PartInventoryRecord['lifecycle_status'] {
+  const normalized = String(lifecycleStatus || '').toLowerCase();
+  if (
+    normalized === 'serviceable'
+    || normalized === 'inspection_due'
+    || normalized === 'needs_repair'
+    || normalized === 'repair_in_progress'
+    || normalized === 'ready_for_install'
+    || normalized === 'replaced'
+    || normalized === 'retired'
+    || normalized === 'quarantined'
+  ) {
+    return normalized;
+  }
+  if (fallbackStatus === 'unserviceable') return 'needs_repair';
+  if (fallbackStatus === 'quarantined') return 'quarantined';
+  return 'serviceable';
+}
+
 export function mapLiveApiRecordToPartInventoryRecord(record: ApiRecord): PartInventoryRecord {
   const quantityOnHand = Math.max(0, Number(record.quantityOnHand || 0));
   const quantityReserved = Math.max(0, Number(record.quantityReserved || 0));
   const quantityAvailable = Math.max(0, quantityOnHand - quantityReserved);
   const normalizedStatus = normalizeStatus(record.status);
+  const normalizedLifecycleStatus = normalizeLifecycleStatus(record.lifecycleStatus, normalizedStatus);
   const partNumber = String(record.partNumber || '').trim();
   const id = String(record.id || `missing-${partNumber || 'part'}`).trim();
   const ata = String(record.ataChapter || '').trim();
@@ -168,6 +269,7 @@ export function mapLiveApiRecordToPartInventoryRecord(record: ApiRecord): PartIn
     part_number: partNumber,
     serial_number: record.serialNumber ?? null,
     description: String(record.description || '').trim(),
+    lifecycle_status: normalizedLifecycleStatus,
     item_type: 'part',
     ata_chapter: ata,
     warehouse_location: location,
@@ -258,15 +360,16 @@ export async function createAmroPartRecord(
   fetchImpl: FetchLike = fetch,
   scope: AmroApiScope = {},
 ): Promise<void> {
+  const sanitizedPayload = sanitizeInventoryMutationPayload(payload);
   const headers = await buildAuthHeaders(asJsonHeaders(), scope);
   const response = await fetchImpl('/api/v2/amro/parts', {
     method: 'POST',
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(sanitizedPayload),
     credentials: 'include',
   });
   if (!response.ok) {
-    throw new Error(`Failed to create part (${response.status})`);
+    throw new Error(await buildMutationErrorMessage(response, 'Failed to create part'));
   }
 }
 
@@ -276,15 +379,16 @@ export async function updateAmroPartRecord(
   fetchImpl: FetchLike = fetch,
   scope: AmroApiScope = {},
 ): Promise<void> {
+  const sanitizedPayload = sanitizeInventoryMutationPayload(payload);
   const headers = await buildAuthHeaders(asJsonHeaders(), scope);
   const response = await fetchImpl(`/api/v2/amro/parts/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers,
-    body: JSON.stringify(payload),
+    body: JSON.stringify(sanitizedPayload),
     credentials: 'include',
   });
   if (!response.ok) {
-    throw new Error(`Failed to update part (${response.status})`);
+    throw new Error(await buildMutationErrorMessage(response, 'Failed to update part'));
   }
 }
 

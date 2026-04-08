@@ -7,6 +7,7 @@ export type PartInventoryRecord = {
   part_number: string;
   serial_number: string | null;
   description: string;
+  lifecycle_status?: 'serviceable' | 'inspection_due' | 'needs_repair' | 'repair_in_progress' | 'ready_for_install' | 'replaced' | 'retired' | 'quarantined';
   item_type: PartItemType;
   ata_chapter: string;
   warehouse_location: string;
@@ -79,6 +80,11 @@ export function generatePartInventoryRecords(options: GeneratorOptions = {}): Pa
     const partNumber = `AMRO-PN-${String(100000 + index).padStart(6, '0')}`;
     const itemType = ITEM_TYPES[index % ITEM_TYPES.length];
     const status = STATUSES[Math.floor(rand() * STATUSES.length)];
+    const lifecycleStatus = status === 'unserviceable'
+      ? 'needs_repair'
+      : status === 'quarantined'
+        ? 'quarantined'
+        : 'serviceable';
     const reorderLevel = Math.floor(5 + rand() * 24);
     const quantityOnHand = Math.floor(4 + rand() * 140);
     const quantityReserved = Math.min(quantityOnHand, Math.floor(rand() * 18));
@@ -96,6 +102,7 @@ export function generatePartInventoryRecords(options: GeneratorOptions = {}): Pa
       part_number: partNumber,
       serial_number: serialNumber,
       description: `${itemType.toUpperCase()} inventory record ${index + 1}`,
+      lifecycle_status: lifecycleStatus,
       item_type: itemType,
       ata_chapter: ATA_CODES[index % ATA_CODES.length],
       warehouse_location: `WH-${String.fromCharCode(65 + (index % 6))}-${String((index % 45) + 1).padStart(3, '0')}`,
@@ -148,4 +155,3 @@ export function computePartInventoryMetrics(records: PartInventoryRecord[]): Par
     inventoryValue: 0,
   });
 }
-
