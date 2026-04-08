@@ -1,0 +1,132 @@
+[
+  {
+    "browser": "chromium",
+    "case": "desktop-1366-75",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-chromium-desktop-1366-75.png"
+  },
+  {
+    "browser": "chromium",
+    "case": "desktop-1366-100",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-chromium-desktop-1366-100.png"
+  },
+  {
+    "browser": "chromium",
+    "case": "desktop-1366-125",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-chromium-desktop-1366-125.png"
+  },
+  {
+    "browser": "chromium",
+    "case": "desktop-1366-150",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-chromium-desktop-1366-150.png"
+  },
+  {
+    "browser": "chromium",
+    "case": "tablet-1024-100",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-chromium-tablet-1024-100.png"
+  },
+  {
+    "browser": "chromium",
+    "case": "mobile-390-100",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-chromium-mobile-390-100.png"
+  },
+  {
+    "browser": "firefox",
+    "case": "all",
+    "hasRail": false,
+    "railWidth": null,
+    "railDisplay": null,
+    "railBackground": null,
+    "screenshot": null,
+    "status": "browser-unavailable",
+    "error": "browser.newPage: Target page, context or browser has been closed"
+  },
+  {
+    "browser": "webkit",
+    "case": "desktop-1366-75",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-webkit-desktop-1366-75.png"
+  },
+  {
+    "browser": "webkit",
+    "case": "desktop-1366-100",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-webkit-desktop-1366-100.png"
+  },
+  {
+    "browser": "webkit",
+    "case": "desktop-1366-125",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-webkit-desktop-1366-125.png"
+  },
+  {
+    "browser": "webkit",
+    "case": "desktop-1366-150",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-webkit-desktop-1366-150.png"
+  },
+  {
+    "browser": "webkit",
+    "case": "tablet-1024-100",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-webkit-tablet-1024-100.png"
+  },
+  {
+    "browser": "webkit",
+    "case": "mobile-390-100",
+    "hasRail": true,
+    "railWidth": "1px",
+    "railDisplay": "block",
+    "railBackground": "rgba(225, 231, 239, 0.95)",
+    "screenshot": "docs/module-layout-v2.3/reports/screenshots/right-border-webkit-mobile-390-100.png"
+  },
+  {
+    "browser": "edge",
+    "case": "all",
+    "hasRail": false,
+    "railWidth": null,
+    "railDisplay": null,
+    "railBackground": null,
+    "screenshot": null,
+    "status": "browser-unavailable",
+    "error": "browserType.launch: Chromium distribution 'msedge' is not found at /Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge\nRun \"npx playwright install msedge\""
+  }
+]

@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://logicnexus.ai/schemas/module-layout-v23/event-stream.schema.json",
+  "title": "Module Layout v2.3 Event Payload",
+  "type": "object",
+  "required": ["event_id", "event_type", "occurred_at", "actor", "payload"],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "minLength": 8,
+      "maxLength": 128,
+      "pattern": "^[A-Za-z0-9:_-]+$"
+    },
+    "event_type": {
+      "type": "string",
+      "enum": [
+        "inventory.updated",
+        "inventory.created",
+        "inventory.deleted",
+        "reservation.changed",
+        "checklist.recomputed",
+        "ui.viewport.validated"
+      ]
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tenant_id": {
+      "type": "string"
+    },
+    "franchise_id": {
+      "type": ["string", "null"]
+    },
+    "actor": {
+      "type": "object",
+      "required": ["id", "role"],
+      "properties": {
+        "id": { "type": "string" },
+        "role": { "type": "string" },
+        "ip_hash": { "type": "string" }
+      },
+      "additionalProperties": false
+    },
+    "payload": {
+      "type": "object",
+      "description": "Sanitized payload subset with PII-redacted content.",
+      "additionalProperties": true
+    },
+    "checksum": {
+      "type": "string",
+      "description": "Optional SHA-256 checksum for tamper detection."
+    }
+  },
+  "additionalProperties": false
+}

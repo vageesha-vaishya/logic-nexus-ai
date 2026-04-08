@@ -1,0 +1,14 @@
+ticket_id,title,workstream,owner,due_date,status,estimate_hours,dependencies
+FE-2301,Event Stream side panel integration,Front-end,Senior React Engineer A,2026-04-15,In Progress,14,
+FE-2302,CRUD timeline panel and callback adapters,Front-end,Senior React Engineer B,2026-04-16,In Progress,12,FE-2301
+FE-2303,Viewport checklist sticky banner and rules engine,Front-end,Senior React Engineer A,2026-04-17,Planned,12,FE-2301
+FE-2304,Panel collapse/restore resilience and keyboard shortcuts,Front-end,Senior React Engineer B,2026-04-14,Completed,8,
+BE-2301,Event ingestion endpoint and schema validation,Back-end,Platform Engineer,2026-04-18,Planned,10,
+BE-2302,WebSocket channel and bounded event replay,Back-end,Platform Engineer,2026-04-21,Planned,12,BE-2301
+BE-2303,Audit log table migration and retention policy,Back-end,Platform Engineer,2026-04-22,Planned,8,BE-2301
+QA-2301,Unit and integration automation suite,QA,QA Automation Engineer,2026-04-23,In Progress,14,FE-2302
+QA-2302,Cypress workflow scenario implementation,QA,QA Automation Engineer,2026-04-24,Planned,8,QA-2301
+UX-2301,Enterprise spacing and hierarchy refinement,UX,UX Designer,2026-04-15,In Progress,8,
+OPS-2301,CI quality gate and cache optimization,DevOps,DevOps Engineer (0.5 FTE),2026-04-24,Planned,10,QA-2301
+SEC-2301,SAST/DAST/dependency gate and sign-off,Security,Platform + QA,2026-04-26,Planned,6,OPS-2301
+REL-2301,UAT sign-off and production cutover,Release,Engineering Manager,2026-04-29,Planned,6,SEC-2301

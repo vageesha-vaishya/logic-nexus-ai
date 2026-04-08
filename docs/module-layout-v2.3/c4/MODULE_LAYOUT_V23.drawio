@@ -1,0 +1,59 @@
+<mxfile host="app.diagrams.net" modified="2026-04-08T00:00:00.000Z" agent="Trae-AI" version="24.7.17">
+  <diagram id="container-view" name="Container View">
+    <mxGraphModel dx="1220" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="browser" value="Browser Client&#xa;(Grid + Detail + Event Stream + Checklist)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="100" y="220" width="300" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="api" value="AMRO API Layer&#xa;(Next.js /api/v2/amro/*)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="470" y="220" width="260" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="db" value="Supabase Postgres&#xa;(AMRO + UIM inventory tables)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="800" y="220" width="280" height="120" as="geometry"/>
+        </mxCell>
+        <mxCell id="obs" value="Observability&#xa;(Sentry + PostHog + Logs)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;" vertex="1" parent="1">
+          <mxGeometry x="470" y="60" width="260" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="e1" value="REST/JSON" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="browser" target="api">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e2" value="SQL/RPC" style="endArrow=block;html=1;rounded=0;" edge="1" parent="1" source="api" target="db">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+        <mxCell id="e3" value="telemetry" style="endArrow=block;html=1;rounded=0;dashed=1;" edge="1" parent="1" source="browser" target="obs">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+  <diagram id="component-view" name="Component View">
+    <mxGraphModel dx="1220" dy="720" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1920" pageHeight="1080" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="c1" value="AmroInventoryDataGridTemplate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;" vertex="1" parent="1">
+          <mxGeometry x="130" y="180" width="260" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="c2" value="EventStreamPanel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="430" y="120" width="220" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="c3" value="CrudTimelinePanel" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;" vertex="1" parent="1">
+          <mxGeometry x="430" y="240" width="220" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="c4" value="ViewportChecklistBanner" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;" vertex="1" parent="1">
+          <mxGeometry x="130" y="60" width="260" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="c5" value="Event API / WebSocket" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;" vertex="1" parent="1">
+          <mxGeometry x="730" y="180" width="220" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="x1" style="endArrow=block;html=1;" edge="1" parent="1" source="c1" target="c2"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="x2" style="endArrow=block;html=1;" edge="1" parent="1" source="c1" target="c3"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="x3" style="endArrow=block;html=1;" edge="1" parent="1" source="c4" target="c1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="x4" style="endArrow=block;html=1;" edge="1" parent="1" source="c2" target="c5"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="x5" style="endArrow=block;html=1;" edge="1" parent="1" source="c3" target="c5"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

@@ -1,0 +1,44 @@
+{
+  "title": "Module Layout v2.3 KPI Dashboard",
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "version": 1,
+  "refresh": "30s",
+  "tags": ["amro", "module-layout-v2.3", "kpi"],
+  "panels": [
+    {
+      "type": "timeseries",
+      "title": "Event Stream Latency p95 (ms)",
+      "targets": [{"expr": "histogram_quantile(0.95, sum(rate(event_stream_latency_bucket[5m])) by (le))"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 250}]}}}
+    },
+    {
+      "type": "stat",
+      "title": "CRUD Error Rate (%)",
+      "targets": [{"expr": "(sum(rate(crud_errors_total[5m])) / sum(rate(crud_requests_total[5m]))) * 100"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 0.1}]}}}
+    },
+    {
+      "type": "stat",
+      "title": "Viewport Checklist Coverage (%)",
+      "targets": [{"expr": "(sum(viewport_checklist_pass_total) / sum(viewport_checklist_required_total)) * 100"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "red", "value": null}, {"color": "yellow", "value": 95}, {"color": "green", "value": 100}]}}}
+    },
+    {
+      "type": "stat",
+      "title": "OWASP High/Critical Findings",
+      "targets": [{"expr": "sum(owasp_zap_findings{severity=~\"high|critical\"})"}],
+      "fieldConfig": {"defaults": {"thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "red", "value": 1}]}}}
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "env",
+        "type": "custom",
+        "query": "dev,staging,prod",
+        "current": {"text": "staging", "value": "staging"}
+      }
+    ]
+  }
+}

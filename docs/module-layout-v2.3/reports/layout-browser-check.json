@@ -1,0 +1,25 @@
+[
+  {
+    "browser": "chromium",
+    "status": "ok",
+    "hasGridRoot": false,
+    "hasDetailHeader": true,
+    "horizontalOverflow": false,
+    "width": 1366,
+    "scrollWidth": 1366
+  },
+  {
+    "browser": "firefox",
+    "status": "failed",
+    "error": "browser.newPage: Target page, context or browser has been closed"
+  },
+  {
+    "browser": "webkit",
+    "status": "ok",
+    "hasGridRoot": false,
+    "hasDetailHeader": true,
+    "horizontalOverflow": false,
+    "width": 1366,
+    "scrollWidth": 1366
+  }
+]

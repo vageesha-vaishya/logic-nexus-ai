@@ -48,6 +48,44 @@
     - ARIA labels + live region announcements
     - high contrast mode toggle
 
+## Inventory Module Storybook Templates
+- Storybook path: `AMRO/Inventory/Module Templates`
+- Story source: `AmroInventoryModuleTemplates.stories.tsx`
+- Evaluation coverage:
+  - integrated table + record detail workspace
+  - search filters and advanced-filter trigger
+  - form-input modal template (`Input`, `Select`, `Textarea`, grouped fields)
+  - action-button patterns (`Import`, `New Part`, `Delete`)
+  - modal dialog patterns (`Dialog`, `AlertDialog`)
+  - state variants (`loading`, `empty`, `error`, `ready`)
+  - responsive view modes (`horizontal-split`, `vertical-split`, `stacked-auto`)
+  - interaction/event trace panel for UX flow verification
+  - large-catalog lazy-load scenario (`LargeCatalogLazyLoading`)
+- Integration contracts:
+  - `partsInventoryContracts.ts` (`PartsCatalogApi`, `PartsCatalogQuery`, `PartsCatalogResponse`)
+- State management pattern:
+  - `usePartsCatalogState` for lazy paging, query reset, and scale-safe loading
+- Practical deployment guide:
+  - `AMRO_PARTS_LIBRARY_DEPLOYMENT_GUIDE.md`
+- Cypress permission guardrail flow:
+  - `cypress/integration/amro-grid-permissions.cy.js` (validates `ReadOnlyRole` and `EditorRole` CRUD icon states)
+- Storybook stress validation:
+  - `LongContentSeparatorValidation` story in `AmroInventoryDataGridTemplate.stories.tsx`
+  - validates separator persistence with long text, deep metadata, and mobile-width viewport constraints
+
+## Record Detail Separator Box
+- Component pattern lives in:
+  - `AmroInventoryDataGridTemplate.tsx` (`renderDefaultDetail`)
+- HTML structure:
+  - Section container: `.record-detail-section-box`
+  - Separator container: `.record-detail-separator-box` (`role="separator"`)
+  - Separator label: `.record-detail-separator-label`
+- Layout/CSS behavior:
+  - Uses flow-based layout (no absolute positioning) so separators never overlap fields.
+  - Uses `relative z-10` on separator and section containers for deterministic stacking.
+  - Uses responsive spacing (`p-2.5 md:p-3`, `space-y-3`) to keep alignment across viewport sizes.
+  - Uses bordered background containers (`bg-background`, `border-border/70`) to keep visual separation persistent regardless of content length.
+
 ## Naming Conventions
 - **Template components**: `AmroStandard*`
 - **Adapter components**: `Amro*Adapter` (module-specific binding layer)
