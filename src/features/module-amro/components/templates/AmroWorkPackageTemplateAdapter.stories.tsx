@@ -1,6 +1,11 @@
 import { useRef, useState, type RefObject } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AmroWorkPackageTemplateAdapter } from './AmroWorkPackageTemplateAdapter';
+import {
+  amroPartsEnterpriseDecorator,
+  amroPartsEnterpriseParameters,
+  buildAmroPartsEnterpriseDocsDescription,
+} from '../parts/storybook/amroPartsEnterpriseStoryTemplate';
 
 type MockRow = Record<string, unknown>;
 type MockTables = {
@@ -142,12 +147,25 @@ function RuntimeAdapterHarness({
 const meta: Meta<typeof RuntimeAdapterHarness> = {
   title: 'AMRO/Templates/WorkPackageTemplatesRuntimeAdapter',
   component: RuntimeAdapterHarness,
-  tags: ['autodocs'],
+  tags: ['autodocs', 'amro', 'parts', 'enterprise'],
+  decorators: [amroPartsEnterpriseDecorator],
   parameters: {
-    layout: 'padded',
+    ...amroPartsEnterpriseParameters,
     docs: {
+      ...(amroPartsEnterpriseParameters.docs || {}),
       description: {
-        component: 'Runtime-parity Storybook reference for AMRO WPT adapter integration (realistic scopedDb mock + live section rendering contract).',
+        component: [
+          buildAmroPartsEnterpriseDocsDescription({
+            componentId: 'AMRO-WPT-RUNTIME-ADAPTER',
+            ownerTeam: 'AMRO Platform Team',
+            releaseRing: 'uat',
+            dataClassification: 'internal',
+            approvalPolicy: 'two_person_review_required',
+            auditReference: 'SCR-AMRO-WPT-RUNTIME-ADAPTER',
+          }),
+          '',
+          'Runtime-parity Storybook reference for AMRO WPT adapter integration (realistic scopedDb mock + live section rendering contract).',
+        ].join('\n'),
       },
     },
   },

@@ -148,6 +148,7 @@ describe('Authentication Middleware', () => {
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
+
 });
 
 describe('Error Handling', () => {

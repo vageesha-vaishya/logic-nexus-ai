@@ -6,6 +6,11 @@ import {
   type AmroTemplateFieldDefinition,
   type AmroTemplateSection,
 } from './AmroStandardFormTemplate';
+import {
+  amroPartsEnterpriseDecorator,
+  amroPartsEnterpriseParameters,
+  buildAmroPartsEnterpriseDocsDescription,
+} from '../parts/storybook/amroPartsEnterpriseStoryTemplate';
 
 const noop = () => undefined;
 
@@ -44,7 +49,24 @@ const baseSections: AmroTemplateSection[] = [
 const meta: Meta<typeof AmroStandardFormTemplate> = {
   title: 'AMRO/Templates/AmroStandardFormTemplate',
   component: AmroStandardFormTemplate,
-  parameters: { layout: 'padded' },
+  parameters: {
+    ...amroPartsEnterpriseParameters,
+    docs: {
+      ...(amroPartsEnterpriseParameters.docs || {}),
+      description: {
+        component: buildAmroPartsEnterpriseDocsDescription({
+          componentId: 'AMRO-STANDARD-FORM-TEMPLATE',
+          ownerTeam: 'AMRO Platform Team',
+          releaseRing: 'production',
+          dataClassification: 'internal',
+          approvalPolicy: 'two_person_review_required',
+          auditReference: 'SCR-AMRO-STANDARD-FORM-TEMPLATE',
+        }),
+      },
+    },
+  },
+  decorators: [amroPartsEnterpriseDecorator],
+  tags: ['autodocs', 'amro', 'parts', 'enterprise'],
   args: {
     moduleKey: 'aircraft',
     title: 'AMRO Standard Template',

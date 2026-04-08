@@ -74,12 +74,20 @@
     - `reason_code`
     - `remediation`
     - header/token presence checks for operations triage
+- Inventory-only payload enforcement:
+  - `POST/PATCH /api/v2/amro/parts*` reject non-inventory mutation fields (supplier, pricing/cost, reorder planning, metadata).
+  - Violations return `400 VALIDATION_ERROR` with `details.rejected_non_inventory_fields` and `details.rejected_unknown_fields`.
 
 ## UI/UX Integration
 - Live API adapter:
   - `src/features/module-amro/components/parts/livePartsCatalogApi.ts`
 - Route-level wiring:
   - `src/features/module-amro/components/AmroOwnedWorkspace.tsx`
+- Shared parts field schema:
+  - `src/features/module-amro/components/parts/partsDetailSchema.ts`
+  - Centralizes required/detail visibility keys + status/criticality/lifecycle options for synchronized UI behavior.
+  - Create/Edit dialogs now render from schema-defined core/advanced field order with required markers from `PARTS_FORM_REQUIRED_KEYS`.
+  - Inventory-only mode keeps stock/location/status fields and excludes supplier, pricing/cost, reorder planning, and other non-inventory detail surfaces.
 - CRUD dialog wiring:
   - Create dialog -> `POST /api/v2/amro/parts`
   - Edit dialog -> `PATCH /api/v2/amro/parts/{id}`

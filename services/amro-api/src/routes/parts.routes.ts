@@ -7,6 +7,45 @@ const router = Router();
 
 type JsonRecord = Record<string, unknown>;
 
+const INVENTORY_MUTATION_KEY_ALIASES: Record<string, string> = {
+  part_number: 'part_number',
+  partNumber: 'part_number',
+  serial_number: 'serial_number',
+  serialNumber: 'serial_number',
+  description: 'description',
+  status: 'status',
+  lifecycle_status: 'lifecycle_status',
+  lifecycleStatus: 'lifecycle_status',
+  quantity_on_hand: 'quantity_on_hand',
+  quantityOnHand: 'quantity_on_hand',
+  quantity_reserved: 'quantity_reserved',
+  quantityReserved: 'quantity_reserved',
+  warehouse_location: 'warehouse_location',
+  warehouseLocation: 'warehouse_location',
+};
+
+const NON_INVENTORY_MUTATION_KEYS = new Set([
+  'supplier_name',
+  'supplierName',
+  'criticality',
+  'ata_chapter',
+  'ataChapter',
+  'reorder_level',
+  'reorderLevel',
+  'reorder_quantity',
+  'reorderQuantity',
+  'min_serviceable_qty',
+  'minServiceableQty',
+  'unit_cost',
+  'unitCost',
+  'currency',
+  'certification_expiry_date',
+  'certificationExpiryDate',
+  'expiry_date',
+  'expiryDate',
+  'metadata',
+]);
+
 function getSupabaseAdminClient(): SupabaseClient {
   const url = String(
     process.env.AMRO_SUPABASE_URL ||
@@ -36,6 +75,31 @@ function asObject(value: unknown): JsonRecord {
   return value && typeof value === 'object' ? (value as JsonRecord) : {};
 }
 
+function sanitizeAndNormalizeInventoryPayload(payload: JsonRecord): {
+  normalizedPayload: JsonRecord;
+  rejectedNonInventoryKeys: string[];
+  rejectedUnknownKeys: string[];
+} {
+  const normalizedPayload: JsonRecord = {};
+  const rejectedNonInventoryKeys: string[] = [];
+  const rejectedUnknownKeys: string[] = [];
+
+  for (const [key, value] of Object.entries(payload)) {
+    if (NON_INVENTORY_MUTATION_KEYS.has(key)) {
+      rejectedNonInventoryKeys.push(key);
+      continue;
+    }
+    const normalizedKey = INVENTORY_MUTATION_KEY_ALIASES[key];
+    if (!normalizedKey) {
+      rejectedUnknownKeys.push(key);
+      continue;
+    }
+    normalizedPayload[normalizedKey] = value;
+  }
+
+  return { normalizedPayload, rejectedNonInventoryKeys, rejectedUnknownKeys };
+}
+
 function mapRowToTemplateRecord(row: JsonRecord): JsonRecord {
   return {
     id: String(row.id || ''),
@@ -50,6 +114,13 @@ function mapRowToTemplateRecord(row: JsonRecord): JsonRecord {
     supplierName: row.supplier_name ? String(row.supplier_name) : null,
     criticality: String(row.criticality || 'normal'),
     ataChapter: row.ata_chapter ? String(row.ata_chapter) : null,
+    reorderLevel: Number(row.reorder_level || 0),
+    reorderQuantity: Number(row.reorder_quantity || 0),
+    minServiceableQty: Number(row.min_serviceable_qty || 0),
+    unitCost: Number(row.unit_cost || 0),
+    currency: row.currency ? String(row.currency) : 'USD',
+    certificationExpiryDate: row.certification_expiry_date ? String(row.certification_expiry_date) : null,
+    expiryDate: row.expiry_date ? String(row.expiry_date) : null,
   };
 }
 
@@ -72,7 +143,7 @@ router.get(
     let query = supabase
       .from('parts_inventory')
       .select(
-        'id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,warehouse_location,supplier_name,criticality,ata_chapter,updated_at',
+        'id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,warehouse_location,supplier_name,criticality,ata_chapter,reorder_level,reorder_quantity,min_serviceable_qty,unit_cost,currency,certification_expiry_date,expiry_date,updated_at',
         { count: 'exact' },
       )
       .eq('tenant_id', tenantId)
@@ -123,7 +194,7 @@ router.get(
     const supabase = getSupabaseAdminClient();
     const { data, error } = await supabase
       .from('parts_inventory')
-      .select('id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,warehouse_location,supplier_name,criticality,ata_chapter')
+      .select('id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,warehouse_location,supplier_name,criticality,ata_chapter,reorder_level,reorder_quantity,min_serviceable_qty,unit_cost,currency,certification_expiry_date,expiry_date')
       .eq('tenant_id', tenantId)
       .eq('id', id)
       .limit(1)
@@ -152,8 +223,21 @@ router.post(
       return;
     }
     const payload = asObject(req.body);
-    const partNumber = String(payload.part_number || payload.partNumber || '').trim().toUpperCase();
-    const warehouseLocation = String(payload.warehouse_location || payload.warehouseLocation || '').trim();
+    const { normalizedPayload, rejectedNonInventoryKeys, rejectedUnknownKeys } = sanitizeAndNormalizeInventoryPayload(payload);
+    if (rejectedNonInventoryKeys.length > 0 || rejectedUnknownKeys.length > 0) {
+      res.status(400).json({
+        error: 'Payload contains unsupported fields for inventory-only AMRO parts route',
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+        details: {
+          rejected_non_inventory_fields: rejectedNonInventoryKeys,
+          rejected_unknown_fields: rejectedUnknownKeys,
+        },
+      });
+      return;
+    }
+    const partNumber = String(normalizedPayload.part_number || '').trim().toUpperCase();
+    const warehouseLocation = String(normalizedPayload.warehouse_location || '').trim();
     if (!partNumber || !warehouseLocation) {
       res.status(400).json({ error: 'part_number and warehouse_location are required', code: 'VALIDATION_ERROR', statusCode: 400 });
       return;
@@ -162,16 +246,13 @@ router.post(
     const insertPayload = {
       tenant_id: req.tenantId,
       part_number: partNumber,
-      serial_number: String(payload.serial_number || payload.serialNumber || '').trim() || null,
-      description: String(payload.description || '').trim() || null,
-      status: String(payload.status || 'available').toLowerCase(),
-      lifecycle_status: String(payload.lifecycle_status || payload.lifecycleStatus || 'serviceable').toLowerCase(),
-      quantity_on_hand: Number(payload.quantity_on_hand ?? payload.quantityOnHand ?? 0),
-      quantity_reserved: Number(payload.quantity_reserved ?? payload.quantityReserved ?? 0),
+      serial_number: String(normalizedPayload.serial_number || '').trim() || null,
+      description: String(normalizedPayload.description || '').trim() || null,
+      status: String(normalizedPayload.status || 'available').toLowerCase(),
+      lifecycle_status: String(normalizedPayload.lifecycle_status || 'serviceable').toLowerCase(),
+      quantity_on_hand: Number(normalizedPayload.quantity_on_hand ?? 0),
+      quantity_reserved: Number(normalizedPayload.quantity_reserved ?? 0),
       warehouse_location: warehouseLocation,
-      supplier_name: String(payload.supplier_name || payload.supplierName || '').trim() || null,
-      criticality: String(payload.criticality || 'normal').toLowerCase(),
-      ata_chapter: String(payload.ata_chapter || payload.ataChapter || '').trim() || null,
       created_by: req.userId,
       updated_by: req.userId,
     };
@@ -179,7 +260,7 @@ router.post(
     const { data, error } = await supabase
       .from('parts_inventory')
       .insert(insertPayload)
-      .select('id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,warehouse_location,supplier_name,criticality,ata_chapter')
+      .select('id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,warehouse_location,supplier_name,criticality,ata_chapter,reorder_level,reorder_quantity,min_serviceable_qty,unit_cost,currency,certification_expiry_date,expiry_date')
       .limit(1)
       .maybeSingle();
     if (error) {
@@ -207,11 +288,24 @@ router.patch(
       return;
     }
     const payload = asObject(req.body);
+    const { normalizedPayload, rejectedNonInventoryKeys, rejectedUnknownKeys } = sanitizeAndNormalizeInventoryPayload(payload);
+    if (rejectedNonInventoryKeys.length > 0 || rejectedUnknownKeys.length > 0) {
+      res.status(400).json({
+        error: 'Payload contains unsupported fields for inventory-only AMRO parts route',
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+        details: {
+          rejected_non_inventory_fields: rejectedNonInventoryKeys,
+          rejected_unknown_fields: rejectedUnknownKeys,
+        },
+      });
+      return;
+    }
     const updatePayload: JsonRecord = {
       updated_by: req.userId,
       updated_at: new Date().toISOString(),
     };
-    for (const [key, value] of Object.entries(payload)) {
+    for (const [key, value] of Object.entries(normalizedPayload)) {
       updatePayload[key] = value;
     }
     const supabase = getSupabaseAdminClient();
@@ -220,7 +314,7 @@ router.patch(
       .update(updatePayload)
       .eq('tenant_id', req.tenantId)
       .eq('id', id)
-      .select('id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,warehouse_location,supplier_name,criticality,ata_chapter')
+      .select('id,part_number,serial_number,description,status,lifecycle_status,quantity_on_hand,quantity_reserved,warehouse_location,supplier_name,criticality,ata_chapter,reorder_level,reorder_quantity,min_serviceable_qty,unit_cost,currency,certification_expiry_date,expiry_date')
       .limit(1)
       .maybeSingle();
     if (error) {
@@ -266,4 +360,3 @@ router.delete(
 );
 
 export default router;
-

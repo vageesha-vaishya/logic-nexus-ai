@@ -7,6 +7,11 @@ import {
   type AmroTemplateFieldDefinition,
   type AmroTemplateSection,
 } from './AmroStandardFormTemplate';
+import {
+  amroPartsEnterpriseDecorator,
+  amroPartsEnterpriseParameters,
+  buildAmroPartsEnterpriseDocsDescription,
+} from '../parts/storybook/amroPartsEnterpriseStoryTemplate';
 
 const noop = () => undefined;
 
@@ -68,12 +73,22 @@ function legacySlot(options?: {
 const meta: Meta<typeof AmroStandardFormTemplate> = {
   title: 'AMRO/Templates/WorkPackageTemplatesEnterprise',
   component: AmroStandardFormTemplate,
-  tags: ['autodocs'],
+  tags: ['autodocs', 'amro', 'parts', 'enterprise'],
+  decorators: [amroPartsEnterpriseDecorator],
   parameters: {
-    layout: 'padded',
+    ...amroPartsEnterpriseParameters,
     docs: {
+      ...(amroPartsEnterpriseParameters.docs || {}),
       description: {
-        component: `
+        component: `${buildAmroPartsEnterpriseDocsDescription({
+          componentId: 'AMRO-WPT-ENTERPRISE-TEMPLATES',
+          ownerTeam: 'AMRO Platform Team',
+          releaseRing: 'uat',
+          dataClassification: 'internal',
+          approvalPolicy: 'two_person_review_required',
+          auditReference: 'SCR-AMRO-WPT-ENTERPRISE',
+        })}
+
 Enterprise-grade reference templates for AMRO Work Package Templates.
 
 Usage Guidance:

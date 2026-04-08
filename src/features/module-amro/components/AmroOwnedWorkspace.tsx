@@ -25,6 +25,13 @@ import {
 } from './parts/livePartsCatalogApi';
 import { usePartsCatalogState } from './parts/usePartsCatalogState';
 import type { PartInventoryRecord } from './parts/mockPartsInventoryData';
+import {
+  PARTS_FORM_ADVANCED_FIELDS,
+  PARTS_FORM_CORE_FIELDS,
+  PARTS_FORM_REQUIRED_KEYS,
+  type PartsFormFieldKey,
+  type PartsFormFieldSchema,
+} from './parts/partsDetailSchema';
 
 const assetTypeLabel: Record<AmroAssetType, string> = {
   aircraft: 'Aircraft',
@@ -386,11 +393,11 @@ export function AmroOwnedWorkspace({
   const canRunRegulatoryFinalSignOff = activeUxRole !== 'engineer';
   const canRunCertifyingRelease = activeUxRole !== 'planner';
   const partsApiScope = useMemo(() => ({
-    tenantId: context.tenantId || null,
-    franchiseId: context.franchiseId || null,
-    userId: context.userId || null,
+    tenantId: context?.tenantId || null,
+    franchiseId: context?.franchiseId || null,
+    userId: context?.userId || null,
     accessToken: session?.access_token || null,
-  }), [context.franchiseId, context.tenantId, context.userId, session?.access_token]);
+  }), [context?.franchiseId, context?.tenantId, context?.userId, session?.access_token]);
   const partsCatalogApi = useMemo(() => createAmroPartsCatalogApi(fetch, partsApiScope), [partsApiScope]);
   const partsCatalog = usePartsCatalogState({
     pageSize: 80,
@@ -449,6 +456,46 @@ export function AmroOwnedWorkspace({
       ata_chapter: '',
     });
   }, []);
+
+  const partsRequiredFieldSet = useMemo(() => new Set<PartsFormFieldKey>(PARTS_FORM_REQUIRED_KEYS), []);
+  const updatePartsFormField = useCallback(<K extends PartsFormFieldKey>(key: K, value: PartsMutationPayload[K]) => {
+    setPartsForm((current) => ({ ...current, [key]: value }));
+  }, []);
+  const isPartsFormFieldRequired = useCallback((key: PartsFormFieldKey) => partsRequiredFieldSet.has(key), [partsRequiredFieldSet]);
+  const isPartsFormValid = useMemo(() => (
+    PARTS_FORM_REQUIRED_KEYS.every((key) => {
+      const value = partsForm[key];
+      if (typeof value === 'number') return !Number.isNaN(value) && value >= 0;
+      return String(value || '').trim().length > 0;
+    })
+  ), [partsForm]);
+  const renderPartsFormField = useCallback((field: PartsFormFieldSchema, mode: 'create' | 'edit') => {
+    const inputId = `parts-${mode}-${field.key.replace(/_/g, '-')}`;
+    const value = partsForm[field.key];
+    const required = isPartsFormFieldRequired(field.key);
+    return (
+      <div key={`${mode}-${field.key}`} className={`space-y-1 ${field.colSpan === 2 ? 'md:col-span-2' : ''}`}>
+        <Label htmlFor={inputId}>
+          {field.label}
+          {required ? <span className="ml-1 text-destructive">*</span> : null}
+        </Label>
+        {field.control === 'textarea' ? (
+          <Textarea id={inputId} value={String(value || '')} onChange={(event) => updatePartsFormField(field.key, event.target.value as never)} />
+        ) : field.control === 'number' ? (
+          <TextInput id={inputId} type="number" value={String(typeof value === 'number' ? value : 0)} onChange={(event) => updatePartsFormField(field.key, Number(event.target.value || 0) as never)} />
+        ) : field.control === 'select' ? (
+          <Select value={String(value || '')} onValueChange={(next) => updatePartsFormField(field.key, next as never)}>
+            <SelectTrigger id={inputId}><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {(field.options || []).map((option) => <SelectItem key={`${inputId}-${option}`} value={option}>{option}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        ) : (
+          <TextInput id={inputId} value={String(value || '')} onChange={(event) => updatePartsFormField(field.key, event.target.value as never)} />
+        )}
+      </div>
+    );
+  }, [isPartsFormFieldRequired, partsForm, updatePartsFormField]);
 
   const openCreatePartDialog = useCallback(() => {
     setPartsTargetRecord(null);
@@ -1921,7 +1968,7 @@ export function AmroOwnedWorkspace({
           {visibleWorkspaceError}
         </div>
       ) : null}
-      {moduleKey && moduleKey !== 'work-packages' ? (
+      {moduleKey && moduleKey !== 'work-packages' && moduleKey !== 'parts' ? (
         <Card data-amro-owned-surface="module-action-bar">
           <CardHeader className="pb-2">
             <CardTitle>{moduleActionBarTitle} Module Actions</CardTitle>
@@ -3345,63 +3392,6 @@ export function AmroOwnedWorkspace({
       {showPartsModule || showIntelligenceModule ? (
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {showPartsModule ? (
-        <Card data-amro-screen="SCR-AMRO-007" data-amro-owned-surface="materials-repair-loop-orchestration" role="region" aria-label="SCR-AMRO-007 Materials Reservation Panel">
-          <CardHeader className="pb-2">
-            <CardTitle>SCR-AMRO-007 Materials Reservation Panel</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="grid grid-cols-2 gap-2 text-sm">
-              <div className="rounded-md border p-2">Shortages: {state.materialsSummary.shortageCount}</div>
-              <div className="rounded-md border p-2">Pending Reservations: {state.materialsSummary.pendingReservations}</div>
-              <div className="rounded-md border p-2">ETA At Risk: {state.materialsSummary.atRiskEtaCount}</div>
-              <div className="rounded-md border p-2">LLP Alerts: {state.materialsSummary.llpAlertCount}</div>
-            </div>
-            <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-              <Button variant="outline" onClick={state.reservePartsAllocationForSelectedWorkPackage} disabled={!state.selectedWorkPackageId}>
-                Build Allocation
-              </Button>
-              <Button variant="outline" onClick={state.processCriticalShortageResponse} disabled={state.materialsSummary.shortageCount === 0}>
-                Process Shortage
-              </Button>
-              <Button variant="outline" onClick={state.runInventoryOptimizationModel} disabled={!state.selectedWorkPackageId}>
-                Run Optimization
-              </Button>
-              <Button variant="outline" onClick={state.syncSupplierAsnAndErpProcurement}>
-                Sync ASN + ERP
-              </Button>
-            </div>
-            <div className="grid grid-cols-1 gap-2 text-xs">
-              <div className="rounded-md border p-2">
-                Optimization Run: {state.lastInventoryOptimizationRunId || 'Not started'}
-              </div>
-              <div className="rounded-md border p-2">
-                Procurement Sync: {state.lastProcurementSyncId || 'Not started'}
-              </div>
-            </div>
-            {state.materials.map((material) => (
-              <div key={material.id} className="space-y-2 rounded-md border p-2 text-xs">
-                <p className="font-medium">{material.partNumber}</p>
-                <p className="text-muted-foreground">
-                  {material.reservationStatus} · {material.repairAction}
-                </p>
-                <p className="text-muted-foreground">
-                  ETA {material.etaStatus} · Shortage {material.shortageSeverity}
-                </p>
-                <p className="text-muted-foreground">
-                  Rotable {material.rotableStatus} · LLP {material.llpRemainingCycles} cycles · Traceability {material.traceabilityStatus}
-                </p>
-                <div>
-                  <Button variant="secondary" size="sm" onClick={() => state.applyRotableLlpTraceability(material.id)}>
-                    Trace Rotable/LLP
-                  </Button>
-                </div>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-        ) : null}
-
-        {showPartsModule ? (
         <div className="xl:col-span-2">
           {partsCatalog.dataSource === 'fallback' ? (
           <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
@@ -3522,67 +3512,19 @@ export function AmroOwnedWorkspace({
             <DialogTitle>Create Part Inventory Record</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-part-number">Part Number</Label>
-              <TextInput id="parts-create-part-number" value={partsForm.part_number} onChange={(event) => setPartsForm((current) => ({ ...current, part_number: event.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-serial-number">Serial Number</Label>
-              <TextInput id="parts-create-serial-number" value={partsForm.serial_number || ''} onChange={(event) => setPartsForm((current) => ({ ...current, serial_number: event.target.value }))} />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="parts-create-description">Description</Label>
-              <Textarea id="parts-create-description" value={partsForm.description || ''} onChange={(event) => setPartsForm((current) => ({ ...current, description: event.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-status">Status</Label>
-              <Select value={partsForm.status} onValueChange={(value) => setPartsForm((current) => ({ ...current, status: value as PartsMutationPayload['status'] }))}>
-                <SelectTrigger id="parts-create-status"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="available">available</SelectItem>
-                  <SelectItem value="reserved">reserved</SelectItem>
-                  <SelectItem value="low_stock">low_stock</SelectItem>
-                  <SelectItem value="quarantined">quarantined</SelectItem>
-                  <SelectItem value="unserviceable">unserviceable</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-criticality">Criticality</Label>
-              <Select value={partsForm.criticality || 'normal'} onValueChange={(value) => setPartsForm((current) => ({ ...current, criticality: value as PartsMutationPayload['criticality'] }))}>
-                <SelectTrigger id="parts-create-criticality"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="critical">critical</SelectItem>
-                  <SelectItem value="high">high</SelectItem>
-                  <SelectItem value="normal">normal</SelectItem>
-                  <SelectItem value="low">low</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-on-hand">Quantity On Hand</Label>
-              <TextInput id="parts-create-on-hand" type="number" value={String(partsForm.quantity_on_hand)} onChange={(event) => setPartsForm((current) => ({ ...current, quantity_on_hand: Number(event.target.value || 0) }))} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-reserved">Quantity Reserved</Label>
-              <TextInput id="parts-create-reserved" type="number" value={String(partsForm.quantity_reserved)} onChange={(event) => setPartsForm((current) => ({ ...current, quantity_reserved: Number(event.target.value || 0) }))} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-location">Warehouse Location</Label>
-              <TextInput id="parts-create-location" value={partsForm.warehouse_location} onChange={(event) => setPartsForm((current) => ({ ...current, warehouse_location: event.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-supplier">Supplier Name</Label>
-              <TextInput id="parts-create-supplier" value={partsForm.supplier_name || ''} onChange={(event) => setPartsForm((current) => ({ ...current, supplier_name: event.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-create-ata">ATA Chapter</Label>
-              <TextInput id="parts-create-ata" value={partsForm.ata_chapter || ''} onChange={(event) => setPartsForm((current) => ({ ...current, ata_chapter: event.target.value }))} />
-            </div>
+            {PARTS_FORM_CORE_FIELDS.map((field) => renderPartsFormField(field, 'create'))}
+            {PARTS_FORM_ADVANCED_FIELDS.length > 0 ? (
+            <details className="md:col-span-2 rounded-md border p-3">
+              <summary className="cursor-pointer text-sm font-medium">Advanced (Optional)</summary>
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {PARTS_FORM_ADVANCED_FIELDS.map((field) => renderPartsFormField(field, 'create'))}
+              </div>
+            </details>
+            ) : null}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setPartsCreateOpen(false)} disabled={partsSubmitting}>Cancel</Button>
-            <Button onClick={() => void submitCreatePart()} disabled={partsSubmitting || !partsForm.part_number.trim() || !partsForm.warehouse_location.trim()}>
+            <Button onClick={() => void submitCreatePart()} disabled={partsSubmitting || !isPartsFormValid}>
               {partsSubmitting ? 'Creating...' : 'Create Part'}
             </Button>
           </div>
@@ -3594,39 +3536,19 @@ export function AmroOwnedWorkspace({
             <DialogTitle>Edit Part Inventory Record</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="space-y-1">
-              <Label htmlFor="parts-edit-part-number">Part Number</Label>
-              <TextInput id="parts-edit-part-number" value={partsForm.part_number} onChange={(event) => setPartsForm((current) => ({ ...current, part_number: event.target.value }))} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-edit-status">Status</Label>
-              <Select value={partsForm.status} onValueChange={(value) => setPartsForm((current) => ({ ...current, status: value as PartsMutationPayload['status'] }))}>
-                <SelectTrigger id="parts-edit-status"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="available">available</SelectItem>
-                  <SelectItem value="reserved">reserved</SelectItem>
-                  <SelectItem value="low_stock">low_stock</SelectItem>
-                  <SelectItem value="quarantined">quarantined</SelectItem>
-                  <SelectItem value="unserviceable">unserviceable</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-edit-on-hand">Quantity On Hand</Label>
-              <TextInput id="parts-edit-on-hand" type="number" value={String(partsForm.quantity_on_hand)} onChange={(event) => setPartsForm((current) => ({ ...current, quantity_on_hand: Number(event.target.value || 0) }))} />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="parts-edit-reserved">Quantity Reserved</Label>
-              <TextInput id="parts-edit-reserved" type="number" value={String(partsForm.quantity_reserved)} onChange={(event) => setPartsForm((current) => ({ ...current, quantity_reserved: Number(event.target.value || 0) }))} />
-            </div>
-            <div className="space-y-1 md:col-span-2">
-              <Label htmlFor="parts-edit-description">Description</Label>
-              <Textarea id="parts-edit-description" value={partsForm.description || ''} onChange={(event) => setPartsForm((current) => ({ ...current, description: event.target.value }))} />
-            </div>
+            {PARTS_FORM_CORE_FIELDS.map((field) => renderPartsFormField(field, 'edit'))}
+            {PARTS_FORM_ADVANCED_FIELDS.length > 0 ? (
+            <details className="md:col-span-2 rounded-md border p-3">
+              <summary className="cursor-pointer text-sm font-medium">Advanced (Optional)</summary>
+              <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+                {PARTS_FORM_ADVANCED_FIELDS.map((field) => renderPartsFormField(field, 'edit'))}
+              </div>
+            </details>
+            ) : null}
           </div>
           <div className="flex justify-end gap-2">
             <Button variant="outline" onClick={() => setPartsEditOpen(false)} disabled={partsSubmitting}>Cancel</Button>
-            <Button onClick={() => void submitUpdatePart()} disabled={partsSubmitting || !partsTargetRecord?.id}>
+            <Button onClick={() => void submitUpdatePart()} disabled={partsSubmitting || !partsTargetRecord?.id || !isPartsFormValid}>
               {partsSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>
           </div>

@@ -7,6 +7,12 @@ import {
   type AmroInventoryDataGridTemplateProps,
   type GridColumnDefinition,
 } from './AmroInventoryDataGridTemplate';
+import {
+  amroPartsEnterpriseArgTypes,
+  amroPartsEnterpriseDecorator,
+  amroPartsEnterpriseParameters,
+  buildAmroPartsEnterpriseDocsDescription,
+} from '../parts/storybook/amroPartsEnterpriseStoryTemplate';
 
 type InventoryRecord = {
   id: string;
@@ -96,10 +102,25 @@ const meta: Meta<typeof TypedAmroInventoryDataGridTemplate> = {
   title: 'AMRO/Templates/AmroInventoryDataGridTemplate',
   component: TypedAmroInventoryDataGridTemplate,
   parameters: {
-    layout: 'padded',
+    ...amroPartsEnterpriseParameters,
+    docs: {
+      ...(amroPartsEnterpriseParameters.docs || {}),
+      description: {
+        component: buildAmroPartsEnterpriseDocsDescription({
+          componentId: 'AMRO-INVENTORY-DATAGRID-TEMPLATE',
+          ownerTeam: 'AMRO Platform Team',
+          releaseRing: 'production',
+          dataClassification: 'internal',
+          approvalPolicy: 'two_person_review_required',
+          auditReference: 'SCR-AMRO-TEMPLATES-DATAGRID',
+        }),
+      },
+    },
   },
-  tags: ['autodocs'],
+  decorators: [amroPartsEnterpriseDecorator],
+  tags: ['autodocs', 'amro', 'parts', 'enterprise'],
   argTypes: {
+    ...amroPartsEnterpriseArgTypes,
     viewMode: {
       control: 'inline-radio',
       options: ['horizontal-split', 'vertical-split', 'stacked-auto'],

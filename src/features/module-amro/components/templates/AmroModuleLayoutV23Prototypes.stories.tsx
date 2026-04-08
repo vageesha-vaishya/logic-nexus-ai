@@ -6,6 +6,11 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { AmroInventoryDataGridTemplate, type GridColumnDefinition } from './AmroInventoryDataGridTemplate';
+import {
+  amroPartsEnterpriseDecorator,
+  amroPartsEnterpriseParameters,
+  buildAmroPartsEnterpriseDocsDescription,
+} from '../parts/storybook/amroPartsEnterpriseStoryTemplate';
 
 type PrototypeRecord = {
   id: string;
@@ -33,8 +38,24 @@ const columns: GridColumnDefinition<PrototypeRecord>[] = [
 
 const meta: Meta = {
   title: 'AMRO/Module Layout v2.3/Comparative Prototypes',
-  parameters: { layout: 'fullscreen' },
-  tags: ['autodocs'],
+  parameters: {
+    ...amroPartsEnterpriseParameters,
+    docs: {
+      ...(amroPartsEnterpriseParameters.docs || {}),
+      description: {
+        component: buildAmroPartsEnterpriseDocsDescription({
+          componentId: 'AMRO-MODULE-LAYOUT-V23-PROTOTYPES',
+          ownerTeam: 'AMRO UX Architecture',
+          releaseRing: 'staging',
+          dataClassification: 'internal',
+          approvalPolicy: 'architecture_review_required',
+          auditReference: 'SCR-AMRO-MODULE-LAYOUT-V23',
+        }),
+      },
+    },
+  },
+  decorators: [amroPartsEnterpriseDecorator],
+  tags: ['autodocs', 'amro', 'parts', 'enterprise'],
 };
 
 export default meta;

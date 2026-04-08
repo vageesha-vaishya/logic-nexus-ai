@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Boxes, CircleDollarSign, Loader2, RefreshCcw, ShieldAlert, SlidersHorizontal } from 'lucide-react';
+import { AlertTriangle, Boxes, Loader2, RefreshCcw, SlidersHorizontal } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -15,9 +15,14 @@ import {
 } from '../templates/AmroInventoryDataGridTemplate';
 import {
   computePartInventoryMetrics,
-  type PartCriticality,
   type PartInventoryRecord,
 } from './mockPartsInventoryData';
+import {
+  PARTS_DETAIL_DEFAULT_VISIBLE_KEYS,
+  PARTS_DETAIL_HIDDEN_KEYS,
+  PARTS_DETAIL_REQUIRED_KEYS,
+  PARTS_STATUS_FILTER_OPTIONS,
+} from './partsDetailSchema';
 
 export type PartsInventoryViewState = 'loading' | 'empty' | 'ready' | 'error';
 
@@ -48,21 +53,10 @@ export interface AmroPartsInventoryWorkbenchProps {
   onViewModeChange?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onViewModeChange'];
 }
 
-const STATUS_OPTIONS = ['all', 'available', 'low_stock', 'reserved', 'quarantined', 'unserviceable'] as const;
-const CRITICALITY_OPTIONS = ['all', 'critical', 'high', 'normal', 'low'] as const;
-
 function metricTone(value: number, warningThreshold: number, criticalThreshold: number): 'default' | 'secondary' | 'destructive' {
   if (value >= criticalThreshold) return 'destructive';
   if (value >= warningThreshold) return 'secondary';
   return 'default';
-}
-
-function asCurrency(value: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-    maximumFractionDigits: 0,
-  }).format(value || 0);
 }
 
 export function AmroPartsInventoryWorkbench({
@@ -91,8 +85,7 @@ export function AmroPartsInventoryWorkbench({
   onScrollPositionChange,
   onViewModeChange,
 }: AmroPartsInventoryWorkbenchProps) {
-  const [statusFilter, setStatusFilter] = useState<(typeof STATUS_OPTIONS)[number]>('all');
-  const [criticalityFilter, setCriticalityFilter] = useState<(typeof CRITICALITY_OPTIONS)[number]>('all');
+  const [statusFilter, setStatusFilter] = useState<(typeof PARTS_STATUS_FILTER_OPTIONS)[number]>('all');
 
   const columns = useMemo<GridColumnDefinition<PartInventoryRecord>[]>(() => [
     { key: 'part_number', header: 'Part Number', sortable: true, filterable: true, groupable: true, resizable: true, dataType: 'text', width: 160 },
@@ -158,10 +151,9 @@ export function AmroPartsInventoryWorkbench({
   const filteredRecords = useMemo(() => {
     return records.filter((row) => {
       if (statusFilter !== 'all' && row.status !== statusFilter) return false;
-      if (criticalityFilter !== 'all' && row.criticality !== criticalityFilter) return false;
       return true;
     });
-  }, [records, statusFilter, criticalityFilter]);
+  }, [records, statusFilter]);
 
   const metrics = useMemo(() => computePartInventoryMetrics(filteredRecords), [filteredRecords]);
 
@@ -173,16 +165,7 @@ export function AmroPartsInventoryWorkbench({
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredRecords]);
 
-  const criticalityDistribution = useMemo(() => {
-    const map = new Map<PartCriticality, number>();
-    for (const row of filteredRecords) {
-      map.set(row.criticality, (map.get(row.criticality) || 0) + 1);
-    }
-    return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
-  }, [filteredRecords]);
-
   const maxStatusCount = Math.max(1, ...statusDistribution.map((entry) => entry[1]));
-  const maxCriticalityCount = Math.max(1, ...criticalityDistribution.map((entry) => entry[1]));
 
   return (
     <div className="space-y-4" aria-label="AMRO parts inventory workbench">
@@ -231,22 +214,25 @@ export function AmroPartsInventoryWorkbench({
             <Card className="border-dashed">
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Critical Items</span>
-                  <ShieldAlert className="h-4 w-4 text-rose-500" />
+                  <span className="text-sm text-muted-foreground">Reserved Items</span>
+                  <Boxes className="h-4 w-4 text-sky-500" />
                 </div>
                 <div className="mt-2 flex items-center gap-2">
-                  <p className="text-2xl font-semibold">{metrics.criticalItems}</p>
-                  <Badge variant={metricTone(metrics.criticalItems, 3, 10)}>priority</Badge>
+                  <p className="text-2xl font-semibold">{metrics.reservedItems}</p>
+                  <Badge variant={metricTone(metrics.reservedItems, 10, 30)}>{metrics.reservedItems > 0 ? 'tracked' : 'clear'}</Badge>
                 </div>
               </CardContent>
             </Card>
             <Card className="border-dashed">
               <CardContent className="pt-4">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Inventory Value</span>
-                  <CircleDollarSign className="h-4 w-4 text-emerald-500" />
+                  <span className="text-sm text-muted-foreground">Quarantined Items</span>
+                  <AlertTriangle className="h-4 w-4 text-rose-500" />
                 </div>
-                <p className="mt-2 text-2xl font-semibold">{asCurrency(metrics.inventoryValue)}</p>
+                <div className="mt-2 flex items-center gap-2">
+                  <p className="text-2xl font-semibold">{metrics.quarantineItems}</p>
+                  <Badge variant={metricTone(metrics.quarantineItems, 1, 5)}>{metrics.quarantineItems > 0 ? 'attention' : 'none'}</Badge>
+                </div>
               </CardContent>
             </Card>
           </div>
@@ -263,26 +249,14 @@ export function AmroPartsInventoryWorkbench({
               <SlidersHorizontal className="h-3.5 w-3.5" />
               Filters
             </Badge>
-            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as (typeof STATUS_OPTIONS)[number])}>
+            <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as (typeof PARTS_STATUS_FILTER_OPTIONS)[number])}>
               <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by inventory status">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
-                {STATUS_OPTIONS.map((value) => (
+                {PARTS_STATUS_FILTER_OPTIONS.map((value) => (
                   <SelectItem key={value} value={value}>
                     Status: {value}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-            <Select value={criticalityFilter} onValueChange={(value) => setCriticalityFilter(value as (typeof CRITICALITY_OPTIONS)[number])}>
-              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by criticality">
-                <SelectValue placeholder="Criticality" />
-              </SelectTrigger>
-              <SelectContent>
-                {CRITICALITY_OPTIONS.map((value) => (
-                  <SelectItem key={value} value={value}>
-                    Criticality: {value}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -290,7 +264,7 @@ export function AmroPartsInventoryWorkbench({
             <Badge variant="secondary">Visible: {filteredRecords.length}</Badge>
           </div>
 
-          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-2">
               <p className="text-sm font-medium">Status Distribution</p>
               {statusDistribution.length ? statusDistribution.map(([label, count]) => (
@@ -314,32 +288,6 @@ export function AmroPartsInventoryWorkbench({
                   </div>
                 </div>
               )) : <p className="text-sm text-muted-foreground">No status data available.</p>}
-            </div>
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Criticality Mix</p>
-              {criticalityDistribution.length ? criticalityDistribution.map(([label, count]) => (
-                <div key={label} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{label}</span>
-                    <span>{count}</span>
-                  </div>
-                  <div className="h-2 rounded bg-muted">
-                    <div
-                      className={cn(
-                        'h-2 rounded transition-all duration-300',
-                        label === 'critical'
-                          ? 'bg-rose-500'
-                          : label === 'high'
-                            ? 'bg-amber-500'
-                            : label === 'normal'
-                              ? 'bg-sky-500'
-                              : 'bg-zinc-500',
-                      )}
-                      style={{ width: `${(count / maxCriticalityCount) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )) : <p className="text-sm text-muted-foreground">No criticality data available.</p>}
             </div>
           </div>
         </CardContent>
@@ -373,7 +321,6 @@ export function AmroPartsInventoryWorkbench({
             <p className="text-sm text-muted-foreground">No parts inventory records match the current filters.</p>
             <Button variant="outline" onClick={() => {
               setStatusFilter('all');
-              setCriticalityFilter('all');
             }}>
               Reset Filters
             </Button>
@@ -405,31 +352,9 @@ export function AmroPartsInventoryWorkbench({
           onCancelRecord={onCancelRecord}
           onCrudAction={onCrudAction}
           crudPermissions={crudPermissions}
-          renderDetail={(record) => (
-            <div className="space-y-3 text-sm">
-              <div className="grid grid-cols-2 gap-2">
-                <p><span className="font-semibold">Part Number:</span> {record.part_number}</p>
-                <p><span className="font-semibold">Serial:</span> {record.serial_number || '-'}</p>
-                <p><span className="font-semibold">Type:</span> {record.item_type}</p>
-                <p><span className="font-semibold">ATA:</span> {record.ata_chapter}</p>
-                <p><span className="font-semibold">Location:</span> {record.warehouse_location}</p>
-                <p><span className="font-semibold">Supplier:</span> {record.supplier_name}</p>
-                <p><span className="font-semibold">On Hand:</span> {record.quantity_on_hand}</p>
-                <p><span className="font-semibold">Reserved:</span> {record.quantity_reserved}</p>
-                <p><span className="font-semibold">Available:</span> {record.quantity_available}</p>
-                <p><span className="font-semibold">Reorder Level:</span> {record.reorder_level}</p>
-                <p><span className="font-semibold">Criticality:</span> {record.criticality}</p>
-                <p><span className="font-semibold">Condition:</span> {record.metadata.condition_code}</p>
-              </div>
-              <div className="rounded-md bg-muted p-2 text-xs">
-                <p className="mb-1 font-semibold">Traceability</p>
-                <p>Barcode: {record.metadata.barcode_value}</p>
-                <p>RFID: {record.metadata.rfid_tag}</p>
-                <p>AOG Priority: {record.metadata.aog_priority ? 'Yes' : 'No'}</p>
-                <p>Tags: {record.metadata.tags.join(', ')}</p>
-              </div>
-            </div>
-          )}
+          requiredDetailFieldKeys={[...PARTS_DETAIL_REQUIRED_KEYS]}
+          defaultVisibleDetailFieldKeys={[...PARTS_DETAIL_DEFAULT_VISIBLE_KEYS]}
+          hiddenDetailFieldKeys={[...PARTS_DETAIL_HIDDEN_KEYS]}
         />
       ) : null}
     </div>

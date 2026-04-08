@@ -35,6 +35,12 @@ import { generatePartInventoryRecords, type PartInventoryRecord } from '../parts
 import { usePartsCatalogState } from '../parts/usePartsCatalogState';
 import type { PartsCatalogApi } from '../parts/partsInventoryContracts';
 import type { GridDensity, GridScrollBehavior, GridViewMode } from './AmroInventoryDataGridTemplate';
+import {
+  amroPartsEnterpriseArgTypes,
+  amroPartsEnterpriseDecorator,
+  amroPartsEnterpriseParameters,
+  buildAmroPartsEnterpriseDocsDescription,
+} from '../parts/storybook/amroPartsEnterpriseStoryTemplate';
 
 type InventoryModuleStoryArgs = {
   state: PartsInventoryViewState;
@@ -48,9 +54,25 @@ type InventoryModuleStoryArgs = {
 
 const meta: Meta<InventoryModuleStoryArgs> = {
   title: 'AMRO/Inventory/Module Templates',
-  parameters: { layout: 'fullscreen' },
-  tags: ['autodocs'],
+  parameters: {
+    ...amroPartsEnterpriseParameters,
+    docs: {
+      ...(amroPartsEnterpriseParameters.docs || {}),
+      description: {
+        component: buildAmroPartsEnterpriseDocsDescription({
+          componentId: 'AMRO-INVENTORY-MODULE-TEMPLATES',
+          ownerTeam: 'AMRO Platform Team',
+          releaseRing: 'uat',
+          dataClassification: 'internal',
+          approvalPolicy: 'two_person_review_required',
+          auditReference: 'SCR-AMRO-INVENTORY-MODULE-TEMPLATES',
+        }),
+      },
+    },
+  },
+  tags: ['autodocs', 'amro', 'parts', 'enterprise'],
   decorators: [
+    amroPartsEnterpriseDecorator,
     (Story) => (
       <div className="bg-muted/20">
         <Story />
@@ -58,6 +80,7 @@ const meta: Meta<InventoryModuleStoryArgs> = {
     ),
   ],
   argTypes: {
+    ...amroPartsEnterpriseArgTypes,
     state: { control: 'inline-radio', options: ['ready', 'loading', 'empty', 'error'] },
     viewMode: { control: 'inline-radio', options: ['horizontal-split', 'vertical-split', 'stacked-auto'] },
     density: { control: 'inline-radio', options: ['compact', 'normal', 'comfortable'] },

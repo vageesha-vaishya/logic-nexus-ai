@@ -78,6 +78,9 @@ export type AmroInventoryDataGridTemplateProps<TRecord extends Record<string, un
   persistKey?: string;
   syncDetailWithScroll?: boolean;
   renderDetail?: (record: TRecord) => React.ReactNode;
+  requiredDetailFieldKeys?: string[];
+  hiddenDetailFieldKeys?: string[];
+  defaultVisibleDetailFieldKeys?: string[];
   getRecordId?: (record: TRecord, index: number) => string;
   onRecordSelectionChange?: (event: GridSelectionEvent<TRecord>) => void;
   onScrollPositionChange?: (event: GridScrollEvent) => void;
@@ -215,6 +218,9 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   persistKey,
   syncDetailWithScroll = true,
   renderDetail,
+  requiredDetailFieldKeys,
+  hiddenDetailFieldKeys,
+  defaultVisibleDetailFieldKeys,
   getRecordId,
   onRecordSelectionChange,
   onScrollPositionChange,
@@ -258,6 +264,16 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   const [isEditing, setIsEditing] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState<'none' | 'grid' | 'detail'>('none');
+  const normalizeDetailKey = useCallback((value: string) => value.trim().toLowerCase(), []);
+  const requiredDetailFieldSet = useMemo(() => (
+    new Set((requiredDetailFieldKeys || []).map(normalizeDetailKey))
+  ), [requiredDetailFieldKeys, normalizeDetailKey]);
+  const hiddenDetailFieldSet = useMemo(() => (
+    new Set((hiddenDetailFieldKeys || []).map(normalizeDetailKey))
+  ), [hiddenDetailFieldKeys, normalizeDetailKey]);
+  const defaultVisibleDetailFieldSet = useMemo(() => (
+    new Set((defaultVisibleDetailFieldKeys || []).map(normalizeDetailKey))
+  ), [defaultVisibleDetailFieldKeys, normalizeDetailKey]);
   const [horizontalSplitPct, setHorizontalSplitPct] = useState(DEFAULT_HORIZONTAL_SPLIT);
   const [verticalSplitPct, setVerticalSplitPct] = useState(DEFAULT_VERTICAL_SPLIT);
 
@@ -960,7 +976,9 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     const fieldType = inferFieldType(value, key);
     const label = toFieldLabel(key);
     const normalizedKey = key.toLowerCase();
-    const required = normalizedKey.includes('id') || normalizedKey.includes('part') || normalizedKey.includes('quantity');
+    const required = requiredDetailFieldSet.size > 0
+      ? requiredDetailFieldSet.has(normalizedKey)
+      : normalizedKey.includes('id') || normalizedKey.includes('part') || normalizedKey.includes('quantity');
     const currentValue = detailFormValues[key];
 
     if (fieldType === 'boolean') {
@@ -1101,10 +1119,15 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
         )}
       </div>
     );
-  }, [detailFormValues, isEditing, statusOptions]);
+  }, [detailFormValues, isEditing, requiredDetailFieldSet, statusOptions]);
 
   const renderDefaultDetail = (record: TRecord) => {
-    const entries = Object.entries(record);
+    const entries = Object.entries(record).filter(([key]) => {
+      const normalizedKey = normalizeDetailKey(key);
+      if (hiddenDetailFieldSet.has(normalizedKey)) return false;
+      if (defaultVisibleDetailFieldSet.size > 0 && !defaultVisibleDetailFieldSet.has(normalizedKey)) return false;
+      return true;
+    });
     const sections: Array<{ id: 'identity' | 'inventory' | 'dates' | 'metadata'; title: string }> = [
       { id: 'identity', title: 'Identity' },
       { id: 'inventory', title: 'Inventory and Operations' },

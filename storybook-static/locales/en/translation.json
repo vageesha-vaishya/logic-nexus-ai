@@ -1,0 +1,139 @@
+{
+  "quotation": {
+    "manualQuote": "Manual Quotation"
+  },
+  "leads": {
+    "title": "Leads Workspace",
+    "subtitle": "Focus on pipeline and active contacts",
+    "kpi": {
+      "totalLeads": "Total Leads",
+      "wonDeals": "Won Deals",
+      "contacted": "Contacted",
+      "highScore": "High Score"
+    },
+    "actions": {
+      "newLead": "New Lead",
+      "refresh": "Refresh",
+      "listView": "List View",
+      "pipelineView": "Pipeline View",
+      "setDefault": "Set as Default",
+      "cancel": "Cancel",
+      "columns": "Columns",
+      "delete": "Delete",
+      "export": "Export"
+    },
+    "tabs": {
+      "all": "All Leads",
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "proposal": "Proposal",
+      "negotiation": "Negotiation"
+    },
+    "table": {
+      "lead": "Lead",
+      "company": "Company",
+      "email": "Email",
+      "phone": "Phone",
+      "status": "Status",
+      "score": "Score",
+      "created": "Created",
+      "owner": "Owner",
+      "source": "Source",
+      "actions": "Actions"
+    },
+    "status": {
+      "new": "New",
+      "contacted": "Contacted",
+      "qualified": "Qualified",
+      "proposal": "Proposal",
+      "negotiation": "Negotiation",
+      "won": "Won",
+      "lost": "Lost"
+    },
+    "filters": {
+      "searchPlaceholder": "Search leads...",
+      "status": "Status",
+      "source": "Source",
+      "owner": "Owner",
+      "createdAfter": "Created After",
+      "createdBefore": "Created Before",
+      "scoreMin": "Min Score",
+      "scoreMax": "Max Score"
+    },
+    "empty": {
+      "title": "No leads found",
+      "description": "Try adjusting your filters or create a new lead."
+    },
+    "messages": {
+      "apiUnavailableFallback": "API unavailable, showing DB fallback",
+      "apiUnauthorizedFallback": "Session expired, showing DB fallback",
+      "apiForbiddenScopeFallback": "Access scope mismatch, showing DB fallback",
+      "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
+      "apiServerFallback": "CRM API error, showing DB fallback",
+      "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback"
+    }
+  },
+  "accounts": {
+    "messages": {
+      "apiUnavailableFallback": "API unavailable, showing DB fallback",
+      "apiUnauthorizedFallback": "Session expired, showing DB fallback",
+      "apiForbiddenScopeFallback": "Access scope mismatch, showing DB fallback",
+      "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
+      "apiServerFallback": "CRM API error, showing DB fallback",
+      "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback",
+      "relationsFallback": "Account relation data unavailable, showing base records",
+      "compatibilityModeFallback": "Compatibility mode active, showing base records"
+    }
+  },
+  "contacts": {
+    "messages": {
+      "apiUnavailableFallback": "API unavailable, showing DB fallback",
+      "apiUnauthorizedFallback": "Session expired, showing DB fallback",
+      "apiForbiddenScopeFallback": "Access scope mismatch, showing DB fallback",
+      "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
+      "apiServerFallback": "CRM API error, showing DB fallback",
+      "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback",
+      "relationsFallback": "Contact relation data unavailable, showing base records",
+      "compatibilityModeFallback": "Compatibility mode active, showing base records"
+    }
+  },
+  "activities": {
+    "messages": {
+      "apiUnavailableFallback": "API unavailable, showing DB fallback",
+      "apiUnauthorizedFallback": "Session expired, showing DB fallback",
+      "apiForbiddenScopeFallback": "Access scope mismatch, showing DB fallback",
+      "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
+      "apiServerFallback": "CRM API error, showing DB fallback",
+      "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback",
+      "relationsFallback": "Activity relation data unavailable, showing base records",
+      "compatibilityModeFallback": "Compatibility mode active, showing base records"
+    }
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "success": "Success",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "view": "View",
+    "create": "Create",
+    "update": "Update",
+    "confirm": "Confirm",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "finish": "Finish",
+    "search": "Search",
+    "filter": "Filter",
+    "sort": "Sort",
+    "actions": "Actions",
+    "noData": "No data available"
+  }
+}

@@ -6,6 +6,12 @@ import {
   type AmroPartsInventoryWorkbenchProps,
 } from './AmroPartsInventoryWorkbench';
 import { generatePartInventoryRecords } from './mockPartsInventoryData';
+import {
+  amroPartsEnterpriseArgTypes,
+  amroPartsEnterpriseDecorator,
+  amroPartsEnterpriseParameters,
+  buildAmroPartsEnterpriseDocsDescription,
+} from './storybook/amroPartsEnterpriseStoryTemplate';
 
 type WorkbenchStoryArgs = Omit<AmroPartsInventoryWorkbenchProps, 'records'> & {
   recordCount: number;
@@ -15,10 +21,25 @@ type WorkbenchStoryArgs = Omit<AmroPartsInventoryWorkbenchProps, 'records'> & {
 const meta: Meta<WorkbenchStoryArgs> = {
   title: 'AMRO/Parts/AmroPartsInventoryWorkbench',
   parameters: {
-    layout: 'fullscreen',
+    ...amroPartsEnterpriseParameters,
+    docs: {
+      ...(amroPartsEnterpriseParameters.docs || {}),
+      description: {
+        component: buildAmroPartsEnterpriseDocsDescription({
+          componentId: 'AMRO-PARTS-WORKBENCH',
+          ownerTeam: 'AMRO Platform Team',
+          releaseRing: 'production',
+          dataClassification: 'internal',
+          approvalPolicy: 'two_person_review_required',
+          auditReference: 'SCR-AMRO-PARTS-ENTERPRISE-STORYBOOK',
+        }),
+      },
+    },
   },
-  tags: ['autodocs'],
+  decorators: [amroPartsEnterpriseDecorator],
+  tags: ['autodocs', 'amro', 'parts', 'enterprise'],
   argTypes: {
+    ...amroPartsEnterpriseArgTypes,
     state: {
       control: 'inline-radio',
       options: ['loading', 'empty', 'ready', 'error'],

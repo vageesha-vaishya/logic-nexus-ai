@@ -21,6 +21,20 @@ type ApiRecord = {
   supplierName?: string | null;
   criticality?: string;
   ataChapter?: string | null;
+  reorderLevel?: number;
+  reorderQuantity?: number;
+  minServiceableQty?: number;
+  unitCost?: number;
+  currency?: string | null;
+  certificationExpiryDate?: string | null;
+  expiryDate?: string | null;
+  metadata?: {
+    barcodeValue?: string | null;
+    rfidTag?: string | null;
+    conditionCode?: string | null;
+    aogPriority?: boolean;
+    tags?: string[] | null;
+  } | null;
 };
 
 type ApiResponseShape = {
@@ -142,40 +156,43 @@ export function mapLiveApiRecordToPartInventoryRecord(record: ApiRecord): PartIn
   const quantityReserved = Math.max(0, Number(record.quantityReserved || 0));
   const quantityAvailable = Math.max(0, quantityOnHand - quantityReserved);
   const normalizedStatus = normalizeStatus(record.status);
-  const id = String(record.id || `part-${Math.random().toString(36).slice(2, 10)}`);
-  const partNumber = String(record.partNumber || 'UNKNOWN-PART');
-  const ata = String(record.ataChapter || 'N/A');
-  const location = String(record.warehouseLocation || 'UNASSIGNED');
-  const supplier = String(record.supplierName || 'Unknown Supplier');
+  const partNumber = String(record.partNumber || '').trim();
+  const id = String(record.id || `missing-${partNumber || 'part'}`).trim();
+  const ata = String(record.ataChapter || '').trim();
+  const location = String(record.warehouseLocation || '').trim();
+  const supplier = String(record.supplierName || '').trim();
+  const metadata = record.metadata || null;
 
   return {
     id,
     part_number: partNumber,
     serial_number: record.serialNumber ?? null,
-    description: String(record.description || `${partNumber} inventory record`),
+    description: String(record.description || '').trim(),
     item_type: 'part',
     ata_chapter: ata,
     warehouse_location: location,
     quantity_on_hand: quantityOnHand,
     quantity_reserved: quantityReserved,
     quantity_available: quantityAvailable,
-    reorder_level: 10,
-    reorder_quantity: 25,
-    min_serviceable_qty: 2,
+    reorder_level: Math.max(0, Number(record.reorderLevel || 0)),
+    reorder_quantity: Math.max(0, Number(record.reorderQuantity || 0)),
+    min_serviceable_qty: Math.max(0, Number(record.minServiceableQty || 0)),
     status: normalizedStatus,
     criticality: normalizeCriticality(record.criticality),
     supplier_name: supplier,
-    unit_cost: 100,
-    currency: 'USD',
-    certification_expiry_date: null,
-    expiry_date: null,
+    unit_cost: Math.max(0, Number(record.unitCost || 0)),
+    currency: String(record.currency || 'USD').trim() || 'USD',
+    certification_expiry_date: record.certificationExpiryDate ?? null,
+    expiry_date: record.expiryDate ?? null,
     updated_at: new Date().toISOString(),
     metadata: {
-      barcode_value: `BAR-${id}`,
-      rfid_tag: `RFID-${id}`,
-      condition_code: normalizedStatus === 'quarantined' ? 'QUAR' : normalizedStatus === 'unserviceable' ? 'INSP' : 'SV',
-      aog_priority: normalizeCriticality(record.criticality) === 'critical',
-      tags: [normalizedStatus, record.lifecycleStatus || 'serviceable'],
+      barcode_value: String(metadata?.barcodeValue || '').trim(),
+      rfid_tag: String(metadata?.rfidTag || '').trim(),
+      condition_code: (metadata?.conditionCode === 'SV' || metadata?.conditionCode === 'AR' || metadata?.conditionCode === 'INSP' || metadata?.conditionCode === 'OH' || metadata?.conditionCode === 'SCRAP' || metadata?.conditionCode === 'QUAR')
+        ? metadata.conditionCode
+        : 'SV',
+      aog_priority: Boolean(metadata?.aogPriority),
+      tags: Array.isArray(metadata?.tags) ? metadata.tags.filter((tag): tag is string => typeof tag === 'string') : [],
     },
   };
 }
