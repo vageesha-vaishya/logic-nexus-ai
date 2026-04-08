@@ -1,8 +1,10 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { action } from '@storybook/addon-actions';
+import { fn } from 'storybook/test';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
+
+const storyAction = fn();
 
 type LeadPipelineVisualMode = 'reference' | 'compact' | 'high-volume' | 'empty';
 
@@ -106,28 +108,28 @@ function LeadsPipelineStory(props: LeadsPipelineStoryProps) {
 
   const handleDragEnd = (activeId: string, overId: string, newStatus: string) => {
     if (props.freezeInteractions) {
-      action('pipeline.dragBlocked')({ activeId, overId, newStatus });
+      storyAction({ type: 'pipeline.dragBlocked', activeId, overId, newStatus });
       return;
     }
-    action('pipeline.dragEnd')({ activeId, overId, newStatus });
+    storyAction({ type: 'pipeline.dragEnd', activeId, overId, newStatus });
     setItems((prev) => prev.map((item) => (item.id === activeId ? { ...item, status: newStatus } : item)));
   };
 
   const handleItemUpdate = async (id: string, updates: Partial<KanbanItem>) => {
     if (props.freezeInteractions) {
-      action('pipeline.itemUpdateBlocked')({ id, updates });
+      storyAction({ type: 'pipeline.itemUpdateBlocked', id, updates });
       return;
     }
-    action('pipeline.itemUpdate')({ id, updates });
+    storyAction({ type: 'pipeline.itemUpdate', id, updates });
     setItems((prev) => prev.map((item) => (item.id === id ? { ...item, ...updates } : item)));
   };
 
   const handleItemClick = (id: string) => {
     if (props.freezeInteractions) {
-      action('pipeline.itemClickBlocked')({ id });
+      storyAction({ type: 'pipeline.itemClickBlocked', id });
       return;
     }
-    action('pipeline.itemClick')({ id });
+    storyAction({ type: 'pipeline.itemClick', id });
   };
 
   return (

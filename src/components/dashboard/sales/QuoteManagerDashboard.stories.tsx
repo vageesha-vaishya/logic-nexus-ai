@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { action } from '@storybook/addon-actions';
+import { fn } from 'storybook/test';
 import { useEffect, useState, type MouseEvent, type PropsWithChildren } from 'react';
 import { QuoteManagerDashboard } from './QuoteManagerDashboard';
 import { BrowserRouter, useLocation, useNavigationType } from 'react-router-dom';
@@ -7,8 +7,8 @@ import { AuthProvider } from '@/hooks/useAuth';
 import { CRMProvider } from '@/hooks/useCRM';
 import { AppSidebar } from '@/components/layout/AppSidebar';
 
-const logMenuClick = action('menu-click');
-const logRouteChange = action('route-change');
+const logMenuClick = fn();
+const logRouteChange = fn();
 
 function StorybookNavigationEvents({ children }: PropsWithChildren) {
   const location = useLocation();

@@ -19,6 +19,35 @@
   - `state`, `mode`, `validation`, `steps`
   - `primaryActions`, `secondaryActions`
 
+## Standardized Data Grid Component
+- Component: `AmroInventoryDataGridTemplate`
+- Storybook path: `AMRO/Templates/AmroInventoryDataGridTemplate`
+- Core capabilities:
+  - Dynamic grid + adjacent detail panel with synchronized record focus.
+  - Three layout modes:
+    - horizontal split (`left grid / right detail`)
+    - vertical split (`top grid / bottom detail`)
+    - responsive stacked (`mobile stacked`, `tablet vertical`, `desktop horizontal`)
+  - Scroll behavior modes:
+    - virtualization (`@tanstack/react-virtual`)
+    - pagination
+    - infinite scroll
+  - Density presets: `compact`, `normal`, `comfortable`.
+  - Column configuration support:
+    - sortable
+    - filterable
+    - groupable
+    - resizable
+  - Event callbacks:
+    - `onRecordSelectionChange`
+    - `onScrollPositionChange`
+    - `onViewModeChange`
+    - `onDetailPanelVisibilityChange`
+  - Accessibility:
+    - keyboard navigation (`ArrowUp`, `ArrowDown`, `Enter`, `Escape`, `Tab`)
+    - ARIA labels + live region announcements
+    - high contrast mode toggle
+
 ## Naming Conventions
 - **Template components**: `AmroStandard*`
 - **Adapter components**: `Amro*Adapter` (module-specific binding layer)
