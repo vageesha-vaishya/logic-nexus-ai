@@ -50,7 +50,8 @@ export default function FranchiseDetail() {
     };
 
     const loadScopedFranchise = async (): Promise<any | null> => {
-      let query = scopedDb.from('franchises').select('*').eq('id', id).limit(1);
+      const bypassScope = Boolean(context.isPlatformAdmin);
+      let query = scopedDb.from('franchises', bypassScope).select('*').eq('id', id).limit(1);
       if (!context.isPlatformAdmin && context.tenantId) {
         query = query.eq('tenant_id', context.tenantId);
       }
@@ -90,9 +91,35 @@ export default function FranchiseDetail() {
         return;
       }
       if (!response.ok) {
-        throw new Error(payload.json?.error || 'Failed to load franchise');
+        const apiErrorMessage = String(payload.json?.error || '');
+        const isRouteNotFound = response.status === 404 || apiErrorMessage.toLowerCase().includes('route not found');
+        if (isRouteNotFound) {
+          logger.warn('Franchise detail API route unavailable; falling back to scoped database query', {
+            component: 'FranchiseDetail',
+            franchiseId: id || null,
+            status: response.status,
+            tenantId: context.tenantId || null,
+            isPlatformAdmin: context.isPlatformAdmin,
+            apiErrorMessage,
+          });
+          const fallbackRow = await loadScopedFranchise();
+          setFranchise(fallbackRow);
+          return;
+        }
+        throw new Error(apiErrorMessage || 'Failed to load franchise');
       }
-      const row = Array.isArray(payload.json?.data) ? payload.json.data[0] || null : null;
+      const records = (() => {
+        if (Array.isArray(payload.json?.data)) return payload.json.data;
+        if (Array.isArray(payload.json?.output?.records)) return payload.json.output.records;
+        if (Array.isArray(payload.json?.records)) return payload.json.records;
+        return [];
+      })();
+      const row = records[0] || null;
+      if (!row) {
+        const fallbackRow = await loadScopedFranchise();
+        setFranchise(fallbackRow);
+        return;
+      }
       setFranchise(row);
     } catch (error: any) {
       logger.error('Failed to fetch franchise detail', {
