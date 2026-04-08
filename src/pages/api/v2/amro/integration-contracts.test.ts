@@ -11,9 +11,14 @@ import {
   AMRO_MIGRATION_PLAN_PATH,
   AMRO_OPENAPI_SPEC_PATH,
   AMRO_OVERVIEW_KPI_PATH,
+  AMRO_PARTS_DETAIL_PATH,
+  AMRO_PARTS_PATH,
   AMRO_PHASE_1_READINESS_PATH,
   AMRO_PHASE_PLAN_PATH,
   AMRO_SCREEN_INVENTORY_PATH,
+  AMRO_INVENTORY_SCAN_PATH,
+  AMRO_UIM_INVENTORY_SYNC_PATH,
+  AMRO_WORK_ORDER_SYNC_PATH,
 } from './integration-contracts';
 import { buildAmroIntegrationContractEnvelope } from './anti-corruption-adapter';
 
@@ -34,6 +39,11 @@ describe('AMRO 13.3 integration contracts', () => {
       '/api/v2/amro/tasks/{id}/evidence',
       '/api/v2/amro/inventory/reservations',
       '/api/v2/amro/inventory/availability',
+      AMRO_PARTS_PATH,
+      AMRO_PARTS_DETAIL_PATH,
+      AMRO_UIM_INVENTORY_SYNC_PATH,
+      AMRO_WORK_ORDER_SYNC_PATH,
+      AMRO_INVENTORY_SCAN_PATH,
       '/api/v2/amro/compliance/obligations',
       '/api/v2/amro/compliance/gates/evaluate',
       '/api/v2/amro/certifications/validate',
@@ -160,6 +170,8 @@ describe('AMRO 13.3 integration contracts', () => {
     expect(openApi).toContain('operationId: releaseAmroInventoryReservation');
     expect(openApi).toContain('/api/v2/amro/inventory/availability:');
     expect(openApi).toContain('operationId: getAmroInventoryAvailability');
+    expect(openApi).toContain('/api/v2/amro/parts:');
+    expect(openApi).toContain('/api/v2/amro/parts/{id}:');
     expect(openApi).toContain('/api/v2/amro/compliance/obligations:');
     expect(openApi).toContain('operationId: listAmroComplianceObligations');
     expect(openApi).toContain('operationId: ingestAmroComplianceObligations');

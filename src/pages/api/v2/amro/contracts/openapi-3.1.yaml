@@ -784,6 +784,149 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /api/v2/amro/parts:
+    get:
+      operationId: listAmroPartsInventory
+      tags: [AMRO]
+      parameters:
+        - in: query
+          name: page
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+        - in: query
+          name: page_size
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+        - in: query
+          name: search
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: status
+          required: false
+          schema:
+            type: string
+        - in: query
+          name: lifecycle_status
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AMRO parts inventory list response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    post:
+      operationId: createAmroPartInventory
+      tags: [AMRO]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [part_number, warehouse_location, status, quantity_on_hand]
+              properties:
+                part_number:
+                  type: string
+                serial_number:
+                  type: string
+                description:
+                  type: string
+                status:
+                  type: string
+                  enum: [available, reserved, low_stock, quarantined, unserviceable]
+                lifecycle_status:
+                  type: string
+                quantity_on_hand:
+                  type: number
+                quantity_reserved:
+                  type: number
+                warehouse_location:
+                  type: string
+                supplier_name:
+                  type: string
+                criticality:
+                  type: string
+                  enum: [critical, high, normal, low]
+                ata_chapter:
+                  type: string
+      responses:
+        '201':
+          description: AMRO part inventory create response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+  /api/v2/amro/parts/{id}:
+    get:
+      operationId: getAmroPartInventoryDetail
+      tags: [AMRO]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AMRO part inventory detail response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    patch:
+      operationId: patchAmroPartInventory
+      tags: [AMRO]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+      responses:
+        '200':
+          description: AMRO part inventory update response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+    delete:
+      operationId: deleteAmroPartInventory
+      tags: [AMRO]
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: AMRO part inventory delete response
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
   /api/v2/amro/inventory/sync:
     get:
       operationId: getAmroUimInventorySyncStatus

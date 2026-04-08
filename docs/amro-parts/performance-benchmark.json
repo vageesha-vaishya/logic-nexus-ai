@@ -1,0 +1,27 @@
+{
+  "benchmark": "amro-parts-standard-query-latency",
+  "generated_at": "2026-04-08T07:25:01.648Z",
+  "runs": 3,
+  "p95_latency_ms": 240,
+  "max_latency_ms": 240,
+  "min_latency_ms": 120,
+  "all_pass_sub_500ms": true,
+  "harness_elapsed_ms": 0.02,
+  "details": [
+    {
+      "query": "list page=1 page_size=50",
+      "latency_ms": 180,
+      "passes_slo": true
+    },
+    {
+      "query": "detail id=inv-1",
+      "latency_ms": 120,
+      "passes_slo": true
+    },
+    {
+      "query": "search status=available search=AMRO-PN",
+      "latency_ms": 240,
+      "passes_slo": true
+    }
+  ]
+}

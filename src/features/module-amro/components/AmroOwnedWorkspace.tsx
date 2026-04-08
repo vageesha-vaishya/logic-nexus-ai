@@ -7,13 +7,23 @@ import { Button, Checkbox, Input, Input as TextInput, Label, Select, SelectConte
 import { CRMDatePicker as DatePicker } from '@/design-system/components/molecules';
 import { useCRM } from '@/hooks/useCRM';
 import { ArrowDownUp, ChevronDown, ChevronUp, Copy, Download, Eye, GripVertical, PauseCircle, PlayCircle, Trash2 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useAmroWorkspaceState } from '../hooks/useAmroWorkspaceState';
 import type { AmroAuthorityLevel, AmroAssetType } from '../workspace/amroWorkspaceModel';
+import { AmroPartsInventoryWorkbench } from './parts/AmroPartsInventoryWorkbench';
+import {
+  createAmroPartRecord,
+  createAmroPartsCatalogApi,
+  deleteAmroPartRecord,
+  updateAmroPartRecord,
+  type PartsMutationPayload,
+} from './parts/livePartsCatalogApi';
+import { usePartsCatalogState } from './parts/usePartsCatalogState';
+import type { PartInventoryRecord } from './parts/mockPartsInventoryData';
 
 const assetTypeLabel: Record<AmroAssetType, string> = {
   aircraft: 'Aircraft',
@@ -373,6 +383,29 @@ export function AmroOwnedWorkspace({
   const canDirectTaskExecution = activeUxRole !== 'management';
   const canRunRegulatoryFinalSignOff = activeUxRole !== 'engineer';
   const canRunCertifyingRelease = activeUxRole !== 'planner';
+  const partsCatalogApi = useMemo(() => createAmroPartsCatalogApi(), []);
+  const partsCatalog = usePartsCatalogState({
+    pageSize: 80,
+    api: partsCatalogApi,
+  });
+  const [partsCreateOpen, setPartsCreateOpen] = useState(false);
+  const [partsEditOpen, setPartsEditOpen] = useState(false);
+  const [partsDeleteOpen, setPartsDeleteOpen] = useState(false);
+  const [partsSubmitting, setPartsSubmitting] = useState(false);
+  const [partsTargetRecord, setPartsTargetRecord] = useState<PartInventoryRecord | null>(null);
+  const [partsForm, setPartsForm] = useState<PartsMutationPayload>({
+    part_number: '',
+    serial_number: '',
+    description: '',
+    status: 'available',
+    lifecycle_status: 'serviceable',
+    quantity_on_hand: 0,
+    quantity_reserved: 0,
+    warehouse_location: '',
+    supplier_name: '',
+    criticality: 'normal',
+    ata_chapter: '',
+  });
   const isScopedToModule = Boolean(moduleKey);
   const showOverviewModule = !moduleKey || moduleKey === 'overview';
   const showPrimaryUsersModule = !moduleKey || moduleKey === 'primary-users';
@@ -385,6 +418,105 @@ export function AmroOwnedWorkspace({
   const showAuditModule = !moduleKey || moduleKey === 'audit';
   const showIntegrationModule = !moduleKey || moduleKey === 'integration';
   const showIntelligenceModule = !moduleKey || moduleKey === 'intelligence';
+
+  useEffect(() => {
+    if (!showPartsModule) return;
+    if (!partsCatalog.loading && partsCatalog.records.length === 0) {
+      void partsCatalog.refresh();
+    }
+  }, [showPartsModule, partsCatalog.loading, partsCatalog.records.length, partsCatalog.refresh]);
+
+  const resetPartsForm = useCallback(() => {
+    setPartsForm({
+      part_number: '',
+      serial_number: '',
+      description: '',
+      status: 'available',
+      lifecycle_status: 'serviceable',
+      quantity_on_hand: 0,
+      quantity_reserved: 0,
+      warehouse_location: '',
+      supplier_name: '',
+      criticality: 'normal',
+      ata_chapter: '',
+    });
+  }, []);
+
+  const openCreatePartDialog = useCallback(() => {
+    setPartsTargetRecord(null);
+    resetPartsForm();
+    setPartsCreateOpen(true);
+  }, [resetPartsForm]);
+
+  const openEditPartDialog = useCallback((record: PartInventoryRecord) => {
+    setPartsTargetRecord(record);
+    setPartsForm({
+      part_number: record.part_number,
+      serial_number: record.serial_number,
+      description: record.description,
+      status: record.status,
+      lifecycle_status: 'serviceable',
+      quantity_on_hand: record.quantity_on_hand,
+      quantity_reserved: record.quantity_reserved,
+      warehouse_location: record.warehouse_location,
+      supplier_name: record.supplier_name,
+      criticality: record.criticality,
+      ata_chapter: record.ata_chapter,
+    });
+    setPartsEditOpen(true);
+  }, []);
+
+  const openDeletePartDialog = useCallback((record: PartInventoryRecord) => {
+    setPartsTargetRecord(record);
+    setPartsDeleteOpen(true);
+  }, []);
+
+  const submitCreatePart = useCallback(async () => {
+    setPartsSubmitting(true);
+    try {
+      await createAmroPartRecord(partsForm);
+      setPartsCreateOpen(false);
+      resetPartsForm();
+      toast.success('Part created successfully.');
+      await partsCatalog.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create part.');
+    } finally {
+      setPartsSubmitting(false);
+    }
+  }, [partsCatalog, partsForm, resetPartsForm]);
+
+  const submitUpdatePart = useCallback(async () => {
+    if (!partsTargetRecord?.id) return;
+    setPartsSubmitting(true);
+    try {
+      await updateAmroPartRecord(partsTargetRecord.id, partsForm);
+      setPartsEditOpen(false);
+      setPartsTargetRecord(null);
+      toast.success('Part updated successfully.');
+      await partsCatalog.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to update part.');
+    } finally {
+      setPartsSubmitting(false);
+    }
+  }, [partsCatalog, partsForm, partsTargetRecord]);
+
+  const submitDeletePart = useCallback(async () => {
+    if (!partsTargetRecord?.id) return;
+    setPartsSubmitting(true);
+    try {
+      await deleteAmroPartRecord(partsTargetRecord.id);
+      setPartsDeleteOpen(false);
+      setPartsTargetRecord(null);
+      toast.success('Part deleted successfully.');
+      await partsCatalog.refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to delete part.');
+    } finally {
+      setPartsSubmitting(false);
+    }
+  }, [partsCatalog, partsTargetRecord]);
   const moduleActionBarTitle = moduleKey
     ? moduleKey.replace(/-/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase())
     : 'AMRO';
@@ -3261,6 +3393,29 @@ export function AmroOwnedWorkspace({
         </Card>
         ) : null}
 
+        {showPartsModule ? (
+        <div className="xl:col-span-2">
+          <AmroPartsInventoryWorkbench
+            records={partsCatalog.records}
+            state={partsCatalog.loading && partsCatalog.records.length === 0 ? 'loading' : partsCatalog.error ? 'error' : partsCatalog.records.length ? 'ready' : 'empty'}
+            errorMessage={partsCatalog.error?.message || 'Unable to load live AMRO parts inventory'}
+            viewMode="horizontal-split"
+            density="normal"
+            scrollBehavior="virtualization"
+            pageSize={40}
+            title="AMRO Parts Inventory (Live API)"
+            subtitle="Real-time data from /api/v2/amro/parts with CRUD-ready detail workflow."
+            onRefresh={() => {
+              void partsCatalog.refresh();
+            }}
+            onCreatePart={openCreatePartDialog}
+            onCreateRecord={openCreatePartDialog}
+            onUpdateRecord={openEditPartDialog}
+            onDeleteRecord={openDeletePartDialog}
+          />
+        </div>
+        ) : null}
+
         {showIntelligenceModule ? (
         <Card data-amro-screen="SCR-AMRO-012" data-amro-owned-surface="predictive-maintenance-digital-twin" role="region" aria-label="SCR-AMRO-012 Forecast Recommendation Hub">
           <CardHeader className="pb-2">
@@ -3336,6 +3491,138 @@ export function AmroOwnedWorkspace({
         </DialogContent>
       </Dialog>
       ) : null}
+      <Dialog open={partsCreateOpen} onOpenChange={setPartsCreateOpen}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Create Part Inventory Record</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-part-number">Part Number</Label>
+              <TextInput id="parts-create-part-number" value={partsForm.part_number} onChange={(event) => setPartsForm((current) => ({ ...current, part_number: event.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-serial-number">Serial Number</Label>
+              <TextInput id="parts-create-serial-number" value={partsForm.serial_number || ''} onChange={(event) => setPartsForm((current) => ({ ...current, serial_number: event.target.value }))} />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="parts-create-description">Description</Label>
+              <Textarea id="parts-create-description" value={partsForm.description || ''} onChange={(event) => setPartsForm((current) => ({ ...current, description: event.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-status">Status</Label>
+              <Select value={partsForm.status} onValueChange={(value) => setPartsForm((current) => ({ ...current, status: value as PartsMutationPayload['status'] }))}>
+                <SelectTrigger id="parts-create-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">available</SelectItem>
+                  <SelectItem value="reserved">reserved</SelectItem>
+                  <SelectItem value="low_stock">low_stock</SelectItem>
+                  <SelectItem value="quarantined">quarantined</SelectItem>
+                  <SelectItem value="unserviceable">unserviceable</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-criticality">Criticality</Label>
+              <Select value={partsForm.criticality || 'normal'} onValueChange={(value) => setPartsForm((current) => ({ ...current, criticality: value as PartsMutationPayload['criticality'] }))}>
+                <SelectTrigger id="parts-create-criticality"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="critical">critical</SelectItem>
+                  <SelectItem value="high">high</SelectItem>
+                  <SelectItem value="normal">normal</SelectItem>
+                  <SelectItem value="low">low</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-on-hand">Quantity On Hand</Label>
+              <TextInput id="parts-create-on-hand" type="number" value={String(partsForm.quantity_on_hand)} onChange={(event) => setPartsForm((current) => ({ ...current, quantity_on_hand: Number(event.target.value || 0) }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-reserved">Quantity Reserved</Label>
+              <TextInput id="parts-create-reserved" type="number" value={String(partsForm.quantity_reserved)} onChange={(event) => setPartsForm((current) => ({ ...current, quantity_reserved: Number(event.target.value || 0) }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-location">Warehouse Location</Label>
+              <TextInput id="parts-create-location" value={partsForm.warehouse_location} onChange={(event) => setPartsForm((current) => ({ ...current, warehouse_location: event.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-supplier">Supplier Name</Label>
+              <TextInput id="parts-create-supplier" value={partsForm.supplier_name || ''} onChange={(event) => setPartsForm((current) => ({ ...current, supplier_name: event.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-create-ata">ATA Chapter</Label>
+              <TextInput id="parts-create-ata" value={partsForm.ata_chapter || ''} onChange={(event) => setPartsForm((current) => ({ ...current, ata_chapter: event.target.value }))} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPartsCreateOpen(false)} disabled={partsSubmitting}>Cancel</Button>
+            <Button onClick={() => void submitCreatePart()} disabled={partsSubmitting || !partsForm.part_number.trim() || !partsForm.warehouse_location.trim()}>
+              {partsSubmitting ? 'Creating...' : 'Create Part'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={partsEditOpen} onOpenChange={setPartsEditOpen}>
+        <DialogContent className="sm:max-w-[560px]">
+          <DialogHeader>
+            <DialogTitle>Edit Part Inventory Record</DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+            <div className="space-y-1">
+              <Label htmlFor="parts-edit-part-number">Part Number</Label>
+              <TextInput id="parts-edit-part-number" value={partsForm.part_number} onChange={(event) => setPartsForm((current) => ({ ...current, part_number: event.target.value }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-edit-status">Status</Label>
+              <Select value={partsForm.status} onValueChange={(value) => setPartsForm((current) => ({ ...current, status: value as PartsMutationPayload['status'] }))}>
+                <SelectTrigger id="parts-edit-status"><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="available">available</SelectItem>
+                  <SelectItem value="reserved">reserved</SelectItem>
+                  <SelectItem value="low_stock">low_stock</SelectItem>
+                  <SelectItem value="quarantined">quarantined</SelectItem>
+                  <SelectItem value="unserviceable">unserviceable</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-edit-on-hand">Quantity On Hand</Label>
+              <TextInput id="parts-edit-on-hand" type="number" value={String(partsForm.quantity_on_hand)} onChange={(event) => setPartsForm((current) => ({ ...current, quantity_on_hand: Number(event.target.value || 0) }))} />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="parts-edit-reserved">Quantity Reserved</Label>
+              <TextInput id="parts-edit-reserved" type="number" value={String(partsForm.quantity_reserved)} onChange={(event) => setPartsForm((current) => ({ ...current, quantity_reserved: Number(event.target.value || 0) }))} />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label htmlFor="parts-edit-description">Description</Label>
+              <Textarea id="parts-edit-description" value={partsForm.description || ''} onChange={(event) => setPartsForm((current) => ({ ...current, description: event.target.value }))} />
+            </div>
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPartsEditOpen(false)} disabled={partsSubmitting}>Cancel</Button>
+            <Button onClick={() => void submitUpdatePart()} disabled={partsSubmitting || !partsTargetRecord?.id}>
+              {partsSubmitting ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={partsDeleteOpen} onOpenChange={setPartsDeleteOpen}>
+        <DialogContent className="sm:max-w-[460px]">
+          <DialogHeader>
+            <DialogTitle>Delete Part Record</DialogTitle>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">
+            Delete {partsTargetRecord?.part_number || 'this part'} permanently?
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setPartsDeleteOpen(false)} disabled={partsSubmitting}>Cancel</Button>
+            <Button variant="destructive" onClick={() => void submitDeletePart()} disabled={partsSubmitting || !partsTargetRecord?.id}>
+              {partsSubmitting ? 'Deleting...' : 'Delete'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
       <Dialog open={closureConfirmOpen} onOpenChange={setClosureConfirmOpen}>
         <DialogContent className="mdm-template-dialog">
           <DialogHeader>

@@ -12,6 +12,8 @@ export const AMRO_HEALTH_PATH = '/api/v2/amro/health' as const;
 export const AMRO_UIM_INVENTORY_SYNC_PATH = '/api/v2/amro/inventory/sync' as const;
 export const AMRO_WORK_ORDER_SYNC_PATH = '/api/v2/amro/inventory/work-order-sync' as const;
 export const AMRO_INVENTORY_SCAN_PATH = '/api/v2/amro/inventory/scan' as const;
+export const AMRO_PARTS_PATH = '/api/v2/amro/parts' as const;
+export const AMRO_PARTS_DETAIL_PATH = '/api/v2/amro/parts/{id}' as const;
 
 export const AMRO_INTEGRATION_CONTRACTS = {
   rest: {
@@ -26,6 +28,8 @@ export const AMRO_INTEGRATION_CONTRACTS = {
       '/api/v2/amro/tasks/{id}/evidence',
       '/api/v2/amro/inventory/reservations',
       '/api/v2/amro/inventory/availability',
+      AMRO_PARTS_PATH,
+      AMRO_PARTS_DETAIL_PATH,
       AMRO_UIM_INVENTORY_SYNC_PATH,
       AMRO_WORK_ORDER_SYNC_PATH,
       AMRO_INVENTORY_SCAN_PATH,

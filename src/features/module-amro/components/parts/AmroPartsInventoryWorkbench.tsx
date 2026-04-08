@@ -35,6 +35,14 @@ export interface AmroPartsInventoryWorkbenchProps {
   onRetry?: () => void;
   onRefresh?: () => void;
   onCreatePart?: () => void;
+  onCreateRecord?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onCreateRecord'];
+  onReadRecord?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onReadRecord'];
+  onUpdateRecord?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onUpdateRecord'];
+  onDeleteRecord?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onDeleteRecord'];
+  onSaveRecord?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onSaveRecord'];
+  onCancelRecord?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onCancelRecord'];
+  onCrudAction?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onCrudAction'];
+  crudPermissions?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['crudPermissions'];
   onRecordSelectionChange?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onRecordSelectionChange'];
   onScrollPositionChange?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onScrollPositionChange'];
   onViewModeChange?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onViewModeChange'];
@@ -71,6 +79,14 @@ export function AmroPartsInventoryWorkbench({
   onRetry,
   onRefresh,
   onCreatePart,
+  onCreateRecord,
+  onReadRecord,
+  onUpdateRecord,
+  onDeleteRecord,
+  onSaveRecord,
+  onCancelRecord,
+  onCrudAction,
+  crudPermissions,
   onRecordSelectionChange,
   onScrollPositionChange,
   onViewModeChange,
@@ -381,6 +397,14 @@ export function AmroPartsInventoryWorkbench({
           onRecordSelectionChange={onRecordSelectionChange}
           onScrollPositionChange={onScrollPositionChange}
           onViewModeChange={onViewModeChange}
+          onCreateRecord={onCreateRecord}
+          onReadRecord={onReadRecord}
+          onUpdateRecord={onUpdateRecord}
+          onDeleteRecord={onDeleteRecord}
+          onSaveRecord={onSaveRecord}
+          onCancelRecord={onCancelRecord}
+          onCrudAction={onCrudAction}
+          crudPermissions={crudPermissions}
           renderDetail={(record) => (
             <div className="space-y-3 text-sm">
               <div className="grid grid-cols-2 gap-2">
