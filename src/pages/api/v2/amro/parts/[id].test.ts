@@ -560,11 +560,77 @@ describe('/api/v2/amro/parts/[id]', () => {
     expect(sendErrorResponse).toHaveBeenCalled();
   });
 
-  it('delegates to error handler on auth failure', async () => {
-    vi.mocked(authenticateRequest).mockRejectedValue(new Error('auth failed'));
+  it('returns structured auth diagnostics on auth failure', async () => {
+    vi.mocked(authenticateRequest).mockRejectedValue(new Error('Unauthorized'));
+    const req: ApiRequest = {
+      method: 'GET',
+      query: { id: 'inv-1' },
+      headers: {
+        'x-tenant-id': 'tenant-1',
+        'x-domain-id': 'AMRO',
+      },
+    };
+    const res = createResponse();
+    await handler(req, res);
+    expect(res.statusCode).toBe(401);
+    expect((res.jsonBody as any)?.error).toBe('Unauthorized');
+    expect((res.jsonBody as any)?.auth_diagnostics?.failure_category).toBe('token');
+    expect(sendErrorResponse).not.toHaveBeenCalled();
+  });
+
+  it('returns structured domain diagnostics when AMRO domain access fails', async () => {
+    vi.mocked(enforceAmroDomainAccess).mockRejectedValue(new Error('Forbidden: AMRO access requires active AMRO domain subscription'));
+    const req: ApiRequest = {
+      method: 'GET',
+      query: { id: 'inv-1' },
+      headers: {
+        authorization: 'Bearer token-1',
+        'x-tenant-id': 'tenant-1',
+        'x-domain-id': 'AMRO',
+      },
+    };
+    const res = createResponse();
+    await handler(req, res);
+    expect(res.statusCode).toBe(403);
+    expect((res.jsonBody as any)?.auth_diagnostics?.failure_category).toBe('domain');
+    expect((res.jsonBody as any)?.auth_diagnostics?.reason_code).toBe('amro_domain_access_denied');
+  });
+
+  it('accepts AMRO-native dashboard permission for detail endpoint', async () => {
+    const supabase: any = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            eq: vi.fn(() => ({
+              limit: vi.fn(() => ({
+                maybeSingle: vi.fn().mockResolvedValue({
+                  data: {
+                    id: 'inv-1',
+                    tenant_id: 'tenant-1',
+                    franchise_id: 'fr-1',
+                    part_number: 'AMRO-PN-1',
+                    status: 'available',
+                    quantity_on_hand: 9,
+                    quantity_reserved: 1,
+                    warehouse_location: 'WH-A-001',
+                  },
+                  error: null,
+                }),
+              })),
+            })),
+          })),
+        })),
+      })),
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabase);
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'u1',
+      role: 'tenant_admin',
+      permissions: ['view_amro_dashboard'],
+    } as any);
     const req: ApiRequest = { method: 'GET', query: { id: 'inv-1' }, headers: {} };
     const res = createResponse();
     await handler(req, res);
-    expect(sendErrorResponse).toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
   });
 });

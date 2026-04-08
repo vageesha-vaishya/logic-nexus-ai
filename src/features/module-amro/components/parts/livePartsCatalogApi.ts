@@ -25,12 +25,25 @@ type ApiRecord = {
 
 type ApiResponseShape = {
   correlationId?: string;
+  error?: string;
+  auth_diagnostics?: {
+    failure_category?: string;
+    reason_code?: string;
+    remediation?: string;
+  };
   output?: {
     page?: number;
     page_size?: number;
     total?: number;
     records?: ApiRecord[];
   };
+};
+
+export type AmroApiScope = {
+  tenantId?: string | null;
+  franchiseId?: string | null;
+  userId?: string | null;
+  accessToken?: string | null;
 };
 
 export type PartsMutationPayload = {
@@ -47,7 +60,46 @@ export type PartsMutationPayload = {
   ata_chapter?: string | null;
 };
 
-async function resolveAccessToken(): Promise<string> {
+export type PartsApiAuthDiagnostics = {
+  failureCategory: string | null;
+  reasonCode: string | null;
+  remediation: string | null;
+};
+
+export class PartsApiError extends Error {
+  status: number;
+  authDiagnostics: PartsApiAuthDiagnostics | null;
+
+  constructor(message: string, status: number, authDiagnostics: PartsApiAuthDiagnostics | null = null) {
+    super(message);
+    this.name = 'PartsApiError';
+    this.status = status;
+    this.authDiagnostics = authDiagnostics;
+  }
+}
+
+async function parseApiResponseShape(response: Response): Promise<ApiResponseShape> {
+  try {
+    const payload = await response.json();
+    return payload && typeof payload === 'object' ? payload as ApiResponseShape : {};
+  } catch {
+    return {};
+  }
+}
+
+function normalizeAuthDiagnostics(payload: ApiResponseShape): PartsApiAuthDiagnostics | null {
+  const diagnostics = payload.auth_diagnostics;
+  if (!diagnostics) return null;
+  return {
+    failureCategory: diagnostics.failure_category ? String(diagnostics.failure_category) : null,
+    reasonCode: diagnostics.reason_code ? String(diagnostics.reason_code) : null,
+    remediation: diagnostics.remediation ? String(diagnostics.remediation) : null,
+  };
+}
+
+async function resolveAccessToken(preferredToken?: string | null): Promise<string> {
+  const normalizedPreferred = String(preferredToken || '').trim();
+  if (normalizedPreferred) return normalizedPreferred;
   const { data: sessionData } = await supabase.auth.getSession();
   let token = sessionData?.session?.access_token || '';
   if (!token) {
@@ -57,11 +109,14 @@ async function resolveAccessToken(): Promise<string> {
   return token;
 }
 
-async function buildAuthHeaders(headers: Record<string, string>): Promise<Record<string, string>> {
-  const token = await resolveAccessToken();
+async function buildAuthHeaders(headers: Record<string, string>, scope: AmroApiScope = {}): Promise<Record<string, string>> {
+  const token = await resolveAccessToken(scope.accessToken);
   return {
     ...headers,
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...(scope.tenantId ? { 'x-tenant-id': scope.tenantId } : {}),
+    ...(scope.franchiseId ? { 'x-franchise-id': scope.franchiseId } : {}),
+    ...(scope.userId ? { 'x-user-id': scope.userId } : {}),
     'x-domain-id': 'AMRO',
   };
 }
@@ -125,7 +180,7 @@ export function mapLiveApiRecordToPartInventoryRecord(record: ApiRecord): PartIn
   };
 }
 
-export function createAmroPartsCatalogApi(fetchImpl: FetchLike = fetch): PartsCatalogApi {
+export function createAmroPartsCatalogApi(fetchImpl: FetchLike = fetch, scope: AmroApiScope = {}): PartsCatalogApi {
   return {
     async listParts(query: PartsCatalogQuery): Promise<PartsCatalogResponse> {
       const params = new URLSearchParams();
@@ -133,8 +188,8 @@ export function createAmroPartsCatalogApi(fetchImpl: FetchLike = fetch): PartsCa
       params.set('page_size', String(query.pageSize));
       if (query.search?.trim()) params.set('search', query.search.trim());
       if (query.status && query.status !== 'all') params.set('status', query.status);
-      const token = await resolveAccessToken();
-      const requestHeaders = await buildAuthHeaders({ Accept: 'application/json' });
+      const token = await resolveAccessToken(scope.accessToken);
+      const requestHeaders = await buildAuthHeaders({ Accept: 'application/json' }, scope);
       const response = await fetchImpl(`/api/v2/amro/parts?${params.toString()}`, {
         method: 'GET',
         headers: requestHeaders,
@@ -149,10 +204,13 @@ export function createAmroPartsCatalogApi(fetchImpl: FetchLike = fetch): PartsCa
         : response;
 
       if (!fallbackResponse.ok) {
-        throw new Error(`Failed to load parts catalog (${fallbackResponse.status})`);
+        const payload = await parseApiResponseShape(fallbackResponse);
+        const diagnostics = normalizeAuthDiagnostics(payload);
+        const message = String(payload.error || `Failed to load parts catalog (${fallbackResponse.status})`);
+        throw new PartsApiError(message, fallbackResponse.status, diagnostics);
       }
 
-      const payload = await fallbackResponse.json() as ApiResponseShape;
+      const payload = await parseApiResponseShape(fallbackResponse);
       const output = payload.output || {};
       const records = Array.isArray(output.records) ? output.records : [];
       const page = Number(output.page || query.page || 1);
@@ -181,8 +239,9 @@ function asJsonHeaders() {
 export async function createAmroPartRecord(
   payload: PartsMutationPayload,
   fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
 ): Promise<void> {
-  const headers = await buildAuthHeaders(asJsonHeaders());
+  const headers = await buildAuthHeaders(asJsonHeaders(), scope);
   const response = await fetchImpl('/api/v2/amro/parts', {
     method: 'POST',
     headers,
@@ -198,8 +257,9 @@ export async function updateAmroPartRecord(
   id: string,
   payload: Partial<PartsMutationPayload>,
   fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
 ): Promise<void> {
-  const headers = await buildAuthHeaders(asJsonHeaders());
+  const headers = await buildAuthHeaders(asJsonHeaders(), scope);
   const response = await fetchImpl(`/api/v2/amro/parts/${encodeURIComponent(id)}`, {
     method: 'PATCH',
     headers,
@@ -211,8 +271,8 @@ export async function updateAmroPartRecord(
   }
 }
 
-export async function deleteAmroPartRecord(id: string, fetchImpl: FetchLike = fetch): Promise<void> {
-  const headers = await buildAuthHeaders({ Accept: 'application/json' });
+export async function deleteAmroPartRecord(id: string, fetchImpl: FetchLike = fetch, scope: AmroApiScope = {}): Promise<void> {
+  const headers = await buildAuthHeaders({ Accept: 'application/json' }, scope);
   const response = await fetchImpl(`/api/v2/amro/parts/${encodeURIComponent(id)}`, {
     method: 'DELETE',
     headers,

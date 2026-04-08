@@ -13,6 +13,7 @@ import {
 import { sendErrorResponse } from '../../../_utils/errorHandler';
 import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
 import {
+  buildPartsAuthDiagnostics,
   mapPartsInventoryRowToTemplate,
   resolveWorkflowTriggers,
   validatePartsRecordInput,
@@ -47,12 +48,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     enforceHttps(req);
     enforceRateLimit(req);
-    const auth = await authenticateRequest(req);
-    ctx.userId = auth.userId;
-    ctx.role = auth.role;
-    enforceAnyPermission(auth.permissions || [], ['dashboards.view']);
-    const access = await resolveAndApplyAccessContext(req, ctx);
-    await enforceAmroDomainAccess(access, { correlationId: ctx.correlationId });
+    let auth: Awaited<ReturnType<typeof authenticateRequest>>;
+    let access: Awaited<ReturnType<typeof resolveAndApplyAccessContext>>;
+    try {
+      auth = await authenticateRequest(req);
+      ctx.userId = auth.userId;
+      ctx.role = auth.role;
+      enforceAnyPermission(auth.permissions || [], ['dashboards.view', 'view_amro_dashboard']);
+      access = await resolveAndApplyAccessContext(req, ctx);
+      await enforceAmroDomainAccess(access, { correlationId: ctx.correlationId });
+    } catch (authError) {
+      const diagnostics = buildPartsAuthDiagnostics(req, authError);
+      res.status(diagnostics.http_status).json({
+        error: diagnostics.http_status === 403 ? 'Forbidden' : 'Unauthorized',
+        version: 'v2',
+        correlationId: ctx.correlationId,
+        auth_diagnostics: diagnostics,
+      });
+      return;
+    }
 
     const tenantId = String(access.tenantId || '');
     const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
@@ -189,4 +203,3 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     sendErrorResponse(res, error, ctx.correlationId, { apiVersion: 'v2' });
   }
 }
-

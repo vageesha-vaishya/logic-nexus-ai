@@ -12,6 +12,7 @@ import { authMiddleware, AuthRequest, getAuthHeaderMonitoringSnapshot } from './
 import masterDataRoutes from './routes/master-data.routes';
 import workOrdersRoutes from './routes/work-orders.routes';
 import workPackageTemplateRoutes from './routes/work-package-template.routes';
+import partsRoutes from './routes/parts.routes';
 import { ErrorResponse } from './types/amro.types';
 import { logger } from './utils/logger';
 import { amroEventsProducer } from './events/amro-events.producer';
@@ -1378,6 +1379,7 @@ app.use('/api/v1', workOrdersRoutes);
 app.use('/api/v2', workPackageTemplateRoutes);
 app.use('/api/v2', workOrdersRoutes);
 app.use('/api/v2', masterDataRoutes);
+app.use('/api/v2', partsRoutes);
 
 // ============================================================================
 // ERROR HANDLING

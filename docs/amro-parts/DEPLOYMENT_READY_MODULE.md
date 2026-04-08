@@ -68,6 +68,12 @@
 - Integration endpoint registry updated:
   - `src/pages/api/v2/amro/integration-contracts.ts`
   - `src/pages/api/v2/amro/integration-contracts.test.ts`
+- Auth troubleshooting diagnostics on `/api/v2/amro/parts*`:
+  - 401/403 responses now include `auth_diagnostics` with:
+    - `failure_category` (`token`, `permission`, `scope`, `domain`, `unknown`)
+    - `reason_code`
+    - `remediation`
+    - header/token presence checks for operations triage
 
 ## UI/UX Integration
 - Live API adapter:

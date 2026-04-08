@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useState } from 'react';
 import { generatePartInventoryRecords, type PartInventoryRecord } from './mockPartsInventoryData';
 import type { PartsCatalogApi, PartsCatalogError, PartsCatalogQuery, PartsCatalogResponse } from './partsInventoryContracts';
+import { PartsApiError, type PartsApiAuthDiagnostics } from './livePartsCatalogApi';
 
 export type UsePartsCatalogStateOptions = {
   pageSize?: number;
@@ -17,14 +18,27 @@ export type UsePartsCatalogStateResult = {
   hasMore: boolean;
   total: number;
   page: number;
+  dataSource: 'api' | 'fallback';
+  fallbackAuthDiagnostics: PartsApiAuthDiagnostics | null;
   query: Omit<PartsCatalogQuery, 'page' | 'pageSize'>;
   setQuery: (query: Partial<Omit<PartsCatalogQuery, 'page' | 'pageSize'>>) => void;
   loadMore: () => Promise<void>;
   refresh: () => Promise<void>;
 };
 
+type CatalogFetchResult = {
+  response: PartsCatalogResponse;
+  dataSource: 'api' | 'fallback';
+  fallbackAuthDiagnostics: PartsApiAuthDiagnostics | null;
+};
+
 function defaultCatalogSource(options: Required<Pick<UsePartsCatalogStateOptions, 'seed' | 'totalRecords'>>): PartInventoryRecord[] {
   return generatePartInventoryRecords({ count: options.totalRecords, seed: options.seed, includeExpired: true });
+}
+
+function shouldFallbackToLocalCatalog(cause: unknown): boolean {
+  const message = cause instanceof Error ? cause.message : String(cause || '');
+  return /401|unauthorized|forbidden|upstream unavailable|network|fetch failed/i.test(message);
 }
 
 export function usePartsCatalogState(options: UsePartsCatalogStateOptions = {}): UsePartsCatalogStateResult {
@@ -38,6 +52,8 @@ export function usePartsCatalogState(options: UsePartsCatalogStateOptions = {}):
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<PartsCatalogError | null>(null);
   const [page, setPage] = useState(0);
+  const [dataSource, setDataSource] = useState<'api' | 'fallback'>('fallback');
+  const [fallbackAuthDiagnostics, setFallbackAuthDiagnostics] = useState<PartsApiAuthDiagnostics | null>(null);
   const [hasMore, setHasMore] = useState(true);
   const [query, setQueryState] = useState<Omit<PartsCatalogQuery, 'page' | 'pageSize'>>({
     search: '',
@@ -59,7 +75,7 @@ export function usePartsCatalogState(options: UsePartsCatalogStateOptions = {}):
     });
   }, [query.criticality, query.search, query.status]);
 
-  const fetchPage = useCallback(async (nextPage: number): Promise<PartsCatalogResponse> => {
+  const fetchPage = useCallback(async (nextPage: number): Promise<CatalogFetchResult> => {
     const pageQuery: PartsCatalogQuery = {
       page: nextPage,
       pageSize,
@@ -67,18 +83,31 @@ export function usePartsCatalogState(options: UsePartsCatalogStateOptions = {}):
       status: query.status,
       criticality: query.criticality,
     };
-    if (options.api) return options.api.listParts(pageQuery);
+    let fallbackDiagnostics: PartsApiAuthDiagnostics | null = null;
+    if (options.api) {
+      try {
+        const response = await options.api.listParts(pageQuery);
+        return { response, dataSource: 'api', fallbackAuthDiagnostics: null };
+      } catch (cause) {
+        if (!shouldFallbackToLocalCatalog(cause)) throw cause;
+        fallbackDiagnostics = cause instanceof PartsApiError ? cause.authDiagnostics : null;
+      }
+    }
     const filtered = filterSource(source);
     const start = (nextPage - 1) * pageSize;
     const end = start + pageSize;
     await new Promise((resolve) => setTimeout(resolve, simulateLatencyMs));
     return {
-      items: filtered.slice(start, end),
-      page: nextPage,
-      pageSize,
-      total: filtered.length,
-      hasMore: end < filtered.length,
-      requestId: `storybook-${nextPage}`,
+      dataSource: 'fallback',
+      fallbackAuthDiagnostics: fallbackDiagnostics,
+      response: {
+        items: filtered.slice(start, end),
+        page: nextPage,
+        pageSize,
+        total: filtered.length,
+        hasMore: end < filtered.length,
+        requestId: `storybook-${nextPage}`,
+      },
     };
   }, [filterSource, options.api, pageSize, query.criticality, query.search, query.status, simulateLatencyMs, source]);
 
@@ -88,10 +117,12 @@ export function usePartsCatalogState(options: UsePartsCatalogStateOptions = {}):
     setError(null);
     try {
       const nextPage = page + 1;
-      const response = await fetchPage(nextPage);
-      setPage(response.page);
-      setHasMore(response.hasMore);
-      setRecords((current) => [...current, ...response.items]);
+      const result = await fetchPage(nextPage);
+      setDataSource(result.dataSource);
+      setFallbackAuthDiagnostics(result.fallbackAuthDiagnostics);
+      setPage(result.response.page);
+      setHasMore(result.response.hasMore);
+      setRecords((current) => [...current, ...result.response.items]);
     } catch (cause) {
       setError({
         code: 'UNKNOWN',
@@ -106,10 +137,12 @@ export function usePartsCatalogState(options: UsePartsCatalogStateOptions = {}):
     setLoading(true);
     setError(null);
     try {
-      const response = await fetchPage(1);
+      const result = await fetchPage(1);
+      setDataSource(result.dataSource);
+      setFallbackAuthDiagnostics(result.fallbackAuthDiagnostics);
       setPage(1);
-      setHasMore(response.hasMore);
-      setRecords(response.items);
+      setHasMore(result.response.hasMore);
+      setRecords(result.response.items);
     } catch (cause) {
       setError({
         code: 'UNKNOWN',
@@ -118,6 +151,8 @@ export function usePartsCatalogState(options: UsePartsCatalogStateOptions = {}):
       setRecords([]);
       setPage(0);
       setHasMore(false);
+      setDataSource('fallback');
+      setFallbackAuthDiagnostics(null);
     } finally {
       setLoading(false);
     }
@@ -141,10 +176,11 @@ export function usePartsCatalogState(options: UsePartsCatalogStateOptions = {}):
     hasMore,
     total,
     page,
+    dataSource,
+    fallbackAuthDiagnostics,
     query,
     setQuery,
     loadMore,
     refresh,
   };
 }
-

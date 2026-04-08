@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   createAmroPartRecord,
+  PartsApiError,
   createAmroPartsCatalogApi,
   deleteAmroPartRecord,
   mapLiveApiRecordToPartInventoryRecord,
@@ -61,10 +62,20 @@ describe('live parts catalog api adapter', () => {
         },
       }),
     });
-    const api = createAmroPartsCatalogApi(fetchMock as never);
+    const api = createAmroPartsCatalogApi(fetchMock as never, {
+      tenantId: 'tenant-1',
+      franchiseId: 'franchise-1',
+      userId: 'user-1',
+      accessToken: 'token-1',
+    });
     const result = await api.listParts({ page: 1, pageSize: 25, status: 'all', criticality: 'all' });
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
+    const firstHeaders = new Headers(fetchMock.mock.calls[0]?.[1]?.headers as HeadersInit);
+    expect(firstHeaders.get('Authorization')).toBe('Bearer token-1');
+    expect(firstHeaders.get('x-tenant-id')).toBe('tenant-1');
+    expect(firstHeaders.get('x-franchise-id')).toBe('franchise-1');
+    expect(firstHeaders.get('x-user-id')).toBe('user-1');
     expect(result.items.length).toBe(1);
     expect(result.items[0]?.part_number).toBe('AMRO-PN-2');
     expect(result.requestId).toBe('corr-123');
@@ -84,5 +95,27 @@ describe('live parts catalog api adapter', () => {
     await updateAmroPartRecord('inv-3', { status: 'reserved' }, fetchMock as never);
     await deleteAmroPartRecord('inv-3', fetchMock as never);
     expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
+
+  it('exposes auth diagnostics when API responds with 401', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 401,
+      json: async () => ({
+        error: 'Unauthorized',
+        auth_diagnostics: {
+          failure_category: 'permission',
+          reason_code: 'missing_permission_dashboards_view',
+          remediation: 'Grant dashboards.view',
+        },
+      }),
+    });
+    const api = createAmroPartsCatalogApi(fetchMock as never, {
+      tenantId: 'tenant-1',
+      userId: 'user-1',
+      accessToken: 'token-1',
+    });
+    await expect(api.listParts({ page: 1, pageSize: 20, status: 'all', criticality: 'all' }))
+      .rejects.toBeInstanceOf(PartsApiError);
   });
 });

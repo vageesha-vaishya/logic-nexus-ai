@@ -6,6 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Button, Checkbox, Input, Input as TextInput, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Tabs, TabsContent, TabsList, TabsTrigger } from '@/design-system';
 import { CRMDatePicker as DatePicker } from '@/design-system/components/molecules';
 import { useCRM } from '@/hooks/useCRM';
+import { useAuth } from '@/hooks/useAuth';
 import { ArrowDownUp, ChevronDown, ChevronUp, Copy, Download, Eye, GripVertical, PauseCircle, PlayCircle, Trash2 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
 import { toast } from 'sonner';
@@ -293,7 +294,8 @@ export function AmroOwnedWorkspace({
   overviewControls: _overviewControls,
   overviewTelemetry: _overviewTelemetry,
 }: AmroOwnedWorkspaceProps) {
-  const { scopedDb } = useCRM();
+  const { scopedDb, context } = useCRM();
+  const { session } = useAuth();
   const state = useAmroWorkspaceState();
   const [newWorkPackageTitle, setNewWorkPackageTitle] = useState('');
   const [savedViewName, setSavedViewName] = useState('');
@@ -383,7 +385,13 @@ export function AmroOwnedWorkspace({
   const canDirectTaskExecution = activeUxRole !== 'management';
   const canRunRegulatoryFinalSignOff = activeUxRole !== 'engineer';
   const canRunCertifyingRelease = activeUxRole !== 'planner';
-  const partsCatalogApi = useMemo(() => createAmroPartsCatalogApi(), []);
+  const partsApiScope = useMemo(() => ({
+    tenantId: context.tenantId || null,
+    franchiseId: context.franchiseId || null,
+    userId: context.userId || null,
+    accessToken: session?.access_token || null,
+  }), [context.franchiseId, context.tenantId, context.userId, session?.access_token]);
+  const partsCatalogApi = useMemo(() => createAmroPartsCatalogApi(fetch, partsApiScope), [partsApiScope]);
   const partsCatalog = usePartsCatalogState({
     pageSize: 80,
     api: partsCatalogApi,
@@ -474,7 +482,7 @@ export function AmroOwnedWorkspace({
   const submitCreatePart = useCallback(async () => {
     setPartsSubmitting(true);
     try {
-      await createAmroPartRecord(partsForm);
+      await createAmroPartRecord(partsForm, fetch, partsApiScope);
       setPartsCreateOpen(false);
       resetPartsForm();
       toast.success('Part created successfully.');
@@ -484,13 +492,13 @@ export function AmroOwnedWorkspace({
     } finally {
       setPartsSubmitting(false);
     }
-  }, [partsCatalog, partsForm, resetPartsForm]);
+  }, [partsApiScope, partsCatalog, partsForm, resetPartsForm]);
 
   const submitUpdatePart = useCallback(async () => {
     if (!partsTargetRecord?.id) return;
     setPartsSubmitting(true);
     try {
-      await updateAmroPartRecord(partsTargetRecord.id, partsForm);
+      await updateAmroPartRecord(partsTargetRecord.id, partsForm, fetch, partsApiScope);
       setPartsEditOpen(false);
       setPartsTargetRecord(null);
       toast.success('Part updated successfully.');
@@ -500,13 +508,13 @@ export function AmroOwnedWorkspace({
     } finally {
       setPartsSubmitting(false);
     }
-  }, [partsCatalog, partsForm, partsTargetRecord]);
+  }, [partsApiScope, partsCatalog, partsForm, partsTargetRecord]);
 
   const submitDeletePart = useCallback(async () => {
     if (!partsTargetRecord?.id) return;
     setPartsSubmitting(true);
     try {
-      await deleteAmroPartRecord(partsTargetRecord.id);
+      await deleteAmroPartRecord(partsTargetRecord.id, fetch, partsApiScope);
       setPartsDeleteOpen(false);
       setPartsTargetRecord(null);
       toast.success('Part deleted successfully.');
@@ -516,7 +524,7 @@ export function AmroOwnedWorkspace({
     } finally {
       setPartsSubmitting(false);
     }
-  }, [partsCatalog, partsTargetRecord]);
+  }, [partsApiScope, partsCatalog, partsTargetRecord]);
   const moduleActionBarTitle = moduleKey
     ? moduleKey.replace(/-/g, ' ').replace(/\b\w/g, (value) => value.toUpperCase())
     : 'AMRO';
@@ -3395,6 +3403,23 @@ export function AmroOwnedWorkspace({
 
         {showPartsModule ? (
         <div className="xl:col-span-2">
+          {partsCatalog.dataSource === 'fallback' ? (
+          <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="font-medium">
+              Live API unavailable - showing fallback data for visibility.
+            </p>
+            {partsCatalog.fallbackAuthDiagnostics?.reasonCode ? (
+            <p className="mt-1 text-xs">
+              reason_code: {partsCatalog.fallbackAuthDiagnostics.reasonCode}
+            </p>
+            ) : null}
+            {partsCatalog.fallbackAuthDiagnostics?.remediation ? (
+            <p className="mt-1 text-xs">
+              remediation: {partsCatalog.fallbackAuthDiagnostics.remediation}
+            </p>
+            ) : null}
+          </div>
+          ) : null}
           <AmroPartsInventoryWorkbench
             records={partsCatalog.records}
             state={partsCatalog.loading && partsCatalog.records.length === 0 ? 'loading' : partsCatalog.error ? 'error' : partsCatalog.records.length ? 'ready' : 'empty'}

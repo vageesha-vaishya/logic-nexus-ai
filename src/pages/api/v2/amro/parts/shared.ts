@@ -261,3 +261,117 @@ export function parsePagination(req: ApiRequest): { page: number; pageSize: numb
   return { page, pageSize };
 }
 
+function readHeaderValue(value: unknown): string {
+  if (Array.isArray(value)) return String(value[0] || '').trim();
+  return String(value || '').trim();
+}
+
+export function buildPartsAuthDiagnostics(req: ApiRequest, error: unknown): {
+  http_status: number;
+  failure_category: 'token' | 'permission' | 'scope' | 'domain' | 'unknown';
+  reason_code: string;
+  remediation: string;
+  checks: {
+    has_authorization_header: boolean;
+    has_access_token_query: boolean;
+    has_access_token_body: boolean;
+    has_tenant_header: boolean;
+    has_franchise_header: boolean;
+    has_user_header: boolean;
+    has_domain_header: boolean;
+  };
+} {
+  const message = String((error as { message?: unknown })?.message || 'Unauthorized');
+  const normalized = message.toLowerCase();
+  const authHeader = readHeaderValue(req.headers?.authorization);
+  const queryToken = readHeaderValue((req.query as Record<string, unknown>)?.access_token);
+  const bodyToken = readHeaderValue((req.body as Record<string, unknown>)?.access_token);
+  const tenantHeader = readHeaderValue(req.headers?.['x-tenant-id']);
+  const franchiseHeader = readHeaderValue(req.headers?.['x-franchise-id']);
+  const userHeader = readHeaderValue(req.headers?.['x-user-id']);
+  const domainHeader = readHeaderValue(req.headers?.['x-domain-id']);
+
+  if (normalized.includes('domain') || normalized.includes('amro access')) {
+    return {
+      http_status: 403,
+      failure_category: 'domain',
+      reason_code: 'amro_domain_access_denied',
+      remediation: 'Assign AMRO domain to tenant/user and ensure subscription is active.',
+      checks: {
+        has_authorization_header: Boolean(authHeader),
+        has_access_token_query: Boolean(queryToken),
+        has_access_token_body: Boolean(bodyToken),
+        has_tenant_header: Boolean(tenantHeader),
+        has_franchise_header: Boolean(franchiseHeader),
+        has_user_header: Boolean(userHeader),
+        has_domain_header: Boolean(domainHeader),
+      },
+    };
+  }
+  if (normalized.includes('forbidden') || normalized.includes('permission')) {
+    return {
+      http_status: 403,
+      failure_category: 'permission',
+      reason_code: 'missing_permission_amro_parts_view',
+      remediation: 'Grant dashboards.view or view_amro_dashboard permission to this user role.',
+      checks: {
+        has_authorization_header: Boolean(authHeader),
+        has_access_token_query: Boolean(queryToken),
+        has_access_token_body: Boolean(bodyToken),
+        has_tenant_header: Boolean(tenantHeader),
+        has_franchise_header: Boolean(franchiseHeader),
+        has_user_header: Boolean(userHeader),
+        has_domain_header: Boolean(domainHeader),
+      },
+    };
+  }
+  if (normalized.includes('tenant') || normalized.includes('franchise') || normalized.includes('scope')) {
+    return {
+      http_status: 403,
+      failure_category: 'scope',
+      reason_code: 'scope_resolution_failed',
+      remediation: 'Provide valid x-tenant-id/x-franchise-id headers aligned with the user access profile.',
+      checks: {
+        has_authorization_header: Boolean(authHeader),
+        has_access_token_query: Boolean(queryToken),
+        has_access_token_body: Boolean(bodyToken),
+        has_tenant_header: Boolean(tenantHeader),
+        has_franchise_header: Boolean(franchiseHeader),
+        has_user_header: Boolean(userHeader),
+        has_domain_header: Boolean(domainHeader),
+      },
+    };
+  }
+  if (normalized.includes('unauthorized') || normalized.includes('token') || normalized.includes('jwt')) {
+    return {
+      http_status: 401,
+      failure_category: 'token',
+      reason_code: 'token_invalid_or_missing',
+      remediation: 'Re-authenticate and send a valid Bearer token or access_token with AMRO scope headers.',
+      checks: {
+        has_authorization_header: Boolean(authHeader),
+        has_access_token_query: Boolean(queryToken),
+        has_access_token_body: Boolean(bodyToken),
+        has_tenant_header: Boolean(tenantHeader),
+        has_franchise_header: Boolean(franchiseHeader),
+        has_user_header: Boolean(userHeader),
+        has_domain_header: Boolean(domainHeader),
+      },
+    };
+  }
+  return {
+    http_status: 401,
+    failure_category: 'unknown',
+    reason_code: 'auth_access_unknown',
+    remediation: 'Review correlationId in server logs and verify token, permissions, and AMRO scope headers.',
+    checks: {
+      has_authorization_header: Boolean(authHeader),
+      has_access_token_query: Boolean(queryToken),
+      has_access_token_body: Boolean(bodyToken),
+      has_tenant_header: Boolean(tenantHeader),
+      has_franchise_header: Boolean(franchiseHeader),
+      has_user_header: Boolean(userHeader),
+      has_domain_header: Boolean(domainHeader),
+    },
+  };
+}

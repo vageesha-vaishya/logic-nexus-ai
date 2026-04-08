@@ -309,11 +309,68 @@ describe('/api/v2/amro/parts', () => {
     expect(sendErrorResponse).toHaveBeenCalled();
   });
 
-  it('delegates to error handler on authentication failure', async () => {
-    vi.mocked(authenticateRequest).mockRejectedValue(new Error('auth failed'));
+  it('returns structured auth diagnostics on authentication failure', async () => {
+    vi.mocked(authenticateRequest).mockRejectedValue(new Error('Unauthorized'));
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {},
+      headers: {
+        'x-tenant-id': 'tenant-1',
+        'x-franchise-id': 'fr-1',
+        'x-user-id': 'u1',
+        'x-domain-id': 'AMRO',
+      },
+    };
+    const res = createResponse();
+    await handler(req, res);
+    expect(res.statusCode).toBe(401);
+    expect((res.jsonBody as any)?.error).toBe('Unauthorized');
+    expect((res.jsonBody as any)?.auth_diagnostics?.failure_category).toBe('token');
+    expect((res.jsonBody as any)?.auth_diagnostics?.checks?.has_tenant_header).toBe(true);
+    expect(sendErrorResponse).not.toHaveBeenCalled();
+  });
+
+  it('returns structured permission diagnostics when permission check fails', async () => {
+    vi.mocked(enforceAnyPermission).mockImplementation(() => {
+      throw new Error('Forbidden: missing dashboards.view');
+    });
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {},
+      headers: {
+        authorization: 'Bearer token-1',
+        'x-tenant-id': 'tenant-1',
+        'x-domain-id': 'AMRO',
+      },
+    };
+    const res = createResponse();
+    await handler(req, res);
+    expect(res.statusCode).toBe(403);
+    expect((res.jsonBody as any)?.auth_diagnostics?.failure_category).toBe('permission');
+    expect((res.jsonBody as any)?.auth_diagnostics?.reason_code).toBe('missing_permission_amro_parts_view');
+  });
+
+  it('accepts AMRO-native dashboard permission', async () => {
+    const supabase: any = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            order: vi.fn(() => ({
+              range: vi.fn().mockResolvedValue({ data: [], error: null, count: 0 }),
+            })),
+          })),
+        })),
+      })),
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabase);
+    vi.mocked(authenticateRequest).mockResolvedValue({
+      userId: 'u1',
+      role: 'tenant_admin',
+      permissions: ['view_amro_dashboard'],
+    } as any);
     const req: ApiRequest = { method: 'GET', query: {}, headers: {} };
     const res = createResponse();
     await handler(req, res);
-    expect(sendErrorResponse).toHaveBeenCalled();
+    expect(res.statusCode).toBe(200);
   });
 });

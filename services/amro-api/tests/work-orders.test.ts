@@ -142,6 +142,12 @@ describe('Authentication Middleware', () => {
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
+
+  it('should no longer return 404 for GET /api/v2/amro/parts when unauthorized', async () => {
+    const response = await request(app).get('/api/v2/amro/parts?page=1&page_size=25');
+    expect(response.status).toBe(401);
+    expect(response.body.code).toBe('MISSING_TOKEN');
+  });
 });
 
 describe('Error Handling', () => {
