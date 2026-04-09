@@ -160,11 +160,25 @@ export function WorkPackageTemplateCreateSection({
   );
   const resolveWorkPackageTaskTemplateId = useCallback((taskTemplate: Record<string, unknown>): string => {
     const primaryId = String(taskTemplate.id || '').trim();
-    if (isUuid(primaryId)) {
+    if (primaryId) {
       return primaryId;
     }
     const fallbackId = String(taskTemplate.task_template_id || '').trim();
-    return isUuid(fallbackId) ? fallbackId : '';
+    if (fallbackId) {
+      return fallbackId;
+    }
+    const sequenceId = String(taskTemplate.tt_sequence || taskTemplate.task_id || '').trim();
+    return sequenceId;
+  }, []);
+
+  const resolveWorkPackageTaskTemplateKeys = useCallback((taskTemplate: Record<string, unknown>): string[] => {
+    const values = [
+      String(taskTemplate.id || '').trim(),
+      String(taskTemplate.task_template_id || '').trim(),
+      String(taskTemplate.tt_sequence || '').trim(),
+      String(taskTemplate.task_id || '').trim(),
+    ];
+    return Array.from(new Set(values.filter((value) => value.length > 0)));
   }, []);
 
   const parseTaskTemplateIdsFromTasksJson = useCallback((raw: unknown): string[] => {
@@ -722,15 +736,35 @@ export function WorkPackageTemplateCreateSection({
   }, [workPackageTemplateTaskSortColumn, workPackageTemplateTaskSortDirection]);
 
   const taskTemplateById = useMemo(() => {
-    return workPackageTemplateTaskTemplates.reduce((map, taskTemplate) => {
-      const id = resolveWorkPackageTaskTemplateId(taskTemplate);
-      if (!id) {
-        return map;
+    const map = new Map<string, Record<string, unknown>>();
+    workPackageTemplateTaskTemplates.forEach((taskTemplate) => {
+      const canonicalId = resolveWorkPackageTaskTemplateId(taskTemplate);
+      const keys = resolveWorkPackageTaskTemplateKeys(taskTemplate);
+      if (canonicalId) {
+        map.set(canonicalId, taskTemplate);
       }
-      map.set(id, taskTemplate);
-      return map;
-    }, new Map<string, Record<string, unknown>>());
-  }, [resolveWorkPackageTaskTemplateId, workPackageTemplateTaskTemplates]);
+      keys.forEach((key) => {
+        if (!map.has(key)) {
+          map.set(key, taskTemplate);
+        }
+      });
+    });
+    return map;
+  }, [resolveWorkPackageTaskTemplateId, resolveWorkPackageTaskTemplateKeys, workPackageTemplateTaskTemplates]);
+
+  const taskTemplateAliasToId = useMemo(() => {
+    const map = new Map<string, string>();
+    workPackageTemplateTaskTemplates.forEach((taskTemplate) => {
+      const canonicalId = resolveWorkPackageTaskTemplateId(taskTemplate);
+      if (!canonicalId) {
+        return;
+      }
+      resolveWorkPackageTaskTemplateKeys(taskTemplate).forEach((key) => {
+        map.set(key, canonicalId);
+      });
+    });
+    return map;
+  }, [resolveWorkPackageTaskTemplateId, resolveWorkPackageTaskTemplateKeys, workPackageTemplateTaskTemplates]);
 
   useEffect(() => {
     if (!workPackageTemplateSelectionInitialized) {
@@ -748,6 +782,20 @@ export function WorkPackageTemplateCreateSection({
       return nextSelectedIds;
     });
   }, [taskTemplateById, workPackageTemplateSelectionInitialized]);
+
+  useEffect(() => {
+    if (!workPackageTemplateSelectionInitialized || taskTemplateAliasToId.size === 0) {
+      return;
+    }
+    setWorkPackageTemplateSelectedTaskIds((previous) => {
+      const remapped = previous.map((id) => taskTemplateAliasToId.get(id) || id);
+      const next = Array.from(new Set(remapped.filter((id) => id.length > 0)));
+      if (next.length === previous.length && next.every((id, index) => id === previous[index])) {
+        return previous;
+      }
+      return next;
+    });
+  }, [taskTemplateAliasToId, workPackageTemplateSelectionInitialized]);
 
   const resolveSelectedWorkPackageTaskPayload = useCallback((selectedIds: string[]) => {
     return selectedIds

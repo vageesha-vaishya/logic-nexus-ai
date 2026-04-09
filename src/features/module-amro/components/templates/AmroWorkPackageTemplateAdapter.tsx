@@ -510,7 +510,7 @@ export function AmroWorkPackageTemplateAdapter({
           return dedupeByValue(
             aircraftModelOptions.map((entry) => (
               entry.value === selectedAircraftModelId
-                ? { ...entry, label: `${resolvedModelDisplayLabel} (current)` }
+                ? { ...entry, label: resolvedModelDisplayLabel }
                 : entry
             )),
           );
@@ -518,7 +518,7 @@ export function AmroWorkPackageTemplateAdapter({
         return dedupeByValue([
           {
             value: selectedAircraftModelId,
-            label: `${resolvedModelDisplayLabel} (current)`,
+            label: resolvedModelDisplayLabel,
             modelCode: resolvedModelDisplayLabel,
           },
           ...aircraftModelOptions,
@@ -530,7 +530,7 @@ export function AmroWorkPackageTemplateAdapter({
       return dedupeByValue([
         {
           value: `legacy:${selectedAircraftModelText}`,
-          label: `${selectedAircraftModelText} (current)`,
+          label: selectedAircraftModelText,
           modelCode: selectedAircraftModelText,
         },
         ...aircraftModelOptions,
@@ -546,7 +546,7 @@ export function AmroWorkPackageTemplateAdapter({
     if (shouldReplaceExistingLabel && existingOption) {
       return aircraftModelOptions.map((entry) => (
         entry.value === selectedAircraftModelId
-          ? { ...entry, label: `${preferredDisplayLabel} (current)` }
+          ? { ...entry, label: preferredDisplayLabel }
           : entry
       ));
     }
@@ -557,7 +557,7 @@ export function AmroWorkPackageTemplateAdapter({
     return dedupeByValue([
       {
         value: selectedAircraftModelId,
-        label: `${selectedAircraftModelText} (current)`,
+        label: selectedAircraftModelText,
         modelCode: selectedAircraftModelText,
       },
       ...aircraftModelOptions,

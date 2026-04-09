@@ -529,7 +529,7 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   assembly_models: ['id', 'model_code', 'name', 'manufacturer_id', 'assembly_type_id', 'is_active', 'updated_at'],
   regulator_profiles: ['id', 'regulator_code', 'regulator_name', 'jurisdiction', 'policy_version', 'effective_from', 'is_active', 'updated_at'],
   shift_calendars: ['id', 'station_code', 'shift_name', 'shift_start_time', 'shift_end_time', 'capacity', 'is_active', 'updated_at'],
-  work_package_templates: ['id', 'template_code', 'template_name', 'model_id', 'maintenance_type', 'version', 'active', 'updated_at'],
+  work_package_templates: ['id', 'template_code', 'template_name', 'model_id', 'aircraft_model', 'maintenance_type', 'version', 'active', 'updated_at'],
 };
 
 const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
@@ -542,11 +542,6 @@ const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'seria
 
 const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   id: 'ID',
-  part_number: 'Item Number',
-  item_number: 'Item Number',
-  description: 'Item Details',
-  quantity_available: 'Available Qty',
-  warehouse_location: 'Storage Location',
   tail_number: 'Tail Number',
   serial_number: 'Serial Number',
   owner_name: 'Owner',
@@ -703,8 +698,6 @@ type AircraftTemplateAssociatedTaskRow = {
   isMandatory: boolean;
   jsonDetails: string;
 };
-
-const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 
 type AircraftDashboardKpis = {
   fleet_size: number;
@@ -1088,9 +1081,9 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'metadata', label: 'Metadata JSON', type: 'json' },
   ],
   parts_inventory: [
-    { key: 'part_number', label: 'Item Number', type: 'text', required: true },
+    { key: 'part_number', label: 'Part Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text' },
-    { key: 'description', label: 'Item Details', type: 'textarea' },
+    { key: 'description', label: 'Description', type: 'textarea' },
     { key: 'category', label: 'Category', type: 'text' },
     { key: 'unit_of_measure', label: 'UoM', type: 'text' },
     { key: 'min_stock_level', label: 'Min Stock Level', type: 'number', min: 0 },
@@ -1183,7 +1176,7 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'template_code', label: 'Template Code', type: 'text', required: true },
     { key: 'template_name', label: 'Template Name', type: 'text', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select' },
-    { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'service', 'upgrade', 'modification'] },
+    { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification'] },
     { key: 'version', label: 'Version', type: 'number', required: true, min: 1 },
     { key: 'active', label: 'Active', type: 'boolean' },
     { key: 'policy_snapshot_id', label: 'Policy Snapshot ID', type: 'text' },
@@ -1342,11 +1335,8 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     is_active: true,
   },
   work_package_templates: {
-    tenant_id: '',
-    franchise_id: '',
     template_code: '',
     template_name: '',
-    model_id: '',
     aircraft_model: '',
     maintenance_type: 'line',
     version: 1,
@@ -1601,10 +1591,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       franchiseId: context.franchiseId,
       userId: context.userId,
       isTenantAdmin: context.isTenantAdmin,
-      isFranchiseAdmin: context.isFranchiseAdmin,
-      isPlatformAdmin: context.isPlatformAdmin,
     }),
-    [context.franchiseId, context.isFranchiseAdmin, context.isPlatformAdmin, context.isTenantAdmin, context.tenantId, context.userId],
+    [context.franchiseId, context.isTenantAdmin, context.tenantId, context.userId],
   );
   const sessionAccessToken = useMemo(() => String(session?.access_token || '').trim(), [session?.access_token]);
   const aircraftColumnPreferenceStorageKey = useMemo(
@@ -2979,53 +2967,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
       }
       if (entity === 'work_package_templates') {
-        const resolvedTenantId = String(payload.tenant_id || scope.tenantId || '').trim();
-        const resolvedFranchiseId = String(payload.franchise_id || scope.franchiseId || '').trim();
-        if (!resolvedFranchiseId) {
-          setFormErrors((previous) => ({ ...previous, franchise_id: 'Franchise is required' }));
-          toast.error('Select a Franchise before saving template');
-          return false;
-        }
-        payload.tenant_id = resolvedTenantId;
-        payload.franchise_id = resolvedFranchiseId;
-        const currentModelId = String(payload.model_id || '').trim();
-        const currentAircraftModel = String(payload.aircraft_model || '').trim();
-        const resolvedAssemblyModel = assemblyModelOptions.find((option) => {
-          const optionId = String(option.id || '').trim();
-          const optionCode = String(option.modelValue || '').trim();
-          const optionName = String(option.label || '').trim();
-          const token = currentAircraftModel.toLowerCase();
-          return optionId === currentAircraftModel
-            || optionCode.toLowerCase() === token
-            || optionName.toLowerCase() === token;
-        });
-        const resolvedModelId = currentModelId
-          || String(resolvedAssemblyModel?.id || '').trim()
-          || (isUuid(currentAircraftModel) ? currentAircraftModel : '');
-        if (!resolvedModelId) {
-          setFormErrors((previous) => ({
-            ...previous,
-            model_id: 'Aircraft Model is required',
-            aircraft_model: previous.aircraft_model || 'Aircraft Model is required',
-          }));
-          toast.error('Select an Aircraft Model before saving template');
-          return false;
-        }
-        payload.model_id = resolvedModelId;
-        if (resolvedAssemblyModel && isUuid(currentAircraftModel)) {
-          payload.aircraft_model = String(resolvedAssemblyModel.modelValue || resolvedAssemblyModel.label || currentAircraftModel).trim();
-        }
         const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
         const selectedTaskTemplateIds = tasksJson
           .map((entry) => {
             if (!entry || typeof entry !== 'object') return null;
             const row = entry as Record<string, unknown>;
-            return String(row.task_template_id || row.taskTemplateId || row.id || row.tt_sequence || '').trim();
+            return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
           })
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] creating work package template request work_package_templates', {
           entity,
-          requestUrl: '/api/v2/amro/work-package-templates',
+          requestUrl: '/api/v2/amro/master-data/work_package_templates',
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
           maintenanceType: String(payload.maintenance_type || ''),
@@ -3036,7 +2988,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         });
       }
       const createEndpoint = entity === 'work_package_templates'
-        ? '/api/v2/amro/work-package-templates'
+        ? '/api/v2/amro/master-data/work_package_templates'
         : `/api/v2/amro/master-data/${entity}`;
       const response = await fetch(createEndpoint, {
         method: 'POST',
@@ -3053,7 +3005,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           : null;
         logger.info('[AMRO Master Data UI] work package template create response', {
           entity,
-          requestUrl: '/api/v2/amro/work-package-templates',
+          requestUrl: '/api/v2/amro/master-data/work_package_templates',
           status: response.status,
           ok: response.ok,
           responseError: String(responsePayload.error || ''),
@@ -3081,7 +3033,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error(message);
       return false;
     }
-  }, [aircraftTemplateModel, assemblyModelOptions, entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, systemTemplateModelOptions]);
+  }, [aircraftTemplateModel, entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, systemTemplateModelOptions]);
 
   const handleUpdate = useCallback(async () => {
     if (!selectedId) {
@@ -3096,14 +3048,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         toast.error('Please resolve form validation errors');
         return false;
       }
-      const createScope = entity === 'work_package_templates'
-        ? {
-            ...scope,
-            tenantId: String(payload.tenant_id || scope.tenantId || '').trim(),
-            franchiseId: String(payload.franchise_id || scope.franchiseId || '').trim(),
-          }
-        : scope;
-      const headers = await buildApiHeaders(createScope);
+      const headers = await buildApiHeaders(scope);
       if (entity === 'aircraft' && payload.manufacturer_id) {
         const exists = await verifyReferenceExists(headers, 'manufacturers', String(payload.manufacturer_id), ['id', 'manufacturer_code', 'name']);
         if (!exists) {
@@ -3161,53 +3106,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
       }
       if (entity === 'work_package_templates') {
-        const resolvedTenantId = String(payload.tenant_id || scope.tenantId || '').trim();
-        const resolvedFranchiseId = String(payload.franchise_id || scope.franchiseId || '').trim();
-        if (!resolvedFranchiseId) {
-          setFormErrors((previous) => ({ ...previous, franchise_id: 'Franchise is required' }));
-          toast.error('Select a Franchise before saving template');
-          return false;
-        }
-        payload.tenant_id = resolvedTenantId;
-        payload.franchise_id = resolvedFranchiseId;
-        const currentModelId = String(payload.model_id || '').trim();
-        const currentAircraftModel = String(payload.aircraft_model || '').trim();
-        const resolvedAssemblyModel = assemblyModelOptions.find((option) => {
-          const optionId = String(option.id || '').trim();
-          const optionCode = String(option.modelValue || '').trim();
-          const optionName = String(option.label || '').trim();
-          const token = currentAircraftModel.toLowerCase();
-          return optionId === currentAircraftModel
-            || optionCode.toLowerCase() === token
-            || optionName.toLowerCase() === token;
-        });
-        const resolvedModelId = currentModelId
-          || String(resolvedAssemblyModel?.id || '').trim()
-          || (isUuid(currentAircraftModel) ? currentAircraftModel : '');
-        if (!resolvedModelId) {
-          setFormErrors((previous) => ({
-            ...previous,
-            model_id: 'Aircraft Model is required',
-            aircraft_model: previous.aircraft_model || 'Aircraft Model is required',
-          }));
-          toast.error('Select an Aircraft Model before saving template');
-          return false;
-        }
-        payload.model_id = resolvedModelId;
-        if (resolvedAssemblyModel && isUuid(currentAircraftModel)) {
-          payload.aircraft_model = String(resolvedAssemblyModel.modelValue || resolvedAssemblyModel.label || currentAircraftModel).trim();
-        }
         const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
         const selectedTaskTemplateIds = tasksJson
           .map((entry) => {
             if (!entry || typeof entry !== 'object') return null;
             const row = entry as Record<string, unknown>;
-            return String(row.task_template_id || row.taskTemplateId || row.id || row.tt_sequence || '').trim();
+            return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
           })
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] updating work package template request', {
           entity,
-          requestUrl: `/api/v2/amro/work-package-templates/${selectedId}`,
+          requestUrl: `/api/v2/amro/master-data/work_package_templates/${selectedId}`,
           workPackageTemplateId: String(selectedId || ''),
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
@@ -3219,7 +3128,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         });
       }
       const updateEndpoint = entity === 'work_package_templates'
-        ? `/api/v2/amro/work-package-templates/${selectedId}`
+        ? `/api/v2/amro/master-data/work_package_templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const updateMethod = 'PATCH';
       const response = await fetch(updateEndpoint, {
@@ -3237,7 +3146,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           : null;
         logger.info('[AMRO Master Data UI] work package template update response', {
           entity,
-          requestUrl: `/api/v2/amro/work-package-templates/${selectedId}`,
+          requestUrl: `/api/v2/amro/master-data/work_package_templates/${selectedId}`,
           status: response.status,
           ok: response.ok,
           responseError: String(responsePayload.error || ''),
@@ -3271,7 +3180,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error(message);
       return false;
     }
-  }, [assemblyModelOptions, entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, selectedId]);
+  }, [entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, selectedId]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedId) {
@@ -3284,16 +3193,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const confirmDelete = useCallback(async () => {
     if (!selectedId) return;
     try {
-      const updateScope = entity === 'work_package_templates'
-        ? {
-            ...scope,
-            tenantId: String(formValues.tenant_id || scope.tenantId || '').trim(),
-            franchiseId: String(formValues.franchise_id || scope.franchiseId || '').trim(),
-          }
-        : scope;
-      const headers = await buildApiHeaders(updateScope);
+      const headers = await buildApiHeaders(scope);
       const deleteEndpoint = entity === 'work_package_templates'
-        ? `/api/v2/amro/work-package-templates/${selectedId}`
+        ? `/api/v2/amro/master-data/work_package_templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const response = await fetch(deleteEndpoint, {
         method: 'DELETE',
@@ -3310,7 +3212,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } catch (error) {
       toast.error(String((error as Error).message || 'Delete failed'));
     }
-  }, [entity, formValues.franchise_id, formValues.tenant_id, loadRecords, scope, selectedId]);
+  }, [entity, loadRecords, scope, selectedId]);
 
   const handleBulkImport = useCallback(async () => {
     try {
@@ -3421,20 +3323,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (entity === 'flight_logs') {
       return String(selectedRow.flight_number || selectedRow.id || 'None');
     }
-    if (entity === 'parts_inventory') {
-      const itemNumber = String(selectedRow.part_number || selectedRow.item_number || selectedRow.itemNumber || '').trim();
-      const itemDetails = String(selectedRow.description || '').trim();
-      if (itemNumber && itemDetails) {
-        return `${itemNumber} - ${itemDetails}`;
-      }
-      return String(itemNumber || itemDetails || selectedRow.id || 'None');
-    }
     return String(selectedRow.id || 'None');
   }, [entity, selectedRow]);
-  const partsInventoryHeaderStatus = useMemo(() => {
-    if (entity !== 'parts_inventory') return '';
-    return String(formValues.status || selectedRow?.status || '').trim().toLowerCase();
-  }, [entity, formValues.status, selectedRow?.status]);
   const selectedAircraft = useMemo(
     () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
     [entity, rows, selectedRow],
@@ -4238,26 +4128,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           return resolveFlightLogAirportLabel(row, 'arrival_airport_label', 'arrival_airport_ref', 'arrival_airport');
         }
       }
-      if (entity === 'parts_inventory') {
-        if (column === 'part_number') {
-          return String(row.part_number ?? row.item_number ?? row.itemNumber ?? '');
-        }
-        if (column === 'description') {
-          return String(row.description ?? row.item_details ?? row.itemDetails ?? '');
-        }
-      }
       return String(row[column] ?? '');
     },
     [assemblyTypeLabelById, entity, manufacturerLabelById],
   );
-
-  const resolvePartsInventoryStatusBadgeClass = useCallback((rawStatus: unknown) => {
-    const status = String(rawStatus ?? '').trim().toLowerCase();
-    if (status === 'active') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
-    if (status === 'quarantine') return 'bg-amber-100 text-amber-800 border-amber-200';
-    if (status === 'inactive') return 'bg-slate-100 text-slate-700 border-slate-200';
-    return 'bg-gray-100 text-gray-700 border-gray-200';
-  }, []);
 
   const handleRowSingleClick = useCallback(
     (row: RecordRow, event: MouseEvent<HTMLTableRowElement>) => {
@@ -8684,19 +8558,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                       autoFocus
                                       className="h-8 mdm-template-input"
                                     />
-                                  ) : entity === 'parts_inventory' && column === 'part_number' ? (
-                                    <div className="flex items-center gap-2">
-                                      <span className="truncate">{resolveTableCellValue(row, column)}</span>
-                                      <Badge
-                                        variant="outline"
-                                        className={cn(
-                                          'h-5 rounded px-1.5 text-[10px] font-medium uppercase',
-                                          resolvePartsInventoryStatusBadgeClass(row.status),
-                                        )}
-                                      >
-                                        {String(row.status || 'unknown')}
-                                      </Badge>
-                                    </div>
                                   ) : column === 'id' ? (
                                     <Link
                                       to={`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}?selected=${row.id}`}
@@ -8809,19 +8670,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
           <DialogContent className="mdm-template-dialog mdm-template-dialog-large" data-testid="amro-master-data-form-dialog">
             <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
-              <DialogTitle className="flex items-center gap-2 text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                <span>{modalMode === 'create' ? `Create ${ENTITY_LABEL[entity]}` : `Update ${ENTITY_LABEL[entity]}`}</span>
-                {entity === 'parts_inventory' && partsInventoryHeaderStatus ? (
-                  <Badge
-                    variant="outline"
-                    className={cn(
-                      'h-5 rounded px-1.5 text-[10px] font-medium uppercase',
-                      resolvePartsInventoryStatusBadgeClass(partsInventoryHeaderStatus),
-                    )}
-                  >
-                    {partsInventoryHeaderStatus}
-                  </Badge>
-                ) : null}
+              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                {modalMode === 'create' ? `Create ${ENTITY_LABEL[entity]}` : `Update ${ENTITY_LABEL[entity]}`}
               </DialogTitle>
               <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
                 Double-click row behavior and CRUD flow mirrors Leads Management interaction patterns.

@@ -487,7 +487,10 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
   const payload: Record<string, unknown> = {};
   fields.forEach((field) => {
     const raw = values[field.key];
-    if (field.required && isBlank(raw) && field.type !== 'boolean') {
+    const isWorkPackageAircraftModelSatisfiedByModelId = entity === 'work_package_templates'
+      && field.key === 'aircraft_model'
+      && !isBlank(values.model_id);
+    if (field.required && isBlank(raw) && field.type !== 'boolean' && !isWorkPackageAircraftModelSatisfiedByModelId) {
       errors[field.key] = `${field.label} is required`;
       return;
     }
