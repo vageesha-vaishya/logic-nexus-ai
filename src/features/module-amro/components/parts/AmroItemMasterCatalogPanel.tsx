@@ -2,13 +2,16 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { AmroKpiGrid, AmroModuleSurface, AmroStandardToolbar } from './AmroPartsUiStandards';
+import { AmroCrudDialogFooter, AmroCrudMessageBanner } from './AmroCrudPrimitives';
+import { AmroModuleGridDetailPanel } from './AmroModuleGridDetailPanel';
 import {
   createItemMasterRecord,
   deleteItemMasterRecord,
@@ -90,6 +93,8 @@ export function AmroItemMasterCatalogPanel({ apiScope = {}, onCreatePart, onCrea
   const [activeTab, setActiveTab] = useState('core');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formValue, setFormValue] = useState<ItemMasterMutationPayload>({ ...DEFAULT_FORM });
+  const [deleteCandidate, setDeleteCandidate] = useState<ItemMasterRecord | null>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -103,6 +108,7 @@ export function AmroItemMasterCatalogPanel({ apiScope = {}, onCreatePart, onCrea
         itemType: typeFilter,
       }, fetch, apiScope);
       setRecords(data.records);
+      setSelectedRecordId((current) => current || data.records[0]?.id || null);
     } catch (loadError) {
       const message = loadError instanceof Error ? loadError.message : 'Failed to load item master records';
       setError(message);
@@ -145,6 +151,9 @@ export function AmroItemMasterCatalogPanel({ apiScope = {}, onCreatePart, onCrea
   const upsertRecord = useCallback(async () => {
     setDialogLoading(true);
     try {
+      if (!formValue.partNumber.trim()) {
+        throw new Error('Part Number is required');
+      }
       const payload = { ...formValue };
       if (editingId) {
         await updateItemMasterRecord(editingId, payload, fetch, apiScope);
@@ -174,106 +183,117 @@ export function AmroItemMasterCatalogPanel({ apiScope = {}, onCreatePart, onCrea
 
   const crossReferences = useMemo(() => formValue.crossReferences || [], [formValue.crossReferences]);
   const uomConversions = useMemo(() => formValue.uomConversions || [], [formValue.uomConversions]);
+  const activeRecords = useMemo(() => records.filter((record) => record.isActive).length, [records]);
+  const inactiveRecords = useMemo(() => Math.max(0, records.length - activeRecords), [activeRecords, records.length]);
 
   return (
-    <Card className="mt-4 border-slate-300">
-      <CardHeader className="space-y-3 pb-3">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-base">Item Master Catalog</CardTitle>
-          <div className="flex items-center gap-2">
-            {onCreatePart ? (
-              <Button type="button" size="sm" variant="outline" onClick={onCreatePart}>
-                Create Inventory Part
+    <div className="mt-4 space-y-3">
+      <AmroModuleSurface
+        title="Item Master Catalog"
+        subtitle="Canonical part definitions with cross-reference and UOM governance."
+        moduleId="inventory-core.item-master"
+        status={error ? 'warning' : loading ? 'loading' : 'ready'}
+      >
+        <AmroStandardToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          placeholder="Search part number or description"
+          leftActions={(
+            <>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-8 w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  <SelectItem value="active">Active</SelectItem>
+                  <SelectItem value="inactive">Inactive</SelectItem>
+                  <SelectItem value="deprecated">Deprecated</SelectItem>
+                  <SelectItem value="retired">Retired</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={typeFilter} onValueChange={setTypeFilter}>
+                <SelectTrigger className="h-8 w-[140px]"><SelectValue placeholder="Item Type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  <SelectItem value="part">Part</SelectItem>
+                  <SelectItem value="tool">Tool</SelectItem>
+                  <SelectItem value="consumable">Consumable</SelectItem>
+                  <SelectItem value="kit">Kit</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="secondary" size="sm" className="h-8" onClick={() => setRefreshTick((value) => value + 1)}>
+                Apply Filters
               </Button>
-            ) : null}
-            <Button type="button" size="sm" variant="outline" onClick={() => setRefreshTick((value) => value + 1)}>
-              <RefreshCw className="mr-1 h-4 w-4" />
-              Refresh
-            </Button>
-            <Button type="button" size="sm" onClick={openCreateDialog}>
-              <Plus className="mr-1 h-4 w-4" />
-              New Item
-            </Button>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 gap-2 md:grid-cols-4">
-          <Input value={search} placeholder="Search part number or description" onChange={(event) => setSearch(event.target.value)} />
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="active">Active</SelectItem>
-              <SelectItem value="inactive">Inactive</SelectItem>
-              <SelectItem value="deprecated">Deprecated</SelectItem>
-              <SelectItem value="retired">Retired</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger>
-              <SelectValue placeholder="Item Type" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Types</SelectItem>
-              <SelectItem value="part">Part</SelectItem>
-              <SelectItem value="tool">Tool</SelectItem>
-              <SelectItem value="consumable">Consumable</SelectItem>
-              <SelectItem value="kit">Kit</SelectItem>
-            </SelectContent>
-          </Select>
-          <Button type="button" variant="secondary" onClick={() => setRefreshTick((value) => value + 1)}>
-            Apply Filters
-          </Button>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {error ? <p className="mb-2 text-sm text-red-600">{error}</p> : null}
-        <div className="overflow-x-auto rounded-md border">
-          <table className="w-full text-sm">
-            <thead className="bg-slate-50 text-left">
-              <tr>
-                <th className="px-3 py-2">Part Number</th>
-                <th className="px-3 py-2">Description</th>
-                <th className="px-3 py-2">Type</th>
-                <th className="px-3 py-2">Lifecycle</th>
-                <th className="px-3 py-2">UOM</th>
-                <th className="px-3 py-2 text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {loading ? (
-                <tr><td className="px-3 py-4 text-slate-600" colSpan={6}>Loading item master...</td></tr>
-              ) : records.length === 0 ? (
-                <tr><td className="px-3 py-4 text-slate-600" colSpan={6}>No item master records found.</td></tr>
-              ) : records.map((record) => (
-                <tr key={record.id} className="border-t">
-                  <td className="px-3 py-2 font-medium">{record.partNumber}</td>
-                  <td className="px-3 py-2">{record.description || '-'}</td>
-                  <td className="px-3 py-2">{record.itemType}</td>
-                  <td className="px-3 py-2">{record.lifecycleStatus}</td>
-                  <td className="px-3 py-2">{record.unitOfMeasure}</td>
-                  <td className="px-3 py-2 text-right">
-                    <div className="inline-flex gap-1">
-                      {onCreatePartFromItemMaster ? (
-                        <Button type="button" size="sm" variant="secondary" onClick={() => onCreatePartFromItemMaster(record)}>
-                          Create Part
-                        </Button>
-                      ) : null}
-                      <Button type="button" size="sm" variant="outline" onClick={() => { void openEditDialog(record.id); }}>
-                        Edit
+            </>
+          )}
+          rightActions={(
+            <>
+              {onCreatePart ? (
+                <Button type="button" size="sm" variant="outline" className="h-8" onClick={onCreatePart}>
+                  Create Inventory Part
+                </Button>
+              ) : null}
+              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setRefreshTick((value) => value + 1)}>
+                <RefreshCw className="mr-1 h-4 w-4" />
+                Refresh
+              </Button>
+              <Button type="button" size="sm" className="h-8" onClick={openCreateDialog}>
+                <Plus className="mr-1 h-4 w-4" />
+                New Item
+              </Button>
+            </>
+          )}
+        />
+        <AmroKpiGrid
+          items={[
+            { label: 'Total Records', value: String(records.length) },
+            { label: 'Active', value: String(activeRecords), tone: activeRecords > 0 ? 'success' : 'default' },
+            { label: 'Inactive', value: String(inactiveRecords), tone: inactiveRecords > 0 ? 'warning' : 'default' },
+          ]}
+        />
+        <AmroCrudMessageBanner message={error} tone="error" />
+        <AmroModuleGridDetailPanel
+          rows={records}
+          loading={loading}
+          emptyMessage="No item master records found."
+          selectedId={selectedRecordId}
+          onSelect={setSelectedRecordId}
+          detailTitle="Item Master Detail"
+          columns={[
+            { key: 'partNumber', label: 'Part Number', render: (record) => record.partNumber },
+            { key: 'description', label: 'Description', render: (record) => record.description || '-' },
+            { key: 'itemType', label: 'Type', render: (record) => record.itemType },
+            { key: 'lifecycleStatus', label: 'Lifecycle', render: (record) => record.lifecycleStatus },
+            { key: 'uom', label: 'UOM', render: (record) => record.unitOfMeasure },
+          ]}
+          renderDetail={(record) => (
+            !record ? <p className="text-xs text-muted-foreground">Select an item to inspect details.</p> : (
+              <div className="space-y-2 text-xs">
+                <p><span className="font-semibold">Part Number:</span> {record.partNumber}</p>
+                <p><span className="font-semibold">Description:</span> {record.description || '-'}</p>
+                <p><span className="font-semibold">Type:</span> {record.itemType}</p>
+                <p><span className="font-semibold">Lifecycle:</span> {record.lifecycleStatus}</p>
+                <p><span className="font-semibold">Unit:</span> {record.unitOfMeasure}</p>
+                <p><span className="font-semibold">Status:</span> {record.status}</p>
+                <div className="pt-1">
+                  <div className="flex flex-wrap gap-1">
+                    {onCreatePartFromItemMaster ? (
+                      <Button type="button" size="sm" variant="secondary" onClick={() => onCreatePartFromItemMaster(record)}>
+                        Create Part
                       </Button>
-                      <Button type="button" size="sm" variant="destructive" onClick={() => { void removeRecord(record.id); }}>
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </CardContent>
+                    ) : null}
+                    <Button type="button" size="sm" variant="outline" onClick={() => { void openEditDialog(record.id); }}>
+                      Edit
+                    </Button>
+                    <Button type="button" size="sm" variant="destructive" onClick={() => setDeleteCandidate(record)}>
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )
+          )}
+        />
+      </AmroModuleSurface>
 
       <Dialog open={dialogOpen} onOpenChange={(open) => { if (!dialogLoading) setDialogOpen(open); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
@@ -417,16 +437,37 @@ export function AmroItemMasterCatalogPanel({ apiScope = {}, onCreatePart, onCrea
             </TabsContent>
           </Tabs>
 
-          <DialogFooter>
-            <Button type="button" variant="outline" disabled={dialogLoading} onClick={() => setDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="button" disabled={dialogLoading} onClick={() => { void upsertRecord(); }}>
-              {dialogLoading ? 'Saving...' : editingId ? 'Save Item' : 'Create Item'}
-            </Button>
-          </DialogFooter>
+          <AmroCrudDialogFooter
+            saving={dialogLoading}
+            onCancel={() => setDialogOpen(false)}
+            onConfirm={() => { void upsertRecord(); }}
+            confirmLabel={editingId ? 'Save Item' : 'Create Item'}
+          />
         </DialogContent>
       </Dialog>
-    </Card>
+
+      <AlertDialog open={Boolean(deleteCandidate)} onOpenChange={(open) => { if (!open) setDeleteCandidate(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Item Master Record?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This permanently removes {deleteCandidate?.partNumber || 'this record'} from item master.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (!deleteCandidate) return;
+                void removeRecord(deleteCandidate.id);
+                setDeleteCandidate(null);
+              }}
+            >
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 }

@@ -1,0 +1,13 @@
+interaction_id,from,target,user_action,system_response,expected_latency_ms,accessibility_note,test_case_id
+NAV-001,Desktop Nav Rail,Overview,Click module button,Active module switches and breadcrumb updates,<=200,Set aria-current on active module,NAV-UAT-01
+NAV-002,Desktop Nav Rail,Item Master,Click module button,Surface switches to Item Master panel,<=200,Focus remains in nav context,NAV-UAT-02
+NAV-003,Desktop Quick Access,Stock Ledger,Click shortcut chip,Chip becomes active and content updates,<=200,Chip is keyboard-focusable,NAV-UAT-03
+NAV-004,Desktop Quick Access,Reservations,Click shortcut chip,Reservations panel renders,<=200,Announce update via aria-live,NAV-UAT-04
+NAV-005,Desktop Quick Access,Issue & Consume,Click shortcut chip,Issue queue panel renders,<=200,Enter/Space triggers action,NAV-UAT-05
+NAV-006,Desktop Nav Rail,Restock,Click module button,Restock priorities panel renders,<=200,Visible focus ring required,NAV-UAT-06
+NAV-007,Desktop Nav Rail,Locations,Click module button,Locations distribution panel renders,<=200,Contrast AA on active state,NAV-UAT-07
+NAV-008,Desktop Nav Rail,Analytics,Click module button,Analytics KPI panel renders,<=200,Breadcrumb reflects module,NAV-UAT-08
+NAV-009,Mobile Header,Drawer Open,Tap Modules button,Drawer opens with grouped module list,<=200,Drawer trap focus and escape closes,NAV-UAT-09
+NAV-010,Mobile Drawer,Locations,Tap module row,Drawer closes and target module renders,<=200,Maintain logical tab order,NAV-UAT-10
+NAV-011,Role Filter,Technician role,Load workspace,Unauthorized modules hidden,<=200,Hidden items not focusable,NAV-UAT-11
+NAV-012,Role Filter,Management role,Load workspace,All modules available,<=200,All controls keyboard navigable,NAV-UAT-12
