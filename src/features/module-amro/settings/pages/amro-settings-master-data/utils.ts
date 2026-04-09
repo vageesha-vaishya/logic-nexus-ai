@@ -439,6 +439,12 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
   if (entity === 'work_package_templates' && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
     next.model_id = String(row.model_id ?? '').trim();
   }
+  if (entity === 'parts_inventory' && !String(next.part_number ?? '').trim()) {
+    const itemNumber = String(row.item_number ?? row.itemNumber ?? '').trim();
+    if (itemNumber) {
+      next.part_number = itemNumber;
+    }
+  }
   return next;
 }
 

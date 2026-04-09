@@ -542,6 +542,11 @@ const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'seria
 
 const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   id: 'ID',
+  part_number: 'Item Number',
+  item_number: 'Item Number',
+  description: 'Item Details',
+  quantity_available: 'Available Qty',
+  warehouse_location: 'Storage Location',
   tail_number: 'Tail Number',
   serial_number: 'Serial Number',
   owner_name: 'Owner',
@@ -1083,9 +1088,9 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'metadata', label: 'Metadata JSON', type: 'json' },
   ],
   parts_inventory: [
-    { key: 'part_number', label: 'Part Number', type: 'text', required: true },
+    { key: 'part_number', label: 'Item Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text' },
-    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'description', label: 'Item Details', type: 'textarea' },
     { key: 'category', label: 'Category', type: 'text' },
     { key: 'unit_of_measure', label: 'UoM', type: 'text' },
     { key: 'min_stock_level', label: 'Min Stock Level', type: 'number', min: 0 },
@@ -3416,8 +3421,20 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (entity === 'flight_logs') {
       return String(selectedRow.flight_number || selectedRow.id || 'None');
     }
+    if (entity === 'parts_inventory') {
+      const itemNumber = String(selectedRow.part_number || selectedRow.item_number || selectedRow.itemNumber || '').trim();
+      const itemDetails = String(selectedRow.description || '').trim();
+      if (itemNumber && itemDetails) {
+        return `${itemNumber} - ${itemDetails}`;
+      }
+      return String(itemNumber || itemDetails || selectedRow.id || 'None');
+    }
     return String(selectedRow.id || 'None');
   }, [entity, selectedRow]);
+  const partsInventoryHeaderStatus = useMemo(() => {
+    if (entity !== 'parts_inventory') return '';
+    return String(formValues.status || selectedRow?.status || '').trim().toLowerCase();
+  }, [entity, formValues.status, selectedRow?.status]);
   const selectedAircraft = useMemo(
     () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
     [entity, rows, selectedRow],
@@ -4221,10 +4238,26 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           return resolveFlightLogAirportLabel(row, 'arrival_airport_label', 'arrival_airport_ref', 'arrival_airport');
         }
       }
+      if (entity === 'parts_inventory') {
+        if (column === 'part_number') {
+          return String(row.part_number ?? row.item_number ?? row.itemNumber ?? '');
+        }
+        if (column === 'description') {
+          return String(row.description ?? row.item_details ?? row.itemDetails ?? '');
+        }
+      }
       return String(row[column] ?? '');
     },
     [assemblyTypeLabelById, entity, manufacturerLabelById],
   );
+
+  const resolvePartsInventoryStatusBadgeClass = useCallback((rawStatus: unknown) => {
+    const status = String(rawStatus ?? '').trim().toLowerCase();
+    if (status === 'active') return 'bg-emerald-100 text-emerald-800 border-emerald-200';
+    if (status === 'quarantine') return 'bg-amber-100 text-amber-800 border-amber-200';
+    if (status === 'inactive') return 'bg-slate-100 text-slate-700 border-slate-200';
+    return 'bg-gray-100 text-gray-700 border-gray-200';
+  }, []);
 
   const handleRowSingleClick = useCallback(
     (row: RecordRow, event: MouseEvent<HTMLTableRowElement>) => {
@@ -8651,6 +8684,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                       autoFocus
                                       className="h-8 mdm-template-input"
                                     />
+                                  ) : entity === 'parts_inventory' && column === 'part_number' ? (
+                                    <div className="flex items-center gap-2">
+                                      <span className="truncate">{resolveTableCellValue(row, column)}</span>
+                                      <Badge
+                                        variant="outline"
+                                        className={cn(
+                                          'h-5 rounded px-1.5 text-[10px] font-medium uppercase',
+                                          resolvePartsInventoryStatusBadgeClass(row.status),
+                                        )}
+                                      >
+                                        {String(row.status || 'unknown')}
+                                      </Badge>
+                                    </div>
                                   ) : column === 'id' ? (
                                     <Link
                                       to={`/dashboard/amro/settings/master-data/${ENTITY_ROUTE_SEGMENT[entity]}?selected=${row.id}`}
@@ -8763,8 +8809,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         <Dialog open={modalOpen} onOpenChange={setModalOpen}>
           <DialogContent className="mdm-template-dialog mdm-template-dialog-large" data-testid="amro-master-data-form-dialog">
             <DialogHeader className="border-b border-[hsl(var(--mdm-template-border))] px-6 py-4">
-              <DialogTitle className="text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
-                {modalMode === 'create' ? `Create ${ENTITY_LABEL[entity]}` : `Update ${ENTITY_LABEL[entity]}`}
+              <DialogTitle className="flex items-center gap-2 text-[15px] font-semibold text-[hsl(var(--mdm-template-heading))]">
+                <span>{modalMode === 'create' ? `Create ${ENTITY_LABEL[entity]}` : `Update ${ENTITY_LABEL[entity]}`}</span>
+                {entity === 'parts_inventory' && partsInventoryHeaderStatus ? (
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      'h-5 rounded px-1.5 text-[10px] font-medium uppercase',
+                      resolvePartsInventoryStatusBadgeClass(partsInventoryHeaderStatus),
+                    )}
+                  >
+                    {partsInventoryHeaderStatus}
+                  </Badge>
+                ) : null}
               </DialogTitle>
               <DialogDescription className="text-[12px] text-[hsl(var(--mdm-template-muted))]">
                 Double-click row behavior and CRUD flow mirrors Leads Management interaction patterns.

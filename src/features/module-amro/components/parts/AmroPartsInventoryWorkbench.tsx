@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
-import { AlertTriangle, Boxes, Loader2, RefreshCcw, SlidersHorizontal } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, BellRing, Boxes, ChevronDown, ChevronUp, Download, Loader2, Pencil, RefreshCcw, SlidersHorizontal, Trash2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   type AmroInventoryDataGridTemplateProps,
   type GridColumnDefinition,
@@ -51,6 +53,52 @@ export interface AmroPartsInventoryWorkbenchProps {
   onRecordSelectionChange?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onRecordSelectionChange'];
   onScrollPositionChange?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onScrollPositionChange'];
   onViewModeChange?: AmroInventoryDataGridTemplateProps<PartInventoryRecord>['onViewModeChange'];
+  canExport?: boolean;
+  canManageAlerts?: boolean;
+  canShowTourAgain?: boolean;
+}
+
+type GroupingKey = 'item_type' | 'supplier_name' | 'warehouse_location' | 'criticality' | 'status' | 'reorder_band';
+type RiskBand = 'healthy' | 'watch' | 'critical';
+type StockSignal = 'all' | 'low' | 'critical';
+type EasyModePreset = 'all' | 'shortage-risk' | 'critical-only' | 'reorder-due';
+type WarehouseStatusSort = 'risk_desc' | 'available_desc';
+type AlertSort = 'severity_desc' | 'severity_asc';
+
+const GROUPING_OPTIONS: Array<{ value: GroupingKey; label: string }> = [
+  { value: 'item_type', label: 'Part Type' },
+  { value: 'supplier_name', label: 'Supplier' },
+  { value: 'warehouse_location', label: 'Location' },
+  { value: 'criticality', label: 'Criticality' },
+  { value: 'status', label: 'Stock Status' },
+  { value: 'reorder_band', label: 'Reorder Band' },
+];
+
+const TREND_MONTHS = ['M-5', 'M-4', 'M-3', 'M-2', 'M-1', 'Current'];
+
+function formatCurrency(value: number): string {
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value || 0);
+}
+
+function toNumber(value: unknown, fallback = 0): number {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+function computeRiskBand(row: PartInventoryRecord): RiskBand {
+  const forecast30d = Math.max(1, toNumber((row.metadata as Record<string, unknown> | undefined)?.demand_forecast_30d, row.reorder_quantity * 2));
+  const leadTimeDays = Math.max(1, toNumber((row.metadata as Record<string, unknown> | undefined)?.lead_time_days, 14));
+  const dailyDemand = Math.max(0.1, forecast30d / 30);
+  const projectedDaysCover = row.quantity_available / dailyDemand;
+  if (projectedDaysCover <= leadTimeDays * 0.75 || row.quantity_available <= row.min_serviceable_qty) return 'critical';
+  if (projectedDaysCover <= leadTimeDays * 1.3 || row.quantity_available <= row.reorder_level) return 'watch';
+  return 'healthy';
+}
+
+function computeReorderBand(row: PartInventoryRecord): 'critical_reorder' | 'reorder_due' | 'healthy_stock' {
+  if (row.quantity_available <= row.min_serviceable_qty) return 'critical_reorder';
+  if (row.quantity_available <= row.reorder_level) return 'reorder_due';
+  return 'healthy_stock';
 }
 
 function metricTone(value: number, warningThreshold: number, criticalThreshold: number): 'default' | 'secondary' | 'destructive' {
@@ -84,8 +132,107 @@ export function AmroPartsInventoryWorkbench({
   onRecordSelectionChange,
   onScrollPositionChange,
   onViewModeChange,
+  canExport = true,
+  canManageAlerts = true,
+  canShowTourAgain = false,
 }: AmroPartsInventoryWorkbenchProps) {
   const [statusFilter, setStatusFilter] = useState<(typeof PARTS_STATUS_FILTER_OPTIONS)[number]>('all');
+  const [criticalityFilter, setCriticalityFilter] = useState<'all' | PartInventoryRecord['criticality']>('all');
+  const [itemTypeFilter, setItemTypeFilter] = useState<'all' | PartInventoryRecord['item_type']>('all');
+  const [supplierFilter, setSupplierFilter] = useState<'all' | string>('all');
+  const [locationFilter, setLocationFilter] = useState<'all' | string>('all');
+  const [stockSignalFilter, setStockSignalFilter] = useState<StockSignal>('all');
+  const [riskBandFilter, setRiskBandFilter] = useState<'all' | RiskBand>('all');
+  const [erpLinkedOnly, setErpLinkedOnly] = useState<'all' | 'linked'>('all');
+  const [groupBy, setGroupBy] = useState<GroupingKey>('item_type');
+  const [searchText, setSearchText] = useState('');
+  const [easyMode, setEasyMode] = useState(true);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+  const [easyPreset, setEasyPreset] = useState<EasyModePreset>('all');
+  const [preferredViewMode, setPreferredViewMode] = useState<GridViewMode>(viewMode);
+  const [showGuidedTour, setShowGuidedTour] = useState(false);
+  const [warehousePanelCollapsed, setWarehousePanelCollapsed] = useState(false);
+  const [alertsPanelCollapsed, setAlertsPanelCollapsed] = useState(false);
+  const [recordsPanelCollapsed, setRecordsPanelCollapsed] = useState(false);
+  const [selectedWarehouseRecordByLocation, setSelectedWarehouseRecordByLocation] = useState<Record<string, string>>({});
+  const [warehouseStatusSort, setWarehouseStatusSort] = useState<WarehouseStatusSort>('risk_desc');
+  const [alertSort, setAlertSort] = useState<AlertSort>('severity_desc');
+
+  const guidedTourStorageKey = useMemo(() => `amro-parts-guided-tour-dismissed:${persistKey}`, [persistKey]);
+  const panelStateStorageKey = useMemo(() => `amro-parts-panel-state:${persistKey}`, [persistKey]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const dismissed = window.localStorage.getItem(guidedTourStorageKey) === '1';
+    if (!dismissed) {
+      setShowGuidedTour(true);
+    }
+  }, [guidedTourStorageKey]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(panelStateStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as {
+        warehousePanelCollapsed?: boolean;
+        alertsPanelCollapsed?: boolean;
+        recordsPanelCollapsed?: boolean;
+      };
+      setWarehousePanelCollapsed(Boolean(parsed.warehousePanelCollapsed));
+      setAlertsPanelCollapsed(Boolean(parsed.alertsPanelCollapsed));
+      setRecordsPanelCollapsed(Boolean(parsed.recordsPanelCollapsed));
+    } catch {
+      // ignore invalid localStorage payload
+    }
+  }, [panelStateStorageKey]);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      panelStateStorageKey,
+      JSON.stringify({ warehousePanelCollapsed, alertsPanelCollapsed, recordsPanelCollapsed }),
+    );
+  }, [alertsPanelCollapsed, panelStateStorageKey, recordsPanelCollapsed, warehousePanelCollapsed]);
+  useEffect(() => {
+    if (!onRefresh) return;
+    const timer = window.setInterval(() => {
+      onRefresh();
+    }, 30_000);
+    return () => window.clearInterval(timer);
+  }, [onRefresh]);
+
+  useEffect(() => {
+    setPreferredViewMode(viewMode);
+  }, [viewMode]);
+
+  useEffect(() => {
+    if (easyPreset === 'all') {
+      setStatusFilter('all');
+      setStockSignalFilter('all');
+      setRiskBandFilter('all');
+      setCriticalityFilter('all');
+      return;
+    }
+    if (easyPreset === 'shortage-risk') {
+      setStockSignalFilter('low');
+      setRiskBandFilter('watch');
+      setStatusFilter('all');
+      setCriticalityFilter('all');
+      return;
+    }
+    if (easyPreset === 'critical-only') {
+      setStockSignalFilter('critical');
+      setRiskBandFilter('critical');
+      setCriticalityFilter('critical');
+      setStatusFilter('all');
+      return;
+    }
+    if (easyPreset === 'reorder-due') {
+      setStockSignalFilter('low');
+      setRiskBandFilter('all');
+      setStatusFilter('low_stock');
+      setCriticalityFilter('all');
+    }
+  }, [easyPreset]);
 
   const columns = useMemo<GridColumnDefinition<PartInventoryRecord>[]>(() => [
     {
@@ -167,12 +314,44 @@ export function AmroPartsInventoryWorkbench({
     },
   ], []);
 
+  const supplierOptions = useMemo(
+    () => Array.from(new Set(records.map((record) => String(record.supplier_name || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [records],
+  );
+  const locationOptions = useMemo(
+    () => Array.from(new Set(records.map((record) => String(record.warehouse_location || '').trim()).filter(Boolean))).sort((a, b) => a.localeCompare(b)),
+    [records],
+  );
+
   const filteredRecords = useMemo(() => {
+    const normalizedSearch = searchText.trim().toLowerCase();
     return records.filter((row) => {
       if (statusFilter !== 'all' && row.status !== statusFilter) return false;
+      if (criticalityFilter !== 'all' && row.criticality !== criticalityFilter) return false;
+      if (itemTypeFilter !== 'all' && row.item_type !== itemTypeFilter) return false;
+      if (supplierFilter !== 'all' && row.supplier_name !== supplierFilter) return false;
+      if (locationFilter !== 'all' && row.warehouse_location !== locationFilter) return false;
+      if (stockSignalFilter === 'low' && !(row.quantity_available <= row.reorder_level || row.status === 'low_stock')) return false;
+      if (stockSignalFilter === 'critical' && !(row.quantity_available <= row.min_serviceable_qty || row.criticality === 'critical')) return false;
+      const riskBand = computeRiskBand(row);
+      if (riskBandFilter !== 'all' && riskBand !== riskBandFilter) return false;
+      if (erpLinkedOnly === 'linked' && !row.metadata.item_master_id) return false;
+      if (normalizedSearch) {
+        const searchable = [
+          row.part_number,
+          row.description,
+          row.supplier_name,
+          row.warehouse_location,
+          row.ata_chapter,
+          row.item_type,
+          row.status,
+          row.criticality,
+        ].join(' ').toLowerCase();
+        if (!searchable.includes(normalizedSearch)) return false;
+      }
       return true;
     });
-  }, [records, statusFilter]);
+  }, [records, statusFilter, criticalityFilter, itemTypeFilter, supplierFilter, locationFilter, stockSignalFilter, riskBandFilter, erpLinkedOnly, searchText]);
 
   const metrics = useMemo(() => computePartInventoryMetrics(filteredRecords), [filteredRecords]);
 
@@ -184,7 +363,156 @@ export function AmroPartsInventoryWorkbench({
     return Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
   }, [filteredRecords]);
 
+  const groupedSummary = useMemo(() => {
+    const groups = new Map<string, { label: string; count: number; availableQty: number; value: number; lowStock: number }>();
+    for (const row of filteredRecords) {
+      const reorderBand = computeReorderBand(row);
+      const keyValue = groupBy === 'reorder_band'
+        ? reorderBand
+        : String(row[groupBy] || 'Unassigned');
+      const current = groups.get(keyValue) || { label: keyValue, count: 0, availableQty: 0, value: 0, lowStock: 0 };
+      current.count += 1;
+      current.availableQty += row.quantity_available;
+      current.value += row.quantity_on_hand * row.unit_cost;
+      if (row.quantity_available <= row.reorder_level || row.status === 'low_stock') current.lowStock += 1;
+      groups.set(keyValue, current);
+    }
+    return Array.from(groups.values()).sort((left, right) => right.count - left.count);
+  }, [filteredRecords, groupBy]);
+
+  const criticalAlerts = useMemo(
+    () =>
+      filteredRecords
+        .filter((row) => computeRiskBand(row) === 'critical')
+        .sort((left, right) => (left.quantity_available - left.min_serviceable_qty) - (right.quantity_available - right.min_serviceable_qty))
+        .slice(0, 8),
+    [filteredRecords],
+  );
+  const sortedCriticalAlerts = useMemo(() => {
+    const rows = [...criticalAlerts];
+    if (alertSort === 'severity_asc') {
+      return rows.sort((left, right) => (left.quantity_available - left.min_serviceable_qty) - (right.quantity_available - right.min_serviceable_qty));
+    }
+    return rows.sort((left, right) => (right.min_serviceable_qty - right.quantity_available) - (left.min_serviceable_qty - left.quantity_available));
+  }, [alertSort, criticalAlerts]);
+
+  const locationCriticalityHeatmap = useMemo(() => {
+    const grid = new Map<string, Map<string, number>>();
+    for (const row of filteredRecords) {
+      const location = row.warehouse_location || 'UNASSIGNED';
+      const severity = row.criticality || 'normal';
+      const locationMap = grid.get(location) || new Map<string, number>();
+      locationMap.set(severity, (locationMap.get(severity) || 0) + 1);
+      grid.set(location, locationMap);
+    }
+    return Array.from(grid.entries()).map(([location, severityMap]) => ({
+      location,
+      critical: severityMap.get('critical') || 0,
+      high: severityMap.get('high') || 0,
+      normal: severityMap.get('normal') || 0,
+      low: severityMap.get('low') || 0,
+      total: (severityMap.get('critical') || 0) + (severityMap.get('high') || 0) + (severityMap.get('normal') || 0) + (severityMap.get('low') || 0),
+    }));
+  }, [filteredRecords]);
+  const warehouseStatusSummary = useMemo(() => {
+    const rows = locationCriticalityHeatmap.map((entry) => {
+      const warehouseRows = filteredRecords.filter((row) => (row.warehouse_location || 'UNASSIGNED') === entry.location);
+      const availableQty = warehouseRows.reduce((sum, row) => sum + row.quantity_available, 0);
+      const riskScore = entry.critical * 3 + entry.high * 2 + entry.normal;
+      return {
+        ...entry,
+        availableQty,
+        riskScore,
+      };
+    });
+    if (warehouseStatusSort === 'available_desc') {
+      return rows.sort((left, right) => right.availableQty - left.availableQty);
+    }
+    return rows.sort((left, right) => right.riskScore - left.riskScore);
+  }, [filteredRecords, locationCriticalityHeatmap, warehouseStatusSort]);
+  const warehouseRecordsByLocation = useMemo(() => {
+    const map = new Map<string, PartInventoryRecord[]>();
+    for (const entry of warehouseStatusSummary) {
+      const scoped = filteredRecords
+        .filter((row) => (row.warehouse_location || 'UNASSIGNED') === entry.location)
+        .sort((left, right) => {
+          const leftSeverity = (left.min_serviceable_qty - left.quantity_available) + (left.criticality === 'critical' ? 100 : left.criticality === 'high' ? 50 : 0);
+          const rightSeverity = (right.min_serviceable_qty - right.quantity_available) + (right.criticality === 'critical' ? 100 : right.criticality === 'high' ? 50 : 0);
+          return rightSeverity - leftSeverity;
+        });
+      map.set(entry.location, scoped);
+    }
+    return map;
+  }, [filteredRecords, warehouseStatusSummary]);
+  useEffect(() => {
+    const nextSelection: Record<string, string> = {};
+    for (const [location, records] of warehouseRecordsByLocation.entries()) {
+      if (records.length === 0) continue;
+      const currentSelected = selectedWarehouseRecordByLocation[location];
+      const selectedStillExists = currentSelected && records.some((record) => record.id === currentSelected);
+      nextSelection[location] = selectedStillExists ? currentSelected : records[0].id;
+    }
+    setSelectedWarehouseRecordByLocation(nextSelection);
+  }, [selectedWarehouseRecordByLocation, warehouseRecordsByLocation]);
+
+  const trendSeries = useMemo(() => {
+    const totalValue = filteredRecords.reduce((sum, row) => sum + row.quantity_on_hand * row.unit_cost, 0);
+    const lowStockCount = filteredRecords.filter((row) => row.quantity_available <= row.reorder_level || row.status === 'low_stock').length;
+    return TREND_MONTHS.map((month, index) => {
+      const factor = 0.86 + (index * 0.04);
+      const churn = 1 + ((index % 2 === 0 ? -1 : 1) * 0.06);
+      return {
+        month,
+        value: Math.round(totalValue * factor),
+        lowStock: Math.max(0, Math.round(lowStockCount * churn)),
+      };
+    });
+  }, [filteredRecords]);
+
+  const maxHeatMapTotal = Math.max(1, ...locationCriticalityHeatmap.map((entry) => entry.total));
   const maxStatusCount = Math.max(1, ...statusDistribution.map((entry) => entry[1]));
+
+  const exportCurrentInventory = () => {
+    if (!canExport) return;
+    const header = ['part_number', 'description', 'item_type', 'supplier_name', 'warehouse_location', 'criticality', 'status', 'quantity_on_hand', 'quantity_reserved', 'quantity_available', 'reorder_level', 'min_serviceable_qty', 'risk_band'];
+    const lines = filteredRecords.map((row) => [
+      row.part_number,
+      row.description,
+      row.item_type,
+      row.supplier_name,
+      row.warehouse_location,
+      row.criticality,
+      row.status,
+      row.quantity_on_hand,
+      row.quantity_reserved,
+      row.quantity_available,
+      row.reorder_level,
+      row.min_serviceable_qty,
+      computeRiskBand(row),
+    ]);
+    const csv = [header.join(','), ...lines.map((line) => line.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'amro-parts-inventory-report.csv';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const dismissGuidedTour = () => {
+    setShowGuidedTour(false);
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(guidedTourStorageKey, '1');
+    }
+  };
+
+  const showGuidedTourAgain = () => {
+    setShowGuidedTour(true);
+    if (typeof window !== 'undefined') {
+      window.localStorage.removeItem(guidedTourStorageKey);
+    }
+  };
 
   return (
     <div className="space-y-4" aria-label="AMRO parts inventory workbench">
@@ -200,6 +528,10 @@ export function AmroPartsInventoryWorkbench({
                 <RefreshCcw className="mr-1.5 h-4 w-4" />
                 Refresh
               </Button>
+              <Button variant="outline" size="sm" onClick={exportCurrentInventory} disabled={!canExport}>
+                <Download className="mr-1.5 h-4 w-4" />
+                Export
+              </Button>
               <Button size="sm" onClick={onCreatePart}>
                 <Boxes className="mr-1.5 h-4 w-4" />
                 Add Part
@@ -208,68 +540,95 @@ export function AmroPartsInventoryWorkbench({
           </div>
         </CardHeader>
         <CardContent>
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <Card className="border-dashed">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Total Items</span>
-                  <Boxes className="h-4 w-4 text-muted-foreground" />
-                </div>
-                <p className="mt-2 text-2xl font-semibold">{metrics.totalItems}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-dashed">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Low Stock</span>
-                  <AlertTriangle className="h-4 w-4 text-amber-500" />
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <p className="text-2xl font-semibold">{metrics.lowStockItems}</p>
-                  <Badge variant={metricTone(metrics.lowStockItems, 5, 20)}>{metrics.lowStockItems > 0 ? 'action' : 'healthy'}</Badge>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-dashed">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Reserved Items</span>
-                  <Boxes className="h-4 w-4 text-sky-500" />
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <p className="text-2xl font-semibold">{metrics.reservedItems}</p>
-                  <Badge variant={metricTone(metrics.reservedItems, 10, 30)}>{metrics.reservedItems > 0 ? 'tracked' : 'clear'}</Badge>
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-dashed">
-              <CardContent className="pt-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Quarantined Items</span>
-                  <AlertTriangle className="h-4 w-4 text-rose-500" />
-                </div>
-                <div className="mt-2 flex items-center gap-2">
-                  <p className="text-2xl font-semibold">{metrics.quarantineItems}</p>
-                  <Badge variant={metricTone(metrics.quarantineItems, 1, 5)}>{metrics.quarantineItems > 0 ? 'attention' : 'none'}</Badge>
-                </div>
-              </CardContent>
-            </Card>
+          <div className="flex flex-wrap items-center gap-2 text-xs">
+            <Badge variant="outline">Auto refresh: 30s</Badge>
+            <Badge variant="secondary">Visible records: {filteredRecords.length}</Badge>
+            <Badge variant="outline">Target load: under 2s</Badge>
           </div>
         </CardContent>
       </Card>
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Filters and Distribution</CardTitle>
+          <CardTitle className="text-base">Filters and View</CardTitle>
+          <CardDescription>
+            Easy Mode gives fast, guided filtering. Advanced Mode unlocks full parameter controls.
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {showGuidedTour ? (
+            <div className="rounded border border-sky-200 bg-sky-50/70 p-2">
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="space-y-1">
+                  <p className="text-xs font-semibold text-sky-900">Quick Guided Tour</p>
+                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-sky-900">
+                    <Badge variant="outline" className="border-sky-300 bg-white text-sky-800">Step 1: Search</Badge>
+                    <span>{'->'}</span>
+                    <Badge variant="outline" className="border-sky-300 bg-white text-sky-800">Step 2: Preset</Badge>
+                    <span>{'->'}</span>
+                    <Badge variant="outline" className="border-sky-300 bg-white text-sky-800">Step 3: View</Badge>
+                  </div>
+                  <p className="text-[11px] text-sky-900">
+                    Start with search, apply a quick preset, then choose the preferred view layout.
+                  </p>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button size="sm" variant="outline" className="h-7 border-sky-300 bg-white text-sky-800 hover:bg-sky-100" onClick={dismissGuidedTour}>
+                    Got it
+                  </Button>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline" className="gap-1">
-              <SlidersHorizontal className="h-3.5 w-3.5" />
-              Filters
-            </Badge>
+            <Badge variant={easyMode ? 'default' : 'outline'}>Easy Mode</Badge>
+            <Button
+              size="sm"
+              variant={easyMode ? 'default' : 'outline'}
+              onClick={() => setEasyMode(true)}
+            >
+              Simplified
+            </Button>
+            <Button
+              size="sm"
+              variant={!easyMode ? 'default' : 'outline'}
+              onClick={() => setEasyMode(false)}
+            >
+              Advanced
+            </Button>
+            {canShowTourAgain && !showGuidedTour ? (
+              <Button
+                size="sm"
+                variant="ghost"
+                className="h-7 px-2 text-xs"
+                onClick={showGuidedTourAgain}
+              >
+                Show Tour Again
+              </Button>
+            ) : null}
+            <Badge variant="secondary">Visible: {filteredRecords.length}</Badge>
+          </div>
+
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+            <Input
+              value={searchText}
+              onChange={(event) => setSearchText(event.target.value)}
+              placeholder="Search by item, supplier, or location..."
+              aria-label="Search parts inventory"
+              className="h-8"
+            />
+            <Select value={erpLinkedOnly} onValueChange={(value) => setErpLinkedOnly(value as 'all' | 'linked')}>
+              <SelectTrigger className="h-8" aria-label="Filter by ERP link status">
+                <SelectValue placeholder="ERP Link" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">ERP: all</SelectItem>
+                <SelectItem value="linked">ERP: linked only</SelectItem>
+              </SelectContent>
+            </Select>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as (typeof PARTS_STATUS_FILTER_OPTIONS)[number])}>
-              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by inventory status">
+              <SelectTrigger className="h-8" aria-label="Filter by inventory status">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -280,35 +639,306 @@ export function AmroPartsInventoryWorkbench({
                 ))}
               </SelectContent>
             </Select>
-            <Badge variant="secondary">Visible: {filteredRecords.length}</Badge>
+            <Badge variant="outline" className="gap-1">
+              <SlidersHorizontal className="h-3.5 w-3.5" />
+              Focused Filters
+            </Badge>
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
-            <div className="space-y-2">
-              <p className="text-sm font-medium">Status Distribution</p>
-              {statusDistribution.length ? statusDistribution.map(([label, count]) => (
-                <div key={label} className="space-y-1">
-                  <div className="flex items-center justify-between text-xs text-muted-foreground">
-                    <span>{label}</span>
-                    <span>{count}</span>
-                  </div>
-                  <div className="h-2 rounded bg-muted">
-                    <div
-                      className={cn(
-                        'h-2 rounded transition-all duration-300',
-                        label === 'quarantined' || label === 'unserviceable'
-                          ? 'bg-rose-500'
-                          : label === 'low_stock'
-                            ? 'bg-amber-500'
-                            : 'bg-emerald-500',
-                      )}
-                      style={{ width: `${(count / maxStatusCount) * 100}%` }}
-                    />
-                  </div>
-                </div>
-              )) : <p className="text-sm text-muted-foreground">No status data available.</p>}
-            </div>
+          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+            <Select value={easyPreset} onValueChange={(value) => setEasyPreset(value as EasyModePreset)}>
+              <SelectTrigger className="h-8" aria-label="Quick filter preset">
+                <SelectValue placeholder="Quick Preset" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Quick Preset: All Inventory</SelectItem>
+                <SelectItem value="shortage-risk">Quick Preset: Shortage Risk</SelectItem>
+                <SelectItem value="critical-only">Quick Preset: Critical Only</SelectItem>
+                <SelectItem value="reorder-due">Quick Preset: Reorder Due</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={preferredViewMode}
+              onValueChange={(value) => {
+                const next = value as GridViewMode;
+                setPreferredViewMode(next);
+              }}
+            >
+              <SelectTrigger className="h-8" aria-label="Inventory layout mode">
+                <SelectValue placeholder="View Layout" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="horizontal-split">View: Horizontal Split (Recommended)</SelectItem>
+                <SelectItem value="vertical-split">View: Vertical Split</SelectItem>
+                <SelectItem value="stacked-auto">View: Stacked Auto</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setShowAdvancedFilters((previous) => !previous)}
+            >
+              {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
+            </Button>
           </div>
+
+          {!easyMode || showAdvancedFilters ? (
+            <div className="flex flex-wrap items-center gap-2 rounded border bg-muted/20 p-2">
+            <Select value={criticalityFilter} onValueChange={(value) => setCriticalityFilter(value as 'all' | PartInventoryRecord['criticality'])}>
+              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by criticality">
+                <SelectValue placeholder="Criticality" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Criticality: all</SelectItem>
+                <SelectItem value="critical">Criticality: critical</SelectItem>
+                <SelectItem value="high">Criticality: high</SelectItem>
+                <SelectItem value="normal">Criticality: normal</SelectItem>
+                <SelectItem value="low">Criticality: low</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={itemTypeFilter} onValueChange={(value) => setItemTypeFilter(value as 'all' | PartInventoryRecord['item_type'])}>
+              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by part type">
+                <SelectValue placeholder="Part Type" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Type: all</SelectItem>
+                <SelectItem value="part">Type: part</SelectItem>
+                <SelectItem value="consumable">Type: consumable</SelectItem>
+                <SelectItem value="tool">Type: tool</SelectItem>
+                <SelectItem value="equipment">Type: equipment</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={supplierFilter} onValueChange={(value) => setSupplierFilter(value)}>
+              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by supplier">
+                <SelectValue placeholder="Supplier" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Supplier: all</SelectItem>
+                {supplierOptions.map((supplier) => (
+                  <SelectItem key={supplier} value={supplier}>
+                    {supplier}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={locationFilter} onValueChange={(value) => setLocationFilter(value)}>
+              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by location">
+                <SelectValue placeholder="Location" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Location: all</SelectItem>
+                {locationOptions.map((location) => (
+                  <SelectItem key={location} value={location}>
+                    {location}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={stockSignalFilter} onValueChange={(value) => setStockSignalFilter(value as StockSignal)}>
+              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by stock signal">
+                <SelectValue placeholder="Stock Signal" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Signal: all</SelectItem>
+                <SelectItem value="low">Signal: low stock</SelectItem>
+                <SelectItem value="critical">Signal: critical stock</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={riskBandFilter} onValueChange={(value) => setRiskBandFilter(value as 'all' | RiskBand)}>
+              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by risk band">
+                <SelectValue placeholder="Risk Band" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Risk: all</SelectItem>
+                <SelectItem value="healthy">Risk: healthy</SelectItem>
+                <SelectItem value="watch">Risk: watch</SelectItem>
+                <SelectItem value="critical">Risk: critical</SelectItem>
+              </SelectContent>
+            </Select>
+            </div>
+          ) : (
+            <div className="text-xs text-muted-foreground">
+              Easy Mode active: using quick preset and search. Enable advanced filters if needed.
+            </div>
+          )}
+
+          <section className="rounded border">
+            <button
+              type="button"
+              className="flex h-12 w-full items-center justify-between px-3 text-left"
+              onClick={() => setWarehousePanelCollapsed((previous) => !previous)}
+              aria-expanded={!warehousePanelCollapsed}
+              aria-controls="warehouse-status-multi"
+            >
+              <span className="text-sm font-medium">Warehouse Status - Multi-Warehouse</span>
+              {warehousePanelCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </button>
+            <div
+              id="warehouse-status-multi"
+              className={cn(
+                'overflow-hidden px-3 transition-all duration-300',
+                warehousePanelCollapsed ? 'max-h-0 pb-0' : 'max-h-[1200px] pb-3',
+              )}
+            >
+              <div className="mb-2 flex flex-wrap items-center gap-2">
+                <Select value={warehouseStatusSort} onValueChange={(value) => setWarehouseStatusSort(value as WarehouseStatusSort)}>
+                  <SelectTrigger className="h-8 w-[220px]" aria-label="Sort warehouse status">
+                    <SelectValue placeholder="Warehouse Sort" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="risk_desc">Sort: Highest Risk</SelectItem>
+                    <SelectItem value="available_desc">Sort: Highest Available Qty</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {warehouseStatusSummary.map((entry) => {
+                  const warehouseRecords = warehouseRecordsByLocation.get(entry.location) || [];
+                  const selectedRecordId = selectedWarehouseRecordByLocation[entry.location] || warehouseRecords[0]?.id || '';
+                  const selectedRecord = warehouseRecords.find((record) => record.id === selectedRecordId) || warehouseRecords[0];
+                  return (
+                  <div key={entry.location} className="rounded border p-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold">{entry.location}</span>
+                      <Badge variant={entry.riskScore > 5 ? 'destructive' : 'secondary'}>Risk {entry.riskScore}</Badge>
+                    </div>
+                    <div className="mt-1 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
+                      <span>Avail: {entry.availableQty}</span>
+                      <span>Total: {entry.total}</span>
+                      <span>Critical: {entry.critical}</span>
+                      <span>High: {entry.high}</span>
+                    </div>
+                    <div className="mt-1 grid grid-cols-2 gap-1 text-[11px]">
+                      <span className="rounded bg-rose-100 px-1 py-0.5 text-rose-900">C {entry.critical}</span>
+                      <span className="rounded bg-amber-100 px-1 py-0.5 text-amber-900">H {entry.high}</span>
+                      <span className="rounded bg-emerald-100 px-1 py-0.5 text-emerald-900">N {entry.normal}</span>
+                      <span className="rounded bg-slate-100 px-1 py-0.5 text-slate-900">L {entry.low}</span>
+                    </div>
+                    <div className="mt-2">
+                      <Select
+                        value={selectedRecordId}
+                        onValueChange={(next) => setSelectedWarehouseRecordByLocation((current) => ({ ...current, [entry.location]: next }))}
+                      >
+                        <SelectTrigger className="h-7 text-xs" aria-label={`Select warehouse record for ${entry.location}`}>
+                          <SelectValue placeholder="Select record" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {warehouseRecords.map((record) => (
+                            <SelectItem key={record.id} value={record.id}>
+                              {record.part_number} · Avail {record.quantity_available}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="mt-2 flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        disabled={!selectedRecord}
+                        onClick={() => {
+                          if (selectedRecord) onUpdateRecord?.(selectedRecord);
+                        }}
+                      >
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                        disabled={!selectedRecord}
+                        onClick={() => {
+                          if (selectedRecord) onDeleteRecord?.(selectedRecord);
+                        }}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                );})}
+              </div>
+            </div>
+          </section>
+
+          <section className="rounded border">
+            <button
+              type="button"
+              className="flex h-12 w-full items-center justify-between px-3 text-left"
+              onClick={() => setAlertsPanelCollapsed((previous) => !previous)}
+              aria-expanded={!alertsPanelCollapsed}
+              aria-controls="low-stock-alerts"
+            >
+              <span className="text-sm font-medium">Automated Low-Stock Alerts</span>
+              {alertsPanelCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+            </button>
+            <div
+              id="low-stock-alerts"
+              className={cn(
+                'overflow-hidden px-3 transition-all duration-300',
+                alertsPanelCollapsed ? 'max-h-0 pb-0' : 'max-h-[1200px] pb-3',
+              )}
+            >
+              <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <Select value={alertSort} onValueChange={(value) => setAlertSort(value as AlertSort)}>
+                    <SelectTrigger className="h-8 w-[240px]" aria-label="Sort low-stock alerts">
+                      <SelectValue placeholder="Alert sort" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="severity_desc">Sort: Most Severe First</SelectItem>
+                      <SelectItem value="severity_asc">Sort: Least Severe First</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Badge variant="secondary">Alerts: {sortedCriticalAlerts.length}</Badge>
+                </div>
+                <Button size="sm" variant="outline" disabled={!canManageAlerts}>
+                  <BellRing className="mr-1.5 h-4 w-4" />
+                  Manage
+                </Button>
+              </div>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
+                {sortedCriticalAlerts.length ? sortedCriticalAlerts.map((row) => (
+                  <div key={row.id} className="rounded border border-rose-200 bg-rose-50/40 p-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-semibold">{row.part_number}</span>
+                      <Badge variant="destructive">critical</Badge>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-muted-foreground">{row.description}</p>
+                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
+                      <span>{row.warehouse_location}</span>
+                      <span>Avail {row.quantity_available}</span>
+                      <span>Min {row.min_serviceable_qty}</span>
+                      <span>Supplier {row.supplier_name}</span>
+                    </div>
+                    <div className="mt-2 flex items-center justify-end gap-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        onClick={() => onUpdateRecord?.(row)}
+                      >
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                        onClick={() => onDeleteRecord?.(row)}
+                      >
+                        <Trash2 className="mr-1 h-3.5 w-3.5" />
+                        Delete
+                      </Button>
+                    </div>
+                  </div>
+                )) : <p className="text-sm text-muted-foreground">No critical alerts for current filter scope.</p>}
+              </div>
+            </div>
+          </section>
         </CardContent>
       </Card>
 
@@ -348,33 +978,53 @@ export function AmroPartsInventoryWorkbench({
       ) : null}
 
       {state === 'ready' ? (
-        <AmroUnifiedGridRecordDetailShell
-          title="Parts Inventory Records"
-          subtitle="Navigate records and inspect technical details side-by-side."
-          records={filteredRecords}
-          columns={columns}
-          viewMode={viewMode}
-          density={density}
-          scrollBehavior={scrollBehavior}
-          pageSize={pageSize}
-          persistKey={persistKey}
-          syncDetailWithScroll
-          ariaLabel="AMRO parts inventory grid"
-          onRecordSelectionChange={onRecordSelectionChange}
-          onScrollPositionChange={onScrollPositionChange}
-          onViewModeChange={onViewModeChange}
-          onCreateRecord={onCreateRecord}
-          onReadRecord={onReadRecord}
-          onUpdateRecord={onUpdateRecord}
-          onDeleteRecord={onDeleteRecord}
-          onSaveRecord={onSaveRecord}
-          onCancelRecord={onCancelRecord}
-          onCrudAction={onCrudAction}
-          crudPermissions={crudPermissions}
-          requiredDetailFieldKeys={[...PARTS_DETAIL_REQUIRED_KEYS]}
-          defaultVisibleDetailFieldKeys={[...PARTS_DETAIL_DEFAULT_VISIBLE_KEYS]}
-          hiddenDetailFieldKeys={[...PARTS_DETAIL_HIDDEN_KEYS]}
-        />
+        <section className="rounded border">
+          <button
+            type="button"
+            className="flex h-12 w-full items-center justify-between px-3 text-left"
+            onClick={() => setRecordsPanelCollapsed((previous) => !previous)}
+            aria-expanded={!recordsPanelCollapsed}
+            aria-controls="records-workspace"
+          >
+            <span className="text-sm font-medium">Records Workspace</span>
+            {recordsPanelCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
+          </button>
+          <div
+            id="records-workspace"
+            className={cn(
+              'overflow-hidden transition-all duration-300',
+              recordsPanelCollapsed ? 'max-h-0 pb-0' : 'max-h-[4000px] pb-2',
+            )}
+          >
+            <AmroUnifiedGridRecordDetailShell
+              title="Parts Inventory Records"
+              subtitle="Grid and detail form for full CRUD operations."
+              records={filteredRecords}
+              columns={columns}
+              viewMode={preferredViewMode}
+              density={density}
+              scrollBehavior={scrollBehavior}
+              pageSize={pageSize}
+              persistKey={persistKey}
+              syncDetailWithScroll
+              ariaLabel="AMRO parts inventory grid"
+              onRecordSelectionChange={onRecordSelectionChange}
+              onScrollPositionChange={onScrollPositionChange}
+              onViewModeChange={onViewModeChange}
+              onCreateRecord={onCreateRecord}
+              onReadRecord={onReadRecord}
+              onUpdateRecord={onUpdateRecord}
+              onDeleteRecord={onDeleteRecord}
+              onSaveRecord={onSaveRecord}
+              onCancelRecord={onCancelRecord}
+              onCrudAction={onCrudAction}
+              crudPermissions={crudPermissions}
+              requiredDetailFieldKeys={[...PARTS_DETAIL_REQUIRED_KEYS]}
+              defaultVisibleDetailFieldKeys={[...PARTS_DETAIL_DEFAULT_VISIBLE_KEYS]}
+              hiddenDetailFieldKeys={[...PARTS_DETAIL_HIDDEN_KEYS]}
+            />
+          </div>
+        </section>
       ) : null}
     </div>
   );
