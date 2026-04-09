@@ -122,7 +122,7 @@ function normalizeTemplateRequestTaskTemplateIds(input: WorkPackageTemplateReque
       .map((entry) => {
         if (!entry || typeof entry !== 'object') return '';
         const row = entry as Record<string, unknown>;
-        return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
+        return String(row.task_template_id || row.taskTemplateId || row.id || row.tt_sequence || '').trim();
       })
       .filter((value) => value.length > 0),
   ));
@@ -557,7 +557,7 @@ async function buildTemplateListResponse(
   if (taskTemplateIds.length > 0) {
     let taskTemplateQuery = supabase
       .from('task_templates')
-      .select('id,task_template_id,code_form_no,ata_code,reference_amp,description,assembly_models')
+      .select('id,tt_sequence,code_form_no,ata_code,reference_amp,description,assembly_models')
       .eq('tenant_id', tenantId)
       .in('id', taskTemplateIds);
     if (franchiseId) {
@@ -687,10 +687,10 @@ async function loadTaskTemplateOptionsByModel(params: {
     let query = supabase
       .from('task_templates')
       .select(includeFranchiseColumn
-        ? 'id,task_template_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id,franchise_id'
-        : 'id,task_template_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id')
+        ? 'id,tt_sequence,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id,franchise_id'
+        : 'id,tt_sequence,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id')
       .eq(modelColumn, aircraftModelId)
-      .order('task_template_id', { ascending: true });
+      .order('tt_sequence', { ascending: true });
 
     query = includeGlobalTenantRows ? query.is('tenant_id', null) : query.eq('tenant_id', tenantId);
 
@@ -714,7 +714,7 @@ async function loadTaskTemplateOptionsByModel(params: {
       ...(Array.isArray(globalResult.data) ? globalResult.data : []),
     ] as unknown as Array<Record<string, unknown>>;
     const deduped = Array.from(new Map(
-      merged.map((row) => [String(row.id || row.task_template_id || ''), row]),
+      merged.map((row) => [String(row.id || row.tt_sequence || ''), row]),
     ).values());
     return { data: deduped, error: null };
   };
@@ -739,7 +739,8 @@ async function loadTaskTemplateOptionsByModel(params: {
   const rows = (Array.isArray(data) ? data : []) as unknown as Array<Record<string, unknown>>;
   return rows.map((row) => ({
     id: String(row.id || ''),
-    task_template_id: String(row.task_template_id || ''),
+    tt_sequence: String(row.tt_sequence || ''),
+    task_template_id: String(row.tt_sequence || ''),
     code_form_no: String(row.code_form_no || ''),
     ata_code: String(row.ata_code || ''),
     reference_amp: String(row.reference_amp || ''),

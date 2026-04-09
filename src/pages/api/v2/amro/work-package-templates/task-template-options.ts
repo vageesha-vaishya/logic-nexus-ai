@@ -41,9 +41,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const tenantId = String(scopedAccess.tenantId || '').trim();
     const tenantIdFromQuery = String(req.query.tenant_id || '').trim();
     const aircraftModelId = String(req.query.aircraft_model_id || '').trim();
-    const franchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId || '').trim() : '';
+    const scopedFranchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId || '').trim() : '';
+    const requestedFranchiseId = String(req.query.franchise_id || '').trim();
     const normalizedRole = String((auth as { role?: string }).role || '').trim().toLowerCase();
     const isTenantAdmin = normalizedRole === 'tenant_admin';
+    const franchiseId = isTenantAdmin && requestedFranchiseId ? requestedFranchiseId : scopedFranchiseId;
     const isPlatformAdmin = Boolean(scopedAccess.isPlatformAdmin);
 
     if (!aircraftModelId) {
@@ -62,16 +64,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       let query = supabase
         .from('task_templates')
         .select(includeFranchiseColumn
-          ? 'id,task_template_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id,franchise_id'
-          : 'id,task_template_id,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id')
+          ? 'id,tt_sequence,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id,franchise_id'
+          : 'id,tt_sequence,code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,is_mandatory,task_template_detail_json,tenant_id')
         .eq(modelColumn, aircraftModelId)
-        .order('task_template_id', { ascending: true });
+        .order('tt_sequence', { ascending: true });
 
       if (tenantId) {
         query = query.eq('tenant_id', tenantId);
       }
 
-      if (includeFranchiseColumn && !isTenantAdmin && franchiseId) {
+      if (includeFranchiseColumn && franchiseId && (!isTenantAdmin || Boolean(requestedFranchiseId))) {
         query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
       }
 
@@ -103,7 +105,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const rows = (Array.isArray(data) ? (data as unknown[]) : []) as unknown as TaskTemplateRow[];
     const records = rows.map((row) => ({
       id: String(row.id || ''),
-      task_template_id: String(row.task_template_id || ''),
+      tt_sequence: String(row.tt_sequence || ''),
+      task_template_id: String(row.tt_sequence || ''),
       code_form_no: String(row.code_form_no || ''),
       ata_code: String(row.ata_code || ''),
       reference_amp: String(row.reference_amp || ''),

@@ -1342,6 +1342,8 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     is_active: true,
   },
   work_package_templates: {
+    tenant_id: '',
+    franchise_id: '',
     template_code: '',
     template_name: '',
     model_id: '',
@@ -1599,8 +1601,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       franchiseId: context.franchiseId,
       userId: context.userId,
       isTenantAdmin: context.isTenantAdmin,
+      isFranchiseAdmin: context.isFranchiseAdmin,
+      isPlatformAdmin: context.isPlatformAdmin,
     }),
-    [context.franchiseId, context.isTenantAdmin, context.tenantId, context.userId],
+    [context.franchiseId, context.isFranchiseAdmin, context.isPlatformAdmin, context.isTenantAdmin, context.tenantId, context.userId],
   );
   const sessionAccessToken = useMemo(() => String(session?.access_token || '').trim(), [session?.access_token]);
   const aircraftColumnPreferenceStorageKey = useMemo(
@@ -2975,6 +2979,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
       }
       if (entity === 'work_package_templates') {
+        const resolvedTenantId = String(payload.tenant_id || scope.tenantId || '').trim();
+        const resolvedFranchiseId = String(payload.franchise_id || scope.franchiseId || '').trim();
+        if (!resolvedFranchiseId) {
+          setFormErrors((previous) => ({ ...previous, franchise_id: 'Franchise is required' }));
+          toast.error('Select a Franchise before saving template');
+          return false;
+        }
+        payload.tenant_id = resolvedTenantId;
+        payload.franchise_id = resolvedFranchiseId;
         const currentModelId = String(payload.model_id || '').trim();
         const currentAircraftModel = String(payload.aircraft_model || '').trim();
         const resolvedAssemblyModel = assemblyModelOptions.find((option) => {
@@ -3007,7 +3020,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .map((entry) => {
             if (!entry || typeof entry !== 'object') return null;
             const row = entry as Record<string, unknown>;
-            return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
+            return String(row.task_template_id || row.taskTemplateId || row.id || row.tt_sequence || '').trim();
           })
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] creating work package template request work_package_templates', {
@@ -3083,7 +3096,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         toast.error('Please resolve form validation errors');
         return false;
       }
-      const headers = await buildApiHeaders(scope);
+      const createScope = entity === 'work_package_templates'
+        ? {
+            ...scope,
+            tenantId: String(payload.tenant_id || scope.tenantId || '').trim(),
+            franchiseId: String(payload.franchise_id || scope.franchiseId || '').trim(),
+          }
+        : scope;
+      const headers = await buildApiHeaders(createScope);
       if (entity === 'aircraft' && payload.manufacturer_id) {
         const exists = await verifyReferenceExists(headers, 'manufacturers', String(payload.manufacturer_id), ['id', 'manufacturer_code', 'name']);
         if (!exists) {
@@ -3141,6 +3161,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
       }
       if (entity === 'work_package_templates') {
+        const resolvedTenantId = String(payload.tenant_id || scope.tenantId || '').trim();
+        const resolvedFranchiseId = String(payload.franchise_id || scope.franchiseId || '').trim();
+        if (!resolvedFranchiseId) {
+          setFormErrors((previous) => ({ ...previous, franchise_id: 'Franchise is required' }));
+          toast.error('Select a Franchise before saving template');
+          return false;
+        }
+        payload.tenant_id = resolvedTenantId;
+        payload.franchise_id = resolvedFranchiseId;
         const currentModelId = String(payload.model_id || '').trim();
         const currentAircraftModel = String(payload.aircraft_model || '').trim();
         const resolvedAssemblyModel = assemblyModelOptions.find((option) => {
@@ -3173,7 +3202,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .map((entry) => {
             if (!entry || typeof entry !== 'object') return null;
             const row = entry as Record<string, unknown>;
-            return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
+            return String(row.task_template_id || row.taskTemplateId || row.id || row.tt_sequence || '').trim();
           })
           .filter((value): value is string => Boolean(value));
         logger.info('[AMRO Master Data UI] updating work package template request', {
@@ -3255,7 +3284,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const confirmDelete = useCallback(async () => {
     if (!selectedId) return;
     try {
-      const headers = await buildApiHeaders(scope);
+      const updateScope = entity === 'work_package_templates'
+        ? {
+            ...scope,
+            tenantId: String(payload.tenant_id || scope.tenantId || '').trim(),
+            franchiseId: String(payload.franchise_id || scope.franchiseId || '').trim(),
+          }
+        : scope;
+      const headers = await buildApiHeaders(updateScope);
       const deleteEndpoint = entity === 'work_package_templates'
         ? `/api/v2/amro/work-package-templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
