@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { AsyncCombobox } from '@/components/ui/async-combobox';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 import { WorkPackageTemplateCreateSection } from '@/features/module-amro/settings/pages/amro-settings-master-data/components/WorkPackageTemplateCreateSection';
@@ -28,6 +29,12 @@ export function AmroWorkPackageTemplateAdapter({
   formErrors,
   ...props
 }: AmroWorkPackageTemplateAdapterProps) {
+  const activeTenantId = String(props.formValues.tenant_id ?? props.scope?.tenantId ?? '').trim();
+  const activeFranchiseId = String(props.formValues.franchise_id ?? props.scope?.franchiseId ?? '').trim();
+  const canEditTenant = Boolean((props.scope as Record<string, unknown>)?.isPlatformAdmin);
+  const canEditFranchise =
+    (Boolean((props.scope as Record<string, unknown>)?.isTenantAdmin) || canEditTenant)
+    && !(props.scope as Record<string, unknown>)?.isFranchiseAdmin;
   const isUuidLike = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value.trim());
   const extractRecordsFromPayload = (payload: Record<string, unknown> | null): Record<string, unknown>[] => {
     if (!payload || typeof payload !== 'object') return [];
@@ -89,18 +96,20 @@ export function AmroWorkPackageTemplateAdapter({
   const [resolvedModelDisplayLabel, setResolvedModelDisplayLabel] = useState('');
   const [hydratedModelId, setHydratedModelId] = useState('');
 
-  const buildAuthHeaders = async () => {
+  const buildAuthHeaders = async (tenantOverride?: string, franchiseOverride?: string) => {
     const headers: Record<string, string> = {};
     const { data } = await supabase.auth.getSession();
     const token = String(data.session?.access_token || '').trim();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
-    if (props.scope?.tenantId) {
-      headers['x-tenant-id'] = props.scope.tenantId;
+    const resolvedTenantId = String(tenantOverride ?? props.scope?.tenantId ?? '').trim();
+    if (resolvedTenantId) {
+      headers['x-tenant-id'] = resolvedTenantId;
     }
-    if (props.scope?.franchiseId) {
-      headers['x-franchise-id'] = props.scope.franchiseId;
+    const resolvedFranchiseId = String(franchiseOverride ?? props.scope?.franchiseId ?? '').trim();
+    if (resolvedFranchiseId) {
+      headers['x-franchise-id'] = resolvedFranchiseId;
     }
     const scopeUserId = String((props.scope as Record<string, unknown>)?.userId || '').trim();
     if (scopeUserId) {
@@ -111,10 +120,88 @@ export function AmroWorkPackageTemplateAdapter({
   const [aircraftModelOptions, setAircraftModelOptions] = useState<Array<{ value: string; label: string; modelCode: string }>>([]);
   const [aircraftModelOptionsLoading, setAircraftModelOptionsLoading] = useState(false);
   const [aircraftModelOptionsError, setAircraftModelOptionsError] = useState('');
+  const [tenantOptions, setTenantOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [tenantOptionsLoading, setTenantOptionsLoading] = useState(false);
+  const [tenantOptionsError, setTenantOptionsError] = useState('');
+  const [franchiseOptions, setFranchiseOptions] = useState<Array<{ value: string; label: string }>>([]);
+  const [franchiseOptionsLoading, setFranchiseOptionsLoading] = useState(false);
+  const [franchiseOptionsError, setFranchiseOptionsError] = useState('');
+
+  useEffect(() => {
+    if (!props.modalOpen) return;
+    if (!String(props.formValues.tenant_id || '').trim() && props.scope?.tenantId) {
+      props.setFieldValue('tenant_id', props.scope.tenantId);
+    }
+    if (!String(props.formValues.franchise_id || '').trim() && props.scope?.franchiseId) {
+      props.setFieldValue('franchise_id', props.scope.franchiseId);
+    }
+  }, [props.formValues.franchise_id, props.formValues.tenant_id, props.modalOpen, props.scope?.franchiseId, props.scope?.tenantId, props.setFieldValue]);
+
+  useEffect(() => {
+    const loadTenantAndFranchiseOptions = async () => {
+      if (!props.modalOpen || !props.scope?.tenantId || !props.scopedDb) {
+        setTenantOptions(props.scope?.tenantId ? [{ value: props.scope.tenantId, label: props.scope.tenantId }] : []);
+        setFranchiseOptions(props.scope?.franchiseId ? [{ value: props.scope.franchiseId, label: props.scope.franchiseId }] : []);
+        return;
+      }
+      setTenantOptionsLoading(true);
+      setFranchiseOptionsLoading(true);
+      setTenantOptionsError('');
+      setFranchiseOptionsError('');
+      try {
+        let tenantQuery = (props.scopedDb as any)
+          .from('tenants', canEditTenant)
+          .select('id,name,is_active')
+          .order('name', { ascending: true });
+        if (!canEditTenant) {
+          tenantQuery = tenantQuery.eq('id', props.scope.tenantId).limit(1);
+        } else {
+          tenantQuery = tenantQuery.eq('is_active', true);
+        }
+        const { data: tenantRows, error: tenantError } = await tenantQuery;
+        if (tenantError) throw new Error(String(tenantError.message || 'Failed to load tenants'));
+        const tenants = (Array.isArray(tenantRows) ? tenantRows : [])
+          .map((row) => ({ value: String((row as Record<string, unknown>).id || ''), label: String((row as Record<string, unknown>).name || '') }))
+          .filter((entry) => entry.value && entry.label);
+        setTenantOptions(tenants);
+
+        const { data: franchiseRows, error: franchiseError } = await (props.scopedDb as any)
+          .from('franchises', canEditFranchise || canEditTenant)
+          .select('id,name,is_active,tenant_id')
+          .eq('tenant_id', activeTenantId || props.scope.tenantId)
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+        if (franchiseError) throw new Error(String(franchiseError.message || 'Failed to load franchises'));
+        const franchises = (Array.isArray(franchiseRows) ? franchiseRows : [])
+          .map((row) => ({ value: String((row as Record<string, unknown>).id || ''), label: String((row as Record<string, unknown>).name || '') }))
+          .filter((entry) => entry.value && entry.label);
+        setFranchiseOptions(franchises);
+      } catch (error) {
+        setTenantOptionsError(String((error as Error).message || 'Failed to load tenants'));
+        setFranchiseOptionsError(String((error as Error).message || 'Failed to load franchises'));
+        setTenantOptions(props.scope?.tenantId ? [{ value: props.scope.tenantId, label: props.scope.tenantId }] : []);
+        setFranchiseOptions(props.scope?.franchiseId ? [{ value: props.scope.franchiseId, label: props.scope.franchiseId }] : []);
+      } finally {
+        setTenantOptionsLoading(false);
+        setFranchiseOptionsLoading(false);
+      }
+    };
+    void loadTenantAndFranchiseOptions();
+  }, [activeTenantId, canEditFranchise, canEditTenant, props.modalOpen, props.scope?.franchiseId, props.scope?.tenantId, props.scopedDb]);
+
+  useEffect(() => {
+    if (!props.modalOpen || activeFranchiseId) return;
+    const preferred = props.scope?.franchiseId && franchiseOptions.some((item) => item.value === props.scope?.franchiseId)
+      ? props.scope.franchiseId
+      : (franchiseOptions[0]?.value || '');
+    if (preferred) {
+      props.setFieldValue('franchise_id', preferred);
+    }
+  }, [activeFranchiseId, franchiseOptions, props.modalOpen, props.scope?.franchiseId, props.setFieldValue]);
 
   useEffect(() => {
     const loadAircraftModels = async () => {
-      if (!props.scope?.tenantId) {
+      if (!activeTenantId) {
         setAircraftModelOptions([]);
         setAircraftModelOptionsError('');
         return;
@@ -122,9 +209,13 @@ export function AmroWorkPackageTemplateAdapter({
       setAircraftModelOptionsLoading(true);
       setAircraftModelOptionsError('');
       try {
-        const response = await fetch('/api/v2/amro/work-package-templates/model-options', {
+        const query = new URLSearchParams({ tenant_id: activeTenantId });
+        if (activeFranchiseId) {
+          query.set('franchise_id', activeFranchiseId);
+        }
+        const response = await fetch(`/api/v2/amro/work-package-templates/model-options?${query.toString()}`, {
           method: 'GET',
-          headers: await buildAuthHeaders(),
+          headers: await buildAuthHeaders(activeTenantId, activeFranchiseId),
         });
         if (!response.ok) {
           throw new Error(`Failed to load aircraft models (status ${response.status})`);
@@ -156,7 +247,7 @@ export function AmroWorkPackageTemplateAdapter({
       }
     };
     void loadAircraftModels();
-  }, [props.scope?.tenantId]);
+  }, [activeFranchiseId, activeTenantId]);
 
   const messages = Object.values(formErrors || {}).filter(Boolean).map((value) => String(value));
   const validation: AmroTemplateValidationState = messages.length > 0
@@ -188,7 +279,7 @@ export function AmroWorkPackageTemplateAdapter({
         if (!label) {
           const response = await fetch('/api/v2/amro/work-package-templates/model-options', {
             method: 'GET',
-            headers: await buildAuthHeaders(),
+            headers: await buildAuthHeaders(activeTenantId, activeFranchiseId),
           });
           if (response.ok) {
             const payload = (await response.json()) as Record<string, unknown>;
@@ -245,7 +336,7 @@ export function AmroWorkPackageTemplateAdapter({
           // scopedDb can miss records under franchise scope mismatch; fallback to API by id.
           const response = await fetch(`/api/v2/amro/work-package-templates/${props.selectedTemplateId}`, {
             method: 'GET',
-            headers: await buildAuthHeaders(),
+            headers: await buildAuthHeaders(activeTenantId, activeFranchiseId),
           });
           if (response.ok) {
             const payload = (await response.json()) as Record<string, unknown>;
@@ -403,6 +494,8 @@ export function AmroWorkPackageTemplateAdapter({
   }, [effectiveAircraftModelOptions, selectedAircraftModelId, selectedAircraftModelText]);
 
   const standardFields: AmroTemplateFieldDefinition[] = [
+    { key: 'tenant_id', label: 'Tenant *', required: true },
+    { key: 'franchise_id', label: 'Franchise *', required: true },
     { key: 'template_code', label: 'Template Code (Standard)', required: true },
     { key: 'template_name', label: 'Template Name (Standard)', required: true },
     { key: 'version', label: 'Version (Standard)', required: true },
@@ -418,7 +511,7 @@ export function AmroWorkPackageTemplateAdapter({
       id: 'core',
       title: 'Work Package Details',
       description: 'Adapter-managed standard fields (feature-flag path).',
-      fieldKeys: ['template_code', 'template_name', 'version', 'model_id', 'maintenance_type', 'policy_snapshot_id', 'active'],
+      fieldKeys: ['tenant_id', 'franchise_id', 'template_code', 'template_name', 'version', 'model_id', 'maintenance_type', 'policy_snapshot_id', 'active'],
     },
     {
       id: 'scope',
@@ -450,6 +543,63 @@ export function AmroWorkPackageTemplateAdapter({
       renderField={(field) => {
         const value = props.formValues[field.key];
         const error = String(formErrors[field.key] || '');
+        if (field.key === 'tenant_id') {
+          return (
+            <div className="space-y-1">
+              <Label htmlFor="amro-wpt-standard-tenant-id">{field.label}</Label>
+              <Select
+                value={activeTenantId}
+                onValueChange={(nextValue) => props.setFieldValue('tenant_id', nextValue)}
+                disabled={!canEditTenant || tenantOptionsLoading}
+              >
+                <SelectTrigger id="amro-wpt-standard-tenant-id" className={cn(!canEditTenant && 'bg-muted')}>
+                  <SelectValue placeholder={tenantOptionsLoading ? 'Loading tenants...' : 'Select tenant'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {tenantOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {tenantOptionsError ? <p className="mdm-template-danger">{tenantOptionsError}</p> : null}
+              {error ? <p className="mdm-template-danger">{error}</p> : null}
+            </div>
+          );
+        }
+        if (field.key === 'franchise_id') {
+          const franchiseLabel = franchiseOptions.find((item) => item.value === activeFranchiseId)?.label || '';
+          return (
+            <div className="space-y-1">
+              <Label htmlFor="amro-wpt-standard-franchise-id">{field.label}</Label>
+              <AsyncCombobox
+                value={activeFranchiseId}
+                displayValue={franchiseLabel}
+                onChange={(nextValue) => {
+                  const current = String(props.formValues.franchise_id || '').trim();
+                  const next = String(nextValue || '').trim();
+                  props.setFieldValue('franchise_id', next);
+                  if (current !== next) {
+                    props.setFieldValue('model_id', '');
+                    props.setFieldValue('aircraft_model', '');
+                    props.setFieldValue('tasks_json', '[]');
+                    props.setFieldValue('selected_task_template_ids', []);
+                  }
+                }}
+                disabled={!canEditFranchise || franchiseOptionsLoading}
+                placeholder={franchiseOptionsLoading ? 'Loading franchises...' : 'Select franchise'}
+                loader={async (search: string) => {
+                  const token = search.trim().toLowerCase();
+                  return franchiseOptions
+                    .filter((item) => !token || item.label.toLowerCase().includes(token))
+                    .map((item) => ({ label: item.label, value: item.value }));
+                }}
+              />
+              {franchiseOptionsError ? <p className="mdm-template-danger">{franchiseOptionsError}</p> : null}
+              {!activeFranchiseId ? <p className="mdm-template-danger">Franchise is required</p> : null}
+              {error ? <p className="mdm-template-danger">{error}</p> : null}
+            </div>
+          );
+        }
         if (field.key === 'maintenance_type') {
           return (
             <div className="space-y-1">

@@ -36,7 +36,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const supabase = getSupabaseAdminClient();
     const tenantId = String(scopedAccess.tenantId || '').trim();
-    const franchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId).trim() : '';
+    const scopedFranchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId).trim() : '';
+    const requestedFranchiseId = String(req.query.franchise_id || '').trim();
+    const normalizedRole = String((auth as { role?: string }).role || '').trim().toLowerCase();
+    const isTenantAdmin = normalizedRole === 'tenant_admin';
+    const franchiseId = isTenantAdmin && requestedFranchiseId ? requestedFranchiseId : scopedFranchiseId;
     const isPlatformAdmin = Boolean(scopedAccess.isPlatformAdmin);
 
     if (tenantId) {

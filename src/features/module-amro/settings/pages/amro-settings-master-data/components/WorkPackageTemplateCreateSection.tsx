@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { AsyncCombobox } from '@/components/ui/async-combobox';
 import { supabase } from '@/integrations/supabase/client';
 import { cn } from '@/lib/utils';
 
@@ -32,6 +33,8 @@ type ScopeContext = {
   tenantId: string;
   franchiseId: string;
   isTenantAdmin?: boolean;
+  isFranchiseAdmin?: boolean;
+  isPlatformAdmin?: boolean;
 };
 
 type WorkPackageTemplateCreateSectionProps = {
@@ -89,16 +92,24 @@ export function WorkPackageTemplateCreateSection({
   hideScopeAndTasksJsonSections = false,
   hideSelectedTasksSection = false,
 }: WorkPackageTemplateCreateSectionProps) {
+  const activeTenantId = String(formValues.tenant_id ?? scope.tenantId ?? '').trim();
+  const activeFranchiseId = String(formValues.franchise_id ?? scope.franchiseId ?? '').trim();
+  const canEditTenant = Boolean(scope.isPlatformAdmin);
+  const canEditFranchise = (Boolean(scope.isTenantAdmin) || Boolean(scope.isPlatformAdmin)) && !scope.isFranchiseAdmin;
+  const setFieldValueRef = useRef(setFieldValue);
+  useEffect(() => {
+    setFieldValueRef.current = setFieldValue;
+  }, [setFieldValue]);
   const applyFranchiseScope = useCallback((query: any) => {
     if (scope.isTenantAdmin) {
       return query;
     }
-    if (scope.franchiseId) {
+    if (activeFranchiseId) {
       if (typeof query?.or === 'function') {
-        return query.or(`franchise_id.eq.${scope.franchiseId},franchise_id.is.null`);
+        return query.or(`franchise_id.eq.${activeFranchiseId},franchise_id.is.null`);
       }
       if (typeof query?.eq === 'function') {
-        return query.eq('franchise_id', scope.franchiseId);
+        return query.eq('franchise_id', activeFranchiseId);
       }
       return query;
     }
@@ -106,7 +117,7 @@ export function WorkPackageTemplateCreateSection({
       return query.is('franchise_id', null);
     }
     return query;
-  }, [scope.franchiseId, scope.isTenantAdmin]);
+  }, [activeFranchiseId, scope.isTenantAdmin]);
   const [workPackageTemplateTaskTemplates, setWorkPackageTemplateTaskTemplates] = useState<Record<string, unknown>[]>([]);
   const [workPackageTemplateTaskTemplatesLoading, setWorkPackageTemplateTaskTemplatesLoading] = useState(false);
   const [workPackageTemplateTaskTemplatesError, setWorkPackageTemplateTaskTemplatesError] = useState('');
@@ -114,23 +125,31 @@ export function WorkPackageTemplateCreateSection({
   const [workPackageTemplateAircraftModelOptions, setWorkPackageTemplateAircraftModelOptions] = useState<SelectOption[]>([]);
   const [workPackageTemplateAircraftModelOptionsLoading, setWorkPackageTemplateAircraftModelOptionsLoading] = useState(false);
   const [workPackageTemplateAircraftModelOptionsError, setWorkPackageTemplateAircraftModelOptionsError] = useState('');
+  const [tenantOptions, setTenantOptions] = useState<SelectOption[]>([]);
+  const [tenantOptionsLoading, setTenantOptionsLoading] = useState(false);
+  const [tenantOptionsError, setTenantOptionsError] = useState('');
+  const [franchiseOptions, setFranchiseOptions] = useState<SelectOption[]>([]);
+  const [franchiseOptionsLoading, setFranchiseOptionsLoading] = useState(false);
+  const [franchiseOptionsError, setFranchiseOptionsError] = useState('');
   const [workPackageTemplateSelectedTaskIds, setWorkPackageTemplateSelectedTaskIds] = useState<string[]>([]);
   const [workPackageTemplateSelectionInitialized, setWorkPackageTemplateSelectionInitialized] = useState(false);
   const [workPackageTemplateTaskSortColumn, setWorkPackageTemplateTaskSortColumn] = useState<WorkPackageTaskSortColumn>('task_id');
   const [workPackageTemplateTaskSortDirection, setWorkPackageTemplateTaskSortDirection] = useState<SortDirection>('asc');
 
-  const buildAuthHeaders = useCallback(async () => {
+  const buildAuthHeaders = useCallback(async (franchiseOverride?: string, tenantOverride?: string) => {
     const headers: Record<string, string> = {};
     const { data } = await supabase.auth.getSession();
     const token = String(data.session?.access_token || '').trim();
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
-    if (scope.tenantId) {
-      headers['x-tenant-id'] = scope.tenantId;
+    const resolvedTenantId = String(tenantOverride ?? scope.tenantId ?? '').trim();
+    if (resolvedTenantId) {
+      headers['x-tenant-id'] = resolvedTenantId;
     }
-    if (scope.franchiseId) {
-      headers['x-franchise-id'] = scope.franchiseId;
+    const resolvedFranchiseId = String(franchiseOverride ?? scope.franchiseId ?? '').trim();
+    if (resolvedFranchiseId) {
+      headers['x-franchise-id'] = resolvedFranchiseId;
     }
     return headers;
   }, [scope.franchiseId, scope.tenantId]);
@@ -174,14 +193,77 @@ export function WorkPackageTemplateCreateSection({
     );
   }, []);
 
+  const loadTenantAndFranchiseOptions = useCallback(async () => {
+    if (!scope.tenantId || !scopedDb) {
+      setTenantOptions(scope.tenantId ? [{ value: scope.tenantId, label: scope.tenantId }] : []);
+      setTenantOptionsError('');
+      setFranchiseOptions([]);
+      setFranchiseOptionsError('');
+      return;
+    }
+    setTenantOptionsLoading(true);
+    setTenantOptionsError('');
+    setFranchiseOptionsLoading(true);
+    setFranchiseOptionsError('');
+    try {
+      let tenantQuery = (scopedDb as any)
+        .from('tenants', Boolean(scope.isPlatformAdmin))
+        .select('id,name,is_active')
+        .order('name', { ascending: true });
+      if (!scope.isPlatformAdmin) {
+        tenantQuery = tenantQuery.eq('id', scope.tenantId).limit(1);
+      } else {
+        tenantQuery = tenantQuery.eq('is_active', true);
+      }
+      const { data: tenantRows, error: tenantError } = await tenantQuery;
+      if (tenantError) {
+        throw new Error(String(tenantError.message || 'Failed to load tenant'));
+      }
+      const tenantSelectOptions = (Array.isArray(tenantRows) ? tenantRows : [])
+        .map((row) => {
+          const record = row as Record<string, unknown>;
+          return { value: String(record.id || ''), label: String(record.name || '') };
+        })
+        .filter((option) => option.value && option.label);
+      setTenantOptions(tenantSelectOptions);
+      setTenantOptionsError('');
+
+      const { data: franchiseRows, error: franchiseError } = await (scopedDb as any)
+        .from('franchises', Boolean(scope.isTenantAdmin || scope.isPlatformAdmin))
+        .select('id,name,is_active,tenant_id')
+        .eq('tenant_id', activeTenantId || scope.tenantId)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      if (franchiseError) {
+        throw new Error(String(franchiseError.message || 'Failed to load franchise options'));
+      }
+      const options = (Array.isArray(franchiseRows) ? franchiseRows : [])
+        .map((row) => {
+          const record = row as Record<string, unknown>;
+          return { value: String(record.id || ''), label: String(record.name || '') };
+        })
+        .filter((option) => option.value && option.label);
+      setFranchiseOptions(options);
+      setFranchiseOptionsError('');
+    } catch (error) {
+      setTenantOptions(scope.tenantId ? [{ value: scope.tenantId, label: scope.tenantId }] : []);
+      setTenantOptionsError(String((error as Error).message || 'Failed to load tenant options'));
+      setFranchiseOptions([]);
+      setFranchiseOptionsError(String((error as Error).message || 'Failed to load franchise options'));
+    } finally {
+      setTenantOptionsLoading(false);
+      setFranchiseOptionsLoading(false);
+    }
+  }, [activeTenantId, scope.isPlatformAdmin, scope.isTenantAdmin, scope.tenantId, scopedDb]);
+
   const loadWorkPackageTemplateTaskTemplates = useCallback(async (aircraftModelId: string) => {
     const normalizedModelId = String(aircraftModelId || '').trim();
-    if (!scope.tenantId || !normalizedModelId) {
+    if (!activeTenantId || !normalizedModelId) {
       setWorkPackageTemplateTaskTemplates([]);
       setWorkPackageTemplateTaskTemplatesError('');
       return;
     }
-    const cacheKey = `${scope.tenantId}:${scope.isTenantAdmin ? 'tenant-all' : (scope.franchiseId || 'franchise-null')}:${normalizedModelId}`;
+    const cacheKey = `${activeTenantId}:${activeFranchiseId || 'franchise-null'}:${normalizedModelId}`;
     const cachedRows = taskTemplateOptionsCacheRef.current.get(cacheKey);
     if (cachedRows) {
       setWorkPackageTemplateTaskTemplates(cachedRows);
@@ -192,12 +274,15 @@ export function WorkPackageTemplateCreateSection({
     setWorkPackageTemplateTaskTemplatesError('');
     try {
       const query = new URLSearchParams({
-        tenant_id: scope.tenantId,
+        tenant_id: activeTenantId,
         aircraft_model_id: normalizedModelId,
       });
+      if (activeFranchiseId) {
+        query.set('franchise_id', activeFranchiseId);
+      }
       const response = await fetch(`/api/v2/amro/work-package-templates/task-template-options?${query.toString()}`, {
         method: 'GET',
-        headers: await buildAuthHeaders(),
+        headers: await buildAuthHeaders(activeFranchiseId, activeTenantId),
       });
       if (!response.ok) {
         throw new Error(`Failed to load task templates (status ${response.status})`);
@@ -225,10 +310,10 @@ export function WorkPackageTemplateCreateSection({
     } finally {
       setWorkPackageTemplateTaskTemplatesLoading(false);
     }
-  }, [buildAuthHeaders, scope.franchiseId, scope.isTenantAdmin, scope.tenantId]);
+  }, [activeFranchiseId, activeTenantId, buildAuthHeaders]);
 
   const loadWorkPackageTemplateAircraftModelOptions = useCallback(async () => {
-    if (!scope.tenantId) {
+    if (!activeTenantId) {
       setWorkPackageTemplateAircraftModelOptions([]);
       setWorkPackageTemplateAircraftModelOptionsError('');
       return;
@@ -236,9 +321,15 @@ export function WorkPackageTemplateCreateSection({
     setWorkPackageTemplateAircraftModelOptionsLoading(true);
     setWorkPackageTemplateAircraftModelOptionsError('');
     try {
-      const response = await fetch('/api/v2/amro/work-package-templates/model-options', {
+      const query = new URLSearchParams({
+        tenant_id: activeTenantId,
+      });
+      if (activeFranchiseId) {
+        query.set('franchise_id', activeFranchiseId);
+      }
+      const response = await fetch(`/api/v2/amro/work-package-templates/model-options?${query.toString()}`, {
         method: 'GET',
-        headers: await buildAuthHeaders(),
+        headers: await buildAuthHeaders(activeFranchiseId, activeTenantId),
       });
       if (!response.ok) {
         throw new Error(`Failed to load aircraft models (status ${response.status})`);
@@ -273,7 +364,83 @@ export function WorkPackageTemplateCreateSection({
     } finally {
       setWorkPackageTemplateAircraftModelOptionsLoading(false);
     }
-  }, [buildAuthHeaders, scope.tenantId]);
+  }, [activeFranchiseId, activeTenantId, buildAuthHeaders]);
+
+  const previousTenantIdRef = useRef(activeTenantId);
+  const previousFranchiseIdRef = useRef(activeFranchiseId);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+    if (!String(formValues.tenant_id || '').trim() && scope.tenantId) {
+      setFieldValue('tenant_id', scope.tenantId);
+    }
+    if (!String(formValues.franchise_id || '').trim() && scope.franchiseId) {
+      setFieldValue('franchise_id', scope.franchiseId);
+    }
+  }, [formValues.franchise_id, formValues.tenant_id, modalOpen, scope.franchiseId, scope.tenantId, setFieldValue]);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+    void loadTenantAndFranchiseOptions();
+  }, [loadTenantAndFranchiseOptions, modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      previousTenantIdRef.current = activeTenantId;
+      return;
+    }
+    if (previousTenantIdRef.current === activeTenantId) {
+      return;
+    }
+    previousTenantIdRef.current = activeTenantId;
+    setFieldValue('franchise_id', '');
+    setFieldValue('model_id', '');
+    setFieldValue('aircraft_model', '');
+    setFieldValue('selected_task_template_ids', []);
+    setFieldValue('tasks_json', '[]');
+    setFranchiseOptions([]);
+    taskTemplateOptionsCacheRef.current.clear();
+    setWorkPackageTemplateTaskTemplates([]);
+    setWorkPackageTemplateSelectedTaskIds([]);
+    void loadTenantAndFranchiseOptions();
+  }, [activeTenantId, loadTenantAndFranchiseOptions, modalOpen, setFieldValue]);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      return;
+    }
+    if (activeFranchiseId) {
+      return;
+    }
+    const preferred = scope.franchiseId && franchiseOptions.some((item) => item.value === scope.franchiseId)
+      ? scope.franchiseId
+      : (franchiseOptions[0]?.value || '');
+    if (preferred) {
+      setFieldValue('franchise_id', preferred);
+    }
+  }, [activeFranchiseId, franchiseOptions, modalOpen, scope.franchiseId, setFieldValue]);
+
+  useEffect(() => {
+    if (!modalOpen) {
+      previousFranchiseIdRef.current = activeFranchiseId;
+      return;
+    }
+    if (previousFranchiseIdRef.current === activeFranchiseId) {
+      return;
+    }
+    previousFranchiseIdRef.current = activeFranchiseId;
+    setFieldValue('model_id', '');
+    setFieldValue('aircraft_model', '');
+    setFieldValue('selected_task_template_ids', []);
+    setFieldValue('tasks_json', '[]');
+    taskTemplateOptionsCacheRef.current.clear();
+    setWorkPackageTemplateTaskTemplates([]);
+    setWorkPackageTemplateSelectedTaskIds([]);
+  }, [activeFranchiseId, modalOpen, setFieldValue]);
 
   useEffect(() => {
     if (!modalOpen) {
@@ -556,10 +723,9 @@ export function WorkPackageTemplateCreateSection({
       if (nextSelectedIds.length === previous.length) {
         return previous;
       }
-      setFieldValue('selected_task_template_ids', nextSelectedIds);
       return nextSelectedIds;
     });
-  }, [setFieldValue, taskTemplateById, workPackageTemplateSelectionInitialized]);
+  }, [taskTemplateById, workPackageTemplateSelectionInitialized]);
 
   const resolveSelectedWorkPackageTaskPayload = useCallback((selectedIds: string[]) => {
     return selectedIds
@@ -585,25 +751,24 @@ export function WorkPackageTemplateCreateSection({
 
   const toggleWorkPackageTemplateTaskSelection = useCallback((rowId: string, checked: boolean) => {
     setWorkPackageTemplateSelectedTaskIds((previous) => {
-      const nextSelectedIds = checked
+      return checked
         ? (previous.includes(rowId) ? previous : [...previous, rowId])
         : previous.filter((id) => id !== rowId);
-      setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
-      setFieldValue('selected_task_template_ids', nextSelectedIds);
-      return nextSelectedIds;
     });
-  }, [resolveSelectedWorkPackageTaskPayload, setFieldValue]);
+  }, []);
 
   const toggleWorkPackageTemplateSelectAllTasks = useCallback((checked: boolean) => {
     setWorkPackageTemplateSelectedTaskIds((previous) => {
-      const nextSelectedIds = checked
+      return checked
         ? Array.from(new Set([...previous, ...selectedWorkPackageAircraftModelTaskRowIds]))
         : previous.filter((id) => !selectedWorkPackageAircraftModelTaskRowIds.includes(id));
-      setFieldValue('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(nextSelectedIds)));
-      setFieldValue('selected_task_template_ids', nextSelectedIds);
-      return nextSelectedIds;
     });
-  }, [resolveSelectedWorkPackageTaskPayload, selectedWorkPackageAircraftModelTaskRowIds, setFieldValue]);
+  }, [selectedWorkPackageAircraftModelTaskRowIds]);
+
+  useEffect(() => {
+    setFieldValueRef.current('tasks_json', JSON.stringify(resolveSelectedWorkPackageTaskPayload(workPackageTemplateSelectedTaskIds)));
+    setFieldValueRef.current('selected_task_template_ids', workPackageTemplateSelectedTaskIds);
+  }, [resolveSelectedWorkPackageTaskPayload, workPackageTemplateSelectedTaskIds]);
 
   const selectedWorkPackageTaskPayload = useMemo(() => {
     return resolveSelectedWorkPackageTaskPayload(workPackageTemplateSelectedTaskIds);
@@ -678,6 +843,44 @@ export function WorkPackageTemplateCreateSection({
           <div className="border-b border-slate-200 px-3 py-2 text-[12px] font-semibold text-slate-700">Work Package Details</div>
           <div className="grid gap-2 p-3 lg:grid-cols-2">
             <div className="space-y-1">
+              <Label htmlFor="wpt-tenant-id" className="text-[12px] font-medium text-slate-700">Tenant</Label>
+              <Select
+                value={activeTenantId}
+                onValueChange={(value) => setFieldValue('tenant_id', value)}
+                disabled={!canEditTenant || tenantOptionsLoading}
+              >
+                <SelectTrigger id="wpt-tenant-id" className={cn('h-8 border-slate-300 px-2 text-[12px] text-slate-800', !canEditTenant && 'bg-slate-100')}>
+                  <SelectValue placeholder={tenantOptionsLoading ? 'Loading tenants...' : 'Select tenant'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {tenantOptions.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {tenantOptionsError ? <p className="mdm-template-danger">{tenantOptionsError}</p> : null}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wpt-franchise-id" className="text-[12px] font-medium text-slate-700">Franchise</Label>
+              <AsyncCombobox
+                value={activeFranchiseId}
+                displayValue={franchiseOptions.find((item) => item.value === activeFranchiseId)?.label || ''}
+                onChange={(value) => setFieldValue('franchise_id', value)}
+                disabled={!canEditFranchise || franchiseOptionsLoading}
+                placeholder={franchiseOptionsLoading ? 'Loading franchises...' : 'Select franchise'}
+                loader={async (search: string) => {
+                  const token = search.trim().toLowerCase();
+                  return franchiseOptions
+                    .filter((item) => !token || item.label.toLowerCase().includes(token))
+                    .map((item) => ({ label: item.label, value: item.value }));
+                }}
+              />
+              {franchiseOptionsError ? <p className="mdm-template-danger">{franchiseOptionsError}</p> : null}
+              {!activeFranchiseId ? <p className="mdm-template-danger">Franchise is required</p> : null}
+            </div>
+            <div className="space-y-1">
               <Label htmlFor="wpt-template-code" className="text-[12px] font-medium text-slate-700">Template Code</Label>
               <Input
                 id="wpt-template-code"
@@ -689,6 +892,18 @@ export function WorkPackageTemplateCreateSection({
                 placeholder="WP-LINE-001"
               />
               {formErrors.template_code ? <p className="mdm-template-danger">{formErrors.template_code}</p> : null}
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="wpt-template-name" className="text-[12px] font-medium text-slate-700">Template Name</Label>
+              <Input
+                id="wpt-template-name"
+                value={String(formValues.template_name ?? '')}
+                onChange={(event) => setFieldValue('template_name', event.target.value)}
+                className={cn('h-8 border-slate-300 bg-white px-2 text-[12px] text-slate-800', formErrors.template_name && 'border-destructive')}
+                aria-invalid={Boolean(formErrors.template_name)}
+                placeholder="Line Check Package"
+              />
+              {formErrors.template_name ? <p className="mdm-template-danger">{formErrors.template_name}</p> : null}
             </div>
             <div className="space-y-1">
               <Label htmlFor="wpt-version" className="text-[12px] font-medium text-slate-700">Version</Label>
@@ -703,18 +918,6 @@ export function WorkPackageTemplateCreateSection({
                 placeholder="1"
               />
               {formErrors.version ? <p className="mdm-template-danger">{formErrors.version}</p> : null}
-            </div>
-            <div className="space-y-1 lg:col-span-2">
-              <Label htmlFor="wpt-template-name" className="text-[12px] font-medium text-slate-700">Template Name</Label>
-              <Input
-                id="wpt-template-name"
-                value={String(formValues.template_name ?? '')}
-                onChange={(event) => setFieldValue('template_name', event.target.value)}
-                className={cn('h-8 border-slate-300 bg-white px-2 text-[12px] text-slate-800', formErrors.template_name && 'border-destructive')}
-                aria-invalid={Boolean(formErrors.template_name)}
-                placeholder="Line Check Package"
-              />
-              {formErrors.template_name ? <p className="mdm-template-danger">{formErrors.template_name}</p> : null}
             </div>
             <div className="space-y-1">
               <Label htmlFor="wpt-aircraft-model" className="text-[12px] font-medium text-slate-700">Aircraft Model</Label>

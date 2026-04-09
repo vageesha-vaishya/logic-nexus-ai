@@ -14,7 +14,8 @@ function createQuery(result: QueryResult) {
     eq: () => createQuery(result),
     is: () => createQuery(result),
     or: () => createQuery(result),
-    order: async () => ({ data: result.data, error: result.error }),
+    limit: () => createQuery(result),
+    order: () => createQuery(result),
     then: (resolve: (value: QueryResult) => unknown) => Promise.resolve(resolve(result)),
   };
 }
@@ -22,11 +23,27 @@ function createQuery(result: QueryResult) {
 function createScopedDb(options?: {
   relationRows?: Array<Record<string, unknown>>;
   assemblyModelRows?: Array<Record<string, unknown>>;
+  tenantRows?: Array<Record<string, unknown>>;
+  franchiseRows?: Array<Record<string, unknown>>;
 }) {
   const relationRows = options?.relationRows ?? [{ task_template_id: 'TT-003', model_id: 'amodel-2' }];
   const assemblyModelRows = options?.assemblyModelRows ?? [{ id: 'amodel-2', name: 'A320-200', model_code: 'A320-200', is_active: true }];
+  const tenantRows = options?.tenantRows ?? [{ id: 'tenant-1', name: 'Deccan Airways' }];
+  const franchiseRows = options?.franchiseRows ?? [{ id: 'franchise-1', name: 'Deccan Delhi', is_active: true, tenant_id: 'tenant-1' }];
   return {
     from: (table: string) => {
+      if (table === 'tenants') {
+        return createQuery({
+          data: tenantRows,
+          error: null,
+        });
+      }
+      if (table === 'franchises') {
+        return createQuery({
+          data: franchiseRows,
+          error: null,
+        });
+      }
       if (table === 'assembly_models') {
         return createQuery({
           data: assemblyModelRows,
@@ -47,6 +64,7 @@ function createScopedDb(options?: {
 function TestHarness(props?: {
   scopedDb?: unknown;
   initialFormValues?: Record<string, unknown>;
+  scope?: { tenantId: string; franchiseId: string; isTenantAdmin?: boolean; isFranchiseAdmin?: boolean; isPlatformAdmin?: boolean };
 }) {
   const [formValues, setFormValues] = useState<Record<string, unknown>>({
     template_code: 'TMP-1',
@@ -69,7 +87,7 @@ function TestHarness(props?: {
         modalMode="update"
         selectedTemplateId="d4ebb1de-50eb-4442-84be-1c9d8dd73cfe"
         scopedDb={props?.scopedDb || createScopedDb()}
-        scope={{ tenantId: 'tenant-1', franchiseId: 'franchise-1' }}
+        scope={props?.scope || { tenantId: 'tenant-1', franchiseId: 'franchise-1', isTenantAdmin: true }}
       />
       <pre data-testid="selected-task-template-ids">{JSON.stringify(formValues.selected_task_template_ids || [])}</pre>
     </>
@@ -213,6 +231,20 @@ describe('WorkPackageTemplateCreateSection', () => {
       const selectedIds = screen.getByTestId('selected-task-template-ids').textContent || '[]';
       expect(selectedIds).toContain('11111111-1111-4111-8111-111111111111');
       expect(selectedIds).not.toContain('TT-001');
+    });
+  });
+
+  it('keeps franchise read-only for franchise admin', async () => {
+    render(<TestHarness scope={{ tenantId: 'tenant-1', franchiseId: 'franchise-1', isFranchiseAdmin: true }} />);
+    await waitFor(() => {
+      expect(screen.getAllByRole('combobox')[1]).toBeDisabled();
+    });
+  });
+
+  it('keeps franchise editable for tenant admin', async () => {
+    render(<TestHarness scope={{ tenantId: 'tenant-1', franchiseId: 'franchise-1', isTenantAdmin: true }} />);
+    await waitFor(() => {
+      expect(screen.getAllByRole('combobox')[1]).not.toBeDisabled();
     });
   });
 });

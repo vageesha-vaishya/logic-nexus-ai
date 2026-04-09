@@ -41,9 +41,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const tenantId = String(scopedAccess.tenantId || '').trim();
     const tenantIdFromQuery = String(req.query.tenant_id || '').trim();
     const aircraftModelId = String(req.query.aircraft_model_id || '').trim();
-    const franchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId || '').trim() : '';
+    const scopedFranchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId || '').trim() : '';
+    const requestedFranchiseId = String(req.query.franchise_id || '').trim();
     const normalizedRole = String((auth as { role?: string }).role || '').trim().toLowerCase();
     const isTenantAdmin = normalizedRole === 'tenant_admin';
+    const franchiseId = isTenantAdmin && requestedFranchiseId ? requestedFranchiseId : scopedFranchiseId;
     const isPlatformAdmin = Boolean(scopedAccess.isPlatformAdmin);
 
     if (!aircraftModelId) {
@@ -71,7 +73,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         query = query.eq('tenant_id', tenantId);
       }
 
-      if (includeFranchiseColumn && !isTenantAdmin && franchiseId) {
+      if (includeFranchiseColumn && franchiseId && (!isTenantAdmin || Boolean(requestedFranchiseId))) {
         query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
       }
 
