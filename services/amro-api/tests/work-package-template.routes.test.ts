@@ -293,3 +293,19 @@ describe('work-package-template.routes create endpoint', () => {
     expect(fromMock).toHaveBeenCalledWith('work_package_templates');
   });
 });
+
+describe('work-package-template.routes underscore path and PATCH alias compatibility', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
+  it('accepts PATCH on /api/v2/amro/work_package_templates/:id and routes to template update handler', async () => {
+    const app = await createTestApp(jest.fn());
+    const response = await request(app)
+      .patch('/api/v2/amro/work_package_templates/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa')
+      .send({})
+      .expect(422);
+
+    expect(response.body.code).toBe('VALIDATION_ERROR');
+  });
+});
