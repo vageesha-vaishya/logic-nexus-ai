@@ -571,6 +571,7 @@ export function extractSelectedTaskTemplateResolution(payload: Record<string, un
       row.task_template_id,
       row.taskTemplateId,
       row.id,
+      row.tt_sequence,
     ];
     const resolvedId = idCandidates
       .map((candidate) => asNullableString(candidate))
@@ -753,7 +754,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   const resolveScopedTaskTemplateQuery = () => {
     let query = params.supabase
       .from('task_templates')
-      .select('id,assembly_models,franchise_id,task_template_id,code_form_no')
+      .select('id,assembly_models,franchise_id,tt_sequence,code_form_no')
       .eq('tenant_id', params.tenantId);
     if (params.franchiseId) {
       query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
@@ -783,14 +784,14 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
       workPackageTemplateId: params.workPackageTemplateId,
       queryReferenceCount: uniqueTaskReferenceTokens.length,
     });
-    const { data: byTaskIdRows, error: byTaskIdError } = await resolveScopedTaskTemplateQuery().in('task_template_id', uniqueTaskReferenceTokens);
+    const { data: byTaskIdRows, error: byTaskIdError } = await resolveScopedTaskTemplateQuery().in('tt_sequence', uniqueTaskReferenceTokens);
     if (byTaskIdError) {
       throw new HttpError(byTaskIdError.message, 400);
     }
     (Array.isArray(byTaskIdRows) ? byTaskIdRows : []).forEach((row) => {
       const record = row as Record<string, unknown>;
       const id = asNullableString(record.id);
-      const taskId = asNullableString(record.task_template_id);
+      const taskId = asNullableString(record.tt_sequence);
       if (taskId) resolvedReferenceTokens.add(taskId);
       if (!id) return;
       taskTemplateRowsById.set(id, record);

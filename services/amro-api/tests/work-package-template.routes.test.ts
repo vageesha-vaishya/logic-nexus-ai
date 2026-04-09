@@ -165,7 +165,7 @@ describe('work-package-template.routes create endpoint', () => {
       .mockReturnValueOnce(createThenable({
         data: [{
           id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-          task_template_id: 'TT-1',
+          tt_sequence: 'TT-1',
           code_form_no: 'F-1',
           ata_code: '21',
           reference_amp: 'AMP-1',
@@ -236,7 +236,7 @@ describe('work-package-template.routes create endpoint', () => {
       .mockReturnValueOnce(createThenable({
         data: [{
           id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
-          task_template_id: 'TT-1',
+          tt_sequence: 'TT-1',
           code_form_no: 'F-1',
           ata_code: '21',
           reference_amp: 'AMP-1',

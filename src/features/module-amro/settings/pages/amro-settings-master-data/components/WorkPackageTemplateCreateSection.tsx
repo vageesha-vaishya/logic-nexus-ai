@@ -167,7 +167,7 @@ export function WorkPackageTemplateCreateSection({
           .map((entry) => {
             if (!entry || typeof entry !== 'object') return '';
             const row = entry as Record<string, unknown>;
-            return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
+            return String(row.task_template_id || row.taskTemplateId || row.id || row.tt_sequence || '').trim();
           })
           .filter((value) => value.length > 0),
       ),
@@ -456,7 +456,7 @@ export function WorkPackageTemplateCreateSection({
           return typeof taskTemplate.is_mandatory === 'boolean' ? String(taskTemplate.is_mandatory) : '';
         }
         if (column === 'task_id') {
-          return String(taskTemplate.task_template_id ?? taskTemplate.task_id ?? '').toLowerCase();
+          return String(taskTemplate.tt_sequence ?? taskTemplate.task_template_id ?? taskTemplate.task_id ?? '').toLowerCase();
         }
         return String(taskTemplate[column] ?? '').toLowerCase();
       };
@@ -479,12 +479,12 @@ export function WorkPackageTemplateCreateSection({
       const leftValue = workPackageTemplateTaskSortColumn === 'is_mandatory'
         ? String(typeof left.is_mandatory === 'boolean' ? left.is_mandatory : '').toLowerCase()
         : workPackageTemplateTaskSortColumn === 'task_id'
-          ? String(left.task_template_id ?? left.task_id ?? '').toLowerCase()
+          ? String(left.tt_sequence ?? left.task_template_id ?? left.task_id ?? '').toLowerCase()
           : String(left[workPackageTemplateTaskSortColumn] ?? '').toLowerCase();
       const rightValue = workPackageTemplateTaskSortColumn === 'is_mandatory'
         ? String(typeof right.is_mandatory === 'boolean' ? right.is_mandatory : '').toLowerCase()
         : workPackageTemplateTaskSortColumn === 'task_id'
-          ? String(right.task_template_id ?? right.task_id ?? '').toLowerCase()
+          ? String(right.tt_sequence ?? right.task_template_id ?? right.task_id ?? '').toLowerCase()
           : String(right[workPackageTemplateTaskSortColumn] ?? '').toLowerCase();
       if (leftValue === rightValue) {
         return 0;
@@ -574,7 +574,7 @@ export function WorkPackageTemplateCreateSection({
         }
         return {
           task_template_id: id,
-          task_id: taskTemplate.task_template_id ?? taskTemplate.task_id ?? null,
+          task_id: taskTemplate.tt_sequence ?? taskTemplate.task_template_id ?? taskTemplate.task_id ?? null,
           code_form_no: taskTemplate.code_form_no ?? null,
           ata_code: taskTemplate.ata_code ?? null,
           reference_amp: taskTemplate.reference_amp ?? null,
@@ -953,12 +953,12 @@ export function WorkPackageTemplateCreateSection({
                         <Checkbox
                           checked={selected}
                           onCheckedChange={(checked) => toggleWorkPackageTemplateTaskSelection(rowId, Boolean(checked))}
-                          aria-label={`Select task row ${String(taskTemplate.task_template_id || taskTemplate.task_id || rowId)}`}
+                          aria-label={`Select task row ${String(taskTemplate.tt_sequence || taskTemplate.task_template_id || taskTemplate.task_id || rowId)}`}
                         />
                       </td>
                       <td className="px-2 py-1.5">
                         <div className="inline-flex items-center gap-1">
-                          <span>{String(taskTemplate.task_template_id || taskTemplate.task_id || '-')}</span>
+                          <span>{String(taskTemplate.tt_sequence || taskTemplate.task_template_id || taskTemplate.task_id || '-')}</span>
                           {selected ? <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">Selected</Badge> : null}
                         </div>
                       </td>

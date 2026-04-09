@@ -58,7 +58,7 @@ function createSupabaseClientMock(options?: { assemblyModelsMissing?: boolean })
       data: [
         {
           id: 'tt-001',
-          task_template_id: 'TT-001',
+          tt_sequence: 'TT-001',
           code_form_no: 'CF-1',
           ata_code: '05-20',
           reference_amp: 'AMP-1',
@@ -121,7 +121,7 @@ describe('/api/v2/amro/work-package-templates/task-template-options', () => {
 
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.total).toBe(1);
-    expect((res.jsonBody as any)?.output?.records?.[0]?.task_template_id).toBe('TT-001');
+    expect((res.jsonBody as any)?.output?.records?.[0]?.tt_sequence).toBe('TT-001');
     expect(res.headers['Cache-Control']).toBe('private, max-age=60');
     expect(enforceHttps).toHaveBeenCalledWith(req);
     expect(applyCors).toHaveBeenCalled();
