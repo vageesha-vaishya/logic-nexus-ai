@@ -72,6 +72,8 @@ const DEFAULT_WORK_PACKAGE_TASK_FILTERS: Record<WorkPackageTaskSortColumn, strin
   is_mandatory: '',
 };
 
+const isUuid = (value: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+
 export function WorkPackageTemplateCreateSection({
   formValues,
   formErrors,
@@ -136,7 +138,12 @@ export function WorkPackageTemplateCreateSection({
     DEFAULT_WORK_PACKAGE_TASK_FILTERS,
   );
   const resolveWorkPackageTaskTemplateId = useCallback((taskTemplate: Record<string, unknown>): string => {
-    return String(taskTemplate.task_template_id || taskTemplate.id || '').trim();
+    const primaryId = String(taskTemplate.id || '').trim();
+    if (isUuid(primaryId)) {
+      return primaryId;
+    }
+    const fallbackId = String(taskTemplate.task_template_id || '').trim();
+    return isUuid(fallbackId) ? fallbackId : '';
   }, []);
 
   const parseTaskTemplateIdsFromTasksJson = useCallback((raw: unknown): string[] => {
