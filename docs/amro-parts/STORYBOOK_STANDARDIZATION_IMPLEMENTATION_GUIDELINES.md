@@ -78,3 +78,9 @@ For each AMRO module:
   - `docs/amro-parts/AMRO_PARTS_GRID_RECORD_DETAIL_INVESTIGATION_REPORT.md`
 - Refactor rollout plan:
   - `docs/amro-parts/AMRO_PARTS_GRID_RECORD_DETAIL_REFACTOR_PLAN.md`
+
+## CRUD Interface Governance
+- Comparison matrix:
+  - `docs/amro-parts/CRUD_INTERFACE_COMPARISON_MATRIX.md`
+- Standard specification:
+  - `docs/amro-parts/CRUD_INTERFACE_STANDARD_SPEC.md`

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { Eye, Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { AmroKpiGrid, AmroModuleSurface, AmroStandardToolbar } from './AmroPartsUiStandards';
 import { AmroCrudDialogFooter, AmroCrudMessageBanner } from './AmroCrudPrimitives';
 import { AmroModuleGridDetailPanel } from './AmroModuleGridDetailPanel';
@@ -275,18 +276,81 @@ export function AmroItemMasterCatalogPanel({ apiScope = {}, onCreatePart, onCrea
                 <p><span className="font-semibold">Unit:</span> {record.unitOfMeasure}</p>
                 <p><span className="font-semibold">Status:</span> {record.status}</p>
                 <div className="pt-1">
-                  <div className="flex flex-wrap gap-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            aria-label="Create item master record"
+                            aria-keyshortcuts="Alt+Shift+C"
+                            onClick={openCreateDialog}
+                            disabled={dialogLoading}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Create (Alt+Shift+C)</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            aria-label="Read item master record"
+                            aria-keyshortcuts="Alt+Shift+R"
+                            onClick={() => { void openEditDialog(record.id); }}
+                            disabled={dialogLoading}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Read (Alt+Shift+R)</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            aria-label="Update item master record"
+                            aria-keyshortcuts="Alt+Shift+U"
+                            onClick={() => { void openEditDialog(record.id); }}
+                            disabled={dialogLoading}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Update (Alt+Shift+U)</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            aria-label="Delete item master record"
+                            aria-keyshortcuts="Alt+Shift+D"
+                            onClick={() => setDeleteCandidate(record)}
+                            disabled={dialogLoading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete (Alt+Shift+D)</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                     {onCreatePartFromItemMaster ? (
-                      <Button type="button" size="sm" variant="secondary" onClick={() => onCreatePartFromItemMaster(record)}>
+                      <>
+                        <div className="mx-1 h-5 w-px bg-border" />
+                        <Button type="button" size="sm" variant="secondary" onClick={() => onCreatePartFromItemMaster(record)}>
                         Create Part
-                      </Button>
+                        </Button>
+                      </>
                     ) : null}
-                    <Button type="button" size="sm" variant="outline" onClick={() => { void openEditDialog(record.id); }}>
-                      Edit
-                    </Button>
-                    <Button type="button" size="sm" variant="destructive" onClick={() => setDeleteCandidate(record)}>
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </Button>
                   </div>
                 </div>
               </div>
