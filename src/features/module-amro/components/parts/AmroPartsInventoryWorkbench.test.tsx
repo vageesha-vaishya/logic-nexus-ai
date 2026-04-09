@@ -51,10 +51,10 @@ describe('AmroPartsInventoryWorkbench', () => {
       />,
     );
 
-    expect(screen.getByText('Parts Inventory Records')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Horizontal split layout' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Vertical split layout' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Responsive stacked layout' })).toBeInTheDocument();
+    expect(screen.getByText('Parts Inventory Operations')).toBeInTheDocument();
+    expect(screen.getByRole('combobox', { name: 'Inventory layout mode' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Warehouse Status - Multi-Warehouse' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Automated Low-Stock Alerts' })).toBeInTheDocument();
   });
 
   it('updates status filter via select control', () => {
@@ -65,6 +65,7 @@ describe('AmroPartsInventoryWorkbench', () => {
       />,
     );
 
+    fireEvent.click(screen.getByRole('button', { name: 'Show Advanced Filters' }));
     fireEvent.click(screen.getByRole('combobox', { name: 'Filter by inventory status' }));
     fireEvent.click(screen.getByRole('option', { name: 'Status: low_stock' }));
 

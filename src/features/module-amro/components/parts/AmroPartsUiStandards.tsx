@@ -49,25 +49,29 @@ export function AmroStandardToolbar({
   leftActions,
   rightActions,
   placeholder = 'Search...',
+  showSearch = true,
 }: {
   searchValue: string;
   onSearchChange: (value: string) => void;
   leftActions?: ReactNode;
   rightActions?: ReactNode;
   placeholder?: string;
+  showSearch?: boolean;
 }): JSX.Element {
   return (
     <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-md border bg-muted/20 p-2">
       <div className="flex min-w-[260px] flex-1 items-center gap-2">
-        <div className="relative w-full max-w-sm">
-          <Search className="pointer-events-none absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
-          <Input
-            value={searchValue}
-            onChange={(event) => onSearchChange(event.target.value)}
-            placeholder={placeholder}
-            className="pl-8"
-          />
-        </div>
+        {showSearch ? (
+          <div className="relative w-full max-w-sm">
+            <Search className="pointer-events-none absolute left-2.5 top-2 h-4 w-4 text-muted-foreground" />
+            <Input
+              value={searchValue}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder={placeholder}
+              className="pl-8"
+            />
+          </div>
+        ) : null}
         <Button type="button" variant="outline" size="sm" className="h-8">
           <Filter className="mr-1 h-3.5 w-3.5" />
           Filter

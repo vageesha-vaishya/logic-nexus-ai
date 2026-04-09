@@ -59,6 +59,11 @@ export const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number',
 
 export const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   id: 'ID',
+  part_number: 'Item Number',
+  item_number: 'Item Number',
+  description: 'Item Details',
+  quantity_available: 'Available Qty',
+  warehouse_location: 'Storage Location',
   tail_number: 'Tail Number',
   serial_number: 'Serial Number',
   owner_name: 'Owner',
@@ -161,7 +166,7 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'metadata', label: 'Metadata JSON', type: 'json' },
   ],
   parts_inventory: [
-    { key: 'part_number', label: 'Part Number', type: 'text', required: true },
+    { key: 'part_number', label: 'Item Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text' },
     { key: 'description', label: 'Description', type: 'textarea' },
     { key: 'category', label: 'Category', type: 'text' },
