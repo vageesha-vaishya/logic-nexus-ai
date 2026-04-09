@@ -689,7 +689,7 @@ export function AmroWorkPackageTemplateAdapter({
                   <SelectValue placeholder="Select type" />
                 </SelectTrigger>
                 <SelectContent>
-                  {['line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'upgrade', 'modification'].map((option) => (
+                  {['line', 'base', 'component', 'inspection', 'overhaul', 'repair', 'service', 'upgrade', 'modification'].map((option) => (
                     <SelectItem key={option} value={option}>{option}</SelectItem>
                   ))}
                 </SelectContent>

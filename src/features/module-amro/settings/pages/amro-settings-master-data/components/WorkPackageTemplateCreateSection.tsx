@@ -54,10 +54,11 @@ type WorkPackageTemplateCreateSectionProps = {
 };
 
 const MAINTENANCE_TYPE_OPTIONS: SelectOption[] = [
+  { value: 'inspection', label: 'inspection' },
+  { value: 'service', label: 'service' },
   { value: 'line', label: 'line' },
   { value: 'base', label: 'base' },
   { value: 'component', label: 'component' },
-  { value: 'inspection', label: 'inspection' },
   { value: 'overhaul', label: 'overhaul' },
   { value: 'repair', label: 'repair' },
   { value: 'upgrade', label: 'upgrade' },
