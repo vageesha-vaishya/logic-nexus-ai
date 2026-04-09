@@ -17,6 +17,11 @@ import { useAmroWorkspaceState } from '../hooks/useAmroWorkspaceState';
 import type { AmroAuthorityLevel, AmroAssetType } from '../workspace/amroWorkspaceModel';
 import { AmroPartsInventoryWorkbench } from './parts/AmroPartsInventoryWorkbench';
 import { AmroItemMasterCatalogPanel } from './parts/AmroItemMasterCatalogPanel';
+import { AmroStockLedgerPanel } from './parts/AmroStockLedgerPanel';
+import { AmroPartsNavigationShell } from './parts/AmroPartsNavigationShell';
+import { AnalyticsPanel, IssueConsumePanel, LocationsPanel, ReservationsPanel, RestockPanel } from './parts/AmroPartsModulePanels';
+import { AmroKpiGrid, AmroModuleSurface, AmroStandardToolbar } from './parts/AmroPartsUiStandards';
+import type { PartsNavigationModuleId } from './parts/partsNavigationConfig';
 import type { ItemMasterRecord } from './parts/itemMasterCatalogApi';
 import {
   createAmroPartRecord,
@@ -394,6 +399,125 @@ export function AmroOwnedWorkspace({
   const canDirectTaskExecution = activeUxRole !== 'management';
   const canRunRegulatoryFinalSignOff = activeUxRole !== 'engineer';
   const canRunCertifyingRelease = activeUxRole !== 'planner';
+  function renderPartsModuleSurface(moduleId: PartsNavigationModuleId): JSX.Element {
+    if (moduleId === 'overview') {
+      return (
+        <AmroModuleSurface
+          title="Overview"
+          subtitle="Unified inventory command center with standardized search, filters, KPIs, and CRUD surface."
+          moduleId="inventory-core.overview"
+          status={partsCatalog.error ? 'warning' : partsCatalog.loading ? 'loading' : 'ready'}
+        >
+          <AmroStandardToolbar
+            searchValue={overviewSearch}
+            onSearchChange={setOverviewSearch}
+            placeholder="Search part number, description, supplier..."
+            rightActions={(
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-8"
+                disabled={partsApiDiagnosticRunning}
+                onClick={() => {
+                  void runPartsLiveApiDiagnostics();
+                }}
+              >
+                {partsApiDiagnosticRunning ? <RefreshCw className="mr-1 h-3.5 w-3.5 animate-spin" /> : null}
+                Reconnect Live API
+              </Button>
+            )}
+          />
+          <AmroKpiGrid
+            items={[
+              { label: 'Total Records', value: String(filteredOverviewRecords.length) },
+              { label: 'Low Stock', value: String(filteredOverviewRecords.filter((record) => record.status === 'low_stock').length), tone: 'warning' },
+              { label: 'Reserved', value: String(filteredOverviewRecords.filter((record) => record.quantity_reserved > 0).length), tone: 'success' },
+            ]}
+          />
+          {partsCatalog.dataSource === 'fallback' ? (
+          <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="font-medium">
+              Live API unavailable - showing fallback data for visibility.
+            </p>
+            {partsCatalog.fallbackAuthDiagnostics?.reasonCode ? (
+            <p className="mt-1 text-xs">
+              reason_code: {partsCatalog.fallbackAuthDiagnostics.reasonCode}
+            </p>
+            ) : null}
+            {partsCatalog.fallbackAuthDiagnostics?.remediation ? (
+            <p className="mt-1 text-xs">
+              remediation: {partsCatalog.fallbackAuthDiagnostics.remediation}
+            </p>
+            ) : null}
+            {partsApiDiagnosticMessage ? (
+            <p className="mt-1 text-xs">
+              diagnostic: {partsApiDiagnosticMessage}
+            </p>
+            ) : null}
+            <div className="mt-2">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                disabled={partsApiDiagnosticRunning}
+                onClick={() => {
+                  void runPartsLiveApiDiagnostics();
+                }}
+              >
+                {partsApiDiagnosticRunning ? <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
+                Reconnect Live API
+              </Button>
+            </div>
+          </div>
+          ) : null}
+          <AmroPartsInventoryWorkbench
+            records={filteredOverviewRecords}
+            state={partsCatalog.loading && filteredOverviewRecords.length === 0 ? 'loading' : partsCatalog.error ? 'error' : filteredOverviewRecords.length ? 'ready' : 'empty'}
+            errorMessage={partsCatalog.error?.message || 'Unable to load live AMRO parts inventory'}
+            viewMode="horizontal-split"
+            density="normal"
+            scrollBehavior="virtualization"
+            pageSize={40}
+            title="AMRO Parts Inventory (Live API)"
+            subtitle="Real-time data from /api/v2/amro/parts with CRUD-ready detail workflow."
+            onRefresh={() => {
+              void partsCatalog.refresh();
+            }}
+            onCreatePart={openCreatePartDialog}
+            onCreateRecord={openCreatePartDialog}
+            onUpdateRecord={openEditPartDialog}
+            onDeleteRecord={openDeletePartDialog}
+          />
+        </AmroModuleSurface>
+      );
+    }
+    if (moduleId === 'item-master') {
+      return (
+        <AmroItemMasterCatalogPanel
+          apiScope={partsApiScope}
+          onCreatePart={openCreatePartDialog}
+          onCreatePartFromItemMaster={openCreatePartDialogFromItemMaster}
+        />
+      );
+    }
+    if (moduleId === 'stock-ledger') {
+      return <AmroStockLedgerPanel apiScope={partsApiScope} />;
+    }
+    if (moduleId === 'reservations') {
+      return <ReservationsPanel records={partsCatalog.records} />;
+    }
+    if (moduleId === 'issue-consume') {
+      return <IssueConsumePanel records={partsCatalog.records} />;
+    }
+    if (moduleId === 'restock') {
+      return <RestockPanel records={partsCatalog.records} />;
+    }
+    if (moduleId === 'locations') {
+      return <LocationsPanel records={partsCatalog.records} />;
+    }
+    return <AnalyticsPanel records={partsCatalog.records} />;
+  }
   const partsApiScope = useMemo(() => ({
     tenantId: context?.tenantId || null,
     franchiseId: context?.franchiseId || null,
@@ -412,6 +536,7 @@ export function AmroOwnedWorkspace({
   const [partsCreateItemMasterLink, setPartsCreateItemMasterLink] = useState<{ id: string; partNumber: string } | null>(null);
   const [partsApiDiagnosticRunning, setPartsApiDiagnosticRunning] = useState(false);
   const [partsApiDiagnosticMessage, setPartsApiDiagnosticMessage] = useState<string | null>(null);
+  const [overviewSearch, setOverviewSearch] = useState('');
   const [partsTargetRecord, setPartsTargetRecord] = useState<PartInventoryRecord | null>(null);
   const [partsForm, setPartsForm] = useState<PartsMutationPayload>({
     part_number: '',
@@ -445,6 +570,19 @@ export function AmroOwnedWorkspace({
       void partsCatalog.refresh();
     }
   }, [showPartsModule, partsCatalog.loading, partsCatalog.records.length, partsCatalog.refresh]);
+
+  const filteredOverviewRecords = useMemo(() => {
+    const term = overviewSearch.trim().toLowerCase();
+    if (!term) return partsCatalog.records;
+    return partsCatalog.records.filter((record) => {
+      return (
+        record.part_number.toLowerCase().includes(term) ||
+        record.description.toLowerCase().includes(term) ||
+        record.supplier_name.toLowerCase().includes(term) ||
+        record.warehouse_location.toLowerCase().includes(term)
+      );
+    });
+  }, [overviewSearch, partsCatalog.records]);
 
   const resetPartsForm = useCallback(() => {
     setPartsForm({
@@ -3484,64 +3622,12 @@ export function AmroOwnedWorkspace({
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         {showPartsModule ? (
         <div className="xl:col-span-2">
-          {partsCatalog.dataSource === 'fallback' ? (
-          <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-            <p className="font-medium">
-              Live API unavailable - showing fallback data for visibility.
-            </p>
-            {partsCatalog.fallbackAuthDiagnostics?.reasonCode ? (
-            <p className="mt-1 text-xs">
-              reason_code: {partsCatalog.fallbackAuthDiagnostics.reasonCode}
-            </p>
-            ) : null}
-            {partsCatalog.fallbackAuthDiagnostics?.remediation ? (
-            <p className="mt-1 text-xs">
-              remediation: {partsCatalog.fallbackAuthDiagnostics.remediation}
-            </p>
-            ) : null}
-            {partsApiDiagnosticMessage ? (
-            <p className="mt-1 text-xs">
-              diagnostic: {partsApiDiagnosticMessage}
-            </p>
-            ) : null}
-            <div className="mt-2">
-              <Button
-                type="button"
-                size="sm"
-                variant="outline"
-                disabled={partsApiDiagnosticRunning}
-                onClick={() => {
-                  void runPartsLiveApiDiagnostics();
-                }}
-              >
-                {partsApiDiagnosticRunning ? <RefreshCw className="mr-2 h-3.5 w-3.5 animate-spin" /> : null}
-                Reconnect Live API
-              </Button>
-            </div>
-          </div>
-          ) : null}
-          <AmroPartsInventoryWorkbench
-            records={partsCatalog.records}
-            state={partsCatalog.loading && partsCatalog.records.length === 0 ? 'loading' : partsCatalog.error ? 'error' : partsCatalog.records.length ? 'ready' : 'empty'}
-            errorMessage={partsCatalog.error?.message || 'Unable to load live AMRO parts inventory'}
-            viewMode="horizontal-split"
-            density="normal"
-            scrollBehavior="virtualization"
-            pageSize={40}
-            title="AMRO Parts Inventory (Live API)"
-            subtitle="Real-time data from /api/v2/amro/parts with CRUD-ready detail workflow."
-            onRefresh={() => {
-              void partsCatalog.refresh();
+          <AmroPartsNavigationShell
+            activeRole={activeUxRole}
+            renderModule={renderPartsModuleSurface}
+            onModuleChange={(nextModule) => {
+              setLastInteractionMessage(`Parts module switched to ${nextModule}.`);
             }}
-            onCreatePart={openCreatePartDialog}
-            onCreateRecord={openCreatePartDialog}
-            onUpdateRecord={openEditPartDialog}
-            onDeleteRecord={openDeletePartDialog}
-          />
-          <AmroItemMasterCatalogPanel
-            apiScope={partsApiScope}
-            onCreatePart={openCreatePartDialog}
-            onCreatePartFromItemMaster={openCreatePartDialogFromItemMaster}
           />
         </div>
         ) : null}

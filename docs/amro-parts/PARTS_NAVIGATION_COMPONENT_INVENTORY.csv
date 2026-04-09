@@ -1,0 +1,14 @@
+component_set,component_name,variant,state,size,description,source_symbol
+Nav/Header,Title+Meta,default,default,desktop,Header shell with title/breadcrumb block and control badges,AmroPartsNavigationShell
+Nav/Breadcrumb,Path,default,default,all,AMRO > Parts Inventory > Active Module,breadcrumb.tsx
+Nav/QuickShortcutChip,Shortcut Chip,filled,active,all,Quick access chip for top four role-authorized modules,Button
+Nav/QuickShortcutChip,Shortcut Chip,outline,default,all,Quick access inactive module chip,Button
+Nav/GroupLabel,Module Group Label,default,default,all,Inventory Core/Operations/Insights label,text
+Nav/ModuleButton,Module Button,default,inactive,all,Module card button with description + shortcut badge,button
+Nav/ModuleButton,Module Button,default,active,all,Active module card button with selected style,button
+Nav/ResponseBadge,Latency Badge,success,<=200ms,all,Navigation response benchmark badge,Badge
+Nav/ResponseBadge,Latency Badge,error,>200ms,all,Latency exceeds benchmark,Badge
+Nav/RoleBadge,Role Badge,outline,default,all,Displays current active role persona,Badge
+Nav/MobileDrawer,Drawer Trigger,outline,default,mobile,Opens module list in mobile layout,SheetTrigger
+Nav/MobileDrawer,Drawer Panel,default,open,mobile,Contains grouped modules with same behavior as desktop rail,SheetContent
+Nav/ContentSurfaceShell,Module Surface Host,default,default,all,Container where active module panel renders,renderModule()

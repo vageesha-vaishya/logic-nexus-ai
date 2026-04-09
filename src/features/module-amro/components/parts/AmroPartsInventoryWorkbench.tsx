@@ -6,13 +6,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import {
-  AmroInventoryDataGridTemplate,
   type AmroInventoryDataGridTemplateProps,
   type GridColumnDefinition,
   type GridDensity,
   type GridScrollBehavior,
   type GridViewMode,
 } from '../templates/AmroInventoryDataGridTemplate';
+import { AmroUnifiedGridRecordDetailShell } from './AmroUnifiedGridRecordDetailShell';
 import {
   computePartInventoryMetrics,
   type PartInventoryRecord,
@@ -348,7 +348,7 @@ export function AmroPartsInventoryWorkbench({
       ) : null}
 
       {state === 'ready' ? (
-        <AmroInventoryDataGridTemplate
+        <AmroUnifiedGridRecordDetailShell
           title="Parts Inventory Records"
           subtitle="Navigate records and inspect technical details side-by-side."
           records={filteredRecords}

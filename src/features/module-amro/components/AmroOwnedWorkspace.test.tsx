@@ -312,7 +312,7 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getAllByText('Work Packages').length).toBeGreaterThan(0);
     expect(screen.getByText('Status Filter')).toBeTruthy();
     expect(screen.getByText('Save Current View')).toBeTruthy();
-    expect(screen.getByText('Overview')).toBeTruthy();
+    expect(screen.getAllByText('Overview').length).toBeGreaterThan(0);
     expect(screen.getByText('Tasks')).toBeTruthy();
     expect(screen.getByText('Compliance')).toBeTruthy();
     expect(screen.getAllByText('Role: planner').length).toBeGreaterThan(0);
