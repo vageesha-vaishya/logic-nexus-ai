@@ -439,43 +439,8 @@ export function WorkPackageTemplateCreateSection({
   }, [formValues.aircraft_model, formValues.model_id, modalMode, modalOpen, setFieldValue, workPackageTemplateAircraftModelSelectOptions]);
 
   const selectedWorkPackageAircraftModelTaskItems = useMemo(() => {
-    const selectedModelValue = String(formValues.aircraft_model ?? '').trim().toLowerCase();
-    if (!selectedModelValue) {
-      return workPackageTemplateTaskTemplates;
-    }
-    const selectedModelOption = workPackageTemplateAircraftModelOptions.find((option) => String(option.value).trim().toLowerCase() === selectedModelValue);
-    const selectedLabel = String(selectedModelOption?.label || '').trim().toLowerCase();
-    const selectedCodeMatch = selectedLabel.match(/\(([^)]+)\)/);
-    const selectedCode = String(selectedCodeMatch?.[1] || '').trim().toLowerCase();
-    const rawTokens = [selectedModelValue, selectedLabel, selectedCode]
-      .flatMap((token) => token.split(/[\s/(),_-]+/g))
-      .map((token) => token.trim().toLowerCase())
-      .filter(Boolean);
-    const filterTokens = Array.from(new Set(rawTokens));
-    const normalizedTokens = filterTokens.map((token) => token.replace(/[^a-z0-9]/g, ''));
-    const matchesToken = (text: string) => {
-      const normalized = text.toLowerCase();
-      if (!normalized) {
-        return false;
-      }
-      if (filterTokens.some((token) => normalized.includes(token))) {
-        return true;
-      }
-      const compact = normalized.replace(/[^a-z0-9]/g, '');
-      return normalizedTokens.some((token) => token && compact.includes(token));
-    };
-    const filtered = workPackageTemplateTaskTemplates.filter((taskTemplate) => {
-      const taskText = (() => {
-        try {
-          return JSON.stringify(taskTemplate);
-        } catch {
-          return '';
-        }
-      })();
-      return matchesToken(taskText);
-    });
-    return filtered.length > 0 ? filtered : workPackageTemplateTaskTemplates;
-  }, [formValues.aircraft_model, workPackageTemplateAircraftModelOptions, workPackageTemplateTaskTemplates]);
+    return workPackageTemplateTaskTemplates;
+  }, [workPackageTemplateTaskTemplates]);
 
   const selectedWorkPackageAircraftModelTaskRows = useMemo(() => {
     const filtered = selectedWorkPackageAircraftModelTaskItems.filter((taskTemplate) => {
