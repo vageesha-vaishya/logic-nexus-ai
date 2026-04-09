@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AmroWorkPackageTemplateAdapter } from './AmroWorkPackageTemplateAdapter';
 
@@ -7,6 +7,30 @@ vi.mock('@/features/module-amro/settings/pages/amro-settings-master-data/compone
 }));
 
 describe('AmroWorkPackageTemplateAdapter', () => {
+  const createScopedDb = (templateRecord?: Record<string, unknown>) => ({
+    from: (table: string) => {
+      const tenantRows = [{ id: 'tenant-1', name: 'Deccan Airways', is_active: true }];
+      const franchiseRows = [{ id: 'franchise-1', name: 'Deccan Delhi', is_active: true, tenant_id: 'tenant-1' }];
+      const templateRows = templateRecord ? [templateRecord] : [];
+      const rows = table === 'tenants'
+        ? tenantRows
+        : table === 'franchises'
+          ? franchiseRows
+          : table === 'work_package_templates'
+            ? templateRows
+            : [];
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        limit: () => chain,
+        order: () => Promise.resolve({ data: rows, error: null }),
+        maybeSingle: () => Promise.resolve({ data: templateRows[0] || null, error: null }),
+        then: (resolve: (value: { data: unknown; error: null }) => unknown) => Promise.resolve(resolve({ data: rows, error: null })),
+      };
+      return chain;
+    },
+  });
+
   const baseProps = {
     mode: 'update' as const,
     loading: false,
@@ -17,7 +41,7 @@ describe('AmroWorkPackageTemplateAdapter', () => {
     modalOpen: true,
     modalMode: 'update' as const,
     selectedTemplateId: 'wpt-1',
-    scopedDb: {},
+    scopedDb: createScopedDb(),
     scope: { tenantId: 'tenant-1', franchiseId: 'franchise-1' },
   };
 
@@ -83,5 +107,42 @@ describe('AmroWorkPackageTemplateAdapter', () => {
     expect(screen.queryByText('Aircraft Model could not be resolved for this template.')).not.toBeInTheDocument();
     expect(screen.getByText(/A320-200 \(current\)/i)).toBeInTheDocument();
     expect(screen.getByLabelText('Aircraft Model (Standard)')).toBeInTheDocument();
+  });
+
+  it('pre-populates template code and template name on update when missing in form state', async () => {
+    const setFieldValue = vi.fn();
+    render(
+      <AmroWorkPackageTemplateAdapter
+        {...baseProps}
+        setFieldValue={setFieldValue}
+        formValues={{
+          ...baseProps.formValues,
+          template_code: '',
+          template_name: '',
+          model_id: '',
+          aircraft_model: '',
+        }}
+        scopedDb={createScopedDb({
+          id: 'wpt-1',
+          template_code: 'WP-LINE-001',
+          template_name: 'Line Check Package',
+          model_id: 'amodel-2',
+          aircraft_model: 'A320-200',
+          tenant_id: 'tenant-1',
+          franchise_id: 'franchise-1',
+        })}
+      />,
+    );
+
+    await waitFor(() => {
+      expect(setFieldValue).toHaveBeenCalledWith('template_code', 'WP-LINE-001');
+      expect(setFieldValue).toHaveBeenCalledWith('template_name', 'Line Check Package');
+    });
+  });
+
+  it('keeps aircraft model field non-editable on update', () => {
+    render(<AmroWorkPackageTemplateAdapter {...baseProps} />);
+    expect(screen.getByLabelText('Aircraft Model (Standard)')).toBeDisabled();
+    expect(screen.getByText('Aircraft model is locked for update.')).toBeInTheDocument();
   });
 });

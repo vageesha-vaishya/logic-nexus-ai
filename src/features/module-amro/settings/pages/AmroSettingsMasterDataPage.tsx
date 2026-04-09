@@ -529,7 +529,7 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   assembly_models: ['id', 'model_code', 'name', 'manufacturer_id', 'assembly_type_id', 'is_active', 'updated_at'],
   regulator_profiles: ['id', 'regulator_code', 'regulator_name', 'jurisdiction', 'policy_version', 'effective_from', 'is_active', 'updated_at'],
   shift_calendars: ['id', 'station_code', 'shift_name', 'shift_start_time', 'shift_end_time', 'capacity', 'is_active', 'updated_at'],
-  work_package_templates: ['id', 'template_code', 'template_name', 'model_id', 'aircraft_model', 'maintenance_type', 'version', 'active', 'updated_at'],
+  work_package_templates: ['id', 'template_code', 'template_name', 'model_id', 'maintenance_type', 'version', 'active', 'updated_at'],
 };
 
 const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
@@ -3282,8 +3282,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const updateScope = entity === 'work_package_templates'
         ? {
             ...scope,
-            tenantId: String(payload.tenant_id || scope.tenantId || '').trim(),
-            franchiseId: String(payload.franchise_id || scope.franchiseId || '').trim(),
+            tenantId: String(formValues.tenant_id || scope.tenantId || '').trim(),
+            franchiseId: String(formValues.franchise_id || scope.franchiseId || '').trim(),
           }
         : scope;
       const headers = await buildApiHeaders(updateScope);
@@ -3305,7 +3305,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } catch (error) {
       toast.error(String((error as Error).message || 'Delete failed'));
     }
-  }, [entity, loadRecords, scope, selectedId]);
+  }, [entity, formValues.franchise_id, formValues.tenant_id, loadRecords, scope, selectedId]);
 
   const handleBulkImport = useCallback(async () => {
     try {

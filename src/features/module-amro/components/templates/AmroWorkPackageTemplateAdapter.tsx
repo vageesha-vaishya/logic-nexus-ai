@@ -126,6 +126,82 @@ export function AmroWorkPackageTemplateAdapter({
   const [franchiseOptions, setFranchiseOptions] = useState<Array<{ value: string; label: string }>>([]);
   const [franchiseOptionsLoading, setFranchiseOptionsLoading] = useState(false);
   const [franchiseOptionsError, setFranchiseOptionsError] = useState('');
+  const [templateHydrationError, setTemplateHydrationError] = useState('');
+
+  useEffect(() => {
+    const hydrateTemplateFields = async () => {
+      if (mode !== 'update' || !props.modalOpen || !props.selectedTemplateId) {
+        setTemplateHydrationError('');
+        return;
+      }
+      const hasTemplateCode = String(props.formValues.template_code ?? '').trim().length > 0;
+      const hasTemplateName = String(props.formValues.template_name ?? '').trim().length > 0;
+      const hasModel = String(props.formValues.model_id ?? props.formValues.aircraft_model ?? '').trim().length > 0;
+      const hasTenant = String(props.formValues.tenant_id ?? '').trim().length > 0;
+      const hasFranchise = String(props.formValues.franchise_id ?? '').trim().length > 0;
+      if (hasTemplateCode && hasTemplateName && hasModel && hasTenant && hasFranchise) {
+        setTemplateHydrationError('');
+        return;
+      }
+      try {
+        let record: Record<string, unknown> | null = null;
+        if (props.scopedDb && typeof (props.scopedDb as any).from === 'function') {
+          const { data } = await (props.scopedDb as any)
+            .from('work_package_templates')
+            .select('template_code,template_name,model_id,tenant_id,franchise_id')
+            .eq('id', props.selectedTemplateId)
+            .maybeSingle();
+          if (data && typeof data === 'object') {
+            record = data as Record<string, unknown>;
+          }
+        }
+        if (!record) {
+          const response = await fetch(`/api/v2/amro/work-package-templates/${props.selectedTemplateId}`, {
+            method: 'GET',
+            headers: await buildAuthHeaders(activeTenantId, activeFranchiseId),
+          });
+          if (response.ok) {
+            const payload = (await response.json()) as Record<string, unknown>;
+            record = extractRecordFromPayload(payload);
+          }
+        }
+        if (!record) {
+          throw new Error('Template record was not found');
+        }
+        const templateCode = String(record.template_code ?? '').trim();
+        const templateName = String(record.template_name ?? '').trim();
+        const modelId = String(record.model_id ?? '').trim();
+        const aircraftModel = String(record.aircraft_model ?? '').trim();
+        const tenantId = String(record.tenant_id ?? '').trim();
+        const franchiseId = String(record.franchise_id ?? '').trim();
+
+        if (!hasTemplateCode && templateCode) props.setFieldValue('template_code', templateCode);
+        if (!hasTemplateName && templateName) props.setFieldValue('template_name', templateName);
+        if (!hasModel && modelId) props.setFieldValue('model_id', modelId);
+        if (!hasModel && aircraftModel) props.setFieldValue('aircraft_model', aircraftModel);
+        if (!hasTenant && tenantId) props.setFieldValue('tenant_id', tenantId);
+        if (!hasFranchise && franchiseId) props.setFieldValue('franchise_id', franchiseId);
+        setTemplateHydrationError('');
+      } catch {
+        setTemplateHydrationError('Unable to auto-load selected template details');
+      }
+    };
+    void hydrateTemplateFields();
+  }, [
+    activeFranchiseId,
+    activeTenantId,
+    mode,
+    props.formValues.aircraft_model,
+    props.formValues.franchise_id,
+    props.formValues.model_id,
+    props.formValues.template_code,
+    props.formValues.template_name,
+    props.formValues.tenant_id,
+    props.modalOpen,
+    props.scopedDb,
+    props.selectedTemplateId,
+    props.setFieldValue,
+  ]);
 
   useEffect(() => {
     if (!props.modalOpen) return;
@@ -324,7 +400,7 @@ export function AmroWorkPackageTemplateAdapter({
         if (props.scopedDb && typeof (props.scopedDb as any).from === 'function') {
           const { data } = await (props.scopedDb as any)
             .from('work_package_templates')
-            .select('model_id,aircraft_model')
+            .select('model_id')
             .eq('id', props.selectedTemplateId)
             .maybeSingle();
           if (data && typeof data === 'object') {
@@ -630,6 +706,9 @@ export function AmroWorkPackageTemplateAdapter({
               <Select
                 value={effectiveAircraftModelId}
                 onValueChange={(nextValue) => {
+                  if (mode === 'update') {
+                    return;
+                  }
                   userChangedModelRef.current = true;
                   const option = effectiveAircraftModelOptions.find((entry) => entry.value === nextValue);
                   const currentModelId = String(props.formValues.model_id ?? '').trim();
@@ -644,11 +723,11 @@ export function AmroWorkPackageTemplateAdapter({
                     props.setFieldValue('selected_task_template_ids', []);
                   }
                 }}
-                disabled={aircraftModelOptionsLoading}
+                disabled={aircraftModelOptionsLoading || mode === 'update'}
               >
                 <SelectTrigger
                   id="amro-wpt-standard-aircraft-model"
-                  className={cn(modelError && 'border-destructive')}
+                  className={cn(modelError && 'border-destructive', mode === 'update' && 'bg-muted')}
                   aria-invalid={Boolean(modelError)}
                 >
                   <SelectValue placeholder={aircraftModelOptionsLoading ? 'Loading aircraft models...' : 'Select aircraft model'} />
@@ -670,6 +749,10 @@ export function AmroWorkPackageTemplateAdapter({
               ) : null}
               {aircraftModelOptionsError ? <p className="mdm-template-danger">{aircraftModelOptionsError}</p> : null}
               {modelError ? <p className="mdm-template-danger">{modelError}</p> : null}
+              {templateHydrationError ? <p className="mdm-template-danger">{templateHydrationError}</p> : null}
+              {mode === 'update' ? (
+                <p className="text-[11px] text-muted-foreground">Aircraft model is locked for update.</p>
+              ) : null}
               {mode === 'update' && !selectedAircraftModelId && !selectedAircraftModelText ? (
                 <p className="mdm-template-danger">Aircraft Model could not be resolved for this template.</p>
               ) : null}

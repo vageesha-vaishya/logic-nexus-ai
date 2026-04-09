@@ -122,6 +122,7 @@ export function WorkPackageTemplateCreateSection({
   const [workPackageTemplateTaskTemplatesLoading, setWorkPackageTemplateTaskTemplatesLoading] = useState(false);
   const [workPackageTemplateTaskTemplatesError, setWorkPackageTemplateTaskTemplatesError] = useState('');
   const taskTemplateOptionsCacheRef = useRef(new Map<string, Record<string, unknown>[]>());
+  const selectedTaskHydrationKeyRef = useRef('');
   const [workPackageTemplateAircraftModelOptions, setWorkPackageTemplateAircraftModelOptions] = useState<SelectOption[]>([]);
   const [workPackageTemplateAircraftModelOptionsLoading, setWorkPackageTemplateAircraftModelOptionsLoading] = useState(false);
   const [workPackageTemplateAircraftModelOptionsError, setWorkPackageTemplateAircraftModelOptionsError] = useState('');
@@ -371,6 +372,7 @@ export function WorkPackageTemplateCreateSection({
 
   useEffect(() => {
     if (!modalOpen) {
+      selectedTaskHydrationKeyRef.current = '';
       return;
     }
     if (!String(formValues.tenant_id || '').trim() && scope.tenantId) {
@@ -481,9 +483,26 @@ export function WorkPackageTemplateCreateSection({
     };
 
     if (modalMode !== 'update' || !selectedTemplateId || !scope.tenantId || !scopedDb) {
+      selectedTaskHydrationKeyRef.current = '';
       bootstrapSelectionFromForm();
       return;
     }
+
+    if (!activeFranchiseId && scope.franchiseId) {
+      return;
+    }
+
+    const hydrationKey = [
+      modalMode,
+      selectedTemplateId,
+      scope.tenantId,
+      scope.isTenantAdmin ? 'tenant-admin' : 'scoped',
+      activeFranchiseId || 'franchise-null',
+    ].join(':');
+    if (selectedTaskHydrationKeyRef.current === hydrationKey) {
+      return;
+    }
+    selectedTaskHydrationKeyRef.current = hydrationKey;
 
     let cancelled = false;
     const loadSelectedTaskTemplateIds = async () => {
@@ -535,7 +554,9 @@ export function WorkPackageTemplateCreateSection({
       cancelled = true;
     };
   }, [
-    formValues.selected_task_template_ids,
+    activeFranchiseId,
+    formValues.aircraft_model,
+    formValues.model_id,
     formValues.tasks_json,
     modalMode,
     modalOpen,
