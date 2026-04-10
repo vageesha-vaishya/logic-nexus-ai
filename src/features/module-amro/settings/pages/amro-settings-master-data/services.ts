@@ -48,6 +48,44 @@ export function filterManufacturersByTenant<T extends { tenantId?: string }>(rec
   });
 }
 
+export function filterAssemblyModelsByScope<
+  T extends {
+    tenantId?: string;
+    franchiseId?: string;
+    manufacturerId?: string;
+    active?: boolean;
+  },
+>(
+  records: T[],
+  scope: { tenantId: string; franchiseId: string; manufacturerId: string },
+): T[] {
+  const scopedTenantId = String(scope.tenantId || '').trim();
+  const scopedFranchiseId = String(scope.franchiseId || '').trim();
+  const scopedManufacturerId = String(scope.manufacturerId || '').trim();
+  if (!scopedTenantId || !scopedFranchiseId || !scopedManufacturerId) {
+    return [];
+  }
+  return records.filter((record) => {
+    const recordTenantId = String(record.tenantId || '').trim();
+    const recordFranchiseId = String(record.franchiseId || '').trim();
+    const recordManufacturerId = String(record.manufacturerId || '').trim();
+    const isActive = record.active !== false;
+    if (!isActive) {
+      return false;
+    }
+    if (recordTenantId && recordTenantId !== scopedTenantId) {
+      return false;
+    }
+    if (recordManufacturerId && recordManufacturerId !== scopedManufacturerId) {
+      return false;
+    }
+    if (!recordFranchiseId) {
+      return true;
+    }
+    return recordFranchiseId === scopedFranchiseId;
+  });
+}
+
 export async function buildApiHeaders(
   scope: { tenantId?: string | null; franchiseId?: string | null; userId?: string | null },
   options: ApiHeaderBuildOptions = {},

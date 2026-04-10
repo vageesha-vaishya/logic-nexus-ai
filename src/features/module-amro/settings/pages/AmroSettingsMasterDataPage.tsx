@@ -99,6 +99,7 @@ import {
   buildApiHeaders,
   createAircraftTemplate,
   deleteAircraftTemplate,
+  filterAssemblyModelsByScope,
   filterManufacturersByTenant,
   listAircraftTemplates,
   parseApiPayload,
@@ -205,6 +206,8 @@ type AssemblyModelOption = {
   id: string;
   label: string;
   modelValue: string;
+  tenantId?: string;
+  franchiseId?: string;
   manufacturerId: string;
   manufacturerTokens: string[];
   active: boolean;
@@ -3760,11 +3763,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           throw new Error(String(modelError.message || 'Failed to load assembly models'));
         }
         
-        const filteredModels = (Array.isArray(modelRows) ? modelRows : [])
+        const mappedModels = (Array.isArray(modelRows) ? modelRows : [])
           .map((row: Record<string, unknown>) => {
             const id = String(row.id || '').trim();
             const name = String(row.name || '').trim();
             const code = String(row.model_code || '').trim();
+            const rowTenantId = String(row.tenant_id || scopedTenantId).trim();
+            const rowFranchiseId = String(row.franchise_id || '').trim();
             const manufacturerId = String(row.manufacturer_id || '').trim();
             const manufacturerMeta = manufacturerMetaById.get(manufacturerId);
             const manufacturerName = String(manufacturerMeta?.name || manufacturerMeta?.code || '').trim();
@@ -3777,12 +3782,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               id,
               label,
               modelValue: name || code || id,
+              tenantId: rowTenantId,
+              franchiseId: rowFranchiseId,
               manufacturerId,
               manufacturerTokens,
               active: String(row.is_active ?? 'true').toLowerCase() !== 'false',
             } as AssemblyModelOption;
           });
-        
+        const filteredModels = filterAssemblyModelsByScope(mappedModels, {
+          tenantId: scopedTenantId,
+          franchiseId: scopedFranchiseId,
+          manufacturerId: scopedManufacturerId,
+        });
         setFranchiseAssemblyModels(filteredModels);
       } catch (error) {
         const message = String((error as Error).message || 'Failed to load assembly models for franchise');
