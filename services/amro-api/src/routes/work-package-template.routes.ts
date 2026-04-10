@@ -11,6 +11,15 @@ router.use((req, _res, next) => {
   if (req.url.startsWith('/amro/work-package-templates')) {
     req.url = req.url.replace('/amro/work-package-templates', '/work-package-templates');
   }
+  if (req.url.startsWith('/amro/work_package_templates')) {
+    req.url = req.url.replace('/amro/work_package_templates', '/work-package-templates');
+  }
+  if (req.url.startsWith('/work_package_templates')) {
+    req.url = req.url.replace('/work_package_templates', '/work-package-templates');
+  }
+  if (req.method === 'PATCH' && /^\/(amro\/)?work[_-]package[_-]templates\//.test(req.url)) {
+    req.method = 'PUT';
+  }
   next();
 });
 
