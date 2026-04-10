@@ -64,6 +64,7 @@ type StockSignal = 'all' | 'low' | 'critical';
 type EasyModePreset = 'all' | 'shortage-risk' | 'critical-only' | 'reorder-due';
 type WarehouseStatusSort = 'risk_desc' | 'available_desc';
 type AlertSort = 'severity_desc' | 'severity_asc';
+type LowStockAlertGroup = { key: string; location: string; records: PartInventoryRecord[] };
 
 const GROUPING_OPTIONS: Array<{ value: GroupingKey; label: string }> = [
   { value: 'item_type', label: 'Part Type' },
@@ -155,8 +156,16 @@ export function AmroPartsInventoryWorkbench({
   const [alertsPanelCollapsed, setAlertsPanelCollapsed] = useState(false);
   const [recordsPanelCollapsed, setRecordsPanelCollapsed] = useState(false);
   const [selectedWarehouseRecordByLocation, setSelectedWarehouseRecordByLocation] = useState<Record<string, string>>({});
+  const [selectedWarehouseBulkByLocation, setSelectedWarehouseBulkByLocation] = useState<Record<string, string[]>>({});
+  const [warehouseVisibleCountByLocation, setWarehouseVisibleCountByLocation] = useState<Record<string, number>>({});
   const [warehouseStatusSort, setWarehouseStatusSort] = useState<WarehouseStatusSort>('risk_desc');
+  const [warehouseRecordSearch, setWarehouseRecordSearch] = useState('');
   const [alertSort, setAlertSort] = useState<AlertSort>('severity_desc');
+  const [alertRecordSearch, setAlertRecordSearch] = useState('');
+  const [selectedAlertRecordByGroup, setSelectedAlertRecordByGroup] = useState<Record<string, string>>({});
+  const [selectedAlertBulkByGroup, setSelectedAlertBulkByGroup] = useState<Record<string, string[]>>({});
+  const [alertVisibleCountByGroup, setAlertVisibleCountByGroup] = useState<Record<string, number>>({});
+  const [editOpsNotice, setEditOpsNotice] = useState<string | null>(null);
 
   const guidedTourStorageKey = useMemo(() => `amro-parts-guided-tour-dismissed:${persistKey}`, [persistKey]);
   const panelStateStorageKey = useMemo(() => `amro-parts-panel-state:${persistKey}`, [persistKey]);
@@ -395,6 +404,29 @@ export function AmroPartsInventoryWorkbench({
     }
     return rows.sort((left, right) => (right.min_serviceable_qty - right.quantity_available) - (left.min_serviceable_qty - left.quantity_available));
   }, [alertSort, criticalAlerts]);
+  const normalizedWarehouseRecordSearch = warehouseRecordSearch.trim().toLowerCase();
+  const normalizedAlertRecordSearch = alertRecordSearch.trim().toLowerCase();
+  const lowStockAlertGroups = useMemo<LowStockAlertGroup[]>(() => {
+    const map = new Map<string, PartInventoryRecord[]>();
+    for (const row of sortedCriticalAlerts) {
+      const location = row.warehouse_location || 'UNASSIGNED';
+      const key = location;
+      const bucket = map.get(key) || [];
+      bucket.push(row);
+      map.set(key, bucket);
+    }
+    return Array.from(map.entries())
+      .map(([key, groupRecords]) => ({
+        key,
+        location: key,
+        records: groupRecords.filter((record) => {
+          if (!normalizedAlertRecordSearch) return true;
+          const searchable = `${record.part_number} ${record.description} ${record.supplier_name} ${record.warehouse_location}`.toLowerCase();
+          return searchable.includes(normalizedAlertRecordSearch);
+        }),
+      }))
+      .filter((group) => group.records.length > 0);
+  }, [sortedCriticalAlerts, normalizedAlertRecordSearch]);
 
   const locationCriticalityHeatmap = useMemo(() => {
     const grid = new Map<string, Map<string, number>>();
@@ -454,6 +486,33 @@ export function AmroPartsInventoryWorkbench({
     }
     setSelectedWarehouseRecordByLocation(nextSelection);
   }, [selectedWarehouseRecordByLocation, warehouseRecordsByLocation]);
+  useEffect(() => {
+    const nextSelection: Record<string, string> = {};
+    const nextVisibleCount: Record<string, number> = {};
+    for (const group of lowStockAlertGroups) {
+      const currentSelected = selectedAlertRecordByGroup[group.key];
+      const selectedStillExists = currentSelected && group.records.some((record) => record.id === currentSelected);
+      nextSelection[group.key] = selectedStillExists ? currentSelected : group.records[0]?.id || '';
+      nextVisibleCount[group.key] = Math.max(6, alertVisibleCountByGroup[group.key] || 6);
+    }
+    setSelectedAlertRecordByGroup(nextSelection);
+    setAlertVisibleCountByGroup((current) => ({ ...nextVisibleCount, ...current }));
+  }, [alertVisibleCountByGroup, lowStockAlertGroups, selectedAlertRecordByGroup]);
+
+  function validateRecordForEdit(record: PartInventoryRecord): string[] {
+    const errors: string[] = [];
+    if (record.quantity_available < 0) errors.push('Available quantity cannot be negative');
+    if (record.quantity_available > record.quantity_on_hand) errors.push('Available quantity cannot exceed on-hand quantity');
+    if (record.reorder_level < record.min_serviceable_qty) errors.push('Reorder level must be >= minimum serviceable quantity');
+    return errors;
+  }
+
+  function startSequentialBatchEdit(batch: PartInventoryRecord[], scopeLabel: string): void {
+    if (!batch.length || !onUpdateRecord) return;
+    const [first] = batch;
+    setEditOpsNotice(`Batch edit queued for ${batch.length} records in ${scopeLabel}. Opening first record now; continue sequentially.`);
+    onUpdateRecord(first);
+  }
 
   const trendSeries = useMemo(() => {
     const totalValue = filteredRecords.reduce((sum, row) => sum + row.quantity_on_hand * row.unit_cost, 0);
@@ -609,6 +668,11 @@ export function AmroPartsInventoryWorkbench({
             ) : null}
             <Badge variant="secondary">Visible: {filteredRecords.length}</Badge>
           </div>
+          {editOpsNotice ? (
+            <div className="rounded-md border border-sky-300 bg-sky-50 px-3 py-2 text-xs text-sky-900" role="status" aria-live="polite">
+              {editOpsNotice}
+            </div>
+          ) : null}
 
           <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
             <Input
@@ -791,12 +855,30 @@ export function AmroPartsInventoryWorkbench({
                     <SelectItem value="available_desc">Sort: Highest Available Qty</SelectItem>
                   </SelectContent>
                 </Select>
+                <Input
+                  value={warehouseRecordSearch}
+                  onChange={(event) => setWarehouseRecordSearch(event.target.value)}
+                  className="h-8 w-[260px]"
+                  placeholder="Search records in warehouse cards..."
+                  aria-label="Search warehouse records"
+                />
+                <Badge variant="outline">Scale Target: 10 / 50 / 100+</Badge>
               </div>
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                 {warehouseStatusSummary.map((entry) => {
-                  const warehouseRecords = warehouseRecordsByLocation.get(entry.location) || [];
+                  const warehouseRecordsRaw = warehouseRecordsByLocation.get(entry.location) || [];
+                  const warehouseRecords = warehouseRecordsRaw.filter((record) => {
+                    if (!normalizedWarehouseRecordSearch) return true;
+                    const searchable = `${record.part_number} ${record.description} ${record.supplier_name} ${record.serial_number}`.toLowerCase();
+                    return searchable.includes(normalizedWarehouseRecordSearch);
+                  });
+                  const visibleCount = warehouseVisibleCountByLocation[entry.location] || 6;
+                  const visibleRecords = warehouseRecords.slice(0, visibleCount);
                   const selectedRecordId = selectedWarehouseRecordByLocation[entry.location] || warehouseRecords[0]?.id || '';
                   const selectedRecord = warehouseRecords.find((record) => record.id === selectedRecordId) || warehouseRecords[0];
+                  const selectedBulkIds = selectedWarehouseBulkByLocation[entry.location] || [];
+                  const selectedBulkRecords = warehouseRecords.filter((record) => selectedBulkIds.includes(record.id));
+                  const validationIssues = selectedRecord ? validateRecordForEdit(selectedRecord) : [];
                   return (
                   <div key={entry.location} className="rounded border p-2">
                     <div className="flex items-center justify-between">
@@ -815,29 +897,77 @@ export function AmroPartsInventoryWorkbench({
                       <span className="rounded bg-emerald-100 px-1 py-0.5 text-emerald-900">N {entry.normal}</span>
                       <span className="rounded bg-slate-100 px-1 py-0.5 text-slate-900">L {entry.low}</span>
                     </div>
-                    <div className="mt-2">
-                      <Select
-                        value={selectedRecordId}
-                        onValueChange={(next) => setSelectedWarehouseRecordByLocation((current) => ({ ...current, [entry.location]: next }))}
+                    <div className="mt-2 max-h-40 overflow-auto rounded border">
+                      {visibleRecords.length ? visibleRecords.map((record) => {
+                        const isActive = selectedRecordId === record.id;
+                        const isChecked = selectedBulkIds.includes(record.id);
+                        return (
+                          <label key={`${entry.location}-${record.id}`} className={cn('flex cursor-pointer items-center justify-between gap-2 border-b px-2 py-1 text-[11px]', isActive ? 'bg-primary/5' : '')}>
+                            <div className="flex min-w-0 items-center gap-2">
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(event) => {
+                                  setSelectedWarehouseBulkByLocation((current) => {
+                                    const next = new Set(current[entry.location] || []);
+                                    if (event.target.checked) next.add(record.id); else next.delete(record.id);
+                                    return { ...current, [entry.location]: Array.from(next) };
+                                  });
+                                }}
+                                aria-label={`Select ${record.part_number} for batch edit`}
+                              />
+                              <button
+                                type="button"
+                                className="truncate text-left font-medium"
+                                onClick={() => setSelectedWarehouseRecordByLocation((current) => ({ ...current, [entry.location]: record.id }))}
+                              >
+                                {record.part_number} · Avail {record.quantity_available}
+                              </button>
+                            </div>
+                            <span className="text-muted-foreground">{record.supplier_name}</span>
+                          </label>
+                        );
+                      }) : <div className="px-2 py-2 text-xs text-muted-foreground">No records match card search.</div>}
+                    </div>
+                    {warehouseRecords.length > visibleCount ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="mt-1 h-7 text-xs"
+                        onClick={() => setWarehouseVisibleCountByLocation((current) => ({ ...current, [entry.location]: (current[entry.location] || 6) + 10 }))}
                       >
-                        <SelectTrigger className="h-7 text-xs" aria-label={`Select warehouse record for ${entry.location}`}>
-                          <SelectValue placeholder="Select record" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {warehouseRecords.map((record) => (
-                            <SelectItem key={record.id} value={record.id}>
-                              {record.part_number} · Avail {record.quantity_available}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
+                        Load More ({warehouseRecords.length - visibleCount} remaining)
+                      </Button>
+                    ) : null}
+                    {validationIssues.length ? (
+                      <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">
+                        Validation: {validationIssues[0]}
+                      </div>
+                    ) : null}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        Selected: {selectedBulkRecords.length} for batch
+                      </Badge>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-7 px-2 text-xs"
+                          disabled={!selectedBulkRecords.length}
+                          onClick={() => startSequentialBatchEdit(selectedBulkRecords, entry.location)}
+                        >
+                          <Pencil className="mr-1 h-3.5 w-3.5" />
+                          Batch Edit
+                        </Button>
+                      </div>
                     </div>
                     <div className="mt-2 flex items-center justify-end gap-1">
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-7 px-2 text-xs"
-                        disabled={!selectedRecord}
+                        disabled={!selectedRecord || validationIssues.length > 0}
                         onClick={() => {
                           if (selectedRecord) onUpdateRecord?.(selectedRecord);
                         }}
@@ -849,7 +979,7 @@ export function AmroPartsInventoryWorkbench({
                         size="sm"
                         variant="outline"
                         className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                        disabled={!selectedRecord}
+                        disabled={!selectedRecord || validationIssues.length > 0}
                         onClick={() => {
                           if (selectedRecord) onDeleteRecord?.(selectedRecord);
                         }}
@@ -893,6 +1023,13 @@ export function AmroPartsInventoryWorkbench({
                       <SelectItem value="severity_asc">Sort: Least Severe First</SelectItem>
                     </SelectContent>
                   </Select>
+                  <Input
+                    value={alertRecordSearch}
+                    onChange={(event) => setAlertRecordSearch(event.target.value)}
+                    className="h-8 w-[260px]"
+                    placeholder="Search alert records..."
+                    aria-label="Search low-stock alert records"
+                  />
                   <Badge variant="secondary">Alerts: {sortedCriticalAlerts.length}</Badge>
                 </div>
                 <Button size="sm" variant="outline" disabled={!canManageAlerts}>
@@ -901,25 +1038,86 @@ export function AmroPartsInventoryWorkbench({
                 </Button>
               </div>
               <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-3">
-                {sortedCriticalAlerts.length ? sortedCriticalAlerts.map((row) => (
-                  <div key={row.id} className="rounded border border-rose-200 bg-rose-50/40 p-2">
+                {lowStockAlertGroups.length ? lowStockAlertGroups.map((group) => {
+                  const selectedRecordId = selectedAlertRecordByGroup[group.key] || group.records[0]?.id || '';
+                  const selectedRecord = group.records.find((record) => record.id === selectedRecordId) || group.records[0];
+                  const visibleCount = alertVisibleCountByGroup[group.key] || 6;
+                  const visibleRecords = group.records.slice(0, visibleCount);
+                  const selectedBulkIds = selectedAlertBulkByGroup[group.key] || [];
+                  const selectedBulkRecords = group.records.filter((record) => selectedBulkIds.includes(record.id));
+                  const validationIssues = selectedRecord ? validateRecordForEdit(selectedRecord) : [];
+                  return (
+                  <div key={group.key} className="rounded border border-rose-200 bg-rose-50/40 p-2">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs font-semibold">{row.part_number}</span>
-                      <Badge variant="destructive">critical</Badge>
+                      <span className="text-xs font-semibold">{group.location}</span>
+                      <Badge variant="destructive">critical x{group.records.length}</Badge>
                     </div>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">{row.description}</p>
-                    <div className="mt-1 flex flex-wrap items-center gap-1 text-[11px] text-muted-foreground">
-                      <span>{row.warehouse_location}</span>
-                      <span>Avail {row.quantity_available}</span>
-                      <span>Min {row.min_serviceable_qty}</span>
-                      <span>Supplier {row.supplier_name}</span>
+                    <div className="mt-2 max-h-40 overflow-auto rounded border bg-white/60">
+                      {visibleRecords.map((record) => (
+                        <label key={`${group.key}-${record.id}`} className={cn('flex cursor-pointer items-center justify-between gap-2 border-b px-2 py-1 text-[11px]', selectedRecordId === record.id ? 'bg-primary/5' : '')}>
+                          <div className="flex min-w-0 items-center gap-2">
+                            <input
+                              type="checkbox"
+                              checked={selectedBulkIds.includes(record.id)}
+                              onChange={(event) => {
+                                setSelectedAlertBulkByGroup((current) => {
+                                  const next = new Set(current[group.key] || []);
+                                  if (event.target.checked) next.add(record.id); else next.delete(record.id);
+                                  return { ...current, [group.key]: Array.from(next) };
+                                });
+                              }}
+                              aria-label={`Select ${record.part_number} for batch edit`}
+                            />
+                            <button
+                              type="button"
+                              className="truncate text-left font-medium"
+                              onClick={() => setSelectedAlertRecordByGroup((current) => ({ ...current, [group.key]: record.id }))}
+                            >
+                              {record.part_number} · Avail {record.quantity_available} · Min {record.min_serviceable_qty}
+                            </button>
+                          </div>
+                          <span className="truncate text-muted-foreground">{record.supplier_name}</span>
+                        </label>
+                      ))}
+                    </div>
+                    {group.records.length > visibleCount ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        className="mt-1 h-7 text-xs"
+                        onClick={() => setAlertVisibleCountByGroup((current) => ({ ...current, [group.key]: (current[group.key] || 6) + 10 }))}
+                      >
+                        Load More ({group.records.length - visibleCount} remaining)
+                      </Button>
+                    ) : null}
+                    {validationIssues.length ? (
+                      <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">
+                        Validation: {validationIssues[0]}
+                      </div>
+                    ) : null}
+                    <div className="mt-2 flex items-center justify-between gap-2">
+                      <Badge variant="outline" className="text-[10px]">
+                        Selected: {selectedBulkRecords.length} for batch
+                      </Badge>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-7 px-2 text-xs"
+                        disabled={!selectedBulkRecords.length}
+                        onClick={() => startSequentialBatchEdit(selectedBulkRecords, group.location)}
+                      >
+                        <Pencil className="mr-1 h-3.5 w-3.5" />
+                        Batch Edit
+                      </Button>
                     </div>
                     <div className="mt-2 flex items-center justify-end gap-1">
                       <Button
                         size="sm"
                         variant="outline"
                         className="h-7 px-2 text-xs"
-                        onClick={() => onUpdateRecord?.(row)}
+                        disabled={!selectedRecord || validationIssues.length > 0}
+                        onClick={() => selectedRecord && onUpdateRecord?.(selectedRecord)}
                       >
                         <Pencil className="mr-1 h-3.5 w-3.5" />
                         Edit
@@ -928,14 +1126,15 @@ export function AmroPartsInventoryWorkbench({
                         size="sm"
                         variant="outline"
                         className="h-7 px-2 text-xs text-destructive hover:text-destructive"
-                        onClick={() => onDeleteRecord?.(row)}
+                        disabled={!selectedRecord || validationIssues.length > 0}
+                        onClick={() => selectedRecord && onDeleteRecord?.(selectedRecord)}
                       >
                         <Trash2 className="mr-1 h-3.5 w-3.5" />
                         Delete
                       </Button>
                     </div>
                   </div>
-                )) : <p className="text-sm text-muted-foreground">No critical alerts for current filter scope.</p>}
+                );}) : <p className="text-sm text-muted-foreground">No critical alerts for current filter scope.</p>}
               </div>
             </div>
           </section>
