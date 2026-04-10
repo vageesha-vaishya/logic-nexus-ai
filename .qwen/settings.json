@@ -2,7 +2,9 @@
   "permissions": {
     "allow": [
       "Bash(mkdir *)",
-      "Bash(npx *)"
+      "Bash(npx *)",
+      "Bash(timeout *)",
+      "Bash(git checkout *)"
     ]
   },
   "$version": 3

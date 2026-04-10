@@ -24,7 +24,17 @@ export type PartInventoryRecord = {
   currency: string;
   certification_expiry_date: string | null;
   expiry_date: string | null;
+  last_movement_at: string | null;
   updated_at: string;
+  // Phase 2: Demand Forecasting
+  demand_forecast_30d: number;
+  demand_forecast_60d: number;
+  demand_forecast_90d: number;
+  avg_daily_demand: number;
+  demand_stddev: number;
+  lead_time_days: number;
+  dynamic_reorder_point: number;
+  safety_stock: number;
   metadata: {
     barcode_value: string;
     rfid_tag: string;
@@ -123,7 +133,17 @@ export function generatePartInventoryRecords(options: GeneratorOptions = {}): Pa
       currency: 'USD',
       certification_expiry_date: asIsoDate(120 + (index % 260)),
       expiry_date: asIsoDate(expiryShift),
+      last_movement_at: Math.random() > 0.15 ? asIsoDate(-(Math.floor(Math.random() * 200))) : null,
       updated_at: asIsoDate(-(index % 19)),
+      // Phase 2: Demand Forecasting
+      demand_forecast_30d: Math.floor(Math.random() * 100) + 10,
+      demand_forecast_60d: Math.floor(Math.random() * 200) + 20,
+      demand_forecast_90d: Math.floor(Math.random() * 300) + 30,
+      avg_daily_demand: Math.round((Math.random() * 5 + 0.5) * 100) / 100,
+      demand_stddev: Math.round((Math.random() * 2 + 0.2) * 100) / 100,
+      lead_time_days: Math.floor(Math.random() * 21) + 7,
+      dynamic_reorder_point: Math.floor(Math.random() * 50) + 10,
+      safety_stock: Math.floor(Math.random() * 20) + 5,
       metadata: {
         barcode_value: `BAR-${String(700000 + index).padStart(8, '0')}`,
         rfid_tag: `RFID-${String(500000 + index).padStart(8, '0')}`,

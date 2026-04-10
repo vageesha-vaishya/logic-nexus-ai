@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BellRing, Boxes, ChevronDown, ChevronUp, Download, Loader2, Pencil, RefreshCcw, SlidersHorizontal, Trash2 } from 'lucide-react';
+import { AlertTriangle, BarChart3, BellRing, Boxes, ChevronDown, ChevronUp, Download, LayoutGrid, Loader2, PackageSearch, Pencil, Plane, RefreshCcw, SlidersHorizontal, Trash2, TrendingUp, Warehouse, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,6 +102,88 @@ function computeReorderBand(row: PartInventoryRecord): 'critical_reorder' | 'reo
   return 'healthy_stock';
 }
 
+// Phase 1 & 2: Enhanced computations
+type ExpiryStatus = 'expired' | 'critical' | 'warning' | 'healthy' | 'none';
+function computeExpiryStatus(row: PartInventoryRecord): { status: ExpiryStatus; daysRemaining: number | null; badgeText: string; badgeVariant: 'destructive' | 'secondary' | 'outline' | 'default' } {
+  const expiryDate = row.expiry_date || row.certification_expiry_date;
+  if (!expiryDate) return { status: 'none', daysRemaining: null, badgeText: '—', badgeVariant: 'outline' };
+  const expiry = new Date(expiryDate);
+  const now = new Date();
+  const daysRemaining = Math.ceil((expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+  if (daysRemaining < 0) return { status: 'expired', daysRemaining, badgeText: `Expired ${Math.abs(daysRemaining)}d`, badgeVariant: 'destructive' };
+  if (daysRemaining <= 30) return { status: 'critical', daysRemaining, badgeText: `${daysRemaining}d left`, badgeVariant: 'destructive' };
+  if (daysRemaining <= 180) return { status: 'warning', daysRemaining, badgeText: `${daysRemaining}d left`, badgeVariant: 'secondary' };
+  return { status: 'healthy', daysRemaining, badgeText: `${daysRemaining}d`, badgeVariant: 'default' };
+}
+
+type AbcClass = 'A' | 'B' | 'C';
+function computeAbcClassification(rows: PartInventoryRecord[]): Map<string, { abcClass: AbcClass; inventoryValue: number }> {
+  const enriched = rows.map((row) => ({ id: row.id, inventoryValue: row.quantity_on_hand * row.unit_cost }));
+  const totalValue = enriched.reduce((sum, r) => sum + r.inventoryValue, 0);
+  if (totalValue === 0) return new Map(enriched.map((r) => [r.id, { abcClass: 'C' as AbcClass, inventoryValue: 0 }]));
+  enriched.sort((a, b) => b.inventoryValue - a.inventoryValue);
+  let cumulativeValue = 0;
+  const result = new Map<string, { abcClass: AbcClass; inventoryValue: number }>();
+  for (const item of enriched) {
+    cumulativeValue += item.inventoryValue;
+    const pct = cumulativeValue / totalValue;
+    let abcClass: AbcClass;
+    if (pct <= 0.80) abcClass = 'A';
+    else if (pct <= 0.95) abcClass = 'B';
+    else abcClass = 'C';
+    result.set(item.id, { abcClass, inventoryValue: item.inventoryValue });
+  }
+  return result;
+}
+
+function computeDeadStock(rows: PartInventoryRecord[], thresholdDays = 180): PartInventoryRecord[] {
+  const now = new Date();
+  return rows.filter((row) => {
+    const lastMovement = row.last_movement_at ? new Date(row.last_movement_at) : null;
+    if (!lastMovement) return true;
+    const daysSince = (now.getTime() - lastMovement.getTime()) / (1000 * 60 * 60 * 24);
+    return daysSince >= thresholdDays;
+  }).sort((a, b) => {
+    const dateA = a.last_movement_at ? new Date(a.last_movement_at).getTime() : 0;
+    const dateB = b.last_movement_at ? new Date(b.last_movement_at).getTime() : 0;
+    return dateA - dateB;
+  });
+}
+
+type AogSeverity = 'critical' | 'high' | 'medium';
+function computeAogAlerts(rows: PartInventoryRecord[]): Array<{ part: PartInventoryRecord; severity: AogSeverity; shortage: number; daysToStockout: number }> {
+  return rows.filter((row) => row.quantity_available <= (row.safety_stock || 0) && row.quantity_available < (row.dynamic_reorder_point || row.reorder_level))
+    .map((row) => {
+      const dailyDemand = row.avg_daily_demand || 0.1;
+      const daysToStockout = row.quantity_available / dailyDemand;
+      const severity: AogSeverity = daysToStockout <= 3 ? 'critical' : daysToStockout <= 7 ? 'high' : 'medium';
+      return { part: row, severity, shortage: Math.max(0, (row.dynamic_reorder_point || row.reorder_level) - row.quantity_available), daysToStockout: Math.round(daysToStockout * 10) / 10 };
+    })
+    .filter((a) => a.daysToStockout <= 14)
+    .sort((a, b) => a.daysToStockout - b.daysToStockout);
+}
+
+function computeForecastStatus(row: PartInventoryRecord): { status: 'healthy' | 'watch' | 'reorder_due' | 'critical'; short30d: number } {
+  const qty = row.quantity_available;
+  const f30 = row.demand_forecast_30d || 0;
+  const reorderPt = row.dynamic_reorder_point || row.reorder_level;
+  const safety = row.safety_stock || row.min_serviceable_qty;
+  const short30 = Math.max(0, f30 - qty);
+  let status: typeof row.status extends string ? string : 'healthy' | 'watch' | 'reorder_due' | 'critical';
+  if (qty <= safety || short30 > 0) status = 'critical';
+  else if (qty <= reorderPt) status = 'reorder_due';
+  else if (qty <= reorderPt * 1.5) status = 'watch';
+  else status = 'healthy';
+  return { status: status as any, short30d: short30 };
+}
+
+function generatePurchaseOrder(part: PartInventoryRecord): { partNumber: string; supplier: string; quantity: number; unitCost: number; totalCost: number; leadTimeDays: number; expectedDelivery: string } {
+  const qty = part.reorder_quantity || Math.ceil((part.avg_daily_demand || 1) * (part.lead_time_days || 14));
+  const totalCost = qty * part.unit_cost;
+  const delivery = new Date(Date.now() + (part.lead_time_days || 14) * 24 * 60 * 60 * 1000);
+  return { partNumber: part.part_number, supplier: part.supplier_name, quantity: qty, unitCost: part.unit_cost, totalCost: Math.round(totalCost * 100) / 100, leadTimeDays: part.lead_time_days || 14, expectedDelivery: delivery.toISOString().split('T')[0] };
+}
+
 function metricTone(value: number, warningThreshold: number, criticalThreshold: number): 'default' | 'secondary' | 'destructive' {
   if (value >= criticalThreshold) return 'destructive';
   if (value >= warningThreshold) return 'secondary';
@@ -166,6 +248,11 @@ export function AmroPartsInventoryWorkbench({
   const [selectedAlertBulkByGroup, setSelectedAlertBulkByGroup] = useState<Record<string, string[]>>({});
   const [alertVisibleCountByGroup, setAlertVisibleCountByGroup] = useState<Record<string, number>>({});
   const [editOpsNotice, setEditOpsNotice] = useState<string | null>(null);
+  // Phase 1: Intelligent auto-refresh
+  const [lastUserActivity, setLastUserActivity] = useState(Date.now());
+  const IDLE_THRESHOLD_MS = 120_000;
+  const ACTIVE_REFRESH_MS = 60_000;
+  const IDLE_REFRESH_MS = 300_000;
 
   const guidedTourStorageKey = useMemo(() => `amro-parts-guided-tour-dismissed:${persistKey}`, [persistKey]);
   const panelStateStorageKey = useMemo(() => `amro-parts-panel-state:${persistKey}`, [persistKey]);
@@ -203,11 +290,28 @@ export function AmroPartsInventoryWorkbench({
   }, [alertsPanelCollapsed, panelStateStorageKey, recordsPanelCollapsed, warehousePanelCollapsed]);
   useEffect(() => {
     if (!onRefresh) return;
-    const timer = window.setInterval(() => {
-      onRefresh();
-    }, 30_000);
+    const isIdle = Date.now() - lastUserActivity > IDLE_THRESHOLD_MS;
+    const interval = isIdle ? IDLE_REFRESH_MS : ACTIVE_REFRESH_MS;
+    const timer = window.setInterval(() => { onRefresh(); }, interval);
     return () => window.clearInterval(timer);
-  }, [onRefresh]);
+  }, [onRefresh, lastUserActivity]);
+
+  const markUserActivity = () => setLastUserActivity(Date.now());
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const tag = (event.target as HTMLElement).tagName;
+      if (['INPUT', 'TEXTAREA', 'SELECT'].includes(tag) || (event.target as HTMLElement).getAttribute('contenteditable') === 'true') return;
+      const isMod = event.ctrlKey || event.metaKey;
+      if (isMod && event.key.toLowerCase() === 'f') { event.preventDefault(); const el = document.querySelector('input[aria-label="Search parts inventory"]') as HTMLInputElement; el?.focus(); return; }
+      if (isMod && event.key.toLowerCase() === 'n') { event.preventDefault(); onCreatePart?.(); return; }
+      if (isMod && event.key.toLowerCase() === 'r') { event.preventDefault(); onRefresh?.(); return; }
+      if (isMod && event.key.toLowerCase() === 'e') { event.preventDefault(); exportCurrentInventory(); return; }
+      if (event.key === '/' && !isMod) { event.preventDefault(); const el = document.querySelector('input[aria-label="Search parts inventory"]') as HTMLInputElement; el?.focus(); return; }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [onCreatePart, onRefresh]);
 
   useEffect(() => {
     setPreferredViewMode(viewMode);
@@ -303,6 +407,57 @@ export function AmroPartsInventoryWorkbench({
       ),
     },
     {
+      key: 'abc_classification',
+      header: 'ABC',
+      sortable: true,
+      filterable: true,
+      groupable: true,
+      resizable: true,
+      dataType: 'text',
+      width: 80,
+      render: (row) => {
+        const abcData = abcClassification.get(row.id);
+        const abcClass = abcData?.abcClass ?? 'C';
+        const variant = abcClass === 'A' ? 'destructive' : abcClass === 'B' ? 'secondary' : 'outline';
+        return <Badge variant={variant} className="text-[10px] w-8 justify-center">{abcClass}</Badge>;
+      },
+    },
+    {
+      key: 'expiry',
+      header: 'Expiry',
+      sortable: true,
+      filterable: true,
+      groupable: false,
+      resizable: true,
+      dataType: 'text',
+      width: 140,
+      render: (row) => {
+        const expiry = computeExpiryStatus(row);
+        return <Badge variant={expiry.badgeVariant} className="text-[10px]">{expiry.badgeText}</Badge>;
+      },
+    },
+    {
+      key: 'forecast_status',
+      header: 'Forecast',
+      sortable: true,
+      filterable: true,
+      groupable: true,
+      resizable: true,
+      dataType: 'text',
+      width: 140,
+      render: (row) => {
+        const forecast = computeForecastStatus(row);
+        const variant = forecast.status === 'critical' ? 'destructive' : forecast.status === 'reorder_due' ? 'secondary' : forecast.status === 'watch' ? 'outline' : 'default';
+        const shortLabel = forecast.short30d > 0 ? ` -${Math.ceil(forecast.short30d)}` : '';
+        return (
+          <Badge variant={variant} className="text-[10px]">
+            <TrendingUp className="mr-1 h-3 w-3" />
+            {forecast.status.replace('_', ' ')}{shortLabel}
+          </Badge>
+        );
+      },
+    },
+    {
       key: 'metadata',
       header: 'Tags',
       sortable: false,
@@ -363,6 +518,11 @@ export function AmroPartsInventoryWorkbench({
   }, [records, statusFilter, criticalityFilter, itemTypeFilter, supplierFilter, locationFilter, stockSignalFilter, riskBandFilter, erpLinkedOnly, searchText]);
 
   const metrics = useMemo(() => computePartInventoryMetrics(filteredRecords), [filteredRecords]);
+  const abcClassification = useMemo(() => computeAbcClassification(filteredRecords), [filteredRecords]);
+  const deadStockRecords = useMemo(() => computeDeadStock(filteredRecords), [filteredRecords]);
+  const deadStockValue = useMemo(() => deadStockRecords.reduce((sum, r) => sum + r.quantity_on_hand * r.unit_cost, 0), [deadStockRecords]);
+  const aogAlerts = useMemo(() => computeAogAlerts(filteredRecords), [filteredRecords]);
+  const criticalAogCount = useMemo(() => aogAlerts.filter((a) => a.severity === 'critical').length, [aogAlerts]);
 
   const statusDistribution = useMemo(() => {
     const map = new Map<PartInventoryRecord['status'], number>();
@@ -574,7 +734,7 @@ export function AmroPartsInventoryWorkbench({
   };
 
   return (
-    <div className="space-y-4" aria-label="AMRO parts inventory workbench">
+    <div className="space-y-4" aria-label="AMRO parts inventory workbench" onMouseMove={markUserActivity} onKeyDown={markUserActivity} onScroll={markUserActivity} onClick={markUserActivity}>
       <Card>
         <CardHeader className="pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
@@ -600,9 +760,13 @@ export function AmroPartsInventoryWorkbench({
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center gap-2 text-xs">
-            <Badge variant="outline">Auto refresh: 30s</Badge>
-            <Badge variant="secondary">Visible records: {filteredRecords.length}</Badge>
-            <Badge variant="outline">Target load: under 2s</Badge>
+            <Badge variant={Date.now() - lastUserActivity > IDLE_THRESHOLD_MS ? 'secondary' : 'outline'}>
+              {Date.now() - lastUserActivity > IDLE_THRESHOLD_MS ? '⏸ Idle' : '● Active'}
+            </Badge>
+            <Badge variant="secondary">Visible: {filteredRecords.length}</Badge>
+            {criticalAogCount > 0 && <Badge variant="destructive" className="animate-pulse"><Plane className="mr-1 h-3 w-3" />AOG: {criticalAogCount}</Badge>}
+            {deadStockRecords.length > 0 && <Badge variant="outline"><PackageSearch className="mr-1 h-3 w-3" />Dead: {deadStockRecords.length}</Badge>}
+            <Badge variant="outline">Target: &lt;2s</Badge>
           </div>
         </CardContent>
       </Card>
@@ -988,6 +1152,18 @@ export function AmroPartsInventoryWorkbench({
                         Delete
                       </Button>
                     </div>
+                    {selectedRecord && selectedRecord.quantity_available <= selectedRecord.reorder_level && (
+                      <div className="mt-2 rounded border border-sky-200 bg-sky-50 px-2 py-1.5">
+                        <p className="text-[10px] font-medium text-sky-900">Quick Actions:</p>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-[10px] bg-white" onClick={() => {
+                            const po = generatePurchaseOrder(selectedRecord);
+                            setEditOpsNotice(`Create PO: ${po.partNumber} x ${po.quantity} from ${po.supplier}. Total: ${formatCurrency(po.totalCost)}`);
+                          }}>Create PO ({selectedRecord.reorder_quantity} units)</Button>
+                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-[10px] bg-white" onClick={() => setEditOpsNotice(`Notify ${selectedRecord.supplier_name} about reorder.`)}>Notify Supplier</Button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 );})}
               </div>
@@ -1175,6 +1351,74 @@ export function AmroPartsInventoryWorkbench({
           </CardContent>
         </Card>
       ) : null}
+
+      {/* Phase 2: AOG Alerts */}
+      {aogAlerts.length > 0 && (
+        <Card className="border-red-300 bg-red-50/50">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm text-red-900"><Plane className="mr-1.5 inline h-4 w-4" /> Aircraft on Ground (AOG) Alerts</CardTitle>
+            <CardDescription>Critical stockout risks with timeline to depletion</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {aogAlerts.slice(0, 5).map((alert, idx) => (
+                <div key={`aog-${idx}-${alert.part.id}`} className="rounded border border-red-200 bg-white p-2.5">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge variant={alert.severity === 'critical' ? 'destructive' : alert.severity === 'high' ? 'secondary' : 'outline'} className="text-[10px]">{alert.severity.toUpperCase()}</Badge>
+                      <span className="text-sm font-semibold">{alert.part.part_number}</span>
+                      <span className="text-xs text-muted-foreground">{alert.part.description}</span>
+                    </div>
+                    <span className="text-xs font-medium text-red-700">Stockout in {alert.daysToStockout}d</span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                    <span>Available: <strong className="text-foreground">{alert.part.quantity_available}</strong></span>
+                    <span>Shortage: <strong className="text-red-700">{alert.shortage} units</strong></span>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] bg-white" onClick={() => {
+                      const po = generatePurchaseOrder(alert.part);
+                      setEditOpsNotice(`URGENT PO: ${po.partNumber} x ${po.quantity} from ${po.supplier}. Total: ${formatCurrency(po.totalCost)}. Expected: ${po.expectedDelivery}`);
+                    }}>Create PO ({alert.shortage} units)</Button>
+                    <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] bg-white" onClick={() => setEditOpsNotice(`Escalating AOG for ${alert.part.part_number} to procurement.`)}>Escalate</Button>
+                  </div>
+                </div>
+              ))}
+              {aogAlerts.length > 5 && <p className="text-xs text-muted-foreground">+ {aogAlerts.length - 5} more AOG alerts</p>}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Phase 1: Dead Stock Panel */}
+      {deadStockRecords.length > 0 && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm"><PackageSearch className="mr-1.5 inline h-4 w-4" /> Dead Stock Identification</CardTitle>
+            <CardDescription>Parts with no movement in 180+ days. Value at risk: <strong>{formatCurrency(deadStockValue)}</strong></CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="max-h-64 overflow-auto rounded border">
+              <table className="w-full text-[11px]">
+                <thead className="border-b bg-muted/50"><tr><th className="px-2 py-1 text-left font-medium">Part</th><th className="px-2 py-1 text-left font-medium">Location</th><th className="px-2 py-1 text-right font-medium">On Hand</th><th className="px-2 py-1 text-right font-medium">Value</th><th className="px-2 py-1 text-left font-medium">Last Movement</th><th className="px-2 py-1 text-left font-medium">Actions</th></tr></thead>
+                <tbody>
+                  {deadStockRecords.slice(0, 20).map((row) => (
+                    <tr key={row.id} className="border-b last:border-0">
+                      <td className="px-2 py-1 font-medium">{row.part_number}</td>
+                      <td className="px-2 py-1">{row.warehouse_location}</td>
+                      <td className="px-2 py-1 text-right">{row.quantity_on_hand}</td>
+                      <td className="px-2 py-1 text-right">{formatCurrency(row.quantity_on_hand * row.unit_cost)}</td>
+                      <td className="px-2 py-1 text-muted-foreground">{row.last_movement_at ? new Date(row.last_movement_at).toLocaleDateString() : 'Never'}</td>
+                      <td className="px-2 py-1"><div className="flex gap-1"><Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => onUpdateRecord?.(row)}>Return</Button><Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-destructive" onClick={() => onDeleteRecord?.(row)}>Scrap</Button></div></td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {deadStockRecords.length > 20 && <div className="px-2 py-1 text-center text-[10px] text-muted-foreground">Showing 20 of {deadStockRecords.length}</div>}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {state === 'ready' ? (
         <section className="rounded border">
