@@ -24,6 +24,8 @@ type AircraftTemplatePayloadInput = {
 
 export type AircraftTemplateRecord = {
   id: string;
+  tenant_id: string;
+  franchise_id: string;
   template_name: string;
   aircraft_type: string;
   manufacturer: string;
@@ -124,6 +126,8 @@ const normalizeAircraftTemplateRecord = (record: Record<string, unknown>): Aircr
   }
   return {
     id,
+    tenant_id: String(record.tenant_id || '').trim(),
+    franchise_id: String(record.franchise_id || '').trim(),
     template_name: String(record.template_name || '').trim(),
     aircraft_type: String(record.aircraft_type || '').trim(),
     manufacturer: String(record.manufacturer || '').trim(),
