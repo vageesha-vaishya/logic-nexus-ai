@@ -37,6 +37,17 @@ export type AircraftTemplateRecord = {
   updated_at?: string;
 };
 
+export function filterManufacturersByTenant<T extends { tenantId?: string }>(records: T[], tenantId: string): T[] {
+  const scopedTenantId = String(tenantId || '').trim();
+  if (!scopedTenantId) {
+    return records;
+  }
+  return records.filter((record) => {
+    const recordTenantId = String(record.tenantId || '').trim();
+    return !recordTenantId || recordTenantId === scopedTenantId;
+  });
+}
+
 export async function buildApiHeaders(
   scope: { tenantId?: string | null; franchiseId?: string | null; userId?: string | null },
   options: ApiHeaderBuildOptions = {},

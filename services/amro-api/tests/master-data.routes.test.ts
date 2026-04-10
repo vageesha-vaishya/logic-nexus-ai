@@ -2,6 +2,8 @@ import express from 'express';
 import request from 'supertest';
 
 const mockExecuteWithResilience = jest.fn();
+let lastQueryBuilder: any = null;
+let lastFromTable = '';
 
 function createQueryBuilder() {
   const builder: any = {
@@ -19,6 +21,7 @@ function createQueryBuilder() {
       return Promise.resolve({ data: [], count: 0, error: null }).then(resolve, reject);
     }
   };
+  lastQueryBuilder = builder;
   return builder;
 }
 
@@ -41,7 +44,10 @@ jest.mock('../src/utils/resilience', () => ({
 
 jest.mock('@supabase/supabase-js', () => ({
   createClient: jest.fn(() => ({
-    from: jest.fn(() => createQueryBuilder()),
+    from: jest.fn((tableName: string) => {
+      lastFromTable = String(tableName || '');
+      return createQueryBuilder();
+    }),
   })),
 }));
 
@@ -93,6 +99,8 @@ describe('master-data.routes', () => {
       }
       return { data: null, error: null };
     });
+    lastQueryBuilder = null;
+    lastFromTable = '';
   });
 
   async function createTestApp() {
@@ -224,5 +232,24 @@ describe('master-data.routes', () => {
     expect(response.body.output.entity).toBe('work_package_templates');
     expect(response.body.output.imported_count).toBe(1);
     expect(Array.isArray(response.body.output.records)).toBe(true);
+  });
+
+  it('keeps manufacturers list tenant-scoped and independent of franchise filter', async () => {
+    mockExecuteWithResilience.mockImplementationOnce(async (_context, operation) => await operation());
+    const app = await createTestApp();
+    await request(app)
+      .get('/api/v2/amro/master-data/manufacturers?tenant_id=tenant-1')
+      .set('x-franchise-id', 'franchise-1')
+      .expect(200);
+    expect(lastFromTable).toBe('manufacturers');
+    expect(lastQueryBuilder?.eq).toHaveBeenCalledWith('tenant_id', 'tenant-1');
+    expect(lastQueryBuilder?.or).not.toHaveBeenCalled();
+  });
+
+  it('rejects tenant_id filter mismatch to prevent cross-tenant leakage', async () => {
+    const app = await createTestApp();
+    await request(app)
+      .get('/api/v2/amro/master-data/manufacturers?tenant_id=tenant-2')
+      .expect(403);
   });
 });

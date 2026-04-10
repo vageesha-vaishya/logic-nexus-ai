@@ -99,6 +99,7 @@ import {
   buildApiHeaders,
   createAircraftTemplate,
   deleteAircraftTemplate,
+  filterManufacturersByTenant,
   listAircraftTemplates,
   parseApiPayload,
   updateAircraftTemplate,
@@ -190,6 +191,7 @@ type ManufacturerOption = {
   label: string;
   code: string;
   name: string;
+  tenantId: string;
   active: boolean;
 };
 
@@ -1725,28 +1727,31 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [scope.franchiseId, scope.tenantId, scope.userId],
   );
 
-  const fetchManufacturerOptions = useCallback(async (headers: Headers): Promise<ManufacturerOption[]> => {
+  const fetchManufacturerOptions = useCallback(async (headers: Headers, tenantId: string): Promise<ManufacturerOption[]> => {
     const query = new URLSearchParams({
       page: '1',
       page_size: '200',
       sort_by: 'name',
       sort_dir: 'asc',
+      tenant_id: tenantId,
     });
     const response = await fetch(`/api/v2/amro/master-data/manufacturers?${query.toString()}`, { method: 'GET', headers });
     const payload = await parseApiPayload(response);
     if (!response.ok) throw new Error(String(payload.error || 'Failed to load manufacturers'));
     const records = getPayloadRecords(payload);
-    return records
+    const options = records
       .map((record) => {
         const id = String(record.id || '').trim();
         if (!id) return null;
         const code = String(record.manufacturer_code || '').trim();
         const name = String(record.name || '').trim();
+        const tenantId = String(record.tenant_id || '').trim();
         const label = name && code ? `${name} (${code})` : name || code || id;
         const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
-        return { id, label, code, name, active };
+        return { id, label, code, name, tenantId, active };
       })
       .filter((option): option is ManufacturerOption => Boolean(option));
+    return filterManufacturersByTenant(options, tenantId);
   }, []);
 
   const fetchAssemblyTypeOptions = useCallback(async (headers: Headers): Promise<AssemblyTypeOption[]> => {
@@ -2212,16 +2217,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [],
   );
 
-  const loadManufacturerOptions = useCallback(async () => {
+  const loadManufacturerOptions = useCallback(async (tenantOverride = '') => {
     setManufacturerOptionsLoading(true);
     setManufacturerOptionsError('');
     try {
-      const headers = await buildApiHeaders(scope);
-      let options = await fetchManufacturerOptions(headers);
+      const tenantScopeId = String(tenantOverride || formValues.tenant_id || scope.tenantId || '').trim();
+      const headers = await buildApiHeaders({ tenantId: tenantScopeId, userId: scope.userId, franchiseId: null });
+      let options = await fetchManufacturerOptions(headers, tenantScopeId);
       if (options.length === 0) {
         const seeded = await seedManufacturersIfNeeded(headers);
         if (seeded) {
-          options = await fetchManufacturerOptions(headers);
+          options = await fetchManufacturerOptions(headers, tenantScopeId);
         }
       }
       setManufacturerOptions(options);
@@ -2232,7 +2238,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setManufacturerOptionsLoading(false);
     }
-  }, [fetchManufacturerOptions, scope, seedManufacturersIfNeeded]);
+  }, [fetchManufacturerOptions, formValues.tenant_id, scope.tenantId, scope.userId, seedManufacturersIfNeeded]);
 
   const loadAssemblyTypeOptions = useCallback(async () => {
     setAssemblyTypeOptionsLoading(true);
@@ -2265,11 +2271,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (options.length === 0) {
         let manufacturerReferenceOptions = manufacturerOptions;
         if (manufacturerReferenceOptions.length === 0) {
-          manufacturerReferenceOptions = await fetchManufacturerOptions(headers);
+          manufacturerReferenceOptions = await fetchManufacturerOptions(headers, String(scope.tenantId || '').trim());
           if (manufacturerReferenceOptions.length === 0) {
             const seededManufacturers = await seedManufacturersIfNeeded(headers);
             if (seededManufacturers) {
-              manufacturerReferenceOptions = await fetchManufacturerOptions(headers);
+              manufacturerReferenceOptions = await fetchManufacturerOptions(headers, String(scope.tenantId || '').trim());
             }
           }
           if (manufacturerReferenceOptions.length > 0) {
@@ -2667,15 +2673,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
 
   useEffect(() => {
     if (entity === 'aircraft' || entity === 'assembly_models') {
-      void loadManufacturerOptions();
+      const tenantForLoad = entity === 'aircraft'
+        ? String(formValues.tenant_id ?? scope.tenantId ?? '').trim()
+        : String(scope.tenantId || '').trim();
+      void loadManufacturerOptions(tenantForLoad);
     }
-  }, [entity, loadManufacturerOptions]);
+  }, [entity, formValues.tenant_id, loadManufacturerOptions, scope.tenantId]);
 
   useEffect(() => {
     if ((entity === 'aircraft' || entity === 'assembly_models') && modalOpen) {
-      void loadManufacturerOptions();
+      const tenantForLoad = entity === 'aircraft'
+        ? String(formValues.tenant_id ?? scope.tenantId ?? '').trim()
+        : String(scope.tenantId || '').trim();
+      void loadManufacturerOptions(tenantForLoad);
     }
-  }, [entity, loadManufacturerOptions, modalOpen]);
+  }, [entity, formValues.tenant_id, loadManufacturerOptions, modalOpen, scope.tenantId]);
 
   useEffect(() => {
     if (entity === 'assembly_models' || entity === 'aircraft') {
@@ -3495,13 +3507,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const aircraftModelSelectOptions = useMemo<SelectOption[]>(() => {
     const normalize = (value: string) => value.trim().toLowerCase();
     const manufacturerId = String(formValues.manufacturer_id ?? '').trim();
+    const modelSourceOptions = entity === 'aircraft' ? franchiseAssemblyModels : assemblyModelOptions;
     const manufacturer = manufacturerMetaById.get(manufacturerId);
     const manufacturerTokens = [manufacturerId, manufacturer?.id, manufacturer?.code, manufacturer?.name, manufacturer?.label]
       .filter(Boolean)
       .map((token) => normalize(String(token)));
     const manufacturerTokenSet = new Set(manufacturerTokens);
     const filtered = manufacturerId
-      ? assemblyModelOptions.filter((option) => {
+      ? modelSourceOptions.filter((option) => {
           if (!option.manufacturerTokens.length) {
             const fallback = normalize(option.manufacturerId || '');
             return fallback ? manufacturerTokenSet.has(fallback) : false;
@@ -3519,7 +3532,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       options = [{ value: currentModel, label: currentModel, disabled: false }, ...options];
     }
     return options;
-  }, [assemblyModelOptions, formValues.aircraft_model, formValues.manufacturer_id, manufacturerMetaById]);
+  }, [assemblyModelOptions, entity, formValues.aircraft_model, formValues.manufacturer_id, franchiseAssemblyModels, manufacturerMetaById]);
   const aircraftTypeSelectOptions = useMemo<SelectOption[]>(
     () =>
       (aircraftTypeOptions.length > 0 ? aircraftTypeOptions : AIRCRAFT_TYPE_FALLBACK_OPTIONS).map((option) => ({
@@ -3543,6 +3556,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const activeAircraftFranchiseId = useMemo(
     () => String(formValues.franchise_id ?? scope.franchiseId ?? '').trim(),
     [formValues.franchise_id, scope.franchiseId],
+  );
+  const activeAircraftManufacturerId = useMemo(
+    () => String(formValues.manufacturer_id ?? '').trim(),
+    [formValues.manufacturer_id],
   );
   const filteredSystemTemplateModelOptions = useMemo<AircraftTempOption[]>(
     () =>
@@ -3691,12 +3708,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }
       setFieldValue('tenant_id', normalizedTenantId);
       setFieldValue('franchise_id', '');
+      setFieldValue('manufacturer_id', '');
       setAircraftTemplateModel('');
       setFieldValue('aircraft_template', '');
       setAircraftFranchiseOptions([]);
       setFranchiseAssemblyModels([]); // Clear franchise assembly models when tenant changes
+      void loadManufacturerOptions(normalizedTenantId);
     },
-    [formValues.tenant_id, isSystemSelectValue, scope.tenantId, setFieldValue],
+    [formValues.tenant_id, isSystemSelectValue, loadManufacturerOptions, scope.tenantId, setFieldValue],
   );
   const setAircraftFranchiseValue = useCallback(
     (value: string) => {
@@ -3711,46 +3730,44 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setFieldValue('franchise_id', normalizedFranchiseId);
       setAircraftTemplateModel('');
       setFieldValue('aircraft_template', '');
-      // Load assembly models filtered by franchise
-      void loadFranchiseAssemblyModels(normalizedFranchiseId);
+      setFieldValue('aircraft_model', '');
     },
     [formValues.franchise_id, isSystemSelectValue, scope.franchiseId, setFieldValue],
   );
   
   const loadFranchiseAssemblyModels = useCallback(
-    async (franchiseId: string) => {
-      if (entity !== 'aircraft' || !scopedDb || !activeAircraftTenantId) {
+    async (tenantId: string, franchiseId: string, manufacturerId: string) => {
+      const scopedTenantId = String(tenantId || '').trim();
+      const scopedFranchiseId = String(franchiseId || '').trim();
+      const scopedManufacturerId = String(manufacturerId || '').trim();
+      if (entity !== 'aircraft' || !scopedDb || !scopedTenantId || !scopedFranchiseId || !scopedManufacturerId) {
         setFranchiseAssemblyModels([]);
         return;
       }
       setFranchiseAssemblyModelsLoading(true);
       try {
-        // Query assembly_models filtered by tenant and franchise
-        const { data: modelRows, error: modelError } = await (scopedDb as any)
+        let query = (scopedDb as any)
           .from('assembly_models')
-          .select('id, name, model_code, manufacturer_id, is_active, manufacturer(name, code)')
-          .eq('tenant_id', activeAircraftTenantId)
+          .select('id, name, model_code, manufacturer_id, franchise_id, is_active')
+          .eq('tenant_id', scopedTenantId)
+          .eq('manufacturer_id', scopedManufacturerId)
           .eq('is_active', true)
           .order('name', { ascending: true });
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${scopedFranchiseId}`);
+        const { data: modelRows, error: modelError } = await query;
         
         if (modelError) {
           throw new Error(String(modelError.message || 'Failed to load assembly models'));
         }
         
         const filteredModels = (Array.isArray(modelRows) ? modelRows : [])
-          .filter((row: Record<string, unknown>) => {
-            // Filter by franchise_id if it exists on the row
-            const rowFranchiseId = String(row.franchise_id || '').trim();
-            // Include models that either have no franchise_id or match the selected franchise
-            return !rowFranchiseId || rowFranchiseId === franchiseId || rowFranchiseId === '';
-          })
           .map((row: Record<string, unknown>) => {
             const id = String(row.id || '').trim();
             const name = String(row.name || '').trim();
             const code = String(row.model_code || '').trim();
-            const manufacturer = row.manufacturer as Record<string, unknown> | null;
-            const manufacturerId = String(row.manufacturer_id || manufacturer?.id || '').trim();
-            const manufacturerName = String(manufacturer?.name || manufacturer?.code || '').trim();
+            const manufacturerId = String(row.manufacturer_id || '').trim();
+            const manufacturerMeta = manufacturerMetaById.get(manufacturerId);
+            const manufacturerName = String(manufacturerMeta?.name || manufacturerMeta?.code || '').trim();
             const label = name && code && name !== code ? `${name} (${code})` : name || code || id;
             const manufacturerTokens = [manufacturerId, manufacturerName]
               .filter(Boolean)
@@ -3775,8 +3792,25 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setFranchiseAssemblyModelsLoading(false);
       }
     },
-    [activeAircraftTenantId, entity, scopedDb],
+    [entity, manufacturerMetaById, scopedDb],
   );
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    if (!activeAircraftTenantId || !activeAircraftFranchiseId || !activeAircraftManufacturerId) {
+      setFranchiseAssemblyModels([]);
+      return;
+    }
+    void loadFranchiseAssemblyModels(activeAircraftTenantId, activeAircraftFranchiseId, activeAircraftManufacturerId);
+  }, [
+    activeAircraftFranchiseId,
+    activeAircraftManufacturerId,
+    activeAircraftTenantId,
+    entity,
+    loadFranchiseAssemblyModels,
+    modalOpen,
+  ]);
   const loadAircraftTenantAndFranchiseOptions = useCallback(async () => {
     if (entity !== 'aircraft' || !scopedDb) {
       return;
@@ -4569,6 +4603,24 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       };
     });
   }, [aircraftStatusSelectOptions, aircraftTypeSelectOptions, entity, modalMode, modalOpen, selectedId, systemTemplateModelSelectOptions]);
+
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    const selectedManufacturerId = String(formValues.manufacturer_id ?? '').trim();
+    if (!selectedManufacturerId) {
+      return;
+    }
+    if (manufacturerOptions.some((option) => option.id === selectedManufacturerId)) {
+      return;
+    }
+    setFieldValue('manufacturer_id', '');
+    setFormErrors((previous) => ({
+      ...previous,
+      manufacturer_id: 'Manufacturer is not available for selected tenant',
+    }));
+  }, [entity, formValues.manufacturer_id, manufacturerOptions, modalOpen, setFieldValue]);
 
   useEffect(() => {
     if (!modalOpen || entity !== 'aircraft') {
