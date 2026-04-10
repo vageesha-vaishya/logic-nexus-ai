@@ -1,0 +1,95 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { ApiRequest, ApiResponse } from '../../../../_utils/types';
+import handler from './reconciliation-policy';
+import {
+  authenticateRequest,
+  buildApiContext,
+  enforceAmroDomainAccess,
+  enforceAnyPermission,
+  handlePreflight,
+  resolveAndApplyAccessContext,
+} from '../../../../_utils/http';
+import { getSupabaseAdminClient } from '../../../../_utils/supabaseAdmin';
+
+vi.mock('../../../../_utils/http', () => ({
+  applyCors: vi.fn(),
+  authenticateRequest: vi.fn(),
+  buildApiContext: vi.fn(),
+  enforceAmroDomainAccess: vi.fn(),
+  enforceAnyPermission: vi.fn(),
+  enforceHttps: vi.fn(),
+  enforceRateLimit: vi.fn(),
+  handlePreflight: vi.fn(),
+  resolveAndApplyAccessContext: vi.fn(),
+}));
+
+vi.mock('../../../../_utils/errorHandler', () => ({
+  sendErrorResponse: vi.fn(),
+}));
+
+vi.mock('../../../../_utils/supabaseAdmin', () => ({
+  getSupabaseAdminClient: vi.fn(),
+}));
+
+function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unknown } {
+  const res: any = {
+    setHeader: vi.fn(),
+    status: vi.fn((code: number) => {
+      res.statusCode = code;
+      return {
+        json: (body: unknown) => {
+          res.jsonBody = body;
+        },
+      };
+    }),
+  };
+  return res;
+}
+
+describe('/api/v2/amro/stock-ledger/dashboard/reconciliation-policy', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(handlePreflight).mockReturnValue(false);
+    vi.mocked(buildApiContext).mockReturnValue({ correlationId: 'corr-recon-policy' } as any);
+    vi.mocked(authenticateRequest).mockResolvedValue({ userId: 'u1', role: 'tenant_admin', permissions: ['inventory.read', 'inventory.admin'] } as any);
+    vi.mocked(resolveAndApplyAccessContext).mockResolvedValue({ tenantId: 'tenant-1', franchiseId: null } as any);
+    vi.mocked(enforceAmroDomainAccess).mockResolvedValue({ subscriptionStatus: 'active' } as any);
+    vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
+  });
+
+  it('returns reconciliation policy on GET', async () => {
+    const supabase: any = {
+      from: vi.fn(() => ({
+        select: vi.fn(() => ({
+          eq: vi.fn(() => ({
+            maybeSingle: vi.fn().mockResolvedValue({
+              data: {
+                emergency_contact_info: {
+                  stock_ledger_p2_settings: {
+                    alert_policy: {
+                      enabled: true,
+                      frequency_hours: 24,
+                      variance_threshold: 0.2,
+                      approval_sla_hours: 48,
+                      stale_approval_hours: 12,
+                      backdated_posting_window_days: 7,
+                      notify_severity_threshold: 'warning',
+                      notify_channels: ['in_app'],
+                    },
+                  },
+                },
+              },
+            }),
+          })),
+        })),
+      })),
+    };
+    vi.mocked(getSupabaseAdminClient).mockReturnValue(supabase);
+    const req: ApiRequest = { method: 'GET', query: {}, headers: {} };
+    const res = createResponse();
+    await handler(req, res);
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.interface).toBe('amro-stock-ledger-reconciliation-policy');
+    expect((res.jsonBody as any)?.output?.policy?.frequency_hours).toBe(24);
+  });
+});

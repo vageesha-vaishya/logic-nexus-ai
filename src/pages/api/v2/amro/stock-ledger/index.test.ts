@@ -58,15 +58,17 @@ describe('/api/v2/amro/stock-ledger', () => {
   });
 
   it('returns paginated records on GET', async () => {
+    const queryBuilder: any = {
+      eq: vi.fn(() => queryBuilder),
+      gte: vi.fn(() => queryBuilder),
+      lte: vi.fn(() => queryBuilder),
+      order: vi.fn(() => queryBuilder),
+      range: vi.fn(() => queryBuilder),
+      then: (resolve: (value: unknown) => void) => resolve({ data: [{ id: 'tx-1', quantity_delta: 1 }], error: null, count: 1 }),
+    };
     const supabase: any = {
       from: vi.fn(() => ({
-        select: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            order: vi.fn(() => ({
-              range: vi.fn().mockResolvedValue({ data: [{ id: 'tx-1', quantity_delta: 1 }], error: null, count: 1 }),
-            })),
-          })),
-        })),
+        select: vi.fn(() => queryBuilder),
       })),
     };
     vi.mocked(getSupabaseAdminClient).mockReturnValue(supabase);

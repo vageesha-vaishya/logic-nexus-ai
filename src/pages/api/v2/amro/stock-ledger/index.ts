@@ -12,9 +12,62 @@ import {
 } from '../../../_utils/http';
 import { sendErrorResponse } from '../../../_utils/errorHandler';
 import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
-import { mapStockLedgerRow, parsePagination, validateStockLedgerMutation } from './shared';
+import { mapStockLedgerRow, parseLedgerListFilters, parsePagination, validateStockLedgerMutation } from './shared';
 
 const REQUIRED_PERMISSIONS = ['inventory.admin', 'inventory.read', 'dashboards.view'];
+const SOURCE_ENTITY_TABLES: Record<string, string[]> = {
+  procurement: ['amro_purchase_orders', 'amro_procurement_orders', 'purchase_orders'],
+  sales: ['amro_sales_orders', 'sales_orders'],
+  warehouse: ['amro_warehouse_transactions', 'warehouse_transactions'],
+  maintenance: ['amro_work_orders', 'maintenance_work_orders', 'work_orders', 'work_packages'],
+  inventory_adjustment: ['amro_inventory_adjustments', 'inventory_adjustments'],
+};
+
+const SOURCE_ENTITY_COLUMNS = [
+  'id',
+  'source_reference',
+  'reference_code',
+  'order_number',
+  'document_number',
+  'transaction_number',
+  'work_order_number',
+];
+
+async function validateSourceReferenceEntity(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  tenantId: string,
+  sourceModule?: string,
+  sourceReference?: string,
+): Promise<void> {
+  if (!sourceModule || !sourceReference) return;
+  if (sourceModule === 'stock-ledger-ui' || sourceModule === 'stock_ledger_void') return;
+  const tables = SOURCE_ENTITY_TABLES[sourceModule];
+  if (!tables || tables.length === 0) return;
+
+  const tableErrors: Array<{ table: string; code?: string; message?: string }> = [];
+  for (const table of tables) {
+    for (const column of SOURCE_ENTITY_COLUMNS) {
+      const { data, error } = await supabase
+        .from(table)
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq(column, sourceReference)
+        .limit(1)
+        .maybeSingle();
+
+      if (!error && data) return;
+      if (error) {
+        if (error.code === '42P01' || /does not exist/i.test(String(error.message || ''))) {
+          tableErrors.push({ table, code: error.code, message: error.message });
+          break;
+        }
+      }
+    }
+  }
+
+  if (tableErrors.length === tables.length) return;
+  throw new Error(`source_reference ${sourceReference} was not found for source_module ${sourceModule}`);
+}
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'POST', 'OPTIONS'] });
@@ -41,14 +94,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     if (req.method === 'GET') {
       const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
+      const filters = parseLedgerListFilters(req.query as Record<string, unknown>);
       const from = (page - 1) * pageSize;
       const to = from + pageSize - 1;
-      const query = supabase
+      let query = supabase
         .from('amro_stock_ledger_transactions')
         .select('*', { count: 'exact' })
         .eq('tenant_id', tenantId)
-        .order('effective_at', { ascending: false })
+        .order(filters.sortBy, { ascending: filters.sortDirection === 'asc' })
         .range(from, to);
+      if (!filters.includeVoided) query = query.eq('is_voided', false);
+      if (filters.movementType) query = query.eq('movement_type', filters.movementType);
+      if (filters.partInventoryId) query = query.eq('part_inventory_id', filters.partInventoryId);
+      if (filters.sourceModule) query = query.eq('source_module', filters.sourceModule);
+      if (filters.valuationMethod) query = query.eq('valuation_method', filters.valuationMethod);
+      if (filters.effectiveFrom) query = query.gte('effective_at', filters.effectiveFrom);
+      if (filters.effectiveTo) query = query.lte('effective_at', filters.effectiveTo);
       const { data, error, count } = await query;
       if (error) throw error;
       res.status(200).json({
@@ -60,6 +121,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           total: count ?? 0,
           page,
           page_size: pageSize,
+          applied_filters: filters,
           latency_ms: Date.now() - startedAt,
         },
       });
@@ -68,6 +130,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     if (req.method === 'POST') {
       const payload = validateStockLedgerMutation(req.body);
+      await validateSourceReferenceEntity(
+        supabase,
+        tenantId,
+        payload.source_module,
+        payload.source_reference,
+      );
       const { data, error } = await supabase.rpc('amro_stock_ledger_post_transaction', {
         p_tenant_id: tenantId,
         p_franchise_id: franchiseId,

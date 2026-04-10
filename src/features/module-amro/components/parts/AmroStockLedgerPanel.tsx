@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, Plus, RefreshCw, ShieldCheck } from 'lucide-react';
+import { Download, Keyboard, MoreHorizontal, Plus, QrCode, RefreshCw, ShieldCheck, Sparkles } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,29 +9,47 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { AmroKpiGrid, AmroModuleSurface, AmroStandardToolbar } from './AmroPartsUiStandards';
 import { AmroHeaderCell, amroCompactTableClassNames } from './amroTableStandards';
 import { AmroCrudDialogFooter, AmroCrudMessageBanner, AmroCrudSection } from './AmroCrudPrimitives';
 import { AmroModuleGridDetailPanel } from './AmroModuleGridDetailPanel';
 import {
   createStockLedgerBatch,
+  buildBatchRetryPayload,
+  createStockLedgerScheduledExport,
   createStockLedgerRecord,
   closeStockLedgerPeriod,
   decideStockLedgerApproval,
+  exportStockLedgerEvidenceBundle,
   exportStockLedgerAudit,
   exportStockLedgerReport,
+  getStockLedgerComplianceDashboard,
+  getStockLedgerCurrencyDashboard,
   listStockLedgerApprovals,
+  getStockLedgerDashboardKpis,
+  listStockLedgerReportTemplates,
+  listStockLedgerScheduledExports,
   listStockLedgerPeriods,
   openStockLedgerPeriod,
   requestReopenStockLedgerPeriod,
   reopenStockLedgerPeriod,
+  runStockLedgerScheduledExportNow,
   listStockLedgerRecords,
   runStockLedgerReconciliation,
+  saveStockLedgerReportTemplate,
+  submitStockLedgerScanPosting,
   type StockLedgerCreatePayload,
   type StockLedgerApproval,
+  type StockLedgerBatchReject,
+  type StockLedgerComplianceDashboard,
+  type StockLedgerCurrencyDashboard,
   type StockLedgerMovementType,
   type StockLedgerPeriod,
   type StockLedgerRecord,
+  type StockLedgerDashboardKpis,
+  type StockLedgerReportTemplate,
+  type StockLedgerScheduledExport,
 } from './stockLedgerApi';
 import type { AmroApiScope } from './livePartsCatalogApi';
 
@@ -106,6 +124,23 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
   const [batchJson, setBatchJson] = useState('[\n  {\n    "partInventoryId": "",\n    "movementType": "receipt",\n    "quantityDelta": 1,\n    "unitCost": 0,\n    "currency": "USD"\n  }\n]');
   const [periods, setPeriods] = useState<StockLedgerPeriod[]>([]);
   const [approvals, setApprovals] = useState<StockLedgerApproval[]>([]);
+  const [dashboardKpis, setDashboardKpis] = useState<StockLedgerDashboardKpis | null>(null);
+  const [complianceKpis, setComplianceKpis] = useState<StockLedgerComplianceDashboard | null>(null);
+  const [currencyKpis, setCurrencyKpis] = useState<StockLedgerCurrencyDashboard | null>(null);
+  const [reportTemplates, setReportTemplates] = useState<StockLedgerReportTemplate[]>([]);
+  const [scheduledExports, setScheduledExports] = useState<StockLedgerScheduledExport[]>([]);
+  const [batchRejects, setBatchRejects] = useState<StockLedgerBatchReject[]>([]);
+  const [scanMode, setScanMode] = useState<'barcode' | 'rfid' | 'manual'>('barcode');
+  const [scanEventType, setScanEventType] = useState<'receive' | 'issue' | 'transfer' | 'audit' | 'reserve' | 'release'>('receive');
+  const [scanCode, setScanCode] = useState('');
+  const [scanQuantity, setScanQuantity] = useState(1);
+  const [cycleExpectedQty, setCycleExpectedQty] = useState(0);
+  const [cycleCountedQty, setCycleCountedQty] = useState(0);
+  const [cyclePartInventoryId, setCyclePartInventoryId] = useState('');
+  const [newTemplateName, setNewTemplateName] = useState('');
+  const [newTemplateType, setNewTemplateType] = useState<'stock-balance' | 'transaction-history' | 'valuation-summary'>('stock-balance');
+  const [selectedTemplateForSchedule, setSelectedTemplateForSchedule] = useState('');
+  const [selectedScheduleFrequency, setSelectedScheduleFrequency] = useState<'daily' | 'weekly' | 'monthly'>('weekly');
   const [periodForm, setPeriodForm] = useState(buildDefaultPeriodForm);
   const [periodCloseNote, setPeriodCloseNote] = useState('');
   const [selectedPeriodForClose, setSelectedPeriodForClose] = useState('');
@@ -115,7 +150,7 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
   const [selectedApprovalId, setSelectedApprovalId] = useState('');
   const [selectedPeriodForReopenExecute, setSelectedPeriodForReopenExecute] = useState('');
   const [selectedApprovalForReopenExecute, setSelectedApprovalForReopenExecute] = useState('');
-  const [opsTab, setOpsTab] = useState<'periods' | 'approvals'>('periods');
+  const [opsTab, setOpsTab] = useState<'periods' | 'approvals' | 'automation' | 'cycle_count' | 'compliance'>('periods');
 
   const loadRecords = useCallback(async () => {
     setLoading(true);
@@ -134,12 +169,22 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
       setRecords(response.records);
       setSelectedRecordId((current) => current || response.records[0]?.id || null);
       setTotal(response.total);
-      const [periodList, approvalList] = await Promise.all([
+      const [periodList, approvalList, kpis, templates, schedules, compliance, currency] = await Promise.all([
         listStockLedgerPeriods(fetch, apiScope),
         listStockLedgerApprovals('pending', fetch, apiScope),
+        getStockLedgerDashboardKpis(fetch, apiScope),
+        listStockLedgerReportTemplates(fetch, apiScope),
+        listStockLedgerScheduledExports(fetch, apiScope),
+        getStockLedgerComplianceDashboard(fetch, apiScope),
+        getStockLedgerCurrencyDashboard('USD', fetch, apiScope),
       ]);
       setPeriods(periodList);
       setApprovals(approvalList);
+      setDashboardKpis(kpis);
+      setReportTemplates(templates);
+      setScheduledExports(schedules);
+      setComplianceKpis(compliance);
+      setCurrencyKpis(currency);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to load stock ledger records';
       setError(message);
@@ -182,8 +227,9 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
       if (!Array.isArray(entries)) throw new Error('Batch payload must be a JSON array');
       const payload = entries as StockLedgerCreatePayload[];
       const result = await createStockLedgerBatch(payload, fetch, apiScope);
+      setBatchRejects(result.rejected);
       toast.success(`Batch created. created=${result.createdCount}, rejected=${result.rejectedCount}`);
-      setDialogOpen(false);
+      if (result.rejectedCount === 0) setDialogOpen(false);
       setRefreshTick((value) => value + 1);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create stock ledger batch');
@@ -201,6 +247,26 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
       toast.error(error instanceof Error ? error.message : 'Failed to run reconciliation');
     }
   }, [apiScope]);
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const hotkey = event.ctrlKey || event.metaKey;
+      if (!hotkey) return;
+      if (event.key.toLowerCase() === 'n') {
+        event.preventDefault();
+        setDialogOpen(true);
+      }
+      if (event.key.toLowerCase() === 'r' && event.shiftKey) {
+        event.preventDefault();
+        void runReconciliation();
+      } else if (event.key.toLowerCase() === 'r') {
+        event.preventDefault();
+        setRefreshTick((value) => value + 1);
+      }
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [runReconciliation]);
 
   const exportReport = useCallback(async (reportType: 'stock-balance' | 'transaction-history' | 'valuation-summary') => {
     try {
@@ -314,6 +380,146 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
     }
   }, [apiScope, selectedApprovalForReopenExecute, selectedPeriodForReopenExecute]);
 
+  const saveReportTemplate = useCallback(async () => {
+    try {
+      if (!newTemplateName.trim()) throw new Error('Template name is required');
+      const saved = await saveStockLedgerReportTemplate({
+        name: newTemplateName.trim(),
+        report_type: newTemplateType,
+      }, fetch, apiScope);
+      setReportTemplates((prev) => [saved, ...prev.filter((item) => item.id !== saved.id)]);
+      setNewTemplateName('');
+      toast.success('Report template saved');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save report template');
+    }
+  }, [apiScope, newTemplateName, newTemplateType]);
+
+  const createSchedule = useCallback(async () => {
+    try {
+      if (!selectedTemplateForSchedule) throw new Error('Select template for schedule');
+      const schedule = await createStockLedgerScheduledExport({
+        template_id: selectedTemplateForSchedule,
+        frequency: selectedScheduleFrequency,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      }, fetch, apiScope);
+      setScheduledExports((prev) => [schedule, ...prev.filter((item) => item.id !== schedule.id)]);
+      toast.success('Scheduled export created');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to create schedule');
+    }
+  }, [apiScope, selectedTemplateForSchedule, selectedScheduleFrequency]);
+
+  const executeSchedule = useCallback(async (scheduleId: string) => {
+    try {
+      const updated = await runStockLedgerScheduledExportNow(scheduleId, fetch, apiScope);
+      setScheduledExports((prev) => prev.map((item) => (item.id === updated.id ? updated : item)));
+      toast.success('Scheduled export executed');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to execute scheduled export');
+    }
+  }, [apiScope]);
+
+  const exportEvidenceBundle = useCallback(async (format: 'json' | 'csv') => {
+    try {
+      const content = await exportStockLedgerEvidenceBundle(format, fetch, apiScope);
+      if (!content) {
+        toast.info('No evidence rows available');
+        return;
+      }
+      const blob = new Blob([content], { type: format === 'csv' ? 'text/csv;charset=utf-8;' : 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `amro-stock-ledger-evidence-${Date.now()}.${format}`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+      toast.success(`Evidence bundle exported as ${format.toUpperCase()}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to export evidence bundle');
+    }
+  }, [apiScope]);
+
+  const runScanPosting = useCallback(async () => {
+    try {
+      if (!scanCode.trim()) throw new Error('Scan code is required');
+      if (!Number.isFinite(scanQuantity) || scanQuantity <= 0) throw new Error('Scan quantity must be > 0');
+      await submitStockLedgerScanPosting({
+        scanMode,
+        eventType: scanEventType,
+        scanCode: scanCode.trim(),
+        quantity: scanQuantity,
+      }, fetch, apiScope);
+      toast.success('Scan posting processed');
+      setScanCode('');
+      setScanQuantity(1);
+      setRefreshTick((value) => value + 1);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to process scan posting');
+    }
+  }, [apiScope, scanCode, scanEventType, scanMode, scanQuantity]);
+
+  const submitCycleCount = useCallback(async () => {
+    try {
+      if (!cyclePartInventoryId.trim()) throw new Error('Part Inventory ID is required');
+      const delta = Number(cycleCountedQty) - Number(cycleExpectedQty);
+      if (!Number.isFinite(delta) || delta === 0) throw new Error('No discrepancy to post');
+      await createStockLedgerRecord({
+        partInventoryId: cyclePartInventoryId.trim(),
+        movementType: 'adjustment',
+        valuationMethod: 'weighted_average',
+        quantityDelta: delta,
+        unitCost: 0,
+        currency: 'USD',
+        sourceModule: 'inventory_adjustment',
+        sourceReference: `ADJ-${Date.now()}`,
+        notes: `Cycle count discrepancy posted. expected=${cycleExpectedQty}, counted=${cycleCountedQty}`,
+        metadata: {
+          p2_cycle_count: true,
+          expected_quantity: cycleExpectedQty,
+          counted_quantity: cycleCountedQty,
+        },
+      }, fetch, apiScope);
+      toast.success('Cycle count discrepancy posted');
+      setRefreshTick((value) => value + 1);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to post cycle count discrepancy');
+    }
+  }, [apiScope, cycleCountedQty, cycleExpectedQty, cyclePartInventoryId]);
+
+  const downloadRejectedBatch = useCallback(() => {
+    if (batchRejects.length === 0) {
+      toast.info('No rejected entries available');
+      return;
+    }
+    const content = JSON.stringify(batchRejects, null, 2);
+    const blob = new Blob([content], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `amro-stock-ledger-batch-rejected-${Date.now()}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+    toast.success('Rejected diagnostics downloaded');
+  }, [batchRejects]);
+
+  const retryRejectedBatch = useCallback(async () => {
+    try {
+      const retryEntries = buildBatchRetryPayload(batchRejects);
+      if (retryEntries.length === 0) throw new Error('No retryable rejected entries available');
+      const result = await createStockLedgerBatch(retryEntries, fetch, apiScope);
+      setBatchRejects(result.rejected);
+      toast.success(`Retry completed. created=${result.createdCount}, rejected=${result.rejectedCount}`);
+      setRefreshTick((value) => value + 1);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to retry rejected batch entries');
+    }
+  }, [apiScope, batchRejects]);
+
   return (
     <div className="mt-4 space-y-3">
       <AmroModuleSurface
@@ -339,26 +545,49 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
           )}
           rightActions={(
             <>
-              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setRefreshTick((value) => value + 1)}>
+              <Button type="button" size="sm" variant="outline" className="hidden h-8 md:inline-flex" onClick={() => setRefreshTick((value) => value + 1)}>
                 <RefreshCw className="mr-1 h-4 w-4" />
                 Refresh
               </Button>
-              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => { void runReconciliation(); }}>
+              <Button type="button" size="sm" variant="outline" className="hidden h-8 md:inline-flex" onClick={() => { void runReconciliation(); }}>
                 <ShieldCheck className="mr-1 h-4 w-4" />
                 Reconcile
               </Button>
-              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => { void exportReport('stock-balance'); }}>
+              <Button type="button" size="sm" variant="outline" className="hidden h-8 lg:inline-flex" onClick={() => { void exportReport('stock-balance'); }}>
                 <Download className="mr-1 h-4 w-4" />
                 Export Balance
               </Button>
-              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => { void exportReport('valuation-summary'); }}>
+              <Button type="button" size="sm" variant="outline" className="hidden h-8 lg:inline-flex" onClick={() => { void exportReport('valuation-summary'); }}>
                 <Download className="mr-1 h-4 w-4" />
                 Export Valuation
               </Button>
-              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => { void exportAudit(); }}>
+              <Button type="button" size="sm" variant="outline" className="hidden h-8 lg:inline-flex" onClick={() => { void exportAudit(); }}>
                 <Download className="mr-1 h-4 w-4" />
                 Export Audit
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" size="sm" variant="outline" className="h-8">
+                    <MoreHorizontal className="mr-1 h-4 w-4" />
+                    More Actions
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={() => setRefreshTick((value) => value + 1)}>Refresh</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { void runReconciliation(); }}>Run Reconciliation</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { void exportReport('stock-balance'); }}>Export Balance</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { void exportReport('valuation-summary'); }}>Export Valuation</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { void exportAudit(); }}>Export Audit</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { void exportEvidenceBundle('csv'); }}>Export Evidence (CSV)</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => { void exportEvidenceBundle('json'); }}>Export Evidence (JSON)</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => {
+                    toast.info('Keyboard map: Ctrl/Cmd+N New, Ctrl/Cmd+R Refresh, Ctrl/Cmd+Shift+R Reconcile');
+                  }}>
+                    <Keyboard className="mr-2 h-4 w-4" />
+                    Keyboard Map
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <Button type="button" size="sm" className="h-8" onClick={() => setDialogOpen(true)}>
                 <Plus className="mr-1 h-4 w-4" />
                 New Transaction
@@ -371,6 +600,11 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
             { label: 'Records', value: String(total) },
             { label: 'Net Quantity Delta', value: totalMovementQuantity.toFixed(2), tone: totalMovementQuantity < 0 ? 'warning' : 'success' },
             { label: 'Movement Value', value: totalMovementValue.toFixed(2) },
+            { label: 'Pending Approvals', value: String(dashboardKpis?.pendingApprovals ?? 0), tone: (dashboardKpis?.pendingApprovals ?? 0) > 0 ? 'warning' : 'success' },
+            { label: 'SLA Breaches', value: String(dashboardKpis?.pendingApprovalSlaBreaches ?? 0), tone: (dashboardKpis?.pendingApprovalSlaBreaches ?? 0) > 0 ? 'warning' : 'success' },
+            { label: 'Unresolved Variances', value: String(dashboardKpis?.unresolvedVarianceItems ?? 0), tone: (dashboardKpis?.unresolvedVarianceItems ?? 0) > 0 ? 'warning' : 'success' },
+            { label: 'Open Period Age (h)', value: (dashboardKpis?.openPeriodAgeHours ?? 0).toFixed(1), tone: (dashboardKpis?.openPeriodAgeHours ?? 0) > 48 ? 'warning' : 'default' },
+            { label: 'Inventory Value', value: (dashboardKpis?.totalInventoryValue ?? 0).toFixed(2) },
           ]}
         />
         <AmroCrudMessageBanner message={error} tone="error" />
@@ -406,10 +640,21 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
           )}
         />
 
-        <Tabs value={opsTab} onValueChange={(value) => setOpsTab(value as 'periods' | 'approvals')} className="mt-4">
-          <TabsList className="grid w-full grid-cols-2">
+        {error ? (
+          <div className="rounded border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive" role="alert" aria-live="assertive">
+            <p className="font-semibold">Error Summary</p>
+            <p>{error}</p>
+            <p className="mt-1 text-[11px] text-destructive/80">Use keyboard shortcuts: <span className="font-mono">Ctrl/Cmd+R</span> refresh, <span className="font-mono">Ctrl/Cmd+N</span> new transaction.</p>
+          </div>
+        ) : null}
+
+        <Tabs value={opsTab} onValueChange={(value) => setOpsTab(value as 'periods' | 'approvals' | 'automation' | 'cycle_count' | 'compliance')} className="mt-4">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="periods">Period Controls</TabsTrigger>
             <TabsTrigger value="approvals">Approval Queue</TabsTrigger>
+            <TabsTrigger value="automation">Automation</TabsTrigger>
+            <TabsTrigger value="cycle_count">Cycle + Scan</TabsTrigger>
+            <TabsTrigger value="compliance">Compliance</TabsTrigger>
           </TabsList>
           <TabsContent value="periods" className="pt-3">
             <AmroCrudSection title="Period Controls">
@@ -503,6 +748,137 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
             <Button className="mt-2" size="sm" variant="outline" onClick={() => { void executeReopen(); }}>Execute Reopen</Button>
             </AmroCrudSection>
           </TabsContent>
+          <TabsContent value="automation" className="pt-3">
+            <AmroCrudSection title="Reporting Automation">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <Input
+                  placeholder="Template name"
+                  value={newTemplateName}
+                  onChange={(event) => setNewTemplateName(event.target.value)}
+                />
+                <Select value={newTemplateType} onValueChange={(value) => setNewTemplateType(value as 'stock-balance' | 'transaction-history' | 'valuation-summary')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="stock-balance">stock-balance</SelectItem>
+                    <SelectItem value="transaction-history">transaction-history</SelectItem>
+                    <SelectItem value="valuation-summary">valuation-summary</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" onClick={() => { void saveReportTemplate(); }}>
+                  <Sparkles className="mr-1 h-4 w-4" />
+                  Save Template
+                </Button>
+              </div>
+              <div className="mt-3 rounded border">
+                <table className={amroCompactTableClassNames.table}>
+                  <thead className={amroCompactTableClassNames.thead}><tr><AmroHeaderCell compact>Name</AmroHeaderCell><AmroHeaderCell compact>Type</AmroHeaderCell><AmroHeaderCell compact>Updated</AmroHeaderCell></tr></thead>
+                  <tbody>
+                    {reportTemplates.map((template) => (
+                      <tr key={template.id} className={amroCompactTableClassNames.row}>
+                        <td className={amroCompactTableClassNames.td}>{template.name}</td>
+                        <td className={amroCompactTableClassNames.td}>{template.report_type}</td>
+                        <td className={amroCompactTableClassNames.td}>{new Date(template.updated_at).toLocaleString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+                <Select value={selectedTemplateForSchedule} onValueChange={setSelectedTemplateForSchedule}>
+                  <SelectTrigger><SelectValue placeholder="Template for schedule" /></SelectTrigger>
+                  <SelectContent>
+                    {reportTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+                <Select value={selectedScheduleFrequency} onValueChange={(value) => setSelectedScheduleFrequency(value as 'daily' | 'weekly' | 'monthly')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="daily">daily</SelectItem>
+                    <SelectItem value="weekly">weekly</SelectItem>
+                    <SelectItem value="monthly">monthly</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button size="sm" variant="outline" onClick={() => { void createSchedule(); }}>Create Schedule</Button>
+              </div>
+              <div className="mt-2 space-y-2">
+                {scheduledExports.map((schedule) => (
+                  <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
+                    <span>{schedule.frequency} | next {new Date(schedule.next_run_at).toLocaleString()} | template {schedule.template_id.slice(0, 8)}</span>
+                    <Button size="sm" variant="outline" onClick={() => { void executeSchedule(schedule.id); }}>Run Now</Button>
+                  </div>
+                ))}
+              </div>
+            </AmroCrudSection>
+          </TabsContent>
+          <TabsContent value="cycle_count" className="pt-3">
+            <AmroCrudSection title="Cycle Count & Scan Posting">
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+                <Input placeholder="Part Inventory ID" value={cyclePartInventoryId} onChange={(event) => setCyclePartInventoryId(event.target.value)} />
+                <Input type="number" placeholder="Expected Qty" value={String(cycleExpectedQty)} onChange={(event) => setCycleExpectedQty(Number(event.target.value || 0))} />
+                <Input type="number" placeholder="Counted Qty" value={String(cycleCountedQty)} onChange={(event) => setCycleCountedQty(Number(event.target.value || 0))} />
+              </div>
+              <Button className="mt-2" size="sm" onClick={() => { void submitCycleCount(); }}>Post Discrepancy</Button>
+              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-4">
+                <Select value={scanMode} onValueChange={(value) => setScanMode(value as 'barcode' | 'rfid' | 'manual')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="barcode">barcode</SelectItem>
+                    <SelectItem value="rfid">rfid</SelectItem>
+                    <SelectItem value="manual">manual</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={scanEventType} onValueChange={(value) => setScanEventType(value as 'receive' | 'issue' | 'transfer' | 'audit' | 'reserve' | 'release')}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="receive">receive</SelectItem>
+                    <SelectItem value="issue">issue</SelectItem>
+                    <SelectItem value="transfer">transfer</SelectItem>
+                    <SelectItem value="audit">audit</SelectItem>
+                    <SelectItem value="reserve">reserve</SelectItem>
+                    <SelectItem value="release">release</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Input placeholder="Scan code" value={scanCode} onChange={(event) => setScanCode(event.target.value)} />
+                <Input type="number" placeholder="Qty" value={String(scanQuantity)} onChange={(event) => setScanQuantity(Number(event.target.value || 1))} />
+              </div>
+              <Button className="mt-2" size="sm" variant="outline" onClick={() => { void runScanPosting(); }}>
+                <QrCode className="mr-1 h-4 w-4" />
+                Process Scan Posting
+              </Button>
+            </AmroCrudSection>
+          </TabsContent>
+          <TabsContent value="compliance" className="pt-3">
+            <AmroCrudSection title="Compliance & Multi-currency">
+              <AmroKpiGrid
+                items={[
+                  { label: 'Hash Coverage %', value: String((complianceKpis?.immutableHashCoveragePercent ?? 0).toFixed(2)), tone: (complianceKpis?.immutableHashCoveragePercent ?? 0) < 95 ? 'warning' : 'success' },
+                  { label: 'Stale Approvals', value: String(complianceKpis?.staleApprovals ?? 0), tone: (complianceKpis?.staleApprovals ?? 0) > 0 ? 'warning' : 'success' },
+                  { label: 'Open Periods', value: String(complianceKpis?.openPeriods ?? 0), tone: (complianceKpis?.openPeriods ?? 0) > 0 ? 'warning' : 'success' },
+                  { label: 'Failed Recon Runs', value: String(complianceKpis?.failedReconciliationRuns ?? 0), tone: (complianceKpis?.failedReconciliationRuns ?? 0) > 0 ? 'warning' : 'success' },
+                  { label: `FX Base (${currencyKpis?.baseCurrency || 'USD'})`, value: (currencyKpis?.totalBaseValue ?? 0).toFixed(2) },
+                ]}
+              />
+              <div className="mt-2 rounded border">
+                <table className={amroCompactTableClassNames.table}>
+                  <thead className={amroCompactTableClassNames.thead}><tr><AmroHeaderCell compact>Currency</AmroHeaderCell><AmroHeaderCell compact>Raw Total</AmroHeaderCell><AmroHeaderCell compact>Base Total</AmroHeaderCell><AmroHeaderCell compact>Txn Count</AmroHeaderCell></tr></thead>
+                  <tbody>
+                    {(currencyKpis?.records || []).map((row) => (
+                      <tr key={row.currency} className={amroCompactTableClassNames.row}>
+                        <td className={amroCompactTableClassNames.td}>{row.currency}</td>
+                        <td className={amroCompactTableClassNames.td}>{row.rawTotal.toFixed(2)}</td>
+                        <td className={amroCompactTableClassNames.td}>{row.baseTotal.toFixed(2)}</td>
+                        <td className={amroCompactTableClassNames.td}>{row.txnCount}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" onClick={() => { void exportEvidenceBundle('json'); }}>Download Evidence JSON</Button>
+                <Button size="sm" variant="outline" onClick={() => { void exportEvidenceBundle('csv'); }}>Download Evidence CSV</Button>
+              </div>
+            </AmroCrudSection>
+          </TabsContent>
         </Tabs>
       </AmroModuleSurface>
 
@@ -537,6 +913,16 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
             <div className="space-y-1">
               <Label>Batch JSON (array of entries)</Label>
               <Textarea rows={12} value={batchJson} onChange={(event) => setBatchJson(event.target.value)} />
+              {batchRejects.length > 0 ? (
+                <div className="mt-2 rounded border border-warning/40 bg-warning/5 p-2 text-xs">
+                  <p className="font-semibold">Batch reject diagnostics</p>
+                  <p>{batchRejects.length} rejected row(s) available for retry package generation.</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button size="sm" variant="outline" type="button" onClick={downloadRejectedBatch}>Download Reject JSON</Button>
+                    <Button size="sm" variant="outline" type="button" onClick={() => { void retryRejectedBatch(); }}>Retry Rejected</Button>
+                  </div>
+                </div>
+              ) : null}
             </div>
           )}
 

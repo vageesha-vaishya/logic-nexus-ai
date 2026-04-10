@@ -70,6 +70,66 @@ export type StockLedgerApproval = {
   created_at?: string;
 };
 
+export type StockLedgerBatchReject = {
+  rowIndex: number;
+  reason: string;
+  payload: Record<string, unknown>;
+};
+
+export type StockLedgerReportTemplate = {
+  id: string;
+  name: string;
+  report_type: 'stock-balance' | 'transaction-history' | 'valuation-summary';
+  filters: Record<string, unknown>;
+  columns: string[];
+  created_at: string;
+  updated_at: string;
+};
+
+export type StockLedgerScheduledExport = {
+  id: string;
+  template_id: string;
+  frequency: 'daily' | 'weekly' | 'monthly';
+  timezone: string;
+  next_run_at: string;
+  destinations: string[];
+  enabled: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type StockLedgerComplianceDashboard = {
+  immutableHashCoveragePercent: number;
+  pendingApprovals: number;
+  staleApprovals: number;
+  openPeriods: number;
+  failedReconciliationRuns: number;
+  evidenceSnapshot: Record<string, number>;
+};
+
+export type StockLedgerCurrencyRow = {
+  currency: string;
+  rawTotal: number;
+  baseTotal: number;
+  txnCount: number;
+};
+
+export type StockLedgerCurrencyDashboard = {
+  baseCurrency: string;
+  totalBaseValue: number;
+  fxRates: Record<string, number>;
+  records: StockLedgerCurrencyRow[];
+};
+
+export type StockLedgerDashboardKpis = {
+  pendingApprovals: number;
+  pendingApprovalSlaBreaches: number;
+  unresolvedVarianceItems: number;
+  openPeriodAgeHours: number;
+  totalInventoryValue: number;
+  latestReconciliation: Record<string, unknown> | null;
+};
+
 type ApiResponseShape = {
   error?: string;
   issues?: Array<{ field?: string; message?: string }>;
@@ -193,7 +253,7 @@ export async function createStockLedgerBatch(
   entries: StockLedgerCreatePayload[],
   fetchImpl: FetchLike = fetch,
   scope: AmroApiScope = {},
-): Promise<{ batchId: string; createdCount: number; rejectedCount: number }> {
+): Promise<{ batchId: string; createdCount: number; rejectedCount: number; rejected: StockLedgerBatchReject[] }> {
   const response = await fetchImpl('/api/v2/amro/stock-ledger/batch', {
     method: 'POST',
     credentials: 'include',
@@ -207,6 +267,16 @@ export async function createStockLedgerBatch(
     batchId: String(output.batch_id || ''),
     createdCount: Number(output.created_count || 0),
     rejectedCount: Number(output.rejected_count || 0),
+    rejected: Array.isArray(output.rejected)
+      ? output.rejected.map((item, index) => {
+        const row = item && typeof item === 'object' ? item as Record<string, unknown> : {};
+        return {
+          rowIndex: Number(row.row_index ?? index),
+          reason: String(row.reason || row.message || 'rejected'),
+          payload: row.payload && typeof row.payload === 'object' ? row.payload as Record<string, unknown> : {},
+        };
+      })
+      : [],
   };
 }
 
@@ -362,6 +432,31 @@ export async function listStockLedgerApprovals(
   return rows.map((row) => row as StockLedgerApproval);
 }
 
+export async function getStockLedgerDashboardKpis(
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<StockLedgerDashboardKpis> {
+  const response = await fetchImpl('/api/v2/amro/stock-ledger/dashboard/kpis', {
+    method: 'GET',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+  });
+  await assertResponse(response, 'Failed to load stock ledger KPIs');
+  const payload = await parseResponse(response);
+  const output = payload.output || {};
+  return {
+    pendingApprovals: Number(output.pending_approvals || 0),
+    pendingApprovalSlaBreaches: Number(output.pending_approval_sla_breaches || 0),
+    unresolvedVarianceItems: Number(output.unresolved_variance_items || 0),
+    openPeriodAgeHours: Number(output.open_period_age_hours || 0),
+    totalInventoryValue: Number(output.total_inventory_value || 0),
+    latestReconciliation:
+      output.latest_reconciliation && typeof output.latest_reconciliation === 'object'
+        ? (output.latest_reconciliation as Record<string, unknown>)
+        : null,
+  };
+}
+
 export async function decideStockLedgerApproval(
   approvalId: string,
   decision: 'approved' | 'rejected',
@@ -404,4 +499,207 @@ export async function exportStockLedgerAudit(
     csvRows.push(mapped.join(','));
   }
   return csvRows.join('\n');
+}
+
+export function buildBatchRetryPayload(rejected: StockLedgerBatchReject[]): StockLedgerCreatePayload[] {
+  return rejected
+    .map((item) => item.payload)
+    .map((payload) => ({
+      partInventoryId: String(payload.partInventoryId || payload.part_inventory_id || ''),
+      movementType: String(payload.movementType || payload.movement_type || 'adjustment') as StockLedgerMovementType,
+      valuationMethod: String(payload.valuationMethod || payload.valuation_method || 'weighted_average') as StockLedgerValuationMethod,
+      quantityDelta: Number(payload.quantityDelta ?? payload.quantity_delta ?? 0),
+      unitCost: Number(payload.unitCost ?? payload.unit_cost ?? 0),
+      currency: String(payload.currency || 'USD'),
+      sourceModule: payload.sourceModule ? String(payload.sourceModule) : (payload.source_module ? String(payload.source_module) : undefined),
+      sourceReference: payload.sourceReference ? String(payload.sourceReference) : (payload.source_reference ? String(payload.source_reference) : undefined),
+      notes: payload.notes ? String(payload.notes) : undefined,
+      metadata: payload.metadata && typeof payload.metadata === 'object' ? payload.metadata as Record<string, unknown> : undefined,
+      batchId: payload.batchId ? String(payload.batchId) : (payload.batch_id ? String(payload.batch_id) : undefined),
+    }))
+    .filter((entry) => entry.partInventoryId && Number.isFinite(entry.quantityDelta) && entry.quantityDelta !== 0);
+}
+
+export async function listStockLedgerReportTemplates(
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<StockLedgerReportTemplate[]> {
+  const response = await fetchImpl('/api/v2/amro/stock-ledger/dashboard/report-templates', {
+    method: 'GET',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+  });
+  await assertResponse(response, 'Failed to load report templates');
+  const payload = await parseResponse(response);
+  return Array.isArray(payload.output?.records) ? (payload.output?.records as StockLedgerReportTemplate[]) : [];
+}
+
+export async function saveStockLedgerReportTemplate(
+  input: Partial<StockLedgerReportTemplate> & Pick<StockLedgerReportTemplate, 'name' | 'report_type'>,
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<StockLedgerReportTemplate> {
+  const response = await fetchImpl('/api/v2/amro/stock-ledger/dashboard/report-templates', {
+    method: 'POST',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+    body: JSON.stringify(input),
+  });
+  await assertResponse(response, 'Failed to save report template');
+  const payload = await parseResponse(response);
+  return (payload.output?.record || {}) as StockLedgerReportTemplate;
+}
+
+export async function listStockLedgerScheduledExports(
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<StockLedgerScheduledExport[]> {
+  const response = await fetchImpl('/api/v2/amro/stock-ledger/dashboard/scheduled-exports', {
+    method: 'GET',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+  });
+  await assertResponse(response, 'Failed to load scheduled exports');
+  const payload = await parseResponse(response);
+  return Array.isArray(payload.output?.records) ? (payload.output?.records as StockLedgerScheduledExport[]) : [];
+}
+
+export async function createStockLedgerScheduledExport(
+  input: {
+    template_id: string;
+    frequency: 'daily' | 'weekly' | 'monthly';
+    timezone?: string;
+    destinations?: string[];
+    enabled?: boolean;
+  },
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<StockLedgerScheduledExport> {
+  const response = await fetchImpl('/api/v2/amro/stock-ledger/dashboard/scheduled-exports', {
+    method: 'POST',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+    body: JSON.stringify(input),
+  });
+  await assertResponse(response, 'Failed to create scheduled export');
+  const payload = await parseResponse(response);
+  return (payload.output?.record || {}) as StockLedgerScheduledExport;
+}
+
+export async function runStockLedgerScheduledExportNow(
+  scheduleId: string,
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<StockLedgerScheduledExport> {
+  const response = await fetchImpl('/api/v2/amro/stock-ledger/dashboard/scheduled-exports', {
+    method: 'PATCH',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+    body: JSON.stringify({ id: scheduleId, execute_now: true }),
+  });
+  await assertResponse(response, 'Failed to execute scheduled export');
+  const payload = await parseResponse(response);
+  return (payload.output?.record || {}) as StockLedgerScheduledExport;
+}
+
+export async function getStockLedgerComplianceDashboard(
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<StockLedgerComplianceDashboard> {
+  const response = await fetchImpl('/api/v2/amro/stock-ledger/dashboard/compliance', {
+    method: 'GET',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+  });
+  await assertResponse(response, 'Failed to load compliance dashboard');
+  const payload = await parseResponse(response);
+  const output = payload.output || {};
+  return {
+    immutableHashCoveragePercent: Number(output.immutable_hash_coverage_percent || 0),
+    pendingApprovals: Number(output.pending_approvals || 0),
+    staleApprovals: Number(output.stale_approvals || 0),
+    openPeriods: Number(output.open_periods || 0),
+    failedReconciliationRuns: Number(output.failed_reconciliation_runs || 0),
+    evidenceSnapshot:
+      output.evidence_snapshot && typeof output.evidence_snapshot === 'object'
+        ? (output.evidence_snapshot as Record<string, number>)
+        : {},
+  };
+}
+
+export async function exportStockLedgerEvidenceBundle(
+  format: 'json' | 'csv' = 'json',
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<string> {
+  const response = await fetchImpl(`/api/v2/amro/stock-ledger/dashboard/evidence-bundle?format=${encodeURIComponent(format)}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+  });
+  await assertResponse(response, 'Failed to export evidence bundle');
+  const payload = await parseResponse(response);
+  if (format === 'csv') return String(payload.output?.csv || '');
+  return JSON.stringify(payload.output || {}, null, 2);
+}
+
+export async function getStockLedgerCurrencyDashboard(
+  baseCurrency = 'USD',
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<StockLedgerCurrencyDashboard> {
+  const response = await fetchImpl(`/api/v2/amro/stock-ledger/dashboard/multi-currency?base_currency=${encodeURIComponent(baseCurrency)}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+  });
+  await assertResponse(response, 'Failed to load multi-currency dashboard');
+  const payload = await parseResponse(response);
+  const output = payload.output || {};
+  const rows = Array.isArray(output.records) ? output.records : [];
+  return {
+    baseCurrency: String(output.base_currency || baseCurrency),
+    totalBaseValue: Number(output.total_base_value || 0),
+    fxRates: output.fx_rates && typeof output.fx_rates === 'object' ? output.fx_rates as Record<string, number> : {},
+    records: rows.map((row) => {
+      const rec = row as Record<string, unknown>;
+      return {
+        currency: String(rec.currency || ''),
+        rawTotal: Number(rec.raw_total || 0),
+        baseTotal: Number(rec.base_total || 0),
+        txnCount: Number(rec.txn_count || 0),
+      };
+    }),
+  };
+}
+
+export async function submitStockLedgerScanPosting(
+  input: {
+    scanMode: 'barcode' | 'rfid' | 'manual';
+    eventType: 'receive' | 'issue' | 'transfer' | 'audit' | 'reserve' | 'release';
+    scanCode: string;
+    quantity: number;
+    fromLocation?: string;
+    toLocation?: string;
+  },
+  fetchImpl: FetchLike = fetch,
+  scope: AmroApiScope = {},
+): Promise<Record<string, unknown>> {
+  const response = await fetchImpl('/api/v2/amro/inventory/scan', {
+    method: 'POST',
+    credentials: 'include',
+    headers: buildHeaders(scope),
+    body: JSON.stringify({
+      scan_mode: input.scanMode,
+      event_type: input.eventType,
+      scan_code: input.scanCode,
+      quantity: input.quantity,
+      from_location: input.fromLocation || null,
+      to_location: input.toLocation || null,
+      ui_source: 'stock_ledger_p2_scan_mode',
+    }),
+  });
+  await assertResponse(response, 'Failed to process scan posting');
+  const payload = await parseResponse(response);
+  return payload.output && typeof payload.output === 'object' ? payload.output : {};
 }
