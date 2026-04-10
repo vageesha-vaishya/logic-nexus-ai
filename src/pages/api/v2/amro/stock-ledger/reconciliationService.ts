@@ -34,6 +34,8 @@ export async function executeStockLedgerReconciliationRun(input: {
   }
   const runId = String(run.id);
 
+  // Note: amro_stock_balance_summary view doesn't have franchise_id,
+  // so we filter at the tenant level only
   const { data: balances, error: balanceError } = await supabase
     .from('amro_stock_balance_summary')
     .select('tenant_id,part_inventory_id,current_on_hand,ledger_net_quantity')
@@ -52,19 +54,40 @@ export async function executeStockLedgerReconciliationRun(input: {
     throw new Error(`Failed to evaluate balances: ${balanceError.message}`);
   }
 
+  // Note: amro_stock_valuation_summary view doesn't have franchise_id
+  const { data: valuationData } = await supabase
+    .from('amro_stock_valuation_summary')
+    .select('part_inventory_id,total_available_value,total_available_quantity')
+    .eq('tenant_id', tenantId);
+
+  const valuationMap = new Map<string, { value: number; quantity: number }>();
+  for (const v of valuationData || []) {
+    valuationMap.set(String(v.part_inventory_id), {
+      value: Number(v.total_available_value || 0),
+      quantity: Number(v.total_available_quantity || 0),
+    });
+  }
+
   const varianceRows = (balances || [])
     .map((row: Record<string, unknown>) => {
       const expected = Number(row.ledger_net_quantity || 0);
       const actual = Number(row.current_on_hand || 0);
       const variance = actual - expected;
+      const partId = String(row.part_inventory_id || '');
+      const valuation = valuationMap.get(partId);
+      let varianceCost = 0;
+      if (valuation && valuation.quantity > 0) {
+        const avgUnitCost = valuation.value / valuation.quantity;
+        varianceCost = Math.abs(variance) * avgUnitCost;
+      }
       return {
         tenant_id: tenantId,
         run_id: runId,
-        part_inventory_id: String(row.part_inventory_id || ''),
+        part_inventory_id: partId,
         expected_quantity: expected,
         actual_quantity: actual,
         variance_quantity: variance,
-        variance_cost: 0,
+        variance_cost: varianceCost,
         variance_reason: Math.abs(variance) > 0 ? 'ledger_balance_mismatch' : null,
         metadata: {},
       };

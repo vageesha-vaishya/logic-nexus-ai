@@ -151,24 +151,32 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
   const [selectedPeriodForReopenExecute, setSelectedPeriodForReopenExecute] = useState('');
   const [selectedApprovalForReopenExecute, setSelectedApprovalForReopenExecute] = useState('');
   const [opsTab, setOpsTab] = useState<'periods' | 'approvals' | 'automation' | 'cycle_count' | 'compliance'>('periods');
+  const [cursor, setCursor] = useState<string | null>(null);
+  const [hasNextPage, setHasNextPage] = useState(false);
 
-  const loadRecords = useCallback(async () => {
+  const loadRecords = useCallback(async (loadMore = false) => {
     setLoading(true);
     setError(null);
     try {
+      const currentCursor = loadMore ? cursor : null;
       const response = await listStockLedgerRecords(
         {
           page: 1,
           pageSize: 50,
           movementType: movementTypeFilter,
           search,
+          cursor: currentCursor ?? undefined,
         },
         fetch,
         apiScope,
       );
-      setRecords(response.records);
-      setSelectedRecordId((current) => current || response.records[0]?.id || null);
+      setRecords((prev) => loadMore ? [...prev, ...response.records] : response.records);
+      if (!loadMore) {
+        setSelectedRecordId((current) => current || response.records[0]?.id || null);
+      }
       setTotal(response.total);
+      setHasNextPage(response.hasNextPage);
+      setCursor(response.nextCursor);
       const [periodList, approvalList, kpis, templates, schedules, compliance, currency] = await Promise.all([
         listStockLedgerPeriods(fetch, apiScope),
         listStockLedgerApprovals('pending', fetch, apiScope),
@@ -192,7 +200,7 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
     } finally {
       setLoading(false);
     }
-  }, [apiScope, movementTypeFilter, search]);
+  }, [apiScope, movementTypeFilter, search, cursor]);
 
   useEffect(() => {
     void loadRecords();
@@ -639,6 +647,13 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
             )
           )}
         />
+        {hasNextPage && (
+          <div className="flex justify-center pt-3">
+            <Button size="sm" variant="outline" onClick={() => { void loadRecords(true); }} disabled={loading}>
+              {loading ? 'Loading...' : `Load More (${records.length} of ${total} loaded)`}
+            </Button>
+          </div>
+        )}
 
         {error ? (
           <div className="rounded border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive" role="alert" aria-live="assertive">
@@ -750,101 +765,184 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
           </TabsContent>
           <TabsContent value="automation" className="pt-3">
             <AmroCrudSection title="Reporting Automation">
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                <Input
-                  placeholder="Template name"
-                  value={newTemplateName}
-                  onChange={(event) => setNewTemplateName(event.target.value)}
-                />
-                <Select value={newTemplateType} onValueChange={(value) => setNewTemplateType(value as 'stock-balance' | 'transaction-history' | 'valuation-summary')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="stock-balance">stock-balance</SelectItem>
-                    <SelectItem value="transaction-history">transaction-history</SelectItem>
-                    <SelectItem value="valuation-summary">valuation-summary</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button size="sm" onClick={() => { void saveReportTemplate(); }}>
-                  <Sparkles className="mr-1 h-4 w-4" />
-                  Save Template
-                </Button>
-              </div>
-              <div className="mt-3 rounded border">
-                <table className={amroCompactTableClassNames.table}>
-                  <thead className={amroCompactTableClassNames.thead}><tr><AmroHeaderCell compact>Name</AmroHeaderCell><AmroHeaderCell compact>Type</AmroHeaderCell><AmroHeaderCell compact>Updated</AmroHeaderCell></tr></thead>
-                  <tbody>
-                    {reportTemplates.map((template) => (
-                      <tr key={template.id} className={amroCompactTableClassNames.row}>
-                        <td className={amroCompactTableClassNames.td}>{template.name}</td>
-                        <td className={amroCompactTableClassNames.td}>{template.report_type}</td>
-                        <td className={amroCompactTableClassNames.td}>{new Date(template.updated_at).toLocaleString()}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-                <Select value={selectedTemplateForSchedule} onValueChange={setSelectedTemplateForSchedule}>
-                  <SelectTrigger><SelectValue placeholder="Template for schedule" /></SelectTrigger>
-                  <SelectContent>
-                    {reportTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-                <Select value={selectedScheduleFrequency} onValueChange={(value) => setSelectedScheduleFrequency(value as 'daily' | 'weekly' | 'monthly')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="daily">daily</SelectItem>
-                    <SelectItem value="weekly">weekly</SelectItem>
-                    <SelectItem value="monthly">monthly</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Button size="sm" variant="outline" onClick={() => { void createSchedule(); }}>Create Schedule</Button>
-              </div>
-              <div className="mt-2 space-y-2">
-                {scheduledExports.map((schedule) => (
-                  <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
-                    <span>{schedule.frequency} | next {new Date(schedule.next_run_at).toLocaleString()} | template {schedule.template_id.slice(0, 8)}</span>
-                    <Button size="sm" variant="outline" onClick={() => { void executeSchedule(schedule.id); }}>Run Now</Button>
+              <div className="space-y-4">
+                <div className="rounded-md border p-3">
+                  <h4 className="text-sm font-medium">Save Report Template</h4>
+                  <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+                    <Input
+                      placeholder="Template name (e.g. Monthly Reconciliation)"
+                      value={newTemplateName}
+                      onChange={(event) => setNewTemplateName(event.target.value)}
+                    />
+                    <Select value={newTemplateType} onValueChange={(value) => setNewTemplateType(value as 'stock-balance' | 'transaction-history' | 'valuation-summary')}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="stock-balance">Stock Balance</SelectItem>
+                        <SelectItem value="transaction-history">Transaction History</SelectItem>
+                        <SelectItem value="valuation-summary">Valuation Summary</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" onClick={() => { void saveReportTemplate(); }} disabled={!newTemplateName.trim()}>
+                      <Sparkles className="mr-1 h-4 w-4" />
+                      Save Template
+                    </Button>
                   </div>
-                ))}
+                </div>
+
+                <div className="rounded-md border p-3">
+                  <h4 className="text-sm font-medium">Saved Templates ({reportTemplates.length})</h4>
+                  <div className="mt-2 rounded border">
+                    <table className={amroCompactTableClassNames.table}>
+                      <thead className={amroCompactTableClassNames.thead}><tr><AmroHeaderCell compact>Name</AmroHeaderCell><AmroHeaderCell compact>Type</AmroHeaderCell><AmroHeaderCell compact>Last Updated</AmroHeaderCell></tr></thead>
+                      <tbody>
+                        {reportTemplates.length === 0 ? (
+                          <tr><td colSpan={3} className="p-3 text-center text-sm text-muted-foreground">No saved templates yet</td></tr>
+                        ) : reportTemplates.map((template) => (
+                          <tr key={template.id} className={amroCompactTableClassNames.row}>
+                            <td className={amroCompactTableClassNames.td}>{template.name}</td>
+                            <td className={amroCompactTableClassNames.td}>{template.report_type}</td>
+                            <td className={amroCompactTableClassNames.td}>{new Date(template.updated_at).toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                <div className="rounded-md border p-3">
+                  <h4 className="text-sm font-medium">Schedule Automated Export</h4>
+                  <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
+                    <Select value={selectedTemplateForSchedule} onValueChange={setSelectedTemplateForSchedule}>
+                      <SelectTrigger><SelectValue placeholder="Select template" /></SelectTrigger>
+                      <SelectContent>
+                        {reportTemplates.length === 0 ? (
+                          <SelectItem value="__none__" disabled>No templates available</SelectItem>
+                        ) : reportTemplates.map((template) => <SelectItem key={template.id} value={template.id}>{template.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                    <Select value={selectedScheduleFrequency} onValueChange={(value) => setSelectedScheduleFrequency(value as 'daily' | 'weekly' | 'monthly')}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="daily">Daily</SelectItem>
+                        <SelectItem value="weekly">Weekly</SelectItem>
+                        <SelectItem value="monthly">Monthly</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button size="sm" variant="outline" onClick={() => { void createSchedule(); }} disabled={!selectedTemplateForSchedule || selectedTemplateForSchedule === '__none__'}>Create Schedule</Button>
+                  </div>
+                </div>
+
+                <div className="rounded-md border p-3">
+                  <h4 className="text-sm font-medium">Scheduled Exports ({scheduledExports.length})</h4>
+                  {scheduledExports.length === 0 ? (
+                    <p className="mt-2 text-center text-sm text-muted-foreground">No scheduled exports configured</p>
+                  ) : (
+                    <div className="mt-2 space-y-2">
+                      {scheduledExports.map((schedule) => (
+                        <div key={schedule.id} className="flex flex-wrap items-center justify-between gap-2 rounded border p-2 text-xs">
+                          <div>
+                            <span className="font-medium">{schedule.frequency}</span>
+                            {' · '}Next run: <span className="text-muted-foreground">{new Date(schedule.next_run_at).toLocaleString()}</span>
+                            {' · '}Template: <span className="font-mono">{schedule.template_id.slice(0, 8)}...</span>
+                          </div>
+                          <Button size="sm" variant="outline" onClick={() => { void executeSchedule(schedule.id); }}>Run Now</Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </AmroCrudSection>
           </TabsContent>
           <TabsContent value="cycle_count" className="pt-3">
-            <AmroCrudSection title="Cycle Count & Scan Posting">
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-                <Input placeholder="Part Inventory ID" value={cyclePartInventoryId} onChange={(event) => setCyclePartInventoryId(event.target.value)} />
-                <Input type="number" placeholder="Expected Qty" value={String(cycleExpectedQty)} onChange={(event) => setCycleExpectedQty(Number(event.target.value || 0))} />
-                <Input type="number" placeholder="Counted Qty" value={String(cycleCountedQty)} onChange={(event) => setCycleCountedQty(Number(event.target.value || 0))} />
+            <AmroCrudSection title="Cycle Counting">
+              <div className="space-y-3">
+                <div className="rounded-md border p-3">
+                  <h4 className="text-sm font-medium">Post Cycle Count Discrepancy</h4>
+                  <p className="mt-1 text-xs text-muted-foreground">Compare physical count against ledger and post an adjustment if there is a discrepancy.</p>
+                  <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Part Inventory ID</Label>
+                      <Input placeholder="e.g. part-uuid-here" value={cyclePartInventoryId} onChange={(event) => setCyclePartInventoryId(event.target.value)} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Expected Qty (System)</Label>
+                      <Input type="number" placeholder="0" value={String(cycleExpectedQty)} onChange={(event) => setCycleExpectedQty(Number(event.target.value || 0))} />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Counted Qty (Physical)</Label>
+                      <Input type="number" placeholder="0" value={String(cycleCountedQty)} onChange={(event) => setCycleCountedQty(Number(event.target.value || 0))} />
+                    </div>
+                    <div className="flex items-end">
+                      <Button size="sm" onClick={() => { void submitCycleCount(); }} disabled={!cyclePartInventoryId.trim() || cycleCountedQty === cycleExpectedQty}>
+                        <ShieldCheck className="mr-1 h-4 w-4" />
+                        Post Adjustment
+                      </Button>
+                    </div>
+                  </div>
+                  {cyclePartInventoryId && cycleCountedQty !== cycleExpectedQty && (
+                    <div className="mt-2 text-xs">
+                      <span className={Number(cycleCountedQty) - Number(cycleExpectedQty) > 0 ? 'text-green-600' : 'text-red-600'}>
+                        Discrepancy: {Number(cycleCountedQty) - Number(cycleExpectedQty) > 0 ? '+' : ''}{Number(cycleCountedQty) - Number(cycleExpectedQty)} units
+                      </span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="rounded-md border p-3">
+                  <h4 className="text-sm font-medium">Scan-Assisted Posting</h4>
+                  <p className="mt-1 text-xs text-muted-foreground">Use barcode or RFID scanner to capture stock movements directly.</p>
+                  <div className="mt-3 grid grid-cols-2 gap-2 md:grid-cols-5">
+                    <div className="space-y-1">
+                      <Label className="text-xs">Scan Mode</Label>
+                      <Select value={scanMode} onValueChange={(value) => setScanMode(value as 'barcode' | 'rfid' | 'manual')}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="barcode">🔲 Barcode</SelectItem>
+                          <SelectItem value="rfid">📡 RFID</SelectItem>
+                          <SelectItem value="manual">⌨️ Manual</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Event Type</Label>
+                      <Select value={scanEventType} onValueChange={(value) => setScanEventType(value as 'receive' | 'issue' | 'transfer' | 'audit' | 'reserve' | 'release')}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="receive">📥 Receive</SelectItem>
+                          <SelectItem value="issue">📤 Issue</SelectItem>
+                          <SelectItem value="transfer">🔄 Transfer</SelectItem>
+                          <SelectItem value="audit">🔍 Audit</SelectItem>
+                          <SelectItem value="reserve">🔒 Reserve</SelectItem>
+                          <SelectItem value="release">🔓 Release</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1 md:col-span-2">
+                      <Label className="text-xs">Scan Code / Reference</Label>
+                      <Input
+                        placeholder="Scan or enter code"
+                        value={scanCode}
+                        onChange={(event) => setScanCode(event.target.value)}
+                        onKeyDown={(event) => { if (event.key === 'Enter') { void runScanPosting(); } }}
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-xs">Quantity</Label>
+                      <Input type="number" placeholder="1" value={String(scanQuantity)} min={1} onChange={(event) => setScanQuantity(Math.max(1, Number(event.target.value || 1)))} />
+                    </div>
+                  </div>
+                  <div className="mt-2 flex gap-2">
+                    <Button size="sm" variant="outline" onClick={() => { void runScanPosting(); }} disabled={!scanCode.trim() || scanQuantity < 1}>
+                      <QrCode className="mr-1 h-4 w-4" />
+                      Process Scan
+                    </Button>
+                    <span className="text-xs text-muted-foreground self-center">
+                      Mode: {scanMode} → Event: {scanEventType}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <Button className="mt-2" size="sm" onClick={() => { void submitCycleCount(); }}>Post Discrepancy</Button>
-              <div className="mt-4 grid grid-cols-1 gap-2 md:grid-cols-4">
-                <Select value={scanMode} onValueChange={(value) => setScanMode(value as 'barcode' | 'rfid' | 'manual')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="barcode">barcode</SelectItem>
-                    <SelectItem value="rfid">rfid</SelectItem>
-                    <SelectItem value="manual">manual</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Select value={scanEventType} onValueChange={(value) => setScanEventType(value as 'receive' | 'issue' | 'transfer' | 'audit' | 'reserve' | 'release')}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="receive">receive</SelectItem>
-                    <SelectItem value="issue">issue</SelectItem>
-                    <SelectItem value="transfer">transfer</SelectItem>
-                    <SelectItem value="audit">audit</SelectItem>
-                    <SelectItem value="reserve">reserve</SelectItem>
-                    <SelectItem value="release">release</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input placeholder="Scan code" value={scanCode} onChange={(event) => setScanCode(event.target.value)} />
-                <Input type="number" placeholder="Qty" value={String(scanQuantity)} onChange={(event) => setScanQuantity(Number(event.target.value || 1))} />
-              </div>
-              <Button className="mt-2" size="sm" variant="outline" onClick={() => { void runScanPosting(); }}>
-                <QrCode className="mr-1 h-4 w-4" />
-                Process Scan Posting
-              </Button>
             </AmroCrudSection>
           </TabsContent>
           <TabsContent value="compliance" className="pt-3">

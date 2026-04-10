@@ -191,6 +191,14 @@ function mapRecord(value: unknown): StockLedgerRecord {
   };
 }
 
+function escapeCsvField(value: unknown): string {
+  const str = typeof value === 'string' ? value : JSON.stringify(value ?? '');
+  if (str.includes(',') || str.includes('"') || str.includes('\n') || str.includes('\r')) {
+    return `"${str.replace(/"/g, '""')}"`;
+  }
+  return str;
+}
+
 function toPayload(payload: StockLedgerCreatePayload): Record<string, unknown> {
   return {
     part_inventory_id: payload.partInventoryId,
@@ -204,19 +212,21 @@ function toPayload(payload: StockLedgerCreatePayload): Record<string, unknown> {
     notes: payload.notes || null,
     metadata: payload.metadata || {},
     batch_id: payload.batchId || null,
+    idempotency_key: `sl-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`,
   };
 }
 
 export async function listStockLedgerRecords(
-  params: { page: number; pageSize: number; movementType?: string; search?: string },
+  params: { page: number; pageSize: number; movementType?: string; search?: string; cursor?: string },
   fetchImpl: FetchLike = fetch,
   scope: AmroApiScope = {},
-): Promise<{ records: StockLedgerRecord[]; total: number }> {
+): Promise<{ records: StockLedgerRecord[]; total: number; nextCursor: string | null; hasNextPage: boolean }> {
   const query = new URLSearchParams();
   query.set('page', String(params.page));
   query.set('page_size', String(params.pageSize));
   if (params.movementType && params.movementType !== 'all') query.set('movement_type', params.movementType);
   if (params.search?.trim()) query.set('search', params.search.trim());
+  if (params.cursor) query.set('cursor', params.cursor);
   const response = await fetchImpl(`/api/v2/amro/stock-ledger?${query.toString()}`, {
     method: 'GET',
     credentials: 'include',
@@ -229,6 +239,8 @@ export async function listStockLedgerRecords(
   return {
     records: rows.map((row) => mapRecord(row)),
     total: Number(output.total || 0),
+    nextCursor: output.next_cursor ?? null,
+    hasNextPage: Boolean(output.has_next_page),
   };
 }
 
@@ -316,13 +328,9 @@ export async function exportStockLedgerReport(
   const rows = Array.isArray(output.records) ? output.records : [];
   if (rows.length === 0) return '';
   const headers = Object.keys(rows[0] as Record<string, unknown>);
-  const csvRows = [headers.join(',')];
+  const csvRows = [headers.map(escapeCsvField).join(',')];
   for (const row of rows) {
-    const mapped = headers.map((header) => {
-      const value = (row as Record<string, unknown>)[header];
-      const raw = typeof value === 'string' ? value : JSON.stringify(value ?? '');
-      return `"${String(raw).replace(/"/g, '""')}"`;
-    });
+    const mapped = headers.map((header) => escapeCsvField((row as Record<string, unknown>)[header]));
     csvRows.push(mapped.join(','));
   }
   return csvRows.join('\n');
@@ -489,13 +497,9 @@ export async function exportStockLedgerAudit(
   const rows = Array.isArray(payload.output?.records) ? payload.output?.records : [];
   if (rows.length === 0) return '';
   const headers = Object.keys(rows[0] as Record<string, unknown>);
-  const csvRows = [headers.join(',')];
+  const csvRows = [headers.map(escapeCsvField).join(',')];
   for (const row of rows) {
-    const mapped = headers.map((header) => {
-      const value = (row as Record<string, unknown>)[header];
-      const raw = typeof value === 'string' ? value : JSON.stringify(value ?? '');
-      return `"${String(raw).replace(/"/g, '""')}"`;
-    });
+    const mapped = headers.map((header) => escapeCsvField((row as Record<string, unknown>)[header]));
     csvRows.push(mapped.join(','));
   }
   return csvRows.join('\n');

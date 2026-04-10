@@ -31,16 +31,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const access = await resolveAndApplyAccessContext(req, ctx);
     await enforceAmroDomainAccess(access, { correlationId: ctx.correlationId });
     const tenantId = String(access.tenantId || '');
+    const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
     const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
     const supabase = getSupabaseAdminClient();
-    const { data, error, count } = await supabase
+    let query = supabase
       .from('amro_stock_ledger_transactions')
       .select('*', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .order('effective_at', { ascending: false })
       .range(from, to);
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+    const { data, error, count } = await query;
     if (error) throw error;
     res.status(200).json({
       version: 'v2',

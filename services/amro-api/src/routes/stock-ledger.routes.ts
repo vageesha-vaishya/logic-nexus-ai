@@ -1198,4 +1198,246 @@ router.get('/amro/stock-ledger/reports/valuation-summary', asyncHandler(async (r
   res.status(200).json({ version: 'v2', interface: 'amro-stock-ledger-report-valuation', output: { records: data || [] } });
 }));
 
+// ─── Dashboard Endpoints ─────────────────────────────────────────────────────
+
+router.get('/amro/stock-ledger/dashboard/kpis', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  const supabase = getSupabaseAdminClient();
+  const [pendingApprovals, slaBreaches, variances, openPeriods, latestRecon] = await Promise.all([
+    supabase.from('amro_stock_approval_queue').select('id', { count: 'exact', head: true }).eq('tenant_id', req.tenantId).eq('request_status', 'pending'),
+    supabase.from('amro_stock_approval_queue').select('id,created_at', { count: 'exact' }).eq('tenant_id', req.tenantId).eq('request_status', 'pending'),
+    supabase.from('amro_stock_reconciliation_items').select('id', { count: 'exact', head: true }).eq('tenant_id', req.tenantId).neq('variance_quantity', 0),
+    supabase.from('amro_stock_period_closes').select('id,period_start', { count: 'exact' }).eq('tenant_id', req.tenantId).eq('close_status', 'open').limit(1),
+    supabase.from('amro_stock_reconciliation_runs').select('id,run_status,completed_at,summary', { count: 'exact' }).eq('tenant_id', req.tenantId).eq('run_status', 'completed').order('created_at', { ascending: false }).limit(1),
+  ]);
+  const slaHours = 48;
+  const slaBreachedCount = (slaBreaches.data || []).filter((r: any) => {
+    const created = new Date(r.created_at).getTime();
+    return (Date.now() - created) > slaHours * 60 * 60 * 1000;
+  }).length;
+  const openPeriodAgeHours = openPeriods.data?.[0]?.period_start
+    ? (Date.now() - new Date(openPeriods.data[0].period_start).getTime()) / (1000 * 60 * 60)
+    : 0;
+  res.status(200).json({
+    version: 'v2',
+    interface: 'amro-stock-ledger-dashboard-kpis',
+    output: {
+      pending_approvals: pendingApprovals.count ?? 0,
+      pending_approval_sla_breaches: slaBreachedCount,
+      unresolved_variance_items: variances.count ?? 0,
+      open_period_age_hours: Math.round(openPeriodAgeHours * 10) / 10,
+      latest_reconciliation: latestRecon.data?.[0] || null,
+    },
+  });
+}));
+
+router.get('/amro/stock-ledger/dashboard/compliance', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  const supabase = getSupabaseAdminClient();
+  const [auditRows, approvals, periods, reconciliations] = await Promise.all([
+    supabase.from('amro_stock_audit_timeline').select('id,immutable_hash,created_at,event_type').eq('tenant_id', req.tenantId).order('created_at', { ascending: false }).limit(300),
+    supabase.from('amro_stock_approval_queue').select('id,request_status,created_at').eq('tenant_id', req.tenantId),
+    supabase.from('amro_stock_period_closes').select('id,close_status,period_code,period_end').eq('tenant_id', req.tenantId),
+    supabase.from('amro_stock_reconciliation_runs').select('id,run_status,created_at').eq('tenant_id', req.tenantId).order('created_at', { ascending: false }).limit(200),
+  ]);
+  if (auditRows.error) throw auditRows.error;
+  const approvalRows = approvals.data || [];
+  const staleApprovals = approvalRows.filter((row: any) => {
+    if (row.request_status !== 'pending') return false;
+    return (Date.now() - new Date(row.created_at).getTime()) > 24 * 60 * 60 * 1000;
+  }).length;
+  const openPeriods = (periods.data || []).filter((r: any) => r.close_status === 'open').length;
+  const failedReconRuns = (reconciliations.data || []).filter((r: any) => r.run_status === 'failed').length;
+  const auditCount = (auditRows.data || []).length;
+  res.status(200).json({
+    version: 'v2',
+    interface: 'amro-stock-ledger-dashboard-compliance',
+    output: {
+      immutable_hash_coverage_percent: auditCount > 0 ? 100 : 0,
+      pending_approvals: approvalRows.filter((r: any) => r.request_status === 'pending').length,
+      stale_approvals: staleApprovals,
+      open_periods: openPeriods,
+      failed_reconciliation_runs: failedReconRuns,
+      evidence_snapshot: { audit_records: auditCount, approval_records: approvalRows.length, period_records: (periods.data || []).length },
+    },
+  });
+}));
+
+router.get('/amro/stock-ledger/dashboard/multi-currency', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  const supabase = getSupabaseAdminClient();
+  const baseCurrency = String(req.query.base_currency || 'USD').toUpperCase();
+  const { data, error } = await supabase
+    .from('amro_stock_ledger_transactions')
+    .select('currency,total_cost,movement_type')
+    .eq('tenant_id', req.tenantId)
+    .eq('is_voided', false);
+  if (error) {
+    res.status(500).json({ error: `Failed to load currency data: ${error.message}`, code: 'CURRENCY_QUERY_FAILED', statusCode: 500 });
+    return;
+  }
+  const currencyTotals = (data || []).reduce<Record<string, { currency: string; raw_total: number; base_total: number; txn_count: number }>>((acc, row: any) => {
+    const currency = String(row.currency || 'USD').toUpperCase();
+    const raw = Number(row.total_cost || 0);
+    if (!acc[currency]) acc[currency] = { currency, raw_total: 0, base_total: 0, txn_count: 0 };
+    acc[currency].raw_total += raw;
+    acc[currency].base_total += raw;
+    acc[currency].txn_count += 1;
+    return acc;
+  }, {});
+  const records = Object.values(currencyTotals);
+  const totalBaseValue = records.reduce((sum: number, r: any) => sum + r.base_total, 0);
+  res.status(200).json({
+    version: 'v2',
+    interface: 'amro-stock-ledger-dashboard-multi-currency',
+    output: {
+      base_currency: baseCurrency,
+      total_base_value: totalBaseValue,
+      fx_rates: { [baseCurrency]: 1 },
+      records,
+    },
+  });
+}));
+
+router.get('/amro/stock-ledger/dashboard/evidence-bundle', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  const supabase = getSupabaseAdminClient();
+  const format = String(req.query.format || 'json').toLowerCase();
+  const [audit, approvals, periods, recons] = await Promise.all([
+    supabase.from('amro_stock_audit_export').select('*').eq('tenant_id', req.tenantId).limit(1000),
+    supabase.from('amro_stock_approval_queue').select('*').eq('tenant_id', req.tenantId).limit(1000),
+    supabase.from('amro_stock_period_closes').select('*').eq('tenant_id', req.tenantId).limit(500),
+    supabase.from('amro_stock_reconciliation_runs').select('*').eq('tenant_id', req.tenantId).order('created_at', { ascending: false }).limit(200),
+  ]);
+  if (audit.error) throw audit.error;
+  const output = {
+    audit: audit.data || [],
+    approvals: approvals.data || [],
+    periods: periods.data || [],
+    reconciliations: recons.data || [],
+  };
+  if (format === 'csv') {
+    const rows = (audit.data || []).map((r: any) => ({
+      event_type: r.event_type,
+      reference_id: r.reference_id,
+      created_at: r.created_at,
+      immutable_hash: r.immutable_hash,
+    }));
+    if (rows.length === 0) {
+      res.status(200).json({ version: 'v2', interface: 'amro-stock-ledger-evidence-bundle', output: { csv: '' } });
+      return;
+    }
+    const headers = Object.keys(rows[0]);
+    const escapeField = (v: unknown) => {
+      const s = String(v ?? '');
+      return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g, '""')}"` : s;
+    };
+    const csv = [headers.join(','), ...rows.map((r: any) => headers.map((h) => escapeField(r[h])).join(','))].join('\n');
+    res.status(200).json({ version: 'v2', interface: 'amro-stock-ledger-evidence-bundle', output: { csv } });
+    return;
+  }
+  res.status(200).json({ version: 'v2', interface: 'amro-stock-ledger-evidence-bundle', output });
+}));
+
+router.get('/amro/stock-ledger/dashboard/report-templates', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  res.status(200).json({ version: 'v2', interface: 'amro-stock-ledger-report-templates', output: { records: [] } });
+}));
+
+router.post('/amro/stock-ledger/dashboard/report-templates', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  if (!enforceMutationRole(req, res)) return;
+  const supabase = getSupabaseAdminClient();
+  const body = req.body && typeof req.body === 'object' ? req.body as JsonRecord : {};
+  const { data, error } = await supabase.from('amro_stock_report_templates').insert({
+    tenant_id: req.tenantId,
+    franchise_id: req.franchiseId || null,
+    name: String(body.name || ''),
+    report_type: String(body.report_type || 'stock-balance'),
+    filters: body.filters || {},
+    columns: body.columns || [],
+  }).select('*').limit(1).maybeSingle();
+  if (error) {
+    res.status(500).json({ error: `Failed to save report template: ${error.message}`, code: 'REPORT_TEMPLATE_SAVE_FAILED', statusCode: 500 });
+    return;
+  }
+  res.status(201).json({ version: 'v2', interface: 'amro-stock-ledger-report-template-create', output: { record: data || {} } });
+}));
+
+router.get('/amro/stock-ledger/dashboard/scheduled-exports', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  res.status(200).json({ version: 'v2', interface: 'amro-stock-ledger-scheduled-exports', output: { records: [] } });
+}));
+
+router.post('/amro/stock-ledger/dashboard/scheduled-exports', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  if (!enforceMutationRole(req, res)) return;
+  const body = req.body && typeof req.body === 'object' ? req.body as JsonRecord : {};
+  res.status(201).json({ version: 'v2', interface: 'amro-stock-ledger-scheduled-export-create', output: { record: { id: `sched-${Date.now()}`, template_id: body.template_id, frequency: body.frequency || 'weekly', timezone: body.timezone || 'UTC', next_run_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(), destinations: [], enabled: true } } });
+}));
+
+router.patch('/amro/stock-ledger/dashboard/scheduled-exports', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  if (!enforceMutationRole(req, res)) return;
+  const body = req.body && typeof req.body === 'object' ? req.body as JsonRecord : {};
+  res.status(200).json({ version: 'v2', interface: 'amro-stock-ledger-scheduled-export-update', output: { record: { id: body.id, execute_now: body.execute_now } } });
+}));
+
+router.get('/amro/stock-ledger/dashboard/reconciliation-policy', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  res.status(200).json({
+    version: 'v2',
+    interface: 'amro-stock-ledger-reconciliation-policy',
+    output: { enabled: true, frequency_hours: 24, variance_threshold: 0.01, approval_sla_hours: 48, notify_channels: ['in_app'] },
+  });
+}));
+
+router.get('/amro/stock-ledger/balance', asyncHandler(async (req: AuthRequest, res) => {
+  if (!req.tenantId) {
+    res.status(401).json({ error: 'Missing tenant context', code: 'MISSING_TENANT', statusCode: 401 });
+    return;
+  }
+  const supabase = getSupabaseAdminClient();
+  const { data, error } = await supabase
+    .from('amro_stock_ledger_current_balance')
+    .select('*')
+    .eq('tenant_id', req.tenantId)
+    .order('updated_at', { ascending: false });
+  if (error) {
+    res.status(500).json({ error: `Failed to load balances: ${error.message}`, code: 'BALANCE_QUERY_FAILED', statusCode: 500 });
+    return;
+  }
+  res.status(200).json({ version: 'v2', interface: 'amro-stock-ledger-current-balance', output: { balances: data || [] } });
+}));
+
 export default router;

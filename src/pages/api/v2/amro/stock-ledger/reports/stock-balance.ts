@@ -30,12 +30,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const access = await resolveAndApplyAccessContext(req, ctx);
     await enforceAmroDomainAccess(access, { correlationId: ctx.correlationId });
     const tenantId = String(access.tenantId || '');
+    const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
     const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from('amro_stock_ledger_current_balance')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('updated_at', { ascending: false });
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+    const { data, error } = await query;
     if (error) throw error;
     res.status(200).json({ version: 'v2', correlationId: ctx.correlationId, interface: 'amro-stock-ledger-report-stock-balance', output: { rows: data || [] } });
   } catch (error) {

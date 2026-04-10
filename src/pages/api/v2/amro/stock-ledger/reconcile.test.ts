@@ -86,6 +86,16 @@ describe('/api/v2/amro/stock-ledger/reconcile', () => {
             })),
           };
         }
+        if (table === 'amro_stock_valuation_summary') {
+          return {
+            select: vi.fn(() => ({
+              eq: vi.fn().mockResolvedValue({
+                data: [{ part_inventory_id: 'part-1', total_available_value: 500, total_available_quantity: 5 }],
+                error: null,
+              }),
+            })),
+          };
+        }
         if (table === 'amro_stock_reconciliation_items') {
           return {
             insert: vi.fn().mockResolvedValue({ error: null }),

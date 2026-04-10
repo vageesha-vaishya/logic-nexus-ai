@@ -46,6 +46,7 @@ async function validateSourceReferenceEntity(
 
   const tableErrors: Array<{ table: string; code?: string; message?: string }> = [];
   for (const table of tables) {
+    let columnLookupSuccess = false;
     for (const column of SOURCE_ENTITY_COLUMNS) {
       const { data, error } = await supabase
         .from(table)
@@ -62,11 +63,18 @@ async function validateSourceReferenceEntity(
           break;
         }
       }
+      if (!error && data === null) {
+        columnLookupSuccess = true;
+      }
+    }
+    if (!columnLookupSuccess && tableErrors.every((e) => e.table !== table)) {
+      tableErrors.push({ table, message: `No matching record found in ${table}` });
     }
   }
 
-  if (tableErrors.length === tables.length) return;
-  throw new Error(`source_reference ${sourceReference} was not found for source_module ${sourceModule}`);
+  if (tableErrors.length === tables.length) {
+    throw new Error(`source_reference ${sourceReference} was not found for source_module ${sourceModule}`);
+  }
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
@@ -95,14 +103,28 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (req.method === 'GET') {
       const { page, pageSize } = parsePagination(req.query as Record<string, unknown>);
       const filters = parseLedgerListFilters(req.query as Record<string, unknown>);
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
+      const cursor = req.query.cursor ? String(req.query.cursor).trim() : null;
+
       let query = supabase
         .from('amro_stock_ledger_transactions')
         .select('*', { count: 'exact' })
         .eq('tenant_id', tenantId)
-        .order(filters.sortBy, { ascending: filters.sortDirection === 'asc' })
-        .range(from, to);
+        .order(filters.sortBy, { ascending: filters.sortDirection === 'asc' });
+
+      if (cursor) {
+        // Cursor-based pagination: fetch records after the cursor position
+        if (filters.sortDirection === 'asc') {
+          query = query.gt(filters.sortBy, cursor);
+        } else {
+          query = query.lt(filters.sortBy, cursor);
+        }
+      } else {
+        // Offset-based pagination (backward compatible)
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        query = query.range(from, to);
+      }
+
       if (!filters.includeVoided) query = query.eq('is_voided', false);
       if (filters.movementType) query = query.eq('movement_type', filters.movementType);
       if (filters.partInventoryId) query = query.eq('part_inventory_id', filters.partInventoryId);
@@ -110,17 +132,31 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       if (filters.valuationMethod) query = query.eq('valuation_method', filters.valuationMethod);
       if (filters.effectiveFrom) query = query.gte('effective_at', filters.effectiveFrom);
       if (filters.effectiveTo) query = query.lte('effective_at', filters.effectiveTo);
+
+      query = query.limit(cursor ? pageSize : undefined);
+
       const { data, error, count } = await query;
       if (error) throw error;
+
+      const records = (data || []).map((row) => mapStockLedgerRow(row as Record<string, unknown>));
+      const nextCursor = cursor
+        ? (records.length > 0 ? String((records[records.length - 1] as any)[filters.sortBy] || '') : null)
+        : null;
+      const hasNextPage = cursor
+        ? records.length === pageSize
+        : page * pageSize < (count ?? 0);
       res.status(200).json({
         version: 'v2',
         correlationId: ctx.correlationId,
         interface: 'amro-stock-ledger-list',
         output: {
-          records: (data || []).map((row) => mapStockLedgerRow(row as Record<string, unknown>)),
+          records,
           total: count ?? 0,
           page,
           page_size: pageSize,
+          next_cursor: nextCursor,
+          has_next_page: hasNextPage,
+          pagination_mode: cursor ? 'cursor' : 'offset',
           applied_filters: filters,
           latency_ms: Date.now() - startedAt,
         },

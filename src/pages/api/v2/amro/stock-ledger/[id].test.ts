@@ -81,21 +81,31 @@ describe('/api/v2/amro/stock-ledger/[id]', () => {
 
   it('updates mutable fields on PATCH', async () => {
     const supabase: any = {
-      from: vi.fn(() => ({
-        update: vi.fn(() => ({
-          eq: vi.fn(() => ({
-            eq: vi.fn(() => ({
+      from: vi.fn((table: string) => {
+        if (table === 'amro_stock_ledger_transactions') {
+          return {
+            update: vi.fn(() => ({
               eq: vi.fn(() => ({
-                select: vi.fn(() => ({
-                  limit: vi.fn(() => ({
-                    maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'tx-2', notes: 'updated' }, error: null }),
+                eq: vi.fn(() => ({
+                  eq: vi.fn(() => ({
+                    select: vi.fn(() => ({
+                      limit: vi.fn(() => ({
+                        maybeSingle: vi.fn().mockResolvedValue({ data: { id: 'tx-2', notes: 'updated' }, error: null }),
+                      })),
+                    })),
                   })),
                 })),
               })),
             })),
-          })),
-        })),
-      })),
+          };
+        }
+        if (table === 'amro_stock_audit_timeline') {
+          return {
+            insert: vi.fn().mockResolvedValue({ error: null }),
+          };
+        }
+        return {};
+      }),
     };
     vi.mocked(getSupabaseAdminClient).mockReturnValue(supabase);
     const req: ApiRequest = { method: 'PATCH', query: { id: 'tx-2' }, headers: {}, body: { notes: 'updated' } };

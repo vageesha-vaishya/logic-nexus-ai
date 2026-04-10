@@ -30,11 +30,16 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const access = await resolveAndApplyAccessContext(req, ctx);
     await enforceAmroDomainAccess(access, { correlationId: ctx.correlationId });
     const tenantId = String(access.tenantId || '');
+    const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
     const supabase = getSupabaseAdminClient();
-    const { data, error } = await supabase
+    let query = supabase
       .from('amro_stock_ledger_current_balance')
       .select('valuation_method,currency,inventory_value')
       .eq('tenant_id', tenantId);
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+    const { data, error } = await query;
     if (error) throw error;
     const summary = (data || []).reduce<Record<string, { currency: string; total_value: number; rows: number }>>((acc, row) => {
       const method = String((row as any).valuation_method || 'weighted_average');

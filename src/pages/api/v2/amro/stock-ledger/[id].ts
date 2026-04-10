@@ -1,3 +1,4 @@
+import { createHash } from 'crypto';
 import type { ApiRequest, ApiResponse } from '../../../_utils/types';
 import {
   applyCors,
@@ -94,6 +95,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         res.status(404).json({ error: 'Record not found or already voided', version: 'v2', correlationId: ctx.correlationId });
         return;
       }
+
+      await supabase
+        .from('amro_stock_audit_timeline')
+        .insert({
+          tenant_id: tenantId,
+          franchise_id: franchiseId,
+          actor_user_id: auth.userId,
+          event_type: 'stock_ledger.transaction.updated',
+          event_category: 'stock-ledger',
+          reference_id: id,
+          event_payload: {
+            updated_fields: Object.keys(updatePayload),
+            previous_notes: data.notes,
+            previous_source_reference: data.source_reference,
+          },
+          immutable_hash: createHash('sha256')
+            .update(`${tenantId}|${id}|updated|${JSON.stringify(updatePayload)}|${new Date().toISOString()}`)
+            .digest('hex'),
+        });
+
       res.status(200).json({
         version: 'v2',
         correlationId: ctx.correlationId,
