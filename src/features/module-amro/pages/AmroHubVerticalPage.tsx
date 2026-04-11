@@ -43,6 +43,7 @@ import {
   YAxis,
 } from 'recharts';
 import { AmroOwnedWorkspace } from '../components/AmroOwnedWorkspace';
+import { AmroWorkOrdersListPage } from '../components/work-orders/AmroWorkOrdersListPage';
 import { useAmroOverviewKpi } from '../hooks/useAmroOverviewKpi';
 
 type AmroModuleShellProps = {
@@ -1507,13 +1508,8 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
             </Card>
           ) : (
             <>
-              {isWorkspaceOnlyModuleRoute ? (
-                <AmroWorkspaceSurface
-                  moduleKey={workspaceModuleKey}
-                  overviewPersona={activePersona}
-                  overviewControls={overviewControls}
-                  overviewTelemetry={overviewTelemetry}
-                />
+              {moduleKey === 'work-packages' ? (
+                <AmroWorkOrdersListPage />
               ) : isWorkspaceDocumentationRoute ? (
                 <AmroWorkspaceDocumentationReference phasePlanRows={phasePlanRows} phasePlanSource={phasePlanSource} />
               ) : (

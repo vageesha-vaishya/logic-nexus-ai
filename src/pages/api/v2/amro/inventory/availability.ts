@@ -11,6 +11,7 @@ import {
   resolveAndApplyAccessContext,
 } from '../../../_utils/http';
 import { sendErrorResponse } from '../../../_utils/errorHandler';
+import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../../_utils/compatibility-facade';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -60,10 +61,81 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const scopedAccess = await resolveAndApplyAccessContext(req, ctx);
     await enforceAmroDomainAccess(scopedAccess, { correlationId: ctx.correlationId });
     const tenantId = String(scopedAccess.tenantId || '');
-    const stationCode = String(req.query.station_code || req.query.station || 'BASE').trim();
+    const franchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId) : null;
+    const stationCode = String(req.query.station_code || req.query.station || '').trim() || null;
     const requestedPartNumbers = parsePartNumbers(req.query.part_numbers || req.query.part_number);
-    const parts = requestedPartNumbers.length > 0 ? requestedPartNumbers : ['GENERIC-PART-001', 'GENERIC-PART-002'];
+
+    const supabase = getSupabaseAdminClient();
+
+    let query = supabase
+      .from('parts_inventory')
+      .select(
+        'id, part_number, serial_number, description, quantity_on_hand, quantity_available, quantity_reserved, warehouse_location, status, criticality, reorder_level, item_type, ata_chapter, supplier_name'
+      )
+      .eq('tenant_id', tenantId);
+
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+
+    if (requestedPartNumbers.length > 0) {
+      query = query.in('part_number', requestedPartNumbers);
+    }
+
+    if (stationCode) {
+      query = query.ilike('warehouse_location', `%${stationCode}%`);
+    }
+
+    query = query.order('part_number', { ascending: true });
+
+    const { data: rows, error: dbError } = await query;
+    if (dbError) {
+      throw new Error(`Failed to query inventory availability: ${dbError.message}`);
+    }
+
     const checkedAt = new Date().toISOString();
+
+    const items = (rows || []).map((row) => {
+      const onHand = Number(row.quantity_on_hand || 0);
+      const reserved = Number(row.quantity_reserved || 0);
+      const available = row.quantity_available != null
+        ? Number(row.quantity_available)
+        : Math.max(0, onHand - reserved);
+      const reorderLevel = Number(row.reorder_level || 0);
+
+      let availabilityStatus: string;
+      if (available <= 0) {
+        availabilityStatus = 'out_of_stock';
+      } else if (available <= reorderLevel) {
+        availabilityStatus = 'limited';
+      } else {
+        availabilityStatus = 'available';
+      }
+
+      return {
+        part_number: String(row.part_number || ''),
+        serial_number: row.serial_number || null,
+        description: row.description || null,
+        available_qty: available,
+        quantity_on_hand: onHand,
+        reserved_qty: reserved,
+        warehouse_location: row.warehouse_location || null,
+        status: availabilityStatus,
+        inventory_status: row.status || null,
+        criticality: row.criticality || null,
+        item_type: row.item_type || null,
+        ata_chapter: row.ata_chapter || null,
+        supplier_name: row.supplier_name || null,
+        reorder_level: reorderLevel,
+      };
+    });
+
+    const summary = {
+      total_items: items.length,
+      available_items: items.filter((i) => i.status === 'available').length,
+      limited_items: items.filter((i) => i.status === 'limited').length,
+      out_of_stock_items: items.filter((i) => i.status === 'out_of_stock').length,
+    };
 
     res.status(200).json({
       version: 'v2',
@@ -71,14 +143,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       correlationId: ctx.correlationId,
       output: {
         tenant_id: tenantId,
+        franchise_id: franchiseId,
         station_code: stationCode,
+        part_numbers_requested: requestedPartNumbers.length > 0 ? requestedPartNumbers : null,
         checked_at: checkedAt,
-        items: parts.map((partNumber, index) => ({
-          part_number: partNumber,
-          available_qty: Math.max(0, 12 - (index * 2)),
-          reserved_qty: index,
-          status: index % 2 === 0 ? 'available' : 'limited',
-        })),
+        summary,
+        items,
       },
     });
   } catch (error) {

@@ -3495,6 +3495,431 @@ interface FieldVisibilityRule {
 
 ---
 
+## 17.5 Comprehensive Gap Analysis: Existing vs Required MRO Features
+
+### Current State Assessment
+
+Based on a thorough audit of the existing AMRO module codebase (723 migrations, 84 API endpoints, 63 components, 60+ test files, 30+ documentation files), here is the complete breakdown of what EXISTS, what is PARTIAL, and what is MISSING — organized by MRO domain and sequenced by dependency.
+
+### MRO Feature Status Matrix
+
+| # | MRO Feature | Status | What EXISTS | What is MISSING | Dependency Tier |
+|---|-------------|--------|-------------|-----------------|-----------------|
+| 1 | **Aircraft/Asset Registry** | ✅ EXISTS | `aircraft` table, full CRUD in MasterData page, E2E tests, engine JSONB tracking | — | Tier 0 (Foundation) |
+| 2 | **Parts Inventory & Stock Management** | ✅ EXISTS | `parts_inventory` table, workbench (1598 lines), stock ledger (9 movement types, 3 valuation methods), period management, reconciliation, approval workflow, 3 reports | Multi-warehouse transfer workflows, cycle counting | Tier 0 (Foundation) |
+| 3 | **Component/Part Tracking** | ⚠️ PARTIAL | `components` table with LLP fields, installation/removal dates, ATA chapter | Dedicated component lifecycle UI, LLP surfacing in parts UI | Tier 1 |
+| 4 | **Work Order Management** | ⚠️ PARTIAL | `work_packages` table, full CRUD API (2554 lines), state transitions, dual-write reconciliation | Dedicated work order management UI (separate from settings), Gantt view | Tier 1 |
+| 5 | **Task Cards & Procedures** | ⚠️ PARTIAL | `tasks` table with steps/evidence/qualifications JSONB, API endpoint | Task card execution UI, technician mobile view, digital signatures | Tier 1 |
+| 6 | **Maintenance Planning & Scheduling** | ⚠️ PARTIAL | `schedules/` API (index, replan), work package templates | Visual scheduling board, Gantt chart, calendar view | Tier 1 |
+| 7 | **Compliance Tracking (AD/SB)** | ⚠️ PARTIAL | `compliance-gates.ts` API, `compliance/obligations.ts`, compliance rule packs in workspace model | Dedicated AD/SB tracking UI, regulatory ingestion | Tier 2 |
+| 8 | **Vendor/Supplier Management** | ⚠️ PARTIAL | `suppliers` table, CRUD in master data | Supplier performance tracking, scorecards, dedicated UI | Tier 2 |
+| 9 | **Cost Tracking** | ⚠️ PARTIAL | `estimated_cost`/`actual_cost` on work_packages, stock ledger cost tracking | Budget management, cost center, financial reporting | Tier 2 |
+| 10 | **Reporting & Analytics** | ⚠️ PARTIAL | Overview KPI dashboard, stock ledger reports (3 types), aircraft dashboard | Custom report builder, scheduled reporting UI | Tier 2 |
+| 11 | **Barcode/QR Scanning** | ⚠️ PARTIAL | `inventory/scan.ts` API endpoint | Barcode scanning UI component, scanner integration | Tier 2 |
+| 12 | **Life-Limited Parts Tracking** | ⚠️ PARTIAL | LLP fields on `components` table (is_llp_part, llp_hours, llp_cycles) | Not surfaced in parts UI, no LLP lifecycle management | Tier 2 |
+| 13 | **Purchase Orders & Procurement** | ❌ MISSING | `generatePurchaseOrder()` stub function | No PO table, no PO API, no PO UI, no vendor selection workflow | Tier 1 |
+| 14 | **Quality Management/Inspection** | ❌ MISSING | QA fields on tasks (qa_verified_by) | No inspections table, no NCR workflow, no quality dashboard | Tier 1 |
+| 15 | **Certificate Management** | ❌ MISSING | `material_certification` string field (unused) | No certificate table, no FAA 8130/EASA Form 1 tracking | Tier 1 |
+| 16 | **Mobile/Offline Operations** | ❌ MISSING | `useIsMobile()` responsive hook | No PWA, no offline sync, no mobile-specific components | Tier 1 |
+| 17 | **Tool & Equipment Management** | ❌ MISSING | `item_type='tool'` in item_master | No tool table, no calibration tracking, no tool assignment | Tier 3 |
+| 18 | **Warranty Management** | ❌ MISSING | — | No warranty table, no claims workflow | Tier 3 |
+| 19 | **Rotable Pool Management** | ❌ MISSING | — | No rotable pool table, no turnaround tracking | Tier 3 |
+| 20 | **Core Returns & Repair Tracking** | ❌ MISSING | — | No repair order table, no core return workflow | Tier 3 |
+
+---
+
+### Dependency-Ordered Implementation Sequence
+
+The following sequence ensures that each feature builds on already-implemented foundations. **You cannot build Tier 2 without Tier 1, and you cannot build Tier 1 without Tier 0.**
+
+---
+
+#### TIER 0: Foundation (Already Exists — Validate & Stabilize)
+
+**These features are already implemented. Before building anything new, validate they work correctly.**
+
+| # | Feature | Existing Implementation | Validation Activity | Est. Effort |
+|---|---------|----------------------|---------------------|-------------|
+| 0.1 | Aircraft Registry | `aircraft` table, MasterData CRUD, E2E tests | Run E2E tests, verify all fields, test engine JSONB | 1 day |
+| 0.2 | Parts Inventory Workbench | `AmroPartsInventoryWorkbench.tsx` (1598 lines), `parts_inventory` table | Test all filters, grouping, alerts, risk bands, ABC classification | 2 days |
+| 0.3 | Stock Ledger | `stockLedgerApi.ts` (710 lines), `amro_stock_ledger_transactions` table, 9 movement types, 3 valuation methods | Test all movement types, period open/close, reconciliation, approvals | 3 days |
+| 0.4 | Work Package CRUD | `work_packages` table, API (2554 lines), template adapter | Test create/update/transition, template-based creation, dual-write | 2 days |
+| 0.5 | Task Management | `tasks` table, `tasks.ts` API | Test CRUD, verify JSONB fields (steps, evidence, qualifications) | 1 day |
+| 0.6 | Master Data Management | `AmroSettingsMasterDataPage.tsx` (9410 lines), 12 entities | Test CRUD for all 12 entities, verify export functionality | 2 days |
+| 0.7 | Overview Dashboard | `useAmroOverviewKpi.ts`, KPI cards, risk heatmap, trend lines | Verify data accuracy, test auto-refresh, test export | 1 day |
+| 0.8 | Item Master Catalog | `amro_item_master` table, `AmroItemMasterCatalogPanel.tsx`, cross-references, UOM conversions | Test catalog display, cross-reference lookup, UOM conversion | 1 day |
+
+**Tier 0 Total: ~13 days of validation. No new code — just ensure existing features work.**
+
+---
+
+#### TIER 1: Critical Missing Features (Build First — Blocks All Downstream Work)
+
+These are the features that, if missing, prevent the platform from functioning as a complete MRO system. They must be built before any Tier 2/3 features.
+
+##### Group 1.1: Database Foundation for Tier 1 Features
+
+| # | Activity | Tables Needed | Depends On | Est. Effort |
+|---|----------|--------------|------------|-------------|
+| 1.1.1 | Design `purchase_orders` schema | `purchase_orders`, `po_line_items`, `po_approvals` | Tier 0 complete | 2 days |
+| 1.1.2 | Design `quality_inspections` schema | `quality_inspections`, `ncr_reports`, `inspection_checklists` | Tier 0 complete | 2 days |
+| 1.1.3 | Design `certificates` schema | `certificates` (FAA 8130, EASA Form 1), `certificate_attachments` | Tier 0 complete | 1 day |
+| 1.1.4 | Design `component_lifecycle` schema | `component_lifecycle` (enhanced from `components`), `component_removal_reasons` | Tier 0 complete | 2 days |
+| 1.1.5 | Design `work_order_management` schema | `work_orders` (separate from `work_packages`), `work_order_assignments`, `work_order_materials` | Tier 0 complete | 2 days |
+| 1.1.6 | Design `task_execution` schema | `task_execution_records`, `task_signatures`, `task_evidence` | Tier 0 complete | 2 days |
+| 1.1.7 | Design `scheduling_board` schema | `schedule_events`, `schedule_assignments`, `schedule_conflicts` | Tier 0 complete | 2 days |
+| 1.1.8 | Write & execute all Tier 1 migrations | All above tables + FKs, indexes, RLS policies | 1.1.1 - 1.1.7 | 3 days |
+| 1.1.9 | Write seed data for reference tables | Certificate types, inspection types, PO statuses | 1.1.8 | 1 day |
+
+**Group 1.1 Total: ~17 days**
+
+##### Group 1.2: Purchase Order & Procurement (Depends on Group 1.1)
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 1.2.1 | Create `PurchaseOrderService` (CRUD, status transitions, approval workflow) | Group 1.1 | 3 days |
+| 1.2.2 | Create PO API endpoints (list, create, update, approve, send to vendor, receive) | 1.2.1 | 3 days |
+| 1.2.3 | Build PO Creation UI (wizard: vendor selection → line items → approval routing) | 1.2.2 | 4 days |
+| 1.2.4 | Build PO List & Detail view (status tracking, vendor responses, delivery tracking) | 1.2.2 | 3 days |
+| 1.2.5 | Build PO Approval Workflow (multi-level, email notifications) | 1.2.2 | 2 days |
+| 1.2.6 | Build Goods Receipt UI (receive against PO, inspect, accept/reject, update stock) | 1.2.2 | 4 days |
+| 1.2.7 | Integrate PO with Parts Inventory (auto-create PO from reorder alerts) | 1.2.2, Tier 0.2 | 2 days |
+| 1.2.8 | Write unit + E2E tests for PO workflow | 1.2.3 - 1.2.7 | 3 days |
+
+**Group 1.2 Total: ~24 days**
+
+##### Group 1.3: Quality Management & Inspection (Depends on Group 1.1)
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 1.3.1 | Create `QualityInspectionService` (inspection CRUD, NCR workflow, checklist execution) | Group 1.1 | 3 days |
+| 1.3.2 | Create Quality API endpoints (inspections, NCRs, checklists, quality dashboard data) | 1.3.1 | 3 days |
+| 1.3.3 | Build Incoming Inspection UI (inspect received parts, pass/fail, NCR creation) | 1.3.2 | 4 days |
+| 1.3.4 | Build NCR (Non-Conformance Report) UI (create, investigate, corrective action, close) | 1.3.2 | 4 days |
+| 1.3.5 | Build Inspection Checklist Executor (step-by-step, pass/fail per step, photo attachment) | 1.3.2 | 3 days |
+| 1.3.6 | Build Quality Dashboard (defect rates, NCR trends, inspection backlog) | 1.3.2 | 3 days |
+| 1.3.7 | Integrate quality with Goods Receipt (mandatory inspection before stock acceptance) | 1.2.6, 1.3.3 | 2 days |
+| 1.3.8 | Write unit + E2E tests for quality workflow | 1.3.3 - 1.3.7 | 3 days |
+
+**Group 1.3 Total: ~25 days**
+
+##### Group 1.4: Certificate Management (Depends on Group 1.1)
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 1.4.1 | Create `CertificateService` (certificate CRUD, attachment, expiry tracking, verification) | Group 1.1 | 3 days |
+| 1.4.2 | Create Certificate API endpoints (upload, verify, expiry alerts, search by part/serial) | 1.4.1 | 2 days |
+| 1.4.3 | Build Certificate Upload UI (attach FAA 8130/EASA Form 1 to part or PO receipt) | 1.4.2 | 3 days |
+| 1.4.4 | Build Certificate Verification view (display certificate, validate authenticity, expiry status) | 1.4.2 | 2 days |
+| 1.4.5 | Build Certificate Expiry Alerts (dashboard alerts, email notifications) | 1.4.2 | 1 day |
+| 1.4.6 | Integrate with Goods Receipt (require certificate upload before accepting parts) | 1.2.6, 1.4.3 | 2 days |
+| 1.4.7 | Write unit + E2E tests for certificate management | 1.4.3 - 1.4.6 | 2 days |
+
+**Group 1.4 Total: ~15 days**
+
+##### Group 1.5: Work Order Management UI (Depends on Group 1.1)
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 1.5.1 | Create `WorkOrderManagementService` (WO CRUD, lifecycle, material linking) | Group 1.1 | 3 days |
+| 1.5.2 | Create Work Order API endpoints (list, create, update, transition, materials, cost) | 1.5.1 | 3 days |
+| 1.5.3 | Build Work Order List view (filtering, status badges, priority, assignment) | 1.5.2 | 3 days |
+| 1.5.4 | Build Work Order Detail view (full context: tasks, materials, cost, timeline, sign-offs) | 1.5.2 | 4 days |
+| 1.5.5 | Build Work Order Creation wizard (template-based or ad-hoc, task selection, scheduling) | 1.5.2 | 4 days |
+| 1.5.6 | Build Material Reservation UI (link parts from inventory to work order materials) | 1.5.2, Tier 0.2 | 3 days |
+| 1.5.7 | Build Cost Tracking display (estimated vs actual cost, labor cost, material cost) | 1.5.2 | 3 days |
+| 1.5.8 | Write unit + E2E tests for work order management | 1.5.3 - 1.5.7 | 3 days |
+
+**Group 1.5 Total: ~26 days**
+
+##### Group 1.6: Task Execution UI (Depends on Group 1.1)
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 1.6.1 | Create `TaskExecutionService` (execution recording, signature capture, evidence upload) | Group 1.1 | 3 days |
+| 1.6.2 | Create Task Execution API endpoints (start, step complete, sign-off, evidence upload, rework) | 1.6.1 | 3 days |
+| 1.6.3 | Build Task Card Execution view (step-by-step navigator, procedure display, pass/fail) | 1.6.2 | 5 days |
+| 1.6.4 | Build Digital Signature Capture (technician sign, inspector approval, timestamp) | 1.6.2 | 3 days |
+| 1.6.5 | Build Evidence Upload (photos, documents, notes per task step) | 1.6.2 | 3 days |
+| 1.6.6 | Build Rework Loop UI (mark task as rework_required, re-execute, track rework count) | 1.6.2 | 2 days |
+| 1.6.7 | Build Task Completion Summary (findings, recommendations, parts consumed) | 1.6.2 | 2 days |
+| 1.6.8 | Write unit + E2E tests for task execution | 1.6.3 - 1.6.7 | 3 days |
+
+**Group 1.6 Total: ~24 days**
+
+##### Group 1.7: Scheduling Board (Depends on Group 1.1)
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 1.7.1 | Create `SchedulingService` (schedule creation, conflict detection, optimization) | Group 1.1 | 4 days |
+| 1.7.2 | Create Scheduling API endpoints (schedules, assignments, conflicts, optimization results) | 1.7.1 | 3 days |
+| 1.7.3 | Build Calendar View (monthly/weekly/daily, drag-and-drop work orders) | 1.7.2 | 5 days |
+| 1.7.4 | Build Gantt Chart View (timeline visualization, dependencies, critical path) | 1.7.2 | 5 days |
+| 1.7.5 | Build Schedule Conflict Detector (overlapping assignments, resource conflicts, alerts) | 1.7.2 | 3 days |
+| 1.7.6 | Build Schedule Optimization (auto-suggest based on priority, resource availability) | 1.7.1 | 4 days |
+| 1.7.7 | Write unit + E2E tests for scheduling | 1.7.3 - 1.7.6 | 3 days |
+
+**Group 1.7 Total: ~27 days**
+
+##### Group 1.8: Mobile/Offline Foundation (Depends on Tier 0)
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 1.8.1 | Set up PWA (service worker, manifest, offline shell) | Tier 0 complete | 3 days |
+| 1.8.2 | Implement IndexedDB cache for work orders, tasks, parts | Tier 0 complete | 3 days |
+| 1.8.3 | Implement offline task execution (cache steps, store signatures locally) | 1.8.2, Group 1.6 | 4 days |
+| 1.8.4 | Implement background sync queue (pending actions, retry, conflict resolution) | 1.8.2 | 3 days |
+| 1.8.5 | Implement offline status indicator (online/offline badge, sync progress) | 1.8.2 | 1 day |
+| 1.8.6 | Build mobile-optimized task card view (touch-friendly, large tap targets) | Group 1.6, 1.8.1 | 3 days |
+| 1.8.7 | Test end-to-end offline workflow (go offline → execute task → go online → verify sync) | 1.8.3 - 1.8.6 | 2 days |
+
+**Group 1.8 Total: ~19 days**
+
+---
+
+**Tier 1 Total: ~177 days (~35 weeks, 7 groups in parallel where possible)**
+
+**Critical Path (sequential):** Group 1.1 → Groups 1.2-1.7 can run in parallel → Group 1.8 depends on 1.6
+
+---
+
+#### TIER 2: Enhancement of Partial Features (Build After Tier 1)
+
+These features exist partially and need significant enhancement to reach MRO-standard capability.
+
+##### Group 2.1: Component Lifecycle Enhancement
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 2.1.1 | Enhance `components` table with additional lifecycle fields (condition monitoring, repair history, turnaround time) | Tier 1 complete | 2 days |
+| 2.1.2 | Build Component Lifecycle UI (installation history, removal reasons, condition trends, LLP status) | Tier 1 complete | 4 days |
+| 2.1.3 | Surface LLP data in Parts Inventory (link components to parts, show LLP status in workbench) | Tier 0.2, 2.1.2 | 3 days |
+| 2.1.4 | Build Component Removal workflow (reason codes, return-to-shop tagging, core return flagging) | 2.1.2 | 3 days |
+| 2.1.5 | Write tests for component lifecycle | 2.1.2 - 2.1.4 | 2 days |
+
+**Group 2.1 Total: ~14 days**
+
+##### Group 2.2: Supplier Performance Management
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 2.2.1 | Enhance `suppliers` table with performance fields (on_time_rate, defect_rate, response_time) | Tier 1 complete | 2 days |
+| 2.2.2 | Build Supplier Performance Dashboard (delivery trends, quality metrics, cost analysis) | 2.2.1 | 4 days |
+| 2.2.3 | Build Supplier Scorecard Generator (weighted scoring, grade assignment, trend analysis) | 2.2.1 | 4 days |
+| 2.2.4 | Integrate with Purchase Orders (auto-calculate supplier performance from PO data) | Group 1.2, 2.2.1 | 3 days |
+| 2.2.5 | Write tests for supplier management | 2.2.2 - 2.2.4 | 2 days |
+
+**Group 2.2 Total: ~15 days**
+
+##### Group 2.3: Compliance (AD/SB) Enhancement
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 2.3.1 | Design `airworthiness_directives` schema (AD number, applicability, compliance deadline, method, status) | Tier 1 complete | 2 days |
+| 2.3.2 | Write AD schema migration | 2.3.1 | 1 day |
+| 2.3.3 | Create AD Tracking Service (ingestion, applicability check, compliance tracking, recurring ADs) | 2.3.2 | 4 days |
+| 2.3.4 | Create AD API endpoints (list, ingest, applicability check, compliance recording) | 2.3.3 | 3 days |
+| 2.3.5 | Build AD Compliance Dashboard (due, overdue, completed, upcoming, by aircraft) | 2.3.4 | 4 days |
+| 2.3.6 | Build AD Applicability Checker (match ADs to registered aircraft/models) | 2.3.3 | 3 days |
+| 2.3.7 | Build Recurring AD Scheduler (track next due by hours/cycles/months) | 2.3.3 | 3 days |
+| 2.3.8 | Build Service Bulletin Tracking (SBs, AD mapping, manufacturer recommendations) | 2.3.4 | 3 days |
+| 2.3.9 | Write tests for compliance tracking | 2.3.5 - 2.3.8 | 3 days |
+
+**Group 2.3 Total: ~26 days**
+
+##### Group 2.4: Barcode/QR Code Scanning
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 2.4.1 | Build Barcode Scanner UI component (camera access, scan-to-input) | Tier 1 complete | 4 days |
+| 2.4.2 | Implement QR Code generation for parts, components, work orders | Tier 1 complete | 2 days |
+| 2.4.3 | Integrate scan with Goods Receipt (scan part → auto-fill PO receipt) | Group 1.2.6, 2.4.1 | 2 days |
+| 2.4.4 | Integrate scan with Parts Inventory (scan → locate part in warehouse) | Tier 0.2, 2.4.1 | 2 days |
+| 2.4.5 | Integrate scan with Task Execution (scan component → load task card) | Group 1.6, 2.4.1 | 2 days |
+| 2.4.6 | Write tests for barcode/QR features | 2.4.1 - 2.4.5 | 2 days |
+
+**Group 2.4 Total: ~14 days**
+
+##### Group 2.5: Multi-Warehouse Enhancement
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 2.5.1 | Design `warehouses` schema (warehouse, zone, bin, rack hierarchical locations) | Tier 1 complete | 2 days |
+| 2.5.2 | Write warehouse schema migration | 2.5.1 | 1 day |
+| 2.5.3 | Build Warehouse Transfer workflow (initiate, ship, receive, reconcile) | 2.5.2 | 4 days |
+| 2.5.4 | Build Cycle Counting workflow (scheduled counts, variance reconciliation) | 2.5.2 | 4 days |
+| 2.5.5 | Build Bin/Location Management UI (hierarchical location browser, assignment) | 2.5.2 | 3 days |
+| 2.5.6 | Enhance Parts Inventory with true multi-warehouse view | Tier 0.2, 2.5.2 | 3 days |
+| 2.5.7 | Write tests for multi-warehouse | 2.5.3 - 2.5.6 | 2 days |
+
+**Group 2.5 Total: ~19 days**
+
+##### Group 2.6: Reporting & Analytics Enhancement
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 2.6.1 | Build Custom Report Builder (select data source, fields, filters, format, schedule) | Tier 1 complete | 5 days |
+| 2.6.2 | Build Scheduled Reporting UI (create schedule, recipients, format, delivery method) | 2.6.1 | 3 days |
+| 2.6.3 | Build Cost Analysis Report (by work order, by aircraft, by period, by cost center) | Tier 1 complete | 3 days |
+| 2.6.4 | Build Maintenance Analytics (MTBF, MTTR, utilization, downtime trends) | Tier 1 complete | 4 days |
+| 2.6.5 | Build Executive Dashboard (consolidated KPIs, trend summaries, financial summary) | Tier 1 complete | 4 days |
+| 2.6.6 | Write tests for reporting | 2.6.1 - 2.6.5 | 2 days |
+
+**Group 2.6 Total: ~21 days**
+
+---
+
+**Tier 2 Total: ~109 days (~22 weeks, groups can run in parallel)**
+
+---
+
+#### TIER 3: Advanced MRO Features (Build After Tier 2)
+
+These are advanced features that differentiate a world-class MRO platform from a basic one.
+
+##### Group 3.1: Tool & Equipment Management
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 3.1.1 | Design `tools_equipment` schema (tool registry, calibration schedule, assignment tracking) | Tier 2 complete | 2 days |
+| 3.1.2 | Write tool schema migration | 3.1.1 | 1 day |
+| 3.1.3 | Create Tool Management Service (tool CRUD, calibration scheduling, assignment to tasks) | 3.1.2 | 3 days |
+| 3.1.4 | Create Tool API endpoints (tool registry, calibration due, assignment, availability) | 3.1.3 | 2 days |
+| 3.1.5 | Build Tool Registry UI (tool catalog, availability, assignment history) | 3.1.4 | 3 days |
+| 3.1.6 | Build Calibration Management (calibration schedule, due alerts, calibration records) | 3.1.4 | 3 days |
+| 3.1.7 | Build Tool Assignment UI (assign tools to work orders/tasks, check-out/check-in) | 3.1.4 | 3 days |
+| 3.1.8 | Write tests for tool management | 3.1.5 - 3.1.7 | 2 days |
+
+**Group 3.1 Total: ~19 days**
+
+##### Group 3.2: Warranty Management
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 3.2.1 | Design `warranties` schema (warranty terms, coverage, claims, expiry) | Tier 2 complete | 2 days |
+| 3.2.2 | Write warranty schema migration | 3.2.1 | 1 day |
+| 3.2.3 | Create Warranty Service (warranty CRUD, coverage check, claims processing) | 3.2.2 | 3 days |
+| 3.2.4 | Create Warranty API endpoints (warranty lookup, claim submission, claim status) | 3.2.3 | 2 days |
+| 3.2.5 | Build Warranty Management UI (warranty registration, coverage view, claims tracking) | 3.2.4 | 4 days |
+| 3.2.6 | Integrate with Purchase Orders (auto-create warranty on PO receipt) | Group 1.2.6, 3.2.5 | 2 days |
+| 3.2.7 | Build Warranty Expiry Alerts (dashboard alerts, notifications) | 3.2.3 | 1 day |
+| 3.2.8 | Write tests for warranty management | 3.2.5 - 3.2.7 | 2 days |
+
+**Group 3.2 Total: ~17 days**
+
+##### Group 3.3: Rotable Pool Management
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 3.3.1 | Design `rotable_pool` schema (rotable items, pool status, turnaround tracking) | Tier 2 complete | 2 days |
+| 3.3.2 | Write rotable schema migration | 3.3.1 | 1 day |
+| 3.3.3 | Create Rotable Pool Service (pool management, allocation, turnaround tracking) | 3.3.2 | 4 days |
+| 3.3.4 | Create Rotable API endpoints (pool status, allocation, TAT tracking, availability) | 3.3.3 | 2 days |
+| 3.3.5 | Build Rotable Pool Dashboard (pool status, available items, items in turnaround, TAT trends) | 3.3.4 | 4 days |
+| 3.3.6 | Build Rotable Allocation UI (allocate rotable to work order, track return) | 3.3.4 | 3 days |
+| 3.3.7 | Write tests for rotable pool | 3.3.5 - 3.3.6 | 2 days |
+
+**Group 3.3 Total: ~18 days**
+
+##### Group 3.4: Core Returns & Repair Tracking
+
+| # | Activity | Depends On | Est. Effort |
+|---|----------|------------|-------------|
+| 3.4.1 | Design `repair_orders` schema (repair order, core return, repair shop, status tracking) | Tier 2 complete | 2 days |
+| 3.4.2 | Write repair schema migration | 3.4.1 | 1 day |
+| 3.4.3 | Create Repair Tracking Service (repair order CRUD, core return tracking, shop management) | 3.4.2 | 4 days |
+| 3.4.4 | Create Repair API endpoints (repair orders, core returns, shop status, turnaround) | 3.4.3 | 2 days |
+| 3.4.5 | Build Repair Order UI (create repair order, track progress, core return recording) | 3.4.4 | 4 days |
+| 3.4.6 | Build Repair Shop Management (shop registry, performance tracking, capacity) | 3.4.4 | 3 days |
+| 3.4.7 | Build Core Return workflow (tag component for return, ship to shop, receive repaired) | 3.4.4 | 3 days |
+| 3.4.8 | Write tests for repair tracking | 3.4.5 - 3.4.7 | 2 days |
+
+**Group 3.4 Total: ~21 days**
+
+---
+
+**Tier 3 Total: ~75 days (~15 weeks, groups can run in parallel)**
+
+---
+
+### Implementation Priority Summary
+
+| Tier | Description | Groups | Total Days | Weeks | Can Parallelize? |
+|------|-------------|--------|-----------|-------|-----------------|
+| **Tier 0** | Validate existing features | 8 groups | 13 days | 3 | Yes |
+| **Tier 1** | Critical missing features | 8 groups | 177 days | 35 | Partially (1.2-1.7 parallel) |
+| **Tier 2** | Enhance partial features | 6 groups | 109 days | 22 | Yes |
+| **Tier 3** | Advanced MRO features | 4 groups | 75 days | 15 | Yes |
+| **TOTAL** | | **26 groups** | **374 days** | **75 weeks (~17 months)** | |
+
+### Dependency Graph
+
+```
+Tier 0 (Validation)
+  ↓
+Tier 1 — Group 1.1 (DB Foundation)
+  ↓
+  ├── Group 1.2 (Purchase Orders) ────────────────────┐
+  ├── Group 1.3 (Quality Management) ─────────────────┤
+  ├── Group 1.4 (Certificate Management) ─────────────┤
+  ├── Group 1.5 (Work Order Management UI) ───────────┤
+  ├── Group 1.6 (Task Execution UI) ──────────────────┤──→ Tier 2
+  ├── Group 1.7 (Scheduling Board) ───────────────────┤
+  └── Group 1.8 (Mobile/Offline) ← depends on 1.6 ────┘
+                                                        ↓
+  ├── Group 2.1 (Component Lifecycle) ────────────────┐
+  ├── Group 2.2 (Supplier Performance) ───────────────┤
+  ├── Group 2.3 (Compliance AD/SB) ───────────────────┤
+  ├── Group 2.4 (Barcode/QR Scanning) ────────────────┤──→ Tier 3
+  ├── Group 2.5 (Multi-Warehouse) ────────────────────┤
+  └── Group 2.6 (Reporting & Analytics) ──────────────┘
+                                                        ↓
+  ├── Group 3.1 (Tool & Equipment) ───────────────────┐
+  ├── Group 3.2 (Warranty Management) ────────────────┤
+  ├── Group 3.3 (Rotable Pool) ───────────────────────┤
+  └── Group 3.4 (Core Returns & Repair) ──────────────┘
+```
+
+### Where to Start — Week 1 Action Plan
+
+**Week 1, Day 1-2:** Tier 0 Validation
+- Run all existing E2E tests: `npm run test:amro`
+- Manually test Aircraft Registry CRUD
+- Manually test Parts Inventory Workbench filters, alerts, grouping
+- Document any bugs found
+
+**Week 1, Day 3-5:** Tier 1, Group 1.1 — Database Design
+- Design `purchase_orders` schema (Activity 1.1.1)
+- Design `quality_inspections` schema (Activity 1.1.2)
+- Design `certificates` schema (Activity 1.1.3)
+- Review schemas with team before implementation
+
+### Feature Completeness Scorecard
+
+| Feature Area | Current Completeness | Target | Gap |
+|-------------|---------------------|--------|-----|
+| Aircraft/Asset Registry | 95% | 100% | 5% (engine detail enhancement) |
+| Parts Inventory & Stock | 85% | 100% | 15% (multi-warehouse, cycle count, bin management) |
+| Work Order Management | 40% | 100% | 60% (dedicated UI, Gantt, material linking, cost tracking) |
+| Task Execution | 20% | 100% | 80% (execution UI, signatures, evidence, rework) |
+| Scheduling | 15% | 100% | 85% (calendar, Gantt, conflict detection, optimization) |
+| Procurement/Purchase Orders | 5% | 100% | 95% (entire feature missing) |
+| Quality Management | 10% | 100% | 90% (entire feature missing) |
+| Certificate Management | 0% | 100% | 100% (entire feature missing) |
+| Compliance (AD/SB) | 20% | 100% | 80% (API exists, no UI) |
+| Supplier Management | 30% | 100% | 70% (basic CRUD, no performance tracking) |
+| Component Lifecycle | 40% | 100% | 60% (DB exists, no dedicated UI) |
+| Mobile/Offline | 5% | 100% | 95% (responsive only, no offline) |
+| Barcode/QR | 10% | 100% | 90% (API exists, no UI) |
+| Reporting/Analytics | 35% | 100% | 65% (basic reports, no custom builder) |
+| Tool & Equipment | 0% | 100% | 100% |
+| Warranty | 0% | 100% | 100% |
+| Rotable Pool | 0% | 100% | 100% |
+| Core Returns & Repair | 0% | 100% | 100% |
+| **Overall Platform Completeness** | **27%** | **100%** | **73% remaining** |
+
+---
+
 ## Overall Implementation Summary
 
 **Total Phases:** 10  
