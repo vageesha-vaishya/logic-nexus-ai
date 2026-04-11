@@ -233,48 +233,44 @@ export function AircraftCreateDialogSection({
         </section>
         <section className="rounded bg-white p-3">
           <p className="mb-2 text-[11px] text-slate-600">Aircraft Model Details</p>
-          <div className="grid grid-cols-1 border border-slate-200 text-[12px]">
-            <div className="px-3 py-2 font-semibold text-slate-800">System Details</div>
-            <div className="border-t border-slate-200 px-3 py-2">
-              <div className="space-y-2">
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-model-select" className="text-[12px]">Aircraft Model:</Label>
-                  <select
-                    id="aircraft-model-select"
-                    value={String(formValues.aircraft_model ?? '')}
-                    onChange={(event) => setSelectFieldValue('aircraft_model', event.target.value)}
-                    className={cn(
-                      'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-                      formErrors.aircraft_model && 'border-destructive',
-                    )}
-                  >
-                    {resolveSelectOptions({ key: 'aircraft_model', label: 'Aircraft Model', type: 'select' }).map((option) => (
-                      <option key={option.value} value={option.value} disabled={option.disabled}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-model-name-readonly" className="text-[12px]">Name:</Label>
-                  <Input id="aircraft-model-name-readonly" value={aircraftModelNameValue} readOnly disabled className="h-8 bg-slate-100 text-[12px] text-slate-800" />
-                </div>
-                <div className="space-y-1">
-                  <Label htmlFor="aircraft-type-select" className="text-[12px]">Aircraft Type:</Label>
-                  <select
-                    id="aircraft-type-select"
-                    value={aircraftModelTypeValue}
-                    disabled
-                    className="h-8 w-full rounded-md border border-input bg-slate-100 px-2 text-[12px] text-slate-800 focus:outline-none"
-                  >
-                    {aircraftTypeSelectOptions.map((option) => (
-                      <option key={option.value} value={option.value} disabled={option.disabled}>
-                        {option.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
+          <div className="space-y-2 border border-slate-200 px-3 py-2 text-[12px]">
+            <div className="space-y-1">
+              <Label htmlFor="aircraft-model-select" className="text-[12px]">Aircraft Model:</Label>
+              <select
+                id="aircraft-model-select"
+                value={String(formValues.aircraft_model ?? '')}
+                onChange={(event) => setSelectFieldValue('aircraft_model', event.target.value)}
+                className={cn(
+                  'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+                  formErrors.aircraft_model && 'border-destructive',
+                )}
+              >
+                {resolveSelectOptions({ key: 'aircraft_model', label: 'Aircraft Model', type: 'select' }).map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="aircraft-model-name-readonly" className="text-[12px]">Name:</Label>
+              <Input id="aircraft-model-name-readonly" value={aircraftModelNameValue} readOnly disabled className="h-8 bg-slate-100 text-[12px] text-slate-800" />
+            </div>
+            <div className="space-y-1">
+              <Label htmlFor="aircraft-type-select" className="text-[12px]">Aircraft Type:</Label>
+              <select
+                id="aircraft-type-select"
+                value={aircraftModelTypeValue}
+                disabled
+                className="h-8 w-full rounded-md border border-input bg-slate-100 px-2 text-[12px] text-slate-800 focus:outline-none"
+              >
+                <option value="">Select aircraft type</option>
+                {aircraftTypeSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
           </div>
         </section>

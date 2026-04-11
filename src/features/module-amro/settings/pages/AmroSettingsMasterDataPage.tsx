@@ -1801,7 +1801,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         const manufacturerId = String(record.manufacturer_id || '').trim();
         const code = String(record.model_code || '').trim();
         const name = String(record.name || '').trim();
-        const aircraftType = String(record.aircraft_type || record.type || '').trim();
+        const aircraftType = String(record.aircraft_type || '').trim();
         const modelValue = name || code || id;
         const label = name && code && name !== code ? `${name} (${code})` : name || code || id;
         const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
@@ -3766,7 +3766,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       try {
         let query = (scopedDb as any)
           .from('assembly_models')
-          .select('id, name, model_code, manufacturer_id, franchise_id, tenant_id, aircraft_type, type, is_active')
+          .select('id, name, model_code, manufacturer_id, franchise_id, tenant_id, aircraft_type, is_active')
           .eq('tenant_id', scopedTenantId)
           .eq('manufacturer_id', scopedManufacturerId)
           .eq('is_active', true)
@@ -3785,7 +3785,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             const code = String(row.model_code || '').trim();
             const rowTenantId = String(row.tenant_id || scopedTenantId).trim();
             const rowFranchiseId = String(row.franchise_id || '').trim();
-            const aircraftType = String(row.aircraft_type || row.type || '').trim();
+            const aircraftType = String(row.aircraft_type || '').trim();
             const manufacturerId = String(row.manufacturer_id || '').trim();
             const manufacturerMeta = manufacturerMetaById.get(manufacturerId);
             const manufacturerName = String(manufacturerMeta?.name || manufacturerMeta?.code || '').trim();

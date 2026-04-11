@@ -228,13 +228,14 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   },
   assembly_models: {
     table: 'assembly_models',
-    searchableColumns: ['model_code', 'name', 'primary_model', 'id'],
+    searchableColumns: ['model_code', 'name', 'primary_model', 'aircraft_type', 'id'],
     listColumns:
-      'id,tenant_id,franchise_id,manufacturer_id,assembly_type_id,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
+      'id,tenant_id,franchise_id,manufacturer_id,assembly_type_id,aircraft_type,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['manufacturer_id', 'assembly_type_id', 'model_code', 'name'],
     writeAllowedFields: [
       'manufacturer_id',
       'assembly_type_id',
+      'aircraft_type',
       'model_code',
       'name',
       'primary_model',

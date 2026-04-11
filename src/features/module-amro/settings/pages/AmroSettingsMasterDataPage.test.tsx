@@ -94,11 +94,11 @@ vi.mock('@/hooks/useCRM', () => ({
             }
             if (tableName === 'assembly_models') {
               const models = [
-                { id: 'amodel-f1-m1', name: 'B737-800', model_code: 'B737-800', tenant_id: 'tenant-1', franchise_id: 'franchise-1', manufacturer_id: 'manu-1', is_active: true },
-                { id: 'amodel-f1-m2', name: 'A320-200', model_code: 'A320-200', tenant_id: 'tenant-1', franchise_id: 'franchise-1', manufacturer_id: 'manu-2', is_active: true },
-                { id: 'amodel-f2-m2', name: 'A321-200', model_code: 'A321-200', tenant_id: 'tenant-1', franchise_id: 'franchise-2', manufacturer_id: 'manu-2', is_active: true },
-                { id: 'amodel-global-m2', name: 'A319-100', model_code: 'A319-100', tenant_id: 'tenant-1', franchise_id: null, manufacturer_id: 'manu-2', is_active: true },
-                { id: 'amodel-t2-m2', name: 'E190', model_code: 'E190', tenant_id: 'tenant-2', franchise_id: 'franchise-3', manufacturer_id: 'manu-2', is_active: true },
+                { id: 'amodel-f1-m1', name: 'B737-800', model_code: 'B737-800', aircraft_type: 'NarrowBody', tenant_id: 'tenant-1', franchise_id: 'franchise-1', manufacturer_id: 'manu-1', is_active: true },
+                { id: 'amodel-f1-m2', name: 'A320-200', model_code: 'A320-200', aircraft_type: 'NarrowBody', tenant_id: 'tenant-1', franchise_id: 'franchise-1', manufacturer_id: 'manu-2', is_active: true },
+                { id: 'amodel-f2-m2', name: 'A321-200', model_code: 'A321-200', aircraft_type: 'NarrowBody', tenant_id: 'tenant-1', franchise_id: 'franchise-2', manufacturer_id: 'manu-2', is_active: true },
+                { id: 'amodel-global-m2', name: 'A319-100', model_code: 'A319-100', aircraft_type: 'NarrowBody', tenant_id: 'tenant-1', franchise_id: null, manufacturer_id: 'manu-2', is_active: true },
+                { id: 'amodel-t2-m2', name: 'E190', model_code: 'E190', aircraft_type: 'RegionalJet', tenant_id: 'tenant-2', franchise_id: 'franchise-3', manufacturer_id: 'manu-2', is_active: true },
               ];
               const scoped = models.filter((row) => {
                 if (state.tenantId && row.tenant_id !== state.tenantId) return false;
@@ -545,6 +545,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       id: 'amodel-1',
                       model_code: 'B737-800',
                       name: 'B737-800',
+                      aircraft_type: 'NarrowBody',
                       manufacturer_id: 'manu-1',
                       is_active: true,
                     },
@@ -552,6 +553,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       id: 'amodel-2',
                       model_code: 'A320-200',
                       name: 'A320-200',
+                      aircraft_type: 'NarrowBody',
                       manufacturer_id: 'manu-2',
                       is_active: true,
                     },
@@ -1836,6 +1838,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     const modelSelect = within(dialog).getByLabelText(/^Aircraft Model:/i);
     expect(within(modelSelect).getByRole('option', { name: 'A320-200' })).toBeInTheDocument();
     expect(within(modelSelect).queryByRole('option', { name: 'B737-800' })).not.toBeInTheDocument();
+    fireEvent.change(modelSelect, { target: { value: 'A320-200' } });
+    const typeSelect = within(dialog).getByLabelText(/^Aircraft Type:/i);
+    expect(typeSelect).toHaveValue('NarrowBody');
   });
 
   it('refreshes aircraft model options in real-time for tenant-franchise-manufacturer combinations', async () => {
