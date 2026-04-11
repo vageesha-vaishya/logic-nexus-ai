@@ -24,6 +24,8 @@ type AircraftTemplatePayloadInput = {
 
 export type AircraftTemplateRecord = {
   id: string;
+  tenant_id: string;
+  franchise_id: string;
   template_name: string;
   aircraft_type: string;
   manufacturer: string;
@@ -34,6 +36,55 @@ export type AircraftTemplateRecord = {
   amendment_number: string;
   updated_at?: string;
 };
+
+export function filterManufacturersByTenant<T extends { tenantId?: string }>(records: T[], tenantId: string): T[] {
+  const scopedTenantId = String(tenantId || '').trim();
+  if (!scopedTenantId) {
+    return records;
+  }
+  return records.filter((record) => {
+    const recordTenantId = String(record.tenantId || '').trim();
+    return !recordTenantId || recordTenantId === scopedTenantId;
+  });
+}
+
+export function filterAssemblyModelsByScope<
+  T extends {
+    tenantId?: string;
+    franchiseId?: string;
+    manufacturerId?: string;
+    active?: boolean;
+  },
+>(
+  records: T[],
+  scope: { tenantId: string; franchiseId: string; manufacturerId: string },
+): T[] {
+  const scopedTenantId = String(scope.tenantId || '').trim();
+  const scopedFranchiseId = String(scope.franchiseId || '').trim();
+  const scopedManufacturerId = String(scope.manufacturerId || '').trim();
+  if (!scopedTenantId || !scopedFranchiseId || !scopedManufacturerId) {
+    return [];
+  }
+  return records.filter((record) => {
+    const recordTenantId = String(record.tenantId || '').trim();
+    const recordFranchiseId = String(record.franchiseId || '').trim();
+    const recordManufacturerId = String(record.manufacturerId || '').trim();
+    const isActive = record.active !== false;
+    if (!isActive) {
+      return false;
+    }
+    if (recordTenantId && recordTenantId !== scopedTenantId) {
+      return false;
+    }
+    if (recordManufacturerId && recordManufacturerId !== scopedManufacturerId) {
+      return false;
+    }
+    if (!recordFranchiseId) {
+      return true;
+    }
+    return recordFranchiseId === scopedFranchiseId;
+  });
+}
 
 export async function buildApiHeaders(
   scope: { tenantId?: string | null; franchiseId?: string | null; userId?: string | null },
@@ -124,6 +175,8 @@ const normalizeAircraftTemplateRecord = (record: Record<string, unknown>): Aircr
   }
   return {
     id,
+    tenant_id: String(record.tenant_id || '').trim(),
+    franchise_id: String(record.franchise_id || '').trim(),
     template_name: String(record.template_name || '').trim(),
     aircraft_type: String(record.aircraft_type || '').trim(),
     manufacturer: String(record.manufacturer || '').trim(),

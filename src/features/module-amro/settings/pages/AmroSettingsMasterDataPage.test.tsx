@@ -33,7 +33,13 @@ vi.mock('@/hooks/useCRM', () => ({
     },
     scopedDb: {
       from: (tableName: string) => {
-        const state: { tenantId?: string; franchiseId?: string | null } = {};
+        const state: {
+          tenantId?: string;
+          franchiseId?: string | null;
+          manufacturerId?: string;
+          isActive?: boolean;
+          franchiseScopeId?: string;
+        } = {};
         const query = {
           select: () => query,
           eq: (column: string, value: string) => {
@@ -42,6 +48,19 @@ vi.mock('@/hooks/useCRM', () => ({
             }
             if (column === 'franchise_id') {
               state.franchiseId = value;
+            }
+            if (column === 'manufacturer_id') {
+              state.manufacturerId = value;
+            }
+            if (column === 'is_active') {
+              state.isActive = String(value) === 'true';
+            }
+            return query;
+          },
+          or: (clause: string) => {
+            const franchiseMatch = /franchise_id\.eq\.([^,]+)/.exec(String(clause || ''));
+            if (franchiseMatch?.[1]) {
+              state.franchiseScopeId = franchiseMatch[1];
             }
             return query;
           },
@@ -52,6 +71,46 @@ vi.mock('@/hooks/useCRM', () => ({
             return query;
           },
           order: async () => {
+            if (tableName === 'tenants') {
+              return {
+                data: [
+                  { id: 'tenant-1', name: 'Tenant One', is_active: true },
+                  { id: 'tenant-2', name: 'Tenant Two', is_active: true },
+                ],
+                error: null,
+              };
+            }
+            if (tableName === 'franchises') {
+              const tenantId = state.tenantId || 'tenant-1';
+              return {
+                data: tenantId === 'tenant-2'
+                  ? [{ id: 'franchise-3', name: 'Franchise Three', tenant_id: 'tenant-2', is_active: true }]
+                  : [
+                      { id: 'franchise-1', name: 'Franchise One', tenant_id: 'tenant-1', is_active: true },
+                      { id: 'franchise-2', name: 'Franchise Two', tenant_id: 'tenant-1', is_active: true },
+                    ],
+                error: null,
+              };
+            }
+            if (tableName === 'assembly_models') {
+              const models = [
+                { id: 'amodel-f1-m1', name: 'B737-800', model_code: 'B737-800', aircraft_type: 'NarrowBody', tenant_id: 'tenant-1', franchise_id: 'franchise-1', manufacturer_id: 'manu-1', is_active: true },
+                { id: 'amodel-f1-m2', name: 'A320-200', model_code: 'A320-200', aircraft_type: 'NarrowBody', tenant_id: 'tenant-1', franchise_id: 'franchise-1', manufacturer_id: 'manu-2', is_active: true },
+                { id: 'amodel-f2-m2', name: 'A321-200', model_code: 'A321-200', aircraft_type: 'NarrowBody', tenant_id: 'tenant-1', franchise_id: 'franchise-2', manufacturer_id: 'manu-2', is_active: true },
+                { id: 'amodel-global-m2', name: 'A319-100', model_code: 'A319-100', aircraft_type: 'NarrowBody', tenant_id: 'tenant-1', franchise_id: null, manufacturer_id: 'manu-2', is_active: true },
+                { id: 'amodel-t2-m2', name: 'E190', model_code: 'E190', aircraft_type: 'RegionalJet', tenant_id: 'tenant-2', franchise_id: 'franchise-3', manufacturer_id: 'manu-2', is_active: true },
+              ];
+              const scoped = models.filter((row) => {
+                if (state.tenantId && row.tenant_id !== state.tenantId) return false;
+                if (state.manufacturerId && row.manufacturer_id !== state.manufacturerId) return false;
+                if (state.isActive === true && row.is_active !== true) return false;
+                if (state.franchiseScopeId) {
+                  return !row.franchise_id || row.franchise_id === state.franchiseScopeId;
+                }
+                return true;
+              });
+              return { data: scoped, error: null };
+            }
             if (tableName === 'task_templates' && state.tenantId === 'tenant-1' && state.franchiseId === 'franchise-1') {
               return {
                 data: [
@@ -216,7 +275,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       rendered = render(
         <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/aircraft']} future={memoryRouterFuture}>
           <Routes>
-            <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+            <Route path="/dashboard/amro/settings/master-data/:entity/*" element={<AmroSettingsMasterDataPage />} />
           </Routes>
         </MemoryRouter>,
       );
@@ -229,7 +288,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       rendered = render(
         <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/flight-logs']} future={memoryRouterFuture}>
           <Routes>
-            <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+            <Route path="/dashboard/amro/settings/master-data/:entity/*" element={<AmroSettingsMasterDataPage />} />
           </Routes>
         </MemoryRouter>,
       );
@@ -242,7 +301,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       rendered = render(
         <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/work-package-templates']} future={memoryRouterFuture}>
           <Routes>
-            <Route path="/dashboard/amro/settings/master-data/:entity" element={<AmroSettingsMasterDataPage />} />
+            <Route path="/dashboard/amro/settings/master-data/:entity/*" element={<AmroSettingsMasterDataPage />} />
           </Routes>
         </MemoryRouter>,
       );
@@ -486,6 +545,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       id: 'amodel-1',
                       model_code: 'B737-800',
                       name: 'B737-800',
+                      aircraft_type: 'NarrowBody',
                       manufacturer_id: 'manu-1',
                       is_active: true,
                     },
@@ -493,6 +553,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                       id: 'amodel-2',
                       model_code: 'A320-200',
                       name: 'A320-200',
+                      aircraft_type: 'NarrowBody',
                       manufacturer_id: 'manu-2',
                       is_active: true,
                     },
@@ -1765,16 +1826,59 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
   it('filters aircraft model listbox options by selected manufacturer in aircraft create form', async () => {
     renderAircraftPage();
-
-    fireEvent.click(await screen.findByRole('button', { name: /New aircraft record/i }));
+    const rowCheckbox = await screen.findByRole('checkbox', { name: 'Select row ac-1' });
+    const aircraftRow = rowCheckbox.closest('tr');
+    expect(aircraftRow).not.toBeNull();
+    fireEvent.doubleClick(aircraftRow as HTMLElement);
     const dialog = await screen.findByTestId('amro-master-data-form-dialog');
 
-    const manufacturerSelect = within(dialog).getByLabelText(/^Manufacturer:/i);
+    const manufacturerSelect = within(dialog).getByLabelText(/Manufacturer/i);
     fireEvent.change(manufacturerSelect, { target: { value: 'manu-2' } });
 
     const modelSelect = within(dialog).getByLabelText(/^Aircraft Model:/i);
     expect(within(modelSelect).getByRole('option', { name: 'A320-200' })).toBeInTheDocument();
     expect(within(modelSelect).queryByRole('option', { name: 'B737-800' })).not.toBeInTheDocument();
+    fireEvent.change(modelSelect, { target: { value: 'A320-200' } });
+    const typeSelect = within(dialog).getByLabelText(/^Aircraft Type:/i);
+    expect(typeSelect).toHaveValue('NarrowBody');
+    fireEvent.change(manufacturerSelect, { target: { value: 'manu-1' } });
+    expect(typeSelect).toHaveValue('');
+  });
+
+  it('refreshes aircraft model options in real-time for tenant-franchise-manufacturer combinations', async () => {
+    renderAircraftPage();
+    const rowCheckbox = await screen.findByRole('checkbox', { name: 'Select row ac-1' });
+    const aircraftRow = rowCheckbox.closest('tr');
+    expect(aircraftRow).not.toBeNull();
+    fireEvent.doubleClick(aircraftRow as HTMLElement);
+    const dialog = await screen.findByTestId('amro-master-data-form-dialog');
+
+    const tenantSelect = within(dialog).getByLabelText(/^Tenant$/i);
+    const franchiseSelect = within(dialog).getByLabelText(/^Franchise$/i);
+    const manufacturerSelect = within(dialog).getByLabelText(/Manufacturer/i);
+    const modelSelect = within(dialog).getByLabelText(/^Aircraft Model:/i);
+
+    fireEvent.change(tenantSelect, { target: { value: 'tenant-1' } });
+    fireEvent.change(franchiseSelect, { target: { value: 'franchise-1' } });
+    fireEvent.change(manufacturerSelect, { target: { value: 'manu-2' } });
+
+    await waitFor(() => {
+      expect(within(modelSelect).getByRole('option', { name: 'A320-200' })).toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    expect(within(modelSelect).queryByRole('option', { name: 'A321-200' })).not.toBeInTheDocument();
+
+    fireEvent.change(franchiseSelect, { target: { value: 'franchise-2' } });
+    await waitFor(() => {
+      expect(within(modelSelect).getByRole('option', { name: 'A321-200' })).toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
+    expect(within(modelSelect).queryByRole('option', { name: 'A320-200' })).not.toBeInTheDocument();
+
+    fireEvent.change(tenantSelect, { target: { value: 'tenant-2' } });
+    fireEvent.change(franchiseSelect, { target: { value: 'franchise-3' } });
+    fireEvent.change(manufacturerSelect, { target: { value: 'manu-2' } });
+    await waitFor(() => {
+      expect(within(modelSelect).getByRole('option', { name: 'E190' })).toBeInTheDocument();
+    }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
   it('creates aircraft with manufacturer-model selection and preserves those values when reopened', async () => {

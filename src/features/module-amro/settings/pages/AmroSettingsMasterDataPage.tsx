@@ -99,6 +99,8 @@ import {
   buildApiHeaders,
   createAircraftTemplate,
   deleteAircraftTemplate,
+  filterAssemblyModelsByScope,
+  filterManufacturersByTenant,
   listAircraftTemplates,
   parseApiPayload,
   updateAircraftTemplate,
@@ -190,6 +192,7 @@ type ManufacturerOption = {
   label: string;
   code: string;
   name: string;
+  tenantId: string;
   active: boolean;
 };
 
@@ -202,7 +205,11 @@ type AssemblyTypeOption = {
 type AssemblyModelOption = {
   id: string;
   label: string;
+  name: string;
   modelValue: string;
+  aircraftType: string;
+  tenantId?: string;
+  franchiseId?: string;
   manufacturerId: string;
   manufacturerTokens: string[];
   active: boolean;
@@ -217,6 +224,8 @@ type SelectOption = {
 type AircraftTempOption = {
   id: string;
   name: string;
+  tenantId: string;
+  franchiseId: string;
   aircraftType: string;
   manufacturerId: string;
   manufacturerName: string;
@@ -1447,6 +1456,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [assemblyModelOptions, setAssemblyModelOptions] = useState<AssemblyModelOption[]>([]);
   const [assemblyModelOptionsLoading, setAssemblyModelOptionsLoading] = useState(false);
   const [assemblyModelOptionsError, setAssemblyModelOptionsError] = useState('');
+  const [franchiseAssemblyModels, setFranchiseAssemblyModels] = useState<AssemblyModelOption[]>([]);
+  const [franchiseAssemblyModelsLoading, setFranchiseAssemblyModelsLoading] = useState(false);
   const [systemTemplateModelOptions, setSystemTemplateModelOptions] = useState<AircraftTempOption[]>([]);
   const [aircraftTemplateRows, setAircraftTemplateRows] = useState<AircraftTemplateRecord[]>([]);
   const [aircraftTemplateLoading, setAircraftTemplateLoading] = useState(false);
@@ -1475,6 +1486,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftBaseCatalogOptions, setAircraftBaseCatalogOptions] = useState<string[]>([]);
   const [aircraftOwnerCatalogOptions, setAircraftOwnerCatalogOptions] = useState<string[]>([]);
   const [aircraftListboxOptionsLoading, setAircraftListboxOptionsLoading] = useState(false);
+  const [aircraftTenantOptions, setAircraftTenantOptions] = useState<SelectOption[]>([]);
+  const [aircraftTenantOptionsLoading, setAircraftTenantOptionsLoading] = useState(false);
+  const [aircraftTenantOptionsError, setAircraftTenantOptionsError] = useState('');
+  const [aircraftFranchiseOptions, setAircraftFranchiseOptions] = useState<SelectOption[]>([]);
+  const [aircraftFranchiseOptionsLoading, setAircraftFranchiseOptionsLoading] = useState(false);
+  const [aircraftFranchiseOptionsError, setAircraftFranchiseOptionsError] = useState('');
   const [aircraftWorkPackageDialogOpen, setAircraftWorkPackageDialogOpen] = useState(false);
   const [aircraftWorkPackageValues, setAircraftWorkPackageValues] = useState<AircraftWorkPackageFormValues>(getDefaultAircraftWorkPackageValues());
   const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState<Record<string, string>>({});
@@ -1715,28 +1732,31 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [scope.franchiseId, scope.tenantId, scope.userId],
   );
 
-  const fetchManufacturerOptions = useCallback(async (headers: Headers): Promise<ManufacturerOption[]> => {
+  const fetchManufacturerOptions = useCallback(async (headers: Headers, tenantId: string): Promise<ManufacturerOption[]> => {
     const query = new URLSearchParams({
       page: '1',
       page_size: '200',
       sort_by: 'name',
       sort_dir: 'asc',
+      tenant_id: tenantId,
     });
     const response = await fetch(`/api/v2/amro/master-data/manufacturers?${query.toString()}`, { method: 'GET', headers });
     const payload = await parseApiPayload(response);
     if (!response.ok) throw new Error(String(payload.error || 'Failed to load manufacturers'));
     const records = getPayloadRecords(payload);
-    return records
+    const options = records
       .map((record) => {
         const id = String(record.id || '').trim();
         if (!id) return null;
         const code = String(record.manufacturer_code || '').trim();
         const name = String(record.name || '').trim();
+        const tenantId = String(record.tenant_id || '').trim();
         const label = name && code ? `${name} (${code})` : name || code || id;
         const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
-        return { id, label, code, name, active };
+        return { id, label, code, name, tenantId, active };
       })
       .filter((option): option is ManufacturerOption => Boolean(option));
+    return filterManufacturersByTenant(options, tenantId);
   }, []);
 
   const fetchAssemblyTypeOptions = useCallback(async (headers: Headers): Promise<AssemblyTypeOption[]> => {
@@ -1781,6 +1801,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         const manufacturerId = String(record.manufacturer_id || '').trim();
         const code = String(record.model_code || '').trim();
         const name = String(record.name || '').trim();
+        const aircraftType = String(record.aircraft_type || '').trim();
         const modelValue = name || code || id;
         const label = name && code && name !== code ? `${name} (${code})` : name || code || id;
         const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
@@ -1793,7 +1814,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         ]
           .filter(Boolean)
           .map((token) => token.toLowerCase());
-        return { id, manufacturerId, label, modelValue, manufacturerTokens, active };
+        return { id, name, manufacturerId, label, modelValue, aircraftType, manufacturerTokens, active };
       })
       .filter((option): option is AssemblyModelOption => Boolean(option));
   }, []);
@@ -1822,6 +1843,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return {
           id,
           name,
+          tenantId: String(record.tenant_id || '').trim(),
+          franchiseId: String(record.franchise_id || '').trim(),
           aircraftType: String(record.aircraft_type || '').trim(),
           manufacturerId: String(record.manufacturer_id || '').trim(),
           manufacturerName: String(record.manufacturer || '').trim(),
@@ -2200,16 +2223,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [],
   );
 
-  const loadManufacturerOptions = useCallback(async () => {
+  const loadManufacturerOptions = useCallback(async (tenantOverride = '') => {
     setManufacturerOptionsLoading(true);
     setManufacturerOptionsError('');
     try {
-      const headers = await buildApiHeaders(scope);
-      let options = await fetchManufacturerOptions(headers);
+      const tenantScopeId = String(tenantOverride || formValues.tenant_id || scope.tenantId || '').trim();
+      const headers = await buildApiHeaders({ tenantId: tenantScopeId, userId: scope.userId, franchiseId: null });
+      let options = await fetchManufacturerOptions(headers, tenantScopeId);
       if (options.length === 0) {
         const seeded = await seedManufacturersIfNeeded(headers);
         if (seeded) {
-          options = await fetchManufacturerOptions(headers);
+          options = await fetchManufacturerOptions(headers, tenantScopeId);
         }
       }
       setManufacturerOptions(options);
@@ -2220,7 +2244,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setManufacturerOptionsLoading(false);
     }
-  }, [fetchManufacturerOptions, scope, seedManufacturersIfNeeded]);
+  }, [fetchManufacturerOptions, formValues.tenant_id, scope.tenantId, scope.userId, seedManufacturersIfNeeded]);
 
   const loadAssemblyTypeOptions = useCallback(async () => {
     setAssemblyTypeOptionsLoading(true);
@@ -2253,11 +2277,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (options.length === 0) {
         let manufacturerReferenceOptions = manufacturerOptions;
         if (manufacturerReferenceOptions.length === 0) {
-          manufacturerReferenceOptions = await fetchManufacturerOptions(headers);
+          manufacturerReferenceOptions = await fetchManufacturerOptions(headers, String(scope.tenantId || '').trim());
           if (manufacturerReferenceOptions.length === 0) {
             const seededManufacturers = await seedManufacturersIfNeeded(headers);
             if (seededManufacturers) {
-              manufacturerReferenceOptions = await fetchManufacturerOptions(headers);
+              manufacturerReferenceOptions = await fetchManufacturerOptions(headers, String(scope.tenantId || '').trim());
             }
           }
           if (manufacturerReferenceOptions.length > 0) {
@@ -2362,6 +2386,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           return {
             id,
             name,
+            tenantId: String(record.tenant_id || '').trim(),
+            franchiseId: String(record.franchise_id || '').trim(),
             aircraftType: String(record.aircraft_type || '').trim(),
             manufacturerId: String(record.manufacturer_id || '').trim(),
             manufacturerName: String(record.manufacturer || '').trim(),
@@ -2653,15 +2679,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
 
   useEffect(() => {
     if (entity === 'aircraft' || entity === 'assembly_models') {
-      void loadManufacturerOptions();
+      const tenantForLoad = entity === 'aircraft'
+        ? String(formValues.tenant_id ?? scope.tenantId ?? '').trim()
+        : String(scope.tenantId || '').trim();
+      void loadManufacturerOptions(tenantForLoad);
     }
-  }, [entity, loadManufacturerOptions]);
+  }, [entity, formValues.tenant_id, loadManufacturerOptions, scope.tenantId]);
 
   useEffect(() => {
     if ((entity === 'aircraft' || entity === 'assembly_models') && modalOpen) {
-      void loadManufacturerOptions();
+      const tenantForLoad = entity === 'aircraft'
+        ? String(formValues.tenant_id ?? scope.tenantId ?? '').trim()
+        : String(scope.tenantId || '').trim();
+      void loadManufacturerOptions(tenantForLoad);
     }
-  }, [entity, loadManufacturerOptions, modalOpen]);
+  }, [entity, formValues.tenant_id, loadManufacturerOptions, modalOpen, scope.tenantId]);
 
   useEffect(() => {
     if (entity === 'assembly_models' || entity === 'aircraft') {
@@ -2885,7 +2917,22 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const submitValues = getFormValuesForSubmit(formValues);
       const { payload, errors } = buildPayloadFromForm(entity, submitValues);
       if (entity === 'aircraft') {
+        const selectedTenantId = String(formValues.tenant_id ?? scope.tenantId ?? '').trim();
+        const selectedFranchiseId = String(formValues.franchise_id ?? scope.franchiseId ?? '').trim();
         const selectedTemplateId = String(aircraftTemplateModel || '').trim();
+        if (!selectedTenantId) {
+          errors.tenant_id = 'Tenant is required';
+        } else {
+          payload.tenant_id = selectedTenantId;
+        }
+        if (!selectedFranchiseId) {
+          errors.franchise_id = 'Franchise is required';
+        } else {
+          payload.franchise_id = selectedFranchiseId;
+        }
+        if (!selectedTemplateId || isSystemSelectValue(selectedTemplateId)) {
+          errors.aircraft_template = 'Aircraft Model is required';
+        }
         const selectedTemplate = selectedTemplateId
           ? systemTemplateModelOptions.find((option) => option.id === selectedTemplateId)
           : null;
@@ -3033,7 +3080,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error(message);
       return false;
     }
-  }, [aircraftTemplateModel, entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, systemTemplateModelOptions]);
+  }, [aircraftTemplateModel, entity, extractValidationErrors, formValues, getFormValuesForSubmit, isSystemSelectValue, loadRecords, scope, systemTemplateModelOptions]);
 
   const handleUpdate = useCallback(async () => {
     if (!selectedId) {
@@ -3466,13 +3513,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const aircraftModelSelectOptions = useMemo<SelectOption[]>(() => {
     const normalize = (value: string) => value.trim().toLowerCase();
     const manufacturerId = String(formValues.manufacturer_id ?? '').trim();
+    const modelSourceOptions = entity === 'aircraft' ? franchiseAssemblyModels : assemblyModelOptions;
     const manufacturer = manufacturerMetaById.get(manufacturerId);
     const manufacturerTokens = [manufacturerId, manufacturer?.id, manufacturer?.code, manufacturer?.name, manufacturer?.label]
       .filter(Boolean)
       .map((token) => normalize(String(token)));
     const manufacturerTokenSet = new Set(manufacturerTokens);
     const filtered = manufacturerId
-      ? assemblyModelOptions.filter((option) => {
+      ? modelSourceOptions.filter((option) => {
           if (!option.manufacturerTokens.length) {
             const fallback = normalize(option.manufacturerId || '');
             return fallback ? manufacturerTokenSet.has(fallback) : false;
@@ -3490,7 +3538,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       options = [{ value: currentModel, label: currentModel, disabled: false }, ...options];
     }
     return options;
-  }, [assemblyModelOptions, formValues.aircraft_model, formValues.manufacturer_id, manufacturerMetaById]);
+  }, [assemblyModelOptions, entity, formValues.aircraft_model, formValues.manufacturer_id, franchiseAssemblyModels, manufacturerMetaById]);
   const aircraftTypeSelectOptions = useMemo<SelectOption[]>(
     () =>
       (aircraftTypeOptions.length > 0 ? aircraftTypeOptions : AIRCRAFT_TYPE_FALLBACK_OPTIONS).map((option) => ({
@@ -3507,17 +3555,86 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       })),
     [aircraftStatusOptions],
   );
+  const activeAircraftTenantId = useMemo(
+    () => String(formValues.tenant_id ?? scope.tenantId ?? '').trim(),
+    [formValues.tenant_id, scope.tenantId],
+  );
+  const activeAircraftFranchiseId = useMemo(
+    () => String(formValues.franchise_id ?? scope.franchiseId ?? '').trim(),
+    [formValues.franchise_id, scope.franchiseId],
+  );
+  const activeAircraftManufacturerId = useMemo(
+    () => String(formValues.manufacturer_id ?? '').trim(),
+    [formValues.manufacturer_id],
+  );
+  const activeAircraftModelValue = useMemo(
+    () => String(formValues.aircraft_model ?? '').trim(),
+    [formValues.aircraft_model],
+  );
+  const activeAircraftModelSourceOptions = useMemo<AssemblyModelOption[]>(
+    () => (entity === 'aircraft' ? franchiseAssemblyModels : assemblyModelOptions),
+    [assemblyModelOptions, entity, franchiseAssemblyModels],
+  );
+  const selectedAircraftModelOption = useMemo(
+    () => activeAircraftModelSourceOptions.find((option) => option.modelValue === activeAircraftModelValue) || null,
+    [activeAircraftModelSourceOptions, activeAircraftModelValue],
+  );
+  const filteredSystemTemplateModelOptions = useMemo<AircraftTempOption[]>(
+    () =>
+      systemTemplateModelOptions.filter((option) => {
+        const optionTenantId = String(option.tenantId || '').trim();
+        const optionFranchiseId = String(option.franchiseId || '').trim();
+        const tenantMatched = !optionTenantId || optionTenantId === activeAircraftTenantId;
+        if (!tenantMatched) {
+          return false;
+        }
+        if (!activeAircraftFranchiseId) {
+          return true;
+        }
+        return !optionFranchiseId || optionFranchiseId === activeAircraftFranchiseId;
+      }),
+    [activeAircraftFranchiseId, activeAircraftTenantId, systemTemplateModelOptions],
+  );
   const systemTemplateModelSelectOptions = useMemo<SelectOption[]>(
     () => {
-      if (systemTemplateModelOptions.length === 0) {
+      if (filteredSystemTemplateModelOptions.length === 0) {
         return [{ value: '__empty_aircraft_templates__', label: 'No aircraft templates available', disabled: true }];
       }
-      return systemTemplateModelOptions.map((option) => ({
+      return filteredSystemTemplateModelOptions.map((option) => ({
         value: option.id,
         label: option.name,
       }));
     },
-    [systemTemplateModelOptions],
+    [filteredSystemTemplateModelOptions],
+  );
+  const franchiseAssemblyModelSelectOptions = useMemo<SelectOption[]>(
+    () => {
+      if (franchiseAssemblyModelsLoading) {
+        return [{ value: '__loading_assembly_models__', label: 'Loading models...', disabled: true }];
+      }
+      if (franchiseAssemblyModels.length === 0) {
+        return [{ value: '__empty_assembly_models__', label: 'No models available for selected franchise', disabled: true }];
+      }
+      return franchiseAssemblyModels.map((option) => ({
+        value: option.id,
+        label: option.label,
+      }));
+    },
+    [franchiseAssemblyModels, franchiseAssemblyModelsLoading],
+  );
+  const aircraftTenantSelectOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: '', label: aircraftTenantOptionsLoading ? 'Loading tenants...' : 'Select tenant', disabled: true },
+      ...aircraftTenantOptions,
+    ],
+    [aircraftTenantOptions, aircraftTenantOptionsLoading],
+  );
+  const aircraftFranchiseSelectOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: '', label: aircraftFranchiseOptionsLoading ? 'Loading franchises...' : 'Select franchise', disabled: true },
+      ...aircraftFranchiseOptions,
+    ],
+    [aircraftFranchiseOptions, aircraftFranchiseOptionsLoading],
   );
   const aircraftBaseSelectOptions = useMemo<SelectOption[]>(() => {
     const seen = new Set<string>();
@@ -3565,12 +3682,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setFormValues((previous) => ({
       ...previous,
       [fieldKey]: value,
-      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '' } : {}),
+      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '', aircraft_type: '' } : {}),
     }));
     setFormErrors((previous) => ({
       ...previous,
       [fieldKey]: '',
-      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '' } : {}),
+      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '', aircraft_type: '' } : {}),
     }));
   }, []);
   const setAircraftCounterValue = useCallback((key: string, field: 'initialValue' | 'initialDate', value: string) => {
@@ -3597,6 +3714,188 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     },
     [setFieldValue],
   );
+  const setAircraftTenantValue = useCallback(
+    (value: string) => {
+      if (isSystemSelectValue(value)) {
+        return;
+      }
+      const normalizedTenantId = String(value || '').trim();
+      const currentTenantId = String(formValues.tenant_id ?? scope.tenantId ?? '').trim();
+      if (normalizedTenantId === currentTenantId) {
+        return;
+      }
+      setFieldValue('tenant_id', normalizedTenantId);
+      setFieldValue('franchise_id', '');
+      setFieldValue('manufacturer_id', '');
+      setAircraftTemplateModel('');
+      setFieldValue('aircraft_template', '');
+      setAircraftFranchiseOptions([]);
+      setFranchiseAssemblyModels([]); // Clear franchise assembly models when tenant changes
+      void loadManufacturerOptions(normalizedTenantId);
+    },
+    [formValues.tenant_id, isSystemSelectValue, loadManufacturerOptions, scope.tenantId, setFieldValue],
+  );
+  const setAircraftFranchiseValue = useCallback(
+    (value: string) => {
+      if (isSystemSelectValue(value)) {
+        return;
+      }
+      const normalizedFranchiseId = String(value || '').trim();
+      const currentFranchiseId = String(formValues.franchise_id ?? scope.franchiseId ?? '').trim();
+      if (normalizedFranchiseId === currentFranchiseId) {
+        return;
+      }
+      setFieldValue('franchise_id', normalizedFranchiseId);
+      setAircraftTemplateModel('');
+      setFieldValue('aircraft_template', '');
+      setFieldValue('aircraft_model', '');
+    },
+    [formValues.franchise_id, isSystemSelectValue, scope.franchiseId, setFieldValue],
+  );
+  
+  const loadFranchiseAssemblyModels = useCallback(
+    async (tenantId: string, franchiseId: string, manufacturerId: string) => {
+      const scopedTenantId = String(tenantId || '').trim();
+      const scopedFranchiseId = String(franchiseId || '').trim();
+      const scopedManufacturerId = String(manufacturerId || '').trim();
+      if (entity !== 'aircraft' || !scopedDb || !scopedTenantId || !scopedFranchiseId || !scopedManufacturerId) {
+        setFranchiseAssemblyModels([]);
+        return;
+      }
+      setFranchiseAssemblyModelsLoading(true);
+      try {
+        let query = (scopedDb as any)
+          .from('assembly_models')
+          .select('id, name, model_code, manufacturer_id, franchise_id, tenant_id, aircraft_type, is_active')
+          .eq('tenant_id', scopedTenantId)
+          .eq('manufacturer_id', scopedManufacturerId)
+          .eq('is_active', true)
+          .order('name', { ascending: true });
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${scopedFranchiseId}`);
+        const { data: modelRows, error: modelError } = await query;
+        
+        if (modelError) {
+          throw new Error(String(modelError.message || 'Failed to load assembly models'));
+        }
+        
+        const mappedModels = (Array.isArray(modelRows) ? modelRows : [])
+          .map((row: Record<string, unknown>) => {
+            const id = String(row.id || '').trim();
+            const name = String(row.name || '').trim();
+            const code = String(row.model_code || '').trim();
+            const rowTenantId = String(row.tenant_id || scopedTenantId).trim();
+            const rowFranchiseId = String(row.franchise_id || '').trim();
+            const aircraftType = String(row.aircraft_type || '').trim();
+            const manufacturerId = String(row.manufacturer_id || '').trim();
+            const manufacturerMeta = manufacturerMetaById.get(manufacturerId);
+            const manufacturerName = String(manufacturerMeta?.name || manufacturerMeta?.code || '').trim();
+            const label = name && code && name !== code ? `${name} (${code})` : name || code || id;
+            const manufacturerTokens = [manufacturerId, manufacturerName]
+              .filter(Boolean)
+              .map((token: string) => token.toLowerCase());
+            
+            return {
+              id,
+              name,
+              label,
+              modelValue: name || code || id,
+              aircraftType,
+              tenantId: rowTenantId,
+              franchiseId: rowFranchiseId,
+              manufacturerId,
+              manufacturerTokens,
+              active: String(row.is_active ?? 'true').toLowerCase() !== 'false',
+            } as AssemblyModelOption;
+          });
+        const filteredModels = filterAssemblyModelsByScope(mappedModels, {
+          tenantId: scopedTenantId,
+          franchiseId: scopedFranchiseId,
+          manufacturerId: scopedManufacturerId,
+        });
+        setFranchiseAssemblyModels(filteredModels);
+      } catch (error) {
+        const message = String((error as Error).message || 'Failed to load assembly models for franchise');
+        toast.error(message);
+        setFranchiseAssemblyModels([]);
+      } finally {
+        setFranchiseAssemblyModelsLoading(false);
+      }
+    },
+    [entity, manufacturerMetaById, scopedDb],
+  );
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    if (!activeAircraftTenantId || !activeAircraftFranchiseId || !activeAircraftManufacturerId) {
+      setFranchiseAssemblyModels([]);
+      return;
+    }
+    void loadFranchiseAssemblyModels(activeAircraftTenantId, activeAircraftFranchiseId, activeAircraftManufacturerId);
+  }, [
+    activeAircraftFranchiseId,
+    activeAircraftManufacturerId,
+    activeAircraftTenantId,
+    entity,
+    loadFranchiseAssemblyModels,
+    modalOpen,
+  ]);
+  const loadAircraftTenantAndFranchiseOptions = useCallback(async () => {
+    if (entity !== 'aircraft' || !scopedDb) {
+      return;
+    }
+    setAircraftTenantOptionsLoading(true);
+    setAircraftFranchiseOptionsLoading(true);
+    setAircraftTenantOptionsError('');
+    setAircraftFranchiseOptionsError('');
+    try {
+      const { data: tenantRows, error: tenantError } = await (scopedDb as any)
+        .from('tenants')
+        .select('id,name,is_active')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      if (tenantError) {
+        throw new Error(String(tenantError.message || 'Failed to load tenants'));
+      }
+      const tenantOptions = (Array.isArray(tenantRows) ? tenantRows : [])
+        .map((row) => ({
+          value: String((row as Record<string, unknown>).id || '').trim(),
+          label: String((row as Record<string, unknown>).name || (row as Record<string, unknown>).id || '').trim(),
+        }))
+        .filter((option) => option.value.length > 0);
+      setAircraftTenantOptions(tenantOptions);
+
+      if (!activeAircraftTenantId) {
+        setAircraftFranchiseOptions([]);
+        return;
+      }
+      const { data: franchiseRows, error: franchiseError } = await (scopedDb as any)
+        .from('franchises')
+        .select('id,name,is_active,tenant_id')
+        .eq('tenant_id', activeAircraftTenantId)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+      if (franchiseError) {
+        throw new Error(String(franchiseError.message || 'Failed to load franchises'));
+      }
+      const franchiseOptions = (Array.isArray(franchiseRows) ? franchiseRows : [])
+        .map((row) => ({
+          value: String((row as Record<string, unknown>).id || '').trim(),
+          label: String((row as Record<string, unknown>).name || (row as Record<string, unknown>).id || '').trim(),
+        }))
+        .filter((option) => option.value.length > 0);
+      setAircraftFranchiseOptions(franchiseOptions);
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load tenant/franchise options');
+      setAircraftTenantOptionsError(message);
+      setAircraftFranchiseOptionsError(message);
+      setAircraftTenantOptions([]);
+      setAircraftFranchiseOptions([]);
+    } finally {
+      setAircraftTenantOptionsLoading(false);
+      setAircraftFranchiseOptionsLoading(false);
+    }
+  }, [activeAircraftTenantId, entity, scopedDb]);
   const hydrateAircraftCountersFromTemplate = useCallback(
     async (templateId: string) => {
       if (entity !== 'aircraft') {
@@ -3698,7 +3997,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       .filter(Boolean)
       .map((token) => normalize(String(token)));
     const manufacturerTokenSet = new Set(manufacturerTokens);
-    const match = assemblyModelOptions.some((option) => {
+    const match = activeAircraftModelSourceOptions.some((option) => {
       const manufacturerMatch =
         option.manufacturerTokens.length > 0
           ? option.manufacturerTokens.some((token) => manufacturerTokenSet.has(token))
@@ -3709,7 +4008,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setFieldValue('aircraft_model', '');
     }
   }, [
-    assemblyModelOptions,
+    activeAircraftModelSourceOptions,
     assemblyModelOptionsError,
     assemblyModelOptionsLoading,
     entity,
@@ -3718,6 +4017,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     manufacturerMetaById,
     setFieldValue,
   ]);
+
+  useEffect(() => {
+    if (entity !== 'aircraft') {
+      return;
+    }
+    const nextAircraftType = String(selectedAircraftModelOption?.aircraftType || '').trim();
+    const currentAircraftType = String(formValues.aircraft_type ?? '').trim();
+    if (nextAircraftType === currentAircraftType) {
+      return;
+    }
+    setFieldValue('aircraft_type', nextAircraftType);
+  }, [entity, formValues.aircraft_type, selectedAircraftModelOption, setFieldValue]);
 
   const supportsColumnHeaderFilters = entity === 'aircraft' || entity === 'flight_logs';
 
@@ -4267,11 +4578,49 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (!modalOpen || entity !== 'aircraft') {
       return;
     }
+    if (!String(formValues.tenant_id ?? '').trim() && scope.tenantId) {
+      setFieldValue('tenant_id', scope.tenantId);
+    }
+    if (!String(formValues.franchise_id ?? '').trim() && scope.franchiseId) {
+      setFieldValue('franchise_id', scope.franchiseId);
+    }
+  }, [entity, formValues.franchise_id, formValues.tenant_id, modalOpen, scope.franchiseId, scope.tenantId, setFieldValue]);
+
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    void loadAircraftTenantAndFranchiseOptions();
+  }, [entity, loadAircraftTenantAndFranchiseOptions, modalOpen]);
+
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    const currentTemplateModel = String(aircraftTemplateModel || '').trim();
+    if (!currentTemplateModel) {
+      return;
+    }
+    const templateStillAvailable = filteredSystemTemplateModelOptions.some((option) => option.id === currentTemplateModel);
+    if (templateStillAvailable) {
+      return;
+    }
+    setAircraftTemplateModel('');
+    setFieldValue('aircraft_template', '');
+  }, [aircraftTemplateModel, entity, filteredSystemTemplateModelOptions, modalOpen, setFieldValue]);
+
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
     const registration = String(formValues.registration ?? '').trim().toUpperCase();
     const serialNumber = String(formValues.serial_number ?? '').trim().toUpperCase();
     setAircraftNoSerialNumber(serialNumber === 'N/A');
-    const defaultTemplateModel = systemTemplateModelSelectOptions.find((option) => !option.disabled && !isSystemSelectValue(option.value))?.value || '';
-    const templateModelSource = formValues.aircraft_template ?? defaultTemplateModel;
+    const canHydrateTemplate = Boolean(activeAircraftTenantId && activeAircraftFranchiseId);
+    const defaultTemplateModel = canHydrateTemplate
+      ? systemTemplateModelSelectOptions.find((option) => !option.disabled && !isSystemSelectValue(option.value))?.value || ''
+      : '';
+    const templateModelSource = canHydrateTemplate ? (formValues.aircraft_template ?? defaultTemplateModel) : '';
     setAircraftTemplateModel(String(templateModelSource).trim() || defaultTemplateModel);
     setAircraftManufacturingDate(String(formValues.manufacturing_date ?? '').trim());
     const baseSource = formValues.base_location ?? AIRCRAFT_UNSELECTED_OPTION;
@@ -4295,6 +4644,24 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       };
     });
   }, [aircraftStatusSelectOptions, aircraftTypeSelectOptions, entity, modalMode, modalOpen, selectedId, systemTemplateModelSelectOptions]);
+
+  useEffect(() => {
+    if (!modalOpen || entity !== 'aircraft') {
+      return;
+    }
+    const selectedManufacturerId = String(formValues.manufacturer_id ?? '').trim();
+    if (!selectedManufacturerId) {
+      return;
+    }
+    if (manufacturerOptions.some((option) => option.id === selectedManufacturerId)) {
+      return;
+    }
+    setFieldValue('manufacturer_id', '');
+    setFormErrors((previous) => ({
+      ...previous,
+      manufacturer_id: 'Manufacturer is not available for selected tenant',
+    }));
+  }, [entity, formValues.manufacturer_id, manufacturerOptions, modalOpen, setFieldValue]);
 
   useEffect(() => {
     if (!modalOpen || entity !== 'aircraft') {
@@ -8684,19 +9051,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   collaborationIndicator={collaborationIndicator}
                   aircraftValidationSummary={aircraftValidationSummary}
                   aircraftTemplateModel={aircraftTemplateModel}
+                  aircraftTenantValue={activeAircraftTenantId}
+                  aircraftFranchiseValue={activeAircraftFranchiseId}
                   aircraftListboxOptionsLoading={aircraftListboxOptionsLoading}
+                  aircraftTenantOptionsLoading={aircraftTenantOptionsLoading}
+                  aircraftFranchiseOptionsLoading={aircraftFranchiseOptionsLoading}
+                  aircraftTenantOptionsError={aircraftTenantOptionsError}
+                  aircraftFranchiseOptionsError={aircraftFranchiseOptionsError}
                   isSystemSelectValue={isSystemSelectValue}
                   setAircraftTemplateModel={setAircraftTemplateModel}
+                  setAircraftTenantValue={setAircraftTenantValue}
+                  setAircraftFranchiseValue={setAircraftFranchiseValue}
                   setAircraftAuxField={setAircraftAuxField}
                   systemTemplateModelOptions={systemTemplateModelOptions}
+                  franchiseAssemblyModelOptions={franchiseAssemblyModels}
                   setFieldValue={setFieldValue}
                   hydrateAircraftCountersFromTemplate={hydrateAircraftCountersFromTemplate}
                   systemTemplateModelSelectOptions={systemTemplateModelSelectOptions}
+                  franchiseAssemblyModelSelectOptions={franchiseAssemblyModelSelectOptions}
+                  aircraftTenantSelectOptions={aircraftTenantSelectOptions}
+                  aircraftFranchiseSelectOptions={aircraftFranchiseSelectOptions}
+                  disableAircraftFranchiseSelection={!activeAircraftTenantId}
+                  disableAircraftModelSelection={!activeAircraftTenantId || !activeAircraftFranchiseId}
                   formValues={formValues}
                   formErrors={formErrors}
                   firstFieldRef={firstFieldRef}
-                  aircraftTypeSelectOptions={aircraftTypeSelectOptions}
-                  aircraftStatusSelectOptions={aircraftStatusSelectOptions}
+                  aircraftModelNameValue={String(selectedAircraftModelOption?.name || '')}
+                  aircraftModelTypeValue={String(selectedAircraftModelOption?.aircraftType || '')}
                   setSelectFieldValue={setSelectFieldValue}
                   resolveSelectOptions={resolveSelectOptions}
                   aircraftNoSerialNumber={aircraftNoSerialNumber}

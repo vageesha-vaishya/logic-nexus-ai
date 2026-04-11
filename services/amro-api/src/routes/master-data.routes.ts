@@ -228,13 +228,14 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   },
   assembly_models: {
     table: 'assembly_models',
-    searchableColumns: ['model_code', 'name', 'primary_model', 'id'],
+    searchableColumns: ['model_code', 'name', 'primary_model', 'aircraft_type', 'id'],
     listColumns:
-      'id,tenant_id,franchise_id,manufacturer_id,assembly_type_id,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
+      'id,tenant_id,franchise_id,manufacturer_id,assembly_type_id,aircraft_type,model_code,name,primary_model,description,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['manufacturer_id', 'assembly_type_id', 'model_code', 'name'],
     writeAllowedFields: [
       'manufacturer_id',
       'assembly_type_id',
+      'aircraft_type',
       'model_code',
       'name',
       'primary_model',
@@ -1098,6 +1099,12 @@ router.get(
     const { page, pageSize, start, end } = parsePagination(req);
     const { sortBy, ascending } = parseSort(req, entity);
     const franchiseId = extractFranchiseId(req);
+    const queryFranchiseId = String(req.query.franchise_id || req.query.franchiseId || '').trim();
+    const queryManufacturerId = String(req.query.manufacturer_id || req.query.manufacturerId || '').trim();
+    const tenantFilter = String(req.query.tenant_id || req.query.tenantId || '').trim();
+    if (tenantFilter && tenantFilter !== String(req.tenantId || '').trim()) {
+      throw new HttpError('tenant_id filter must match current tenant context', 403);
+    }
     const supabase = getSupabaseAdminClient();
 
     let finalData: unknown[] = [];
@@ -1115,8 +1122,17 @@ router.get(
 
       query = query.eq('tenant_id', req.tenantId);
 
-      if (franchiseId) {
+      if (franchiseId && entity !== 'manufacturers' && entity !== 'assembly_models') {
         query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+      }
+      if (entity === 'assembly_models') {
+        const effectiveFranchiseId = queryFranchiseId || franchiseId || '';
+        if (effectiveFranchiseId) {
+          query = query.or(`franchise_id.is.null,franchise_id.eq.${effectiveFranchiseId}`);
+        }
+        if (queryManufacturerId) {
+          query = query.eq('manufacturer_id', queryManufacturerId);
+        }
       }
       if (search && !franchiseId && searchableColumns.length) {
         const trimmedSearch = search.trim();
