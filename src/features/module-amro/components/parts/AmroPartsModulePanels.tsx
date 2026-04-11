@@ -22,7 +22,11 @@ export function ReservationsPanel({ records }: Props): JSX.Element {
       moduleId="operations.reservations"
     >
       <div className="space-y-3">
-        <AmroKpiGrid items={[{ label: 'Reserved Records', value: String(reserved.length) }]} />
+        {/* Issue AC-03: Live region for KPI updates */}
+        <div aria-live="polite" aria-atomic="true">
+          <AmroKpiGrid items={[{ label: 'Reserved Records', value: String(reserved.length) }]} />
+          <span className="sr-only">{reserved.length} reserved records found</span>
+        </div>
         <AmroModuleGridDetailPanel
           rows={reserved}
           loading={false}
@@ -66,7 +70,11 @@ export function IssueConsumePanel({ records }: Props): JSX.Element {
       moduleId="operations.issue-consume"
     >
       <div className="space-y-3">
-        <AmroKpiGrid items={[{ label: 'Ready Candidates', value: String(candidates.length), tone: 'success' }]} />
+        {/* Issue AC-03: Live region for KPI updates */}
+        <div aria-live="polite" aria-atomic="true">
+          <AmroKpiGrid items={[{ label: 'Ready Candidates', value: String(candidates.length), tone: 'success' }]} />
+          <span className="sr-only">{candidates.length} ready candidates available</span>
+        </div>
         <AmroModuleGridDetailPanel
           rows={candidates}
           loading={false}
@@ -110,7 +118,11 @@ export function RestockPanel({ records }: Props): JSX.Element {
       moduleId="operations.restock"
     >
       <div className="space-y-3">
-        <AmroKpiGrid items={[{ label: 'Low Stock Items', value: String(lowStock.length), tone: lowStock.length > 0 ? 'warning' : 'success' }]} />
+        {/* Issue AC-03: Live region for KPI updates */}
+        <div aria-live="polite" aria-atomic="true">
+          <AmroKpiGrid items={[{ label: 'Low Stock Items', value: String(lowStock.length), tone: lowStock.length > 0 ? 'warning' : 'success' }]} />
+          <span className="sr-only">{lowStock.length} low stock items requiring attention</span>
+        </div>
         <AmroModuleGridDetailPanel
           rows={lowStock}
           loading={false}
@@ -162,7 +174,11 @@ export function LocationsPanel({ records }: Props): JSX.Element {
       moduleId="operations.locations"
     >
       <div className="space-y-3">
-        <AmroKpiGrid items={[{ label: 'Active Locations', value: String(byLocation.length) }]} />
+        {/* Issue AC-03: Live region for KPI updates */}
+        <div aria-live="polite" aria-atomic="true">
+          <AmroKpiGrid items={[{ label: 'Active Locations', value: String(byLocation.length) }]} />
+          <span className="sr-only">{byLocation.length} active warehouse locations</span>
+        </div>
         <AmroModuleGridDetailPanel
           rows={rows}
           loading={false}
@@ -208,13 +224,19 @@ export function AnalyticsPanel({ records }: Props): JSX.Element {
       moduleId="insights.analytics"
     >
       <div className="space-y-3">
-        <AmroKpiGrid
-          items={[
-            { label: 'Total Items', value: String(metrics.totalItems) },
-            { label: 'Low Stock', value: String(metrics.lowStockItems), tone: metrics.lowStockItems > 0 ? 'warning' : 'success' },
-            { label: 'Inventory Value', value: currency(metrics.inventoryValue) },
-          ]}
-        />
+        {/* Issue AC-03: Live region for KPI updates */}
+        <div aria-live="polite" aria-atomic="true">
+          <AmroKpiGrid
+            items={[
+              { label: 'Total Items', value: String(metrics.totalItems) },
+              { label: 'Low Stock', value: String(metrics.lowStockItems), tone: metrics.lowStockItems > 0 ? 'warning' : 'success' },
+              { label: 'Inventory Value', value: currency(metrics.inventoryValue) },
+            ]}
+          />
+          <span className="sr-only">
+            Analytics update: {metrics.totalItems} total items, {metrics.lowStockItems} low stock, inventory value {currency(metrics.inventoryValue)}
+          </span>
+        </div>
         <AmroModuleGridDetailPanel
           rows={rows}
           loading={false}

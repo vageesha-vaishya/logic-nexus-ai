@@ -45,7 +45,7 @@ export const LeadCard = React.forwardRef<HTMLDivElement, LeadCardProps>(function
   };
 
   const getScoreColor = (score: number | null) => {
-    if (!score) return 'bg-gray-100 text-gray-600';
+    if (!score) return 'bg-muted text-muted-foreground';
     if (score >= 70) return 'bg-green-100 text-green-700';
     if (score >= 40) return 'bg-yellow-100 text-yellow-700';
     return 'bg-red-100 text-red-700';

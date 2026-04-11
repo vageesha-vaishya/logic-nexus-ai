@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { H1 } from '@/components/ui/Heading';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { ContactForm } from '@/components/crm/ContactForm';
 import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
@@ -230,7 +231,7 @@ export default function ContactDetail() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-gray-500"
+                className="h-8 w-8 text-muted-foreground"
                 onClick={() => setShowDeleteDialog(true)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -245,7 +246,7 @@ export default function ContactDetail() {
             !isEditing && (
               <div className="flex flex-col gap-4 w-full">
                 <div>
-                  <h1 className="text-3xl font-bold text-gray-900">{contactName}</h1>
+                  <H1>{contactName}</H1>
                 </div>
 
                 {/* Contact Details Grid */}
@@ -254,20 +255,20 @@ export default function ContactDetail() {
                   <div className="space-y-3">
                     {contact.title && (
                       <div className="flex items-center gap-2 text-[13px]">
-                        <User className="h-3.5 w-3.5 text-gray-500" />
-                        <span className="text-gray-700">{contact.title}</span>
+                        <User className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-foreground">{contact.title}</span>
                       </div>
                     )}
                     {contact.email && (
                       <div className="flex items-center gap-2 text-[13px]">
-                        <Mail className="h-3.5 w-3.5 text-gray-500" />
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                         <a href={`mailto:${contact.email}`} className="text-[#714B67] hover:underline font-medium">{contact.email}</a>
                       </div>
                     )}
                     {contact.phone && (
                       <div className="flex items-center gap-2 text-[13px]">
-                        <Phone className="h-3.5 w-3.5 text-gray-500" />
-                        <span className="text-gray-700">{contact.phone}</span>
+                        <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-foreground">{contact.phone}</span>
                       </div>
                     )}
                   </div>

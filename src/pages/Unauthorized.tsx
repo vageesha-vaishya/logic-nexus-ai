@@ -1,5 +1,6 @@
 import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { H1 } from '@/components/ui/Heading';
 import { ShieldAlert, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { useEffect, useRef, useState } from 'react';
@@ -41,7 +42,7 @@ export default function Unauthorized() {
           </div>
         </div>
         <div className="space-y-2">
-          <h1 className="text-3xl font-bold tracking-tight">Access Denied</h1>
+          <H1 className="tracking-tight">Access Denied</H1>
           <p className="text-muted-foreground">
             {state?.message || "You don't have permission to access this resource."}
           </p>

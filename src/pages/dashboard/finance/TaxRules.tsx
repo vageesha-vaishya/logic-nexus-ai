@@ -2,6 +2,7 @@
 import { useEffect, useState } from 'react';
 import { Plus, Filter } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { H2 } from '@/components/ui/Heading';
 import {
   Table,
   TableBody,
@@ -115,7 +116,7 @@ export default function TaxRules() {
     <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Tax Rules</h2>
+          <H2>Tax Rules</H2>
           <p className="text-muted-foreground">
             Manage tax rates and rules for different jurisdictions
           </p>
@@ -196,7 +197,7 @@ export default function TaxRules() {
                         <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                           rule.ruleType === 'STANDARD' ? 'bg-blue-100 text-blue-800' :
                           rule.ruleType === 'REDUCED' ? 'bg-green-100 text-green-800' :
-                          'bg-gray-100 text-gray-800'
+                          'bg-muted text-foreground'
                         }`}>
                           {rule.ruleType}
                         </span>

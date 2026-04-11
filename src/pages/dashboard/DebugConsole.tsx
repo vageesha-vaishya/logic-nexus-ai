@@ -8,6 +8,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { H1, H3 } from '@/components/ui/Heading';
 import { 
   Activity, 
   Settings, 
@@ -53,7 +54,7 @@ class DebugErrorBoundary extends React.Component<{ children: React.ReactNode, on
         <div className="p-4 m-4 text-red-500 bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-900 rounded-md">
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle className="h-5 w-5" />
-            <h3 className="font-bold">Render Error</h3>
+            <H3 className="font-bold">Render Error</H3>
           </div>
           <p className="text-sm mb-2 text-muted-foreground">The console encountered an error while rendering logs. This usually happens with malformed log data.</p>
           <div className="bg-background p-2 rounded border mb-4 overflow-auto max-h-32">
@@ -474,10 +475,10 @@ export default function DebugConsole() {
   return (
     <div className="flex flex-col p-4 gap-4 h-auto md:h-[calc(100vh-4rem)]">
       <div className="flex justify-between items-center">
-        <h1 className="text-2xl font-bold flex items-center gap-2">
+        <H1 className="text-2xl font-bold flex items-center gap-2">
           <Activity className="h-6 w-6 text-primary" />
           System Debug Console
-        </h1>
+        </H1>
         <div className="flex items-center gap-2">
            <Badge variant={config.enabled ? "default" : "secondary"}>
              {config.enabled ? "Active" : "Disabled"}
@@ -500,9 +501,9 @@ export default function DebugConsole() {
                 {/* Fixed Configuration Section */}
                 <div className="flex-shrink-0 space-y-6">
                   <div className="space-y-4">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <H3 className="text-sm font-semibold flex items-center gap-2">
                       <Globe className="h-4 w-4" /> Network Capture
-                    </h3>
+                    </H3>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label className="text-sm">Request Headers</label>
@@ -551,9 +552,9 @@ export default function DebugConsole() {
                   </div>
 
                   <div className="space-y-2">
-                    <h3 className="text-sm font-semibold flex items-center gap-2">
+                    <H3 className="text-sm font-semibold flex items-center gap-2">
                       <Filter className="h-4 w-4" /> Filters
-                    </h3>
+                    </H3>
                     <div className="space-y-1">
                       <label className="text-xs text-muted-foreground">URL Patterns (Regex)</label>
                       <Input 
@@ -576,9 +577,9 @@ export default function DebugConsole() {
 
                 {/* Scrollable Scopes Section */}
                 <div className="flex flex-col space-y-2">
-                  <h3 className="text-sm font-semibold flex items-center gap-2 flex-shrink-0">
+                  <H3 className="text-sm font-semibold flex items-center gap-2 flex-shrink-0">
                     <FolderTree className="h-4 w-4" /> Debug Scopes
-                  </h3>
+                  </H3>
                   <div className="min-h-[200px] pr-2 border rounded-md p-2 bg-muted/10">
                     <div className="space-y-1">
                       {Object.keys(config.scopes).length === 0 ? (

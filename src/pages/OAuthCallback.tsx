@@ -5,6 +5,7 @@ import { handleOAuthCallback } from "@/lib/oauth";
 import { invokeFunction } from "@/lib/supabase-functions";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { H2 } from "@/components/ui/Heading";
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
@@ -85,7 +86,7 @@ export default function OAuthCallback() {
         {status === "processing" && (
           <>
             <Loader2 className="w-12 h-12 animate-spin mx-auto text-primary" />
-            <h2 className="text-2xl font-semibold">Connecting Your Account</h2>
+            <H2>Connecting Your Account</H2>
             <p className="text-muted-foreground">Please wait while we complete the authorization...</p>
           </>
         )}
@@ -96,7 +97,7 @@ export default function OAuthCallback() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold">Successfully Connected!</h2>
+            <H2>Successfully Connected!</H2>
             <p className="text-muted-foreground">Redirecting you back...</p>
           </>
         )}
@@ -107,7 +108,7 @@ export default function OAuthCallback() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
               </svg>
             </div>
-            <h2 className="text-2xl font-semibold">Connection Failed</h2>
+            <H2>Connection Failed</H2>
             <p className="text-muted-foreground">Redirecting you back...</p>
           </>
         )}

@@ -3,6 +3,7 @@ import { Plus, Search, Package, Filter } from 'lucide-react';
 import { useNavigate, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { H1 } from '@/components/ui/Heading';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
 import { useSort } from '@/hooks/useSort';
@@ -133,7 +134,7 @@ export default function Shipments() {
   const pending = shipments.filter(s => ['draft', 'confirmed'].includes(s.status)).length;
 
   const getStatusColor = (status: ShipmentStatus) => {
-    return statusConfig[status]?.color || 'bg-gray-500/10 text-gray-500';
+    return statusConfig[status]?.color || 'bg-muted/50 text-muted-foreground';
   };
 
   return (
@@ -141,7 +142,7 @@ export default function Shipments() {
       <div className="space-y-6">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold">Shipments</h1>
+            <H1>Shipments</H1>
             <p className="text-muted-foreground">Track and manage all shipments</p>
           </div>
           <div className="mt-3 flex items-center justify-between gap-3">

@@ -9,6 +9,8 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { Loader2, ArrowRight } from 'lucide-react';
+import { H1 } from '@/components/ui/Heading';
+import { FormActions } from '@/components/ui/FormActions';
 
 export default function BookingNew() {
   const navigate = useNavigate();
@@ -125,7 +127,7 @@ export default function BookingNew() {
   return (
     <DashboardLayout>
       <div className="flex flex-col gap-6 p-6 max-w-2xl mx-auto">
-        <h1 className="text-3xl font-bold tracking-tight">New Booking</h1>
+        <H1 className="tracking-tight">New Booking</H1>
         
         <Card>
           <CardHeader>
@@ -186,14 +188,16 @@ export default function BookingNew() {
                  </div>
                )}
 
-               <Button 
-                 onClick={handleCreateFromQuote} 
-                 disabled={loading || !selectedQuoteId || quotesLoading || fallbackLoading} 
-                 className="w-full sm:w-auto mt-2"
-               >
-                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                 Create Booking
-               </Button>
+               <FormActions variant="bottom">
+                 <Button
+                   onClick={handleCreateFromQuote}
+                   disabled={loading || !selectedQuoteId || quotesLoading || fallbackLoading}
+                   className="w-full sm:w-auto"
+                 >
+                   {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                   Create Booking
+                 </Button>
+               </FormActions>
             </div>
           </CardContent>
         </Card>
@@ -213,10 +217,12 @@ export default function BookingNew() {
             <CardDescription>Create a blank booking draft.</CardDescription>
           </CardHeader>
           <CardContent>
-             <Button onClick={handleCreateManual} disabled={loading} variant="outline" className="w-full sm:w-auto">
-               {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-               Create Empty Draft
-             </Button>
+             <FormActions variant="bottom">
+               <Button onClick={handleCreateManual} disabled={loading} variant="outline" className="w-full sm:w-auto">
+                 {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                 Create Empty Draft
+               </Button>
+             </FormActions>
           </CardContent>
         </Card>
       </div>

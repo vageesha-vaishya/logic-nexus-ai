@@ -1,6 +1,7 @@
 import { useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { H1 } from '@/components/ui/Heading';
 import { LeadForm } from '@/components/crm/LeadForm';
 import { LeadWorkspaceSections } from '@/components/crm/LeadWorkspaceSections';
 import { useCRM } from '@/hooks/useCRM';
@@ -149,7 +150,7 @@ export default function LeadNew() {
       <div style={themeStyleFromPreset(currentTheme)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-start justify-between gap-4 sm:items-center">
           <div>
-            <h1 className="text-3xl font-bold">New Lead</h1>
+            <H1>New Lead</H1>
             <p className="text-muted-foreground">Create a new sales lead</p>
           </div>
           <CRMModuleHeaderNavigation

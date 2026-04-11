@@ -4,7 +4,10 @@
       "Bash(mkdir *)",
       "Bash(npx *)",
       "Bash(timeout *)",
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(wc *)",
+      "Bash(sed *)",
+      "Bash(npm run *)"
     ]
   },
   "$version": 3

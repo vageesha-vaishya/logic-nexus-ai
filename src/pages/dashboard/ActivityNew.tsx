@@ -7,6 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from "@/lib/supabase-functions";
 import { toast } from 'sonner';
+import { H1 } from '@/components/ui/Heading';
 
 export default function ActivityNew() {
   const navigate = useNavigate();
@@ -254,7 +255,7 @@ export default function ActivityNew() {
             <ArrowLeft className="h-4 w-4" />
           </Button>
           <div>
-            <h1 className="text-3xl font-bold">New Activity</h1>
+            <H1>New Activity</H1>
             <p className="text-muted-foreground">Schedule a new activity or task</p>
           </div>
         </div>

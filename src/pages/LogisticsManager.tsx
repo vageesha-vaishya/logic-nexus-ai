@@ -29,6 +29,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { H1 } from '@/components/ui/Heading';
 import { Plus, Pencil, Trash2, Package, Search } from 'lucide-react';
 import { CargoForm } from '@/components/logistics/CargoForm';
 import { Input } from '@/components/ui/input';
@@ -88,7 +89,7 @@ export default function LogisticsManager() {
       <div className="container mx-auto py-8 space-y-8">
         <div className="flex justify-between items-center">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Logistics Management</h1>
+            <H1>Logistics Management</H1>
             <p className="text-muted-foreground">Manage cargo inventory and HTS classifications.</p>
           </div>
           <Button onClick={() => setIsCreateOpen(true)}>

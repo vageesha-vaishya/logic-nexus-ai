@@ -1,4 +1,5 @@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { H1 } from '@/components/ui/Heading';
 import { ActivityLogs } from "./audit/ActivityLogs";
 import { SystemLogs } from "./audit/SystemLogs";
 import { DataFlowMonitor } from "./audit/DataFlowMonitor";
@@ -8,7 +9,7 @@ export default function AuditLogs() {
     <div className="flex flex-col gap-6 p-8 max-w-[1600px] mx-auto w-full">
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight text-foreground">Audit & Logs</h1>
+          <H1 className="tracking-tight">Audit & Logs</H1>
           <p className="text-muted-foreground mt-2">
             Monitor system activity, data flow, and system logs.
           </p>

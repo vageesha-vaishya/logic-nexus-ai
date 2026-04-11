@@ -6,7 +6,8 @@ import { invokeFunction } from '@/lib/supabase-functions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
+import { H2 } from '@/components/ui/Heading';
 import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
@@ -184,7 +185,7 @@ export default function Auth() {
           <div className="flex justify-center mb-4">
             <img src={sosLogo} alt="SOS Logistic Pro Enterprise" className="h-20 w-20" />
           </div>
-          <CardTitle className="text-2xl font-bold">SOS Logistic Pro Enterprise</CardTitle>
+          <H2>SOS Logistic Pro Enterprise</H2>
           <CardDescription>
             {recoveryMode ? 'Set a new password for your account' : 'Sign in to your account to continue'}
           </CardDescription>

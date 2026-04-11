@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { H1, H5 } from '@/components/ui/Heading';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { AccountForm } from '@/components/crm/AccountForm';
 import { EmailClient } from "@/components/email/EmailClient";
@@ -349,7 +350,7 @@ export default function AccountDetailLegacy() {
               </Button>
               <Button
                 variant="outline"
-                className="h-8 text-gray-600"
+                className="h-8 text-muted-foreground"
                 onClick={handleEnrich}
                 disabled={isEnriching}
               >
@@ -358,7 +359,7 @@ export default function AccountDetailLegacy() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-gray-500"
+                className="h-8 w-8 text-muted-foreground"
                 onClick={() => setShowDeleteDialog(true)}
               >
                 <Trash2 className="h-4 w-4" />
@@ -403,21 +404,21 @@ export default function AccountDetailLegacy() {
                     <div className="flex items-center gap-6 mb-2">
                       <div className="flex items-center gap-2">
                         <input type="radio" checked={account.account_type !== 'individual'} readOnly className="accent-[#714B67] h-4 w-4" />
-                        <span className="text-sm font-semibold text-gray-700">Company</span>
+                        <span className="text-sm font-semibold text-foreground">Company</span>
                       </div>
                       <div className="flex items-center gap-2">
                         <input type="radio" checked={account.account_type === 'individual'} readOnly className="accent-[#714B67] h-4 w-4" />
-                        <span className="text-sm font-semibold text-gray-700">Individual</span>
+                        <span className="text-sm font-semibold text-foreground">Individual</span>
                       </div>
                     </div>
-                    <h1 className="text-3xl font-bold text-gray-900">{account.name}</h1>
+                    <H1>{account.name}</H1>
                   </div>
 
                   {/* Address & Metadata Grid */}
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-x-12 gap-y-4 mt-2">
                     {/* Left Column: Address/Contact */}
                     <div className="space-y-4">
-                      <div className="text-[13px] text-gray-900 font-normal leading-relaxed">
+                      <div className="text-[13px] text-foreground font-normal leading-relaxed">
                         <div className="flex gap-8 mb-1">
                           <span className="font-bold min-w-[60px]">Address</span>
                           <div className="flex flex-col">
@@ -430,14 +431,14 @@ export default function AccountDetailLegacy() {
 
                       {account.email && (
                         <div className="flex items-center gap-2 text-[13px]">
-                          <Mail className="h-3.5 w-3.5 text-gray-500" />
+                          <Mail className="h-3.5 w-3.5 text-muted-foreground" />
                           <a href={`mailto:${account.email}`} className="text-[#714B67] hover:underline font-medium">{account.email}</a>
                         </div>
                       )}
                       {account.phone && (
                         <div className="flex items-center gap-2 text-[13px]">
-                          <Phone className="h-3.5 w-3.5 text-gray-500" />
-                          <span className="text-gray-700">{account.phone}</span>
+                          <Phone className="h-3.5 w-3.5 text-muted-foreground" />
+                          <span className="text-foreground">{account.phone}</span>
                         </div>
                       )}
                     </div>

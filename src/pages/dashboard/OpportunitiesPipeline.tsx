@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { formatCurrency } from "@/lib/utils";
+import { H1 } from "@/components/ui/Heading";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -454,7 +455,7 @@ export default function OpportunitiesPipeline() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold">Opportunities Pipeline</h1>
+            <H1>Opportunities Pipeline</H1>
             <p className="text-muted-foreground">
               Manage opportunities through stages
               {(() => {

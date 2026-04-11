@@ -200,7 +200,7 @@ function EmailMessage({
                 className={cn("text-[10px] h-4 px-1", 
                   email.ai_sentiment === 'positive' ? "border-green-500 text-green-600 bg-green-50" : 
                   email.ai_sentiment === 'negative' ? "border-red-500 text-red-600 bg-red-50" : 
-                  "border-gray-400 text-gray-600 bg-gray-50"
+                  "border-border text-muted-foreground bg-muted/30"
                 )}
               >
                 {email.ai_sentiment === 'positive' ? <Smile className="h-3 w-3 mr-1" /> :

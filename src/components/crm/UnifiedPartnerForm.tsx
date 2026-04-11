@@ -22,6 +22,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Loader2, Building2, User } from 'lucide-react';
+import { H5 } from '@/components/ui/Heading';
 import { useCRM } from '@/hooks/useCRM';
 import { cn } from '@/lib/utils';
 
@@ -208,11 +209,11 @@ export function UnifiedPartnerForm({
   }, [autoSave, autoSaveDelayMs, form, mode, onSubmit]);
 
   // Enterprise Input Style Helper
-  const inputStyle = "border-0 border-b border-gray-300 rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] px-0 h-9 placeholder:text-gray-300";
-  const labelStyle = "text-xs font-semibold text-gray-500 mb-1";
+  const inputStyle = "border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] px-0 h-9 placeholder:text-muted-foreground/50";
+  const labelStyle = "text-xs font-semibold text-muted-foreground mb-1";
 
   return (
-    <div className="w-full max-w-5xl mx-auto p-6 bg-white shadow-sm border border-gray-100 rounded-sm">
+    <div className="w-full max-w-5xl mx-auto p-6 bg-white shadow-sm border border-border/50 rounded-sm">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
           
@@ -246,7 +247,7 @@ export function UnifiedPartnerForm({
 
           {/* Top Bar: Type Selector */}
           {mode === 'create' && !entityType && (
-            <div className="flex items-center space-x-6 pb-6 border-b border-gray-100">
+            <div className="flex items-center space-x-6 pb-6 border-b border-border/50">
               <FormField
                 control={form.control}
                 name="type"
@@ -260,19 +261,19 @@ export function UnifiedPartnerForm({
                       >
                         <FormItem className="flex items-center space-x-2 space-y-0 cursor-pointer">
                           <FormControl>
-                            <RadioGroupItem value="company" id="r-company" className="text-[#714B67] border-gray-300" />
+                            <RadioGroupItem value="company" id="r-company" className="text-[#714B67] border-border" />
                           </FormControl>
-                          <FormLabel htmlFor="r-company" className="font-medium text-base cursor-pointer flex items-center gap-2 text-gray-700">
-                            <Building2 className="w-4 h-4 text-gray-400" />
+                          <FormLabel htmlFor="r-company" className="font-medium text-base cursor-pointer flex items-center gap-2 text-foreground">
+                            <Building2 className="w-4 h-4 text-muted-foreground" />
                             Company
                           </FormLabel>
                         </FormItem>
                         <FormItem className="flex items-center space-x-2 space-y-0 cursor-pointer">
                           <FormControl>
-                            <RadioGroupItem value="individual" id="r-individual" className="text-[#714B67] border-gray-300" />
+                            <RadioGroupItem value="individual" id="r-individual" className="text-[#714B67] border-border" />
                           </FormControl>
-                          <FormLabel htmlFor="r-individual" className="font-medium text-base cursor-pointer flex items-center gap-2 text-gray-700">
-                            <User className="w-4 h-4 text-gray-400" />
+                          <FormLabel htmlFor="r-individual" className="font-medium text-base cursor-pointer flex items-center gap-2 text-foreground">
+                            <User className="w-4 h-4 text-muted-foreground" />
                             Individual
                           </FormLabel>
                         </FormItem>
@@ -293,7 +294,7 @@ export function UnifiedPartnerForm({
               {/* Name Section */}
               <div className="flex gap-6 items-start">
                  {/* Placeholder for Avatar */}
-                 <div className="w-24 h-24 bg-gray-50 border border-gray-200 rounded-sm flex items-center justify-center text-gray-300 shrink-0 shadow-inner">
+                 <div className="w-24 h-24 bg-muted/30 border border-border rounded-sm flex items-center justify-center text-muted-foreground shrink-0 shadow-inner">
                     {partnerType === 'company' ? <Building2 size={40} /> : <User size={40} />}
                  </div>
                  
@@ -305,10 +306,10 @@ export function UnifiedPartnerForm({
                             render={({ field }) => (
                             <FormItem>
                                 <FormControl>
-                                <Input 
-                                    placeholder="e.g. Lumber Inc" 
-                                    className="text-3xl font-bold h-12 px-0 border-0 border-b border-gray-300 rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-gray-300" 
-                                    {...field} 
+                                <Input
+                                    placeholder="e.g. Lumber Inc"
+                                    className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-muted-foreground/50"
+                                    {...field}
                                 />
                                 </FormControl>
                                 <FormMessage />
@@ -323,10 +324,10 @@ export function UnifiedPartnerForm({
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
                                     <FormControl>
-                                    <Input 
-                                        placeholder="First Name" 
-                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-gray-300 rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-gray-300" 
-                                        {...field} 
+                                    <Input
+                                        placeholder="First Name"
+                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-muted-foreground/50"
+                                        {...field}
                                     />
                                     </FormControl>
                                     <FormMessage />
@@ -339,10 +340,10 @@ export function UnifiedPartnerForm({
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
                                     <FormControl>
-                                    <Input 
-                                        placeholder="Last Name" 
-                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-gray-300 rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-gray-300" 
-                                        {...field} 
+                                    <Input
+                                        placeholder="Last Name"
+                                        className="text-3xl font-bold h-12 px-0 border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-[#714B67] placeholder:text-muted-foreground/50"
+                                        {...field}
                                     />
                                     </FormControl>
                                     <FormMessage />
@@ -366,7 +367,7 @@ export function UnifiedPartnerForm({
                                 </FormItem>
                                 )}
                             />
-                            <span className="text-gray-400 text-sm">at</span>
+                            <span className="text-muted-foreground text-sm">at</span>
                             <FormField
                                 control={form.control}
                                 name="account_id"
@@ -397,7 +398,7 @@ export function UnifiedPartnerForm({
               <div className="grid grid-cols-1 md:grid-cols-2 gap-x-16 gap-y-6 pt-2">
                   {/* Left Column: Address */}
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wide text-gray-400 border-b border-gray-100 pb-2 mb-4">Address</h3>
+                    <H5 className="mb-4">Address</H5>
                     
                     <div className="space-y-2">
                         <FormField
@@ -463,7 +464,7 @@ export function UnifiedPartnerForm({
                     
                     {partnerType === 'company' && (
                          <div className="pt-6 space-y-4">
-                             <h3 className="text-sm font-bold uppercase tracking-wide text-gray-400 border-b border-gray-100 pb-2 mb-2">Tax ID</h3>
+                             <H5 className="mb-2">Tax ID</H5>
                             <FormField
                                 control={form.control}
                                 name="vat_number"
@@ -482,7 +483,7 @@ export function UnifiedPartnerForm({
 
                   {/* Right Column: Communication */}
                   <div className="space-y-4">
-                    <h3 className="text-sm font-bold uppercase tracking-wide text-gray-400 border-b border-gray-100 pb-2 mb-4">Communication</h3>
+                    <H5 className="mb-4">Communication</H5>
                     
                     <FormField
                         control={form.control}
@@ -541,8 +542,8 @@ export function UnifiedPartnerForm({
                     {/* Company Specific Details */}
                     {partnerType === 'company' && (
                         <>
-                            <div className="pt-4 border-t border-gray-100 mt-4 mb-2">
-                                <h3 className="text-sm font-bold uppercase tracking-wide text-gray-400 pb-2">Company Details</h3>
+                            <div className="pt-4 border-t border-border/50 mt-4 mb-2">
+                                <H5>Company Details</H5>
                             </div>
                             <FormField
                                 control={form.control}
@@ -660,18 +661,18 @@ export function UnifiedPartnerForm({
 
             {/* Right Sidebar / Tabbed Area for Extra Info */}
             <div className="md:col-span-12 lg:col-span-12 pt-6">
-                <div className="border-t border-gray-100 pt-6">
+                <div className="border-t border-border/50 pt-6">
                      <FormField
                         control={form.control}
                         name="notes"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel className="text-sm font-semibold text-gray-700">Internal Notes</FormLabel>
+                            <FormLabel className="text-sm font-semibold text-foreground">Internal Notes</FormLabel>
                             <FormControl>
-                            <Textarea 
-                                placeholder="Add internal notes..." 
-                                className="min-h-[100px] border-gray-200 resize-none bg-yellow-50/20 focus-visible:ring-[#714B67]" 
-                                {...field} 
+                            <Textarea
+                                placeholder="Add internal notes..."
+                                className="min-h-[100px] border-border resize-none bg-yellow-50/20 focus-visible:ring-[#714B67]"
+                                {...field}
                             />
                             </FormControl>
                         </FormItem>
@@ -683,8 +684,8 @@ export function UnifiedPartnerForm({
           </div>
 
           {/* Actions */}
-          <div className="flex justify-end gap-3 pt-6 border-t border-gray-100">
-            <Button type="button" variant="outline" onClick={onCancel} className="border-gray-300">
+          <div className="flex justify-end gap-3 pt-6 border-t border-border/50">
+            <Button type="button" variant="outline" onClick={onCancel} className="border-border">
               Discard
             </Button>
             <Button type="submit" disabled={isLoading} className="bg-[#714B67] hover:bg-[#5e3d55] text-white">

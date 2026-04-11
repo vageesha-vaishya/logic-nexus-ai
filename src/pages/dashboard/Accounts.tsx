@@ -175,9 +175,9 @@ export default function Accounts() {
   const getStatusColor = (status: string) => {
     switch (status) {
       case 'active': return 'bg-green-500/10 text-green-500';
-      case 'inactive': return 'bg-gray-500/10 text-gray-500';
+      case 'inactive': return 'bg-muted/50 text-muted-foreground';
       case 'pending': return 'bg-yellow-500/10 text-yellow-500';
-      default: return 'bg-gray-500/10 text-gray-500';
+      default: return 'bg-muted/50 text-muted-foreground';
     }
   };
 
@@ -187,7 +187,7 @@ export default function Accounts() {
       case 'prospect': return 'bg-purple-500/10 text-purple-500';
       case 'partner': return 'bg-teal-500/10 text-teal-500';
       case 'vendor': return 'bg-orange-500/10 text-orange-500';
-      default: return 'bg-gray-500/10 text-gray-500';
+      default: return 'bg-muted/50 text-muted-foreground';
     }
   };
 

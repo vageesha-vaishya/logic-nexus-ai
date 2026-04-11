@@ -993,19 +993,23 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     const currentValue = detailFormValues[key];
 
     if (fieldType === 'boolean') {
+      const fieldId = `detail-${key}`;
+      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3">
           <div className="flex items-center justify-between">
-            <Label htmlFor={`detail-${key}`} className="text-xs font-semibold text-muted-foreground">
+            <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
               {label}
               {required ? <span className="ml-1 text-destructive">*</span> : null}
             </Label>
             <Switch
-              id={`detail-${key}`}
+              id={fieldId}
               checked={Boolean(currentValue)}
               disabled={!isEditing}
               onCheckedChange={(checked) => setDetailFormValues((current) => ({ ...current, [key]: checked }))}
+              // Issue AC-02: ARIA attributes for switch
               aria-label={`${label} toggle`}
+              aria-required={required || undefined}
             />
           </div>
         </div>
@@ -1014,39 +1018,62 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
 
     if (fieldType === 'numeric') {
       const invalid = Number.isNaN(Number(currentValue ?? 0));
+      const fieldId = `detail-${key}`;
+      const errorId = invalid ? `${fieldId}-error` : undefined;
+      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3">
-          <Label htmlFor={`detail-${key}`} className="text-xs font-semibold text-muted-foreground">
+          <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
             {label}
             {required ? <span className="ml-1 text-destructive">*</span> : null}
           </Label>
           <Input
-            id={`detail-${key}`}
+            id={fieldId}
             type="number"
             value={currentValue == null ? '' : String(currentValue)}
             disabled={!isEditing}
             onChange={(event) => setDetailFormValues((current) => ({ ...current, [key]: Number(event.target.value) }))}
+            // Issue AC-02: ARIA error association
             aria-invalid={invalid}
+            aria-describedby={errorId}
+            aria-required={required || undefined}
           />
-          {invalid ? <p className="text-xs text-destructive">Invalid numeric value</p> : null}
+          {invalid ? (
+            <p id={errorId} className="text-xs text-destructive" role="alert">
+              Invalid numeric value
+            </p>
+          ) : null}
         </div>
       );
     }
 
     if (fieldType === 'date') {
+      const fieldId = `detail-${key}`;
+      const invalid = currentValue && isNaN(new Date(String(currentValue)).getTime());
+      const errorId = invalid ? `${fieldId}-error` : undefined;
+      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3">
-          <Label htmlFor={`detail-${key}`} className="text-xs font-semibold text-muted-foreground">
+          <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
             {label}
             {required ? <span className="ml-1 text-destructive">*</span> : null}
           </Label>
           <Input
-            id={`detail-${key}`}
+            id={fieldId}
             type="date"
             value={toInputDateValue(currentValue)}
             disabled={!isEditing}
             onChange={(event) => setDetailFormValues((current) => ({ ...current, [key]: event.target.value }))}
+            // Issue AC-02: ARIA error association
+            aria-invalid={!!invalid}
+            aria-describedby={errorId}
+            aria-required={required || undefined}
           />
+          {invalid ? (
+            <p id={errorId} className="text-xs text-destructive" role="alert">
+              Invalid date format
+            </p>
+          ) : null}
         </div>
       );
     }
@@ -1054,9 +1081,11 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     if (normalizedKey.includes('status')) {
       const selected = String(currentValue ?? '');
       const fallback = selected && !statusOptions.includes(selected) ? [selected, ...statusOptions] : statusOptions;
+      const fieldId = `detail-${key}`;
+      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3">
-          <Label className="text-xs font-semibold text-muted-foreground">
+          <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
             {label}
             {required ? <span className="ml-1 text-destructive">*</span> : null}
           </Label>
@@ -1065,7 +1094,12 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
             onValueChange={(next) => setDetailFormValues((current) => ({ ...current, [key]: next }))}
             disabled={!isEditing}
           >
-            <SelectTrigger id={`detail-${key}`} aria-label={label}>
+            <SelectTrigger 
+              id={fieldId} 
+              // Issue AC-02: ARIA attributes for select
+              aria-label={label}
+              aria-required={required || undefined}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -1081,13 +1115,25 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     }
 
     if (fieldType === 'object') {
+      const fieldId = `detail-${key}`;
+      let invalid = false;
+      try {
+        if (typeof currentValue === 'string') {
+          JSON.parse(currentValue);
+        }
+      } catch {
+        invalid = true;
+      }
+      const errorId = invalid ? `${fieldId}-error` : undefined;
+      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3 md:col-span-2">
-          <Label htmlFor={`detail-${key}`} className="text-xs font-semibold text-muted-foreground">
+          <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
             {label}
+            {required ? <span className="ml-1 text-destructive">*</span> : null}
           </Label>
           <Textarea
-            id={`detail-${key}`}
+            id={fieldId}
             value={JSON.stringify(currentValue ?? {}, null, 2)}
             disabled={!isEditing}
             rows={6}
@@ -1100,32 +1146,47 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
                 setDetailFormValues((current) => ({ ...current, [key]: text }));
               }
             }}
+            // Issue AC-02: ARIA error association
+            aria-invalid={invalid}
+            aria-describedby={errorId}
+            aria-required={required || undefined}
           />
+          {invalid ? (
+            <p id={errorId} className="text-xs text-destructive" role="alert">
+              Invalid JSON format
+            </p>
+          ) : null}
         </div>
       );
     }
 
     const isLongText = String(currentValue ?? '').length > 64 || normalizedKey.includes('description') || normalizedKey.includes('notes');
+    const fieldId = `detail-${key}`;
+    
     return (
       <div key={key} className={cn('space-y-2 rounded-md border p-3', isLongText ? 'md:col-span-2' : '')}>
-        <Label htmlFor={`detail-${key}`} className="text-xs font-semibold text-muted-foreground">
+        <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
           {label}
           {required ? <span className="ml-1 text-destructive">*</span> : null}
         </Label>
         {isLongText ? (
           <Textarea
-            id={`detail-${key}`}
+            id={fieldId}
             value={String(currentValue ?? '')}
             disabled={!isEditing}
             rows={3}
             onChange={(event) => setDetailFormValues((current) => ({ ...current, [key]: event.target.value }))}
+            // Issue AC-02: ARIA attributes for textarea
+            aria-required={required || undefined}
           />
         ) : (
           <Input
-            id={`detail-${key}`}
+            id={fieldId}
             value={String(currentValue ?? '')}
             disabled={!isEditing}
             onChange={(event) => setDetailFormValues((current) => ({ ...current, [key]: event.target.value }))}
+            // Issue AC-02: ARIA attributes for input
+            aria-required={required || undefined}
           />
         )}
       </div>

@@ -803,7 +803,7 @@ export default function LeadDetail() {
       won: 'bg-green-500/10 text-green-500',
       lost: 'bg-red-500/10 text-red-500',
     };
-    return colors[status] || 'bg-gray-500/10 text-gray-500';
+    return colors[status] || 'bg-muted/50 text-muted-foreground';
   };
 
   const StickyActionsRegister = () => {

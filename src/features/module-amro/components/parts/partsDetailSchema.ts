@@ -96,3 +96,42 @@ export const PARTS_DETAIL_HIDDEN_KEYS = [
   'certification_expiry_date',
   'expiry_date',
 ] as const;
+
+// Issue VH-04: Column prioritization for optimal scanability
+// Recommended maximum: 10 columns for optimal scanability (Nielsen Norman Group, 2024)
+
+/**
+ * Core columns - always visible (P0 priority)
+ * These are the essential columns needed for basic part identification and operations
+ */
+export const PARTS_CORE_VISIBLE_KEYS = [
+  'part_number',      // Primary identifier
+  'description',      // Context
+  'quantity_available', // Core metric
+  'status',           // Operational state
+  'item_type',        // Classification
+  'warehouse_location', // Physical location
+  'criticality',      // Priority indicator
+  'quantity_on_hand', // Stock level
+  'quantity_reserved', // Reserved stock
+  'forecast_status',  // Predictive metric
+] as const;
+
+/**
+ * Extended columns - hidden by default, available via "Show All Columns" toggle (P2-P3 priority)
+ * These columns are useful for advanced analysis but clutter the default view
+ */
+export const PARTS_EXTENDED_KEYS = [
+  'serial_number',      // Detail view - not needed for quick scanning
+  'abc_classification', // Advanced analysis - power users only
+  'expiry',            // Conditional relevance - not all parts have expiry
+  'ata_chapter',       // Specialized use - maintenance teams only
+] as const;
+
+/**
+ * All visible keys when "Show All Columns" is enabled
+ */
+export const PARTS_ALL_VISIBLE_KEYS = [
+  ...PARTS_CORE_VISIBLE_KEYS,
+  ...PARTS_EXTENDED_KEYS,
+] as const;

@@ -3,6 +3,7 @@ import { Plus, Search, User, Mail, Phone, Building2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { H1, H3 } from '@/components/ui/Heading';
 import TitleStrip from '@/components/ui/title-strip';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHeader, TableRow, SortableHead } from '@/components/ui/table';
@@ -119,7 +120,7 @@ export default function Contacts() {
       <div className="space-y-6">
       <div className="flex justify-between items-center">
         <div>
-          <h1 className="text-3xl font-bold">Contacts</h1>
+          <H1>Contacts</H1>
           <p className="text-muted-foreground">Manage your business contacts</p>
         </div>
         <div className="flex items-center gap-2">
@@ -168,7 +169,7 @@ export default function Contacts() {
         <Card>
           <CardContent className="py-12 text-center">
             <User className="mx-auto h-12 w-12 text-muted-foreground mb-4" />
-            <h3 className="text-lg font-semibold mb-2">No contacts found</h3>
+            <H3 className="mb-2">No contacts found</H3>
             <p className="text-muted-foreground mb-4">
               {searchQuery ? 'Try adjusting your search' : 'Get started by adding your first contact'}
             </p>

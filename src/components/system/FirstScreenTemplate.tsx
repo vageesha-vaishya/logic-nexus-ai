@@ -5,6 +5,7 @@ import { ViewToggle, ViewMode } from "@/components/ui/view-toggle";
 import { FileDown, FileUp, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
+import { H1 } from "@/components/ui/Heading";
 
 /**
  * A single breadcrumb item displayed in the page header.
@@ -117,7 +118,7 @@ export function FirstScreenTemplate({
             </Breadcrumb>
           )}
           <div>
-            <h1 className="text-3xl font-bold">{title}</h1>
+            <H1>{title}</H1>
             {description && <p className="text-muted-foreground">{description}</p>}
           </div>
         </div>

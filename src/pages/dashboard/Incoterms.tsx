@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Button } from "@/components/ui/button";
+import { H1 } from "@/components/ui/Heading";
 import { Plus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { IncotermForm } from "@/components/logistics/IncotermForm";
@@ -75,7 +76,7 @@ export default function Incoterms() {
     <DashboardLayout>
       <div className="space-y-6">
         <div>
-          <h1 className="text-3xl font-bold">Incoterms</h1>
+          <H1>Incoterms</H1>
           <p className="text-muted-foreground">Manage international commercial terms for quotations</p>
         </div>
         <div className="space-y-4">

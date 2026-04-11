@@ -28,12 +28,21 @@ The "Enterprise" design system mimics high-density, data-rich ERP interfaces (in
   - Neutral: `bg-gray-100 text-gray-800`
 
 ## 3. Typography
+
+**⚠️ UPDATED:** See [DESIGN_SYSTEM_STANDARDS.md](./DESIGN_SYSTEM_STANDARDS.md) for comprehensive typography scale with mathematical precision (1.25x Major Third ratio).
+
+### Quick Reference
 - **Font Family**: Inter (default sans).
-- **Headings**:
-  - H1 (Page Title): `text-3xl font-bold`
-  - H2 (Section Title): `text-lg font-semibold`
-  - H3 (Card Title): `text-sm font-semibold uppercase tracking-wider`
-- **Body**: `text-sm` is the standard size for all form inputs and labels.
+- **Heading System**: Uses unified `.heading-*` classes or `<Heading>` component
+  - H1 (Page Title): 30px, font-bold, tight line-height
+  - H2 (Section Title): 24px, font-semibold
+  - H3 (Card Title): 20px, font-semibold
+  - H4 (Section Heading): 18px, font-semibold
+  - H5 (Subsection): 16px, font-semibold
+  - H6 (Captions/Labels): 12px, font-semibold, uppercase
+- **Body**: `text-sm` (14px) is the standard size for all content
+- **Data Grids**: All tables use consistent 14px text (headers, body, pagination)
+- **Colors**: Use semantic colors (`text-foreground`, `text-muted-foreground`) NOT hardcoded colors
 
 ## 4. Component Library (`src/components/ui/enterprise`)
 

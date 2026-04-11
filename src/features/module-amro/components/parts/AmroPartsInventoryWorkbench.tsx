@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, BarChart3, BellRing, Boxes, ChevronDown, ChevronUp, Download, LayoutGrid, Loader2, PackageSearch, Pencil, Plane, RefreshCcw, SlidersHorizontal, Trash2, TrendingUp, Warehouse, Zap } from 'lucide-react';
+import { AlertTriangle, BarChart3, BellRing, Boxes, ChevronDown, ChevronUp, Columns3, Download, LayoutGrid, Loader2, PackageSearch, Pencil, Plane, RefreshCcw, SlidersHorizontal, Trash2, TrendingUp, Warehouse, Zap } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { CartesianGrid, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import {
   type AmroInventoryDataGridTemplateProps,
@@ -20,6 +21,9 @@ import {
   type PartInventoryRecord,
 } from './mockPartsInventoryData';
 import {
+  PARTS_CORE_VISIBLE_KEYS,
+  PARTS_EXTENDED_KEYS,
+  PARTS_ALL_VISIBLE_KEYS,
   PARTS_DETAIL_DEFAULT_VISIBLE_KEYS,
   PARTS_DETAIL_HIDDEN_KEYS,
   PARTS_DETAIL_REQUIRED_KEYS,
@@ -248,8 +252,13 @@ export function AmroPartsInventoryWorkbench({
   const [selectedAlertBulkByGroup, setSelectedAlertBulkByGroup] = useState<Record<string, string[]>>({});
   const [alertVisibleCountByGroup, setAlertVisibleCountByGroup] = useState<Record<string, number>>({});
   const [editOpsNotice, setEditOpsNotice] = useState<string | null>(null);
+  // Issue VH-04: Column prioritization - show extended columns toggle
+  const [showExtendedColumns, setShowExtendedColumns] = useState(false);
+  const columnVisibilityStorageKey = useMemo(() => `amro-parts-column-visibility:${persistKey}`, [persistKey]);
   // Phase 1: Intelligent auto-refresh
   const [lastUserActivity, setLastUserActivity] = useState(Date.now());
+  // Issue RD-01: Mobile responsive detection
+  const isMobile = useIsMobile();
   const IDLE_THRESHOLD_MS = 120_000;
   const ACTIVE_REFRESH_MS = 60_000;
   const IDLE_REFRESH_MS = 300_000;
@@ -288,6 +297,31 @@ export function AmroPartsInventoryWorkbench({
       JSON.stringify({ warehousePanelCollapsed, alertsPanelCollapsed, recordsPanelCollapsed }),
     );
   }, [alertsPanelCollapsed, panelStateStorageKey, recordsPanelCollapsed, warehousePanelCollapsed]);
+  
+  // Issue VH-04: Load column visibility preference from localStorage
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const raw = window.localStorage.getItem(columnVisibilityStorageKey);
+    if (!raw) return;
+    try {
+      const parsed = JSON.parse(raw) as {
+        showExtendedColumns?: boolean;
+      };
+      setShowExtendedColumns(Boolean(parsed.showExtendedColumns));
+    } catch {
+      // ignore invalid localStorage payload
+    }
+  }, [columnVisibilityStorageKey]);
+  
+  // Issue VH-04: Persist column visibility preference
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem(
+      columnVisibilityStorageKey,
+      JSON.stringify({ showExtendedColumns }),
+    );
+  }, [columnVisibilityStorageKey, showExtendedColumns]);
+
   useEffect(() => {
     if (!onRefresh) return;
     const isIdle = Date.now() - lastUserActivity > IDLE_THRESHOLD_MS;
@@ -347,6 +381,12 @@ export function AmroPartsInventoryWorkbench({
     }
   }, [easyPreset]);
 
+  // Issue VH-04: Determine visible columns based on showExtendedColumns state
+  const visibleColumnKeys = useMemo(
+    () => new Set(showExtendedColumns ? PARTS_ALL_VISIBLE_KEYS : PARTS_CORE_VISIBLE_KEYS),
+    [showExtendedColumns],
+  );
+
   const columns = useMemo<GridColumnDefinition<PartInventoryRecord>[]>(() => [
     {
       key: 'part_number',
@@ -361,7 +401,7 @@ export function AmroPartsInventoryWorkbench({
         <div className="flex items-center gap-2">
           <span>{row.part_number}</span>
           {row.metadata.item_master_id ? (
-            <Badge variant="secondary" className="text-[10px] uppercase tracking-wide">
+            <Badge variant="secondary" className="text-xs uppercase tracking-wide">
               Linked Item Master
             </Badge>
           ) : null}
@@ -419,7 +459,7 @@ export function AmroPartsInventoryWorkbench({
         const abcData = abcClassification.get(row.id);
         const abcClass = abcData?.abcClass ?? 'C';
         const variant = abcClass === 'A' ? 'destructive' : abcClass === 'B' ? 'secondary' : 'outline';
-        return <Badge variant={variant} className="text-[10px] w-8 justify-center">{abcClass}</Badge>;
+        return <Badge variant={variant} className="text-xs w-8 justify-center">{abcClass}</Badge>;
       },
     },
     {
@@ -433,7 +473,7 @@ export function AmroPartsInventoryWorkbench({
       width: 140,
       render: (row) => {
         const expiry = computeExpiryStatus(row);
-        return <Badge variant={expiry.badgeVariant} className="text-[10px]">{expiry.badgeText}</Badge>;
+        return <Badge variant={expiry.badgeVariant} className="text-xs">{expiry.badgeText}</Badge>;
       },
     },
     {
@@ -450,7 +490,7 @@ export function AmroPartsInventoryWorkbench({
         const variant = forecast.status === 'critical' ? 'destructive' : forecast.status === 'reorder_due' ? 'secondary' : forecast.status === 'watch' ? 'outline' : 'default';
         const shortLabel = forecast.short30d > 0 ? ` -${Math.ceil(forecast.short30d)}` : '';
         return (
-          <Badge variant={variant} className="text-[10px]">
+          <Badge variant={variant} className="text-xs">
             <TrendingUp className="mr-1 h-3 w-3" />
             {forecast.status.replace('_', ' ')}{shortLabel}
           </Badge>
@@ -735,23 +775,51 @@ export function AmroPartsInventoryWorkbench({
 
   return (
     <div className="space-y-4" aria-label="AMRO parts inventory workbench" onMouseMove={markUserActivity} onKeyDown={markUserActivity} onScroll={markUserActivity} onClick={markUserActivity}>
+      {/* Issue AC-03: Main content live region for screen reader announcements */}
+      <div aria-live="polite" aria-atomic="false" className="sr-only">
+        {state === 'loading' && 'Loading parts inventory data'}
+        {state === 'error' && `Error: ${errorMessage}`}
+        {state === 'empty' && 'No records found matching current filters'}
+        {state === 'ready' && `Loaded ${filteredRecords.length} records`}
+        {/* Issue VH-04: Column visibility announcement */}
+        {showExtendedColumns && `Showing all ${visibleColumnKeys.size} columns including extended fields`}
+        {!showExtendedColumns && `Showing ${visibleColumnKeys.size} core columns, extended fields hidden`}
+      </div>
+
       <Card>
         <CardHeader className="pb-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
-              <CardTitle>{title}</CardTitle>
-              <CardDescription>{subtitle}</CardDescription>
+              {/* Issue VH-01: Semantic heading hierarchy - h1 for page title */}
+              <h1 className="text-xl font-semibold leading-tight">{title}</h1>
+              <p className="text-sm leading-normal text-muted-foreground">{subtitle}</p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
-              <Button variant="outline" size="sm" onClick={onRefresh}>
+              {/* Issue AC-01: Touch target padding - 44px minimum on mobile */}
+              <Button variant="outline" size="sm" className="h-11 min-h-[44px] md:h-8" onClick={onRefresh}>
                 <RefreshCcw className="mr-1.5 h-4 w-4" />
                 Refresh
               </Button>
-              <Button variant="outline" size="sm" onClick={exportCurrentInventory} disabled={!canExport}>
+              <Button variant="outline" size="sm" className="h-11 min-h-[44px] md:h-8" onClick={exportCurrentInventory} disabled={!canExport}>
                 <Download className="mr-1.5 h-4 w-4" />
                 Export
               </Button>
-              <Button size="sm" onClick={onCreatePart}>
+              {/* Issue VH-04: Column visibility toggle */}
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-11 min-h-[44px] md:h-8"
+                onClick={() => setShowExtendedColumns((prev) => !prev)}
+                aria-pressed={showExtendedColumns}
+                aria-label={showExtendedColumns ? 'Hide extended columns' : 'Show extended columns'}
+              >
+                <Columns3 className="mr-1.5 h-4 w-4" />
+                {showExtendedColumns ? 'Hide Extended' : 'Show Extended'}
+                <Badge variant="secondary" className="ml-2 text-xs">
+                  {visibleColumnKeys.size} cols
+                </Badge>
+              </Button>
+              <Button size="sm" className="h-11 min-h-[44px] md:h-8" onClick={onCreatePart}>
                 <Boxes className="mr-1.5 h-4 w-4" />
                 Add Part
               </Button>
@@ -763,9 +831,26 @@ export function AmroPartsInventoryWorkbench({
             <Badge variant={Date.now() - lastUserActivity > IDLE_THRESHOLD_MS ? 'secondary' : 'outline'}>
               {Date.now() - lastUserActivity > IDLE_THRESHOLD_MS ? '⏸ Idle' : '● Active'}
             </Badge>
-            <Badge variant="secondary">Visible: {filteredRecords.length}</Badge>
-            {criticalAogCount > 0 && <Badge variant="destructive" className="animate-pulse"><Plane className="mr-1 h-3 w-3" />AOG: {criticalAogCount}</Badge>}
-            {deadStockRecords.length > 0 && <Badge variant="outline"><PackageSearch className="mr-1 h-3 w-3" />Dead: {deadStockRecords.length}</Badge>}
+            {/* Issue AC-03: Live region for filter results */}
+            <Badge variant="secondary" aria-live="polite" aria-atomic="true">
+              Visible: {filteredRecords.length}
+            </Badge>
+            {/* Screen reader only announcement for filter changes */}
+            <span className="sr-only" aria-live="polite" aria-atomic="true">
+              Showing {filteredRecords.length} of {records.length} parts inventory records
+            </span>
+            {criticalAogCount > 0 && (
+              <Badge variant="destructive" className="animate-pulse" role="alert" aria-live="assertive">
+                <Plane className="mr-1 h-3 w-3" />
+                AOG: {criticalAogCount}
+              </Badge>
+            )}
+            {deadStockRecords.length > 0 && (
+              <Badge variant="outline" aria-live="polite">
+                <PackageSearch className="mr-1 h-3 w-3" />
+                Dead: {deadStockRecords.length}
+              </Badge>
+            )}
             <Badge variant="outline">Target: &lt;2s</Badge>
           </div>
         </CardContent>
@@ -773,25 +858,26 @@ export function AmroPartsInventoryWorkbench({
 
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-base">Filters and View</CardTitle>
+          {/* Issue VH-01: Semantic heading hierarchy - h2 for section title */}
+          <h2 className="text-base font-semibold leading-tight">Filters and View</h2>
           <CardDescription>
             Easy Mode gives fast, guided filtering. Advanced Mode unlocks full parameter controls.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           {showGuidedTour ? (
-            <div className="rounded border border-sky-200 bg-sky-50/70 p-2">
+            <div className="rounded border border-sky-300 bg-sky-50 p-2">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="space-y-1">
                   <p className="text-xs font-semibold text-sky-900">Quick Guided Tour</p>
-                  <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-sky-900">
+                  <div className="flex flex-wrap items-center gap-1.5 text-xs text-sky-900">
                     <Badge variant="outline" className="border-sky-300 bg-white text-sky-800">Step 1: Search</Badge>
                     <span>{'->'}</span>
                     <Badge variant="outline" className="border-sky-300 bg-white text-sky-800">Step 2: Preset</Badge>
                     <span>{'->'}</span>
                     <Badge variant="outline" className="border-sky-300 bg-white text-sky-800">Step 3: View</Badge>
                   </div>
-                  <p className="text-[11px] text-sky-900">
+                  <p className="text-xs text-sky-900">
                     Start with search, apply a quick preset, then choose the preferred view layout.
                   </p>
                 </div>
@@ -838,16 +924,17 @@ export function AmroPartsInventoryWorkbench({
             </div>
           ) : null}
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2 xl:grid-cols-4">
+          {/* Issue SP-03: Smoother responsive breakpoint progression */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             <Input
               value={searchText}
               onChange={(event) => setSearchText(event.target.value)}
               placeholder="Search by item, supplier, or location..."
               aria-label="Search parts inventory"
-              className="h-8"
+              className="h-8 min-h-[44px] md:h-8"
             />
             <Select value={erpLinkedOnly} onValueChange={(value) => setErpLinkedOnly(value as 'all' | 'linked')}>
-              <SelectTrigger className="h-8" aria-label="Filter by ERP link status">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8" aria-label="Filter by ERP link status">
                 <SelectValue placeholder="ERP Link" />
               </SelectTrigger>
               <SelectContent>
@@ -856,7 +943,7 @@ export function AmroPartsInventoryWorkbench({
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as (typeof PARTS_STATUS_FILTER_OPTIONS)[number])}>
-              <SelectTrigger className="h-8" aria-label="Filter by inventory status">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8" aria-label="Filter by inventory status">
                 <SelectValue placeholder="Status" />
               </SelectTrigger>
               <SelectContent>
@@ -867,15 +954,16 @@ export function AmroPartsInventoryWorkbench({
                 ))}
               </SelectContent>
             </Select>
-            <Badge variant="outline" className="gap-1">
+            <Badge variant="outline" className="gap-1 min-h-[44px] items-center justify-center">
               <SlidersHorizontal className="h-3.5 w-3.5" />
               Focused Filters
             </Badge>
           </div>
 
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
+          {/* Issue SP-03: Smoother responsive breakpoint progression */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Select value={easyPreset} onValueChange={(value) => setEasyPreset(value as EasyModePreset)}>
-              <SelectTrigger className="h-8" aria-label="Quick filter preset">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8" aria-label="Quick filter preset">
                 <SelectValue placeholder="Quick Preset" />
               </SelectTrigger>
               <SelectContent>
@@ -892,7 +980,7 @@ export function AmroPartsInventoryWorkbench({
                 setPreferredViewMode(next);
               }}
             >
-              <SelectTrigger className="h-8" aria-label="Inventory layout mode">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8" aria-label="Inventory layout mode">
                 <SelectValue placeholder="View Layout" />
               </SelectTrigger>
               <SelectContent>
@@ -904,7 +992,7 @@ export function AmroPartsInventoryWorkbench({
             <Button
               variant="outline"
               size="sm"
-              className="h-8"
+              className="h-8 min-h-[44px] md:h-8"
               onClick={() => setShowAdvancedFilters((previous) => !previous)}
             >
               {showAdvancedFilters ? 'Hide Advanced Filters' : 'Show Advanced Filters'}
@@ -912,9 +1000,10 @@ export function AmroPartsInventoryWorkbench({
           </div>
 
           {!easyMode || showAdvancedFilters ? (
-            <div className="flex flex-wrap items-center gap-2 rounded border bg-muted/20 p-2">
+            // Issue SP-03: Responsive grid for advanced filters
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 rounded border bg-muted/20 p-3">
             <Select value={criticalityFilter} onValueChange={(value) => setCriticalityFilter(value as 'all' | PartInventoryRecord['criticality'])}>
-              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by criticality">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8 w-full" aria-label="Filter by criticality">
                 <SelectValue placeholder="Criticality" />
               </SelectTrigger>
               <SelectContent>
@@ -926,7 +1015,7 @@ export function AmroPartsInventoryWorkbench({
               </SelectContent>
             </Select>
             <Select value={itemTypeFilter} onValueChange={(value) => setItemTypeFilter(value as 'all' | PartInventoryRecord['item_type'])}>
-              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by part type">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8 w-full" aria-label="Filter by part type">
                 <SelectValue placeholder="Part Type" />
               </SelectTrigger>
               <SelectContent>
@@ -938,7 +1027,7 @@ export function AmroPartsInventoryWorkbench({
               </SelectContent>
             </Select>
             <Select value={supplierFilter} onValueChange={(value) => setSupplierFilter(value)}>
-              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by supplier">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8 w-full" aria-label="Filter by supplier">
                 <SelectValue placeholder="Supplier" />
               </SelectTrigger>
               <SelectContent>
@@ -951,7 +1040,7 @@ export function AmroPartsInventoryWorkbench({
               </SelectContent>
             </Select>
             <Select value={locationFilter} onValueChange={(value) => setLocationFilter(value)}>
-              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by location">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8 w-full" aria-label="Filter by location">
                 <SelectValue placeholder="Location" />
               </SelectTrigger>
               <SelectContent>
@@ -964,7 +1053,7 @@ export function AmroPartsInventoryWorkbench({
               </SelectContent>
             </Select>
             <Select value={stockSignalFilter} onValueChange={(value) => setStockSignalFilter(value as StockSignal)}>
-              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by stock signal">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8 w-full" aria-label="Filter by stock signal">
                 <SelectValue placeholder="Stock Signal" />
               </SelectTrigger>
               <SelectContent>
@@ -974,7 +1063,7 @@ export function AmroPartsInventoryWorkbench({
               </SelectContent>
             </Select>
             <Select value={riskBandFilter} onValueChange={(value) => setRiskBandFilter(value as 'all' | RiskBand)}>
-              <SelectTrigger className="h-8 w-[180px]" aria-label="Filter by risk band">
+              <SelectTrigger className="h-8 min-h-[44px] md:h-8 w-full" aria-label="Filter by risk band">
                 <SelectValue placeholder="Risk Band" />
               </SelectTrigger>
               <SelectContent>
@@ -1002,6 +1091,7 @@ export function AmroPartsInventoryWorkbench({
               <span className="text-sm font-medium">Warehouse Status - Multi-Warehouse</span>
               {warehousePanelCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </button>
+            {/* Issue RD-01: Mobile horizontal overflow protection */}
             <div
               id="warehouse-status-multi"
               className={cn(
@@ -1009,6 +1099,8 @@ export function AmroPartsInventoryWorkbench({
                 warehousePanelCollapsed ? 'max-h-0 pb-0' : 'max-h-[1200px] pb-3',
               )}
             >
+              {/* Mobile: horizontal scroll for warehouse cards */}
+              <div className="-mx-3 overflow-x-auto px-3 md:mx-0 md:overflow-visible md:px-0">
               <div className="mb-2 flex flex-wrap items-center gap-2">
                 <Select value={warehouseStatusSort} onValueChange={(value) => setWarehouseStatusSort(value as WarehouseStatusSort)}>
                   <SelectTrigger className="h-8 w-[220px]" aria-label="Sort warehouse status">
@@ -1049,13 +1141,13 @@ export function AmroPartsInventoryWorkbench({
                       <span className="text-xs font-semibold">{entry.location}</span>
                       <Badge variant={entry.riskScore > 5 ? 'destructive' : 'secondary'}>Risk {entry.riskScore}</Badge>
                     </div>
-                    <div className="mt-1 grid grid-cols-2 gap-1 text-[11px] text-muted-foreground">
+                    <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-muted-foreground">
                       <span>Avail: {entry.availableQty}</span>
                       <span>Total: {entry.total}</span>
                       <span>Critical: {entry.critical}</span>
                       <span>High: {entry.high}</span>
                     </div>
-                    <div className="mt-1 grid grid-cols-2 gap-1 text-[11px]">
+                    <div className="mt-1 grid grid-cols-2 gap-1 text-xs">
                       <span className="rounded bg-rose-100 px-1 py-0.5 text-rose-900">C {entry.critical}</span>
                       <span className="rounded bg-amber-100 px-1 py-0.5 text-amber-900">H {entry.high}</span>
                       <span className="rounded bg-emerald-100 px-1 py-0.5 text-emerald-900">N {entry.normal}</span>
@@ -1066,7 +1158,7 @@ export function AmroPartsInventoryWorkbench({
                         const isActive = selectedRecordId === record.id;
                         const isChecked = selectedBulkIds.includes(record.id);
                         return (
-                          <label key={`${entry.location}-${record.id}`} className={cn('flex cursor-pointer items-center justify-between gap-2 border-b px-2 py-1 text-[11px]', isActive ? 'bg-primary/5' : '')}>
+                          <label key={`${entry.location}-${record.id}`} className={cn('flex cursor-pointer items-center justify-between gap-2 border-b px-2 py-1 text-xs', isActive ? 'bg-primary/5' : '')}>
                             <div className="flex min-w-0 items-center gap-2">
                               <input
                                 type="checkbox"
@@ -1105,12 +1197,12 @@ export function AmroPartsInventoryWorkbench({
                       </Button>
                     ) : null}
                     {validationIssues.length ? (
-                      <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">
+                      <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900" role="alert" aria-live="assertive">
                         Validation: {validationIssues[0]}
                       </div>
                     ) : null}
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-xs">
                         Selected: {selectedBulkRecords.length} for batch
                       </Badge>
                       <div className="flex items-center justify-end gap-1">
@@ -1153,19 +1245,20 @@ export function AmroPartsInventoryWorkbench({
                       </Button>
                     </div>
                     {selectedRecord && selectedRecord.quantity_available <= selectedRecord.reorder_level && (
-                      <div className="mt-2 rounded border border-sky-200 bg-sky-50 px-2 py-1.5">
-                        <p className="text-[10px] font-medium text-sky-900">Quick Actions:</p>
+                      <div className="mt-2 rounded border border-sky-300 bg-sky-50 px-2 py-1.5">
+                        <p className="text-xs font-medium text-sky-900">Quick Actions:</p>
                         <div className="mt-1 flex flex-wrap gap-1">
-                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-[10px] bg-white" onClick={() => {
+                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-xs bg-white" onClick={() => {
                             const po = generatePurchaseOrder(selectedRecord);
                             setEditOpsNotice(`Create PO: ${po.partNumber} x ${po.quantity} from ${po.supplier}. Total: ${formatCurrency(po.totalCost)}`);
                           }}>Create PO ({selectedRecord.reorder_quantity} units)</Button>
-                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-[10px] bg-white" onClick={() => setEditOpsNotice(`Notify ${selectedRecord.supplier_name} about reorder.`)}>Notify Supplier</Button>
+                          <Button size="sm" variant="outline" className="h-6 px-1.5 text-xs bg-white" onClick={() => setEditOpsNotice(`Notify ${selectedRecord.supplier_name} about reorder.`)}>Notify Supplier</Button>
                         </div>
                       </div>
                     )}
                   </div>
                 );})}
+              </div>
               </div>
             </div>
           </section>
@@ -1181,6 +1274,7 @@ export function AmroPartsInventoryWorkbench({
               <span className="text-sm font-medium">Automated Low-Stock Alerts</span>
               {alertsPanelCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
             </button>
+            {/* Issue RD-01: Mobile horizontal overflow protection */}
             <div
               id="low-stock-alerts"
               className={cn(
@@ -1188,6 +1282,8 @@ export function AmroPartsInventoryWorkbench({
                 alertsPanelCollapsed ? 'max-h-0 pb-0' : 'max-h-[1200px] pb-3',
               )}
             >
+              {/* Mobile: horizontal scroll for alert cards */}
+              <div className="-mx-3 overflow-x-auto px-3 md:mx-0 md:overflow-visible md:px-0">
               <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
                 <div className="flex items-center gap-2">
                   <Select value={alertSort} onValueChange={(value) => setAlertSort(value as AlertSort)}>
@@ -1230,7 +1326,7 @@ export function AmroPartsInventoryWorkbench({
                     </div>
                     <div className="mt-2 max-h-40 overflow-auto rounded border bg-white/60">
                       {visibleRecords.map((record) => (
-                        <label key={`${group.key}-${record.id}`} className={cn('flex cursor-pointer items-center justify-between gap-2 border-b px-2 py-1 text-[11px]', selectedRecordId === record.id ? 'bg-primary/5' : '')}>
+                        <label key={`${group.key}-${record.id}`} className={cn('flex cursor-pointer items-center justify-between gap-2 border-b px-2 py-1 text-xs', selectedRecordId === record.id ? 'bg-primary/5' : '')}>
                           <div className="flex min-w-0 items-center gap-2">
                             <input
                               type="checkbox"
@@ -1268,12 +1364,12 @@ export function AmroPartsInventoryWorkbench({
                       </Button>
                     ) : null}
                     {validationIssues.length ? (
-                      <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-[11px] text-amber-900">
+                      <div className="mt-2 rounded border border-amber-300 bg-amber-50 px-2 py-1 text-xs text-amber-900" role="alert" aria-live="assertive">
                         Validation: {validationIssues[0]}
                       </div>
                     ) : null}
                     <div className="mt-2 flex items-center justify-between gap-2">
-                      <Badge variant="outline" className="text-[10px]">
+                      <Badge variant="outline" className="text-xs">
                         Selected: {selectedBulkRecords.length} for batch
                       </Badge>
                       <Button
@@ -1312,17 +1408,21 @@ export function AmroPartsInventoryWorkbench({
                   </div>
                 );}) : <p className="text-sm text-muted-foreground">No critical alerts for current filter scope.</p>}
               </div>
+              </div>
             </div>
           </section>
         </CardContent>
       </Card>
 
+      {/* Issue AC-03: Live regions for state changes */}
       {state === 'loading' ? (
         <Card>
           <CardContent className="flex min-h-[240px] items-center justify-center">
-            <div className="flex items-center gap-2 text-muted-foreground" aria-live="polite">
+            {/* Issue AC-03: Loading state with live region */}
+            <div className="flex items-center gap-2 text-muted-foreground" role="status" aria-live="polite">
               <Loader2 className="h-4 w-4 animate-spin" />
               Loading parts inventory...
+              <span className="sr-only">Loading parts inventory data. Please wait.</span>
             </div>
           </CardContent>
         </Card>
@@ -1331,8 +1431,9 @@ export function AmroPartsInventoryWorkbench({
       {state === 'error' ? (
         <Card className="border-destructive/40">
           <CardContent className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">
+            {/* Issue AC-03: Error state with alert role */}
             <AlertTriangle className="h-5 w-5 text-destructive" />
-            <p className="max-w-xl text-sm text-muted-foreground">{errorMessage}</p>
+            <p className="max-w-xl text-sm text-muted-foreground" role="alert" aria-live="assertive">{errorMessage}</p>
             <Button variant="outline" onClick={onRetry}>Retry</Button>
           </CardContent>
         </Card>
@@ -1341,8 +1442,9 @@ export function AmroPartsInventoryWorkbench({
       {state === 'empty' ? (
         <Card>
           <CardContent className="flex min-h-[240px] flex-col items-center justify-center gap-3 text-center">
+            {/* Issue AC-03: Empty state with status role */}
             <Boxes className="h-5 w-5 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">No parts inventory records match the current filters.</p>
+            <p className="text-sm text-muted-foreground" role="status" aria-live="polite">No parts inventory records match the current filters.</p>
             <Button variant="outline" onClick={() => {
               setStatusFilter('all');
             }}>
@@ -1356,16 +1458,22 @@ export function AmroPartsInventoryWorkbench({
       {aogAlerts.length > 0 && (
         <Card className="border-red-300 bg-red-50/50">
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-red-900"><Plane className="mr-1.5 inline h-4 w-4" /> Aircraft on Ground (AOG) Alerts</CardTitle>
+            {/* Issue VH-01: Semantic heading hierarchy - h3 for subsection */}
+            <h3 className="text-sm font-semibold leading-tight text-red-900"><Plane className="mr-1.5 inline h-4 w-4" /> Aircraft on Ground (AOG) Alerts</h3>
             <CardDescription>Critical stockout risks with timeline to depletion</CardDescription>
+            {/* Issue AC-03: Screen reader announcement for AOG count */}
+            <span className="sr-only" role="alert" aria-live="assertive">
+              {aogAlerts.length} aircraft on ground alerts requiring immediate attention
+            </span>
           </CardHeader>
           <CardContent>
-            <div className="space-y-2">
+            {/* Issue AC-03: Live region for AOG alerts list */}
+            <div className="space-y-2" role="alert" aria-live="assertive" aria-atomic="false">
               {aogAlerts.slice(0, 5).map((alert, idx) => (
                 <div key={`aog-${idx}-${alert.part.id}`} className="rounded border border-red-200 bg-white p-2.5">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <Badge variant={alert.severity === 'critical' ? 'destructive' : alert.severity === 'high' ? 'secondary' : 'outline'} className="text-[10px]">{alert.severity.toUpperCase()}</Badge>
+                      <Badge variant={alert.severity === 'critical' ? 'destructive' : alert.severity === 'high' ? 'secondary' : 'outline'} className="text-xs">{alert.severity.toUpperCase()}</Badge>
                       <span className="text-sm font-semibold">{alert.part.part_number}</span>
                       <span className="text-xs text-muted-foreground">{alert.part.description}</span>
                     </div>
@@ -1376,15 +1484,19 @@ export function AmroPartsInventoryWorkbench({
                     <span>Shortage: <strong className="text-red-700">{alert.shortage} units</strong></span>
                   </div>
                   <div className="mt-2 flex flex-wrap gap-1">
-                    <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] bg-white" onClick={() => {
+                    <Button size="sm" variant="outline" className="h-6 px-2 text-xs bg-white" onClick={() => {
                       const po = generatePurchaseOrder(alert.part);
                       setEditOpsNotice(`URGENT PO: ${po.partNumber} x ${po.quantity} from ${po.supplier}. Total: ${formatCurrency(po.totalCost)}. Expected: ${po.expectedDelivery}`);
                     }}>Create PO ({alert.shortage} units)</Button>
-                    <Button size="sm" variant="outline" className="h-6 px-2 text-[10px] bg-white" onClick={() => setEditOpsNotice(`Escalating AOG for ${alert.part.part_number} to procurement.`)}>Escalate</Button>
+                    <Button size="sm" variant="outline" className="h-6 px-2 text-xs bg-white" onClick={() => setEditOpsNotice(`Escalating AOG for ${alert.part.part_number} to procurement.`)}>Escalate</Button>
                   </div>
                 </div>
               ))}
-              {aogAlerts.length > 5 && <p className="text-xs text-muted-foreground">+ {aogAlerts.length - 5} more AOG alerts</p>}
+              {aogAlerts.length > 5 && (
+                <p className="text-xs text-muted-foreground" aria-live="polite">
+                  + {aogAlerts.length - 5} more AOG alerts
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -1394,12 +1506,13 @@ export function AmroPartsInventoryWorkbench({
       {deadStockRecords.length > 0 && (
         <Card>
           <CardHeader className="pb-2">
-            <CardTitle className="text-sm"><PackageSearch className="mr-1.5 inline h-4 w-4" /> Dead Stock Identification</CardTitle>
+            {/* Issue VH-01: Semantic heading hierarchy - h3 for subsection */}
+            <h3 className="text-sm font-semibold leading-tight"><PackageSearch className="mr-1.5 inline h-4 w-4" /> Dead Stock Identification</h3>
             <CardDescription>Parts with no movement in 180+ days. Value at risk: <strong>{formatCurrency(deadStockValue)}</strong></CardDescription>
           </CardHeader>
           <CardContent>
             <div className="max-h-64 overflow-auto rounded border">
-              <table className="w-full text-[11px]">
+              <table className="w-full text-xs">
                 <thead className="border-b bg-muted/50"><tr><th className="px-2 py-1 text-left font-medium">Part</th><th className="px-2 py-1 text-left font-medium">Location</th><th className="px-2 py-1 text-right font-medium">On Hand</th><th className="px-2 py-1 text-right font-medium">Value</th><th className="px-2 py-1 text-left font-medium">Last Movement</th><th className="px-2 py-1 text-left font-medium">Actions</th></tr></thead>
                 <tbody>
                   {deadStockRecords.slice(0, 20).map((row) => (
@@ -1409,12 +1522,12 @@ export function AmroPartsInventoryWorkbench({
                       <td className="px-2 py-1 text-right">{row.quantity_on_hand}</td>
                       <td className="px-2 py-1 text-right">{formatCurrency(row.quantity_on_hand * row.unit_cost)}</td>
                       <td className="px-2 py-1 text-muted-foreground">{row.last_movement_at ? new Date(row.last_movement_at).toLocaleDateString() : 'Never'}</td>
-                      <td className="px-2 py-1"><div className="flex gap-1"><Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px]" onClick={() => onUpdateRecord?.(row)}>Return</Button><Button size="sm" variant="ghost" className="h-6 px-1.5 text-[10px] text-destructive" onClick={() => onDeleteRecord?.(row)}>Scrap</Button></div></td>
+                      <td className="px-2 py-1"><div className="flex gap-1"><Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs" onClick={() => onUpdateRecord?.(row)}>Return</Button><Button size="sm" variant="ghost" className="h-6 px-1.5 text-xs text-destructive" onClick={() => onDeleteRecord?.(row)}>Scrap</Button></div></td>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              {deadStockRecords.length > 20 && <div className="px-2 py-1 text-center text-[10px] text-muted-foreground">Showing 20 of {deadStockRecords.length}</div>}
+              {deadStockRecords.length > 20 && <div className="px-2 py-1 text-center text-xs text-muted-foreground">Showing 20 of {deadStockRecords.length}</div>}
             </div>
           </CardContent>
         </Card>
@@ -1432,6 +1545,7 @@ export function AmroPartsInventoryWorkbench({
             <span className="text-sm font-medium">Records Workspace</span>
             {recordsPanelCollapsed ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
           </button>
+          {/* Issue RD-01: Mobile horizontal overflow protection */}
           <div
             id="records-workspace"
             className={cn(
@@ -1439,33 +1553,40 @@ export function AmroPartsInventoryWorkbench({
               recordsPanelCollapsed ? 'max-h-0 pb-0' : 'max-h-[4000px] pb-2',
             )}
           >
-            <AmroUnifiedGridRecordDetailShell
-              title="Parts Inventory Records"
-              subtitle="Grid and detail form for full CRUD operations."
-              records={filteredRecords}
-              columns={columns}
-              viewMode={preferredViewMode}
-              density={density}
-              scrollBehavior={scrollBehavior}
-              pageSize={pageSize}
-              persistKey={persistKey}
-              syncDetailWithScroll
-              ariaLabel="AMRO parts inventory grid"
-              onRecordSelectionChange={onRecordSelectionChange}
-              onScrollPositionChange={onScrollPositionChange}
-              onViewModeChange={onViewModeChange}
-              onCreateRecord={onCreateRecord}
-              onReadRecord={onReadRecord}
-              onUpdateRecord={onUpdateRecord}
-              onDeleteRecord={onDeleteRecord}
-              onSaveRecord={onSaveRecord}
-              onCancelRecord={onCancelRecord}
-              onCrudAction={onCrudAction}
-              crudPermissions={crudPermissions}
-              requiredDetailFieldKeys={[...PARTS_DETAIL_REQUIRED_KEYS]}
-              defaultVisibleDetailFieldKeys={[...PARTS_DETAIL_DEFAULT_VISIBLE_KEYS]}
-              hiddenDetailFieldKeys={[...PARTS_DETAIL_HIDDEN_KEYS]}
-            />
+            {/* Mobile: horizontal scroll container with negative margin bleed */}
+            <div className="-mx-4 overflow-x-auto px-4 md:mx-0 md:overflow-visible md:px-0">
+              <div className={isMobile ? 'min-w-[640px]' : undefined}>
+                {/* Issue VH-04: Filter columns based on visibility state */}
+                <AmroUnifiedGridRecordDetailShell
+                  title="Parts Inventory Records"
+                  subtitle="Grid and detail form for full CRUD operations."
+                  records={filteredRecords}
+                  columns={columns.filter((col) => visibleColumnKeys.has(col.key as any))}
+                  // Issue RD-01: Mobile uses stacked-auto view for better readability
+                  viewMode={isMobile ? 'stacked-auto' : preferredViewMode}
+                  density={density}
+                  scrollBehavior={scrollBehavior}
+                  pageSize={pageSize}
+                  persistKey={persistKey}
+                  syncDetailWithScroll
+                  ariaLabel="AMRO parts inventory grid"
+                  onRecordSelectionChange={onRecordSelectionChange}
+                  onScrollPositionChange={onScrollPositionChange}
+                  onViewModeChange={onViewModeChange}
+                  onCreateRecord={onCreateRecord}
+                  onReadRecord={onReadRecord}
+                  onUpdateRecord={onUpdateRecord}
+                  onDeleteRecord={onDeleteRecord}
+                  onSaveRecord={onSaveRecord}
+                  onCancelRecord={onCancelRecord}
+                  onCrudAction={onCrudAction}
+                  crudPermissions={crudPermissions}
+                  requiredDetailFieldKeys={[...PARTS_DETAIL_REQUIRED_KEYS]}
+                  defaultVisibleDetailFieldKeys={[...PARTS_DETAIL_DEFAULT_VISIBLE_KEYS]}
+                  hiddenDetailFieldKeys={[...PARTS_DETAIL_HIDDEN_KEYS]}
+                />
+              </div>
+            </div>
           </div>
         </section>
       ) : null}

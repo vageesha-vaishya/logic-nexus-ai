@@ -1,0 +1,404 @@
+/**
+ * AMRO Design System Stylesheet
+ * 
+ * Implements:
+ * - Mathematical typography scale (1.25x ratio)
+ * - 8px base grid spacing system
+ * - 12-column CSS Grid layout
+ * - Responsive breakpoints (320px, 768px, 1024px, 1440px)
+ * - Visual decluttering (subtle shadows, removed borders)
+ * - Progressive disclosure patterns
+ * - WCAG 2.1 AA accessibility compliance
+ */
+
+/* ==========================================================================
+   TYPOGRAPHY SCALE - Major Third (1.25x Ratio)
+   Font Family: Inter (primary), system-ui (fallback)
+   Line Heights: 1.2 for headings, 1.5 for body text
+   ========================================================================== */
+
+.amro-heading {
+  font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  line-height: 1.2;
+  color: hsl(var(--foreground));
+}
+
+.amro-h1 {
+  font-size: 2.44rem;      /* 39.04px */
+  font-weight: 700;        /* bold */
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.amro-h2 {
+  font-size: 1.95rem;      /* 31.2px */
+  font-weight: 700;        /* bold */
+  line-height: 1.2;
+  letter-spacing: -0.025em;
+}
+
+.amro-h3 {
+  font-size: 1.56rem;      /* 24.96px */
+  font-weight: 600;        /* semibold */
+  line-height: 1.2;
+  letter-spacing: -0.0125em;
+}
+
+.amro-h4 {
+  font-size: 1.25rem;      /* 20px */
+  font-weight: 600;        /* semibold */
+  line-height: 1.2;
+  letter-spacing: 0em;
+}
+
+.amro-h5 {
+  font-size: 1rem;         /* 16px */
+  font-weight: 600;        /* semibold */
+  line-height: 1.2;
+  letter-spacing: 0.025em;
+}
+
+.amro-h6 {
+  font-size: 0.8rem;       /* 12.8px */
+  font-weight: 600;        /* semibold */
+  line-height: 1.2;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+/* Body Text */
+.amro-text-lg {
+  font-size: 1.125rem;     /* 18px */
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.amro-text-base {
+  font-size: 1rem;         /* 16px */
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+.amro-text-sm {
+  font-size: 0.875rem;     /* 14px */
+  line-height: 1.5;        /* 21px */
+  font-weight: 400;
+}
+
+.amro-text-xs {
+  font-size: 0.75rem;      /* 12px */
+  line-height: 1.5;
+  font-weight: 400;
+}
+
+/* ==========================================================================
+   LAYOUT ENGINE - 12-Column Grid System
+   ========================================================================== */
+
+.amro-layout-page {
+  width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  padding-left: var(--amro-margin-sm);   /* 8px mobile */
+  padding-right: var(--amro-margin-sm);
+}
+
+@media (min-width: 768px) {
+  .amro-layout-page {
+    padding-left: var(--amro-margin-md);   /* 12px tablet */
+    padding-right: var(--amro-margin-md);
+  }
+}
+
+@media (min-width: 1024px) {
+  .amro-layout-page {
+    padding-left: var(--amro-margin-lg);   /* 16px laptop */
+    padding-right: var(--amro-margin-lg);
+  }
+}
+
+@media (min-width: 1440px) {
+  .amro-layout-page {
+    padding-left: var(--amro-margin-xl);   /* 24px desktop */
+    padding-right: var(--amro-margin-xl);
+    max-width: 1280px;
+  }
+}
+
+.amro-layout-section {
+  margin-bottom: 2rem;  /* 32px - 25% increase from 24px */
+}
+
+.amro-layout-card {
+  border-radius: 0.5rem;
+  background-color: white;
+  border: 1px solid hsl(var(--border) / 0.5);
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.amro-layout-card:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+.amro-layout-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+/* ==========================================================================
+   DATA GRID SYSTEM - Fixed Specifications
+   ========================================================================== */
+
+.amro-grid-container {
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  background-color: white;
+  overflow: hidden;
+}
+
+.amro-grid-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.amro-grid-header-cell {
+  font-size: 1rem;         /* 16px per specification */
+  font-weight: 600;        /* 600 weight per specification */
+  text-align: left;
+  padding: 0.5rem 0.75rem; /* 8px vertical, 12px horizontal */
+  border-bottom: 1px solid #E5E7EB;
+  color: hsl(var(--foreground));
+  background-color: hsl(var(--muted) / 0.3);
+}
+
+.amro-grid-cell {
+  font-size: 0.875rem;     /* 14px per specification */
+  line-height: 1.4285;     /* 20px line height */
+  padding: 0.5rem 0.75rem; /* 8px vertical, 12px horizontal */
+  border-bottom: 1px solid #E5E7EB;
+  color: hsl(var(--foreground));
+}
+
+.amro-grid-row:hover {
+  background-color: hsl(var(--muted) / 0.4);
+}
+
+.amro-grid-row:nth-child(even) {
+  background-color: hsl(var(--muted) / 0.2); /* Zebra striping */
+}
+
+.amro-grid-loading,
+.amro-grid-empty {
+  border: 1px solid #E5E7EB;
+  border-radius: 0.5rem;
+  background-color: white;
+  text-align: center;
+  padding: 2rem;
+}
+
+/* Pagination */
+.amro-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 1rem;  /* 16px from grid edge */
+  gap: 0.5rem;       /* 8px between page numbers */
+}
+
+/* Sort Icons */
+.amro-sort-icon {
+  width: 1rem;   /* 16x16px */
+  height: 1rem;
+}
+
+/* ==========================================================================
+   FORM ACTION BAR - Responsive CRUD Positioning
+   ========================================================================== */
+
+.amro-form-action-bar {
+  display: flex;
+  align-items: center;
+}
+
+/* Desktop: Top-right with 24px margin */
+.amro-form-action-top {
+  justify-content: flex-end;
+  margin-bottom: 1.5rem;  /* 24px */
+}
+
+/* Tablet/Bottom: Center with full-width buttons */
+.amro-form-action-bottom {
+  flex-direction: column;
+  margin-top: 1.5rem;     /* 24px */
+  padding-top: 1.5rem;    /* 24px */
+  border-top: 1px solid hsl(var(--border));
+}
+
+@media (min-width: 768px) {
+  .amro-form-action-bottom {
+    flex-direction: row;
+    justify-content: flex-end;
+  }
+}
+
+/* Mobile: Sticky bottom bar */
+.amro-form-action-sticky-bottom {
+  position: sticky;
+  bottom: 0;
+  z-index: 50;
+  background-color: white;
+  padding: 1rem;
+  border-top: 1px solid hsl(var(--border));
+  box-shadow: 0 -2px 4px rgb(0 0 0 / 0.05);
+}
+
+@media (min-width: 768px) {
+  .amro-form-action-sticky-bottom {
+    position: static;
+    box-shadow: none;
+  }
+}
+
+.amro-form-action-primary,
+.amro-form-action-secondary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;  /* 8px */
+}
+
+/* ==========================================================================
+   BUTTON SPECIFICATIONS
+   ========================================================================== */
+
+.amro-btn-primary {
+  height: 2.5rem;          /* 40px */
+  min-width: 7.5rem;       /* 120px */
+  padding: 0.5rem 1.5rem;  /* 8px vertical, 24px horizontal */
+  font-size: 0.875rem;     /* 14px */
+  font-weight: 500;        /* medium */
+  line-height: 1.5;
+  min-height: 2.75rem;     /* 44px touch target WCAG 2.1 AA */
+}
+
+.amro-btn-secondary {
+  height: 2.25rem;         /* 36px */
+  min-width: 6.25rem;      /* 100px */
+  padding: 0.375rem 1rem;  /* 6px vertical, 16px horizontal */
+  font-size: 0.8125rem;    /* 13px */
+  font-weight: 500;        /* medium */
+  line-height: 1.5;
+  min-height: 2.75rem;     /* 44px touch target WCAG 2.1 AA */
+}
+
+/* ==========================================================================
+   VISUAL DECLUTTERING - Subtle Shadows Instead of Borders
+   ========================================================================== */
+
+.amro-surface {
+  background-color: white;
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+}
+
+.amro-surface-elevated {
+  background-color: white;
+  border: 1px solid hsl(var(--border) / 0.3);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+}
+
+.amro-surface-interactive {
+  background-color: white;
+  border: 1px solid hsl(var(--border) / 0.5);
+  border-radius: 0.5rem;
+  box-shadow: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  transition: box-shadow 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.amro-surface-interactive:hover {
+  box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+}
+
+/* ==========================================================================
+   PROGRESSIVE DISCLOSURE - 7±2 Principle
+   ========================================================================== */
+
+.amro-advanced-filters {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.amro-advanced-filters.expanded {
+  max-height: 2000px;
+}
+
+.amro-accordion-content {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.amro-accordion-content.expanded {
+  max-height: 2000px;
+}
+
+/* ==========================================================================
+   ACCESSIBILITY - WCAG 2.1 AA
+   ========================================================================== */
+
+/* Focus indicators */
+.amro-focus-visible:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Skip link */
+.amro-skip-link {
+  position: absolute;
+  top: -40px;
+  left: 0;
+  background: hsl(var(--primary));
+  color: white;
+  padding: 0.5rem 1rem;
+  z-index: 100;
+  transition: top 0.2s;
+}
+
+.amro-skip-link:focus {
+  top: 0;
+}
+
+/* Screen reader only */
+.amro-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .amro-surface-interactive,
+  .amro-advanced-filters,
+  .amro-accordion-content {
+    transition: none;
+  }
+}
+
+/* High contrast mode */
+@media (prefers-contrast: high) {
+  .amro-surface,
+  .amro-surface-elevated,
+  .amro-surface-interactive {
+    border-width: 2px;
+  }
+}

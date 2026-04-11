@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader } from '@/components/ui/card';
+import { H2 } from '@/components/ui/Heading';
 import { toast } from 'sonner';
 import { Loader2, Shield, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { invokeAnonymous } from '@/lib/supabase-functions';
@@ -79,7 +80,7 @@ export default function SetupAdmin() {
               <Shield className="h-8 w-8 text-primary" />
             </div>
           </div>
-          <CardTitle className="text-2xl font-bold">Platform Setup</CardTitle>
+          <H2>Platform Setup</H2>
           <CardDescription>
             Create the platform administrator account
           </CardDescription>

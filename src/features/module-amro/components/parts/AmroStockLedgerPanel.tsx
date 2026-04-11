@@ -659,7 +659,7 @@ export function AmroStockLedgerPanel({ apiScope = {} }: Props): JSX.Element {
           <div className="rounded border border-destructive/30 bg-destructive/5 p-3 text-xs text-destructive" role="alert" aria-live="assertive">
             <p className="font-semibold">Error Summary</p>
             <p>{error}</p>
-            <p className="mt-1 text-[11px] text-destructive/80">Use keyboard shortcuts: <span className="font-mono">Ctrl/Cmd+R</span> refresh, <span className="font-mono">Ctrl/Cmd+N</span> new transaction.</p>
+            <p className="mt-1 text-xs text-destructive/80">Use keyboard shortcuts: <span className="font-mono">Ctrl/Cmd+R</span> refresh, <span className="font-mono">Ctrl/Cmd+N</span> new transaction.</p>
           </div>
         ) : null}
 

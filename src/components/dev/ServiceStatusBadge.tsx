@@ -71,7 +71,7 @@ export function ServiceStatusBadge() {
       {services.map((s) => {
         const state = statuses[s.id] || "unknown";
         const tone =
-          state === "up" ? "bg-emerald-600 text-white" : state === "down" ? "bg-red-600 text-white" : "bg-gray-300 text-gray-800";
+          state === "up" ? "bg-emerald-600 text-white" : state === "down" ? "bg-red-600 text-white" : "bg-muted text-muted-foreground";
         return (
           <Badge key={s.id} variant="secondary" className={`${tone} border-none`}>
             {s.label}

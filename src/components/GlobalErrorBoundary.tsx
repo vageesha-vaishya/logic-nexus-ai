@@ -1,5 +1,6 @@
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
+import { H1 } from '@/components/ui/Heading';
 import { AlertTriangle } from 'lucide-react';
 import * as Sentry from "@sentry/react";
 import { logger } from '@/lib/logger';
@@ -44,7 +45,7 @@ export class GlobalErrorBoundary extends Component<Props, State> {
             </div>
             
             <div className="space-y-2">
-              <h1 className="text-2xl font-bold tracking-tight">Something went wrong</h1>
+              <H1 className="text-2xl font-bold tracking-tight">Something went wrong</H1>
               <p className="text-muted-foreground">
                 An unexpected error occurred. We've been notified and are working to fix it.
               </p>

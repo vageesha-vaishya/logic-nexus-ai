@@ -4,6 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { FranchiseForm } from '@/components/admin/FranchiseForm';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { H1 } from '@/components/ui/Heading';
 import { Store, Trash2, ArrowLeft, FileDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import Papa from 'papaparse';
@@ -252,7 +253,7 @@ export default function FranchiseDetail() {
               <ArrowLeft className="h-4 w-4" />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold">{franchise.name}</h1>
+              <H1>{franchise.name}</H1>
               <p className="text-muted-foreground">Edit franchise details</p>
             </div>
           </div>

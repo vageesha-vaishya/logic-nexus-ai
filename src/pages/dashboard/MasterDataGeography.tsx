@@ -1,5 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
+import { H1 } from '@/components/ui/Heading';
+import { FormActions } from '@/components/ui/FormActions';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -120,7 +122,7 @@ export default function MasterDataGeography() {
     <DashboardLayout>
       <div className="mdm-template-page" data-testid="master-data-geography-template">
         <div>
-          <h1 className="mdm-template-header-title">Master Data Management</h1>
+          <H1>Master Data Management</H1>
           <p className="mdm-template-header-subtitle">Manage geographical demographic data</p>
         </div>
 
@@ -163,7 +165,7 @@ export default function MasterDataGeography() {
                         <Input className="mdm-template-input" placeholder="International Code" value={continentForm.intl} onChange={e => setContinentForm({ ...continentForm, intl: e.target.value })} />
                         <Input className="mdm-template-input" placeholder="National Code" value={continentForm.nat} onChange={e => setContinentForm({ ...continentForm, nat: e.target.value })} />
                       </div>
-                      <div className="flex justify-end gap-2 mt-3">
+                      <FormActions variant="bottom-minimal">
                         <Button variant="outline" onClick={() => setShowAddContinent(false)}>Cancel</Button>
                         <Button onClick={() => {
                           const name = String(continentForm.name || '').trim();
@@ -175,7 +177,7 @@ export default function MasterDataGeography() {
                           setShowAddContinent(false);
                           setContinentForm({ name: '', intl: '', nat: '' });
                         }}>Save</Button>
-                      </div>
+                      </FormActions>
                     </DialogContent>
                   </Dialog>
                   <input ref={contFileRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={async (e) => {
@@ -296,7 +298,7 @@ export default function MasterDataGeography() {
                       <Input className="mdm-template-input" placeholder="International Code" value={editContinentForm.intl} onChange={e => setEditContinentForm({ ...editContinentForm, intl: e.target.value })} />
                       <Input className="mdm-template-input" placeholder="National Code" value={editContinentForm.nat} onChange={e => setEditContinentForm({ ...editContinentForm, nat: e.target.value })} />
                     </div>
-                    <div className="flex justify-end gap-2 mt-3">
+                    <FormActions variant="bottom-minimal">
                       <Button variant="outline" onClick={() => setShowEditContinent(false)}>Cancel</Button>
                       <Button onClick={() => {
                         const name = String(editContinentForm.name || '').trim();
@@ -307,7 +309,7 @@ export default function MasterDataGeography() {
                         updateRow('continents', editContinentForm.id, { name, code_international: intl ? intl.toUpperCase() : null, code_national: nat || null });
                         setShowEditContinent(false);
                       }}>Save</Button>
-                    </div>
+                    </FormActions>
                   </DialogContent>
                 </Dialog>
                 
@@ -349,7 +351,7 @@ export default function MasterDataGeography() {
                         <Input className="mdm-template-input" placeholder="National Code" value={countryForm.nat} onChange={e => setCountryForm({ ...countryForm, nat: e.target.value })} />
                         <Input className="mdm-template-input" placeholder="Phone Code" value={countryForm.phone} onChange={e => setCountryForm({ ...countryForm, phone: e.target.value })} />
                       </div>
-                      <div className="flex justify-end gap-2 mt-3">
+                      <FormActions variant="bottom-minimal">
                         <Button variant="outline" onClick={() => setShowAddCountry(false)}>Cancel</Button>
                         <Button onClick={() => {
                           const name = String(countryForm.name || '').trim();
@@ -358,7 +360,7 @@ export default function MasterDataGeography() {
                           setShowAddCountry(false);
                           setCountryForm({ name: '', continent_id: '', iso2: '', iso3: '', nat: '', phone: '' });
                         }}>Save</Button>
-                      </div>
+                      </FormActions>
                     </DialogContent>
                   </Dialog>
                   <input ref={countryFileRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={async (e) => {
@@ -516,7 +518,7 @@ export default function MasterDataGeography() {
                       <Input className="mdm-template-input" placeholder="National Code" value={editCountryForm.nat} onChange={e => setEditCountryForm({ ...editCountryForm, nat: e.target.value })} />
                       <Input className="mdm-template-input" placeholder="Phone Code" value={editCountryForm.phone} onChange={e => setEditCountryForm({ ...editCountryForm, phone: e.target.value })} />
                     </div>
-                    <div className="flex justify-end gap-2 mt-3">
+                    <FormActions variant="bottom-minimal">
                       <Button variant="outline" onClick={() => setShowEditCountry(false)}>Cancel</Button>
                       <Button onClick={() => {
                         const name = String(editCountryForm.name || '').trim();
@@ -528,7 +530,7 @@ export default function MasterDataGeography() {
                         updateRow('countries', editCountryForm.id, { name, continent_id: editCountryForm.continent_id || null, code_iso2: iso2 || null, code_iso3: iso3 || null, code_national: editCountryForm.nat || null, phone_code: editCountryForm.phone || null });
                         setShowEditCountry(false);
                       }}>Save</Button>
-                    </div>
+                    </FormActions>
                   </DialogContent>
                 </Dialog>
                 {/* Countries bottom import block removed; import is now in top Actions toolbar */}
@@ -569,7 +571,7 @@ export default function MasterDataGeography() {
                         </Select>
                         <Input className="mdm-template-input" placeholder="ISO Code" value={stateForm.iso} onChange={e => setStateForm({ ...stateForm, iso: e.target.value })} />
                       </div>
-                      <div className="flex justify-end gap-2 mt-3">
+                      <FormActions variant="bottom-minimal">
                         <Button variant="outline" onClick={() => setShowAddState(false)}>Cancel</Button>
                         <Button onClick={() => {
                           const name = String(stateForm.name || '').trim();
@@ -581,7 +583,7 @@ export default function MasterDataGeography() {
                           setShowAddState(false);
                           setStateForm({ name: '', country_id: '', iso: '', nat: '' });
                         }}>Save</Button>
-                      </div>
+                      </FormActions>
                     </DialogContent>
                   </Dialog>
                   <input ref={stateFileRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={async (e) => {
@@ -751,7 +753,7 @@ export default function MasterDataGeography() {
                       </Select>
                       <Input className="mdm-template-input" placeholder="ISO Code" value={editStateForm.iso} onChange={e => setEditStateForm({ ...editStateForm, iso: e.target.value })} />
                     </div>
-                    <div className="flex justify-end gap-2 mt-3">
+                    <FormActions variant="bottom-minimal">
                       <Button variant="outline" onClick={() => setShowEditState(false)}>Cancel</Button>
                       <Button onClick={() => {
                         const name = String(editStateForm.name || '').trim();
@@ -762,7 +764,7 @@ export default function MasterDataGeography() {
                         updateRow('states', editStateForm.id, { name, country_id, code_iso: iso || null });
                         setShowEditState(false);
                       }}>Save</Button>
-                    </div>
+                    </FormActions>
                   </DialogContent>
                 </Dialog>
               </CardContent>
@@ -808,7 +810,7 @@ export default function MasterDataGeography() {
                         <Input className="mdm-template-input" placeholder="Latitude" value={cityForm.lat} onChange={e => setCityForm({ ...cityForm, lat: e.target.value })} />
                         <Input className="mdm-template-input" placeholder="Longitude" value={cityForm.lng} onChange={e => setCityForm({ ...cityForm, lng: e.target.value })} />
                       </div>
-                      <div className="flex justify-end gap-2 mt-3">
+                      <FormActions variant="bottom-minimal">
                         <Button variant="outline" onClick={() => setShowAddCity(false)}>Cancel</Button>
                         <Button onClick={() => {
                           const name = String(cityForm.name || '').trim();
@@ -821,7 +823,7 @@ export default function MasterDataGeography() {
                           setShowAddCity(false);
                           setCityForm({ name: '', country_id: '', state_id: '', nat: '', lat: '', lng: '' });
                         }}>Save</Button>
-                      </div>
+                      </FormActions>
                     </DialogContent>
                   </Dialog>
                   <input ref={cityFileRef} type="file" accept=".csv,.xlsx" className="hidden" onChange={async (e) => {
@@ -991,7 +993,7 @@ export default function MasterDataGeography() {
                       <Input className="mdm-template-input" placeholder="Latitude" value={editCityForm.lat} onChange={e => setEditCityForm({ ...editCityForm, lat: e.target.value })} />
                       <Input className="mdm-template-input" placeholder="Longitude" value={editCityForm.lng} onChange={e => setEditCityForm({ ...editCityForm, lng: e.target.value })} />
                     </div>
-                    <div className="flex justify-end gap-2 mt-3">
+                    <FormActions variant="bottom-minimal">
                       <Button variant="outline" onClick={() => setShowEditCity(false)}>Cancel</Button>
                       <Button onClick={() => {
                         const name = String(editCityForm.name || '').trim();
@@ -1003,7 +1005,7 @@ export default function MasterDataGeography() {
                         updateRow('cities', editCityForm.id, { name, country_id, state_id: state_id || null, code_national: editCityForm.nat || null, latitude: isNaN(latitude) ? null : latitude, longitude: isNaN(longitude) ? null : longitude });
                         setShowEditCity(false);
                       }}>Save</Button>
-                    </div>
+                    </FormActions>
                   </DialogContent>
                 </Dialog>
               </CardContent>

@@ -8,6 +8,91 @@ All colors MUST be HSL.
 
 @layer base {
   :root {
+    /* ==========================================================================
+       DESIGN SYSTEM: Typography Scale (Major Third 1.25x Ratio)
+       Unified H1-H6 heading system with proportional relationships
+       ========================================================================== */
+    /* Typography Scale - Major Third (1.25x ratio) */
+    --text-xs: 0.75rem;        /* 12px - H6, captions, badges */
+    --text-sm: 0.875rem;       /* 14px - Body standard, form labels, table content */
+    --text-base: 1rem;         /* 16px - H5, primary body text */
+    --text-lg: 1.125rem;       /* 18px - H4, section headings */
+    --text-xl: 1.25rem;        /* 20px - H3, card titles */
+    --text-2xl: 1.5rem;        /* 24px - H2, page subtitles */
+    --text-3xl: 1.875rem;      /* 30px - H1, page titles */
+    --text-4xl: 2.25rem;       /* 36px - Hero titles */
+    --text-5xl: 3rem;          /* 48px - Landing pages */
+    --text-6xl: 3.75rem;       /* 60px - Marketing headers */
+
+    /* Line Heights */
+    --leading-none: 1;
+    --leading-tight: 1.25;
+    --leading-snug: 1.375;
+    --leading-normal: 1.5;
+    --leading-relaxed: 1.625;
+    --leading-loose: 2;
+
+    /* Font Weights */
+    --font-thin: 100;
+    --font-extralight: 200;
+    --font-light: 300;
+    --font-regular: 400;
+    --font-medium: 500;
+    --font-semibold: 600;
+    --font-bold: 700;
+    --font-extrabold: 800;
+    --font-black: 900;
+
+    /* Letter Spacing */
+    --tracking-tighter: -0.05em;
+    --tracking-tight: -0.025em;
+    --tracking-normal: 0em;
+    --tracking-wide: 0.025em;
+    --tracking-wider: 0.05em;
+    --tracking-widest: 0.1em;
+
+    /* ==========================================================================
+       SPACING SYSTEM (8px Grid)
+       ========================================================================== */
+    --space-px: 1px;
+    --space-0: 0;
+    --space-0-5: 0.125rem;   /* 2px */
+    --space-1: 0.25rem;      /* 4px */
+    --space-1-5: 0.375rem;   /* 6px */
+    --space-2: 0.5rem;       /* 8px */
+    --space-2-5: 0.625rem;   /* 10px */
+    --space-3: 0.75rem;      /* 12px */
+    --space-4: 1rem;         /* 16px */
+    --space-5: 1.25rem;      /* 20px */
+    --space-6: 1.5rem;       /* 24px */
+    --space-8: 2rem;         /* 32px */
+    --space-10: 2.5rem;      /* 40px */
+    --space-12: 3rem;        /* 48px */
+    --space-16: 4rem;        /* 64px */
+    --space-20: 5rem;        /* 80px */
+    --space-24: 6rem;        /* 96px */
+
+    /* ==========================================================================
+       LAYOUT & ALIGNMENT SYSTEM
+       ========================================================================== */
+    --margin-desktop: 1.5rem;    /* 24px desktop margin */
+    --margin-tablet: 1rem;       /* 16px tablet margin */
+    --margin-mobile: 1rem;       /* 16px mobile margin */
+    --grid-columns: 12;
+    --grid-gap: 1.5rem;          /* 24px grid gap */
+    --max-content-width: 1440px;
+
+    /* ==========================================================================
+       COMPONENT SPACING STANDARDS
+       ========================================================================== */
+    --section-gap: 1.5rem;       /* 24px between major sections */
+    --field-gap: 1rem;           /* 16px between form fields */
+    --button-gap: 0.5rem;        /* 8px between buttons */
+    --card-padding: 1.5rem;      /* 24px card padding */
+    --form-padding: 1.5rem;      /* 24px form padding */
+    --element-spacing: 0.5rem;   /* 8px inline element spacing */
+
+    /* Existing design tokens */
     --background: 0 0% 100%;
     --foreground: 222 47% 11%;
 
@@ -355,5 +440,372 @@ All colors MUST be HSL.
       textarea
     ) {
     line-height: var(--lead-workspace-line-height);
+  }
+
+  /* ==========================================================================
+     HEADING SYSTEM: Unified H1-H6 Classes
+     Major Third (1.25x) ratio scale with proper visual hierarchy
+     ========================================================================== */
+  
+  /* H1 - Page Titles (30px / 1.875rem) */
+  .heading-1 {
+    @apply text-3xl font-bold;
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tight);
+    color: hsl(var(--foreground));
+  }
+
+  /* H2 - Page Subtitles / Section Headers (24px / 1.5rem) */
+  .heading-2 {
+    @apply text-2xl font-semibold;
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-tight);
+    color: hsl(var(--foreground));
+  }
+
+  /* H3 - Card Titles / Major Sections (20px / 1.25rem) */
+  .heading-3 {
+    @apply text-xl font-semibold;
+    line-height: var(--leading-tight);
+    letter-spacing: var(--tracking-normal);
+    color: hsl(var(--foreground));
+  }
+
+  /* H4 - Section Headings (18px / 1.125rem) */
+  .heading-4 {
+    @apply text-lg font-semibold;
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-normal);
+    color: hsl(var(--foreground));
+  }
+
+  /* H5 - Subsection Headers (16px / 1rem) */
+  .heading-5 {
+    @apply text-base font-semibold;
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-wide);
+    color: hsl(var(--foreground));
+  }
+
+  /* H6 - Captions / Labels / Badges (12px / 0.75rem) */
+  .heading-6 {
+    @apply text-xs font-semibold uppercase;
+    line-height: var(--leading-snug);
+    letter-spacing: var(--tracking-wider);
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* ==========================================================================
+     DATA GRID SYSTEM: Standardized Table Typography
+     Consistent text sizing for all data grid components
+     ========================================================================== */
+  
+  /* Data Grid Root */
+  .data-grid {
+    @apply text-sm;
+    line-height: var(--leading-normal);
+  }
+
+  /* Data Grid Headers */
+  .data-grid-header {
+    @apply text-sm font-semibold;
+    line-height: var(--leading-normal);
+    color: hsl(var(--foreground));
+  }
+
+  .data-grid-header-cell {
+    @apply text-sm font-medium;
+    line-height: var(--leading-normal);
+    color: hsl(var(--foreground));
+  }
+
+  /* Data Grid Body */
+  .data-grid-body {
+    @apply text-sm;
+    line-height: var(--leading-normal);
+  }
+
+  .data-grid-cell {
+    @apply text-sm;
+    line-height: var(--leading-normal);
+    color: hsl(var(--foreground));
+  }
+
+  /* Data Grid Footer / Pagination */
+  .data-grid-footer {
+    @apply text-sm;
+    line-height: var(--leading-normal);
+    color: hsl(var(--muted-foreground));
+  }
+
+  .data-grid-pagination {
+    @apply text-sm font-medium;
+    line-height: var(--leading-normal);
+  }
+
+  .data-grid-pagination button {
+    @apply text-sm;
+  }
+
+  /* Data Grid Empty State */
+  .data-grid-empty {
+    @apply text-sm;
+    line-height: var(--leading-relaxed);
+    color: hsl(var(--muted-foreground));
+  }
+
+  /* Data Grid Loading State */
+  .data-grid-loading {
+    @apply text-sm;
+    line-height: var(--leading-normal);
+  }
+
+  /* ==========================================================================
+     FORM SYSTEM: Standardized CRUD Button Positioning
+     Fixed placement patterns with proper spacing
+     ========================================================================== */
+  
+  /* Form Actions - Top Right (Primary CRUD buttons) */
+  .form-actions-top {
+    @apply flex items-center justify-end gap-2;
+    margin-bottom: var(--section-gap);
+  }
+
+  /* Form Actions - Bottom Center (Submit/Cancel) */
+  .form-actions-bottom {
+    @apply flex items-center justify-end gap-2;
+    margin-top: var(--section-gap);
+    padding-top: var(--space-6);
+    border-top: 1px solid hsl(var(--border));
+  }
+
+  /* Form Actions - Minimal (No border) */
+  .form-actions-minimal {
+    @apply flex items-center justify-end gap-2;
+    margin-top: var(--space-6);
+  }
+
+  /* Form Field Spacing */
+  .form-field-group {
+    @apply space-y-2;
+  }
+
+  .form-field-label {
+    @apply text-sm font-medium;
+    line-height: var(--leading-snug);
+    color: hsl(var(--foreground));
+  }
+
+  .form-field-description {
+    @apply text-sm;
+    line-height: var(--leading-snug);
+    color: hsl(var(--muted-foreground));
+  }
+
+  .form-field-error {
+    @apply text-sm font-medium;
+    line-height: var(--leading-snug);
+    color: hsl(var(--destructive));
+  }
+
+  /* Form Grid Layouts */
+  .form-grid-2-col {
+    @apply grid gap-4 md:grid-cols-2;
+  }
+
+  .form-grid-3-col {
+    @apply grid gap-4 md:grid-cols-2 lg:grid-cols-3;
+  }
+
+  /* ==========================================================================
+     LAYOUT ALIGNMENT SYSTEM: CSS Grid & Flexbox
+     Master layout with defined breakpoints
+     ========================================================================== */
+  
+  /* Page Layout Shell */
+  .page-shell {
+    @apply w-full;
+    min-height: 100vh;
+    padding: var(--margin-mobile);
+  }
+
+  @media (min-width: 768px) {
+    .page-shell {
+      padding: var(--margin-tablet);
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .page-shell {
+      padding: var(--margin-desktop);
+    }
+  }
+
+  /* Content Container */
+  .page-content {
+    @apply mx-auto w-full max-w-[1440px];
+  }
+
+  /* Section Spacing */
+  .page-section {
+    margin-bottom: var(--section-gap);
+  }
+
+  .page-section:last-child {
+    margin-bottom: 0;
+  }
+
+  /* Card Layout Grid */
+  .card-grid {
+    @apply grid gap-6;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  }
+
+  .card-grid-2 {
+    @apply grid gap-6;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .card-grid-3 {
+    @apply grid gap-6;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .card-grid-4 {
+    @apply grid gap-6;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  /* Responsive breakpoints */
+  @media (max-width: 767px) {
+    .card-grid,
+    .card-grid-2,
+    .card-grid-3,
+    .card-grid-4 {
+      grid-template-columns: 1fr;
+    }
+  }
+
+  @media (min-width: 768px) and (max-width: 1023px) {
+    .card-grid-3,
+    .card-grid-4 {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  /* ==========================================================================
+     DECLUTTERING SYSTEM: Reduced Visual Noise
+     Consistent spacing, removed unnecessary borders/shadows
+     ========================================================================== */
+  
+  /* Clean Card - No shadow, minimal border */
+  .card-clean {
+    @apply rounded-lg border bg-white p-6;
+    border-color: hsl(var(--border) / 0.5);
+    box-shadow: none;
+  }
+
+  /* Elevated Card - Subtle shadow for emphasis */
+  .card-elevated {
+    @apply rounded-lg border bg-white p-6;
+    border-color: hsl(var(--border) / 0.3);
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  }
+
+  /* Clean Section Divider */
+  .section-divider {
+    @apply my-6 border-t;
+    border-color: hsl(var(--border) / 0.5);
+  }
+
+  /* Minimal Input */
+  .input-minimal {
+    @apply rounded-md border bg-white px-3 py-2 text-sm;
+    border-color: hsl(var(--border) / 0.5);
+    transition: border-color 0.15s ease;
+  }
+
+  .input-minimal:focus {
+    @apply outline-none ring-2;
+    border-color: hsl(var(--ring));
+    ring-color: hsl(var(--ring) / 0.2);
+  }
+
+  /* ==========================================================================
+     PROGRESSIVE DISCLOSURE: Limit Interactive Elements
+     Maximum 7-9 interactive elements per screen view
+     ========================================================================== */
+  
+  /* Primary Actions - Limit to 3 visible */
+  .primary-actions {
+    @apply flex items-center gap-2;
+  }
+
+  .primary-actions > * {
+    @apply text-sm;
+  }
+
+  /* Secondary Actions - Collapsible or grouped */
+  .secondary-actions {
+    @apply flex items-center gap-1;
+  }
+
+  /* Action Group - Maximum visibility */
+  .action-group {
+    @apply flex items-center gap-2;
+  }
+
+  .action-group .action-primary {
+    @apply visible;
+  }
+
+  .action-group .action-secondary {
+    @apply opacity-70 transition-opacity hover:opacity-100;
+  }
+
+  /* ==========================================================================
+     VISUAL REGRESSION HELPERS: Consistent alignment markers
+     Use for testing alignment across breakpoints
+     ========================================================================== */
+  
+  /* Grid Overlay (for development/testing only) */
+  .grid-overlay {
+    @apply relative;
+  }
+
+  .grid-overlay::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: repeating-linear-gradient(
+      to right,
+      hsl(var(--ring) / 0.1) 0px,
+      hsl(var(--ring) / 0.1) calc((100% / 12) - 1px),
+      transparent calc((100% / 12) - 1px),
+      transparent calc(100% / 12)
+    );
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Alignment Markers */
+  .align-start {
+    justify-content: flex-start;
+  }
+
+  .align-center {
+    justify-content: center;
+  }
+
+  .align-end {
+    justify-content: flex-end;
+  }
+
+  .align-stretch {
+    justify-content: stretch;
+  }
+
+  .align-baseline {
+    justify-content: baseline;
   }
 }

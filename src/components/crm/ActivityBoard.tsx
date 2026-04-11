@@ -49,7 +49,7 @@ const STATUSES = [
   { id: 'planned', label: 'Planned', color: 'bg-blue-100 text-blue-800' },
   { id: 'in_progress', label: 'In Progress', color: 'bg-yellow-100 text-yellow-800' },
   { id: 'completed', label: 'Completed', color: 'bg-green-100 text-green-800' },
-  { id: 'cancelled', label: 'Cancelled', color: 'bg-gray-100 text-gray-800' },
+  { id: 'cancelled', label: 'Cancelled', color: 'bg-muted text-foreground' },
 ];
 
 const getTypeIcon = (type: string) => {

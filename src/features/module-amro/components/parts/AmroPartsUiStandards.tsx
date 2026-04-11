@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { getKpiCardStyles } from './semanticBadgeClasses';
 
 export function AmroModuleSurface({
   title,
@@ -24,14 +25,16 @@ export function AmroModuleSurface({
       <CardHeader className="space-y-2 pb-3">
         <div className="flex flex-wrap items-center justify-between gap-2">
           <div className="space-y-1">
-            <CardTitle className="text-base">{title}</CardTitle>
-            <p className="text-xs text-muted-foreground">{subtitle}</p>
+            {/* Issue VH-01: Semantic heading hierarchy */}
+            <h2 className="text-base font-semibold leading-tight">{title}</h2>
+            <p className="text-xs leading-snug text-muted-foreground">{subtitle}</p>
           </div>
           <div className="flex items-center gap-2">
-            <Badge variant="outline" className="text-[10px] uppercase">{moduleId}</Badge>
+            {/* Issue TY-01: Minimum 12px font size (text-xs = 12px) */}
+            <Badge variant="outline" className="text-xs uppercase">{moduleId}</Badge>
             <Badge
               variant={status === 'warning' ? 'destructive' : status === 'loading' ? 'secondary' : 'default'}
-              className="text-[10px] uppercase"
+              className="text-xs uppercase"
             >
               {status}
             </Badge>
@@ -72,11 +75,12 @@ export function AmroStandardToolbar({
             />
           </div>
         ) : null}
-        <Button type="button" variant="outline" size="sm" className="h-8">
+        {/* Issue AC-01: Touch target padding - 44px minimum on mobile */}
+        <Button type="button" variant="outline" size="sm" className="h-8 min-h-[44px] md:h-8">
           <Filter className="mr-1 h-3.5 w-3.5" />
           Filter
         </Button>
-        <Button type="button" variant="outline" size="sm" className="h-8">
+        <Button type="button" variant="outline" size="sm" className="h-8 min-h-[44px] md:h-8">
           <SlidersHorizontal className="mr-1 h-3.5 w-3.5" />
           View
         </Button>
@@ -87,22 +91,27 @@ export function AmroStandardToolbar({
   );
 }
 
-export function AmroKpiGrid({ items }: { items: Array<{ label: string; value: string; tone?: 'default' | 'success' | 'warning' }> }): JSX.Element {
+export function AmroKpiGrid({ items }: { items: Array<{ label: string; value: string; tone?: 'default' | 'success' | 'warning' | 'critical' }> }): JSX.Element {
   return (
     <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-3">
-      {items.map((item) => (
-        <div
-          key={item.label}
-          className={cn(
-            'rounded-md border px-3 py-2 text-sm',
-            item.tone === 'success' ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : '',
-            item.tone === 'warning' ? 'border-amber-300 bg-amber-50 text-amber-900' : '',
-          )}
-        >
-          <p className="text-xs text-muted-foreground">{item.label}</p>
-          <p className="font-semibold">{item.value}</p>
-        </div>
-      ))}
+      {items.map((item) => {
+        // Issue VH-03: Semantic KPI variants with proper visual weight
+        const urgency = item.tone === 'critical' ? 'critical' : item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'healthy';
+        const styles = getKpiCardStyles(urgency);
+        
+        return (
+          <div
+            key={item.label}
+            className={cn(
+              'rounded-md border px-3 py-2 text-sm',
+              styles.card
+            )}
+          >
+            <p className={cn('text-xs leading-snug', styles.label)}>{item.label}</p>
+            <p className={cn('font-semibold', styles.text)}>{item.value}</p>
+          </div>
+        );
+      })}
     </div>
   );
 }

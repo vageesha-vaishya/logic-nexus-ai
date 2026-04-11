@@ -123,7 +123,7 @@ export function EnterpriseTable<T extends Record<string, any>>({
     if (!column.sortable) return null;
 
     if (currentSortConfig?.column !== column.key) {
-      return <ChevronsUpDown className="h-4 w-4 text-gray-400" />;
+      return <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />;
     }
 
     if (currentSortConfig.direction === 'asc') {
@@ -134,21 +134,25 @@ export function EnterpriseTable<T extends Record<string, any>>({
       return <ChevronDown className="h-4 w-4 text-primary" />;
     }
 
-    return <ChevronsUpDown className="h-4 w-4 text-gray-400" />;
+    return <ChevronsUpDown className="h-4 w-4 text-muted-foreground" />;
   };
 
   if (isLoading) {
     return (
-      <div className={cn('border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)]', className)}>
+      <div className={cn(
+        'border rounded-lg overflow-hidden data-grid-loading',
+        'border-border bg-card',
+        className
+      )}>
         <table className="w-full">
-          <thead className="bg-gray-50 border-b border-gray-200">
+          <thead className="bg-muted/50 border-b border-border data-grid-header">
             <tr>
               {columns.map((col) => (
                 <th
                   key={String(col.key)}
                   style={{ width: col.width }}
                   className={cn(
-                    'px-6 py-3 text-left text-sm font-medium text-gray-900',
+                    'px-6 py-3 data-grid-header-cell',
                     col.headerClassName
                   )}
                 >
@@ -157,18 +161,18 @@ export function EnterpriseTable<T extends Record<string, any>>({
               ))}
             </tr>
           </thead>
-          <tbody>
+          <tbody className="data-grid-body">
             {[...Array(5)].map((_, i) => (
-              <tr key={i} className="border-b border-gray-200 bg-white">
+              <tr key={i} className="border-b border-border bg-card">
                 {columns.map((col) => (
                   <td
                     key={`${i}-${String(col.key)}`}
                     className={cn(
-                      'px-6 py-3 text-sm',
+                      'px-6 py-3 data-grid-cell',
                       col.cellClassName
                     )}
                   >
-                    <div className="h-4 bg-gray-200 rounded animate-pulse" />
+                    <div className="h-4 bg-muted rounded animate-pulse" />
                   </td>
                 ))}
               </tr>
@@ -181,12 +185,14 @@ export function EnterpriseTable<T extends Record<string, any>>({
 
   if (data.length === 0) {
     return (
-      <div className={cn('border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)] p-8', className)}>
-        <div className="text-center text-muted-foreground">
+      <div className={cn(
+        'border rounded-lg p-8 data-grid-empty',
+        'border-border bg-card',
+        className
+      )}>
+        <div className="text-center">
           {emptyState || (
-            <>
-              <p className="text-sm text-gray-500">No data available</p>
-            </>
+            <p className="text-sm text-muted-foreground">No data available</p>
           )}
         </div>
       </div>
@@ -194,9 +200,16 @@ export function EnterpriseTable<T extends Record<string, any>>({
   }
 
   return (
-    <div className={cn('border border-gray-200 rounded-lg shadow-[0_1px_4px_rgba(0,0,0,0.05)] overflow-hidden', className)}>
+    <div className={cn(
+      'border rounded-lg overflow-hidden data-grid',
+      'border-border bg-card',
+      className
+    )}>
       <table className="w-full">
-        <thead className={cn('bg-gray-50 border-b border-gray-200', headerClassName)}>
+        <thead className={cn(
+          'bg-muted/50 border-b border-border data-grid-header',
+          headerClassName
+        )}>
           <tr>
             {columns.map((col) => (
               <th
@@ -204,8 +217,8 @@ export function EnterpriseTable<T extends Record<string, any>>({
                 style={{ width: col.width }}
                 onClick={() => handleSort(col)}
                 className={cn(
-                  'px-6 py-3 text-left text-sm font-medium text-gray-900',
-                  col.sortable && 'cursor-pointer hover:bg-gray-100 transition-colors',
+                  'px-6 py-3 data-grid-header-cell',
+                  col.sortable && 'cursor-pointer hover:bg-muted/30 transition-colors',
                   col.headerClassName
                 )}
               >
@@ -217,17 +230,17 @@ export function EnterpriseTable<T extends Record<string, any>>({
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="data-grid-body">
           {sortedData.map((row, index) => (
             <tr
               key={rowKey ? rowKey(row, index) : index}
               onClick={() => onRowClick?.(row, index)}
               className={cn(
-                'border-b border-gray-200 transition-colors',
-                striped && index % 2 === 1 && 'bg-gray-50',
-                hover && 'hover:bg-gray-100',
+                'border-b border-border transition-colors',
+                striped && index % 2 === 1 && 'bg-muted/20',
+                hover && 'hover:bg-muted/30',
                 onRowClick && 'cursor-pointer',
-                !striped && !hover && 'bg-white',
+                !striped && !hover && 'bg-card',
                 rowClassName
               )}
             >
@@ -235,7 +248,7 @@ export function EnterpriseTable<T extends Record<string, any>>({
                 <td
                   key={String(col.key)}
                   className={cn(
-                    'px-6 py-3 text-sm text-gray-900',
+                    'px-6 py-3 data-grid-cell',
                     col.className,
                     col.cellClassName
                   )}

@@ -286,7 +286,7 @@ export function EmailAccounts() {
                         variant="outline"
                         className={account.is_active 
                           ? "bg-green-500/10 text-green-600 border-green-200" 
-                          : "bg-gray-500/10 text-gray-600 border-gray-200"
+                          : "bg-muted/50 text-muted-foreground border-border"
                         }
                       >
                         {account.is_active ? "Active" : "Inactive"}
