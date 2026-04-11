@@ -414,7 +414,7 @@ const normalizeWorkPackageRecordSummary = (record: Record<string, unknown>): Air
   if (!id) {
     return null;
   }
-  const workPackageNumber = String(record.work_order_number || record.work_package_number || record.package_number || '').trim() || id;
+  const workPackageNumber = String(record.work_package_number || record.work_order_number || record.package_number || '').trim() || id;
   const title = String(record.title || record.topic || workPackageNumber).trim() || workPackageNumber;
   const status = String(record.status || record.lifecycle_stage || 'planning').trim() || 'planning';
   const maintenanceType = String(record.maintenance_type || record.type || 'line').trim() || 'line';

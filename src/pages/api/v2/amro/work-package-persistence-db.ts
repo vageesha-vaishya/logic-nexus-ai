@@ -10,6 +10,7 @@ export interface PersistedWorkPackage {
   franchise_id: string | null;
   aircraft_id: string | null;
   work_order_number: string;
+  work_package_number: string;
   title: string;
   description: string | null;
   work_type: string | null;
@@ -115,7 +116,7 @@ export async function persistCreateWorkPackage(params: {
       tenant_id: params.tenantId,
       franchise_id: params.franchiseId,
       aircraft_id: params.aircraftId,
-      work_order_number: workOrderNumber,
+      work_package_number: workOrderNumber,
       title: params.title,
       description: params.description || null,
       work_type: params.workType || params.maintenanceType, // NOT NULL in DB; default to maintenance type
@@ -321,7 +322,7 @@ export async function fetchWorkPackageList(params: {
   }
   if (params.search) {
     query = query.or(
-      `title.ilike.%${params.search}%,work_order_number.ilike.%${params.search}%,notes.ilike.%${params.search}%`
+      `title.ilike.%${params.search}%,work_package_number.ilike.%${params.search}%,notes.ilike.%${params.search}%`
     );
   }
 
@@ -429,7 +430,9 @@ function mapRowToWorkPackage(row: Record<string, unknown>): PersistedWorkPackage
     tenant_id: String(row.tenant_id || ''),
     franchise_id: row.franchise_id ? String(row.franchise_id) : null,
     aircraft_id: row.aircraft_id ? String(row.aircraft_id) : null,
-    work_order_number: String(row.work_order_number || ''),
+    // work_package_number is the sole identifier; work_order_number column was dropped
+    work_order_number: String(row.work_package_number || ''),
+    work_package_number: String(row.work_package_number || ''),
     title: String(row.title || ''),
     description: row.description ? String(row.description) : null,
     work_type: row.work_type ? String(row.work_type) : null,

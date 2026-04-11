@@ -515,7 +515,7 @@ export function AmroWorkOrdersListPage() {
                       className="text-primary underline cursor-pointer"
                       onClick={() => handleView(wp.id)}
                     >
-                      {wp.work_order_number}
+                      {(wp as any).work_package_number || wp.work_order_number || '—'}
                     </span>
                   </TableCell>
                   <TableCell className="font-medium max-w-[200px] truncate">

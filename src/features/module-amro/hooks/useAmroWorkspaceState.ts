@@ -695,7 +695,7 @@ export function useAmroWorkspaceState() {
         setHasV1WorkPackageConnectivity(true);
         next = payload.data.map((item) => mapWorkPackageRecord({
           id: item.id,
-          packageNumber: item.work_order_number || item.work_package_number || item.id,
+          packageNumber: item.work_package_number || item.work_order_number || item.id,
           status: item.status,
           assetId: item.aircraft_id,
         })) as AmroWorkPackage[];

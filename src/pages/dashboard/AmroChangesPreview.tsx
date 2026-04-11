@@ -211,7 +211,7 @@ export default function AmroChangesPreview() {
     const { data, error } = await scopedDb
       .from("work_packages")
       .select(
-        "id, work_order_number, title, description, maintenance_type, work_type, priority, status, aircraft_id, assigned_to, planned_start_date, planned_end_date, actual_start_date, actual_end_date, estimated_labor_hours, estimated_cost, actual_labor_hours, actual_cost, updated_at",
+        "id, work_package_number, work_order_number, title, description, maintenance_type, work_type, priority, status, aircraft_id, assigned_to, planned_start_date, planned_end_date, actual_start_date, actual_end_date, estimated_labor_hours, estimated_cost, actual_labor_hours, actual_cost, updated_at",
       )
       .order("updated_at", { ascending: false })
       .limit(200);
@@ -332,7 +332,7 @@ export default function AmroChangesPreview() {
       if (!query) return true;
       const aircraft = aircraftById[item.aircraft_id];
       const searchable = [
-        item.work_order_number,
+        item.work_package_number || item.work_order_number,
         item.title,
         item.maintenance_type,
         item.work_type,
@@ -511,7 +511,7 @@ export default function AmroChangesPreview() {
                 </SelectContent>
               </Select>
               <div className="flex items-center rounded-md border px-3 text-sm text-muted-foreground">
-                Selected Work Package: {selectedWorkPackage?.work_order_number ?? "None"}
+                Selected Work Package: {selectedWorkPackage?.work_package_number || selectedWorkPackage?.work_order_number ?? "None"}
               </div>
             </div>
           </CardHeader>
@@ -547,7 +547,7 @@ export default function AmroChangesPreview() {
                         >
                           <TableCell>
                             <div className="space-y-1">
-                              <div className="font-medium">{item.work_order_number}</div>
+                              <div className="font-medium">{item.work_package_number || item.work_order_number}</div>
                               <div className="text-xs text-muted-foreground line-clamp-2">{item.title}</div>
                             </div>
                           </TableCell>
@@ -580,7 +580,7 @@ export default function AmroChangesPreview() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-3">
-                  <span>{selectedWorkPackage ? `${selectedWorkPackage.work_order_number} · ${selectedWorkPackage.title}` : "Work Package Detail"}</span>
+                  <span>{selectedWorkPackage ? `${selectedWorkPackage.work_package_number || selectedWorkPackage.work_order_number} · ${selectedWorkPackage.title}` : "Work Package Detail"}</span>
                   {savingTask ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
                 </CardTitle>
                 <CardDescription>

@@ -84,7 +84,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           id: wp.id,
-          work_order_number: wp.work_order_number,
+          work_order_number: wp.work_package_number,
           title: wp.title,
           aircraft_id: wp.aircraft_id,
           description: wp.description,
@@ -187,7 +187,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           id: updated.id,
-          work_order_number: updated.work_order_number,
+          work_order_number: updated.work_package_number,
           status: updated.status,
           updated_at: updated.updated_at,
         },

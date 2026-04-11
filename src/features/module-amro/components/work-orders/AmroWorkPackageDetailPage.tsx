@@ -103,7 +103,7 @@ function WorkPackageHeader({ wp }: { wp: WorkPackageDetail }) {
         </Button>
         <div>
           <div className="flex items-center gap-2">
-            <span className="font-mono text-sm text-muted-foreground">{wp.work_order_number}</span>
+            <span className="font-mono text-sm text-muted-foreground">{wp.work_package_number || wp.work_order_number}</span>
             <Badge variant={STATUS_VARIANT[wp.status]}>
               {wp.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
             </Badge>
@@ -525,7 +525,7 @@ export function AmroWorkPackageDetailPage() {
               Transition to {transitionDialog?.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}?
             </AlertDialogTitle>
             <AlertDialogDescription>
-              This will change the status of work order {wp.work_order_number} from{' '}
+              This will change the status of work order {wp.work_package_number || wp.work_order_number} from{' '}
               <strong>{wp.status.replace('_', ' ')}</strong> to{' '}
               <strong>{transitionDialog?.replace('_', ' ')}</strong>.
               {transitionDialog === 'completed' && ' All tasks must be completed before closing.'}
