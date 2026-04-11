@@ -205,7 +205,9 @@ type AssemblyTypeOption = {
 type AssemblyModelOption = {
   id: string;
   label: string;
+  name: string;
   modelValue: string;
+  aircraftType: string;
   tenantId?: string;
   franchiseId?: string;
   manufacturerId: string;
@@ -1799,6 +1801,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         const manufacturerId = String(record.manufacturer_id || '').trim();
         const code = String(record.model_code || '').trim();
         const name = String(record.name || '').trim();
+        const aircraftType = String(record.aircraft_type || record.type || '').trim();
         const modelValue = name || code || id;
         const label = name && code && name !== code ? `${name} (${code})` : name || code || id;
         const active = String(record.is_active ?? 'true').toLowerCase() !== 'false';
@@ -1811,7 +1814,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         ]
           .filter(Boolean)
           .map((token) => token.toLowerCase());
-        return { id, manufacturerId, label, modelValue, manufacturerTokens, active };
+        return { id, name, manufacturerId, label, modelValue, aircraftType, manufacturerTokens, active };
       })
       .filter((option): option is AssemblyModelOption => Boolean(option));
   }, []);
@@ -3564,6 +3567,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     () => String(formValues.manufacturer_id ?? '').trim(),
     [formValues.manufacturer_id],
   );
+  const activeAircraftModelValue = useMemo(
+    () => String(formValues.aircraft_model ?? '').trim(),
+    [formValues.aircraft_model],
+  );
+  const activeAircraftModelSourceOptions = useMemo<AssemblyModelOption[]>(
+    () => (entity === 'aircraft' ? franchiseAssemblyModels : assemblyModelOptions),
+    [assemblyModelOptions, entity, franchiseAssemblyModels],
+  );
+  const selectedAircraftModelOption = useMemo(
+    () => activeAircraftModelSourceOptions.find((option) => option.modelValue === activeAircraftModelValue) || null,
+    [activeAircraftModelSourceOptions, activeAircraftModelValue],
+  );
   const filteredSystemTemplateModelOptions = useMemo<AircraftTempOption[]>(
     () =>
       systemTemplateModelOptions.filter((option) => {
@@ -3751,7 +3766,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       try {
         let query = (scopedDb as any)
           .from('assembly_models')
-          .select('id, name, model_code, manufacturer_id, franchise_id, is_active')
+          .select('id, name, model_code, manufacturer_id, franchise_id, tenant_id, aircraft_type, type, is_active')
           .eq('tenant_id', scopedTenantId)
           .eq('manufacturer_id', scopedManufacturerId)
           .eq('is_active', true)
@@ -3770,6 +3785,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             const code = String(row.model_code || '').trim();
             const rowTenantId = String(row.tenant_id || scopedTenantId).trim();
             const rowFranchiseId = String(row.franchise_id || '').trim();
+            const aircraftType = String(row.aircraft_type || row.type || '').trim();
             const manufacturerId = String(row.manufacturer_id || '').trim();
             const manufacturerMeta = manufacturerMetaById.get(manufacturerId);
             const manufacturerName = String(manufacturerMeta?.name || manufacturerMeta?.code || '').trim();
@@ -3780,8 +3796,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             
             return {
               id,
+              name,
               label,
               modelValue: name || code || id,
+              aircraftType,
               tenantId: rowTenantId,
               franchiseId: rowFranchiseId,
               manufacturerId,
@@ -3979,7 +3997,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       .filter(Boolean)
       .map((token) => normalize(String(token)));
     const manufacturerTokenSet = new Set(manufacturerTokens);
-    const match = assemblyModelOptions.some((option) => {
+    const match = activeAircraftModelSourceOptions.some((option) => {
       const manufacturerMatch =
         option.manufacturerTokens.length > 0
           ? option.manufacturerTokens.some((token) => manufacturerTokenSet.has(token))
@@ -3990,7 +4008,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setFieldValue('aircraft_model', '');
     }
   }, [
-    assemblyModelOptions,
+    activeAircraftModelSourceOptions,
     assemblyModelOptionsError,
     assemblyModelOptionsLoading,
     entity,
@@ -3999,6 +4017,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     manufacturerMetaById,
     setFieldValue,
   ]);
+
+  useEffect(() => {
+    if (entity !== 'aircraft') {
+      return;
+    }
+    const nextAircraftType = String(selectedAircraftModelOption?.aircraftType || '').trim();
+    const currentAircraftType = String(formValues.aircraft_type ?? '').trim();
+    if (!nextAircraftType || nextAircraftType === currentAircraftType) {
+      return;
+    }
+    setFieldValue('aircraft_type', nextAircraftType);
+  }, [entity, formValues.aircraft_type, selectedAircraftModelOption, setFieldValue]);
 
   const supportsColumnHeaderFilters = entity === 'aircraft' || entity === 'flight_logs';
 
@@ -9047,7 +9077,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   formErrors={formErrors}
                   firstFieldRef={firstFieldRef}
                   aircraftTypeSelectOptions={aircraftTypeSelectOptions}
-                  aircraftStatusSelectOptions={aircraftStatusSelectOptions}
+                  aircraftModelNameValue={String(selectedAircraftModelOption?.name || '')}
+                  aircraftModelTypeValue={String(selectedAircraftModelOption?.aircraftType || formValues.aircraft_type || '')}
                   setSelectFieldValue={setSelectFieldValue}
                   resolveSelectOptions={resolveSelectOptions}
                   aircraftNoSerialNumber={aircraftNoSerialNumber}
@@ -9075,10 +9106,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   aircraftAmendmentDate={aircraftAmendmentDate}
                   setAircraftAmendmentDate={setAircraftAmendmentDate}
                   aircraftAuditTimeline={aircraftAuditTimeline}
-                  selectedAssemblyModelName={(() => {
-                    const selectedModel = franchiseAssemblyModels.find(m => m.id === aircraftTemplateModel);
-                    return selectedModel ? selectedModel.label : '';
-                  })()}
                 />
               ) : entity === 'work_package_templates' ? (
                 workPackageTemplateStandardEnabled ? (

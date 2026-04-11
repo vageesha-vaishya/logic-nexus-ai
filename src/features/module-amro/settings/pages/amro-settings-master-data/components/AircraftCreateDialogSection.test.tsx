@@ -45,7 +45,8 @@ describe('AircraftCreateDialogSection', () => {
     formErrors: {},
     firstFieldRef: { current: null },
     aircraftTypeSelectOptions: [{ value: 'NarrowBody', label: 'NarrowBody' }],
-    aircraftStatusSelectOptions: [{ value: 'active', label: 'active' }],
+    aircraftModelNameValue: '',
+    aircraftModelTypeValue: '',
     setSelectFieldValue: vi.fn(),
     resolveSelectOptions: vi.fn(() => [{ value: '', label: 'Select', disabled: true }]),
     aircraftNoSerialNumber: false,
@@ -73,7 +74,6 @@ describe('AircraftCreateDialogSection', () => {
     aircraftAmendmentDate: '',
     setAircraftAmendmentDate: vi.fn(),
     aircraftAuditTimeline: [],
-    selectedAssemblyModelName: '',
   });
 
   it('renders Aircraft Model section labels and cascade controls', () => {
