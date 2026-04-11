@@ -44,7 +44,6 @@ describe('AircraftCreateDialogSection', () => {
     formValues: {},
     formErrors: {},
     firstFieldRef: { current: null },
-    aircraftTypeSelectOptions: [{ value: 'NarrowBody', label: 'NarrowBody' }],
     aircraftModelNameValue: '',
     aircraftModelTypeValue: '',
     setSelectFieldValue: vi.fn(),
@@ -85,7 +84,6 @@ describe('AircraftCreateDialogSection', () => {
     expect(screen.queryByText('System Details')).not.toBeInTheDocument();
     const typeSelect = screen.getByLabelText('Aircraft Type:');
     expect(typeSelect).toHaveValue('');
-    expect(screen.getByRole('option', { name: 'Select aircraft type' })).toBeInTheDocument();
   });
 
   it('disables franchise selector when tenant prerequisite is missing', () => {

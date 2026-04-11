@@ -74,7 +74,6 @@ type AircraftCreateDialogSectionProps = {
   formValues: Record<string, unknown>;
   formErrors: Record<string, string>;
   firstFieldRef: RefObject<HTMLInputElement>;
-  aircraftTypeSelectOptions: SelectOption[];
   aircraftModelNameValue: string;
   aircraftModelTypeValue: string;
   setSelectFieldValue: (field: string, value: string) => void;
@@ -136,7 +135,6 @@ export function AircraftCreateDialogSection({
   formValues,
   formErrors,
   firstFieldRef,
-  aircraftTypeSelectOptions,
   aircraftModelNameValue,
   aircraftModelTypeValue,
   setSelectFieldValue,
@@ -258,19 +256,7 @@ export function AircraftCreateDialogSection({
             </div>
             <div className="space-y-1">
               <Label htmlFor="aircraft-type-select" className="text-[12px]">Aircraft Type:</Label>
-              <select
-                id="aircraft-type-select"
-                value={aircraftModelTypeValue}
-                disabled
-                className="h-8 w-full rounded-md border border-input bg-slate-100 px-2 text-[12px] text-slate-800 focus:outline-none"
-              >
-                <option value="">Select aircraft type</option>
-                {aircraftTypeSelectOptions.map((option) => (
-                  <option key={option.value} value={option.value} disabled={option.disabled}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Input id="aircraft-type-select" value={aircraftModelTypeValue} readOnly disabled className="h-8 bg-slate-100 text-[12px] text-slate-800" />
             </div>
           </div>
         </section>

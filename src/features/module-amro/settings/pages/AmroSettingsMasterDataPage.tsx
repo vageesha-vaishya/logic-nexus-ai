@@ -3682,12 +3682,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setFormValues((previous) => ({
       ...previous,
       [fieldKey]: value,
-      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '' } : {}),
+      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '', aircraft_type: '' } : {}),
     }));
     setFormErrors((previous) => ({
       ...previous,
       [fieldKey]: '',
-      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '' } : {}),
+      ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '', aircraft_type: '' } : {}),
     }));
   }, []);
   const setAircraftCounterValue = useCallback((key: string, field: 'initialValue' | 'initialDate', value: string) => {
@@ -4024,7 +4024,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     const nextAircraftType = String(selectedAircraftModelOption?.aircraftType || '').trim();
     const currentAircraftType = String(formValues.aircraft_type ?? '').trim();
-    if (!nextAircraftType || nextAircraftType === currentAircraftType) {
+    if (nextAircraftType === currentAircraftType) {
       return;
     }
     setFieldValue('aircraft_type', nextAircraftType);
@@ -9076,9 +9076,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   formValues={formValues}
                   formErrors={formErrors}
                   firstFieldRef={firstFieldRef}
-                  aircraftTypeSelectOptions={aircraftTypeSelectOptions}
                   aircraftModelNameValue={String(selectedAircraftModelOption?.name || '')}
-                  aircraftModelTypeValue={String(selectedAircraftModelOption?.aircraftType || formValues.aircraft_type || '')}
+                  aircraftModelTypeValue={String(selectedAircraftModelOption?.aircraftType || '')}
                   setSelectFieldValue={setSelectFieldValue}
                   resolveSelectOptions={resolveSelectOptions}
                   aircraftNoSerialNumber={aircraftNoSerialNumber}

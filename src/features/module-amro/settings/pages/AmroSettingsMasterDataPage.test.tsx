@@ -1841,6 +1841,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.change(modelSelect, { target: { value: 'A320-200' } });
     const typeSelect = within(dialog).getByLabelText(/^Aircraft Type:/i);
     expect(typeSelect).toHaveValue('NarrowBody');
+    fireEvent.change(manufacturerSelect, { target: { value: 'manu-1' } });
+    expect(typeSelect).toHaveValue('');
   });
 
   it('refreshes aircraft model options in real-time for tenant-franchise-manufacturer combinations', async () => {
