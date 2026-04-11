@@ -7,7 +7,8 @@
       "Bash(git checkout *)",
       "Bash(wc *)",
       "Bash(sed *)",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(mv *)"
     ]
   },
   "$version": 3
