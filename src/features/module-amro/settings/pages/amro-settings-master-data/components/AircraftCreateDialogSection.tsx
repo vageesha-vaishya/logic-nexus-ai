@@ -382,13 +382,9 @@ export function AircraftCreateDialogSection({
               onChange={(event) => {
                 setAircraftVariableNumber(event.target.value);
                 setAircraftAuxField('variable_number', event.target.value);
-                if (!String(formValues.tail_number ?? '').trim()) {
-                  setFieldValue('tail_number', event.target.value.toUpperCase());
-                }
               }}
-              className={cn('h-8 text-[12px]', formErrors.tail_number && 'border-destructive')}
+              className="h-8 text-[12px]"
             />
-            {formErrors.tail_number ? <p className="mdm-template-danger">{formErrors.tail_number}</p> : null}
           </div>
         </section>
         <section className="rounded bg-white p-3">
