@@ -23,7 +23,9 @@
       "Bash(sleep *)",
       "Bash(npm install)",
       "Bash(python3 *)",
-      "Bash(xargs *)"
+      "Bash(xargs *)",
+      "Bash(node *)",
+      "Bash(cp *)"
     ]
   },
   "$version": 3

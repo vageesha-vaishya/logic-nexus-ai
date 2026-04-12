@@ -965,6 +965,87 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
   }
 });
 
+// GET /api/v2/amro/work-package-template-versions?template_id=uuid
+app.get('/api/v2/amro/work-package-template-versions', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+  if (!tenantId) {
+    res.status(400).json({ error: 'Missing tenant context', statusCode: 400, requestId, version: 'v2' });
+    return;
+  }
+
+  try {
+    const templateId = String(req.query.template_id || '').trim();
+    if (!templateId) {
+      res.status(400).json({ error: 'template_id is required', statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+
+    const page = Math.max(1, Math.trunc(Number(req.query.page) || 1));
+    const pageSize = Math.min(100, Math.max(1, Math.trunc(Number(req.query.page_size) || 20)));
+
+    // Get Supabase client
+    const supabase = getSupabaseAdminClient();
+
+    // Query template versions from database
+    const { data: versions, error, count } = await supabase
+      .from('amro_work_package_template_versions')
+      .select('*', { count: 'exact' })
+      .eq('tenant_id', tenantId)
+      .eq('template_id', templateId)
+      .order('version_number', { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1);
+
+    if (error) {
+      // Table might not exist, return empty response
+      logger.warn('Template versions table query failed', { error: error.message });
+      res.status(200).json({
+        version: 'v2',
+        interface: 'list-template-versions',
+        correlationId: requestId,
+        output: {
+          template_id: templateId,
+          tenant_id: tenantId,
+          versions: [],
+          pagination: { page, page_size: pageSize, total: 0, total_pages: 0 },
+        },
+      });
+      return;
+    }
+
+    res.status(200).json({
+      version: 'v2',
+      interface: 'list-template-versions',
+      correlationId: requestId,
+      output: {
+        template_id: templateId,
+        tenant_id: tenantId,
+        versions: versions || [],
+        pagination: {
+          page,
+          page_size: pageSize,
+          total: count || 0,
+          total_pages: Math.ceil((count || 0) / pageSize),
+        },
+      },
+    });
+  } catch (error) {
+    logger.error('work-package-template-versions route error', {
+      requestId,
+      message: error instanceof Error ? error.message : 'Unknown error',
+      stack: error instanceof Error ? error.stack : undefined,
+      tenantId,
+      templateId: String(req.query.template_id || ''),
+    });
+    res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unexpected error',
+      statusCode: 500,
+      requestId,
+      version: 'v2',
+    });
+  }
+});
+
 app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: AuthRequest, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
@@ -1379,6 +1460,7 @@ app.use('/api/v2/amro', authMiddleware);
 // Mount work orders routes
 app.use('/api/v1', workOrdersRoutes);
 app.use('/api/v2', workPackageTemplateRoutes);
+app.use('/api/v2/amro', workPackageTemplateRoutes); // Alias for /api/v2/amro/* path prefix
 app.use('/api/v2', workOrdersRoutes);
 app.use('/api/v2', masterDataRoutes);
 app.use('/api/v2', partsRoutes);

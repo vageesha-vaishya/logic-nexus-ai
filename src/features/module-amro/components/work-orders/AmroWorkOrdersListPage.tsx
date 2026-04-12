@@ -28,6 +28,7 @@ import {
   type WorkPackagePriority,
   type MaintenanceType,
 } from './useWorkPackageState';
+import { AmroWorkPackageCreateWizard } from './AmroWorkPackageCreateWizard';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,7 @@ export function AmroWorkOrdersListPage() {
   const [refreshTick, setRefreshTick] = useState(0);
 
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [wizardOpen, setWizardOpen] = useState(false);
   const [dialogLoading, setDialogLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('details');
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -136,10 +138,7 @@ export function AmroWorkOrdersListPage() {
   }, [data, isError, isLoading, refreshTick]);
 
   const openCreateDialog = useCallback(() => {
-    setEditingId(null);
-    setFormValue({ ...DEFAULT_FORM });
-    setActiveTab('details');
-    setDialogOpen(true);
+    setWizardOpen(true);
   }, []);
 
   const openEditDialog = useCallback((id: string) => {
@@ -382,11 +381,20 @@ export function AmroWorkOrdersListPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Create/Edit Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!dialogLoading) setDialogOpen(open); }}>
+      {/* Create Work Package Wizard */}
+      <AmroWorkPackageCreateWizard
+        open={wizardOpen}
+        onOpenChange={setWizardOpen}
+        onSuccess={() => {
+          setRefreshTick((v) => v + 1);
+        }}
+      />
+
+      {/* Edit Work Order Dialog (edit mode only) */}
+      <Dialog open={dialogOpen && editingId !== null} onOpenChange={(open) => { if (!dialogLoading && editingId) setDialogOpen(open); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>{editingId ? 'Edit Work Order' : 'Create Work Order'}</DialogTitle>
+            <DialogTitle>Edit Work Order</DialogTitle>
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -456,11 +464,11 @@ export function AmroWorkOrdersListPage() {
           <AmroCrudDialogFooter
             onCancel={() => setDialogOpen(false)}
             onSave={() => {
-              toast.info(editingId ? 'Edit via Settings module' : 'Create via Settings module');
+              toast.info('Edit via Settings module');
               setDialogOpen(false);
             }}
             loading={dialogLoading}
-            saveLabel={editingId ? 'Update' : 'Create'}
+            saveLabel="Update"
           />
         </DialogContent>
       </Dialog>

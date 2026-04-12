@@ -132,7 +132,7 @@ import { AircraftDataTableFrame } from './amro-settings-master-data/components/A
 import { AircraftListingControls } from './amro-settings-master-data/components/AircraftListingControls';
 import { AircraftCreateDialogSection } from './amro-settings-master-data/components/AircraftCreateDialogSection';
 import { AircraftTemplateDialog } from './amro-settings-master-data/components/AircraftTemplateDialog';
-import { AddWorkPackageDialog } from './amro-settings-master-data/components/AddWorkPackageDialog';
+import { AmroWorkPackageCreateWizard } from '../../components/work-orders/AmroWorkPackageCreateWizard';
 import { WorkPackageTemplateCreateSection } from './amro-settings-master-data/components/WorkPackageTemplateCreateSection';
 import { AmroWorkPackageTemplateAdapter } from '@/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter';
 import {
@@ -9240,44 +9240,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
           </DialogContent>
         </Dialog>
-        <AddWorkPackageDialog
-          aircraftWorkPackageDialogOpen={aircraftWorkPackageDialogOpen}
-          setAircraftWorkPackageDialogOpen={setAircraftWorkPackageDialogOpen}
-          aircraftWorkPackageActiveTab={aircraftWorkPackageActiveTab}
-          setAircraftWorkPackageActiveTab={setAircraftWorkPackageActiveTab}
-          aircraftWorkPackageValues={aircraftWorkPackageValues}
-          aircraftWorkPackageErrors={aircraftWorkPackageErrors}
-          setAircraftWorkPackageField={setAircraftWorkPackageField}
-          selectedWorkPackageTemplateId={selectedWorkPackageTemplateId}
-          handleAircraftWorkPackageTemplateSelect={handleAircraftWorkPackageTemplateSelect}
-          workPackageTemplateRegistryLoading={workPackageTemplateRegistryLoading}
-          workPackageTemplateRegistry={workPackageTemplateRegistry}
-          workPackageTemplateRegistryError={workPackageTemplateRegistryError}
-          selectedWorkPackageTemplate={selectedWorkPackageTemplate}
-          aircraftWorkPackagePagedTasks={aircraftWorkPackagePagedTasks}
-          aircraftWorkPackageSelectedTaskIds={aircraftWorkPackageSelectedTaskIds}
-          handleAircraftWorkPackageTaskSelection={handleAircraftWorkPackageTaskSelection}
-          setAircraftWorkPackageSelectedTaskIds={setAircraftWorkPackageSelectedTaskIds}
-          aircraftWorkPackageTaskSort={aircraftWorkPackageTaskSort}
-          setAircraftWorkPackageTaskSort={setAircraftWorkPackageTaskSort}
-          setAircraftWorkPackageTaskSortDirection={setAircraftWorkPackageTaskSortDirection}
-          aircraftWorkPackageTaskPage={aircraftWorkPackageTaskPage}
-          setAircraftWorkPackageTaskPage={setAircraftWorkPackageTaskPage}
-          aircraftWorkPackageTaskTotalPages={aircraftWorkPackageTaskTotalPages}
-          loadWorkPackageTemplateRegistry={loadWorkPackageTemplateRegistry}
-          aircraftSelectedExistingWorkPackageId={aircraftSelectedExistingWorkPackageId}
-          setAircraftSelectedExistingWorkPackageId={setAircraftSelectedExistingWorkPackageId}
-          aircraftExistingWorkPackagesError={aircraftExistingWorkPackagesError}
-          aircraftExistingWorkPackagesLoading={aircraftExistingWorkPackagesLoading}
-          aircraftExistingWorkPackageList={aircraftExistingWorkPackageList}
-          handleApplyExistingWorkPackageSelection={handleApplyExistingWorkPackageSelection}
-          aircraftTaskGridFilteredRows={aircraftTaskGridFilteredRows}
-          aircraftWorkPackageSubmitting={aircraftWorkPackageSubmitting}
-          handleAircraftWorkPackageSubmit={handleAircraftWorkPackageSubmit}
-          canCreateWorkPackageFromTemplate={canCreateWorkPackageFromTemplate}
-          associatedTemplateTasks={aircraftTemplateAssociatedTasks}
-          associatedTemplateTasksLoading={aircraftTemplateAssociatedTasksLoading}
-          associatedTemplateTasksError={aircraftTemplateAssociatedTasksError}
+        <AmroWorkPackageCreateWizard
+          open={aircraftWorkPackageDialogOpen}
+          onOpenChange={setAircraftWorkPackageDialogOpen}
+          preselectedAircraftId={selectedAircraft?.id || ''}
+          onSuccess={() => {
+            // Work package created successfully - user will see toast from wizard
+          }}
         />
         <Dialog open={flightLogDialogOpen} onOpenChange={setFlightLogDialogOpen}>
           <DialogContent className="mdm-template-dialog mdm-template-dialog-large">

@@ -28,7 +28,7 @@ export class WorkOrdersService {
   private supabase: SupabaseClient;
 
   private getWorkPackageNumber(workPackage: WorkPackage): string {
-    return workPackage.work_order_number ?? workPackage.work_package_number ?? '';
+    return workPackage.work_package_number ?? workPackage.work_package_number ?? '';
   }
 
   private getTaskSequence(task: Task): number | undefined {
@@ -210,7 +210,7 @@ export class WorkOrdersService {
           .insert({
             tenant_id: tenantId,
             aircraft_id: aircraftId,
-            work_order_number: workOrderNumber,
+            work_package_number: workOrderNumber,
             work_package_number: workOrderNumber,
             title: request.title,
             description: request.description,
@@ -261,7 +261,7 @@ export class WorkOrdersService {
             id: workPackage.id,
             title: workPackage.title,
             status: workPackage.status,
-            work_order_number: workPackage.work_order_number,
+            work_package_number: workPackage.work_package_number,
             maintenance_type: workPackage.maintenance_type,
           },
         });
@@ -360,7 +360,7 @@ export class WorkOrdersService {
         id: workPackage.id,
         title: workPackage.title,
         status: workPackage.status,
-        work_order_number: workPackage.work_order_number,
+        work_package_number: workPackage.work_package_number,
         maintenance_type: workPackage.maintenance_type,
       },
     });
@@ -409,7 +409,7 @@ export class WorkOrdersService {
         id: workPackage.id,
         title: workPackage.title,
         status: workPackage.status,
-        work_order_number: workPackage.work_order_number,
+        work_package_number: workPackage.work_package_number,
         maintenance_type: workPackage.maintenance_type,
       },
     });
@@ -876,7 +876,7 @@ export class WorkOrdersService {
   async getForecastRecommendations(tenantId: string): Promise<AmroForecastRecommendation[]> {
     const { data, error } = await this.supabase
       .from('work_packages')
-      .select('id,work_order_number,status,maintenance_type,planned_start_date')
+      .select('id,work_package_number,status,maintenance_type,planned_start_date')
       .eq('tenant_id', tenantId)
       .order('updated_at', { ascending: false })
       .limit(10);
@@ -887,7 +887,7 @@ export class WorkOrdersService {
 
     const rows = (data ?? []) as Array<{
       id: string;
-      work_order_number: string;
+      work_package_number: string;
       status: string;
       maintenance_type: string;
       planned_start_date?: string | null;
@@ -909,7 +909,7 @@ export class WorkOrdersService {
         row.maintenance_type === 'line' ? 'telemetry' : row.planned_start_date ? 'calendar' : 'reliability';
       return {
         id: `rec-${row.id}`,
-        digital_twin_reference: `DT-${row.work_order_number || row.id}`,
+        digital_twin_reference: `DT-${row.work_package_number || row.id}`,
         risk_score: riskScore,
         trigger,
         recommendation:

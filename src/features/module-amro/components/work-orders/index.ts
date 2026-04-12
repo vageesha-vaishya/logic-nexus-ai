@@ -89,6 +89,15 @@ export {
   useAircraftById,
 } from './useAircraftState';
 
+// Template Options
+export {
+  useWorkPackageTemplateOptions,
+} from './useWorkPackageTemplates';
+
+export type {
+  WorkPackageTemplateOption,
+} from './useWorkPackageTemplates';
+
 // Types - Work Packages
 export type {
   WorkPackageListItem,

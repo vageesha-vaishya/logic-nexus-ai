@@ -16,7 +16,7 @@
  */
 
 import { useCallback, useMemo, useState } from 'react';
-import { CheckCircle2, Clock, Convert, Eye, Filter, Plus, RefreshCw, Wrench } from 'lucide-react';
+import { CheckCircle2, Clock, ArrowRightLeft, Eye, Filter, Plus, RefreshCw, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -363,7 +363,7 @@ export function AmroNonScheduledTaskPanel(): JSX.Element {
                               handleConvert(task);
                             }}
                           >
-                            <Convert className="h-4 w-4" />
+                            <ArrowRightLeft className="h-4 w-4" />
                           </Button>
                         )}
                       </div>
@@ -433,7 +433,7 @@ export function AmroNonScheduledTaskPanel(): JSX.Element {
                   onClick={() => handleConvert(selectedTask)}
                   className="w-full mt-4"
                 >
-                  <Convert className="mr-2 h-4 w-4" />
+                  <ArrowRightLeft className="mr-2 h-4 w-4" />
                   Convert to Work Package
                 </Button>
               )}
@@ -569,7 +569,7 @@ export function AmroNonScheduledTaskPanel(): JSX.Element {
         <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Convert className="h-5 w-5" />
+              <ArrowRightLeft className="h-5 w-5" />
               Convert to Work Package
             </DialogTitle>
           </DialogHeader>

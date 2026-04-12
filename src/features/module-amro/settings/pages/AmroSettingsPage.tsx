@@ -69,7 +69,7 @@ export function AmroSettingsPage() {
             </CardHeader>
             <CardContent>
               <Button asChild variant="outline">
-                <Link to="/dashboard/amro/settings/work-package-templates">Open Work Package Templates</Link>
+                <Link to="/dashboard/amro/templates">Open Work Package Templates</Link>
               </Button>
             </CardContent>
           </Card>

@@ -23,7 +23,7 @@
  * 4. Review & Submit
  */
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, ArrowRight, Calendar, Check, CheckCircle2, Plane, Plus, Shield } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -56,6 +56,10 @@ import {
   useAircraftOptions,
   type AircraftRecord,
 } from './useAircraftState';
+import {
+  useWorkPackageTemplateOptions,
+  type WorkPackageTemplateOption,
+} from './useWorkPackageTemplates';
 
 type CreationPath = 'scheduled' | 'non-scheduled' | 'emergency';
 type WizardStep = 1 | 2 | 3 | 4;
@@ -167,10 +171,43 @@ export function AmroWorkPackageCreateWizard({
   
   // Real aircraft data from API
   const { options: aircraftOptions, isLoading: aircraftLoading, error: aircraftError } = useAircraftOptions(open);
-  
+
+  // Real template data from API
+  const { options: templateOptions, isLoading: templateLoading, error: templateError } = useWorkPackageTemplateOptions(open);
+
+  // Load template version details when template is selected
+  const { data: templateVersionData, isLoading: templateVersionLoading } = useListTemplateVersions({
+    templateId: formData.templateVersionId.split(':')[0] || '',
+    page: 1,
+    pageSize: 1,
+    enabled: !!formData.templateVersionId && formData.creationPath === 'scheduled',
+  });
+
+  // Auto-populate form from template when template version is loaded
+  useEffect(() => {
+    if (templateVersionData?.records && templateVersionData.records.length > 0 && formData.creationPath === 'scheduled') {
+      const latestVersion = templateVersionData.records[0];
+      
+      // Auto-populate from template metadata
+      if (latestVersion && !formData.title) {
+        const templateName = templateOptions.find(t => t.value === formData.templateVersionId)?.label || '';
+        setFormData(prev => ({
+          ...prev,
+          title: prev.title || `${templateName} - ${latestVersion.version_label || `v${latestVersion.version_number}`}`,
+          description: prev.description || latestVersion.change_description || '',
+          maintenance_type: prev.maintenance_type || (latestVersion.maintenance_type as MaintenanceType) || 'line',
+          priority: prev.priority || (latestVersion.priority as WorkPackagePriority) || 3,
+          selectedTaskIds: latestVersion.tasks_json?.map((t: any) => t.id).filter(Boolean) || [],
+          estimatedLaborHours: latestVersion.estimated_labor_hours?.toString() || '',
+          scopeItems: latestVersion.scope_json ? JSON.stringify(latestVersion.scope_json, null, 2) : '',
+        }));
+      }
+    }
+  }, [templateVersionData?.records, formData.creationPath, formData.templateVersionId, formData.title, templateOptions]);
+
   const { data: templateData } = useListTemplateVersions({
     templateId: formData.templateVersionId.split(':')[0] || '',
-    enabled: !!formData.templateVersionId,
+    enabled: false, // Only used when explicitly needed
   });
 
   // Handlers
@@ -186,8 +223,14 @@ export function AmroWorkPackageCreateWizard({
       if (!formData.aircraftId) {
         newErrors.aircraftId = 'Aircraft selection is required';
       }
-      if (formData.creationPath === 'scheduled' && !formData.templateVersionId) {
-        newErrors.templateVersionId = 'Template selection is required for scheduled maintenance';
+      if (formData.creationPath === 'scheduled') {
+        if (!formData.templateVersionId) {
+          if (templateOptions.length === 0) {
+            newErrors.templateVersionId = 'No approved templates available. Contact your administrator.';
+          } else {
+            newErrors.templateVersionId = 'Template selection is required for scheduled maintenance';
+          }
+        }
       }
       if (formData.creationPath === 'non-scheduled' && !formData.defectDescription) {
         newErrors.defectDescription = 'Defect description is required';
@@ -360,15 +403,21 @@ export function AmroWorkPackageCreateWizard({
               <div>
                 <Label className="text-base font-semibold">Select Aircraft *</Label>
                 <p className="text-sm text-muted-foreground mt-1">Choose the aircraft for this work package</p>
-                <Select value={formData.aircraftId} onValueChange={(val) => updateField('aircraftId', val)}>
-                  <SelectTrigger className={cn('mt-2 h-11', errors.aircraftId && 'border-destructive')} disabled={aircraftLoading}>
-                    <SelectValue placeholder={aircraftLoading ? "Loading aircraft..." : "Select an aircraft..."} />
+                <Select value={formData.aircraftId} onValueChange={(val) => updateField('aircraftId', val)} disabled={aircraftLoading}>
+                  <SelectTrigger className={cn('mt-2 h-11', errors.aircraftId && 'border-destructive')}>
+                    <SelectValue placeholder={
+                      aircraftLoading 
+                        ? "Loading aircraft..." 
+                        : aircraftOptions.length === 0
+                        ? "No aircraft available"
+                        : "Select an aircraft..."
+                    } />
                   </SelectTrigger>
                   <SelectContent>
                     {aircraftError ? (
-                      <div className="p-2 text-sm text-destructive">Failed to load aircraft</div>
+                      <div className="p-2 text-sm text-destructive">Failed to load aircraft: {aircraftError.message || 'Unknown error'}</div>
                     ) : aircraftOptions.length === 0 ? (
-                      <div className="p-2 text-sm text-muted-foreground">No aircraft available</div>
+                      <div className="p-2 text-sm text-muted-foreground">No aircraft available in the system</div>
                     ) : (
                       aircraftOptions.map((ac) => (
                         <SelectItem key={ac.value} value={ac.value}>
@@ -383,6 +432,13 @@ export function AmroWorkPackageCreateWizard({
                     <AlertTriangle className="h-4 w-4" />
                     {errors.aircraftId}
                   </p>
+                )}
+                {aircraftOptions.length === 0 && !aircraftLoading && (
+                  <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                    <p className="text-sm text-amber-800">
+                      ⚠️ <strong>No aircraft available.</strong> Please contact your administrator to add aircraft to the system.
+                    </p>
+                  </div>
                 )}
               </div>
 
@@ -428,17 +484,34 @@ export function AmroWorkPackageCreateWizard({
                 <div>
                   <Label className="text-base font-semibold">Select Template *</Label>
                   <p className="text-sm text-muted-foreground mt-1">Choose an approved maintenance template</p>
-                  <Select 
-                    value={formData.templateVersionId} 
+                  <Select
+                    value={formData.templateVersionId}
                     onValueChange={(val) => updateField('templateVersionId', val)}
+                    disabled={templateLoading || templateOptions.length === 0}
                   >
                     <SelectTrigger className={cn('mt-2 h-11', errors.templateVersionId && 'border-destructive')}>
-                      <SelectValue placeholder="Select a template..." />
+                      <SelectValue placeholder={
+                        templateLoading 
+                          ? "Loading templates..." 
+                          : templateOptions.length === 0
+                          ? "No templates available"
+                          : "Select a template..."
+                      } />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="template-1">A-Check Template v2.1</SelectItem>
-                      <SelectItem value="template-2">C-Check Template v1.5</SelectItem>
-                      <SelectItem value="template-3">Engine Overhaul v3.0</SelectItem>
+                      {templateError ? (
+                        <div className="p-2 text-sm text-destructive">Failed to load templates</div>
+                      ) : templateOptions.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          No approved templates available. Contact your administrator to create templates.
+                        </div>
+                      ) : (
+                        templateOptions.map((template) => (
+                          <SelectItem key={template.value} value={template.value}>
+                            {template.label}
+                          </SelectItem>
+                        ))
+                      )}
                     </SelectContent>
                   </Select>
                   {errors.templateVersionId && (
@@ -446,6 +519,17 @@ export function AmroWorkPackageCreateWizard({
                       <AlertTriangle className="h-4 w-4" />
                       {errors.templateVersionId}
                     </p>
+                  )}
+                  {templateOptions.length === 0 && !templateLoading && (
+                    <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
+                      <p className="text-sm text-amber-800">
+                        💡 <strong>No templates available.</strong> You can:
+                      </p>
+                      <ul className="text-sm text-amber-700 mt-2 ml-4 list-disc space-y-1">
+                        <li>Switch to <strong>Non-Scheduled</strong> path to create a work package without a template</li>
+                        <li>Contact your administrator to create work package templates</li>
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}
@@ -716,54 +800,103 @@ export function AmroWorkPackageCreateWizard({
               <div>
                 <h3 className="text-lg font-semibold">Task Selection</h3>
                 <p className="text-sm text-muted-foreground mt-1">
-                  {formData.creationPath === 'scheduled' 
+                  {formData.creationPath === 'scheduled'
                     ? 'Select tasks from the template or add custom tasks'
                     : 'Add tasks for this work package'}
                 </p>
               </div>
 
               {formData.creationPath === 'scheduled' ? (
-                <div className="border rounded-lg overflow-hidden">
-                  <table className="w-full">
-                    <thead className="bg-muted">
-                      <tr>
-                        <th className="p-3 text-left text-sm font-medium">
-                          <Checkbox />
-                        </th>
-                        <th className="p-3 text-left text-sm font-medium">Task Number</th>
-                        <th className="p-3 text-left text-sm font-medium">ATA Code</th>
-                        <th className="p-3 text-left text-sm font-medium">Description</th>
-                        <th className="p-3 text-left text-sm font-medium">Est. Hours</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { id: 't1', number: 'TASK-001', ata: '05-20', desc: 'General Inspection', hours: '4.0' },
-                        { id: 't2', number: 'TASK-002', ata: '29-10', desc: 'Hydraulic System Check', hours: '2.5' },
-                        { id: 't3', number: 'TASK-003', ata: '32-40', desc: 'Landing Gear Inspection', hours: '3.0' },
-                      ].map((task) => (
-                        <tr key={task.id} className="border-t hover:bg-muted/50">
-                          <td className="p-3">
-                            <Checkbox
-                              checked={formData.selectedTaskIds.includes(task.id)}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  updateField('selectedTaskIds', [...formData.selectedTaskIds, task.id]);
-                                } else {
-                                  updateField('selectedTaskIds', formData.selectedTaskIds.filter((id) => id !== task.id));
-                                }
-                              }}
-                            />
-                          </td>
-                          <td className="p-3 text-sm">{task.number}</td>
-                          <td className="p-3 text-sm font-mono">{task.ata}</td>
-                          <td className="p-3 text-sm">{task.desc}</td>
-                          <td className="p-3 text-sm">{task.hours}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <>
+                  {/* Template Tasks */}
+                  {templateVersionLoading ? (
+                    <div className="text-center py-8 text-muted-foreground">
+                      <p className="text-sm">Loading template tasks...</p>
+                    </div>
+                  ) : templateVersionData?.records && templateVersionData.records[0]?.tasks_json && templateVersionData.records[0].tasks_json.length > 0 ? (
+                    <div>
+                      <div className="flex items-center justify-between mb-3">
+                        <h4 className="text-sm font-medium">Template Tasks ({templateVersionData.records[0].tasks_json.length} tasks)</h4>
+                        <div className="flex gap-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => {
+                              const allTaskIds = templateVersionData.records[0].tasks_json.map((t: any) => t.id).filter(Boolean);
+                              updateField('selectedTaskIds', allTaskIds);
+                            }}
+                          >
+                            Select All
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => updateField('selectedTaskIds', [])}
+                          >
+                            Deselect All
+                          </Button>
+                        </div>
+                      </div>
+                      <div className="border rounded-lg overflow-hidden max-h-[400px] overflow-y-auto">
+                        <table className="w-full">
+                          <thead className="bg-muted sticky top-0">
+                            <tr>
+                              <th className="p-3 text-left text-sm font-medium w-10">
+                                <Checkbox />
+                              </th>
+                              <th className="p-3 text-left text-sm font-medium">Task Number</th>
+                              <th className="p-3 text-left text-sm font-medium">ATA Code</th>
+                              <th className="p-3 text-left text-sm font-medium">Description</th>
+                              <th className="p-3 text-left text-sm font-medium">Est. Hours</th>
+                              <th className="p-3 text-left text-sm font-medium">Category</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {templateVersionData.records[0].tasks_json.map((task: any, idx: number) => (
+                              <tr key={task.id || idx} className="border-t hover:bg-muted/50 transition-colors">
+                                <td className="p-3">
+                                  <Checkbox
+                                    checked={formData.selectedTaskIds.includes(task.id || `task-${idx}`)}
+                                    onCheckedChange={(checked) => {
+                                      const taskId = task.id || `task-${idx}`;
+                                      if (checked) {
+                                        updateField('selectedTaskIds', [...formData.selectedTaskIds, taskId]);
+                                      } else {
+                                        updateField('selectedTaskIds', formData.selectedTaskIds.filter((id) => id !== taskId));
+                                      }
+                                    }}
+                                  />
+                                </td>
+                                <td className="p-3 text-sm font-mono">{task.task_number || task.code || task.number || `TASK-${idx + 1}`}</td>
+                                <td className="p-3 text-sm font-mono">{task.ata_code || task.ata || '-'}</td>
+                                <td className="p-3 text-sm">{task.description || task.desc || task.title || 'Untitled Task'}</td>
+                                <td className="p-3 text-sm">{task.estimated_labor_hours || task.est_hours || task.hours || '-'}</td>
+                                <td className="p-3 text-sm">
+                                  {task.category_code ? (
+                                    <Badge variant="outline">{task.category_code}</Badge>
+                                  ) : (
+                                    '-'
+                                  )}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
+                        <p className="text-sm text-blue-800">
+                          💡 <strong>{formData.selectedTaskIds.length}</strong> of {templateVersionData.records[0].tasks_json.length} tasks selected
+                          {formData.selectedTaskIds.length === 0 && ' - Select at least one task to continue'}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 border-2 border-dashed rounded-lg">
+                      <p className="text-sm text-muted-foreground">No tasks found in selected template</p>
+                      <p className="text-xs mt-2 text-muted-foreground">You can still create the work package and add tasks later</p>
+                    </div>
+                  )}
+                </>
               ) : (
                 <div className="text-center py-12 text-muted-foreground">
                   <p className="text-sm">Task selection is optional for {formData.creationPath} work packages</p>
@@ -781,6 +914,11 @@ export function AmroWorkPackageCreateWizard({
                   placeholder="e.g., 24"
                   className="mt-2 h-11"
                 />
+                {formData.creationPath === 'scheduled' && templateVersionData?.records && templateVersionData.records[0] && (
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Template estimated: {templateVersionData.records[0].estimated_labor_hours || 'N/A'} hours
+                  </p>
+                )}
               </div>
             </div>
           )}
