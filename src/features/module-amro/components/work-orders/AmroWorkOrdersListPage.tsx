@@ -1,76 +1,45 @@
 /**
- * Work Orders list page that reuses the existing AircraftWorkPackageCreateDialog
- * for creating actual work packages (not templates).
+ * Unified Work Orders list page following AMRO design system standards.
+ * Uses AmroModuleSurface, AmroStandardToolbar, AmroKpiGrid, and AmroModuleGridDetailPanel
+ * to match the Item Master Catalog pattern.
  */
-import { useCallback, useMemo, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import {
-  AlertCircle,
-  Calendar,
-  CheckCircle2,
-  Clock,
-  Filter,
-  ListFilter,
-  MoreHorizontal,
-  PauseCircle,
-  Plus,
-  Search,
-  Settings,
-  Wrench,
-} from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Calendar, Clock, Eye, Filter, Pencil, PauseCircle, Plus, RefreshCw, Settings, Trash2, Wrench } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Badge } from '@/components/ui/badge';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Textarea } from '@/components/ui/textarea';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { AmroKpiGrid, AmroModuleSurface, AmroStandardToolbar } from '@/features/module-amro/components/parts/AmroPartsUiStandards';
+import { AmroCrudMessageBanner, AmroCrudDialogFooter } from '@/features/module-amro/components/parts/AmroCrudPrimitives';
+import { AmroModuleGridDetailPanel } from '@/features/module-amro/components/parts/AmroModuleGridDetailPanel';
 import {
   useListWorkPackages,
   useDeleteWorkPackage,
   useWorkPackageActions,
   type WorkPackageListItem,
   type WorkPackageStatus,
-  type MaintenanceType,
   type WorkPackagePriority,
+  type MaintenanceType,
 } from './useWorkPackageState';
-import { AircraftWorkPackageCreateDialog } from '@/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog';
-import type {
-  AircraftWorkPackageTab,
-  AircraftWorkPackageFormValues,
-  WorkPackageCreateAction,
-} from '@/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog';
-import { toast } from 'sonner';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<WorkPackageStatus, { label: string; variant: 'default' | 'secondary' | 'destructive' | 'outline'; icon: typeof Clock }> = {
-  planning: { label: 'Planning', variant: 'outline', icon: Settings },
-  approved: { label: 'Approved', variant: 'secondary', icon: CheckCircle2 },
-  scheduled: { label: 'Scheduled', variant: 'default', icon: Calendar },
-  in_progress: { label: 'In Progress', variant: 'default', icon: Wrench },
-  on_hold: { label: 'On Hold', variant: 'destructive', icon: PauseCircle },
-  completed: { label: 'Completed', variant: 'secondary', icon: CheckCircle2 },
-  closed: { label: 'Closed', variant: 'outline', icon: CheckCircle2 },
-  cancelled: { label: 'Cancelled', variant: 'destructive', icon: AlertCircle },
+const STATUS_CONFIG: Record<WorkPackageStatus, { label: string; badge: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  planning: { label: 'Planning', badge: 'outline' },
+  approved: { label: 'Approved', badge: 'secondary' },
+  scheduled: { label: 'Scheduled', badge: 'default' },
+  in_progress: { label: 'In Progress', badge: 'default' },
+  on_hold: { label: 'On Hold', badge: 'destructive' },
+  completed: { label: 'Completed', badge: 'secondary' },
+  closed: { label: 'Closed', badge: 'outline' },
+  cancelled: { label: 'Cancelled', badge: 'destructive' },
 };
 
 const PRIORITY_CONFIG: Record<WorkPackagePriority, { label: string; color: string }> = {
@@ -92,554 +61,409 @@ const MAINTENANCE_LABELS: Record<MaintenanceType, string> = {
   modification: 'Modification',
 };
 
-// ── Status Badge ─────────────────────────────────────────────────────────────
+const DEFAULT_FORM = {
+  title: '',
+  description: '',
+  maintenance_type: 'line' as MaintenanceType,
+  priority: '3' as string,
+  planned_start_date: '',
+  planned_end_date: '',
+  assigned_to: '',
+  notes: '',
+  aircraft_id: '',
+};
 
-function StatusBadge({ status }: { status: WorkPackageStatus }) {
-  const config = STATUS_CONFIG[status];
-  const Icon = config.icon;
-  return (
-    <Badge variant={config.variant} className="gap-1">
-      <Icon className="h-3 w-3" />
-      {config.label}
-    </Badge>
-  );
+function cloneFormValue(record?: WorkPackageListItem | null) {
+  if (!record) return { ...DEFAULT_FORM };
+  return {
+    id: record.id,
+    title: record.title || '',
+    description: '',
+    maintenance_type: record.maintenance_type || 'line',
+    priority: String(record.priority || 3),
+    planned_start_date: record.planned_start_date || '',
+    planned_end_date: record.planned_end_date || '',
+    assigned_to: record.assigned_to || '',
+    notes: '',
+    aircraft_id: record.aircraft_id || '',
+  };
 }
 
-function PriorityBadge({ priority }: { priority: WorkPackagePriority }) {
-  const config = PRIORITY_CONFIG[priority];
-  return <span className={`font-medium ${config.color}`}>{config.label}</span>;
-}
-
-// ── Filters ──────────────────────────────────────────────────────────────────
-
-interface WorkOrderFilters {
-  status: WorkPackageStatus | 'all';
-  priority: WorkPackagePriority | 'all';
-  maintenanceType: MaintenanceType | 'all';
-  search: string;
-}
-
-function FiltersBar({
-  filters,
-  onFilterChange,
-}: {
-  filters: WorkOrderFilters;
-  onFilterChange: (filters: Partial<WorkOrderFilters>) => void;
-}) {
-  return (
-    <div className="flex flex-wrap items-center gap-3">
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Filter className="h-4 w-4" />
-        <span>Filters:</span>
-      </div>
-
-      <Select
-        value={filters.status}
-        onValueChange={(v) => onFilterChange({ status: v as WorkPackageStatus | 'all' })}
-      >
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Status" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Status</SelectItem>
-          {Object.entries(STATUS_CONFIG).map(([key, { label }]) => (
-            <SelectItem key={key} value={key}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={String(filters.priority)}
-        onValueChange={(v) => onFilterChange({ priority: v === 'all' ? 'all' : Number(v) as WorkPackagePriority })}
-      >
-        <SelectTrigger className="w-[140px]">
-          <SelectValue placeholder="Priority" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Priority</SelectItem>
-          <SelectItem value="1">P1 - Critical</SelectItem>
-          <SelectItem value="2">P2 - High</SelectItem>
-          <SelectItem value="3">P3 - Medium</SelectItem>
-          <SelectItem value="4">P4 - Low</SelectItem>
-          <SelectItem value="5">P5 - Routine</SelectItem>
-        </SelectContent>
-      </Select>
-
-      <Select
-        value={filters.maintenanceType}
-        onValueChange={(v) => onFilterChange({ maintenanceType: v as MaintenanceType | 'all' })}
-      >
-        <SelectTrigger className="w-[160px]">
-          <SelectValue placeholder="Maintenance Type" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">All Types</SelectItem>
-          {Object.entries(MAINTENANCE_LABELS).map(([key, label]) => (
-            <SelectItem key={key} value={key}>
-              {label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  );
-}
-
-// ── Row Actions ──────────────────────────────────────────────────────────────
-
-function WorkPackageRowActions({
-  workPackage,
-  onDelete,
-  onView,
-}: {
-  workPackage: WorkPackageListItem;
-  onDelete: (id: string) => void;
-  onView: (id: string) => void;
-}) {
-  const canDelete = ['planning', 'cancelled'].includes(workPackage.status);
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-8 w-8">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => onView(workPackage.id)}>
-          View Details
-        </DropdownMenuItem>
-        <DropdownMenuItem disabled>Edit (via Settings)</DropdownMenuItem>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem
-          disabled={!canDelete}
-          onClick={() => onDelete(workPackage.id)}
-          className="text-destructive"
-        >
-          Delete
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
-}
-
-// ── Main Page ────────────────────────────────────────────────────────────────
+// ── Main Component ───────────────────────────────────────────────────────────
 
 export function AmroWorkOrdersListPage() {
   const navigate = useNavigate();
-  const [page, setPage] = useState(1);
-  const pageSize = 20;
+  const [records, setRecords] = useState<WorkPackageListItem[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
-  const [filters, setFilters] = useState<WorkOrderFilters>({
-    status: 'all',
-    priority: 'all',
-    maintenanceType: 'all',
-    search: '',
-  });
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [maintenanceFilter, setMaintenanceFilter] = useState('all');
+  const [refreshTick, setRefreshTick] = useState(0);
 
-  // Create dialog state
-  const [createOpen, setCreateOpen] = useState(false);
-  const [createTab, setCreateTab] = useState<AircraftWorkPackageTab>('new-wp');
-  const [createForm, setCreateForm] = useState<AircraftWorkPackageFormValues>({
-    source: 'schedule_due',
-    maintenanceType: 'line',
-    priority: 'medium',
-    status: 'planning',
-    validationState: '',
-    plannedStart: '',
-    plannedEnd: '',
-    station: '',
-    workPackageNumber: '',
-    topic: '',
-    ttafHours: '',
-    openingDate: '',
-    revisionNumber: '',
-    revisionDate: '',
-    transmissionDate: '',
-    maintenanceReleaseDate: '',
-    workReportNumber: '',
-    expectedReceptionDate: '',
-    workReceptionDate: '',
-    comments: '',
-    selectedTaskNumber: '',
-    selectedTaskAtaCode: '',
-    selectedTaskSerialNumber: '',
-    selectedTaskPartNumber: '',
-    selectedTaskDescription: '',
-    scopeItemsText: '',
-  });
-  const [createErrors, setCreateErrors] = useState<Record<string, string>>({});
-  const [createSubmitting, setCreateSubmitting] = useState(false);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogLoading, setDialogLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState('details');
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [formValue, setFormValue] = useState(DEFAULT_FORM);
+  const [deleteCandidate, setDeleteCandidate] = useState<WorkPackageListItem | null>(null);
+  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
 
   const { invalidate } = useWorkPackageActions();
   const deleteMutation = useDeleteWorkPackage();
 
   const { data, isLoading, isError } = useListWorkPackages({
-    page,
-    pageSize,
-    status: filters.status === 'all' ? undefined : filters.status,
-    priority: filters.priority === 'all' ? undefined : filters.priority,
-    maintenanceType: filters.maintenanceType === 'all' ? undefined : filters.maintenanceType,
-    search: filters.search || undefined,
+    page: 1,
+    pageSize: 50,
+    status: statusFilter === 'all' ? undefined : statusFilter as WorkPackageStatus,
+    priority: priorityFilter === 'all' ? undefined : Number(priorityFilter) as WorkPackagePriority,
+    maintenanceType: maintenanceFilter === 'all' ? undefined : maintenanceFilter as MaintenanceType,
+    search: search || undefined,
   });
 
-  const handleFilterChange = useCallback((partial: Partial<WorkOrderFilters>) => {
-    setFilters((prev) => ({ ...prev, ...partial }));
-    setPage(1);
+  useEffect(() => {
+    if (data?.records) {
+      setRecords(data.records);
+      setSelectedRecordId((current) => current || data.records[0]?.id || null);
+    }
+    if (isError) {
+      setError('Failed to load work orders');
+    } else {
+      setError(null);
+    }
+    setLoading(isLoading);
+  }, [data, isError, isLoading, refreshTick]);
+
+  const openCreateDialog = useCallback(() => {
+    setEditingId(null);
+    setFormValue({ ...DEFAULT_FORM });
+    setActiveTab('details');
+    setDialogOpen(true);
   }, []);
 
-  const handleDelete = useCallback(
-    (id: string) => {
-      if (window.confirm('Are you sure you want to delete this work order?')) {
-        deleteMutation.mutate(id, {
-          onSuccess: () => invalidate(),
-        });
-      }
-    },
-    [deleteMutation, invalidate],
-  );
+  const openEditDialog = useCallback((id: string) => {
+    setEditingId(id);
+    setFormValue(cloneFormValue(records.find((r) => r.id === id)));
+    setActiveTab('details');
+    setDialogOpen(true);
+  }, [records]);
 
-  const handleView = useCallback(
-    (id: string) => {
-      navigate(`/dashboard/amro/work-packages/${id}`);
-    },
-    [navigate],
-  );
-
-  const handleSearch = useCallback(
-    (e: React.FormEvent) => {
-      e.preventDefault();
-      handleFilterChange({ search });
-    },
-    [search, handleFilterChange],
-  );
-
-  const setCreateField = useCallback((key: keyof AircraftWorkPackageFormValues, value: string) => {
-    setCreateForm((prev) => ({ ...prev, [key]: value }));
-    setCreateErrors((prev) => {
-      const next = { ...prev };
-      delete next[key];
-      return next;
-    });
+  const setField = useCallback(<K extends keyof typeof formValue>(field: K, value: (typeof formValue)[K]) => {
+    setFormValue((previous) => ({ ...previous, [field]: value }));
   }, []);
 
-  const handleCreateSubmit = useCallback(
-    async (action: WorkPackageCreateAction) => {
-      const errors: Record<string, string> = {};
-      if (!createForm.topic) errors.topic = 'Topic is required';
-      if (!createForm.plannedStart) errors.plannedStart = 'Planned start date is required';
-      if (!createForm.station) errors.station = 'Station is required';
-      if (Object.keys(errors).length > 0) {
-        setCreateErrors(errors);
-        return;
-      }
-
-      setCreateSubmitting(true);
-      try {
-        const priorityMap: Record<string, string> = { critical: 'critical', high: 'high', medium: 'medium', low: 'low' };
-        const payload = {
-          interface: 'create-work-package',
-          aircraft_id: 'aircraft-primary',
-          title: createForm.topic,
-          maintenance_type: createForm.maintenanceType,
-          station: createForm.station,
-          priority: priorityMap[createForm.priority] || 'medium',
-          planned_window: createForm.plannedStart && createForm.plannedEnd
-            ? `${createForm.plannedStart}|${createForm.plannedEnd}`
-            : `${createForm.plannedStart}|`,
-          scope_items: createForm.scopeItemsText
-            ? createForm.scopeItemsText.split('\n').map((s) => s.trim()).filter(Boolean)
-            : [],
-          source: createForm.source,
-          comments: createForm.comments || undefined,
-        };
-
-        const response = await fetch(`/api/v2/amro/work-packages?interface=create-work-package`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-
-        if (!response.ok) {
-          const text = await response.text();
-          throw new Error(`Failed to create work order: ${response.status} — ${text}`);
-        }
-
-        const data = await response.json();
-        toast.success(`Work order ${data.output.work_package_id || 'created'} successfully`);
-        setCreateOpen(false);
+  const handleDelete = useCallback((id: string) => {
+    deleteMutation.mutate(id, {
+      onSuccess: () => {
+        toast.success('Work order deleted successfully');
         invalidate();
-      } catch (err) {
-        toast.error(err instanceof Error ? err.message : 'Failed to create work order');
-      } finally {
-        setCreateSubmitting(false);
-      }
-    },
-    [createForm, invalidate],
-  );
+        setRefreshTick((v) => v + 1);
+      },
+      onError: (err) => {
+        toast.error(err instanceof Error ? err.message : 'Failed to delete work order');
+      },
+    });
+  }, [deleteMutation, invalidate]);
 
-  const records = data?.records || [];
-  const total = data?.total || 0;
-  const totalPages = Math.ceil(total / pageSize);
+  const handleView = useCallback((id: string) => {
+    navigate(`/dashboard/amro/work-packages/${id}`);
+  }, [navigate]);
 
-  // Quick stats
   const stats = useMemo(() => {
-    if (!records.length) return null;
+    const activeRecords = records.filter((r) => !['completed', 'closed', 'cancelled'].includes(r.status));
+    const inProgress = records.filter((r) => r.status === 'in_progress').length;
+    const scheduled = records.filter((r) => r.status === 'scheduled').length;
+    const onHold = records.filter((r) => r.status === 'on_hold').length;
+    const overdue = records.filter(
+      (r) => r.planned_end_date && new Date(r.planned_end_date) < new Date() && !['completed', 'closed', 'cancelled'].includes(r.status)
+    ).length;
+
     return {
-      inProgress: records.filter((r) => r.status === 'in_progress').length,
-      scheduled: records.filter((r) => r.status === 'scheduled').length,
-      onHold: records.filter((r) => r.status === 'on_hold').length,
-      overdue: records.filter(
-        (r) => r.planned_end_date && new Date(r.planned_end_date) < new Date() && r.status !== 'completed' && r.status !== 'closed'
-      ).length,
+      total: records.length,
+      active: activeRecords.length,
+      inProgress,
+      scheduled,
+      onHold,
+      overdue,
     };
   }, [records]);
 
   return (
-    <div className="flex flex-col gap-6 p-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Work Orders</h1>
-          <p className="text-sm text-muted-foreground">
-            Manage and track aircraft maintenance work orders
-          </p>
-        </div>
-        <Button onClick={() => setCreateOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Work Order
-        </Button>
-      </div>
+    <div className="mt-4 space-y-3">
+      <AmroModuleSurface
+        title="Work Orders"
+        subtitle="Manage and track aircraft maintenance work orders."
+        moduleId="amro.work-orders"
+        status={error ? 'warning' : loading ? 'loading' : 'ready'}
+      >
+        <AmroStandardToolbar
+          searchValue={search}
+          onSearchChange={setSearch}
+          placeholder="Search work orders..."
+          leftActions={(
+            <>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="h-8 w-[140px]"><SelectValue placeholder="Status" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Status</SelectItem>
+                  {Object.entries(STATUS_CONFIG).map(([key, { label }]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select value={priorityFilter} onValueChange={setPriorityFilter}>
+                <SelectTrigger className="h-8 w-[140px]"><SelectValue placeholder="Priority" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Priority</SelectItem>
+                  <SelectItem value="1">P1 - Critical</SelectItem>
+                  <SelectItem value="2">P2 - High</SelectItem>
+                  <SelectItem value="3">P3 - Medium</SelectItem>
+                  <SelectItem value="4">P4 - Low</SelectItem>
+                  <SelectItem value="5">P5 - Routine</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={maintenanceFilter} onValueChange={setMaintenanceFilter}>
+                <SelectTrigger className="h-8 w-[160px]"><SelectValue placeholder="Type" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Types</SelectItem>
+                  {Object.entries(MAINTENANCE_LABELS).map(([key, label]) => (
+                    <SelectItem key={key} value={key}>{label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Button type="button" variant="secondary" size="sm" className="h-8" onClick={() => setRefreshTick((v) => v + 1)}>
+                Apply Filters
+              </Button>
+            </>
+          )}
+          rightActions={(
+            <>
+              <Button type="button" size="sm" variant="outline" className="h-8" onClick={() => setRefreshTick((v) => v + 1)}>
+                <RefreshCw className="mr-1 h-4 w-4" />
+                Refresh
+              </Button>
+              <Button type="button" size="sm" className="h-8" onClick={openCreateDialog}>
+                <Plus className="mr-1 h-4 w-4" />
+                New Work Order
+              </Button>
+            </>
+          )}
+        />
 
-      {/* Quick Stats */}
-      {stats && (
-        <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-          <div className="rounded-lg border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <Wrench className="h-4 w-4 text-blue-600" />
-              <span className="text-sm font-medium">In Progress</span>
-            </div>
-            <p className="mt-1 text-2xl font-bold">{stats.inProgress}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-green-600" />
-              <span className="text-sm font-medium">Scheduled</span>
-            </div>
-            <p className="mt-1 text-2xl font-bold">{stats.scheduled}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <PauseCircle className="h-4 w-4 text-orange-600" />
-              <span className="text-sm font-medium">On Hold</span>
-            </div>
-            <p className="mt-1 text-2xl font-bold">{stats.onHold}</p>
-          </div>
-          <div className="rounded-lg border bg-card p-4">
-            <div className="flex items-center gap-2">
-              <AlertCircle className="h-4 w-4 text-red-600" />
-              <span className="text-sm font-medium">Overdue</span>
-            </div>
-            <p className="mt-1 text-2xl font-bold">{stats.overdue}</p>
-          </div>
-        </div>
-      )}
+        <AmroKpiGrid
+          items={[
+            { label: 'Total Work Orders', value: String(stats.total) },
+            { label: 'Active', value: String(stats.active), tone: stats.active > 0 ? 'success' : 'default' },
+            { label: 'In Progress', value: String(stats.inProgress), tone: stats.inProgress > 0 ? 'warning' : 'default' },
+            { label: 'Overdue', value: String(stats.overdue), tone: stats.overdue > 0 ? 'critical' : 'default' },
+          ]}
+        />
 
-      {/* Search + Filters */}
-      <div className="flex flex-col gap-4">
-        <form onSubmit={handleSearch} className="flex items-center gap-3">
-          <div className="relative flex-1 max-w-sm">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search work orders..."
-              className="pl-8"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-            />
-          </div>
-          <Button type="submit" variant="outline" size="sm">
-            <ListFilter className="mr-2 h-4 w-4" />
-            Search
-          </Button>
-        </form>
+        <AmroCrudMessageBanner message={error} tone="error" />
 
-        <FiltersBar filters={filters} onFilterChange={handleFilterChange} />
-      </div>
+        <AmroModuleGridDetailPanel
+          rows={records}
+          loading={loading}
+          emptyMessage="No work orders found."
+          selectedId={selectedRecordId}
+          onSelect={setSelectedRecordId}
+          detailTitle="Work Order Detail"
+          columns={[
+            { key: 'workOrderNumber', label: 'Work Order #', render: (record) => (
+              <span
+                className="cursor-pointer text-primary underline"
+                onClick={(e) => { e.stopPropagation(); handleView(record.id); }}
+              >
+                {record.work_package_number || record.work_order_number || '—'}
+              </span>
+            )},
+            { key: 'title', label: 'Title', render: (record) => record.title || '—' },
+            { key: 'status', label: 'Status', render: (record) => {
+              const config = STATUS_CONFIG[record.status];
+              return <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ${config.badge === 'destructive' ? 'border-red-500 text-red-600' : config.badge === 'secondary' ? 'border-green-500 text-green-600' : config.badge === 'outline' ? 'border-border text-muted-foreground' : 'border-blue-500 text-blue-600'}`}>{config.label}</span>;
+            }},
+            { key: 'priority', label: 'Priority', render: (record) => (
+              <span className={`font-medium ${PRIORITY_CONFIG[record.priority].color}`}>
+                {PRIORITY_CONFIG[record.priority].label}
+              </span>
+            )},
+            { key: 'maintenanceType', label: 'Type', render: (record) => MAINTENANCE_LABELS[record.maintenance_type] || record.maintenance_type },
+            { key: 'plannedStart', label: 'Planned Start', render: (record) => record.planned_start_date ? new Date(record.planned_start_date).toLocaleDateString() : '—' },
+          ]}
+          renderDetail={(record) => (
+            !record ? <p className="text-xs text-muted-foreground">Select a work order to inspect details.</p> : (
+              <div className="space-y-2 text-xs">
+                <p><span className="font-semibold">Work Order #:</span> {record.work_package_number || record.work_order_number || '—'}</p>
+                <p><span className="font-semibold">Title:</span> {record.title || '—'}</p>
+                <p><span className="font-semibold">Aircraft:</span> {record.aircraft_registration || '—'}</p>
+                <p><span className="font-semibold">Status:</span> {STATUS_CONFIG[record.status].label}</p>
+                <p><span className="font-semibold">Priority:</span> {PRIORITY_CONFIG[record.priority].label}</p>
+                <p><span className="font-semibold">Type:</span> {MAINTENANCE_LABELS[record.maintenance_type] || record.maintenance_type}</p>
+                <p><span className="font-semibold">Planned Start:</span> {record.planned_start_date ? new Date(record.planned_start_date).toLocaleDateString() : '—'}</p>
+                <p><span className="font-semibold">Planned End:</span> {record.planned_end_date ? new Date(record.planned_end_date).toLocaleDateString() : '—'}</p>
+                {record.assigned_to && <p><span className="font-semibold">Assigned To:</span> {record.assigned_to}</p>}
+                <div className="pt-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            aria-label="View work order"
+                            onClick={() => handleView(record.id)}
+                            disabled={dialogLoading}
+                          >
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>View Details</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            aria-label="Edit work order"
+                            onClick={() => openEditDialog(record.id)}
+                            disabled={dialogLoading}
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Edit (via Settings)</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="outline"
+                            aria-label="Delete work order"
+                            onClick={() => setDeleteCandidate(record)}
+                            disabled={dialogLoading}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Delete</TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </div>
+              </div>
+            )
+          )}
+        />
+      </AmroModuleSurface>
 
-      {/* Data Table */}
-      <div className="rounded-lg border">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Work Order #</TableHead>
-              <TableHead>Title</TableHead>
-              <TableHead>Aircraft</TableHead>
-              <TableHead>Status</TableHead>
-              <TableHead>Priority</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Planned Start</TableHead>
-              <TableHead>Planned End</TableHead>
-              <TableHead className="w-[50px]" />
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  Loading work orders...
-                </TableCell>
-              </TableRow>
-            ) : isError ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-destructive">
-                  Failed to load work orders. Please try again.
-                </TableCell>
-              </TableRow>
-            ) : records.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={9} className="text-center py-8 text-muted-foreground">
-                  No work orders found.{' '}
-                  <span className="text-primary underline cursor-pointer" onClick={() => setCreateOpen(true)}>
-                    Create one
-                  </span>
-                </TableCell>
-              </TableRow>
-            ) : (
-              records.map((wp) => (
-                <TableRow key={wp.id}>
-                  <TableCell className="font-mono text-sm">
-                    <span
-                      className="text-primary underline cursor-pointer"
-                      onClick={() => handleView(wp.id)}
-                    >
-                      {(wp as any).work_package_number || wp.work_order_number || '—'}
-                    </span>
-                  </TableCell>
-                  <TableCell className="font-medium max-w-[200px] truncate">
-                    {wp.title}
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {wp.aircraft_registration || '—'}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge status={wp.status} />
-                  </TableCell>
-                  <TableCell>
-                    <PriorityBadge priority={wp.priority} />
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {MAINTENANCE_LABELS[wp.maintenance_type] || wp.maintenance_type}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {wp.planned_start_date
-                      ? new Date(wp.planned_start_date).toLocaleDateString()
-                      : '—'}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {wp.planned_end_date ? (
-                      <span
-                        className={
-                          new Date(wp.planned_end_date) < new Date() &&
-                          wp.status !== 'completed' &&
-                          wp.status !== 'closed'
-                            ? 'text-red-600 font-medium'
-                            : ''
-                        }
-                      >
-                        {new Date(wp.planned_end_date).toLocaleDateString()}
-                      </span>
-                    ) : (
-                      '—'
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    <WorkPackageRowActions
-                      workPackage={wp}
-                      onDelete={handleDelete}
-                      onView={handleView}
-                    />
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-muted-foreground">
-            Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, total)} of {total} work
-            orders
-          </p>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page <= 1}
-              onClick={() => setPage((p) => p - 1)}
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={!!deleteCandidate} onOpenChange={() => setDeleteCandidate(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently delete work order {deleteCandidate?.work_package_number || deleteCandidate?.work_order_number}.
+              This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteCandidate && handleDelete(deleteCandidate.id)}
+              className="bg-destructive hover:bg-destructive/90"
             >
-              Previous
-            </Button>
-            <span className="text-sm">
-              Page {page} of {totalPages}
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={page >= totalPages}
-              onClick={() => setPage((p) => p + 1)}
-            >
-              Next
-            </Button>
-          </div>
-        </div>
-      )}
+              Delete
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
-      {/* Create Work Order Dialog (reuses existing AircraftWorkPackageCreateDialog) */}
-      <AircraftWorkPackageCreateDialog
-        aircraftWorkPackageDialogOpen={createOpen}
-        setAircraftWorkPackageDialogOpen={setCreateOpen}
-        aircraftWorkPackageActiveTab={createTab}
-        setAircraftWorkPackageActiveTab={setCreateTab}
-        aircraftWorkPackageValues={createForm}
-        aircraftWorkPackageErrors={createErrors}
-        setAircraftWorkPackageField={setCreateField}
-        selectedWorkPackageTemplateId=""
-        handleAircraftWorkPackageTemplateSelect={() => {}}
-        workPackageTemplateRegistryLoading={false}
-        workPackageTemplateRegistry={[]}
-        workPackageTemplateRegistryError=""
-        selectedWorkPackageTemplate={null}
-        aircraftWorkPackagePagedTasks={[]}
-        aircraftWorkPackageSelectedTaskIds={[]}
-        handleAircraftWorkPackageTaskSelection={() => {}}
-        setAircraftWorkPackageSelectedTaskIds={() => {}}
-        aircraftWorkPackageTaskSort="taskNumber"
-        setAircraftWorkPackageTaskSort={() => {}}
-        setAircraftWorkPackageTaskSortDirection={() => {}}
-        aircraftWorkPackageTaskPage={1}
-        setAircraftWorkPackageTaskPage={() => {}}
-        aircraftWorkPackageTaskTotalPages={1}
-        loadWorkPackageTemplateRegistry={() => {}}
-        aircraftSelectedExistingWorkPackageId=""
-        setAircraftSelectedExistingWorkPackageId={() => {}}
-        aircraftExistingWorkPackagesError=""
-        aircraftExistingWorkPackagesLoading={false}
-        aircraftExistingWorkPackageList={[]}
-        handleApplyExistingWorkPackageSelection={() => {}}
-        aircraftTaskGridFilteredRows={[]}
-        aircraftWorkPackageSubmitting={createSubmitting}
-        handleAircraftWorkPackageSubmit={handleCreateSubmit}
-        canCreateWorkPackageFromTemplate={false}
-        associatedTemplateTasks={[]}
-        associatedTemplateTasksLoading={false}
-        associatedTemplateTasksError=""
-      />
+      {/* Create/Edit Dialog */}
+      <Dialog open={dialogOpen} onOpenChange={(open) => { if (!dialogLoading) setDialogOpen(open); }}>
+        <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>{editingId ? 'Edit Work Order' : 'Create Work Order'}</DialogTitle>
+          </DialogHeader>
+
+          <Tabs value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="details">Details</TabsTrigger>
+              <TabsTrigger value="scheduling">Scheduling</TabsTrigger>
+            </TabsList>
+            <TabsContent value="details" className="space-y-3 pt-3">
+              <div className="space-y-1">
+                <Label>Title</Label>
+                <Input value={formValue.title} onChange={(event) => setField('title', event.target.value)} />
+              </div>
+              <div className="space-y-1">
+                <Label>Description</Label>
+                <Textarea rows={3} value={formValue.description} onChange={(event) => setField('description', event.target.value)} />
+              </div>
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+                <div className="space-y-1">
+                  <Label>Maintenance Type</Label>
+                  <Select value={formValue.maintenance_type} onValueChange={(value) => setField('maintenance_type', value as MaintenanceType)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(MAINTENANCE_LABELS).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Priority</Label>
+                  <Select value={formValue.priority} onValueChange={(value) => setField('priority', value)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="1">P1 - Critical</SelectItem>
+                      <SelectItem value="2">P2 - High</SelectItem>
+                      <SelectItem value="3">P3 - Medium</SelectItem>
+                      <SelectItem value="4">P4 - Low</SelectItem>
+                      <SelectItem value="5">P5 - Routine</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label>Assigned To</Label>
+                  <Input value={formValue.assigned_to} onChange={(event) => setField('assigned_to', event.target.value)} />
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="scheduling" className="space-y-3 pt-3">
+              <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                <div className="space-y-1">
+                  <Label>Planned Start Date</Label>
+                  <Input type="date" value={formValue.planned_start_date} onChange={(event) => setField('planned_start_date', event.target.value)} />
+                </div>
+                <div className="space-y-1">
+                  <Label>Planned End Date</Label>
+                  <Input type="date" value={formValue.planned_end_date} onChange={(event) => setField('planned_end_date', event.target.value)} />
+                </div>
+              </div>
+              <div className="space-y-1">
+                <Label>Notes</Label>
+                <Textarea rows={4} value={formValue.notes} onChange={(event) => setField('notes', event.target.value)} />
+              </div>
+            </TabsContent>
+          </Tabs>
+
+          <AmroCrudDialogFooter
+            onCancel={() => setDialogOpen(false)}
+            onSave={() => {
+              toast.info(editingId ? 'Edit via Settings module' : 'Create via Settings module');
+              setDialogOpen(false);
+            }}
+            loading={dialogLoading}
+            saveLabel={editingId ? 'Update' : 'Create'}
+          />
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

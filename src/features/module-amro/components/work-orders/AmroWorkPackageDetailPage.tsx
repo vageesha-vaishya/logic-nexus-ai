@@ -1,11 +1,25 @@
+/**
+ * Unified Work Package detail page following AMRO design system standards.
+ * Uses AmroModuleSurface and consistent design patterns from Item Master Catalog.
+ */
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, ChevronRight, Clock, DollarSign, MoreHorizontal, Pencil, User, Wrench } from 'lucide-react';
+import { ArrowLeft, Calendar, ChevronRight, Clock, DollarSign, Pencil, User, Wrench } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -20,16 +34,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from '@/components/ui/alert-dialog';
+import { AmroModuleSurface } from '@/features/module-amro/components/parts/AmroPartsUiStandards';
+import { AmroCrudMessageBanner } from '@/features/module-amro/components/parts/AmroCrudPrimitives';
 import {
   useWorkPackage,
   useTransitionWorkPackage,
@@ -37,17 +43,17 @@ import {
   type WorkPackageDetail,
 } from './useWorkPackageState';
 
-// ── Status config ────────────────────────────────────────────────────────────
+// ── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_VARIANT: Record<WorkPackageStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  planning: 'outline',
-  approved: 'secondary',
-  scheduled: 'default',
-  in_progress: 'default',
-  on_hold: 'destructive',
-  completed: 'secondary',
-  closed: 'outline',
-  cancelled: 'destructive',
+const STATUS_CONFIG: Record<WorkPackageStatus, { label: string; badge: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+  planning: { label: 'Planning', badge: 'outline' },
+  approved: { label: 'Approved', badge: 'secondary' },
+  scheduled: { label: 'Scheduled', badge: 'default' },
+  in_progress: { label: 'In Progress', badge: 'default' },
+  on_hold: { label: 'On Hold', badge: 'destructive' },
+  completed: { label: 'Completed', badge: 'secondary' },
+  closed: { label: 'Closed', badge: 'outline' },
+  cancelled: { label: 'Cancelled', badge: 'destructive' },
 };
 
 const VALID_TRANSITIONS: Record<WorkPackageStatus, WorkPackageStatus[]> = {
@@ -60,6 +66,20 @@ const VALID_TRANSITIONS: Record<WorkPackageStatus, WorkPackageStatus[]> = {
   closed: [],
   cancelled: [],
 };
+
+// ── Status Badge ─────────────────────────────────────────────────────────────
+
+function StatusBadge({ status }: { status: WorkPackageStatus }) {
+  const config = STATUS_CONFIG[status];
+  return (
+    <Badge
+      variant={config.badge}
+      className="gap-1"
+    >
+      {config.label}
+    </Badge>
+  );
+}
 
 // ── Status Transition Buttons ────────────────────────────────────────────────
 
@@ -74,7 +94,7 @@ function StatusTransitionButtons({
   if (allowed.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <span className="text-sm text-muted-foreground">Transition to:</span>
       {allowed.map((target) => (
         <Button
@@ -83,58 +103,9 @@ function StatusTransitionButtons({
           size="sm"
           onClick={() => onTransition(target)}
         >
-          {target.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
+          {target.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
         </Button>
       ))}
-    </div>
-  );
-}
-
-// ── Detail Header ────────────────────────────────────────────────────────────
-
-function WorkPackageHeader({ wp }: { wp: WorkPackageDetail }) {
-  return (
-    <div className="flex items-start justify-between gap-4">
-      <div className="flex items-start gap-3">
-        <Button variant="ghost" size="icon" asChild>
-          <Link to="/dashboard/amro/work-packages">
-            <ArrowLeft className="h-4 w-4" />
-          </Link>
-        </Button>
-        <div>
-          <div className="flex items-center gap-2">
-            <span className="font-mono text-sm text-muted-foreground">{wp.work_package_number || wp.work_order_number}</span>
-            <Badge variant={STATUS_VARIANT[wp.status]}>
-              {wp.status.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}
-            </Badge>
-            {wp.priority <= 2 && (
-              <Badge variant="destructive">P{wp.priority} - {wp.priority === 1 ? 'Critical' : 'High'}</Badge>
-            )}
-          </div>
-          <h1 className="mt-1 text-2xl font-bold">{wp.title}</h1>
-          {wp.description && (
-            <p className="mt-1 text-sm text-muted-foreground">{wp.description}</p>
-          )}
-        </div>
-      </div>
-      <div className="flex items-center gap-2">
-        <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/amro/settings/master-data/work-packages')}>
-          <Pencil className="mr-2 h-4 w-4" />
-          Edit (Settings)
-        </Button>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="icon">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem>Export PDF</DropdownMenuItem>
-            <DropdownMenuItem>Print</DropdownMenuItem>
-            <DropdownMenuItem>Clone</DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
     </div>
   );
 }
@@ -270,9 +241,6 @@ function TasksTab({ wp }: { wp: WorkPackageDetail }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Tasks ({tasks.length})</CardTitle>
-        <CardDescription>
-          {tasks.filter((t) => t.status === 'completed').length} of {tasks.length} completed
-        </CardDescription>
       </CardHeader>
       <CardContent>
         {tasks.length === 0 ? (
@@ -336,7 +304,6 @@ function MaterialsTab({ wp }: { wp: WorkPackageDetail }) {
     <Card>
       <CardHeader>
         <CardTitle className="text-base">Materials ({materials.length})</CardTitle>
-        <CardDescription>Total material cost: ${totalMaterialCost.toLocaleString(undefined, { minimumFractionDigits: 2 })}</CardDescription>
       </CardHeader>
       <CardContent>
         {materials.length === 0 ? (
@@ -459,33 +426,100 @@ export function AmroWorkPackageDetailPage() {
 
   if (isLoading) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <p className="text-muted-foreground">Loading work order details...</p>
+      <div className="flex flex-col gap-6 p-6">
+        <AmroModuleSurface
+          title="Loading..."
+          subtitle="Please wait"
+          moduleId="amro.work-package-detail"
+          status="loading"
+        >
+          <div className="flex items-center justify-center py-20">
+            <p className="text-muted-foreground">Loading work order details...</p>
+          </div>
+        </AmroModuleSurface>
       </div>
     );
   }
 
   if (isError || !wp) {
     return (
-      <div className="flex flex-col items-center justify-center py-20 gap-4">
-        <p className="text-destructive">Failed to load work order details.</p>
-        <Button onClick={() => navigate('/dashboard/amro/work-packages')}>
-          Back to Work Orders
-        </Button>
+      <div className="flex flex-col gap-6 p-6">
+        <AmroModuleSurface
+          title="Error"
+          subtitle="Failed to load work order"
+          moduleId="amro.work-package-detail"
+          status="warning"
+        >
+          <AmroCrudMessageBanner message="Failed to load work order details. Please try again." tone="error" />
+          <div className="flex items-center justify-center gap-4 py-8">
+            <Button onClick={() => navigate('/dashboard/amro/work-packages')}>
+              Back to Work Orders
+            </Button>
+          </div>
+        </AmroModuleSurface>
       </div>
     );
   }
 
   return (
     <div className="flex flex-col gap-6 p-6">
-      <WorkPackageHeader wp={wp} />
-      <Separator />
+      {/* Header Section */}
+      <AmroModuleSurface
+        title={wp.title}
+        subtitle={`${wp.work_package_number || wp.work_order_number} • ${wp.aircraft_registration || 'No aircraft assigned'}`}
+        moduleId="amro.work-package-detail"
+        status="ready"
+      >
+        <div className="space-y-4">
+          {/* Navigation and Actions */}
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="sm" asChild>
+                <Link to="/dashboard/amro/work-packages">
+                  <ArrowLeft className="mr-2 h-4 w-4" />
+                  Back to Work Orders
+                </Link>
+              </Button>
+              <Separator orientation="vertical" className="h-6" />
+              <StatusBadge status={wp.status} />
+              {wp.priority <= 2 && (
+                <Badge variant="destructive">P{wp.priority} - {wp.priority === 1 ? 'Critical' : 'High'}</Badge>
+              )}
+            </div>
+            <div className="flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => navigate('/dashboard/amro/settings/master-data/work-packages')}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Edit (Settings)
+              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="icon">
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem>Export PDF</DropdownMenuItem>
+                  <DropdownMenuItem>Print</DropdownMenuItem>
+                  <DropdownMenuItem>Clone</DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+          </div>
 
-      {/* Status Transitions */}
-      <StatusTransitionButtons
-        currentStatus={wp.status}
-        onTransition={setTransitionDialog}
-      />
+          {/* Description */}
+          {wp.description && (
+            <div className="rounded-md border bg-muted/20 p-3">
+              <p className="text-sm text-muted-foreground">{wp.description}</p>
+            </div>
+          )}
+
+          {/* Status Transitions */}
+          <StatusTransitionButtons
+            currentStatus={wp.status}
+            onTransition={setTransitionDialog}
+          />
+        </div>
+      </AmroModuleSurface>
 
       {/* Info + Cost Cards */}
       <div className="grid gap-4 md:grid-cols-2">
@@ -522,12 +556,12 @@ export function AmroWorkPackageDetailPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              Transition to {transitionDialog?.replace('_', ' ').replace(/\b\w/g, (c) => c.toUpperCase())}?
+              Transition to {transitionDialog?.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase())}?
             </AlertDialogTitle>
             <AlertDialogDescription>
               This will change the status of work order {wp.work_package_number || wp.work_order_number} from{' '}
-              <strong>{wp.status.replace('_', ' ')}</strong> to{' '}
-              <strong>{transitionDialog?.replace('_', ' ')}</strong>.
+              <strong>{wp.status.replace(/_/g, ' ')}</strong> to{' '}
+              <strong>{transitionDialog?.replace(/_/g, ' ')}</strong>.
               {transitionDialog === 'completed' && ' All tasks must be completed before closing.'}
               {transitionDialog === 'cancelled' && ' This action cannot be undone.'}
             </AlertDialogDescription>
