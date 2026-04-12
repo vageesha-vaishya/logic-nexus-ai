@@ -92,6 +92,47 @@ router.get(
   }),
 );
 
+/**
+ * GET /api/v2/amro/work-packages
+ * Alias for /work-packages to support /api/v2/amro/* path prefix
+ */
+router.get(
+  '/amro/work-packages',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    try {
+      const workPackages = await workOrdersService.getWorkPackages(tenantId);
+      res.json({
+        items: workPackages,
+        pagination: {
+          page: 1,
+          page_size: workPackages.length,
+          total_items: workPackages.length,
+          total_pages: 1,
+        },
+        count: workPackages.length,
+      });
+    } catch (error) {
+      console.error('[AMRO API] Failed to fetch work packages:', error);
+      res.status(500).json({
+        error: 'Failed to fetch work packages',
+        code: 'WORK_PACKAGES_FETCH_ERROR',
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+    }
+    return;
+  }),
+);
+
 router.get('/work-packages/stream', (req: AuthRequest, res: Response): void => {
   const tenantId = req.tenantId;
   if (!tenantId) {
