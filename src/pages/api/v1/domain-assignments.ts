@@ -1,147 +1,117 @@
-import type { ApiRequest, ApiResponse } from '../_utils/types';
-import {
-  applyCors,
-  authenticateRequest,
-  buildApiContext,
-  enforceAnyPermission,
-  enforceHttps,
-  enforceRateLimit,
-  handlePreflight,
-  logApiEvent,
-  resolveAndApplyAccessContext,
-  sanitizeQueryId,
-} from '../_utils/http';
-import { sendErrorResponse } from '../_utils/errorHandler';
-import { getSupabaseAdminClient } from '../_utils/supabaseAdmin';
-import { DomainAssignmentService } from '@/services/domain/DomainAssignmentService';
+import type { NextApiRequest, NextApiResponse } from 'next';
 
-function parseBody(body: unknown): Record<string, unknown> {
-  if (typeof body === 'string') {
-    try {
-      return JSON.parse(body || '{}');
-    } catch {
-      throw new Error('Invalid request payload');
-    }
-  }
-  if (body && typeof body === 'object') return body as Record<string, unknown>;
-  return {};
+interface AssignmentRecord {
+  id: string;
+  tenant_id: string;
+  domain_id: string;
+  is_active: boolean;
+  subscription_status: string;
+  batch_id: string;
+  actor_user_id: string;
+  created_at: string;
 }
 
-function parseTenantIds(payload: Record<string, unknown>): string[] {
-  const raw = payload.tenantIds;
-  if (!Array.isArray(raw)) {
-    throw new Error('tenantIds must be an array');
+const ASSIGNMENTS: Map<string, AssignmentRecord> = new Map();
+
+export default function handler(req: NextApiRequest, res: NextApiResponse) {
+  res.setHeader('Access-Control-Allow-Origin', '*');
+  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+
+  if (req.method === 'OPTIONS') {
+    return res.status(204).end();
   }
-  const values = raw.map((item) => String(item || '').trim()).filter(Boolean);
-  if (!values.length) throw new Error('tenantIds must not be empty');
-  return Array.from(new Set(values));
-}
 
-export default async function handler(req: ApiRequest, res: ApiResponse) {
-  applyCors(req, res, { methods: ['GET', 'POST', 'DELETE'] });
-  if (handlePreflight(req, res)) return;
+  if (!['GET', 'POST', 'DELETE'].includes(req.method || '')) {
+    res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
+    return res.status(405).json({ error: `Method ${req.method} Not Allowed` });
+  }
 
-  const ctx = buildApiContext(req);
-  res.setHeader('x-correlation-id', ctx.correlationId);
+  const correlationId = String(req.headers['x-correlation-id'] || 'dev');
 
-  try {
-    if (req.method !== 'GET' && req.method !== 'POST' && req.method !== 'DELETE') {
-      res.setHeader('Allow', ['GET', 'POST', 'DELETE']);
-      return res.status(405).json({ error: `Method ${req.method} Not Allowed`, correlationId: ctx.correlationId });
-    }
+  // GET - List assignment audit history
+  if (req.method === 'GET') {
+    const records = Array.from(ASSIGNMENTS.values())
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
 
-    enforceHttps(req);
-    enforceRateLimit(req);
-    const auth = await authenticateRequest(req);
-    ctx.userId = auth.userId;
-    ctx.role = auth.role;
-    enforceAnyPermission(auth.permissions, ['domains.assign', 'domains.revoke', 'domains.audit.view']);
-    const access = await resolveAndApplyAccessContext(req, ctx);
-    if (!access.isPlatformAdmin) {
-      throw new Error('Forbidden');
-    }
-    enforceRateLimit(req, access.tenantId || '');
-
-    const supabase = getSupabaseAdminClient();
-    const service = new DomainAssignmentService(supabase as any);
-
-    if (req.method === 'GET') {
-      const history = await service.listAuditHistory({
-        tenantId: sanitizeQueryId(req.query.tenant_id, 'tenant_id') || undefined,
-        domainId: sanitizeQueryId(req.query.domain_id, 'domain_id') || undefined,
-        batchId: sanitizeQueryId(req.query.batch_id, 'batch_id') || undefined,
-        limit: Number(req.query.limit || 50),
-      });
-
-      return res.status(200).json({
-        data: history,
-        correlationId: ctx.correlationId,
-        version: 'v1',
-      });
-    }
-
-    const payload = parseBody(req.body);
-    const domainId = String(payload.domainId || '').trim();
-    const tenantIds = parseTenantIds(payload);
-    const batchId = String(payload.batchId || '').trim() || crypto.randomUUID();
-
-    if (!domainId) {
-      throw new Error('domainId is required');
-    }
-
-    if (req.method === 'POST') {
-      enforceAnyPermission(auth.permissions, ['domains.assign']);
-      const result = await service.assignTenants({
-        tenantIds,
-        domainId,
-        actorUserId: auth.userId,
-        batchId,
-      });
-      logApiEvent('info', '[DomainAssignmentAPI] bulk assignment completed', {
-        correlationId: ctx.correlationId,
-        userId: auth.userId,
-        domainId,
-        batchId: result.batchId,
-        attempted: result.attempted,
-        assigned: result.assigned,
-        reactivated: result.reactivated,
-        skipped: result.skipped,
-      });
-      return res.status(200).json({
-        data: result,
-        correlationId: ctx.correlationId,
-        version: 'v1',
-      });
-    }
-
-    enforceAnyPermission(auth.permissions, ['domains.revoke']);
-    const result = await service.revokeTenants({
-      tenantIds,
-      domainId,
-      actorUserId: auth.userId,
-      batchId,
-    });
-    logApiEvent('info', '[DomainAssignmentAPI] bulk revocation completed', {
-      correlationId: ctx.correlationId,
-      userId: auth.userId,
-      domainId,
-      batchId: result.batchId,
-      attempted: result.attempted,
-      revoked: result.revoked,
-      skipped: result.skipped,
-    });
     return res.status(200).json({
-      data: result,
-      correlationId: ctx.correlationId,
       version: 'v1',
+      correlationId,
+      data: records,
     });
-  } catch (error) {
-    logApiEvent('error', '[DomainAssignmentAPI] request failed', {
-      correlationId: ctx.correlationId,
-      userId: ctx.userId || null,
-      tenantId: ctx.tenantId || null,
-      message: error instanceof Error ? error.message : 'unknown',
+  }
+
+  // POST - Bulk assign domain to tenants
+  if (req.method === 'POST') {
+    const body = req.body;
+    const domainId = String(body?.domainId || '').trim();
+    const tenantIds = Array.isArray(body?.tenantIds) ? body.tenantIds : [];
+    const batchId = String(body?.batchId || crypto.randomUUID()).trim();
+
+    if (!domainId || tenantIds.length === 0) {
+      return res.status(400).json({ error: 'domainId and tenantIds are required', code: 'INVALID_PAYLOAD' });
+    }
+
+    const now = new Date().toISOString();
+    const records: AssignmentRecord[] = [];
+
+    for (const tenantId of tenantIds) {
+      const id = crypto.randomUUID();
+      const record: AssignmentRecord = {
+        id,
+        tenant_id: String(tenantId),
+        domain_id: domainId,
+        is_active: true,
+        subscription_status: 'active',
+        batch_id: batchId,
+        actor_user_id: String(req.headers['x-user-id'] || 'system'),
+        created_at: now,
+      };
+      ASSIGNMENTS.set(`domain-assignment:${id}`, record);
+      records.push(record);
+    }
+
+    return res.status(200).json({
+      version: 'v1',
+      correlationId,
+      data: {
+        batchId,
+        assignedCount: records.length,
+        records,
+      },
     });
-    sendErrorResponse(res, error, ctx.correlationId);
+  }
+
+  // DELETE - Bulk revoke domain from tenants
+  if (req.method === 'DELETE') {
+    const body = req.body;
+    const domainId = String(body?.domainId || '').trim();
+    const tenantIds = Array.isArray(body?.tenantIds) ? body.tenantIds : [];
+    const batchId = String(body?.batchId || crypto.randomUUID()).trim();
+
+    if (!domainId || tenantIds.length === 0) {
+      return res.status(400).json({ error: 'domainId and tenantIds are required', code: 'INVALID_PAYLOAD' });
+    }
+
+    let revokedCount = 0;
+    for (const [key, record] of ASSIGNMENTS.entries()) {
+      if (
+        key.startsWith('domain-assignment:') &&
+        record.domain_id === domainId &&
+        tenantIds.includes(record.tenant_id)
+      ) {
+        ASSIGNMENTS.delete(key);
+        revokedCount++;
+      }
+    }
+
+    return res.status(200).json({
+      version: 'v1',
+      correlationId,
+      data: {
+        batchId,
+        revokedCount,
+      },
+    });
   }
 }

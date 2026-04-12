@@ -114,14 +114,28 @@ export default function PlatformDomains() {
     setSavingAssignments(true);
     try {
       const summary = await DomainService.setTenantDomains(selectedTenantId, draftDomainIds, assignedDomainIds);
-      setAssignedDomainIds(draftDomainIds);
-      toast({
-        title: 'Domain assignments updated',
-        description: `Assigned ${summary.assigned}, revoked ${summary.revoked}`,
-      });
+      
+      // Only update state if we had successful operations
+      if (summary.totalFailures === 0) {
+        setAssignedDomainIds(draftDomainIds);
+        toast({
+          title: 'Domain assignments updated',
+          description: `Assigned ${summary.assigned}, revoked ${summary.revoked}`,
+        });
+      } else {
+        // Partial success - reload from database to get actual state
+        await fetchTenantAssignments();
+        toast({
+          title: 'Partial success',
+          description: `Assigned ${summary.assigned}, revoked ${summary.revoked}, ${summary.totalFailures} failed. Check logs for details.`,
+          variant: 'destructive',
+        });
+      }
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast({ title: 'Error', description: message, variant: 'destructive' });
+      // Reload to ensure state is consistent
+      await fetchTenantAssignments();
     } finally {
       setSavingAssignments(false);
     }

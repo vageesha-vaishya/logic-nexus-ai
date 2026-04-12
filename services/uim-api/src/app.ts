@@ -233,6 +233,155 @@ export async function handleUimMockRequest(req: IncomingMessage, res: ServerResp
     return;
   }
 
+  // Domain assignments - POST (bulk assign)
+  if (pathname === '/api/v1/domain-assignments' && method === 'POST') {
+    const body = await parseBody(req);
+    const domainId = String(body.domainId || '').trim();
+    const tenantIds = Array.isArray(body.tenantIds) ? body.tenantIds : [];
+    const batchId = String(body.batchId || randomUUID()).trim();
+
+    if (!domainId || tenantIds.length === 0) {
+      sendJson(res, 400, { error: 'domainId and tenantIds are required', code: 'INVALID_PAYLOAD' });
+      return;
+    }
+
+    // Store assignment records in mock store
+    const now = new Date().toISOString();
+    const records: any[] = [];
+    for (const tenantId of tenantIds) {
+      const id = randomUUID();
+      const record = {
+        id,
+        tenant_id: String(tenantId),
+        domain_id: domainId,
+        is_active: true,
+        subscription_status: 'active',
+        batch_id: batchId,
+        actor_user_id: String(getHeader(req, 'x-user-id') || 'system'),
+        created_at: now,
+      };
+      store.set(`domain-assignment:${id}`, record as any);
+      records.push(record);
+    }
+
+    sendJson(res, 200, {
+      version: 'v1',
+      correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
+      data: {
+        batchId,
+        assignedCount: records.length,
+        records,
+      },
+    });
+    return;
+  }
+
+  // Domain assignments - DELETE (bulk revoke)
+  if (pathname === '/api/v1/domain-assignments' && method === 'DELETE') {
+    const body = await parseBody(req);
+    const domainId = String(body.domainId || '').trim();
+    const tenantIds = Array.isArray(body.tenantIds) ? body.tenantIds : [];
+    const batchId = String(body.batchId || randomUUID()).trim();
+
+    if (!domainId || tenantIds.length === 0) {
+      sendJson(res, 400, { error: 'domainId and tenantIds are required', code: 'INVALID_PAYLOAD' });
+      return;
+    }
+
+    let revokedCount = 0;
+    for (const [key, record] of store.entries()) {
+      if (
+        key.startsWith('domain-assignment:') &&
+        record.domain_id === domainId &&
+        tenantIds.includes(record.tenant_id)
+      ) {
+        store.delete(key);
+        revokedCount++;
+      }
+    }
+
+    sendJson(res, 200, {
+      version: 'v1',
+      correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
+      data: {
+        batchId,
+        revokedCount,
+      },
+    });
+    return;
+  }
+
+  // Domain assignments - GET (audit history)
+  if (pathname === '/api/v1/domain-assignments' && method === 'GET') {
+    const records: any[] = [];
+    for (const [key, record] of store.entries()) {
+      if (key.startsWith('domain-assignment:')) {
+        records.push(record);
+      }
+    }
+    const sorted = records.sort((a, b) => (a.created_at < b.created_at ? 1 : -1));
+
+    sendJson(res, 200, {
+      version: 'v1',
+      correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
+      data: sorted,
+    });
+    return;
+  }
+
+  // Platform domains - GET
+  if (pathname === '/api/v1/platform-domains' && method === 'GET') {
+    const domains = [
+      { id: 'domain-logistics', code: 'LOGISTICS', name: 'Logistics & Supply Chain', description: 'Transportation, warehousing, and freight', is_active: true },
+      { id: 'domain-banking', code: 'BANKING', name: 'Banking & Finance', description: 'Financial services and lending', is_active: true },
+      { id: 'domain-ecommerce', code: 'ECOMMERCE', name: 'E-Commerce', description: 'Online retail and order management', is_active: true },
+      { id: 'domain-telecom', code: 'TELECOM', name: 'Telecommunications', description: 'Network services and connectivity', is_active: true },
+      { id: 'domain-insurance', code: 'INSURANCE', name: 'Insurance', description: 'Risk management and coverage', is_active: true },
+      { id: 'domain-customs', code: 'CUSTOMS', name: 'Customs & Compliance', description: 'Regulatory compliance and border clearance', is_active: true },
+      { id: 'domain-trading', code: 'TRADING', name: 'Trading & Procurement', description: 'Sourcing and trade execution', is_active: true },
+      { id: 'domain-real-estate', code: 'REAL_ESTATE', name: 'Real Estate', description: 'Property management and sales', is_active: true },
+      { id: 'domain-amro', code: 'AMRO', name: 'Aircraft Maintenance & Repair Operations', description: 'Aviation maintenance, repair, and overhaul management', is_active: true },
+    ];
+
+    sendJson(res, 200, {
+      version: 'v1',
+      correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
+      data: domains,
+      tenantDomainCount: domains.length,
+    });
+    return;
+  }
+
+  // Domain config - GET
+  if (pathname === '/api/v1/domain-config' && method === 'GET') {
+    sendJson(res, 200, {
+      version: 'v1',
+      correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
+      data: [],
+    });
+    return;
+  }
+
+  // Domain config - PUT
+  if (pathname === '/api/v1/domain-config' && method === 'PUT') {
+    const body = await parseBody(req);
+    const now = new Date().toISOString();
+    const id = String(body.id || randomUUID());
+    const record = {
+      id,
+      ...body,
+      updated_at: now,
+    };
+    store.set(`domain-config:${id}`, record as any);
+
+    sendJson(res, 200, {
+      version: 'v1',
+      correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
+      data: record,
+    });
+    return;
+  }
+
   sendJson(res, 404, {
     error: 'Route not found',
     code: 'NOT_FOUND',

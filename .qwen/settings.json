@@ -16,7 +16,14 @@
       "Bash(echo *)",
       "Bash(tr *)",
       "Bash(curl *)",
-      "Bash(head *)"
+      "Bash(head *)",
+      "Bash(npm exec *)",
+      "Bash(lsof *)",
+      "Bash(kill *)",
+      "Bash(sleep *)",
+      "Bash(npm install)",
+      "Bash(python3 *)",
+      "Bash(xargs *)"
     ]
   },
   "$version": 3

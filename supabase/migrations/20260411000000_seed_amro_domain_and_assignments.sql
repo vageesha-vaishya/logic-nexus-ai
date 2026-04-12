@@ -6,7 +6,32 @@
 BEGIN;
 
 -----------------------------------------------------------------------------
--- 1. Seed AMRO Domain in platform_domains
+-- 1. Add Missing Columns to tenant_domain_assignments
+-----------------------------------------------------------------------------
+
+-- Add subscription_status column if it doesn't exist
+ALTER TABLE public.tenant_domain_assignments
+ADD COLUMN IF NOT EXISTS subscription_status text NOT NULL DEFAULT 'active';
+
+-- Add grace_until column if it doesn't exist
+ALTER TABLE public.tenant_domain_assignments
+ADD COLUMN IF NOT EXISTS grace_until timestamptz;
+
+-- Add check constraint for valid subscription statuses
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint 
+    WHERE conname = 'tenant_domain_assignments_subscription_status_ck'
+  ) THEN
+    ALTER TABLE public.tenant_domain_assignments
+    ADD CONSTRAINT tenant_domain_assignments_subscription_status_ck
+    CHECK (subscription_status IN ('active', 'inactive', 'trialing', 'grace_period', 'cancelled', 'expired'));
+  END IF;
+END $$;
+
+-----------------------------------------------------------------------------
+-- 2. Seed AMRO Domain in platform_domains
 -----------------------------------------------------------------------------
 
 INSERT INTO public.platform_domains (key, code, name, description, owner, status, is_active)
@@ -28,7 +53,7 @@ ON CONFLICT (key) DO UPDATE SET
   updated_at = NOW();
 
 -----------------------------------------------------------------------------
--- 2. Assign All Active Tenants to AMRO Domain
+-- 3. Assign All Active Tenants to AMRO Domain
 -----------------------------------------------------------------------------
 
 -- Get the AMRO domain ID
@@ -84,7 +109,7 @@ BEGIN
 END $$;
 
 -----------------------------------------------------------------------------
--- 3. Verify Seeding
+-- 4. Verify Seeding
 -----------------------------------------------------------------------------
 
 DO $$

@@ -370,11 +370,21 @@ export const DomainService = {
   async getTenantAssignedDomainIds(tenantId: string): Promise<string[]> {
     if (!tenantId) return [];
     const { data, error } = await (supabase as any)
-      .from('domain_tenant')
+      .from('tenant_domain_assignments')
       .select('domain_id')
       .eq('tenant_id', tenantId)
       .eq('is_active', true);
-    if (error) throw error;
+    if (error) {
+      logger.warn('[DomainService] Failed to load tenant domain assignments, falling back to domain_tenant', error);
+      // Fallback to legacy table if new table doesn't exist yet
+      const { data: fallbackData, error: fallbackError } = await (supabase as any)
+        .from('domain_tenant')
+        .select('domain_id')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true);
+      if (fallbackError) throw fallbackError;
+      return Array.from(new Set((fallbackData || []).map((row: any) => String(row.domain_id))));
+    }
     return Array.from(new Set((data || []).map((row: any) => String(row.domain_id))));
   },
 
@@ -385,26 +395,59 @@ export const DomainService = {
     const revokeDomainIds = Array.from(currentSet).filter((id) => !nextSet.has(id));
     const batchId = crypto.randomUUID();
 
-    await Promise.all(assignDomainIds.map((domainId) =>
-      this.callDomainAssignmentApi('POST', {
-        domainId,
-        tenantIds: [tenantId],
-        batchId,
-      })
-    ));
+    // Use Promise.allSettled to track individual successes/failures
+    const assignResults = await Promise.allSettled(
+      assignDomainIds.map((domainId) =>
+        this.callDomainAssignmentApi('POST', {
+          domainId,
+          tenantIds: [tenantId],
+          batchId,
+        })
+      )
+    );
 
-    await Promise.all(revokeDomainIds.map((domainId) =>
-      this.callDomainAssignmentApi('DELETE', {
-        domainId,
-        tenantIds: [tenantId],
-        batchId,
-      })
-    ));
+    const revokeResults = await Promise.allSettled(
+      revokeDomainIds.map((domainId) =>
+        this.callDomainAssignmentApi('DELETE', {
+          domainId,
+          tenantIds: [tenantId],
+          batchId,
+        })
+      )
+    );
+
+    // Count successes and log failures
+    const assignSuccesses = assignResults.filter((r) => r.status === 'fulfilled').length;
+    const revokeSuccesses = revokeResults.filter((r) => r.status === 'fulfilled').length;
+
+    // Log any failures
+    assignResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        logger.error('[DomainService] Failed to assign domain', {
+          domainId: assignDomainIds[index],
+          tenantId,
+          error: result.reason,
+        });
+      }
+    });
+
+    revokeResults.forEach((result, index) => {
+      if (result.status === 'rejected') {
+        logger.error('[DomainService] Failed to revoke domain', {
+          domainId: revokeDomainIds[index],
+          tenantId,
+          error: result.reason,
+        });
+      }
+    });
 
     return {
-      assigned: assignDomainIds.length,
-      revoked: revokeDomainIds.length,
+      assigned: assignSuccesses,
+      revoked: revokeSuccesses,
       batchId,
+      totalAttempts: assignDomainIds.length + revokeDomainIds.length,
+      totalSuccesses: assignSuccesses + revokeSuccesses,
+      totalFailures: (assignDomainIds.length - assignSuccesses) + (revokeDomainIds.length - revokeSuccesses),
     };
   },
 
@@ -728,19 +771,60 @@ export const DomainService = {
    * Creates a new domain.
    */
   async createDomain(domain: Omit<PlatformDomain, 'id' | 'created_at' | 'updated_at'>): Promise<PlatformDomain> {
-    // Check for duplicate code
-    const existing = await this.getDomainByCode(domain.code);
-    if (existing) {
-      throw new Error(`Domain with code "${domain.code}" already exists.`);
+    // Normalize input
+    const normalizedCode = domain.code ? domain.code.trim().toUpperCase() : null;
+    const normalizedName = domain.name.trim();
+
+    // Validate non-empty
+    if (!normalizedName) {
+      throw new Error('Domain name is required.');
+    }
+    if (!normalizedCode) {
+      throw new Error('Domain code is required.');
+    }
+
+    // Check for duplicate code (case-insensitive)
+    const allDomains = await this.getAllDomains(false);
+    const duplicateByCode = allDomains.find(
+      d => d.code && d.code.trim().toUpperCase() === normalizedCode
+    );
+    if (duplicateByCode) {
+      throw new Error(`Domain with code "${normalizedCode}" already exists.`);
+    }
+
+    // Check for duplicate name (case-insensitive)
+    const duplicateByName = allDomains.find(
+      d => d.name.trim().toUpperCase() === normalizedName.toUpperCase()
+    );
+    if (duplicateByName) {
+      throw new Error(`Domain with name "${normalizedName}" already exists.`);
     }
 
     const { data, error } = await supabase
       .from('platform_domains')
-      .insert(domain)
+      .insert({
+        ...domain,
+        code: normalizedCode,
+        name: normalizedName,
+      })
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Handle database-level constraint violations
+      if (error.code === '23505') { // unique_violation
+        const message = error.message || '';
+        if (message.includes('code') || message.includes(normalizedCode)) {
+          throw new Error(`Domain with code "${normalizedCode}" already exists.`);
+        }
+        if (message.includes('name') || message.includes(normalizedName)) {
+          throw new Error(`Domain with name "${normalizedName}" already exists.`);
+        }
+        throw new Error('A domain with these details already exists.');
+      }
+      throw error;
+    }
+    
     this.invalidateCache();
     return data;
   },
@@ -749,22 +833,58 @@ export const DomainService = {
    * Updates an existing domain.
    */
   async updateDomain(id: string, updates: Partial<PlatformDomain>): Promise<PlatformDomain> {
+    // Normalize input if code/name being updated
+    const normalizedCode = updates.code ? updates.code.trim().toUpperCase() : undefined;
+    const normalizedName = updates.name ? updates.name.trim() : undefined;
+
     // Check for duplicate code if code is being updated
-    if (updates.code) {
-      const existing = await this.getDomainByCode(updates.code);
-      if (existing && existing.id !== id) {
-        throw new Error(`Domain with code "${updates.code}" already exists.`);
+    if (normalizedCode) {
+      const allDomains = await this.getAllDomains(false);
+      const existing = allDomains.find(
+        d => d.code && d.code.trim().toUpperCase() === normalizedCode && d.id !== id
+      );
+      if (existing) {
+        throw new Error(`Domain with code "${normalizedCode}" already exists.`);
+      }
+    }
+
+    // Check for duplicate name if name is being updated
+    if (normalizedName) {
+      const allDomains = await this.getAllDomains(false);
+      const existing = allDomains.find(
+        d => d.name.trim().toUpperCase() === normalizedName.toUpperCase() && d.id !== id
+      );
+      if (existing) {
+        throw new Error(`Domain with name "${normalizedName}" already exists.`);
       }
     }
 
     const { data, error } = await supabase
       .from('platform_domains')
-      .update(updates)
+      .update({
+        ...updates,
+        code: normalizedCode !== undefined ? normalizedCode : undefined,
+        name: normalizedName !== undefined ? normalizedName : undefined,
+      })
       .eq('id', id)
       .select()
       .single();
 
-    if (error) throw error;
+    if (error) {
+      // Handle database-level constraint violations
+      if (error.code === '23505') { // unique_violation
+        const message = error.message || '';
+        if (message.includes('code') || (normalizedCode && message.includes(normalizedCode))) {
+          throw new Error(`Domain with code "${normalizedCode || updates.code}" already exists.`);
+        }
+        if (message.includes('name') || (normalizedName && message.includes(normalizedName))) {
+          throw new Error(`Domain with name "${normalizedName || updates.name}" already exists.`);
+        }
+        throw new Error('A domain with these details already exists.');
+      }
+      throw error;
+    }
+    
     this.invalidateCache();
     return data;
   },
