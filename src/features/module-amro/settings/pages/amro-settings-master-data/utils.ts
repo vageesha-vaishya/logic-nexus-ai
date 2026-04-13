@@ -659,7 +659,10 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
 
   if (entity === 'work_package_templates') {
     const modelId = String(values.model_id ?? '').trim();
-    if (modelId) {
+    // model_id is required by database constraint ck_work_package_templates_model_id_required
+    if (!modelId) {
+      errors.model_id = 'Model ID is required';
+    } else {
       payload.model_id = modelId;
     }
   }

@@ -305,7 +305,7 @@ export function TemplateCreateEditDialog({
         ? `/api/v2/amro/master-data/work_package_templates/${template!.id}`
         : '/api/v2/amro/master-data/work_package_templates';
 
-      const method = isEditMode ? 'PUT' : 'POST';
+      const method = isEditMode ? 'PATCH' : 'POST';
 
       const response = await fetch(url, {
         method,

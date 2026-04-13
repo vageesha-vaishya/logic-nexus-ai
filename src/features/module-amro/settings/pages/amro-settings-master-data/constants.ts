@@ -261,7 +261,7 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
   work_package_templates: [
     { key: 'template_code', label: 'Template Code', type: 'text', required: true },
     { key: 'template_name', label: 'Template Name', type: 'text', required: true },
-    { key: 'model_id', label: 'Model ID', type: 'text' },
+    { key: 'model_id', label: 'Model ID', type: 'text', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
     { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['inspection','service', 'line', 'base', 'component', 'overhaul', 'repair', 'upgrade', 'modification'] },
     { key: 'version', label: 'Version', type: 'number', required: true, min: 1 },
