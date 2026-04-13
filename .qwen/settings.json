@@ -26,7 +26,11 @@
       "Bash(xargs *)",
       "Bash(node *)",
       "Bash(cp *)",
-      "Bash(ls *)"
+      "Bash(ls *)",
+      "Bash(chmod *)",
+      "Bash(pkill *)",
+      "Bash(npm start)",
+      "Bash(supabase *)"
     ]
   },
   "$version": 3
