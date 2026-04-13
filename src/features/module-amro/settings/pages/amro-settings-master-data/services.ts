@@ -13,10 +13,8 @@ type ApiHeaderBuildOptions = {
 
 type AircraftTemplatePayloadInput = {
   template_name?: unknown;
-  aircraft_type?: unknown;
-  manufacturer?: unknown;
-  manufacturer_id?: unknown;
-  aircraft_model?: unknown;
+  franchise_id?: unknown;
+  assembly_models?: unknown;
   maintenance_program?: unknown;
   revision_number?: unknown;
   amendment_number?: unknown;
@@ -27,10 +25,7 @@ export type AircraftTemplateRecord = {
   tenant_id: string;
   franchise_id: string;
   template_name: string;
-  aircraft_type: string;
-  manufacturer: string;
-  manufacturer_id: string;
-  aircraft_model: string;
+  assembly_models: string;
   maintenance_program: string;
   revision_number: string;
   amendment_number: string;
@@ -178,10 +173,7 @@ const normalizeAircraftTemplateRecord = (record: Record<string, unknown>): Aircr
     tenant_id: String(record.tenant_id || '').trim(),
     franchise_id: String(record.franchise_id || '').trim(),
     template_name: String(record.template_name || '').trim(),
-    aircraft_type: String(record.aircraft_type || '').trim(),
-    manufacturer: String(record.manufacturer || '').trim(),
-    manufacturer_id: String(record.manufacturer_id || '').trim(),
-    aircraft_model: String(record.aircraft_model || '').trim(),
+    assembly_models: String(record.assembly_models || '').trim(),
     maintenance_program: String(record.maintenance_program || '').trim(),
     revision_number: String(record.revision_number || '').trim(),
     amendment_number: String(record.amendment_number || '').trim(),
@@ -192,18 +184,14 @@ const normalizeAircraftTemplateRecord = (record: Record<string, unknown>): Aircr
 const sanitizeAircraftTemplatePayload = (input: AircraftTemplatePayloadInput): Record<string, unknown> => {
   const payload: Record<string, unknown> = {};
   const templateName = String(input.template_name || '').trim();
-  const aircraftType = String(input.aircraft_type || '').trim();
-  const manufacturer = String(input.manufacturer || '').trim();
-  const manufacturerId = String(input.manufacturer_id || '').trim();
-  const aircraftModel = String(input.aircraft_model || '').trim();
+  const franchiseId = String(input.franchise_id || '').trim();
+  const assemblyModels = String(input.assembly_models || '').trim();
   const maintenanceProgram = String(input.maintenance_program || '').trim();
   const revisionNumber = String(input.revision_number || '').trim();
   const amendmentNumber = String(input.amendment_number || '').trim();
   if (templateName) payload.template_name = templateName;
-  if (aircraftType) payload.aircraft_type = aircraftType;
-  if (manufacturer) payload.manufacturer = manufacturer;
-  if (manufacturerId) payload.manufacturer_id = manufacturerId;
-  if (aircraftModel) payload.aircraft_model = aircraftModel;
+  if (franchiseId) payload.franchise_id = franchiseId;
+  if (assemblyModels) payload.assembly_models = assemblyModels;
   if (maintenanceProgram) payload.maintenance_program = maintenanceProgram;
   if (revisionNumber) payload.revision_number = revisionNumber;
   if (amendmentNumber) payload.amendment_number = amendmentNumber;
