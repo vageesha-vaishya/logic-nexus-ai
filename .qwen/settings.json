@@ -25,7 +25,8 @@
       "Bash(python3 *)",
       "Bash(xargs *)",
       "Bash(node *)",
-      "Bash(cp *)"
+      "Bash(cp *)",
+      "Bash(ls *)"
     ]
   },
   "$version": 3

@@ -205,10 +205,10 @@ const AmroManufacturersMasterData = lazy(() => import("./features/module-amro/se
 const AmroModelMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.ModelMasterDataPage })));
 const AmroRegulatorProfilesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.RegulatorProfilesMasterDataPage })));
 const AmroShiftCalendarsMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.ShiftCalendarsMasterDataPage })));
+const AmroWorkPackagesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkPackagesMasterDataPage })));
 const AmroWorkPackageTemplatesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkPackageTemplatesMasterDataPage })));
 const AmroTemplateCatalog = lazy(() => import("./features/module-amro/components/templates/AmroTemplateCatalogPage").then((module) => ({ default: module.AmroTemplateCatalogPage })));
 const AmroWorkPackageTemplates = lazy(() => import("./features/module-amro/templates/AmroWorkPackageTemplatesPage").then((module) => ({ default: module.AmroWorkPackageTemplatesPage })));
-const AmroWorkPackagesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkPackagesMasterDataPage })));
 const AmroWorkspaceDocumentation = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroWorkspaceDocumentationPage })));
 const MigrationBaselineDashboard = lazy(() => import("./pages/dashboard/MigrationBaselineDashboard"));
 
@@ -905,7 +905,7 @@ const App = () => (
             <Route path="/dashboard/amro/settings/master-data/regulator-profiles" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroRegulatorProfilesMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/shift-calendars" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroShiftCalendarsMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkPackagesMasterData /></ProtectedRoute>} />
-           /* <Route path="/dashboard/amro/settings/master-data/work-package-templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkPackageTemplatesMasterData /></ProtectedRoute>} /> */
+            <Route path="/dashboard/amro/settings/master-data/work-package-templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkPackageTemplatesMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/work-package-templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroTemplateCatalog /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/work-package-templates/new" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkPackageTemplatesMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/work-package-templates/:id" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkPackageTemplatesMasterData /></ProtectedRoute>} />
