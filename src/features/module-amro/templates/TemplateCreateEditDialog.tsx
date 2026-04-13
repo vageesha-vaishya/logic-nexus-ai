@@ -11,7 +11,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Save, X, Wrench, Package, Settings, Check, FileText } from 'lucide-react';
+import { Plus, Save, X, Wrench, Package, Settings, Check, FileText, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -28,6 +28,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import type { WorkPackageTemplate, TaskTemplateOption, AircraftModelOption } from './AmroWorkPackageTemplatesPage';
 import { fetchTaskTemplates } from './templateApi';
 import { useAuth } from '@/hooks/useAuth';
+// Enterprise editors
+import { EnterpriseMaterialsEditor } from '../components/templates/EnterpriseMaterialsEditor';
+import { EnterpriseToolingEditor } from '../components/templates/EnterpriseToolingEditor';
+import { EnterpriseComplianceEditor } from '../components/templates/EnterpriseComplianceEditor';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -282,6 +286,15 @@ export function TemplateCreateEditDialog({
         return;
       }
 
+      // Debug: Log what we're about to save
+      console.log('=== SAVE DEBUG ===');
+      console.log('form.materials_json:', form.materials_json);
+      console.log('form.materials_json.length:', form.materials_json.length);
+      console.log('materials (local):', materials);
+      console.log('Using enterprise data:', form.materials_json.length > 0);
+      console.log('form.tooling_json:', form.tooling_json);
+      console.log('form.compliance_requirements_json:', form.compliance_requirements_json);
+
       const payload: Record<string, unknown> = {
         tenant_id: tenantId || template?.tenant_id || '',
         template_code: form.template_code.trim(),
@@ -294,12 +307,18 @@ export function TemplateCreateEditDialog({
         active: form.active,
         scope_json,
         tasks_json: form.tasks_json,
-        materials_json: materials,
-        tooling_json: tooling,
-        compliance_requirements_json: compliance,
+        // ALWAYS use form state (enterprise editors update form state directly)
+        materials_json: form.materials_json,
+        tooling_json: form.tooling_json,
+        compliance_requirements_json: form.compliance_requirements_json,
         // Express API requires aircraft_model as text
         aircraft_model: form.aircraft_model || 'All Models',
       };
+
+      console.log('Final payload materials_json:', payload.materials_json);
+      console.log('Final payload tooling_json:', payload.tooling_json);
+      console.log('Final payload compliance:', payload.compliance_requirements_json);
+      console.log('===================');
 
       const url = isEditMode
         ? `/api/v2/amro/master-data/work_package_templates/${template!.id}`
@@ -316,10 +335,16 @@ export function TemplateCreateEditDialog({
         body: JSON.stringify(payload),
       });
 
+      console.log('API Response status:', response.status);
+      
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
+        console.error('API Error:', errorData);
         throw new Error(errorData.error || errorData.message || `Save failed: ${response.status}`);
       }
+
+      const responseData = await response.json();
+      console.log('API Response data:', responseData);
 
       toast.success(isEditMode ? 'Template updated' : 'Template created');
       onOpenChange(false);
@@ -391,7 +416,7 @@ export function TemplateCreateEditDialog({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-8">
             <TabsTrigger value="details">
               <FileText className="h-4 w-4 mr-1" />
               Details
@@ -411,6 +436,18 @@ export function TemplateCreateEditDialog({
             <TabsTrigger value="compliance">
               <Check className="h-4 w-4 mr-1" />
               Compliance
+            </TabsTrigger>
+            <TabsTrigger value="enterprise-materials" className="bg-green-50">
+              <Layers className="h-4 w-4 mr-1" />
+              Materials+
+            </TabsTrigger>
+            <TabsTrigger value="enterprise-tooling" className="bg-blue-50">
+              <Layers className="h-4 w-4 mr-1" />
+              Tooling+
+            </TabsTrigger>
+            <TabsTrigger value="enterprise-compliance" className="bg-purple-50">
+              <Layers className="h-4 w-4 mr-1" />
+              Compliance+
             </TabsTrigger>
           </TabsList>
 
@@ -763,6 +800,36 @@ export function TemplateCreateEditDialog({
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          {/* Enterprise Materials Tab */}
+          <TabsContent value="enterprise-materials" className="space-y-4 pt-4">
+            <EnterpriseMaterialsEditor
+              materials={form.materials_json}
+              onChange={(materials) => setField('materials_json', materials)}
+              workPackageTemplateId={template?.id}
+              readOnly={false}
+            />
+          </TabsContent>
+
+          {/* Enterprise Tooling Tab */}
+          <TabsContent value="enterprise-tooling" className="space-y-4 pt-4">
+            <EnterpriseToolingEditor
+              tools={form.tooling_json}
+              onChange={(tools) => setField('tooling_json', tools)}
+              workPackageTemplateId={template?.id}
+              readOnly={false}
+            />
+          </TabsContent>
+
+          {/* Enterprise Compliance Tab */}
+          <TabsContent value="enterprise-compliance" className="space-y-4 pt-4">
+            <EnterpriseComplianceEditor
+              requirements={form.compliance_requirements_json}
+              onChange={(requirements) => setField('compliance_requirements_json', requirements)}
+              workPackageTemplateId={template?.id}
+              readOnly={false}
+            />
           </TabsContent>
         </Tabs>
 

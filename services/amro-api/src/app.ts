@@ -15,6 +15,7 @@ import workPackageTemplateRoutes from './routes/work-package-template.routes';
 import partsRoutes from './routes/parts.routes';
 import itemMasterRoutes from './routes/item-master.routes';
 import stockLedgerRoutes from './routes/stock-ledger.routes';
+import enterpriseRoutes from './routes/enterprise.routes';
 import { ErrorResponse } from './types/amro.types';
 import { logger } from './utils/logger';
 import { amroEventsProducer } from './events/amro-events.producer';
@@ -1466,6 +1467,9 @@ app.use('/api/v2', masterDataRoutes);
 app.use('/api/v2', partsRoutes);
 app.use('/api/v2', itemMasterRoutes);
 app.use('/api/v2', stockLedgerRoutes);
+
+// Mount enterprise routes
+app.use('/api/v2/amro/enterprise', enterpriseRoutes);
 
 // ============================================================================
 // ERROR HANDLING
