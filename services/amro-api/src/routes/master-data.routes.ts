@@ -283,11 +283,12 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   },
   work_package_templates: {
     table: 'work_package_templates',
-    searchableColumns: ['template_code', 'template_name', 'maintenance_type'],
+    searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'model_id'],
     listColumns:
-      'id,tenant_id,franchise_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
-    requiredCreateFields: ['template_code', 'version', 'template_name', 'maintenance_type'],
+      'id,tenant_id,franchise_id,model_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
+    requiredCreateFields: ['model_id', 'template_code', 'version', 'template_name', 'maintenance_type'],
     writeAllowedFields: [
+      'model_id',
       'template_code',
       'version',
       'active',
@@ -781,6 +782,7 @@ function normalizeShiftCalendar(payload: JsonRecord): JsonRecord {
 
 function normalizeWorkPackageTemplate(payload: JsonRecord): JsonRecord {
   return {
+    model_id: asString(payload.model_id),
     template_code: asString(payload.template_code),
     version: asNumber(payload.version),
     active: asBoolean(payload.active, true),
