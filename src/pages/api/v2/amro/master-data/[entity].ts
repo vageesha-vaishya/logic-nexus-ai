@@ -1206,8 +1206,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const scopedAccess = await resolveAndApplyAccessContext(req, ctx);
     await enforceAmroDomainAccess(scopedAccess, { correlationId: ctx.correlationId });
     const tenantId = String(scopedAccess.tenantId || '');
-    const franchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId) : null;
-    const entity = resolveEntity(req.query.entity);
+    // For aircraft_template, use franchise ID from request header to allow filtering by selected franchise
+    const entityForScope = resolveEntity(req.query.entity);
+    const requestedFranchiseId = String(req.headers['x-franchise-id'] || '').trim() || null;
+    const franchiseId = entityForScope === 'aircraft_template' && requestedFranchiseId
+      ? requestedFranchiseId
+      : (scopedAccess.franchiseId ? String(scopedAccess.franchiseId) : null);
+    const entity = entityForScope;
     const entityConfig = getEntityConfig(entity);
     const supabase = getSupabaseAdminClient();
 
