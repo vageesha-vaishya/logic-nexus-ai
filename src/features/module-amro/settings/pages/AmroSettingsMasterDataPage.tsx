@@ -2331,13 +2331,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     seedManufacturersIfNeeded,
   ]);
 
-  const loadAircraftCreateListboxOptions = useCallback(async () => {
+  const loadAircraftCreateListboxOptions = useCallback(async (tenantOverride?: string, franchiseOverride?: string) => {
     if (entity !== 'aircraft') {
       return;
     }
     setAircraftListboxOptionsLoading(true);
     try {
-      const headers = await buildApiHeaders(scope);
+      const effectiveTenantId = tenantOverride || String(formValues.tenant_id ?? scope.tenantId ?? '').trim();
+      const effectiveFranchiseId = franchiseOverride || String(formValues.franchise_id ?? scope.franchiseId ?? '').trim();
+      const headers = await buildApiHeaders({ tenantId: effectiveTenantId, franchiseId: effectiveFranchiseId, userId: scope.userId });
       let templateOptions = await fetchAircraftTempOptions(headers);
       if (templateOptions.length === 0) {
         const seeded = await seedAircraftTemplatesIfNeeded(headers);
@@ -2372,7 +2374,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setAircraftListboxOptionsLoading(false);
     }
-  }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftCreateCatalogOptions, fetchAircraftTempOptions, scope, seedAircraftTemplatesIfNeeded]);
+  }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftCreateCatalogOptions, fetchAircraftTempOptions, formValues.franchise_id, formValues.tenant_id, scope.franchiseId, scope.tenantId, scope.userId, seedAircraftTemplatesIfNeeded]);
 
   const loadAircraftTemplatesWorkspace = useCallback(async () => {
     if (entity !== 'aircraft') {
@@ -3756,8 +3758,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setSelectedTemplateManufacturerName('');
       setSelectedTemplateAircraftType('');
       void loadManufacturerOptions(normalizedTenantId);
+      // Reload templates for the new tenant (no franchise selected yet)
+      void loadAircraftCreateListboxOptions(normalizedTenantId, '');
     },
-    [formValues.tenant_id, isSystemSelectValue, loadManufacturerOptions, scope.tenantId, setFieldValue],
+    [formValues.tenant_id, isSystemSelectValue, loadAircraftCreateListboxOptions, loadManufacturerOptions, scope.tenantId, setFieldValue],
   );
   const setAircraftFranchiseValue = useCallback(
     (value: string) => {
@@ -3769,6 +3773,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (normalizedFranchiseId === currentFranchiseId) {
         return;
       }
+      const normalizedTenantId = String(formValues.tenant_id ?? scope.tenantId ?? '').trim();
       setFieldValue('franchise_id', normalizedFranchiseId);
       setAircraftTemplateModel('');
       setFieldValue('aircraft_template', '');
@@ -3777,8 +3782,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setSelectedTemplateModelName('');
       setSelectedTemplateManufacturerName('');
       setSelectedTemplateAircraftType('');
+      // Reload templates to filter by new franchise
+      void loadAircraftCreateListboxOptions(normalizedTenantId, normalizedFranchiseId);
     },
-    [formValues.franchise_id, isSystemSelectValue, scope.franchiseId, setFieldValue],
+    [formValues.franchise_id, formValues.tenant_id, isSystemSelectValue, loadAircraftCreateListboxOptions, scope.franchiseId, scope.tenantId, setFieldValue],
   );
   
   const loadFranchiseAssemblyModels = useCallback(
