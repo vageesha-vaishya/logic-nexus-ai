@@ -139,8 +139,9 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'serial_number', label: 'Serial Number', type: 'text', required: true },
     { key: 'aircraft_type', label: 'Aircraft Type', type: 'select', required: true, options: AIRCRAFT_TYPE_OPTIONS },
     { key: 'engine_type', label: 'Engine Type', type: 'text' },
-    { key: 'manufacturer_id', label: 'Manufacturer', type: 'select', required: true },
-    { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
+    { key: 'aircraft_template', label: 'Aircraft Template', type: 'select', required: true },
+    { key: 'aircraft_model', label: 'Aircraft Model', type: 'text' }, // Populated from template's assembly_models
+    { key: 'manufacturer_id', label: 'Manufacturer', type: 'text' }, // Populated from template's assembly_models
     { key: 'configuration_code', label: 'Configuration Code', type: 'text' },
     { key: 'maintenance_program', label: 'Maintenance Program', type: 'text' },
     { key: 'engine_install_history', label: 'Engine Install History', type: 'json' },

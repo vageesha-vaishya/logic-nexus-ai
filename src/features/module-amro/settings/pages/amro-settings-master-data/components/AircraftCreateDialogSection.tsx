@@ -54,6 +54,7 @@ type AircraftCreateDialogSectionProps = {
   aircraftListboxOptionsLoading: boolean;
   aircraftTenantOptionsLoading: boolean;
   aircraftFranchiseOptionsLoading: boolean;
+  aircraftTemplateOptionsLoading: boolean;
   aircraftTenantOptionsError: string;
   aircraftFranchiseOptionsError: string;
   isSystemSelectValue: (value: string) => boolean;
@@ -65,8 +66,7 @@ type AircraftCreateDialogSectionProps = {
   franchiseAssemblyModelOptions: AircraftTemplateModelOption[];
   setFieldValue: (field: string, value: unknown) => void;
   hydrateAircraftCountersFromTemplate: (templateId: string) => Promise<void>;
-  systemTemplateModelSelectOptions: SelectOption[];
-  franchiseAssemblyModelSelectOptions: SelectOption[];
+  aircraftTemplateSelectOptions: SelectOption[];
   aircraftTenantSelectOptions: SelectOption[];
   aircraftFranchiseSelectOptions: SelectOption[];
   disableAircraftFranchiseSelection: boolean;
@@ -74,8 +74,10 @@ type AircraftCreateDialogSectionProps = {
   formValues: Record<string, unknown>;
   formErrors: Record<string, string>;
   firstFieldRef: RefObject<HTMLInputElement>;
-  aircraftModelNameValue: string;
-  aircraftModelTypeValue: string;
+  // Assembly model details (populated from selected template)
+  selectedTemplateModelName: string;
+  selectedTemplateManufacturerName: string;
+  selectedTemplateAircraftType: string;
   setSelectFieldValue: (field: string, value: string) => void;
   resolveSelectOptions: (field: FieldDescriptor) => SelectOption[];
   aircraftNoSerialNumber: boolean;
@@ -115,6 +117,7 @@ export function AircraftCreateDialogSection({
   aircraftListboxOptionsLoading,
   aircraftTenantOptionsLoading,
   aircraftFranchiseOptionsLoading,
+  aircraftTemplateOptionsLoading,
   aircraftTenantOptionsError,
   aircraftFranchiseOptionsError,
   isSystemSelectValue,
@@ -126,8 +129,7 @@ export function AircraftCreateDialogSection({
   franchiseAssemblyModelOptions,
   setFieldValue,
   hydrateAircraftCountersFromTemplate,
-  systemTemplateModelSelectOptions,
-  franchiseAssemblyModelSelectOptions,
+  aircraftTemplateSelectOptions,
   aircraftTenantSelectOptions,
   aircraftFranchiseSelectOptions,
   disableAircraftFranchiseSelection,
@@ -135,8 +137,9 @@ export function AircraftCreateDialogSection({
   formValues,
   formErrors,
   firstFieldRef,
-  aircraftModelNameValue,
-  aircraftModelTypeValue,
+  selectedTemplateModelName,
+  selectedTemplateManufacturerName,
+  selectedTemplateAircraftType,
   setSelectFieldValue,
   resolveSelectOptions,
   aircraftNoSerialNumber,
@@ -180,14 +183,17 @@ export function AircraftCreateDialogSection({
       </div>
       <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
         <section className="space-y-2 rounded bg-white p-3">
-          <p className="text-[11px] text-slate-600">Aircraft Model</p>
+          <p className="text-[11px] text-slate-600">Aircraft Template</p>
           <Label htmlFor="aircraft-tenant-id" className="text-[12px] font-medium text-slate-800">Tenant</Label>
           <select
             id="aircraft-tenant-id"
             value={aircraftTenantValue}
             disabled={aircraftTenantOptionsLoading}
             onChange={(event) => setAircraftTenantValue(event.target.value)}
-            className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className={cn(
+              'h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+              formErrors.tenant_id && 'border-destructive',
+            )}
           >
             {aircraftTenantSelectOptions.map((option) => (
               <option key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
@@ -195,14 +201,17 @@ export function AircraftCreateDialogSection({
               </option>
             ))}
           </select>
-          {aircraftTenantOptionsError ? <p className="text-[10px] text-red-600">{aircraftTenantOptionsError}</p> : null}
+          {formErrors.tenant_id ? <p className="mdm-template-danger">{formErrors.tenant_id}</p> : aircraftTenantOptionsError ? <p className="text-[10px] text-red-600">{aircraftTenantOptionsError}</p> : null}
           <Label htmlFor="aircraft-franchise-id" className="text-[12px] font-medium text-slate-800">Franchise</Label>
           <select
             id="aircraft-franchise-id"
             value={aircraftFranchiseValue}
             disabled={disableAircraftFranchiseSelection || aircraftFranchiseOptionsLoading}
             onChange={(event) => setAircraftFranchiseValue(event.target.value)}
-            className="h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+            className={cn(
+              'h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
+              formErrors.franchise_id && 'border-destructive',
+            )}
           >
             {aircraftFranchiseSelectOptions.map((option) => (
               <option key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
@@ -210,53 +219,61 @@ export function AircraftCreateDialogSection({
               </option>
             ))}
           </select>
-          {aircraftFranchiseOptionsError ? <p className="text-[10px] text-red-600">{aircraftFranchiseOptionsError}</p> : null}
-          <Label htmlFor="aircraft-manufacturer-select-left" className="text-[12px] font-medium text-slate-800">Manufacturer</Label>
+          {formErrors.franchise_id ? <p className="mdm-template-danger">{formErrors.franchise_id}</p> : aircraftFranchiseOptionsError ? <p className="text-[10px] text-red-600">{aircraftFranchiseOptionsError}</p> : null}
+          <Label htmlFor="aircraft-template-select" className="text-[12px] font-medium text-slate-800">Aircraft Template</Label>
           <select
-            id="aircraft-manufacturer-select-left"
-            value={String(formValues.manufacturer_id ?? '')}
-            onChange={(event) => setSelectFieldValue('manufacturer_id', event.target.value)}
+            id="aircraft-template-select"
+            value={aircraftTemplateModel}
+            disabled={aircraftTemplateOptionsLoading || disableAircraftModelSelection}
+            onChange={(event) => {
+              setAircraftTemplateModel(event.target.value);
+              void hydrateAircraftCountersFromTemplate(event.target.value);
+            }}
             className={cn(
               'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-              formErrors.manufacturer_id && 'border-destructive',
+              formErrors.aircraft_template && 'border-destructive',
             )}
           >
-            {resolveSelectOptions({ key: 'manufacturer_id', label: 'Manufacturer', type: 'select' }).map((option) => (
+            {aircraftTemplateSelectOptions.map((option) => (
               <option key={option.value} value={option.value} disabled={option.disabled}>
                 {option.label}
               </option>
             ))}
           </select>
-          {formErrors.manufacturer_id ? <p className="mdm-template-danger">{formErrors.manufacturer_id}</p> : null}
+          {formErrors.aircraft_template ? <p className="mdm-template-danger">{formErrors.aircraft_template}</p> : null}
         </section>
         <section className="rounded bg-white p-3">
           <p className="mb-2 text-[11px] text-slate-600">Aircraft Model Details</p>
           <div className="space-y-2 border border-slate-200 px-3 py-2 text-[12px]">
             <div className="space-y-1">
-              <Label htmlFor="aircraft-model-select" className="text-[12px]">Aircraft Model:</Label>
-              <select
-                id="aircraft-model-select"
-                value={String(formValues.aircraft_model ?? '')}
-                onChange={(event) => setSelectFieldValue('aircraft_model', event.target.value)}
-                className={cn(
-                  'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-                  formErrors.aircraft_model && 'border-destructive',
-                )}
-              >
-                {resolveSelectOptions({ key: 'aircraft_model', label: 'Aircraft Model', type: 'select' }).map((option) => (
-                  <option key={option.value} value={option.value} disabled={option.disabled}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Label htmlFor="aircraft-model-name-readonly" className="text-[12px]">Model Name:</Label>
+              <Input
+                id="aircraft-model-name-readonly"
+                value={selectedTemplateModelName || '-'}
+                readOnly
+                disabled
+                className="h-8 bg-slate-100 text-[12px] text-slate-800"
+              />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="aircraft-model-name-readonly" className="text-[12px]">Name:</Label>
-              <Input id="aircraft-model-name-readonly" value={aircraftModelNameValue} readOnly disabled className="h-8 bg-slate-100 text-[12px] text-slate-800" />
+              <Label htmlFor="aircraft-manufacturer-readonly" className="text-[12px]">Manufacturer:</Label>
+              <Input
+                id="aircraft-manufacturer-readonly"
+                value={selectedTemplateManufacturerName || '-'}
+                readOnly
+                disabled
+                className="h-8 bg-slate-100 text-[12px] text-slate-800"
+              />
             </div>
             <div className="space-y-1">
-              <Label htmlFor="aircraft-type-select" className="text-[12px]">Aircraft Type:</Label>
-              <Input id="aircraft-type-select" value={aircraftModelTypeValue} readOnly disabled className="h-8 bg-slate-100 text-[12px] text-slate-800" />
+              <Label htmlFor="aircraft-type-readonly" className="text-[12px]">Aircraft Type:</Label>
+              <Input
+                id="aircraft-type-readonly"
+                value={selectedTemplateAircraftType || '-'}
+                readOnly
+                disabled
+                className="h-8 bg-slate-100 text-[12px] text-slate-800"
+              />
             </div>
           </div>
         </section>
