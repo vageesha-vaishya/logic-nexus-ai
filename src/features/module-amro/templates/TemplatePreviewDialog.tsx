@@ -211,7 +211,7 @@ export function TemplatePreviewDialog({
         </DialogHeader>
 
         {/* Metadata Grid - Enhanced with all available fields */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Maintenance Type</CardDescription>
@@ -260,6 +260,29 @@ export function TemplatePreviewDialog({
               </Badge>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Audit Info - Integrated for visibility */}
+        <div className="flex flex-wrap items-center gap-4 px-1 text-sm">
+          <div className="flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Created:</span>
+            <span className="font-medium truncate max-w-[150px]">{displayTemplate.created_by || '-'}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">{displayTemplate.created_at ? new Date(displayTemplate.created_at).toLocaleDateString() : '-'}</span>
+          </div>
+          <div className="h-4 w-px bg-border" />
+          <div className="flex items-center gap-1.5">
+            <User className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">Updated:</span>
+            <span className="font-medium truncate max-w-[150px]">{displayTemplate.updated_by || '-'}</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Calendar className="h-3.5 w-3.5 text-muted-foreground" />
+            <span className="text-muted-foreground">{displayTemplate.updated_at ? new Date(displayTemplate.updated_at).toLocaleDateString() : '-'}</span>
+          </div>
         </div>
 
         {displayTemplate.description && (
