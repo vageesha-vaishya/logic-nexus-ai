@@ -283,7 +283,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'work_package_templates',
     searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'model_id'],
     listColumns:
-      'id,tenant_id,franchise_id,model_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
+      'id,tenant_id,franchise_id,model_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,materials_json,tooling_json,compliance_requirements_json,policy_snapshot_id,created_at,updated_at',
     requiredCreateFields: ['model_id', 'template_code', 'version', 'template_name', 'maintenance_type'],
     writeAllowedFields: [
       'model_id',
@@ -294,6 +294,9 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'maintenance_type',
       'scope_json',
       'tasks_json',
+      'materials_json',
+      'tooling_json',
+      'compliance_requirements_json',
       'policy_snapshot_id',
     ],
     defaultSortColumn: 'updated_at',
@@ -788,6 +791,9 @@ function normalizeWorkPackageTemplate(payload: JsonRecord): JsonRecord {
     maintenance_type: asString(payload.maintenance_type),
     scope_json: asJsonArray(payload.scope_json),
     tasks_json: asJsonArray(payload.tasks_json),
+    materials_json: asJsonArray(payload.materials_json),
+    tooling_json: asJsonArray(payload.tooling_json),
+    compliance_requirements_json: asJsonArray(payload.compliance_requirements_json),
     policy_snapshot_id: asNullableString(payload.policy_snapshot_id),
   };
 }
@@ -1279,8 +1285,28 @@ router.post(
       return;
     }
     logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP -001] ', {function: 'insertPayload'});
+    
+    // DEBUG: Log what we received
+    if (entity === 'work_package_templates') {
+      logger.info('[WPT DEBUG] Received body keys:', Object.keys(body));
+      logger.info('[WPT DEBUG] materials_json present:', 'materials_json' in body);
+      logger.info('[WPT DEBUG] materials_json value:', body.materials_json);
+      logger.info('[WPT DEBUG] tooling_json present:', 'tooling_json' in body);
+      logger.info('[WPT DEBUG] tooling_json value:', body.tooling_json);
+      logger.info('[WPT DEBUG] compliance_requirements_json present:', 'compliance_requirements_json' in body);
+      logger.info('[WPT DEBUG] compliance_requirements_json value:', body.compliance_requirements_json);
+    }
+    
     const hydratedBody = entity === 'aircraft' ? await hydrateAircraftPayload(supabase, req.tenantId, franchiseId, body) : body;
     const payload = sanitizeWritePayload(entity, hydratedBody);
+    
+    // DEBUG: Log what passed through sanitization
+    if (entity === 'work_package_templates') {
+      logger.info('[WPT DEBUG] After sanitizeWritePayload keys:', Object.keys(payload));
+      logger.info('[WPT DEBUG] payload.materials_json:', payload.materials_json);
+      logger.info('[WPT DEBUG] payload.tooling_json:', payload.tooling_json);
+      logger.info('[WPT DEBUG] payload.compliance_requirements_json:', payload.compliance_requirements_json);
+    }
     if (entity === 'assembly_models') {
       const issues = await validateAssemblyModelReferences(supabase, req.tenantId, franchiseId, [payload]);
       if (issues.size > 0) {

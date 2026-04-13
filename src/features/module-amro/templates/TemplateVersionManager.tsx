@@ -10,24 +10,26 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
-import { Plus, Send, CheckCircle, XCircle, Eye, Trash2 } from 'lucide-react';
+import { Plus, Send, CheckCircle, XCircle, Eye, Trash2, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
+import { Separator } from '@/components/ui/separator';
 import type { WorkPackageTemplate } from './AmroWorkPackageTemplatesPage';
-import { 
-  fetchTemplateVersions, 
-  createTemplateVersion, 
-  submitTemplateVersion, 
+import {
+  fetchTemplateVersions,
+  createTemplateVersion,
+  submitTemplateVersion,
   reviewTemplateVersion,
   deleteTemplateVersion,
-  type TemplateVersion 
+  updateTemplateVersion,
+  type TemplateVersion
 } from './templateApi';
 import { useAuth } from '@/hooks/useAuth';
 
@@ -63,6 +65,15 @@ export function TemplateVersionManager({
   const [reviewDialog, setReviewDialog] = useState<{ open: boolean; version: TemplateVersion | null; action: 'approve' | 'reject' }>({ open: false, version: null, action: 'approve' });
   const [rejectionReason, setRejectionReason] = useState('');
   const [setActive, setSetActive] = useState(false);
+
+  // Edit dialog state
+  const [editDialog, setEditDialog] = useState<{ open: boolean; version: TemplateVersion | null }>({ open: false, version: null });
+  const [editLoading, setEditLoading] = useState(false);
+  const [editForm, setEditForm] = useState({ change_description: '', change_reason: '', version_label: '' });
+  const [editIncludeTasks, setEditIncludeTasks] = useState(true);
+  const [editIncludeMaterials, setEditIncludeMaterials] = useState(true);
+  const [editIncludeTooling, setEditIncludeTooling] = useState(true);
+  const [editIncludeCompliance, setEditIncludeCompliance] = useState(true);
 
   // Create form
   const [changeDescription, setChangeDescription] = useState('');
@@ -165,6 +176,61 @@ export function TemplateVersionManager({
       onSuccess();
     } catch (err: any) {
       toast.error(err.message || 'Failed to review');
+    }
+  };
+
+  // ── Edit Version ───────────────────────────────────────────────────────────
+
+  const openEditDialog = (version: TemplateVersion) => {
+    setEditDialog({ open: true, version });
+    setEditForm({
+      change_description: version.change_description || '',
+      change_reason: version.change_reason || '',
+      version_label: version.version_label || '',
+    });
+    setEditIncludeTasks(Array.isArray(version.tasks_json) && version.tasks_json.length > 0);
+    setEditIncludeMaterials(Array.isArray(version.materials_json) && version.materials_json.length > 0);
+    setEditIncludeTooling(Array.isArray(version.tooling_json) && version.tooling_json.length > 0);
+    setEditIncludeCompliance(Array.isArray(version.compliance_requirements_json) && version.compliance_requirements_json.length > 0);
+  };
+
+  const handleEditVersion = async () => {
+    if (!editDialog.version) return;
+    if (!editForm.change_description.trim()) {
+      toast.error('Change description is required');
+      return;
+    }
+
+    setEditLoading(true);
+    try {
+      const payload: any = {
+        change_description: editForm.change_description.trim(),
+        change_reason: editForm.change_reason.trim() || null,
+        version_label: editForm.version_label.trim() || null,
+      };
+
+      // Update content arrays based on checkboxes
+      if (editIncludeTasks) payload.tasks_json = template.tasks_json || [];
+      else payload.tasks_json = [];
+
+      if (editIncludeMaterials) payload.materials_json = template.materials_json || [];
+      else payload.materials_json = [];
+
+      if (editIncludeTooling) payload.tooling_json = template.tooling_json || [];
+      else payload.tooling_json = [];
+
+      if (editIncludeCompliance) payload.compliance_requirements_json = template.compliance_requirements_json || [];
+      else payload.compliance_requirements_json = [];
+
+      await updateTemplateVersion(accessToken, editDialog.version.id, payload);
+      toast.success('Version updated');
+      setEditDialog({ open: false, version: null });
+      loadVersions();
+      onSuccess();
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to update version');
+    } finally {
+      setEditLoading(false);
     }
   };
 
@@ -310,6 +376,14 @@ export function TemplateVersionManager({
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  onClick={() => openEditDialog(v)}
+                                  title="Edit Version"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => handleSubmit(v)}
                                   title="Submit for Review"
                                 >
@@ -402,6 +476,93 @@ export function TemplateVersionManager({
               {reviewDialog.action === 'approve' ? 'Approve' : 'Reject'}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Edit Version Dialog */}
+      <Dialog open={editDialog.open} onOpenChange={(open) => { if (!open) setEditDialog({ open: false, version: null }); }}>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Edit Version</DialogTitle>
+            <DialogDescription>
+              {editDialog.version?.version_label || `v${editDialog.version?.version_number}`} — Modify draft version details
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Change Description *</Label>
+              <Textarea
+                value={editForm.change_description}
+                onChange={e => setEditForm({ ...editForm, change_description: e.target.value })}
+                placeholder="Describe what changed in this version..."
+                rows={2}
+              />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <Label>Change Reason</Label>
+                <Input
+                  value={editForm.change_reason}
+                  onChange={e => setEditForm({ ...editForm, change_reason: e.target.value })}
+                  placeholder="e.g., Regulatory update, process improvement..."
+                />
+              </div>
+              <div>
+                <Label>Version Label</Label>
+                <Input
+                  value={editForm.version_label}
+                  onChange={e => setEditForm({ ...editForm, version_label: e.target.value })}
+                  placeholder="e.g., Initial Release, Q2 Update..."
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            <div>
+              <Label className="text-sm">Include in this version:</Label>
+              <div className="grid grid-cols-2 gap-3 mt-2">
+                <div className="flex items-center gap-2 p-2 border rounded">
+                  <Checkbox checked={editIncludeTasks} onCheckedChange={v => setEditIncludeTasks(!!v)} />
+                  <div>
+                    <div className="text-sm font-medium">Tasks</div>
+                    <div className="text-xs text-muted-foreground">{template.tasks_count || 0} tasks</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-2 border rounded">
+                  <Checkbox checked={editIncludeMaterials} onCheckedChange={v => setEditIncludeMaterials(!!v)} />
+                  <div>
+                    <div className="text-sm font-medium">Materials</div>
+                    <div className="text-xs text-muted-foreground">Bill of materials</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-2 border rounded">
+                  <Checkbox checked={editIncludeTooling} onCheckedChange={v => setEditIncludeTooling(!!v)} />
+                  <div>
+                    <div className="text-sm font-medium">Tooling</div>
+                    <div className="text-xs text-muted-foreground">Tools & equipment</div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 p-2 border rounded">
+                  <Checkbox checked={editIncludeCompliance} onCheckedChange={v => setEditIncludeCompliance(!!v)} />
+                  <div>
+                    <div className="text-sm font-medium">Compliance</div>
+                    <div className="text-xs text-muted-foreground">Regulatory requirements</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEditDialog({ open: false, version: null })}>
+              Cancel
+            </Button>
+            <Button onClick={handleEditVersion} disabled={editLoading}>
+              {editLoading ? 'Saving...' : 'Save Changes'}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </>

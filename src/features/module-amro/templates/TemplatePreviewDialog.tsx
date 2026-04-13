@@ -1,15 +1,18 @@
 /**
  * Template Preview Dialog Component
- * 
+ *
  * Shows template details including:
  * - Template metadata (name, code, description, maintenance type, etc.)
  * - Version history with status badges
  * - Task list from latest version
  * - Materials and tooling requirements
  * - Compliance requirements
+ *
+ * NOTE: Fetches fresh template data on open to ensure Aircraft Model and
+ * other fields reflect the latest saved changes.
  */
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -17,7 +20,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { Calendar, CheckCircle2, Clock, FileText, Package, Settings, Wrench } from 'lucide-react';
+import { Activity, Calendar, CheckCircle2, Clock, FileText, Package, Settings, User, Wrench } from 'lucide-react';
+import { useAuth } from '@/hooks/useAuth';
 
 interface TemplateRecord {
   id: string;
@@ -36,6 +40,7 @@ interface TemplateRecord {
   created_at: string;
   updated_at: string;
   created_by: string | null;
+  updated_by: string | null;
 }
 
 interface TemplateVersionRecord {
@@ -90,6 +95,73 @@ export function TemplatePreviewDialog({
   versions,
   loading,
 }: TemplatePreviewDialogProps) {
+  const { session } = useAuth();
+  const accessToken = session?.access_token || '';
+
+  // State for fresh template data fetched from API
+  const [freshTemplate, setFreshTemplate] = useState<TemplateRecord | null>(null);
+  const [freshLoading, setFreshLoading] = useState(false);
+
+  // Fetch fresh template data when dialog opens to ensure Aircraft Model
+  // and other fields reflect the latest saved changes
+  useEffect(() => {
+    if (!open || !template?.id || !accessToken) {
+      setFreshTemplate(null);
+      return;
+    }
+
+    let cancelled = false;
+    setFreshLoading(true);
+
+    const fetchFresh = async () => {
+      try {
+        const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${template.id}`, {
+          method: 'GET',
+          headers: { Authorization: `Bearer ${accessToken}` },
+        });
+
+        if (!response.ok) return;
+
+        const json = await response.json();
+        const record = json.data || json.output?.record || json.output;
+
+        if (!cancelled && record) {
+          setFreshTemplate({
+            id: record.id,
+            template_code: record.template_code,
+            template_name: record.template_name,
+            description: record.description || null,
+            maintenance_type: record.maintenance_type,
+            model_id: record.model_id || null,
+            aircraft_model: record.aircraft_model || null,
+            version: record.version,
+            active: record.active,
+            status: record.status || 'draft',
+            scope_items_count: record.scope_items_count || 0,
+            tasks_count: record.tasks_count || 0,
+            estimated_labor_hours: record.estimated_labor_hours || null,
+            created_at: record.created_at,
+            updated_at: record.updated_at,
+            created_by: record.created_by || null,
+            updated_by: record.updated_by || null,
+          });
+        }
+      } catch {
+        // Silently fail - fall back to prop data
+      } finally {
+        if (!cancelled) {
+          setFreshLoading(false);
+        }
+      }
+    };
+
+    fetchFresh();
+    return () => { cancelled = true; };
+  }, [open, template?.id, accessToken]);
+
+  // Use fresh template data if available, otherwise fall back to prop
+  const displayTemplate = freshTemplate || template;
+
   // Ensure versions is always an array
   const safeVersions = Array.isArray(versions) ? versions : [];
   const latestVersion = useMemo(() => {
@@ -97,34 +169,56 @@ export function TemplatePreviewDialog({
     return safeVersions.reduce((latest, v) => v.version_number > latest.version_number ? v : latest, safeVersions[0]);
   }, [safeVersions]);
 
-  if (!template) return null;
+  // Fallback to template data if no versions available
+  const effectiveMaterials = latestVersion?.materials_json
+    || (displayTemplate as any)?.materials_json
+    || [];
+  const effectiveTooling = latestVersion?.tooling_json
+    || (displayTemplate as any)?.tooling_json
+    || [];
+  const effectiveCompliance = latestVersion?.compliance_requirements_json
+    || (displayTemplate as any)?.compliance_requirements_json
+    || [];
+  const effectiveTasks = latestVersion?.tasks_json
+    || (displayTemplate as any)?.tasks_json
+    || [];
 
-  const statusConfig = STATUS_CONFIG[template.status] || { label: template.status, variant: 'outline' };
+  if (!displayTemplate) return null;
+
+  const statusConfig = STATUS_CONFIG[displayTemplate.status] || { label: displayTemplate.status, variant: 'outline' };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-primary/10">
-              <FileText className="h-6 w-6 text-primary" />
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-primary/10">
+                <FileText className="h-6 w-6 text-primary" />
+              </div>
+              <div>
+                <DialogTitle className="text-xl">{displayTemplate.template_name}</DialogTitle>
+                <DialogDescription className="font-mono text-xs mt-1">{displayTemplate.template_code}</DialogDescription>
+              </div>
             </div>
-            <div>
-              <DialogTitle className="text-xl">{template.template_name}</DialogTitle>
-              <DialogDescription className="font-mono text-xs mt-1">{template.template_code}</DialogDescription>
-            </div>
+            {(freshLoading || loading) && (
+              <div className="text-xs text-muted-foreground flex items-center gap-1">
+                <Activity className="h-3 w-3 animate-spin" />
+                Loading fresh data...
+              </div>
+            )}
           </div>
         </DialogHeader>
 
-        {/* Metadata Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {/* Metadata Grid - Enhanced with all available fields */}
+        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
           <Card>
             <CardHeader className="pb-2">
               <CardDescription>Maintenance Type</CardDescription>
             </CardHeader>
             <CardContent>
               <Badge variant="outline">
-                {MAINTENANCE_TYPE_LABELS[template.maintenance_type] || template.maintenance_type}
+                {MAINTENANCE_TYPE_LABELS[displayTemplate.maintenance_type] || displayTemplate.maintenance_type}
               </Badge>
             </CardContent>
           </Card>
@@ -133,8 +227,8 @@ export function TemplatePreviewDialog({
               <CardDescription>Aircraft Model</CardDescription>
             </CardHeader>
             <CardContent>
-              {template.aircraft_model ? (
-                <Badge variant="secondary">{template.aircraft_model}</Badge>
+              {displayTemplate.aircraft_model ? (
+                <Badge variant="secondary">{displayTemplate.aircraft_model}</Badge>
               ) : (
                 <span className="text-sm text-muted-foreground">All Models</span>
               )}
@@ -145,7 +239,7 @@ export function TemplatePreviewDialog({
               <CardDescription>Version</CardDescription>
             </CardHeader>
             <CardContent>
-              <span className="text-lg font-mono font-bold">v{template.version}</span>
+              <span className="text-lg font-mono font-bold">v{displayTemplate.version}</span>
             </CardContent>
           </Card>
           <Card>
@@ -156,39 +250,89 @@ export function TemplatePreviewDialog({
               <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
             </CardContent>
           </Card>
+          <Card>
+            <CardHeader className="pb-2">
+              <CardDescription>Active</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Badge variant={displayTemplate.active ? 'default' : 'secondary'}>
+                {displayTemplate.active ? 'Yes' : 'No'}
+              </Badge>
+            </CardContent>
+          </Card>
         </div>
 
-        {template.description && (
+        {displayTemplate.description && (
           <>
             <Separator />
             <div>
               <h4 className="text-sm font-medium mb-2">Description</h4>
-              <p className="text-sm text-muted-foreground">{template.description}</p>
+              <p className="text-sm text-muted-foreground">{displayTemplate.description}</p>
             </div>
           </>
         )}
 
-        {/* Quick Stats */}
-        <div className="grid grid-cols-3 gap-3">
+        {/* Enhanced Quick Stats */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
             <Wrench className="h-5 w-5 text-muted-foreground" />
             <div>
               <div className="text-xs text-muted-foreground">Tasks</div>
-              <div className="text-lg font-bold">{template.tasks_count || 0}</div>
+              <div className="text-lg font-bold">{displayTemplate.tasks_count || 0}</div>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-            <Clock className="h-5 w-5 text-muted-foreground" />
+            <Package className="h-5 w-5 text-muted-foreground" />
             <div>
-              <div className="text-xs text-muted-foreground">Est. Hours</div>
-              <div className="text-lg font-bold">{template.estimated_labor_hours?.toFixed(1) || '-'}</div>
+              <div className="text-xs text-muted-foreground">Materials</div>
+              <div className="text-lg font-bold">{effectiveMaterials.length || displayTemplate.scope_items_count || 0}</div>
             </div>
           </div>
           <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
-            <Calendar className="h-5 w-5 text-muted-foreground" />
+            <Settings className="h-5 w-5 text-muted-foreground" />
             <div>
-              <div className="text-xs text-muted-foreground">Updated</div>
-              <div className="text-sm font-medium">{new Date(template.updated_at).toLocaleDateString()}</div>
+              <div className="text-xs text-muted-foreground">Tooling</div>
+              <div className="text-lg font-bold">{effectiveTooling.length}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 p-3 bg-muted rounded-md">
+            <CheckCircle2 className="h-5 w-5 text-muted-foreground" />
+            <div>
+              <div className="text-xs text-muted-foreground">Compliance</div>
+              <div className="text-lg font-bold">{effectiveCompliance.length}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Audit Info Section */}
+        <Separator />
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <div className="text-xs text-muted-foreground">Created By</div>
+              <div className="font-medium truncate">{displayTemplate.created_by || '-'}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <User className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <div className="text-xs text-muted-foreground">Updated By</div>
+              <div className="font-medium truncate">{displayTemplate.updated_by || '-'}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <div className="text-xs text-muted-foreground">Created</div>
+              <div className="font-medium">{displayTemplate.created_at ? new Date(displayTemplate.created_at).toLocaleDateString() : '-'}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <div>
+              <div className="text-xs text-muted-foreground">Last Updated</div>
+              <div className="font-medium">{displayTemplate.updated_at ? new Date(displayTemplate.updated_at).toLocaleDateString() : '-'}</div>
             </div>
           </div>
         </div>
@@ -255,7 +399,7 @@ export function TemplatePreviewDialog({
 
           {/* Tasks Tab */}
           <TabsContent value="tasks">
-            {Array.isArray(latestVersion?.tasks_json) && latestVersion.tasks_json.length > 0 ? (
+            {Array.isArray(effectiveTasks) && effectiveTasks.length > 0 ? (
               <div className="border rounded-md max-h-[400px] overflow-y-auto">
                 <Table>
                   <TableHeader>
@@ -268,7 +412,7 @@ export function TemplatePreviewDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {latestVersion.tasks_json.map((task: any, idx: number) => (
+                    {effectiveTasks.map((task: any, idx: number) => (
                       <TableRow key={task.id || idx}>
                         <TableCell className="text-muted-foreground">{idx + 1}</TableCell>
                         <TableCell className="font-mono">{task.task_number || task.code || task.number || '-'}</TableCell>
@@ -302,7 +446,7 @@ export function TemplatePreviewDialog({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {Array.isArray(latestVersion?.materials_json) && latestVersion.materials_json.length > 0 ? (
+                  {Array.isArray(effectiveMaterials) && effectiveMaterials.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -312,7 +456,7 @@ export function TemplatePreviewDialog({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {latestVersion.materials_json.map((mat: any, idx: number) => (
+                        {effectiveMaterials.map((mat: any, idx: number) => (
                           <TableRow key={mat.id || idx}>
                             <TableCell className="font-mono">{mat.part_number || mat.part_no || '-'}</TableCell>
                             <TableCell>{mat.description || '-'}</TableCell>
@@ -339,7 +483,7 @@ export function TemplatePreviewDialog({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {Array.isArray(latestVersion?.tooling_json) && latestVersion.tooling_json.length > 0 ? (
+                  {Array.isArray(effectiveTooling) && effectiveTooling.length > 0 ? (
                     <Table>
                       <TableHeader>
                         <TableRow>
@@ -348,7 +492,7 @@ export function TemplatePreviewDialog({
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {latestVersion.tooling_json.map((tool: any, idx: number) => (
+                        {effectiveTooling.map((tool: any, idx: number) => (
                           <TableRow key={tool.id || idx}>
                             <TableCell className="font-mono">{tool.tool_code || tool.code || '-'}</TableCell>
                             <TableCell>{tool.description || '-'}</TableCell>
@@ -374,9 +518,9 @@ export function TemplatePreviewDialog({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {Array.isArray(latestVersion?.compliance_requirements_json) && latestVersion.compliance_requirements_json.length > 0 ? (
+                  {Array.isArray(effectiveCompliance) && effectiveCompliance.length > 0 ? (
                     <div className="space-y-2">
-                      {latestVersion.compliance_requirements_json.map((req: any, idx: number) => (
+                      {effectiveCompliance.map((req: any, idx: number) => (
                         <div key={req.id || idx} className="p-3 border rounded-md">
                           <div className="font-medium">{req.requirement_code || req.code || `Requirement ${idx + 1}`}</div>
                           <div className="text-sm text-muted-foreground">{req.description || '-'}</div>
