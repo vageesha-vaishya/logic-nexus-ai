@@ -3958,10 +3958,31 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
 
         // Set model name from assembly model
         setSelectedTemplateModelName(String(assemblyRecord?.name || assemblyRecord?.model_code || ''));
-        
-        // Set aircraft type - use assembly_models.aircraft_type if available, otherwise fallback to assembly_type
+
+        // Set aircraft type - use assembly_models.aircraft_type if available, otherwise fetch from assembly_type
         const aircraftTypeValue = assemblyRecord?.aircraft_type;
-        setSelectedTemplateAircraftType(String(aircraftTypeValue || ''));
+        const assemblyTypeId = String(assemblyRecord?.assembly_type_id || '').trim();
+        
+        if (aircraftTypeValue) {
+          setSelectedTemplateAircraftType(String(aircraftTypeValue));
+        } else if (assemblyTypeId) {
+          // Fallback: fetch assembly_type to get the name/code
+          try {
+            const assemblyTypeResponse = await fetch(`/api/v2/amro/master-data/assembly_types/${assemblyTypeId}`, { method: 'GET', headers });
+            const assemblyTypePayload = await parseApiPayload(assemblyTypeResponse);
+            if (assemblyTypeResponse.ok) {
+              const assemblyTypeOutput = assemblyTypePayload.output as Record<string, unknown> | undefined;
+              const assemblyTypeRecord = assemblyTypeOutput?.record as Record<string, unknown> | undefined;
+              setSelectedTemplateAircraftType(String(assemblyTypeRecord?.name || assemblyTypeRecord?.assembly_code || ''));
+            } else {
+              setSelectedTemplateAircraftType('');
+            }
+          } catch {
+            setSelectedTemplateAircraftType('');
+          }
+        } else {
+          setSelectedTemplateAircraftType('');
+        }
 
         // Fetch manufacturer details using API
         const manufacturerId = String(assemblyRecord?.manufacturer_id || '').trim();
