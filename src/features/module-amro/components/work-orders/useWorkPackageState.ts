@@ -228,21 +228,12 @@ export function useListWorkPackages(params: UseListWorkPackagesParams = {}) {
 
 async function fetchWorkPackage(id: string, headers: HeadersInit): Promise<WorkPackageDetail> {
   const url = `/api/v2/amro/work-packages/${id}`;
-  console.log('[WP DETAIL] Fetching work package:', url);
   const response = await fetch(url, { method: 'GET', headers });
-  console.log('[WP DETAIL] Response status:', response.status);
-  if (!response.ok) {
-    const errorText = await response.text().catch(() => '');
-    console.error('[WP DETAIL] API error response:', response.status, errorText);
-    throw new Error(`Failed to get work package: ${response.status} - ${errorText}`);
-  }
+  if (!response.ok) throw new Error(`Failed to get work package: ${response.status}`);
   const json = await response.json();
-  console.log('[WP DETAIL] API response keys:', Object.keys(json || {}));
-  // FIXED: API returns { data: { work_package: {...}, domainAccess: {...} } }
-  // Need to unwrap the nested work_package object
+  // API returns { data: { work_package: {...} } }
   const dataBlock = json.data || json.output || {};
   const item = dataBlock.work_package || dataBlock.record || dataBlock;
-  console.log('[WP DETAIL] Unwrapped item keys:', Object.keys(item || {}));
   return {
     id: item.id || id,
     work_package_number: item.work_package_number || item.work_order_number || item.code || '',
