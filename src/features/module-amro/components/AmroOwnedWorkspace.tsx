@@ -8,7 +8,7 @@ import { CRMDatePicker as DatePicker } from '@/design-system/components/molecule
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { ArrowDownUp, ChevronDown, ChevronUp, Copy, Download, Eye, GripVertical, PauseCircle, PlayCircle, RefreshCw, Trash2 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, memo, type MouseEvent as ReactMouseEvent } from 'react';
 import { toast } from 'sonner';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -304,6 +304,67 @@ const createDefaultWorkPackageCreateFormState = (): WorkPackageCreateFormState =
   };
 };
 
+/**
+ * Memoized Aircraft Search Component
+ * Extracted to prevent flickering caused by parent component re-renders
+ */
+const AircraftSearchSection = memo(function AircraftSearchSection({
+  aircraftSearchTerm,
+  onSearchChange,
+  filteredAircraftOptions,
+  selectedAircraftId,
+  onSelectAircraft,
+  isLoading,
+  selectedAircraft,
+}: {
+  aircraftSearchTerm: string;
+  onSearchChange: (value: string) => void;
+  filteredAircraftOptions: WorkPackageCreateAircraftOption[];
+  selectedAircraftId: string | undefined;
+  onSelectAircraft: (id: string) => void;
+  isLoading: boolean;
+  selectedAircraft: WorkPackageCreateAircraftOption | null;
+}) {
+  return (
+    <div className="space-y-1">
+      <Label htmlFor="wp-aircraft-search">Aircraft</Label>
+      <TextInput id="wp-aircraft-search" value={aircraftSearchTerm} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search model, registration, serial" />
+      <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-2">
+        {isLoading ? (
+          <p className="text-xs text-muted-foreground">Loading aircraft...</p>
+        ) : filteredAircraftOptions.length === 0 ? (
+          <p className="text-xs text-muted-foreground">No aircraft found in tenant scope.</p>
+        ) : (
+          filteredAircraftOptions.map((aircraft) => (
+            <Button
+              key={aircraft.id}
+              type="button"
+              variant="ghost"
+              size="sm"
+              onClick={() => onSelectAircraft(aircraft.id)}
+              className={`h-auto w-full justify-start rounded-md border px-3 py-2 text-left text-xs ${selectedAircraftId === aircraft.id ? 'border-primary bg-primary/10' : 'border-border'}`}
+              aria-pressed={selectedAircraftId === aircraft.id}
+            >
+              <p className="font-medium">{aircraft.aircraftModel || 'Unknown Model'} · {aircraft.registration || '-'}</p>
+              <p className="text-muted-foreground">SN {aircraft.serialNumber || '-'} · Station {aircraft.stationCode || '-'}</p>
+            </Button>
+          ))
+        )}
+      </div>
+      {selectedAircraft ? (
+        <div className="grid grid-cols-2 gap-2 rounded-md border p-3 text-xs">
+          <div>Model: {selectedAircraft.aircraftModel || '-'}</div>
+          <div>Serial: {selectedAircraft.serialNumber || '-'}</div>
+          <div>Registration: {selectedAircraft.registration || '-'}</div>
+          <div>Hours/Cycles: {selectedAircraft.currentFlightHours}/{selectedAircraft.currentCycles}</div>
+          <div>Status: {selectedAircraft.status || '-'}</div>
+          <div>Operator: {selectedAircraft.operatorCode || '-'}</div>
+        </div>
+      ) : null}
+    </div>
+  );
+});
+
 export function AmroOwnedWorkspace({
   moduleKey,
   overviewPersona: _overviewPersona = 'tenant_admin',
@@ -367,7 +428,25 @@ export function AmroOwnedWorkspace({
   const [maintenanceTaskSelectionOptions, setMaintenanceTaskSelectionOptions] = useState<WorkPackageCreateTaskOption[]>([]);
   const [workPackageAircraftOptions, setWorkPackageAircraftOptions] = useState<WorkPackageCreateAircraftOption[]>([]);
   const [aircraftSearchTerm, setAircraftSearchTerm] = useState('');
+  const [debouncedAircraftSearchTerm, setDebouncedAircraftSearchTerm] = useState('');
   const [taskSearchTerm, setTaskSearchTerm] = useState('');
+  const [debouncedTaskSearchTerm, setDebouncedTaskSearchTerm] = useState('');
+
+  // Debounce aircraft search to prevent flickering during typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedAircraftSearchTerm(aircraftSearchTerm);
+    }, 200); // 200ms debounce delay
+    return () => clearTimeout(timer);
+  }, [aircraftSearchTerm]);
+
+  // Debounce task search to prevent flickering during typing
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedTaskSearchTerm(taskSearchTerm);
+    }, 200); // 200ms debounce delay
+    return () => clearTimeout(timer);
+  }, [taskSearchTerm]);
   const [taskConflictById, setTaskConflictById] = useState<Record<string, TaskConflictInfo>>({});
   const [taskSelectionLoading, setTaskSelectionLoading] = useState(false);
   const [aircraftSelectionLoading, setAircraftSelectionLoading] = useState(false);
@@ -1407,29 +1486,42 @@ export function AmroOwnedWorkspace({
   const visibleWorkspaceError = state.workPackagesError?.trim().toLowerCase() === 'not found' ? null : state.workPackagesError;
   const taskActionDisabledReason = canDirectTaskExecution ? '' : 'Disabled by policy: management role cannot submit technician execution actions.';
   const selectedWorkPackageAssignee = state.selectedWorkPackage?.tasks?.[0]?.assignedRole || 'Unassigned';
-  const selectedAircraft = workPackageAircraftOptions.find((aircraft) => aircraft.id === workPackageCreateForm.aircraftId) || null;
-  const filteredAircraftOptions = aircraftSearchTerm.trim()
-    ? workPackageAircraftOptions.filter((aircraft) => {
-      const token = aircraftSearchTerm.trim().toLowerCase();
-      return [
+  const selectedAircraft = useMemo(() => 
+    workPackageAircraftOptions.find((aircraft) => aircraft.id === workPackageCreateForm.aircraftId) || null,
+    [workPackageAircraftOptions, workPackageCreateForm.aircraftId]
+  );
+  
+  // Memoized aircraft filtering using debounced search to prevent flickering
+  const filteredAircraftOptions = useMemo(() => {
+    const searchTerm = debouncedAircraftSearchTerm.trim();
+    if (!searchTerm) return workPackageAircraftOptions;
+    
+    const token = searchTerm.toLowerCase();
+    return workPackageAircraftOptions.filter((aircraft) =>
+      [
         aircraft.aircraftModel,
         aircraft.registration,
         aircraft.serialNumber,
         aircraft.operatorCode,
-      ].some((entry) => entry.toLowerCase().includes(token));
-    })
-    : workPackageAircraftOptions;
-  const taskSelectionOptions = taskSearchTerm.trim()
-    ? maintenanceTaskSelectionOptions.filter((task) => {
-      const token = taskSearchTerm.trim().toLowerCase();
-      return [
+      ].some((entry) => entry?.toLowerCase().includes(token))
+    );
+  }, [workPackageAircraftOptions, debouncedAircraftSearchTerm]);
+  
+  // Memoized task filtering using debounced search to prevent flickering
+  const taskSelectionOptions = useMemo(() => {
+    const searchTerm = debouncedTaskSearchTerm.trim();
+    if (!searchTerm) return maintenanceTaskSelectionOptions;
+    
+    const token = searchTerm.toLowerCase();
+    return maintenanceTaskSelectionOptions.filter((task) =>
+      [
         task.taskNumber,
         task.title,
         task.category,
         task.status,
-      ].some((entry) => entry.toLowerCase().includes(token));
-    })
-    : maintenanceTaskSelectionOptions;
+      ].some((entry) => entry?.toLowerCase().includes(token))
+    );
+  }, [maintenanceTaskSelectionOptions, debouncedTaskSearchTerm]);
   const selectedTaskOptions = maintenanceTaskSelectionOptions
     .filter((task) => workPackageCreateForm.selectedTaskIds.includes(task.value));
   const selectedTaskCount = selectedTaskOptions.length;
@@ -1888,7 +1980,7 @@ export function AmroOwnedWorkspace({
     setWorkPackageCreateTab(nextTab);
   };
 
-  const handleWorkPackageCreateFormChange = <K extends keyof WorkPackageCreateFormState>(key: K, value: WorkPackageCreateFormState[K]) => {
+  const handleWorkPackageCreateFormChange = useCallback(<K extends keyof WorkPackageCreateFormState>(key: K, value: WorkPackageCreateFormState[K]) => {
     setWorkPackageCreateForm((current) => ({
       ...current,
       [key]: value,
@@ -1901,9 +1993,9 @@ export function AmroOwnedWorkspace({
       delete nextErrors[key];
       return nextErrors;
     });
-  };
+  }, []);
 
-  const handleSelectWorkPackageAircraft = (aircraftId: string) => {
+  const handleSelectWorkPackageAircraft = useCallback((aircraftId: string) => {
     const selected = workPackageAircraftOptions.find((aircraft) => aircraft.id === aircraftId);
     handleWorkPackageCreateFormChange('aircraftId', aircraftId);
     handleWorkPackageCreateFormChange('selectedAircraftModel', selected?.aircraftModel || '');
@@ -1911,7 +2003,7 @@ export function AmroOwnedWorkspace({
     handleWorkPackageCreateFormChange('locationStation', selected?.stationCode || '');
     handleWorkPackageCreateFormChange('selectedTaskIds', []);
     setTaskConflictById({});
-  };
+  }, [workPackageAircraftOptions, handleWorkPackageCreateFormChange]);
 
   const handleToggleWorkPackageCreateTaskSelection = (taskId: string, checked: boolean) => {
     if (taskConflictById[taskId]) {
@@ -3971,41 +4063,16 @@ export function AmroOwnedWorkspace({
           <div className="grid h-[calc(92vh-148px)] grid-cols-1 gap-2 overflow-hidden bg-[#f8f8f8] px-3 pb-2 pt-1 lg:grid-cols-[1.06fr_0.94fr]">
             <div className="space-y-3 overflow-y-auto border border-[#e5e5e5] bg-white p-2.5">
               <div className="border-b border-[#efefef] bg-[#fafafa] px-[10px] py-[6px] text-[13px] font-semibold text-[#757575]">Work Package details</div>
-              <div className="space-y-1">
-                <Label htmlFor="wp-aircraft-search">Aircraft</Label>
-                <TextInput id="wp-aircraft-search" value={aircraftSearchTerm} onChange={(event) => setAircraftSearchTerm(event.target.value)} placeholder="Search model, registration, serial" />
-              </div>
-              <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-2">
-                {aircraftSelectionLoading ? (
-                  <p className="text-xs text-muted-foreground">Loading aircraft...</p>
-                ) : filteredAircraftOptions.length === 0 ? (
-                  <p className="text-xs text-muted-foreground">No aircraft found in tenant scope.</p>
-                ) : filteredAircraftOptions.map((aircraft) => (
-                  <Button
-                    key={aircraft.id}
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleSelectWorkPackageAircraft(aircraft.id)}
-                    className={`h-auto w-full justify-start rounded-md border px-3 py-2 text-left text-xs ${workPackageCreateForm.aircraftId === aircraft.id ? 'border-primary bg-primary/10' : 'border-border'}`}
-                    aria-pressed={workPackageCreateForm.aircraftId === aircraft.id}
-                  >
-                    <p className="font-medium">{aircraft.aircraftModel || 'Unknown Model'} · {aircraft.registration || '-'}</p>
-                    <p className="text-muted-foreground">SN {aircraft.serialNumber || '-'} · Station {aircraft.stationCode || '-'}</p>
-                  </Button>
-                ))}
-              </div>
+              <AircraftSearchSection
+                aircraftSearchTerm={aircraftSearchTerm}
+                onSearchChange={setAircraftSearchTerm}
+                filteredAircraftOptions={filteredAircraftOptions}
+                selectedAircraftId={workPackageCreateForm.aircraftId}
+                onSelectAircraft={handleSelectWorkPackageAircraft}
+                isLoading={aircraftSelectionLoading}
+                selectedAircraft={selectedAircraft}
+              />
               {workPackageCreateErrors.aircraftId ? <p className="text-xs text-destructive">{workPackageCreateErrors.aircraftId}</p> : null}
-              {selectedAircraft ? (
-                <div className="grid grid-cols-2 gap-2 rounded-md border p-3 text-xs">
-                  <div>Model: {selectedAircraft.aircraftModel || '-'}</div>
-                  <div>Serial: {selectedAircraft.serialNumber || '-'}</div>
-                  <div>Registration: {selectedAircraft.registration || '-'}</div>
-                  <div>Hours/Cycles: {selectedAircraft.currentFlightHours}/{selectedAircraft.currentCycles}</div>
-                  <div>Status: {selectedAircraft.status || '-'}</div>
-                  <div>Operator: {selectedAircraft.operatorCode || '-'}</div>
-                </div>
-              ) : null}
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor="wp-number">Package Number</Label>

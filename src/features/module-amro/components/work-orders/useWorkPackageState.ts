@@ -231,16 +231,18 @@ async function fetchWorkPackage(id: string, headers: HeadersInit): Promise<WorkP
   const response = await fetch(url, { method: 'GET', headers });
   if (!response.ok) throw new Error(`Failed to get work package: ${response.status}`);
   const json = await response.json();
-  const item = json.data || json.output || {};
+  // API returns { data: { work_package: {...} } }
+  const dataBlock = json.data || json.output || {};
+  const item = dataBlock.work_package || dataBlock.record || dataBlock;
   return {
     id: item.id || id,
-    work_package_number: item.work_package_number || item.work_order_number || '',
-    work_order_number: item.work_order_number || item.work_package_number || '',
-    title: item.title || '',
+    work_package_number: item.work_package_number || item.work_order_number || item.code || '',
+    work_order_number: item.work_order_number || item.work_package_number || item.code || '',
+    title: item.title || item.work_package_number || 'Work Package',
     aircraft_id: item.aircraft_id || null,
-    aircraft_registration: item.aircraft_registration || null,
+    aircraft_registration: item.aircraft_registration || item.aircraft || null,
     status: (item.status || 'planning') as WorkPackageStatus,
-    priority: (item.priority || 3) as WorkPackagePriority,
+    priority: Number(item.priority || 3) as WorkPackagePriority,
     maintenance_type: (item.maintenance_type || 'line') as MaintenanceType,
     description: item.description || null,
     planned_start_date: item.planned_start_date || item.planned_start || null,

@@ -1,17 +1,18 @@
 /**
  * Template Create/Edit Dialog
- * 
+ *
  * Full-featured form for creating/editing work package templates with:
  * - Core details (code, name, maintenance type, aircraft model)
  * - Task selection table with filtering/sorting
- * - Materials/BOM editor
- * - Tooling & Equipment editor
- * - Compliance Requirements editor
+ * - Enterprise Materials+, Tooling+, Compliance+ editors
  * - Scope definition
+ *
+ * Note: Basic Materials/Tooling/Compliance tabs removed in favor of
+ * enhanced Enterprise editors (Materials+, Tooling+, Compliance+)
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Save, X, Wrench, Package, Settings, Check, FileText, Layers } from 'lucide-react';
+import { Plus, Save, X, Wrench, FileText, Layers } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -114,15 +115,6 @@ export function TemplateCreateEditDialog({
   const [taskFilterCategory, setTaskFilterCategory] = useState('all');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 
-  // Materials state
-  const [materials, setMaterials] = useState<any[]>([]);
-  
-  // Tooling state
-  const [tooling, setTooling] = useState<any[]>([]);
-
-  // Compliance state
-  const [compliance, setCompliance] = useState<any[]>([]);
-
   // ── Initialize form on open ────────────────────────────────────────────────
 
   useEffect(() => {
@@ -144,15 +136,9 @@ export function TemplateCreateEditDialog({
           compliance_requirements_json: template.compliance_requirements_json || [],
         });
         setSelectedTaskIds(new Set((template.tasks_json || []).map((t: any) => t.task_template_id || t.id).filter(Boolean)));
-        setMaterials(template.materials_json || []);
-        setTooling(template.tooling_json || []);
-        setCompliance(template.compliance_requirements_json || []);
       } else {
         setForm(DEFAULT_FORM);
         setSelectedTaskIds(new Set());
-        setMaterials([]);
-        setTooling([]);
-        setCompliance([]);
       }
       setErrors({});
       setActiveTab('details');
@@ -288,12 +274,9 @@ export function TemplateCreateEditDialog({
 
       // Debug: Log what we're about to save
       console.log('=== SAVE DEBUG ===');
-      console.log('form.materials_json:', form.materials_json);
-      console.log('form.materials_json.length:', form.materials_json.length);
-      console.log('materials (local):', materials);
-      console.log('Using enterprise data:', form.materials_json.length > 0);
-      console.log('form.tooling_json:', form.tooling_json);
-      console.log('form.compliance_requirements_json:', form.compliance_requirements_json);
+      console.log('Using enterprise materials data:', form.materials_json.length > 0);
+      console.log('Using enterprise tooling data:', form.tooling_json.length > 0);
+      console.log('Using enterprise compliance data:', form.compliance_requirements_json.length > 0);
 
       const payload: Record<string, unknown> = {
         tenant_id: tenantId || template?.tenant_id || '',
@@ -356,48 +339,6 @@ export function TemplateCreateEditDialog({
     }
   };
 
-  // ── Materials editor helpers ───────────────────────────────────────────────
-
-  const addMaterial = () => {
-    setMaterials(prev => [...prev, { part_number: '', description: '', quantity: 1, unit: 'EA' }]);
-  };
-
-  const updateMaterial = (idx: number, field: string, value: any) => {
-    setMaterials(prev => prev.map((m, i) => i === idx ? { ...m, [field]: value } : m));
-  };
-
-  const removeMaterial = (idx: number) => {
-    setMaterials(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  // ── Tooling editor helpers ─────────────────────────────────────────────────
-
-  const addTool = () => {
-    setTooling(prev => [...prev, { tool_code: '', description: '' }]);
-  };
-
-  const updateTool = (idx: number, field: string, value: any) => {
-    setTooling(prev => prev.map((t, i) => i === idx ? { ...t, [field]: value } : t));
-  };
-
-  const removeTool = (idx: number) => {
-    setTooling(prev => prev.filter((_, i) => i !== idx));
-  };
-
-  // ── Compliance editor helpers ──────────────────────────────────────────────
-
-  const addCompliance = () => {
-    setCompliance(prev => [...prev, { requirement_code: '', description: '', regulatory_authority: '' }]);
-  };
-
-  const updateCompliance = (idx: number, field: string, value: any) => {
-    setCompliance(prev => prev.map((c, i) => i === idx ? { ...c, [field]: value } : c));
-  };
-
-  const removeCompliance = (idx: number) => {
-    setCompliance(prev => prev.filter((_, i) => i !== idx));
-  };
-
   // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
@@ -416,7 +357,7 @@ export function TemplateCreateEditDialog({
         </DialogHeader>
 
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="grid w-full grid-cols-8">
+          <TabsList className="grid w-full grid-cols-5">
             <TabsTrigger value="details">
               <FileText className="h-4 w-4 mr-1" />
               Details
@@ -424,18 +365,6 @@ export function TemplateCreateEditDialog({
             <TabsTrigger value="tasks">
               <Wrench className="h-4 w-4 mr-1" />
               Tasks
-            </TabsTrigger>
-            <TabsTrigger value="materials">
-              <Package className="h-4 w-4 mr-1" />
-              Materials
-            </TabsTrigger>
-            <TabsTrigger value="tooling">
-              <Settings className="h-4 w-4 mr-1" />
-              Tooling
-            </TabsTrigger>
-            <TabsTrigger value="compliance">
-              <Check className="h-4 w-4 mr-1" />
-              Compliance
             </TabsTrigger>
             <TabsTrigger value="enterprise-materials" className="bg-green-50">
               <Layers className="h-4 w-4 mr-1" />
@@ -634,170 +563,6 @@ export function TemplateCreateEditDialog({
                     ))}
                   </TableBody>
                 </Table>
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Materials Tab */}
-          <TabsContent value="materials" className="space-y-4 pt-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">Bill of Materials</h4>
-              <Button variant="outline" size="sm" onClick={addMaterial}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Material
-              </Button>
-            </div>
-
-            {materials.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No materials defined</div>
-            ) : (
-              <div className="space-y-2">
-                {materials.map((mat, idx) => (
-                  <Card key={idx}>
-                    <CardContent className="pt-4">
-                      <div className="grid grid-cols-4 gap-3">
-                        <div>
-                          <Label className="text-xs">Part Number</Label>
-                          <Input
-                            value={mat.part_number || ''}
-                            onChange={e => updateMaterial(idx, 'part_number', e.target.value)}
-                            placeholder="e.g., PN-12345"
-                          />
-                        </div>
-                        <div className="col-span-2">
-                          <Label className="text-xs">Description</Label>
-                          <Input
-                            value={mat.description || ''}
-                            onChange={e => updateMaterial(idx, 'description', e.target.value)}
-                            placeholder="Material description..."
-                          />
-                        </div>
-                        <div className="flex items-end gap-2">
-                          <Input
-                            type="number"
-                            min={1}
-                            value={mat.quantity || 1}
-                            onChange={e => updateMaterial(idx, 'quantity', parseInt(e.target.value) || 1)}
-                            className="w-20"
-                          />
-                          <Input
-                            value={mat.unit || 'EA'}
-                            onChange={e => updateMaterial(idx, 'unit', e.target.value)}
-                            className="w-16"
-                            placeholder="Unit"
-                          />
-                          <Button variant="ghost" size="sm" onClick={() => removeMaterial(idx)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Tooling Tab */}
-          <TabsContent value="tooling" className="space-y-4 pt-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">Tooling & Equipment</h4>
-              <Button variant="outline" size="sm" onClick={addTool}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Tool
-              </Button>
-            </div>
-
-            {tooling.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No tooling requirements defined</div>
-            ) : (
-              <div className="space-y-2">
-                {tooling.map((tool, idx) => (
-                  <Card key={idx}>
-                    <CardContent className="pt-4">
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <Label className="text-xs">Tool Code</Label>
-                          <Input
-                            value={tool.tool_code || ''}
-                            onChange={e => updateTool(idx, 'tool_code', e.target.value)}
-                            placeholder="e.g., TOOL-001"
-                          />
-                        </div>
-                        <div className="col-span-2 flex items-end gap-2">
-                          <Input
-                            value={tool.description || ''}
-                            onChange={e => updateTool(idx, 'description', e.target.value)}
-                            placeholder="Tool/equipment description..."
-                            className="flex-1"
-                          />
-                          <Button variant="ghost" size="sm" onClick={() => removeTool(idx)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            )}
-          </TabsContent>
-
-          {/* Compliance Tab */}
-          <TabsContent value="compliance" className="space-y-4 pt-4">
-            <div className="flex items-center justify-between">
-              <h4 className="text-sm font-medium">Compliance Requirements</h4>
-              <Button variant="outline" size="sm" onClick={addCompliance}>
-                <Plus className="h-4 w-4 mr-1" />
-                Add Requirement
-              </Button>
-            </div>
-
-            {compliance.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">No compliance requirements defined</div>
-            ) : (
-              <div className="space-y-2">
-                {compliance.map((req, idx) => (
-                  <Card key={idx}>
-                    <CardContent className="pt-4">
-                      <div className="grid grid-cols-3 gap-3">
-                        <div>
-                          <Label className="text-xs">Requirement Code</Label>
-                          <Input
-                            value={req.requirement_code || ''}
-                            onChange={e => updateCompliance(idx, 'requirement_code', e.target.value)}
-                            placeholder="e.g., AD-2024-001"
-                          />
-                        </div>
-                        <div>
-                          <Label className="text-xs">Regulatory Authority</Label>
-                          <Select value={req.regulatory_authority || ''} onValueChange={v => updateCompliance(idx, 'regulatory_authority', v)}>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select authority..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="FAA">FAA</SelectItem>
-                              <SelectItem value="EASA">EASA</SelectItem>
-                              <SelectItem value="CAAC">CAAC</SelectItem>
-                              <SelectItem value="DGCA">DGCA</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
-                        <div className="flex items-end gap-2">
-                          <Input
-                            value={req.description || ''}
-                            onChange={e => updateCompliance(idx, 'description', e.target.value)}
-                            placeholder="Compliance requirement description..."
-                            className="flex-1"
-                          />
-                          <Button variant="ghost" size="sm" onClick={() => removeCompliance(idx)}>
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
               </div>
             )}
           </TabsContent>

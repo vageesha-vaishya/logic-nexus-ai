@@ -7404,38 +7404,22 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     handleOpenCreateModal();
   }, [activeAircraftUnifiedModuleKey, handleOpenCreateModal, openAircraftWorkPackageDialog, openCreateAircraftTemplateDialog]);
-  useEffect(() => {
-    if (activeAircraftUnifiedModuleKey !== 'list') {
+  const aircraftUnifiedActiveSearch = activeAircraftUnifiedModuleKey === 'list' ? search : aircraftUnifiedSearch;
+  const aircraftUnifiedActiveStatusFilter = activeAircraftUnifiedModuleKey === 'list' ? statusFilter : aircraftUnifiedStatusFilter;
+  const handleAircraftUnifiedSearchChange = useCallback((value: string) => {
+    if (activeAircraftUnifiedModuleKey === 'list') {
+      setSearch(value);
       return;
     }
-    if (aircraftUnifiedSearch !== search) {
-      setSearch(aircraftUnifiedSearch);
-    }
-  }, [activeAircraftUnifiedModuleKey, aircraftUnifiedSearch, search]);
-  useEffect(() => {
-    if (activeAircraftUnifiedModuleKey !== 'list') {
+    setAircraftUnifiedSearch(value);
+  }, [activeAircraftUnifiedModuleKey]);
+  const handleAircraftUnifiedStatusChange = useCallback((value: string) => {
+    if (activeAircraftUnifiedModuleKey === 'list') {
+      setStatusFilter(value);
       return;
     }
-    if (aircraftUnifiedStatusFilter !== statusFilter) {
-      setStatusFilter(aircraftUnifiedStatusFilter);
-    }
-  }, [activeAircraftUnifiedModuleKey, aircraftUnifiedStatusFilter, statusFilter]);
-  useEffect(() => {
-    if (activeAircraftUnifiedModuleKey !== 'list') {
-      return;
-    }
-    if (search !== aircraftUnifiedSearch) {
-      setAircraftUnifiedSearch(search);
-    }
-  }, [activeAircraftUnifiedModuleKey, aircraftUnifiedSearch, search]);
-  useEffect(() => {
-    if (activeAircraftUnifiedModuleKey !== 'list') {
-      return;
-    }
-    if (statusFilter !== aircraftUnifiedStatusFilter) {
-      setAircraftUnifiedStatusFilter(statusFilter);
-    }
-  }, [activeAircraftUnifiedModuleKey, aircraftUnifiedStatusFilter, statusFilter]);
+    setAircraftUnifiedStatusFilter(value);
+  }, [activeAircraftUnifiedModuleKey]);
   const aircraftTemplateTypeOptions = useMemo<AircraftUnifiedFilterOption[]>(
     () => [
       { value: 'all', label: 'All Types' },
@@ -7654,7 +7638,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     return Array.from(values).sort((a, b) => a.localeCompare(b));
   }, [rows]);
   const clearAircraftUnifiedFilters = useCallback(() => {
+    setSearch('');
     setAircraftUnifiedSearch('');
+    setStatusFilter('all');
     setAircraftUnifiedStatusFilter('all');
     setAircraftUnifiedTemplateTypeFilter('all');
     setAircraftUnifiedTemplateManufacturerFilter('all');
@@ -7853,12 +7839,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             <CardContent className="mdm-template-panel-body space-y-4">
               {showAircraftUnifiedControlsInOperationsCard ? (
                 <AircraftListingControls
-                  searchValue={aircraftUnifiedSearch}
-                  onSearchChange={setAircraftUnifiedSearch}
+                  searchValue={aircraftUnifiedActiveSearch}
+                  onSearchChange={handleAircraftUnifiedSearchChange}
                   searchPlaceholder={aircraftUnifiedLabels.searchPlaceholder}
                   searchAriaLabel={aircraftUnifiedLabels.searchAriaLabel}
-                  statusValue={aircraftUnifiedStatusFilter}
-                  onStatusChange={setAircraftUnifiedStatusFilter}
+                  statusValue={aircraftUnifiedActiveStatusFilter}
+                  onStatusChange={handleAircraftUnifiedStatusChange}
                   statusAriaLabel={aircraftUnifiedLabels.statusAriaLabel}
                   statusOptions={aircraftUnifiedStatusOptions}
                   clearFiltersLabel={aircraftUnifiedLabels.clearFilters}
@@ -8845,12 +8831,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule
                   ? (
                     <AircraftListingControls
-                      searchValue={aircraftUnifiedSearch}
-                      onSearchChange={setAircraftUnifiedSearch}
+                      searchValue={aircraftUnifiedActiveSearch}
+                      onSearchChange={handleAircraftUnifiedSearchChange}
                       searchPlaceholder={aircraftUnifiedLabels.searchPlaceholder}
                       searchAriaLabel={aircraftUnifiedLabels.searchAriaLabel}
-                      statusValue={aircraftUnifiedStatusFilter}
-                      onStatusChange={setAircraftUnifiedStatusFilter}
+                      statusValue={aircraftUnifiedActiveStatusFilter}
+                      onStatusChange={handleAircraftUnifiedStatusChange}
                       statusAriaLabel={aircraftUnifiedLabels.statusAriaLabel}
                       statusOptions={aircraftUnifiedStatusOptions}
                       clearFiltersLabel={aircraftUnifiedLabels.clearFilters}

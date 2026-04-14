@@ -1047,6 +1047,287 @@ app.get('/api/v2/amro/work-package-template-versions', authMiddleware as any, as
   }
 });
 
+// POST /api/v2/amro/work-package-template-versions
+app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+  const userId = String(req.userId || req.header('x-user-id') || '').trim();
+  const franchiseId = String(req.header('x-franchise-id') || '').trim() || null;
+
+  if (!tenantId || !userId) {
+    res.status(401).json({ error: 'Missing tenant or user context', statusCode: 401, requestId, version: 'v2' });
+    return;
+  }
+
+  try {
+    const {
+      template_id,
+      change_description,
+      change_reason,
+      version_label,
+      tasks_json = [],
+      materials_json = [],
+      tooling_json = [],
+      compliance_requirements_json = [],
+      estimated_labor_hours = null,
+    } = req.body || {};
+
+    if (!template_id) {
+      res.status(400).json({ error: 'template_id is required', statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+    if (!change_description) {
+      res.status(400).json({ error: 'change_description is required', statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+
+    const supabase = getSupabaseAdminClient();
+
+    // Verify template exists
+    const { data: template, error: templateError } = await supabase
+      .from('work_package_templates')
+      .select('id, tenant_id, franchise_id')
+      .eq('id', template_id)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (templateError || !template) {
+      res.status(404).json({ error: 'Template not found', statusCode: 404, requestId, version: 'v2' });
+      return;
+    }
+
+    // Get next version number
+    const { data: maxVersion } = await supabase
+      .from('amro_work_package_template_versions')
+      .select('version_number')
+      .eq('template_id', template_id)
+      .eq('tenant_id', tenantId)
+      .order('version_number', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextVersion = maxVersion ? maxVersion.version_number + 1 : 1;
+
+    const versionData = {
+      tenant_id: tenantId,
+      franchise_id: franchiseId || template.franchise_id,
+      template_id,
+      version_number: nextVersion,
+      version_label: version_label || null,
+      change_description,
+      change_reason: change_reason || change_description,
+      status: 'draft',
+      submitted_by: null,
+      submitted_at: null,
+      reviewed_by: null,
+      reviewed_at: null,
+      approved_by: null,
+      approved_at: null,
+      rejection_reason: null,
+      tasks_json,
+      materials_json,
+      tooling_json,
+      compliance_requirements_json,
+      effective_from: null,
+      effective_until: null,
+      aircraft_models: [],
+      engine_models: [],
+      created_by: userId,
+      updated_by: userId,
+    };
+
+    const { data: created, error: createError } = await supabase
+      .from('amro_work_package_template_versions')
+      .insert(versionData)
+      .select()
+      .single();
+
+    console.log("[WPT VERSION CREATE] Attempting to insert:", JSON.stringify(versionData, null, 2));
+    if (createError) {
+      logger.error('Version creation failed', { error: createError.message, requestId });
+      res.status(400).json({ error: createError.message, statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+
+    res.status(201).json({ version: 'v2', correlationId: requestId, output: created });
+  } catch (error) {
+    logger.error('work-package-template-version creation error', {
+      requestId,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+    res.status(500).json({ error: 'Failed to create version', statusCode: 500, requestId, version: 'v2' });
+  }
+});
+
+// PUT /api/v2/amro/work-package-template-versions/:id
+app.put('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+  const userId = String(req.userId || req.header('x-user-id') || '').trim();
+  const { id } = req.params;
+
+  if (!tenantId || !userId) {
+    res.status(401).json({ error: 'Missing context', statusCode: 401, requestId, version: 'v2' });
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('amro_work_package_template_versions')
+      .select('*')
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (fetchError || !existing) {
+      res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
+      return;
+    }
+
+    if (existing.status !== 'draft') {
+      res.status(400).json({ error: 'Only draft versions can be updated', statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+
+    const allowedFields = ['version_label', 'change_description', 'change_reason', 'tasks_json', 'materials_json', 'tooling_json', 'compliance_requirements_json'];
+    const updateData: Record<string, any> = { updated_by: userId };
+    for (const field of allowedFields) {
+      if (req.body[field] !== undefined) updateData[field] = req.body[field];
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from('amro_work_package_template_versions')
+      .update(updateData)
+      .eq('id', id)
+      .eq('tenant_id', tenantId)
+      .select()
+      .single();
+
+    if (updateError) {
+      res.status(400).json({ error: updateError.message, statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+
+    res.json({ version: 'v2', correlationId: requestId, output: updated });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to update version', statusCode: 500, requestId, version: 'v2' });
+  }
+});
+
+// POST /api/v2/amro/work-package-template-versions/:id/submit
+app.post('/api/v2/amro/work-package-template-versions/:id/submit', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+  const userId = String(req.userId || req.header('x-user-id') || '').trim();
+  const { id } = req.params;
+
+  if (!tenantId || !userId) {
+    res.status(401).json({ error: 'Missing context', statusCode: 401, requestId, version: 'v2' });
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+
+    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
+    if (!existing) {
+      res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
+      return;
+    }
+    if (existing.status !== 'draft') {
+      res.status(400).json({ error: 'Only draft versions can be submitted', statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+
+    const { data: updated } = await supabase.from('amro_work_package_template_versions').update({ status: 'pending_review', submitted_by: userId, submitted_at: new Date().toISOString(), updated_by: userId }).eq('id', id).eq('tenant_id', tenantId).select().single();
+
+    res.json({ version: 'v2', correlationId: requestId, output: updated });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to submit', statusCode: 500, requestId, version: 'v2' });
+  }
+});
+
+// POST /api/v2/amro/work-package-template-versions/:id/approve
+app.post('/api/v2/amro/work-package-template-versions/:id/approve', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+  const userId = String(req.userId || req.header('x-user-id') || '').trim();
+  const { id } = req.params;
+  const { action, rejection_reason, set_active = false } = req.body || {};
+
+  if (!tenantId || !userId) {
+    res.status(401).json({ error: 'Missing context', statusCode: 401, requestId, version: 'v2' });
+    return;
+  }
+  if (!['approve', 'reject'].includes(action)) {
+    res.status(400).json({ error: 'action must be "approve" or "reject"', statusCode: 400, requestId, version: 'v2' });
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+
+    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
+    if (!existing) {
+      res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
+      return;
+    }
+    if (existing.status !== 'pending_review') {
+      res.status(400).json({ error: 'Only pending versions can be reviewed', statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+    if (action === 'reject' && !rejection_reason) {
+      res.status(400).json({ error: 'rejection_reason is required', statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+
+    const updateData: Record<string, any> = { status: action === 'approve' ? 'approved' : 'rejected', reviewed_by: userId, reviewed_at: new Date().toISOString(), rejection_reason: action === 'reject' ? rejection_reason : null, updated_by: userId };
+    if (action === 'approve' && set_active) {
+      updateData.status = 'active';
+      updateData.approved_by = userId;
+      updateData.approved_at = new Date().toISOString();
+    }
+
+    const { data: updated } = await supabase.from('amro_work_package_template_versions').update(updateData).eq('id', id).eq('tenant_id', tenantId).select().single();
+    res.json({ version: 'v2', correlationId: requestId, output: updated });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to review', statusCode: 500, requestId, version: 'v2' });
+  }
+});
+
+// DELETE /api/v2/amro/work-package-template-versions/:id
+app.delete('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = req.header('x-request-id') || crypto.randomUUID();
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+  const { id } = req.params;
+
+  if (!tenantId) {
+    res.status(401).json({ error: 'Missing context', statusCode: 401, requestId, version: 'v2' });
+    return;
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+
+    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('id, status').eq('id', id).eq('tenant_id', tenantId).single();
+    if (!existing) {
+      res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
+      return;
+    }
+    if (existing.status !== 'draft') {
+      res.status(400).json({ error: 'Only draft versions can be deleted', statusCode: 400, requestId, version: 'v2' });
+      return;
+    }
+
+    await supabase.from('amro_work_package_template_versions').delete().eq('id', id).eq('tenant_id', tenantId);
+    res.json({ version: 'v2', correlationId: requestId, output: { deleted: true, id } });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to delete', statusCode: 500, requestId, version: 'v2' });
+  }
+});
+
 app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: AuthRequest, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();

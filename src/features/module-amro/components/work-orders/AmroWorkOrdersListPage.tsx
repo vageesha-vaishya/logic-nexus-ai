@@ -1,5 +1,5 @@
 /**
- * Unified Work Orders list page following AMRO design system standards.
+ * Unified Work Packages list page following AMRO design system standards.
  * Uses AmroModuleSurface, AmroStandardToolbar, AmroKpiGrid, and AmroModuleGridDetailPanel
  * to match the Item Master Catalog pattern.
  */
@@ -130,7 +130,7 @@ export function AmroWorkOrdersListPage() {
       setSelectedRecordId((current) => current || data.records[0]?.id || null);
     }
     if (isError) {
-      setError('Failed to load work orders');
+      setError('Failed to load work packages');
     } else {
       setError(null);
     }
@@ -155,12 +155,12 @@ export function AmroWorkOrdersListPage() {
   const handleDelete = useCallback((id: string) => {
     deleteMutation.mutate(id, {
       onSuccess: () => {
-        toast.success('Work order deleted successfully');
+        toast.success('Work package deleted successfully');
         invalidate();
         setRefreshTick((v) => v + 1);
       },
       onError: (err) => {
-        toast.error(err instanceof Error ? err.message : 'Failed to delete work order');
+        toast.error(err instanceof Error ? err.message : 'Failed to delete work package');
       },
     });
   }, [deleteMutation, invalidate]);
@@ -191,15 +191,15 @@ export function AmroWorkOrdersListPage() {
   return (
     <div className="mt-4 space-y-3">
       <AmroModuleSurface
-        title="Work Orders"
-        subtitle="Manage and track aircraft maintenance work orders."
+        title="Work Packages"
+        subtitle="Manage and track aircraft maintenance work packages."
         moduleId="amro.work-orders"
         status={error ? 'warning' : loading ? 'loading' : 'ready'}
       >
         <AmroStandardToolbar
           searchValue={search}
           onSearchChange={setSearch}
-          placeholder="Search work orders..."
+          placeholder="Search work packages..."
           leftActions={(
             <>
               <Select value={statusFilter} onValueChange={setStatusFilter}>
@@ -244,7 +244,7 @@ export function AmroWorkOrdersListPage() {
               </Button>
               <Button type="button" size="sm" className="h-8" onClick={openCreateDialog}>
                 <Plus className="mr-1 h-4 w-4" />
-                New Work Order
+                New Work Package
               </Button>
             </>
           )}
@@ -252,7 +252,7 @@ export function AmroWorkOrdersListPage() {
 
         <AmroKpiGrid
           items={[
-            { label: 'Total Work Orders', value: String(stats.total) },
+            { label: 'Total Work Packages', value: String(stats.total) },
             { label: 'Active', value: String(stats.active), tone: stats.active > 0 ? 'success' : 'default' },
             { label: 'In Progress', value: String(stats.inProgress), tone: stats.inProgress > 0 ? 'warning' : 'default' },
             { label: 'Overdue', value: String(stats.overdue), tone: stats.overdue > 0 ? 'critical' : 'default' },
@@ -264,12 +264,12 @@ export function AmroWorkOrdersListPage() {
         <AmroModuleGridDetailPanel
           rows={records}
           loading={loading}
-          emptyMessage="No work orders found."
+          emptyMessage="No work packages found."
           selectedId={selectedRecordId}
           onSelect={setSelectedRecordId}
-          detailTitle="Work Order Detail"
+          detailTitle="Work Package Detail"
           columns={[
-            { key: 'workOrderNumber', label: 'Work Order #', render: (record) => (
+            { key: 'workOrderNumber', label: 'Work Package #', render: (record) => (
               <span
                 className="cursor-pointer text-primary underline"
                 onClick={(e) => { e.stopPropagation(); handleView(record.id); }}
@@ -291,9 +291,9 @@ export function AmroWorkOrdersListPage() {
             { key: 'plannedStart', label: 'Planned Start', render: (record) => record.planned_start_date ? new Date(record.planned_start_date).toLocaleDateString() : '—' },
           ]}
           renderDetail={(record) => (
-            !record ? <p className="text-xs text-muted-foreground">Select a work order to inspect details.</p> : (
+            !record ? <p className="text-xs text-muted-foreground">Select a work package to inspect details.</p> : (
               <div className="space-y-2 text-xs">
-                <p><span className="font-semibold">Work Order #:</span> {record.work_package_number || record.work_order_number || '—'}</p>
+                <p><span className="font-semibold">Work Package #:</span> {record.work_package_number || record.work_order_number || '—'}</p>
                 <p><span className="font-semibold">Title:</span> {record.title || '—'}</p>
                 <p><span className="font-semibold">Aircraft:</span> {record.aircraft_registration || '—'}</p>
                 <p><span className="font-semibold">Status:</span> {STATUS_CONFIG[record.status].label}</p>
@@ -311,7 +311,7 @@ export function AmroWorkOrdersListPage() {
                             type="button"
                             size="icon"
                             variant="outline"
-                            aria-label="View work order"
+                            aria-label="View work package"
                             onClick={() => handleView(record.id)}
                             disabled={dialogLoading}
                           >
@@ -326,7 +326,7 @@ export function AmroWorkOrdersListPage() {
                             type="button"
                             size="icon"
                             variant="outline"
-                            aria-label="Edit work order"
+                            aria-label="Edit work package"
                             onClick={() => openEditDialog(record.id)}
                             disabled={dialogLoading}
                           >
@@ -341,7 +341,7 @@ export function AmroWorkOrdersListPage() {
                             type="button"
                             size="icon"
                             variant="outline"
-                            aria-label="Delete work order"
+                            aria-label="Delete work package"
                             onClick={() => setDeleteCandidate(record)}
                             disabled={dialogLoading}
                           >
@@ -363,9 +363,9 @@ export function AmroWorkOrdersListPage() {
       <AlertDialog open={!!deleteCandidate} onOpenChange={() => setDeleteCandidate(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
+            <AlertDialogTitle>Delete Work Package?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete work order {deleteCandidate?.work_package_number || deleteCandidate?.work_order_number}.
+              This will permanently delete work package {deleteCandidate?.work_package_number || deleteCandidate?.work_order_number}.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -390,11 +390,11 @@ export function AmroWorkOrdersListPage() {
         }}
       />
 
-      {/* Edit Work Order Dialog (edit mode only) */}
+      {/* Edit Work Package Dialog (edit mode only) */}
       <Dialog open={dialogOpen && editingId !== null} onOpenChange={(open) => { if (!dialogLoading && editingId) setDialogOpen(open); }}>
         <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-4xl">
           <DialogHeader>
-            <DialogTitle>Edit Work Order</DialogTitle>
+            <DialogTitle>Edit Work Package</DialogTitle>
           </DialogHeader>
 
           <Tabs value={activeTab} onValueChange={setActiveTab}>

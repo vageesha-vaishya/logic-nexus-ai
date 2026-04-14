@@ -30,7 +30,15 @@
       "Bash(chmod *)",
       "Bash(pkill *)",
       "Bash(npm start)",
-      "Bash(supabase *)"
+      "Bash(supabase *)",
+      "Bash(cat)",
+      "Bash(const *)",
+      "Bash('fs')",
+      "Bash(let *)",
+      "Bash(file, *)",
+      "Bash(// *)",
+      "Bash(content *)",
+      "Bash($2] *)"
     ]
   },
   "$version": 3

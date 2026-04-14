@@ -199,6 +199,44 @@ router.get(
 );
 
 /**
+ * GET /api/v2/amro/work-packages/:id
+ * Alias for /work-packages/:id to support /api/v2/amro/* path prefix
+ */
+router.get(
+  '/amro/work-packages/:id',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const { id } = req.params;
+
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    const workPackage = await workOrdersService.getWorkPackage(tenantId, id);
+    if (!workPackage) {
+      res.status(404).json({
+        error: 'Work package not found',
+        code: 'NOT_FOUND',
+        statusCode: 404,
+      } as ErrorResponse);
+      return;
+    }
+    // Wrap in the format expected by the frontend
+    res.json({
+      data: {
+        work_package: workPackage,
+      },
+    });
+    return;
+  }),
+);
+
+/**
  * POST /api/v1/work-packages
  * Create a new work package
  */
