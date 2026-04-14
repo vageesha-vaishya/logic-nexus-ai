@@ -32,26 +32,29 @@ const TEMPLATES_KEY = ['amro', 'work-package-templates'] as const;
 async function fetchWorkPackageTemplates(
   headers: HeadersInit,
 ): Promise<WorkPackageTemplateOption[]> {
-  const response = await fetch('/api/v2/amro/work-package-templates/model-options', {
+  // FIXED: Use the correct master-data endpoint for work package templates
+  // Previously was calling /model-options which returns assembly_models instead
+  const response = await fetch('/api/v2/amro/master-data/work_package_templates?page=1&page_size=200', {
     method: 'GET',
     headers,
   });
-  
+
   if (!response.ok) {
     throw new Error(`Failed to load templates: ${response.status}`);
   }
-  
+
   const json = await response.json();
-  const rows = json.data || json.output?.records || json.output?.items || json.items || [];
-  
+  // Parse master-data API response format
+  const rows = json.output?.records || json.output?.data || json.data || json.output?.templates || [];
+
   return (Array.isArray(rows) ? rows : [])
     .filter((row: any) => row && row.id)
     .map((row: any) => ({
       id: String(row.id),
-      name: String(row.name || row.template_name || row.title || 'Untitled Template'),
-      description: row.description || null,
+      name: String(row.template_name || row.name || row.title || 'Untitled Template'),
+      description: row.description || row.template_code || null,
       version: Number(row.version || row.version_number || 1),
-      status: String(row.status || 'active'),
+      status: String(row.status || 'draft'),
     }));
 }
 
@@ -65,14 +68,16 @@ export function useWorkPackageTemplateOptions(enabled = true) {
         ? fetchWorkPackageTemplates(authHeaders)
         : Promise.reject(new Error('Not authenticated')),
     enabled: enabled && !!authHeaders,
-    staleTime: 5 * 60 * 1000, // 5 minutes - templates don't change often
+    staleTime: 2 * 60 * 1000, // 2 minutes - templates may change when created/edited
     retry: 2,
   });
 
   const options = useMemo(() => {
     if (!data) return [];
+    // FIXED: Include draft templates so newly created templates are selectable
+    // Previously filtered to only 'active' or 'approved', hiding draft templates
     return data
-      .filter((t) => t.status === 'active' || t.status === 'approved')
+      .filter((t) => t.status === 'active' || t.status === 'approved' || t.status === 'draft')
       .map((t) => ({
         value: t.id,
         label: `${t.name} v${t.version}`,

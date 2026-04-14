@@ -228,19 +228,30 @@ export function useListWorkPackages(params: UseListWorkPackagesParams = {}) {
 
 async function fetchWorkPackage(id: string, headers: HeadersInit): Promise<WorkPackageDetail> {
   const url = `/api/v2/amro/work-packages/${id}`;
+  console.log('[WP DETAIL] Fetching work package:', url);
   const response = await fetch(url, { method: 'GET', headers });
-  if (!response.ok) throw new Error(`Failed to get work package: ${response.status}`);
+  console.log('[WP DETAIL] Response status:', response.status);
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    console.error('[WP DETAIL] API error response:', response.status, errorText);
+    throw new Error(`Failed to get work package: ${response.status} - ${errorText}`);
+  }
   const json = await response.json();
-  const item = json.data || json.output || {};
+  console.log('[WP DETAIL] API response keys:', Object.keys(json || {}));
+  // FIXED: API returns { data: { work_package: {...}, domainAccess: {...} } }
+  // Need to unwrap the nested work_package object
+  const dataBlock = json.data || json.output || {};
+  const item = dataBlock.work_package || dataBlock.record || dataBlock;
+  console.log('[WP DETAIL] Unwrapped item keys:', Object.keys(item || {}));
   return {
     id: item.id || id,
-    work_package_number: item.work_package_number || item.work_order_number || '',
-    work_order_number: item.work_order_number || item.work_package_number || '',
-    title: item.title || '',
+    work_package_number: item.work_package_number || item.work_order_number || item.code || '',
+    work_order_number: item.work_order_number || item.work_package_number || item.code || '',
+    title: item.title || item.work_package_number || 'Work Package',
     aircraft_id: item.aircraft_id || null,
-    aircraft_registration: item.aircraft_registration || null,
+    aircraft_registration: item.aircraft_registration || item.aircraft || null,
     status: (item.status || 'planning') as WorkPackageStatus,
-    priority: (item.priority || 3) as WorkPackagePriority,
+    priority: Number(item.priority || 3) as WorkPackagePriority,
     maintenance_type: (item.maintenance_type || 'line') as MaintenanceType,
     description: item.description || null,
     planned_start_date: item.planned_start_date || item.planned_start || null,

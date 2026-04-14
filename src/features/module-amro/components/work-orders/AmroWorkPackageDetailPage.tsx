@@ -4,7 +4,7 @@
  */
 import { useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, ChevronRight, Clock, DollarSign, Pencil, User, Wrench } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, DollarSign, Pencil, User, Wrench, MoreHorizontal, Copy, Printer, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -424,6 +424,20 @@ export function AmroWorkPackageDetailPage() {
     );
   };
 
+  // Clone work package - navigate to create page with pre-filled data
+  const handleClone = (workPackage: WorkPackageDetail) => {
+    // Store work package data in sessionStorage for the create form to use
+    sessionStorage.setItem('amro_wp_clone', JSON.stringify(workPackage));
+    navigate('/dashboard/amro/work-packages?clone=true');
+  };
+
+  // Export work package as PDF (basic implementation using window.print)
+  const handleExportPDF = (workPackage: WorkPackageDetail) => {
+    // For now, trigger print dialog which allows saving as PDF
+    // In production, integrate with a PDF generation library like jsPDF
+    window.print();
+  };
+
   if (isLoading) {
     return (
       <div className="flex flex-col gap-6 p-6">
@@ -494,13 +508,22 @@ export function AmroWorkPackageDetailPage() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="outline" size="icon">
-                    <ChevronRight className="h-4 w-4" />
+                    <MoreHorizontal className="h-4 w-4" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem>Export PDF</DropdownMenuItem>
-                  <DropdownMenuItem>Print</DropdownMenuItem>
-                  <DropdownMenuItem>Clone</DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleClone(wp)}>
+                    <Copy className="mr-2 h-4 w-4" />
+                    Clone Work Package
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => window.print()}>
+                    <Printer className="mr-2 h-4 w-4" />
+                    Print
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => handleExportPDF(wp)}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    Export PDF
+                  </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
