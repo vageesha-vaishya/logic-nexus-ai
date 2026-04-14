@@ -12,7 +12,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Plus, Save, X, Wrench, FileText, Layers } from 'lucide-react';
+import { Plus, Save, X, Wrench, FileText, Layers, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,6 +115,22 @@ export function TemplateCreateEditDialog({
   const [taskFilterCategory, setTaskFilterCategory] = useState('all');
   const [selectedTaskIds, setSelectedTaskIds] = useState<Set<string>>(new Set());
 
+  // Task table advanced filter/sort state
+  const [taskSort, setTaskSort] = useState<{ column: keyof TaskTemplateOption; direction: 'asc' | 'desc' }>({
+    column: 'sequence',
+    direction: 'asc',
+  });
+  const [taskFilters, setTaskFilters] = useState<Record<string, string>>({
+    id: '',
+    code_form_no: '',
+    ata_code: '',
+    reference_amp: '',
+    description: '',
+    category_code: '',
+    estimated_man_hours: '',
+    is_mandatory: '',
+  });
+
   // ── Initialize form on open ────────────────────────────────────────────────
 
   useEffect(() => {
@@ -171,20 +187,43 @@ export function TemplateCreateEditDialog({
   // ── Task filtering ─────────────────────────────────────────────────────────
 
   const filteredTasks = useMemo(() => {
-    return taskTemplates.filter(task => {
-      const matchesSearch = !taskSearch || 
-        task.description.toLowerCase().includes(taskSearch.toLowerCase()) ||
-        task.code_form_no.toLowerCase().includes(taskSearch.toLowerCase()) ||
-        task.ata_code.toLowerCase().includes(taskSearch.toLowerCase());
-      const matchesCategory = taskFilterCategory === 'all' || task.category_code === taskFilterCategory;
-      return matchesSearch && matchesCategory;
+    let result = taskTemplates.filter(task => {
+      // apply individual column filters
+      if (taskFilters.id && !task.sequence.toLowerCase().includes(taskFilters.id.toLowerCase()) && !task.id.toLowerCase().includes(taskFilters.id.toLowerCase())) return false;
+      if (taskFilters.code_form_no && !task.code_form_no.toLowerCase().includes(taskFilters.code_form_no.toLowerCase())) return false;
+      if (taskFilters.ata_code && !task.ata_code.toLowerCase().includes(taskFilters.ata_code.toLowerCase())) return false;
+      if (taskFilters.reference_amp && !task.reference_amp.toLowerCase().includes(taskFilters.reference_amp.toLowerCase())) return false;
+      if (taskFilters.description && !task.description.toLowerCase().includes(taskFilters.description.toLowerCase())) return false;
+      if (taskFilters.category_code && !task.category_code.toLowerCase().includes(taskFilters.category_code.toLowerCase())) return false;
+      if (taskFilters.estimated_man_hours && !String(task.estimated_man_hours).includes(taskFilters.estimated_man_hours)) return false;
+      if (taskFilters.is_mandatory && !String(task.is_mandatory).toLowerCase().includes(taskFilters.is_mandatory.toLowerCase())) return false;
+      return true;
     });
-  }, [taskTemplates, taskSearch, taskFilterCategory]);
+
+    result.sort((a, b) => {
+      const aVal = a[taskSort.column];
+      const bVal = b[taskSort.column];
+      if (aVal === bVal) return 0;
+      if (aVal == null) return taskSort.direction === 'asc' ? -1 : 1;
+      if (bVal == null) return taskSort.direction === 'asc' ? 1 : -1;
+      const cmp = aVal > bVal ? 1 : -1;
+      return taskSort.direction === 'asc' ? cmp : -cmp;
+    });
+
+    return result;
+  }, [taskTemplates, taskFilters, taskSort]);
 
   const uniqueCategories = useMemo(() => {
     const cats = new Set(taskTemplates.map(t => t.category_code).filter(Boolean));
     return Array.from(cats);
   }, [taskTemplates]);
+
+  const toggleTaskSort = (column: keyof TaskTemplateOption) => {
+    setTaskSort(prev => ({
+      column,
+      direction: prev.column === column && prev.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   // ── Task selection ─────────────────────────────────────────────────────────
 
@@ -285,7 +324,6 @@ export function TemplateCreateEditDialog({
         description: form.description.trim() || null,
         maintenance_type: form.maintenance_type,
         model_id: form.model_id || null,
-        aircraft_model: form.aircraft_model || null,
         version: form.version,
         active: form.active,
         scope_json,
@@ -362,10 +400,12 @@ export function TemplateCreateEditDialog({
               <FileText className="h-4 w-4 mr-1" />
               Details
             </TabsTrigger>
-            <TabsTrigger value="tasks">
-              <Wrench className="h-4 w-4 mr-1" />
-              Tasks
-            </TabsTrigger>
+            <div title={!form.model_id ? "Aircraft Model selection is required before accessing the Tasks Tab" : undefined}>
+              <TabsTrigger value="tasks" disabled={!form.model_id}>
+                <Wrench className="h-4 w-4 mr-1" />
+                Tasks
+              </TabsTrigger>
+            </div>
             <TabsTrigger value="enterprise-materials" className="bg-green-50">
               <Layers className="h-4 w-4 mr-1" />
               Materials+
@@ -484,87 +524,124 @@ export function TemplateCreateEditDialog({
           <TabsContent value="tasks" className="space-y-4 pt-4">
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-sm font-medium">Task Templates</h4>
+                <h4 className="text-sm font-medium">
+                  Task Templates {form.aircraft_model ? `[${form.aircraft_model}]` : ''}
+                </h4>
                 <p className="text-xs text-muted-foreground">
                   {selectedTaskIds.size} of {filteredTasks.length} tasks selected
                 </p>
               </div>
-              <div className="flex gap-2">
-                <Button variant="outline" size="sm" onClick={selectAllTasks} disabled={taskLoading}>
-                  Select All
-                </Button>
-                <Button variant="outline" size="sm" onClick={deselectAllTasks}>
-                  Deselect All
-                </Button>
-              </div>
-            </div>
-
-            {/* Task filters */}
-            <div className="flex gap-2">
-              <Input
-                placeholder="Search tasks..."
-                value={taskSearch}
-                onChange={e => setTaskSearch(e.target.value)}
-                className="max-w-xs"
-              />
-              <Select value={taskFilterCategory} onValueChange={setTaskFilterCategory}>
-                <SelectTrigger className="w-[150px]">
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {uniqueCategories.map(cat => (
-                    <SelectItem key={cat} value={cat}>{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
             </div>
 
             {/* Task table */}
             {taskLoading ? (
               <div className="text-center py-8 text-muted-foreground">Loading tasks...</div>
-            ) : filteredTasks.length === 0 ? (
+            ) : taskTemplates.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
                 {form.model_id ? 'No tasks found for selected model' : 'Select an aircraft model to load tasks'}
               </div>
             ) : (
-              <div className="border rounded-md max-h-[400px] overflow-y-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 bg-background z-10">
-                    <TableRow>
-                      <TableHead className="w-10">#</TableHead>
-                      <TableHead>Task Code</TableHead>
-                      <TableHead>ATA</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead className="text-right">Est. Hours</TableHead>
-                      <TableHead className="text-center">Mandatory</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {filteredTasks.map((task, idx) => (
-                      <TableRow
-                        key={task.id}
-                        className={`cursor-pointer hover:bg-muted/50 ${selectedTaskIds.has(task.id) ? 'bg-primary/5' : ''}`}
-                        onClick={() => toggleTask(task.id)}
-                      >
-                        <TableCell>
-                          <Checkbox checked={selectedTaskIds.has(task.id)} />
-                        </TableCell>
-                        <TableCell className="font-mono">{task.code_form_no}</TableCell>
-                        <TableCell className="font-mono">{task.ata_code}</TableCell>
-                        <TableCell>{task.description}</TableCell>
-                        <TableCell>{task.category_code ? <Badge variant="outline">{task.category_code}</Badge> : '-'}</TableCell>
-                        <TableCell className="text-right font-mono">{task.estimated_man_hours}</TableCell>
-                        <TableCell className="text-center">
-                          {task.is_mandatory && <Badge variant="default">Yes</Badge>}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
+              <div className="border border-slate-200 rounded-md overflow-x-auto">
+                <table className="w-full text-[12px]">
+                  <thead className="bg-slate-50 text-left text-slate-700">
+                    <tr className="border-b border-slate-200">
+                      <th className="px-2 py-1.5 font-semibold w-10">
+                        <Checkbox 
+                          checked={filteredTasks.length > 0 && selectedTaskIds.size === filteredTasks.length} 
+                          onCheckedChange={(c) => c ? selectAllTasks() : deselectAllTasks()} 
+                        />
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">
+                        <button type="button" className="inline-flex items-center gap-1 uppercase tracking-wide" onClick={() => toggleTaskSort('id')}>
+                          Task ID
+                          {taskSort.column === 'id' ? (taskSort.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                        </button>
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">
+                        <button type="button" className="inline-flex items-center gap-1 uppercase tracking-wide" onClick={() => toggleTaskSort('code_form_no')}>
+                          Code Form No
+                          {taskSort.column === 'code_form_no' ? (taskSort.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                        </button>
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">
+                        <button type="button" className="inline-flex items-center gap-1 uppercase tracking-wide" onClick={() => toggleTaskSort('ata_code')}>
+                          ATA Code
+                          {taskSort.column === 'ata_code' ? (taskSort.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                        </button>
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">
+                        <button type="button" className="inline-flex items-center gap-1 uppercase tracking-wide" onClick={() => toggleTaskSort('reference_amp')}>
+                          Reference AMP
+                          {taskSort.column === 'reference_amp' ? (taskSort.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                        </button>
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">
+                        <button type="button" className="inline-flex items-center gap-1 uppercase tracking-wide" onClick={() => toggleTaskSort('description')}>
+                          Description
+                          {taskSort.column === 'description' ? (taskSort.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                        </button>
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">
+                        <button type="button" className="inline-flex items-center gap-1 uppercase tracking-wide" onClick={() => toggleTaskSort('category_code')}>
+                          Category Code
+                          {taskSort.column === 'category_code' ? (taskSort.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                        </button>
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">
+                        <button type="button" className="inline-flex items-center gap-1 uppercase tracking-wide" onClick={() => toggleTaskSort('estimated_man_hours')}>
+                          Estimated Man Hours
+                          {taskSort.column === 'estimated_man_hours' ? (taskSort.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                        </button>
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">
+                        <button type="button" className="inline-flex items-center gap-1 uppercase tracking-wide" onClick={() => toggleTaskSort('is_mandatory')}>
+                          Is Mandatory
+                          {taskSort.column === 'is_mandatory' ? (taskSort.direction === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />) : <ArrowUpDown className="h-3 w-3" />}
+                        </button>
+                      </th>
+                      <th className="px-2 py-1.5 font-semibold">JSON_Details</th>
+                    </tr>
+                    <tr className="border-t border-slate-200 bg-slate-100/60">
+                      <th className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Filter</th>
+                      <th className="px-2 py-1.5"><Input value={taskFilters.id} onChange={(e) => setTaskFilters(p => ({ ...p, id: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Task ID" /></th>
+                      <th className="px-2 py-1.5"><Input value={taskFilters.code_form_no} onChange={(e) => setTaskFilters(p => ({ ...p, code_form_no: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Code" /></th>
+                      <th className="px-2 py-1.5"><Input value={taskFilters.ata_code} onChange={(e) => setTaskFilters(p => ({ ...p, ata_code: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter ATA" /></th>
+                      <th className="px-2 py-1.5"><Input value={taskFilters.reference_amp} onChange={(e) => setTaskFilters(p => ({ ...p, reference_amp: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Reference" /></th>
+                      <th className="px-2 py-1.5"><Input value={taskFilters.description} onChange={(e) => setTaskFilters(p => ({ ...p, description: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Description" /></th>
+                      <th className="px-2 py-1.5"><Input value={taskFilters.category_code} onChange={(e) => setTaskFilters(p => ({ ...p, category_code: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Category" /></th>
+                      <th className="px-2 py-1.5"><Input value={taskFilters.estimated_man_hours} onChange={(e) => setTaskFilters(p => ({ ...p, estimated_man_hours: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Hours" /></th>
+                      <th className="px-2 py-1.5"><Input value={taskFilters.is_mandatory} onChange={(e) => setTaskFilters(p => ({ ...p, is_mandatory: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="true / false" /></th>
+                      <th className="px-2 py-1.5" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredTasks.length ? filteredTasks.map((task) => (
+                      <tr key={task.id} className={`border-t border-slate-100 text-slate-700 ${selectedTaskIds.has(task.id) ? 'bg-sky-50/60' : ''}`}>
+                        <td className="px-2 py-1.5">
+                          <Checkbox checked={selectedTaskIds.has(task.id)} onCheckedChange={() => toggleTask(task.id)} />
+                        </td>
+                        <td className="px-2 py-1.5 font-mono">{task.sequence || task.id || '-'}</td>
+                        <td className="px-2 py-1.5">{task.code_form_no || '-'}</td>
+                        <td className="px-2 py-1.5">{task.ata_code || '-'}</td>
+                        <td className="px-2 py-1.5">{task.reference_amp || '-'}</td>
+                        <td className="px-2 py-1.5">{task.description || '-'}</td>
+                        <td className="px-2 py-1.5">{task.category_code || '-'}</td>
+                        <td className="px-2 py-1.5">{task.estimated_man_hours || '-'}</td>
+                        <td className="px-2 py-1.5">{String(task.is_mandatory ?? '-')}</td>
+                        <td className="px-2 py-1.5">-</td>
+                      </tr>
+                    )) : (
+                      <tr>
+                        <td className="px-2 py-2 text-slate-500 text-center" colSpan={10}>No task rows available for selected aircraft model</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
               </div>
             )}
+            <div className="text-[11px] text-slate-500">
+              Selection Summary: Checked {selectedTaskIds.size} | Records: {filteredTasks.length}
+            </div>
           </TabsContent>
 
           {/* Enterprise Materials Tab */}
@@ -582,7 +659,6 @@ export function TemplateCreateEditDialog({
             <EnterpriseToolingEditor
               tools={form.tooling_json}
               onChange={(tools) => setField('tooling_json', tools)}
-              workPackageTemplateId={template?.id}
               readOnly={false}
             />
           </TabsContent>
@@ -592,7 +668,6 @@ export function TemplateCreateEditDialog({
             <EnterpriseComplianceEditor
               requirements={form.compliance_requirements_json}
               onChange={(requirements) => setField('compliance_requirements_json', requirements)}
-              workPackageTemplateId={template?.id}
               readOnly={false}
             />
           </TabsContent>
