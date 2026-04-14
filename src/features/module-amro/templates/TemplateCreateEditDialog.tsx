@@ -121,6 +121,7 @@ export function TemplateCreateEditDialog({
     direction: 'asc',
   });
   const [taskFilters, setTaskFilters] = useState<Record<string, string>>({
+    selected: '',
     id: '',
     code_form_no: '',
     ata_code: '',
@@ -189,6 +190,11 @@ export function TemplateCreateEditDialog({
   const filteredTasks = useMemo(() => {
     let result = taskTemplates.filter(task => {
       // apply individual column filters
+      if (taskFilters.selected) {
+        const val = taskFilters.selected.trim().toUpperCase();
+        const isSelected = selectedTaskIds.has(task.id);
+        if (val === 'Y' && !isSelected) return false;
+      }
       if (taskFilters.id && !task.sequence.toLowerCase().includes(taskFilters.id.toLowerCase()) && !task.id.toLowerCase().includes(taskFilters.id.toLowerCase())) return false;
       if (taskFilters.code_form_no && !task.code_form_no.toLowerCase().includes(taskFilters.code_form_no.toLowerCase())) return false;
       if (taskFilters.ata_code && !task.ata_code.toLowerCase().includes(taskFilters.ata_code.toLowerCase())) return false;
@@ -211,7 +217,7 @@ export function TemplateCreateEditDialog({
     });
 
     return result;
-  }, [taskTemplates, taskFilters, taskSort]);
+  }, [taskTemplates, taskFilters, taskSort, selectedTaskIds]);
 
   const uniqueCategories = useMemo(() => {
     const cats = new Set(taskTemplates.map(t => t.category_code).filter(Boolean));
@@ -602,7 +608,18 @@ export function TemplateCreateEditDialog({
                       <th className="px-2 py-1.5 font-semibold">JSON_Details</th>
                     </tr>
                     <tr className="border-t border-slate-200 bg-slate-100/60">
-                      <th className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">Filter</th>
+                      <th className="px-2 py-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-500">
+                        <Select value={taskFilters.selected} onValueChange={(val) => setTaskFilters(p => ({ ...p, selected: val === 'all' ? '' : val }))}>
+                          <SelectTrigger className="h-7 w-16 border-slate-300 px-1.5 text-[11px]">
+                            <SelectValue placeholder="Y/N" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All</SelectItem>
+                            <SelectItem value="Y">Y</SelectItem>
+                            <SelectItem value="N">N</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </th>
                       <th className="px-2 py-1.5"><Input value={taskFilters.id} onChange={(e) => setTaskFilters(p => ({ ...p, id: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Task ID" /></th>
                       <th className="px-2 py-1.5"><Input value={taskFilters.code_form_no} onChange={(e) => setTaskFilters(p => ({ ...p, code_form_no: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter Code" /></th>
                       <th className="px-2 py-1.5"><Input value={taskFilters.ata_code} onChange={(e) => setTaskFilters(p => ({ ...p, ata_code: e.target.value }))} className="h-7 border-slate-300 px-1.5 text-[11px]" placeholder="Filter ATA" /></th>
