@@ -210,6 +210,7 @@ const AmroWorkPackageTemplatesMasterData = lazy(() => import("./features/module-
 const AmroTemplateCatalog = lazy(() => import("./features/module-amro/components/templates/AmroTemplateCatalogPage").then((module) => ({ default: module.AmroTemplateCatalogPage })));
 const AmroWorkPackageTemplates = lazy(() => import("./features/module-amro/templates/AmroWorkPackageTemplatesPage").then((module) => ({ default: module.AmroWorkPackageTemplatesPage })));
 const AmroWorkspaceDocumentation = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroWorkspaceDocumentationPage })));
+const AmroDesignSystemShowcase = lazy(() => import("./features/module-amro/components/AmroDesignSystemShowcase").then((module) => ({ default: module.AmroDesignSystemShowcase })));
 const MigrationBaselineDashboard = lazy(() => import("./pages/dashboard/MigrationBaselineDashboard"));
 
 // Initialize plugins at startup
@@ -914,6 +915,7 @@ const App = () => (
             <Route path="/dashboard/amro/settings/master-data/:entity" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/master-data" element={<ProtectedRoute requiredDomainCode="AMRO"><Navigate to="/dashboard/amro/settings/master-data/aircraft" replace /></ProtectedRoute>} />
             <Route path="/dashboard/amro/workspace-documentation" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkspaceDocumentation /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/design-system-showcase" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroDesignSystemShowcase /></ProtectedRoute>} />
             <Route path="/dashboard/amro/changes" element={<Navigate to="/dashboard/amro/work-packages" replace />} />
             
             {/* Sales Dashboard Routes */}

@@ -120,6 +120,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Intelligence', path: '/dashboard/amro/intelligence', icon: TrendingUp, description: 'Forecast recommendation and risk intelligence', permissions: ['view_amro_dashboard'] },
       { name: 'Settings', path: '/dashboard/amro/settings', icon: Cog, description: 'AMRO configuration and master data controls', permissions: ['edit_aircraft_records'] },
       { name: 'Workspace Documentation', path: '/dashboard/amro/workspace-documentation', icon: BookOpen, description: 'AMRO reference materials and contracts', permissions: ['view_amro_dashboard'] },
+      { name: 'Design System Showcase', path: '/dashboard/amro/design-system-showcase', icon: Palette, description: 'Interactive UI patterns demo and training tool', permissions: ['view_amro_dashboard'] },
     ],
   },
   {
