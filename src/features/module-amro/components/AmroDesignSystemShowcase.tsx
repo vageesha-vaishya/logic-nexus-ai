@@ -17,11 +17,12 @@
 
 import { useState, useMemo } from 'react';
 import {
-  Boxes, TrendingUp, AlertTriangle, CheckCircle2, Package,
+  Boxes, TrendingUp, AlertTriangle, AlertCircle, CheckCircle2, Package,
   Search, Filter, SlidersHorizontal, Plus, MoreHorizontal,
   ChevronDown, LayoutGrid, Columns3, Eye, EyeOff,
   LayoutDashboard, ArrowRight, ArrowLeft, Info,
-  Monitor, Smartphone, Tablet
+  Monitor, Smartphone, Tablet, Download, Upload, RefreshCw,
+  Copy, Trash2, Pencil, ChevronsUpDown, ChevronUp
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -41,6 +42,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import {
@@ -58,8 +60,19 @@ import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Switch } from '@/components/ui/switch';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDataGridStore } from './data-grid/store/useDataGridStore';
+import { AmroAdvancedDataGrid } from './data-grid/AmroAdvancedDataGrid';
+import { AmroRecordDetail, type FormSection } from './data-grid/AmroRecordDetail';
+import { AmroRecordWizard, type WizardStepConfig } from './data-grid/AmroRecordWizard';
 
 // ── Mock Data ──────────────────────────────────────────────────────────────────
 
@@ -1289,6 +1302,338 @@ function FormValidationShowcase() {
   );
 }
 
+// ── Advanced Data Grid Showcase ────────────────────────────────────────────────
+
+function AdvancedGridShowcase() {
+  const [records, setRecords] = useState<Record<string, any>[]>(() => [
+    { id: '1', part_number: 'PN-001-A320', description: 'Hydraulic Pump Assembly', type: 'part', status: 'available', quantity: 12, location: 'WH-A1', unit_cost: 1250.00, updated_at: '2024-01-15', serial_number: 'AMRO-SN-00000001', reorder_level: 5, supplier: 'AeroParts Inc.' },
+    { id: '2', part_number: 'PN-002-B737', description: 'Landing Gear Actuator', type: 'part', status: 'low_stock', quantity: 2, location: 'WH-B3', unit_cost: 3400.50, updated_at: '2024-01-14', serial_number: 'AMRO-SN-00000002', reorder_level: 3, supplier: 'Boeing Supply Co.' },
+    { id: '3', part_number: 'PN-003-A320', description: 'Fuel Filter Element', type: 'consumable', status: 'available', quantity: 45, location: 'WH-A2', unit_cost: 85.00, updated_at: '2024-01-13', serial_number: 'AMRO-SN-00000003', reorder_level: 20, supplier: 'FilterTech Ltd.' },
+    { id: '4', part_number: 'PN-004-B787', description: 'APU Starter Motor', type: 'part', status: 'reserved', quantity: 8, location: 'WH-C1', unit_cost: 2100.00, updated_at: '2024-01-12', serial_number: 'AMRO-SN-00000004', reorder_level: 2, supplier: 'Honeywell Aerospace' },
+    { id: '5', part_number: 'PN-005-A350', description: 'Oxygen Generator', type: 'equipment', status: 'quarantined', quantity: 3, location: 'WH-D1', unit_cost: 5600.00, updated_at: '2024-01-11', serial_number: 'AMRO-SN-00000005', reorder_level: 1, supplier: 'O2 Systems Corp.' },
+    { id: '6', part_number: 'PN-006-A320', description: 'Flight Control Computer', type: 'equipment', status: 'available', quantity: 6, location: 'WH-A3', unit_cost: 8900.00, updated_at: '2024-01-10', serial_number: 'AMRO-SN-00000006', reorder_level: 2, supplier: 'Thales Group' },
+    { id: '7', part_number: 'PN-007-B737', description: 'Navigation Display Unit', type: 'equipment', status: 'serviceable', quantity: 4, location: 'WH-B2', unit_cost: 4200.00, updated_at: '2024-01-09', serial_number: 'AMRO-SN-00000007', reorder_level: 2, supplier: 'Garmin Aviation' },
+    { id: '8', part_number: 'PN-008-B787', description: 'Cabin Pressure Valve', type: 'part', status: 'available', quantity: 15, location: 'WH-C2', unit_cost: 780.00, updated_at: '2024-01-08', serial_number: 'AMRO-SN-00000008', reorder_level: 5, supplier: 'Parker Aerospace' },
+    { id: '9', part_number: 'PN-009-A350', description: 'Engine Oil Cooler', type: 'part', status: 'available', quantity: 20, location: 'WH-A1', unit_cost: 1650.00, updated_at: '2024-01-07', serial_number: 'AMRO-SN-00000009', reorder_level: 5, supplier: 'Rolls-Royce' },
+    { id: '10', part_number: 'PN-010-A320', description: 'Brake Assembly Kit', type: 'consumable', status: 'low_stock', quantity: 1, location: 'WH-B1', unit_cost: 4500.00, updated_at: '2024-01-06', serial_number: 'AMRO-SN-00000010', reorder_level: 3, supplier: 'Messier-Bugatti-Dowty' },
+  ]);
+
+  const [showDetail, setShowDetail] = useState(false);
+  const [detailRecord, setDetailRecord] = useState<Record<string, any> | null>(null);
+  const [detailMode, setDetailMode] = useState<'view' | 'edit'>('view');
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardMode, setWizardMode] = useState<'create' | 'edit'>('create');
+  const [wizardRecord, setWizardRecord] = useState<Record<string, any> | null>(null);
+  const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
+
+  const showNotification = useCallback((type: 'success' | 'error', message: string) => {
+    setNotification({ type, message });
+    setTimeout(() => setNotification(null), 4000);
+  }, []);
+
+  // CRUD handlers
+  const handleView = useCallback((row: Record<string, any>) => {
+    setDetailRecord(row);
+    setDetailMode('view');
+    setShowDetail(true);
+  }, []);
+
+  const handleEdit = useCallback((row: Record<string, any>) => {
+    setWizardRecord(row);
+    setWizardMode('edit');
+    setShowWizard(true);
+  }, []);
+
+  const handleDelete = useCallback((row: Record<string, any>) => {
+    setRecords((prev) => prev.filter((r) => r.id !== row.id));
+    showNotification('success', `Record ${row.part_number} deleted successfully`);
+  }, [showNotification]);
+
+  const handleDuplicate = useCallback((row: Record<string, any>) => {
+    const newRecord = { ...row, id: `new-${Date.now()}`, part_number: `${row.part_number}-COPY`, created_at: new Date().toISOString() };
+    setRecords((prev) => [newRecord, ...prev]);
+    showNotification('success', `Record duplicated as ${newRecord.part_number}`);
+  }, [showNotification]);
+
+  const handleNewRecord = useCallback(() => {
+    setWizardRecord(null);
+    setWizardMode('create');
+    setShowWizard(true);
+  }, []);
+
+  const handleSaveFromWizard = useCallback(async (data: Record<string, any>) => {
+    await new Promise((r) => setTimeout(r, 500));
+    if (wizardMode === 'create') {
+      const newRecord = { ...data, id: `new-${Date.now()}`, updated_at: new Date().toISOString() };
+      setRecords((prev) => [newRecord, ...prev]);
+      showNotification('success', `Record ${data.part_number} created successfully`);
+    } else {
+      setRecords((prev) => prev.map((r) => (r.id === data.id ? { ...data, updated_at: new Date().toISOString() } : r)));
+      showNotification('success', `Record ${data.part_number} updated successfully`);
+    }
+    setShowWizard(false);
+  }, [wizardMode, showNotification]);
+
+  const handleSaveFromDetail = useCallback(async (data: Record<string, any>) => {
+    await new Promise((r) => setTimeout(r, 500));
+    setRecords((prev) => prev.map((r) => (r.id === data.id ? { ...data, updated_at: new Date().toISOString() } : r)));
+    setDetailRecord(data);
+    showNotification('success', `Record ${data.part_number} updated successfully`);
+  }, [showNotification]);
+
+  const handleDeleteFromDetail = useCallback(async (id: string) => {
+    await new Promise((r) => setTimeout(r, 300));
+    setRecords((prev) => prev.filter((r) => r.id !== id));
+    setShowDetail(false);
+    showNotification('success', 'Record deleted successfully');
+  }, [showNotification]);
+
+  // Filter records based on store filters
+  const { filters } = useDataGridStore();
+  const filteredRecords = useMemo(() => {
+    return records.filter((r) => {
+      if (filters.search) {
+        const search = filters.search.toLowerCase();
+        if (!r.part_number.toLowerCase().includes(search) &&
+            !r.description.toLowerCase().includes(search) &&
+            !r.location.toLowerCase().includes(search) &&
+            !r.serial_number.toLowerCase().includes(search)) {
+          return false;
+        }
+      }
+      if (filters.status && filters.status !== 'all' && r.status !== filters.status) return false;
+      if (filters.type && filters.type !== 'all' && r.type !== filters.type) return false;
+      return true;
+    });
+  }, [records, filters]);
+
+  // Form sections for Record Detail
+  const detailSections = useMemo<FormSection[]>(() => [
+    {
+      id: 'identity',
+      title: 'Identity',
+      icon: Package,
+      fields: [
+        { id: 'id', label: 'Id', type: 'readonly', colSpan: 1 },
+        { id: 'part_number', label: 'Part Number', type: 'text', required: true, colSpan: 1, validate: (v: string) => (/^[A-Z]{2}-\d{3}-[A-Z]\d{3}$/.test(v) ? null : 'Format: XX-NNN-XNNN') },
+        { id: 'serial_number', label: 'Serial Number', type: 'text', colSpan: 1 },
+        { id: 'description', label: 'Description', type: 'textarea', required: true, colSpan: 2 },
+      ],
+    },
+    {
+      id: 'classification',
+      title: 'Classification',
+      icon: Settings,
+      fields: [
+        { id: 'type', label: 'Type', type: 'select', required: true, options: [{ value: 'part', label: 'Part' }, { value: 'consumable', label: 'Consumable' }, { value: 'equipment', label: 'Equipment' }, { value: 'tool', label: 'Tool' }] },
+        { id: 'status', label: 'Status', type: 'select', required: true, options: [{ value: 'available', label: 'Available' }, { value: 'low_stock', label: 'Low Stock' }, { value: 'reserved', label: 'Reserved' }, { value: 'quarantined', label: 'Quarantined' }, { value: 'serviceable', label: 'Serviceable' }] },
+        { id: 'supplier', label: 'Supplier', type: 'text' },
+      ],
+    },
+    {
+      id: 'inventory',
+      title: 'Inventory & Location',
+      icon: Boxes,
+      fields: [
+        { id: 'quantity', label: 'Quantity On Hand', type: 'number', required: true },
+        { id: 'reorder_level', label: 'Reorder Level', type: 'number' },
+        { id: 'location', label: 'Warehouse Location', type: 'text', required: true },
+        { id: 'unit_cost', label: 'Unit Cost', type: 'currency' },
+      ],
+    },
+  ], []);
+
+  // Wizard steps
+  const wizardSteps = useMemo<WizardStepConfig[]>(() => [
+    {
+      id: 'identity',
+      title: 'Identity',
+      description: 'Part identification details',
+      icon: Package,
+      fields: [
+        { id: 'part_number', label: 'Part Number', type: 'text', required: true, placeholder: 'PN-001-A320', helperText: 'Format: XX-NNN-XNNN', validate: (v: string) => (/^[A-Z]{2}-\d{3}-[A-Z]\d{3}$/.test(v) ? null : 'Format: XX-NNN-XNNN') },
+        { id: 'serial_number', label: 'Serial Number', type: 'text', placeholder: 'AMRO-SN-00000001' },
+        { id: 'description', label: 'Description', type: 'textarea', required: true, placeholder: 'Enter part description...', colSpan: 2 },
+      ],
+    },
+    {
+      id: 'classification',
+      title: 'Classification',
+      description: 'Type, status, and supplier',
+      icon: Settings,
+      fields: [
+        { id: 'type', label: 'Type', type: 'select', required: true, options: [{ value: 'part', label: 'Part' }, { value: 'consumable', label: 'Consumable' }, { value: 'equipment', label: 'Equipment' }, { value: 'tool', label: 'Tool' }] },
+        { id: 'status', label: 'Status', type: 'select', required: true, options: [{ value: 'available', label: 'Available' }, { value: 'low_stock', label: 'Low Stock' }, { value: 'reserved', label: 'Reserved' }, { value: 'quarantined', label: 'Quarantined' }, { value: 'serviceable', label: 'Serviceable' }] },
+        { id: 'supplier', label: 'Supplier', type: 'text', placeholder: 'Supplier name' },
+      ],
+    },
+    {
+      id: 'inventory',
+      title: 'Inventory',
+      description: 'Stock levels and location',
+      icon: Boxes,
+      fields: [
+        { id: 'quantity', label: 'Quantity On Hand', type: 'number', required: true, placeholder: '0' },
+        { id: 'reorder_level', label: 'Reorder Level', type: 'number', placeholder: '5' },
+        { id: 'location', label: 'Warehouse Location', type: 'text', required: true, placeholder: 'WH-A1-03' },
+        { id: 'unit_cost', label: 'Unit Cost ($)', type: 'number', placeholder: '0.00' },
+      ],
+    },
+    {
+      id: 'review',
+      title: 'Review',
+      description: 'Confirm and submit',
+      icon: Eye,
+      fields: [],
+    },
+  ], []);
+
+  return (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-base font-semibold">Parts Inventory Records</h3>
+        <p className="text-xs text-muted-foreground mt-1">
+          Full CRUD operations with advanced data grid, record detail view, and step-by-step wizard.
+        </p>
+      </div>
+
+      {/* Notification */}
+      {notification && (
+        <Alert className={cn(notification.type === 'error' ? 'border-red-200 bg-red-50' : 'border-green-200 bg-green-50')}>
+          {notification.type === 'success' ? <CheckCircle2 className="h-4 w-4 text-green-600" /> : <AlertCircle className="h-4 w-4 text-red-600" />}
+          <AlertDescription className={cn('text-xs', notification.type === 'error' ? 'text-red-600' : 'text-green-700')}>
+            {notification.message}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Toolbar */}
+      <Card className="border-slate-300">
+        <CardContent className="p-3">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex-1 min-w-[200px] max-w-sm relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                placeholder="Search parts, descriptions, locations..."
+                className="pl-9"
+                value={filters.search}
+                onChange={(e) => useDataGridStore.getState().setFilters({ search: e.target.value })}
+              />
+            </div>
+            <Select
+              value={filters.status || 'all'}
+              onValueChange={(v) => useDataGridStore.getState().setFilters({ status: v === 'all' ? null : v })}
+            >
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Status" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Statuses</SelectItem>
+                <SelectItem value="available">Available</SelectItem>
+                <SelectItem value="low_stock">Low Stock</SelectItem>
+                <SelectItem value="reserved">Reserved</SelectItem>
+                <SelectItem value="quarantined">Quarantined</SelectItem>
+                <SelectItem value="serviceable">Serviceable</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={filters.type || 'all'}
+              onValueChange={(v) => useDataGridStore.getState().setFilters({ type: v === 'all' ? null : v })}
+            >
+              <SelectTrigger className="w-[150px]"><SelectValue placeholder="Type" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Types</SelectItem>
+                <SelectItem value="part">Part</SelectItem>
+                <SelectItem value="consumable">Consumable</SelectItem>
+                <SelectItem value="equipment">Equipment</SelectItem>
+                <SelectItem value="tool">Tool</SelectItem>
+              </SelectContent>
+            </Select>
+            <div className="flex-1" />
+            <Button variant="outline" size="sm" onClick={handleNewRecord}>
+              <Plus className="h-4 w-4 mr-1.5" />
+              New Record
+            </Button>
+            <Button variant="outline" size="sm">
+              <Download className="h-4 w-4 mr-1.5" />
+              Export
+            </Button>
+            <Button variant="outline" size="sm">
+              <Upload className="h-4 w-4 mr-1.5" />
+              Import
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Data Grid */}
+      <AmroAdvancedDataGrid
+        data={filteredRecords}
+        onView={handleView}
+        onEdit={handleEdit}
+        onDelete={handleDelete}
+        onDuplicate={handleDuplicate}
+        density="normal"
+        enableSelection
+        enableColumnResize
+        enableMultiSort
+      />
+
+      {/* Record Count */}
+      <div className="flex items-center justify-between text-xs text-muted-foreground">
+        <span>Showing {filteredRecords.length} of {records.length} records</span>
+        <span>Last updated: {new Date().toLocaleDateString()}</span>
+      </div>
+
+      {/* Record Detail Modal */}
+      {showDetail && detailRecord && (
+        <Dialog open={showDetail} onOpenChange={setShowDetail}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <AmroRecordDetail
+              record={detailRecord}
+              sections={detailSections}
+              isEditing={detailMode === 'edit'}
+              onSave={handleSaveFromDetail}
+              onDelete={handleDeleteFromDetail}
+              onClose={() => setShowDetail(false)}
+            />
+          </DialogContent>
+        </Dialog>
+      )}
+
+      {/* Create/Edit Wizard */}
+      {showWizard && (
+        <AmroRecordWizard
+          mode={wizardMode}
+          steps={wizardSteps}
+          initialData={wizardRecord || {}}
+          onSubmit={handleSaveFromWizard}
+          onClose={() => setShowWizard(false)}
+        />
+      )}
+
+      {/* Feature Summary */}
+      <Separator />
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        {[
+          { title: 'Column Resize', desc: 'Drag borders to resize columns', icon: Columns3 },
+          { title: 'Multi-Sort', desc: 'Shift+Click for multi-column sort', icon: ChevronDown },
+          { title: 'Record Detail', desc: 'View, edit, delete with form sections', icon: Eye },
+          { title: 'Wizard CRUD', desc: 'Step-by-step create/edit with validation', icon: Package },
+        ].map((f) => {
+          const Icon = f.icon;
+          return (
+            <Card key={f.title} className="border-slate-300">
+              <CardContent className="p-3 flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-primary/10"><Icon className="h-4 w-4 text-primary" /></div>
+                <div><p className="text-xs font-medium">{f.title}</p><p className="text-xs text-muted-foreground">{f.desc}</p></div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 // ── Main Showcase Component ────────────────────────────────────────────────────
 
 export function AmroDesignSystemShowcase() {
@@ -1317,6 +1662,7 @@ export function AmroDesignSystemShowcase() {
           <TabsTrigger value="kpi" className="text-xs">KPI Grid</TabsTrigger>
           <TabsTrigger value="toolbar" className="text-xs">Toolbar</TabsTrigger>
           <TabsTrigger value="grid" className="text-xs">Data Grid</TabsTrigger>
+          <TabsTrigger value="advanced-grid" className="text-xs">Advanced Grid</TabsTrigger>
           <TabsTrigger value="navigation" className="text-xs">Navigation</TabsTrigger>
           <TabsTrigger value="forms" className="text-xs">Forms & Wizards</TabsTrigger>
         </TabsList>
@@ -1408,6 +1754,11 @@ export function AmroDesignSystemShowcase() {
         {/* Data Grid Tab */}
         <TabsContent value="grid" className="mt-6">
           <DataGridShowcase />
+        </TabsContent>
+
+        {/* Advanced Data Grid Tab */}
+        <TabsContent value="advanced-grid" className="mt-6">
+          <AdvancedGridShowcase />
         </TabsContent>
 
         {/* Navigation Tab */}
