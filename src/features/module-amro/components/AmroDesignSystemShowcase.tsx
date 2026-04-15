@@ -15,7 +15,7 @@
  * 8. Accessibility Features
  */
 
-import { useState, useMemo } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import {
   Boxes, TrendingUp, AlertTriangle, AlertCircle, CheckCircle2, Package,
   Search, Filter, SlidersHorizontal, Plus, MoreHorizontal,

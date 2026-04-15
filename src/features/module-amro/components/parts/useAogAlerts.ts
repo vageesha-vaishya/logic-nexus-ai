@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient, useCallback } from '@tanstack/react-query';
+import { useCallback } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 export type AogSeverity = 'critical' | 'high' | 'medium';
 export type AogStatus = 'open' | 'escalated' | 'resolved' | 'cancelled';
