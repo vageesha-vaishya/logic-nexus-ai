@@ -53,13 +53,12 @@ import {
   type UrgencyLevel,
 } from './useEmergencyWPState';
 import {
-  useAircraftOptions,
-  type AircraftRecord,
-} from './useAircraftState';
-import {
   useWorkPackageTemplateOptions,
+  useWorkPackageTemplateDetail,
   type WorkPackageTemplateOption,
 } from './useWorkPackageTemplates';
+import { useAircraftOptions } from './useAircraftState';
+import { filterTemplatesByAircraft } from './templateFiltering';
 
 type CreationPath = 'scheduled' | 'non-scheduled' | 'emergency';
 type WizardStep = 1 | 2 | 3 | 4;
@@ -144,6 +143,10 @@ const CREATION_PATH_CONFIG: Record<CreationPath, { label: string; description: s
   },
 };
 
+function normalizeToken(value: unknown): string {
+  return String(value || '').trim().toLowerCase();
+}
+
 type Props = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -183,32 +186,125 @@ export function AmroWorkPackageCreateWizard({
     enabled: !!formData.templateVersionId && formData.creationPath === 'scheduled',
   });
 
+  // Load template directly from work_package_templates as fallback
+  const { data: templateDirectData, isLoading: templateDirectLoading } = useWorkPackageTemplateDetail(
+    formData.templateVersionId.split(':')[0] || '',
+    !!formData.templateVersionId && formData.creationPath === 'scheduled'
+  );
+
+  // Determine which data source to use: versions (if exists) OR direct template
+  const effectiveTemplateData = useMemo(() => {
+    // Priority 1: Use version data if available
+    if (templateVersionData?.records && templateVersionData.records.length > 0) {
+      return templateVersionData.records[0];
+    }
+    // Priority 2: Fallback to direct template data
+    if (templateDirectData) {
+      return {
+        ...templateDirectData,
+        version_number: templateDirectData.version,
+        version_label: `v${templateDirectData.version}`,
+        maintenance_type: templateDirectData.maintenance_type,
+      };
+    }
+    return null;
+  }, [templateVersionData, templateDirectData]);
+
+  const isTaskDataLoading = templateVersionLoading || templateDirectLoading;
+
   // Auto-populate form from template when template version is loaded
   useEffect(() => {
-    if (templateVersionData?.records && templateVersionData.records.length > 0 && formData.creationPath === 'scheduled') {
-      const latestVersion = templateVersionData.records[0];
-      
+    if (effectiveTemplateData && formData.creationPath === 'scheduled') {
       // Auto-populate from template metadata
-      if (latestVersion && !formData.title) {
+      if (effectiveTemplateData && !formData.title) {
         const templateName = templateOptions.find(t => t.value === formData.templateVersionId)?.label || '';
         setFormData(prev => ({
           ...prev,
-          title: prev.title || `${templateName} - ${latestVersion.version_label || `v${latestVersion.version_number}`}`,
-          description: prev.description || latestVersion.change_description || '',
-          maintenance_type: prev.maintenance_type || (latestVersion.maintenance_type as MaintenanceType) || 'line',
-          priority: prev.priority || (latestVersion.priority as WorkPackagePriority) || 3,
-          selectedTaskIds: latestVersion.tasks_json?.map((t: any) => t.id).filter(Boolean) || [],
-          estimatedLaborHours: latestVersion.estimated_labor_hours?.toString() || '',
-          scopeItems: latestVersion.scope_json ? JSON.stringify(latestVersion.scope_json, null, 2) : '',
+          title: prev.title || `${templateName} - ${effectiveTemplateData.version_label || `v${effectiveTemplateData.version_number}`}`,
+          description: prev.description || String((effectiveTemplateData as any).change_description || ''),
+          maintenanceType: prev.maintenanceType || (String((effectiveTemplateData as any).maintenance_type || '').trim() as MaintenanceType) || 'line',
+          priority: prev.priority || (Number((effectiveTemplateData as any).priority) as WorkPackagePriority) || 3,
+          selectedTaskIds: effectiveTemplateData.tasks_json?.map((t: any) => t.task_template_id || t.id).filter(Boolean) || [],
+          estimatedLaborHours: String((effectiveTemplateData as any).estimated_labor_hours ?? ''),
+          scopeItems: effectiveTemplateData.scope_json ? JSON.stringify(effectiveTemplateData.scope_json, null, 2) : '',
         }));
       }
     }
-  }, [templateVersionData?.records, formData.creationPath, formData.templateVersionId, formData.title, templateOptions]);
+  }, [effectiveTemplateData, formData.creationPath, formData.templateVersionId, formData.title, templateOptions]);
 
   const { data: templateData } = useListTemplateVersions({
     templateId: formData.templateVersionId.split(':')[0] || '',
     enabled: false, // Only used when explicitly needed
   });
+
+  const selectedAircraft = useMemo(
+    () => aircraftOptions.find((ac) => ac.value === formData.aircraftId),
+    [aircraftOptions, formData.aircraftId],
+  );
+
+  const selectedAircraftTenantId = useMemo(
+    () => String(selectedAircraft?.tenant_id || '').trim(),
+    [selectedAircraft?.tenant_id],
+  );
+
+  const selectedAircraftAssemblyModel = useMemo(
+    () => String(selectedAircraft?.aircraft_model || selectedAircraft?.type || '').trim(),
+    [selectedAircraft?.aircraft_model, selectedAircraft?.type],
+  );
+  const selectedAircraftModelId = useMemo(
+    () => String((selectedAircraft as any)?.model_id || '').trim(),
+    [(selectedAircraft as any)?.model_id],
+  );
+
+  const filteredTemplateOptions = useMemo(() => {
+    return filterTemplatesByAircraft({
+      aircraftTenantId: selectedAircraftTenantId,
+      aircraftModelId: selectedAircraftModelId,
+      aircraftModelName: selectedAircraftAssemblyModel,
+      templates: templateOptions,
+    });
+  }, [selectedAircraftAssemblyModel, selectedAircraftModelId, selectedAircraftTenantId, templateOptions]);
+
+  const templateFilteringMessage = useMemo(() => {
+    if (!selectedAircraft) {
+      return 'Select an aircraft to load tenant/model-matched templates.';
+    }
+    if (!selectedAircraftModelId && !selectedAircraftAssemblyModel) {
+      return 'Unable to identify aircraft model/model_id for selected aircraft. Template list is restricted until model metadata is available.';
+    }
+    const tenantHint = selectedAircraftTenantId || 'unknown tenant';
+    const modelHint = selectedAircraftAssemblyModel || selectedAircraftModelId || 'unknown model';
+    return `Filter active: showing templates for tenant (${tenantHint}) and exact aircraft model (${modelHint}) only.`;
+  }, [selectedAircraft, selectedAircraftAssemblyModel, selectedAircraftModelId, selectedAircraftTenantId]);
+
+  const filteredTemplateLookup = useMemo(() => new Set(filteredTemplateOptions.map((option) => option.value)), [filteredTemplateOptions]);
+
+  useEffect(() => {
+    if (!formData.templateVersionId) {
+      return;
+    }
+    if (filteredTemplateLookup.has(formData.templateVersionId)) {
+      return;
+    }
+    setFormData((prev) => ({
+      ...prev,
+      templateVersionId: '',
+      selectedTaskIds: [],
+    }));
+  }, [filteredTemplateLookup, formData.templateVersionId]);
+
+  const filteredTemplateTasks = useMemo(() => {
+    const tasks = Array.isArray(effectiveTemplateData?.tasks_json) ? effectiveTemplateData.tasks_json : [];
+    const tenantToken = normalizeToken(selectedAircraftTenantId);
+    const modelToken = normalizeToken(selectedAircraftAssemblyModel);
+    return tasks.filter((task: any) => {
+      const taskTenantToken = normalizeToken(task?.tenant_id || task?.metadata?.tenant_id);
+      const taskModelToken = normalizeToken(task?.aircraft_model || task?.model_id || task?.metadata?.aircraft_model || task?.metadata?.model_id);
+      const tenantMatches = !tenantToken || !taskTenantToken || taskTenantToken === tenantToken;
+      const modelMatches = !modelToken || !taskModelToken || taskModelToken === modelToken;
+      return tenantMatches && modelMatches;
+    });
+  }, [effectiveTemplateData?.tasks_json, selectedAircraftAssemblyModel, selectedAircraftTenantId]);
 
   // Handlers
   const updateField = useCallback(<K extends keyof WizardFormData>(key: K, value: WizardFormData[K]) => {
@@ -225,8 +321,12 @@ export function AmroWorkPackageCreateWizard({
       }
       if (formData.creationPath === 'scheduled') {
         if (!formData.templateVersionId) {
-          if (templateOptions.length === 0) {
-            newErrors.templateVersionId = 'No approved templates available. Contact your administrator.';
+          if (!formData.aircraftId) {
+            newErrors.templateVersionId = 'Select an aircraft before choosing a template';
+          } else if (!selectedAircraftAssemblyModel && !selectedAircraftModelId) {
+            newErrors.templateVersionId = 'Selected aircraft does not expose a valid model/model_id designation';
+          } else if (filteredTemplateOptions.length === 0) {
+            newErrors.templateVersionId = 'No templates match the selected aircraft tenant and assembly model';
           } else {
             newErrors.templateVersionId = 'Template selection is required for scheduled maintenance';
           }
@@ -259,7 +359,7 @@ export function AmroWorkPackageCreateWizard({
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
-  }, [formData]);
+  }, [filteredTemplateOptions.length, formData, selectedAircraftAssemblyModel, selectedAircraftModelId]);
 
   const handleNext = useCallback(() => {
     if (validateStep(currentStep)) {
@@ -331,11 +431,6 @@ export function AmroWorkPackageCreateWizard({
     { number: 3, label: 'Tasks' },
     { number: 4, label: 'Review' },
   ];
-
-  const selectedAircraft = useMemo(
-    () => aircraftOptions.find((ac) => ac.value === formData.aircraftId),
-    [aircraftOptions, formData.aircraftId],
-  );
 
   const creationPathConfig = CREATION_PATH_CONFIG[formData.creationPath];
   const CreationPathIcon = creationPathConfig.icon;
@@ -484,29 +579,40 @@ export function AmroWorkPackageCreateWizard({
                 <div>
                   <Label className="text-base font-semibold">Select Template *</Label>
                   <p className="text-sm text-muted-foreground mt-1">Choose an approved maintenance template</p>
+                  <p className="text-xs text-blue-700 mt-2">{templateFilteringMessage}</p>
                   <Select
                     value={formData.templateVersionId}
                     onValueChange={(val) => updateField('templateVersionId', val)}
-                    disabled={templateLoading || templateOptions.length === 0}
+                    disabled={!formData.aircraftId || templateLoading || filteredTemplateOptions.length === 0}
                   >
                     <SelectTrigger className={cn('mt-2 h-11', errors.templateVersionId && 'border-destructive')}>
                       <SelectValue placeholder={
-                        templateLoading 
+                        !formData.aircraftId
+                          ? 'Select aircraft first'
+                          : templateLoading
                           ? "Loading templates..." 
-                          : templateOptions.length === 0
-                          ? "No templates available"
+                          : filteredTemplateOptions.length === 0
+                          ? "No matching templates for selected aircraft"
                           : "Select a template..."
                       } />
                     </SelectTrigger>
                     <SelectContent>
                       {templateError ? (
                         <div className="p-2 text-sm text-destructive">Failed to load templates</div>
-                      ) : templateOptions.length === 0 ? (
+                      ) : !formData.aircraftId ? (
                         <div className="p-2 text-sm text-muted-foreground">
-                          No approved templates available. Contact your administrator to create templates.
+                          Select an aircraft to load filtered templates.
+                        </div>
+                      ) : (!selectedAircraftAssemblyModel && !selectedAircraftModelId) ? (
+                        <div className="p-2 text-sm text-amber-700">
+                          Aircraft model/model_id is unavailable for this aircraft. Cannot filter templates.
+                        </div>
+                      ) : filteredTemplateOptions.length === 0 ? (
+                        <div className="p-2 text-sm text-muted-foreground">
+                          No templates match this aircraft tenant/model combination.
                         </div>
                       ) : (
-                        templateOptions.map((template) => (
+                        filteredTemplateOptions.map((template) => (
                           <SelectItem key={template.value} value={template.value}>
                             {template.label}
                           </SelectItem>
@@ -520,17 +626,18 @@ export function AmroWorkPackageCreateWizard({
                       {errors.templateVersionId}
                     </p>
                   )}
-                  {templateOptions.length === 0 && !templateLoading && (
+                  {formData.aircraftId && filteredTemplateOptions.length === 0 && !templateLoading ? (
                     <div className="mt-2 p-3 bg-amber-50 border border-amber-200 rounded-md">
                       <p className="text-sm text-amber-800">
-                        💡 <strong>No templates available.</strong> You can:
+                        ⚠️ <strong>No matching templates found.</strong> Template options are filtered by selected aircraft tenant and assembly model.
                       </p>
                       <ul className="text-sm text-amber-700 mt-2 ml-4 list-disc space-y-1">
-                        <li>Switch to <strong>Non-Scheduled</strong> path to create a work package without a template</li>
-                        <li>Contact your administrator to create work package templates</li>
+                        <li>Select another aircraft with a supported model</li>
+                        <li>Switch to <strong>Non-Scheduled</strong> or <strong>Emergency</strong> path</li>
+                        <li>Create/configure matching templates for this aircraft model</li>
                       </ul>
                     </div>
-                  )}
+                  ) : null}
                 </div>
               )}
 
@@ -809,20 +916,20 @@ export function AmroWorkPackageCreateWizard({
               {formData.creationPath === 'scheduled' ? (
                 <>
                   {/* Template Tasks */}
-                  {templateVersionLoading ? (
+                  {isTaskDataLoading ? (
                     <div className="text-center py-8 text-muted-foreground">
                       <p className="text-sm">Loading template tasks...</p>
                     </div>
-                  ) : templateVersionData?.records && templateVersionData.records[0]?.tasks_json && templateVersionData.records[0].tasks_json.length > 0 ? (
+                  ) : filteredTemplateTasks.length > 0 ? (
                     <div>
                       <div className="flex items-center justify-between mb-3">
-                        <h4 className="text-sm font-medium">Template Tasks ({templateVersionData.records[0].tasks_json.length} tasks)</h4>
+                        <h4 className="text-sm font-medium">Template Tasks ({filteredTemplateTasks.length} tasks)</h4>
                         <div className="flex gap-2">
                           <Button
                             variant="outline"
                             size="sm"
                             onClick={() => {
-                              const allTaskIds = templateVersionData.records[0].tasks_json.map((t: any) => t.id).filter(Boolean);
+                              const allTaskIds = filteredTemplateTasks.map((t: any) => t.task_template_id || t.id).filter(Boolean);
                               updateField('selectedTaskIds', allTaskIds);
                             }}
                           >
@@ -844,7 +951,7 @@ export function AmroWorkPackageCreateWizard({
                               <th className="p-3 text-left text-sm font-medium w-10">
                                 <Checkbox />
                               </th>
-                              <th className="p-3 text-left text-sm font-medium">Task Number</th>
+                              <th className="p-3 text-left text-sm font-medium">Task ID</th>
                               <th className="p-3 text-left text-sm font-medium">ATA Code</th>
                               <th className="p-3 text-left text-sm font-medium">Description</th>
                               <th className="p-3 text-left text-sm font-medium">Est. Hours</th>
@@ -852,13 +959,13 @@ export function AmroWorkPackageCreateWizard({
                             </tr>
                           </thead>
                           <tbody>
-                            {templateVersionData.records[0].tasks_json.map((task: any, idx: number) => (
-                              <tr key={task.id || idx} className="border-t hover:bg-muted/50 transition-colors">
+                            {filteredTemplateTasks.map((task: any, idx: number) => (
+                              <tr key={task.task_template_id || task.id || idx} className="border-t hover:bg-muted/50 transition-colors">
                                 <td className="p-3">
                                   <Checkbox
-                                    checked={formData.selectedTaskIds.includes(task.id || `task-${idx}`)}
+                                    checked={formData.selectedTaskIds.includes(task.task_template_id || task.id || `task-${idx}`)}
                                     onCheckedChange={(checked) => {
-                                      const taskId = task.id || `task-${idx}`;
+                                      const taskId = task.task_template_id || task.id || `task-${idx}`;
                                       if (checked) {
                                         updateField('selectedTaskIds', [...formData.selectedTaskIds, taskId]);
                                       } else {
@@ -867,10 +974,10 @@ export function AmroWorkPackageCreateWizard({
                                     }}
                                   />
                                 </td>
-                                <td className="p-3 text-sm font-mono">{task.task_number || task.code || task.number || `TASK-${idx + 1}`}</td>
-                                <td className="p-3 text-sm font-mono">{task.ata_code || task.ata || '-'}</td>
-                                <td className="p-3 text-sm">{task.description || task.desc || task.title || 'Untitled Task'}</td>
-                                <td className="p-3 text-sm">{task.estimated_labor_hours || task.est_hours || task.hours || '-'}</td>
+                                <td className="p-3 text-sm font-mono">{task.task_id || task.code_form_no || `TASK-${idx + 1}`}</td>
+                                <td className="p-3 text-sm font-mono">{task.ata_code || '-'}</td>
+                                <td className="p-3 text-sm">{task.description || 'Untitled Task'}</td>
+                                <td className="p-3 text-sm">{task.estimated_man_hours || '-'}</td>
                                 <td className="p-3 text-sm">
                                   {task.category_code ? (
                                     <Badge variant="outline">{task.category_code}</Badge>
@@ -885,14 +992,14 @@ export function AmroWorkPackageCreateWizard({
                       </div>
                       <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-md">
                         <p className="text-sm text-blue-800">
-                          💡 <strong>{formData.selectedTaskIds.length}</strong> of {templateVersionData.records[0].tasks_json.length} tasks selected
+                          💡 <strong>{formData.selectedTaskIds.length}</strong> of {filteredTemplateTasks.length} tasks selected
                           {formData.selectedTaskIds.length === 0 && ' - Select at least one task to continue'}
                         </p>
                       </div>
                     </div>
                   ) : (
                     <div className="text-center py-12 border-2 border-dashed rounded-lg">
-                      <p className="text-sm text-muted-foreground">No tasks found in selected template</p>
+                      <p className="text-sm text-muted-foreground">No matching task templates found for selected aircraft/model</p>
                       <p className="text-xs mt-2 text-muted-foreground">You can still create the work package and add tasks later</p>
                     </div>
                   )}
@@ -916,7 +1023,7 @@ export function AmroWorkPackageCreateWizard({
                 />
                 {formData.creationPath === 'scheduled' && templateVersionData?.records && templateVersionData.records[0] && (
                   <p className="text-xs text-muted-foreground mt-1">
-                    Template estimated: {templateVersionData.records[0].estimated_labor_hours || 'N/A'} hours
+                    Template estimated: {(templateVersionData.records[0] as any).estimated_labor_hours || 'N/A'} hours
                   </p>
                 )}
               </div>

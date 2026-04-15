@@ -332,6 +332,32 @@ describe('/api/v2/amro/work-packages', () => {
     expect((res.jsonBody as any)?.input?.station).toBe('tenant-1:station-a');
     expect((res.jsonBody as any)?.output?.created_by).toBe('user-1');
     expect((res.jsonBody as any)?.output?.version).toBe(1);
+    expect((res.jsonBody as any)?.output?.generated_tasks_count).toBe(0);
+  });
+
+  it('returns persistence error and skips runtime fallback when template task generation fails', async () => {
+    process.env.AMRO_WORK_PACKAGES_V2_ENABLED = 'true';
+    vi.mocked(persistCreateWorkPackage).mockRejectedValueOnce(new Error('task_template_id not found (bad-id)'));
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { interface: 'create-work-package' },
+      body: {
+        aircraft_id: 'ac-001',
+        maintenance_type: 'line',
+        planned_window: '2026-03-21T00:00:00.000Z|2026-03-23T00:00:00.000Z',
+        station: 'station-a',
+        priority: 'high',
+        scope_items: ['inspection'],
+        work_package_template_id: '11111111-1111-4111-8111-111111111111',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(sendErrorResponse).toHaveBeenCalled();
+    expect(res.statusCode).toBeUndefined();
   });
 
   it('accepts aircraft trigger metadata for schedule due, defect, campaign, and predictive recommendations', async () => {

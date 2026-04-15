@@ -118,7 +118,19 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
       from: vi.fn((table: string) => {
         if (table === 'aircraft') {
           return createQueryChain([
-            { id: 'ac-1', registration: 'A6-ABC', status: 'active', defect_count: 1, current_flight_hours: 120.5, current_cycles: 430, updated_at: '2026-03-27T10:00:00.000Z' },
+            {
+              id: 'ac-1',
+              tenant_id: 'tenant-1',
+              franchise_id: 'fr-1',
+              model_id: 'model-a320',
+              aircraft_model: 'A320-200-157',
+              registration: 'A6-ABC',
+              status: 'active',
+              defect_count: 1,
+              current_flight_hours: 120.5,
+              current_cycles: 430,
+              updated_at: '2026-03-27T10:00:00.000Z',
+            },
           ]);
         }
         if (table === 'work_packages') {
@@ -162,6 +174,8 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
 
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.kpis?.open_work_packages).toBe(1);
+    expect((res.jsonBody as any)?.output?.aircraft_status?.[0]?.model_id).toBe('model-a320');
+    expect((res.jsonBody as any)?.output?.aircraft_status?.[0]?.aircraft_model).toBe('A320-200-157');
     expect((res.jsonBody as any)?.output?.kpis?.aircraft_leads_total).toBe(1);
     expect((res.jsonBody as any)?.output?.kpis?.aircraft_leads_at_risk).toBe(1);
     expect((res.jsonBody as any)?.output?.aircraft_leads?.[0]?.title).toBe('A-check upsell');
