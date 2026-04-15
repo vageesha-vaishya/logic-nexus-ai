@@ -73,6 +73,7 @@ import { useDataGridStore } from './data-grid/store/useDataGridStore';
 import { AmroAdvancedDataGrid } from './data-grid/AmroAdvancedDataGrid';
 import { AmroRecordDetail, type FormSection } from './data-grid/AmroRecordDetail';
 import { AmroRecordWizard, type WizardStepConfig } from './data-grid/AmroRecordWizard';
+import { useGridLayout, AmroSplitView, LayoutToggle, type GridLayoutMode } from './data-grid';
 
 // ── Mock Data ──────────────────────────────────────────────────────────────────
 
@@ -1326,6 +1327,18 @@ function AdvancedGridShowcase() {
   const [wizardRecord, setWizardRecord] = useState<Record<string, any> | null>(null);
   const [notification, setNotification] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
+  // Layout management
+  const layout = useGridLayout({
+    initialMode: 'grid-only',
+    defaultPanelWidth: 35,
+    onModeChange: (mode) => {
+      if (mode === 'grid-only') {
+        setShowDetail(false);
+        setDetailRecord(null);
+      }
+    },
+  });
+
   const showNotification = useCallback((type: 'success' | 'error', message: string) => {
     setNotification({ type, message });
     setTimeout(() => setNotification(null), 4000);
@@ -1335,8 +1348,8 @@ function AdvancedGridShowcase() {
   const handleView = useCallback((row: Record<string, any>) => {
     setDetailRecord(row);
     setDetailMode('view');
-    setShowDetail(true);
-  }, []);
+    layout.openPanel();
+  }, [layout]);
 
   const handleEdit = useCallback((row: Record<string, any>) => {
     setWizardRecord(row);
@@ -1384,9 +1397,10 @@ function AdvancedGridShowcase() {
   const handleDeleteFromDetail = useCallback(async (id: string) => {
     await new Promise((r) => setTimeout(r, 300));
     setRecords((prev) => prev.filter((r) => r.id !== id));
-    setShowDetail(false);
+    layout.closePanel();
+    setDetailRecord(null);
     showNotification('success', 'Record deleted successfully');
-  }, [showNotification]);
+  }, [showNotification, layout]);
 
   // Filter records based on store filters
   const { filters } = useDataGridStore();

@@ -20,6 +20,27 @@ const columns: GridColumnDefinition<RecordRow>[] = [
 ];
 
 describe('AmroInventoryDataGridTemplate collapse/restore UX', () => {
+  it('supports grid-only, right-form, and split-view layout switching', () => {
+    render(
+      <AmroInventoryDataGridTemplate<RecordRow>
+        records={rows}
+        columns={columns}
+        viewMode="split-view"
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Grid-only layout' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Grid with right form layout' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Split view layout' })).toBeInTheDocument();
+    expect(screen.getByText('Record Detail')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grid-only layout' }));
+    expect(screen.queryByText('Record Detail')).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Grid with right form layout' }));
+    expect(screen.getByText('Record Detail')).toBeInTheDocument();
+  });
+
   it('keeps a restore control available after collapsing detail panel', () => {
     render(
       <AmroInventoryDataGridTemplate<RecordRow>

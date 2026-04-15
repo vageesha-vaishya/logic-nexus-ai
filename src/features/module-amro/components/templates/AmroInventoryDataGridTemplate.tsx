@@ -1,10 +1,11 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Columns3, Eye, EyeOff, GripHorizontal, GripVertical, LayoutPanelTop, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Rows3, Save, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Columns3, Eye, EyeOff, GripVertical, LayoutPanelTop, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Rows3, Save, Trash2, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -13,8 +14,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
-export type GridViewMode = 'horizontal-split' | 'vertical-split' | 'stacked-auto';
-export type EffectiveGridViewMode = 'horizontal-split' | 'vertical-split' | 'stacked';
+export type GridLayoutMode = 'grid-only' | 'grid-with-right-form' | 'split-view';
+export type GridViewMode = GridLayoutMode | 'horizontal-split' | 'vertical-split' | 'stacked-auto';
+export type EffectiveGridViewMode = GridLayoutMode | 'stacked';
 export type GridDensity = 'compact' | 'normal' | 'comfortable';
 export type GridScrollBehavior = 'virtualization' | 'pagination' | 'infinite-scroll';
 
@@ -218,7 +220,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   title = 'Inventory Data Grid',
   subtitle = 'Dynamic grid-detail workspace template',
   ariaLabel = 'Inventory data grid',
-  viewMode = 'horizontal-split',
+  viewMode = 'split-view',
   density = 'normal',
   scrollBehavior = 'virtualization',
   pageSize = DEFAULT_PAGE_SIZE,
@@ -273,6 +275,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   const [screenReaderMessage, setScreenReaderMessage] = useState('');
   const [detailFormValues, setDetailFormValues] = useState<Record<string, unknown>>({});
   const [isEditing, setIsEditing] = useState(false);
+  const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
   const [panelCollapsed, setPanelCollapsed] = useState<'none' | 'grid' | 'detail'>('none');
   const normalizeDetailKey = useCallback((value: string) => value.trim().toLowerCase(), []);
@@ -295,12 +298,21 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     return String(index);
   }, [getRecordId]);
 
+  const normalizedRequestedMode = useMemo<GridLayoutMode>(() => {
+    if (requestedMode === 'grid-only' || requestedMode === 'grid-with-right-form' || requestedMode === 'split-view') {
+      return requestedMode;
+    }
+    if (requestedMode === 'horizontal-split' || requestedMode === 'vertical-split') return 'split-view';
+    return 'split-view';
+  }, [requestedMode]);
   const effectiveViewMode: EffectiveGridViewMode = useMemo(() => {
-    if (requestedMode !== 'stacked-auto') return requestedMode;
+    if (normalizedRequestedMode === 'grid-only') return 'grid-only';
     if (viewportWidth < 768) return 'stacked';
-    if (viewportWidth <= 1024) return 'vertical-split';
-    return 'horizontal-split';
-  }, [requestedMode, viewportWidth]);
+    if (normalizedRequestedMode === 'grid-with-right-form') return 'grid-with-right-form';
+    return 'split-view';
+  }, [normalizedRequestedMode, viewportWidth]);
+  const useInlineDetailPanel = detailVisible && effectiveViewMode !== 'stacked' && effectiveViewMode !== 'grid-only';
+  const useMobileOverlayDetail = detailVisible && effectiveViewMode === 'stacked' && normalizedRequestedMode !== 'grid-only';
 
   useEffect(() => {
     const onResize = () => setViewportWidth(window.innerWidth);
@@ -440,6 +452,15 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     setDetailFormValues({ ...selectedRecord });
     setIsEditing(false);
   }, [selectedRecord]);
+  useEffect(() => {
+    if (!useMobileOverlayDetail) {
+      setMobileDetailOpen(false);
+      return;
+    }
+    if (selectedRecord) {
+      setMobileDetailOpen(true);
+    }
+  }, [selectedRecord, useMobileOverlayDetail]);
 
   useEffect(() => {
     if (!selectedRecord && recordsForRender.length > 0) {
@@ -579,18 +600,18 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   }, []);
 
   const gridAreaClassName = useMemo(() => {
-    if (effectiveViewMode === 'horizontal-split') return 'grid-cols-1 lg:grid-cols-[1fr_auto_1fr]';
-    if (effectiveViewMode === 'vertical-split') return 'grid-cols-1 grid-rows-[1fr_auto_1fr]';
+    if (useInlineDetailPanel && effectiveViewMode === 'split-view') return 'grid-cols-1 lg:grid-cols-[1fr_auto_1fr]';
+    if (useInlineDetailPanel && effectiveViewMode === 'grid-with-right-form') return 'grid-cols-1 lg:grid-cols-[minmax(0,64%)_minmax(0,36%)]';
     return 'grid-cols-1';
-  }, [effectiveViewMode]);
+  }, [effectiveViewMode, useInlineDetailPanel]);
 
   const detailPanelClassName = useMemo(() => {
-    if (effectiveViewMode === 'vertical-split') return 'h-[min(50vh,420px)]';
+    if (effectiveViewMode === 'grid-with-right-form') return 'h-[min(68vh,640px)]';
     if (effectiveViewMode === 'stacked') return 'min-h-[260px]';
     return 'h-[min(68vh,640px)]';
   }, [effectiveViewMode]);
   const gridPanelClassName = useMemo(() => {
-    if (effectiveViewMode === 'vertical-split') return 'h-[min(44vh,360px)]';
+    if (effectiveViewMode === 'grid-with-right-form') return 'h-[min(68vh,640px)]';
     if (effectiveViewMode === 'stacked') return 'min-h-[320px]';
     return 'h-[min(68vh,640px)]';
   }, [effectiveViewMode]);
@@ -684,22 +705,14 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   }, [horizontalSplitPct, onPanelResizeEnd, onPanelResizeMove, verticalSplitPct]);
 
   const gridTemplateStyle = useMemo<React.CSSProperties>(() => {
-    if (!detailVisible || effectiveViewMode === 'stacked') return {};
-    if (panelCollapsed === 'grid') {
-      return effectiveViewMode === 'horizontal-split'
-        ? { gridTemplateColumns: '0 min-content 1fr' }
-        : { gridTemplateRows: '0 min-content 1fr' };
+    if (!useInlineDetailPanel) return {};
+    if (effectiveViewMode === 'grid-with-right-form') {
+      return { gridTemplateColumns: 'minmax(0,64%) minmax(0,36%)' };
     }
-    if (panelCollapsed === 'detail') {
-      return effectiveViewMode === 'horizontal-split'
-        ? { gridTemplateColumns: '1fr min-content 0' }
-        : { gridTemplateRows: '1fr min-content 0' };
-    }
-    if (effectiveViewMode === 'horizontal-split') {
-      return { gridTemplateColumns: `${horizontalSplitPct}% min-content ${100 - horizontalSplitPct}%` };
-    }
-    return { gridTemplateRows: `${verticalSplitPct}% min-content ${100 - verticalSplitPct}%` };
-  }, [detailVisible, effectiveViewMode, horizontalSplitPct, panelCollapsed, verticalSplitPct]);
+    if (panelCollapsed === 'grid') return { gridTemplateColumns: '0 min-content 1fr' };
+    if (panelCollapsed === 'detail') return { gridTemplateColumns: '1fr min-content 0' };
+    return { gridTemplateColumns: `${horizontalSplitPct}% min-content ${100 - horizontalSplitPct}%` };
+  }, [effectiveViewMode, horizontalSplitPct, panelCollapsed, useInlineDetailPanel]);
 
   const onSeparatorKeyDown = useCallback((orientation: 'horizontal' | 'vertical', event: React.KeyboardEvent<HTMLButtonElement>) => {
     if (event.key === 'ArrowLeft' && orientation === 'horizontal') {
@@ -1293,33 +1306,33 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
           </Select>
           <Button
             type="button"
-            variant={requestedMode === 'horizontal-split' ? 'default' : 'outline'}
+            variant={normalizedRequestedMode === 'grid-only' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setRequestedMode('horizontal-split')}
-            aria-label="Horizontal split layout"
-          >
-            <Columns3 className="mr-1.5 h-4 w-4" />
-            Horizontal
-          </Button>
-          <Button
-            type="button"
-            variant={requestedMode === 'vertical-split' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setRequestedMode('vertical-split')}
-            aria-label="Vertical split layout"
-          >
-            <LayoutPanelTop className="mr-1.5 h-4 w-4" />
-            Vertical
-          </Button>
-          <Button
-            type="button"
-            variant={requestedMode === 'stacked-auto' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setRequestedMode('stacked-auto')}
-            aria-label="Responsive stacked layout"
+            onClick={() => setRequestedMode('grid-only')}
+            aria-label="Grid-only layout"
           >
             <Rows3 className="mr-1.5 h-4 w-4" />
-            Responsive
+            Grid Only
+          </Button>
+          <Button
+            type="button"
+            variant={normalizedRequestedMode === 'grid-with-right-form' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setRequestedMode('grid-with-right-form')}
+            aria-label="Grid with right form layout"
+          >
+            <LayoutPanelTop className="mr-1.5 h-4 w-4" />
+            Right Form
+          </Button>
+          <Button
+            type="button"
+            variant={normalizedRequestedMode === 'split-view' ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => setRequestedMode('split-view')}
+            aria-label="Split view layout"
+          >
+            <Columns3 className="mr-1.5 h-4 w-4" />
+            Split View
           </Button>
           {enableDetailPanelToggle ? (
             <Button
@@ -1422,39 +1435,35 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
             ) : null}
           </div>
 
-          {detailVisible && effectiveViewMode !== 'stacked' ? (
+          {useInlineDetailPanel && effectiveViewMode === 'split-view' ? (
             <button
               type="button"
               role="separator"
-              aria-label={effectiveViewMode === 'horizontal-split' ? 'Resize grid and detail panels horizontally' : 'Resize grid and detail panels vertically'}
-              aria-orientation={effectiveViewMode === 'horizontal-split' ? 'vertical' : 'horizontal'}
+              aria-label="Resize grid and detail panels horizontally"
+              aria-orientation="vertical"
               aria-valuemin={MIN_PANEL_PERCENT}
               aria-valuemax={MAX_PANEL_PERCENT}
-              aria-valuenow={effectiveViewMode === 'horizontal-split' ? horizontalSplitPct : verticalSplitPct}
+              aria-valuenow={horizontalSplitPct}
               className={cn(
                 'group relative z-0 flex items-center justify-center rounded bg-transparent transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                effectiveViewMode === 'horizontal-split' ? 'w-3 cursor-col-resize' : 'h-3 cursor-row-resize',
+                'w-3 cursor-col-resize',
               )}
-              onMouseDown={(event) => onPanelResizeStart(effectiveViewMode === 'horizontal-split' ? 'horizontal' : 'vertical', event)}
-              onKeyDown={(event) => onSeparatorKeyDown(effectiveViewMode === 'horizontal-split' ? 'horizontal' : 'vertical', event)}
+              onMouseDown={(event) => onPanelResizeStart('horizontal', event)}
+              onKeyDown={(event) => onSeparatorKeyDown('horizontal', event)}
             >
               <span className="sr-only">Use arrow keys to resize panel split</span>
               <span
                 aria-hidden
                 className={cn(
                   'pointer-events-none absolute rounded-full bg-border/80 opacity-0 transition-opacity group-hover:opacity-100 group-focus:opacity-100 group-focus-visible:opacity-100',
-                  effectiveViewMode === 'horizontal-split' ? 'inset-y-0 left-1/2 w-px -translate-x-1/2' : 'inset-x-0 top-1/2 h-px -translate-y-1/2',
+                  'inset-y-0 left-1/2 w-px -translate-x-1/2',
                 )}
               />
-              {effectiveViewMode === 'horizontal-split' ? (
-                <GripVertical className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
-              ) : (
-                <GripHorizontal className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
-              )}
+              <GripVertical className="absolute left-1/2 top-1/2 h-3 w-3 -translate-x-1/2 -translate-y-1/2 text-muted-foreground" />
             </button>
           ) : null}
 
-          {detailVisible ? (
+          {useInlineDetailPanel ? (
             <div
               className={cn(
                 'relative z-10 min-w-0 rounded-md bg-border/90 p-[1px] pr-[2px] transition-all duration-300',
@@ -1571,7 +1580,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
                   </TooltipProvider>
                   <div className="mx-1 h-5 w-px bg-border" />
                   <div className="flex items-center gap-1">
-                  {effectiveViewMode !== 'stacked' ? (
+                  {effectiveViewMode === 'split-view' ? (
                     <>
                       <Button
                         type="button"
@@ -1622,6 +1631,52 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
             </div>
           ) : null}
         </div>
+
+        {useMobileOverlayDetail ? (
+          <>
+            <div className="mt-3 flex items-center justify-end">
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setMobileDetailOpen(true)}
+                disabled={!selectedRecord}
+              >
+                {selectedRecord ? 'Open Selected Record Form' : 'Select a Record'}
+              </Button>
+            </div>
+            <Dialog open={mobileDetailOpen} onOpenChange={setMobileDetailOpen}>
+              <DialogContent className="left-0 top-auto w-full max-w-none translate-x-0 translate-y-0 rounded-t-xl border-b-0 p-4 sm:left-[50%] sm:top-[50%] sm:max-w-2xl sm:translate-x-[-50%] sm:translate-y-[-50%] sm:rounded-lg sm:border-b">
+                <DialogHeader>
+                  <DialogTitle>Record Detail Form</DialogTitle>
+                </DialogHeader>
+                <div className="max-h-[68vh] overflow-auto pr-1">
+                  {selectedRecord ? (
+                    <>
+                      <div className="mb-2 flex flex-wrap items-center gap-1.5">
+                        <Button size="sm" variant="outline" disabled={!canExecuteCrud('update')} onClick={() => handleCrud('update')}>
+                          <Pencil className="mr-1.5 h-4 w-4" />
+                          Edit
+                        </Button>
+                        <Button size="sm" variant="default" disabled={!canExecuteCrud('save')} onClick={() => handleCrud('save')}>
+                          <Save className="mr-1.5 h-4 w-4" />
+                          Save
+                        </Button>
+                        <Button size="sm" variant="outline" disabled={!canExecuteCrud('cancel')} onClick={() => handleCrud('cancel')}>
+                          <X className="mr-1.5 h-4 w-4" />
+                          Cancel
+                        </Button>
+                      </div>
+                      {renderDetail ? renderDetail(selectedRecord) : renderDefaultDetail(selectedRecord)}
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">Select a record to open the detail form.</p>
+                  )}
+                </div>
+              </DialogContent>
+            </Dialog>
+          </>
+        ) : null}
 
         <AlertDialog open={deleteConfirmOpen} onOpenChange={setDeleteConfirmOpen}>
           <AlertDialogContent>
