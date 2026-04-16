@@ -1541,6 +1541,51 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
         : []),
     ];
 
+    // Enrich aircraft model name using assembly_models lookup when aircraft row model is missing.
+    const assemblyModelIds = Array.from(
+      new Set(
+        filteredAircraftRows
+          .map((row) => getStringValue(row, ['assembly_models', 'assemblymodels']))
+          .filter((id) => id.length > 0),
+      ),
+    );
+    let assemblyModelNameById = new Map<string, string>();
+    if (assemblyModelIds.length > 0) {
+      try {
+        const adminClient = getSupabaseAdminClient();
+        const { data: assemblyRows, error: assemblyError } = await adminClient
+          .from('assembly_models')
+          .select('id,name')
+          .in('id', assemblyModelIds);
+        if (assemblyError) {
+          logger.warn('[AMRO Aircraft Dashboard] assembly model enrichment lookup failed', {
+            requestId,
+            message: String(assemblyError.message || ''),
+            requestedCount: assemblyModelIds.length,
+          });
+        } else {
+          assemblyModelNameById = new Map(
+            (Array.isArray(assemblyRows) ? assemblyRows : [])
+              .map((row) => [
+                String((row as Record<string, unknown>).id || '').trim(),
+                String((row as Record<string, unknown>).name || '').trim(),
+              ] as const)
+              .filter(([id, name]) => id.length > 0 && name.length > 0),
+          );
+          logger.info('[AMRO Aircraft Dashboard] assembly model enrichment resolved', {
+            requestId,
+            requestedCount: assemblyModelIds.length,
+            resolvedCount: assemblyModelNameById.size,
+          });
+        }
+      } catch (error) {
+        logger.warn('[AMRO Aircraft Dashboard] assembly model enrichment exception', {
+          requestId,
+          message: String((error as Error)?.message || error),
+        });
+      }
+    }
+
     const output = {
       metadata: {
         role_view: String((req.user as { role?: unknown } | undefined)?.role || 'technician'),
@@ -1558,8 +1603,25 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
         compliance_ready_pct: Number(complianceReadyPct.toFixed(2)),
       },
       aircraft_status: filteredAircraftRows.slice(0, 12).map((row) => ({
+        ...((): Record<string, unknown> => {
+          const assemblyModelId = getStringValue(row, ['assembly_models', 'assemblymodels']);
+          const directModelName = getStringValue(row, ['aircraft_model', 'model', 'model_name']);
+          const enrichedModelName = assemblyModelId ? (assemblyModelNameById.get(assemblyModelId) || '') : '';
+          const resolvedAircraftModel = directModelName || enrichedModelName || null;
+          if (!resolvedAircraftModel && assemblyModelId) {
+            logger.warn('[AMRO Aircraft Dashboard] aircraft model unresolved for assembly model id', {
+              requestId,
+              aircraftId: getStringValue(row, ['id']),
+              assemblyModelId,
+            });
+          }
+          return {
+            aircraft_model: resolvedAircraftModel,
+          };
+        })(),
         aircraft_id: getStringValue(row, ['id']),
         registration: getStringValue(row, ['registration', 'tail_number']),
+        serial_number: getStringValue(row, ['serial_number', 'msn']) || null,
         status: getStringValue(row, ['status'], 'unknown'),
         current_flight_hours: getNumericValue(row, ['current_flight_hours'], 0),
         current_cycles: getNumericValue(row, ['current_cycles'], 0),

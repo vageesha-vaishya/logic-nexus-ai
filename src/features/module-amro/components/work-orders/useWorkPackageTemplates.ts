@@ -50,6 +50,10 @@ async function fetchWorkPackageTemplates(
   const json = await response.json();
   // Parse master-data API response format
   const rows = json.output?.records || json.output?.data || json.data || json.output?.templates || [];
+  console.log('[API_MAP] raw template rows received', {
+    count: Array.isArray(rows) ? rows.length : 0,
+    sample: Array.isArray(rows) && rows.length > 0 ? rows[0] : null,
+  });
 
   return (Array.isArray(rows) ? rows : [])
     .filter((row: any) => row && row.id)
@@ -65,10 +69,17 @@ async function fetchWorkPackageTemplates(
         version: Number(row.version || row.version_number || 1),
         status: String(row.status || 'draft'),
       };
-      console.log(`[API_MAP] Template ${parsed.id}: mapped assembly_models to ${parsed.assembly_models} from raw data: `, {
-        assembly_models: row.assembly_models,
-        assemblymodels: row.assemblymodels
+      console.log(`[API_MAP] Template ${parsed.id}: mapped models`, {
+        assembly_models_id: parsed.assembly_models_id,
+        assembly_models: parsed.assembly_models,
+        raw_assembly_models: row.assembly_models,
+        assemblymodels: row.assemblymodels,
+        model_id: row.model_id,
+        keys: Object.keys(row || {}),
       });
+      if (!parsed.assembly_models_id && !parsed.assembly_models) {
+        console.warn(`[API_MAP] Template ${parsed.id} missing both assembly_models_id and assembly_models after mapping`);
+      }
       return parsed;
     });
 }
@@ -119,7 +130,7 @@ export interface WorkPackageTemplateDetail {
   active: boolean;
   template_name: string;
   maintenance_type: string;
-  model_id: string | null;
+  assembly_models_id: string | null;
   aircraft_model: string | null;
   scope_json: any;
   tasks_json: any[];
