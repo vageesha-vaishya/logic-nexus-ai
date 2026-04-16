@@ -1069,7 +1069,7 @@ async function loadAircraftRows(supabase: SupabaseClient, tenantId: string, fran
     stats,
     candidateTables: ['aircraft'],
     columns:
-      'id,tail_number,registration,status,current_flight_hours,current_cycles,defect_count,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,updated_at',
+      'id,tenant_id,franchise_id,model_id,aircraft_model,aircraft_type,tail_number,registration,status,current_flight_hours,current_cycles,defect_count,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,updated_at',
   });
 }
 
@@ -1587,6 +1587,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const aircraftStatusRows = aircraftRows.map((row) => ({
       aircraft_id: parseStringValue(row.id),
+      tenant_id: parseStringValue(row.tenant_id),
+      franchise_id: parseStringValue(row.franchise_id),
+      model_id: parseStringValue(row.model_id),
+      aircraft_model: parseStringValue(row.aircraft_model),
+      aircraft_type: parseStringValue(row.aircraft_type),
       registration: parseStringValue(row.registration || row.tail_number || row.id),
       status: parseStringValue(row.status || 'unknown'),
       defect_count: Math.trunc(parseNumberValue(row.defect_count, 0)),

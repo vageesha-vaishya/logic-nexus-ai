@@ -883,6 +883,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const plannedWindow = parseDateWindow(body.planned_window);
       const station = assertNonEmpty(body.station, 'station');
       const priority = assertNonEmpty(body.priority, 'priority').toLowerCase();
+      const workPackageTemplateId = String(body.work_package_template_id || '').trim();
       const scopeItems = parseStringArray(body.scope_items);
       const creationTrigger = parseCreationTrigger(body);
       const engineerPlan = parseEngineerPlan(body, scopeItems);
@@ -896,6 +897,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           tenantId,
           franchiseId: String(franchiseId || ''),
           userId,
+          workPackageTemplateId,
           aircraftId,
           maintenanceType,
           plannedWindowFrom: plannedWindow.from,
@@ -908,7 +910,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           creationTriggeredAt: creationTrigger.triggeredAt,
           engineerPlan,
         });
-      } catch (_error) {
+      } catch (error) {
+        if (workPackageTemplateId) {
+          const reason = String((error as Error)?.message || 'task generation failed');
+          throw new Error(`work package creation failed with template tasks: ${reason}`);
+        }
         persistenceMode = 'runtime-fallback';
         persisted = {
           work_package_id: `${tenantId}-${franchiseId || 'fr-none'}-wp-${Date.now()}`,
@@ -954,6 +960,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           parts_count: engineerPlan.parts_plan.length,
           downtime_minutes: engineerPlan.downtime_minutes,
         },
+        generated_tasks_count: Number(persisted.generated_tasks_count ?? persisted.inherited_tasks_count ?? 0),
       };
       const auditRecord = cutoverState.enabled
         ? appendWorkPackageMutationAuditRecord({

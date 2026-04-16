@@ -22,6 +22,7 @@ describe('work-package-persistence', () => {
         work_package_id: 'tenant-1-fr-1-wp-100',
         status: 'planning',
         version: 1,
+        generated_tasks_count: 3,
         created_at: '2026-03-24T00:00:00.000Z',
         created_by: 'user-1',
         updated_at: '2026-03-24T00:00:00.000Z',
@@ -37,6 +38,7 @@ describe('work-package-persistence', () => {
       tenantId: 'tenant-1',
       franchiseId: 'fr-1',
       userId: 'user-1',
+      workPackageTemplateId: '11111111-1111-4111-8111-111111111111',
       aircraftId: 'ac-001',
       maintenanceType: 'line',
       plannedWindowFrom: '2026-03-24T00:00:00.000Z',
@@ -52,9 +54,11 @@ describe('work-package-persistence', () => {
 
     expect(record.work_package_id).toBe('tenant-1-fr-1-wp-100');
     expect(record.version).toBe(1);
+    expect(record.generated_tasks_count).toBe(3);
     expect(rpc).toHaveBeenCalledWith('amro_ops_create_work_package', expect.objectContaining({
       p_tenant_id: 'tenant-1',
       p_station: 'tenant-1:station-a',
+      p_work_package_template_id: '11111111-1111-4111-8111-111111111111',
     }));
   });
 
@@ -83,6 +87,34 @@ describe('work-package-persistence', () => {
       workflowInputPayload: {},
       workflowUserContext: {},
     })).rejects.toThrow('optimistic_lock_conflict');
+  });
+
+  it('surfaces task generation validation failures from persistence rpc', async () => {
+    const rpc = vi.fn().mockResolvedValue({
+      data: null,
+      error: { message: 'WPT.tasks_json must be an array' },
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      schema: vi.fn(() => ({ rpc })),
+    } as any);
+
+    await expect(persistCreateWorkPackage({
+      tenantId: 'tenant-1',
+      franchiseId: 'fr-1',
+      userId: 'user-1',
+      workPackageTemplateId: '11111111-1111-4111-8111-111111111111',
+      aircraftId: 'ac-001',
+      maintenanceType: 'line',
+      plannedWindowFrom: '2026-03-24T00:00:00.000Z',
+      plannedWindowTo: '2026-03-24T02:00:00.000Z',
+      station: 'tenant-1:station-a',
+      priority: 'high',
+      scopeItems: ['task-1'],
+      creationTriggerSource: 'schedule',
+      creationTriggerReferenceId: 'sched-001',
+      creationTriggeredAt: '2026-03-24T00:00:00.000Z',
+      engineerPlan: {},
+    })).rejects.toThrow('WPT.tasks_json must be an array');
   });
 
   it('supports concurrency control by allowing one transition and rejecting stale version', async () => {

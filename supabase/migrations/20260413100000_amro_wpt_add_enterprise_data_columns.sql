@@ -18,18 +18,51 @@ COMMENT ON COLUMN work_package_templates.materials_json IS 'Bill of Materials - 
 COMMENT ON COLUMN work_package_templates.tooling_json IS 'Tooling & Equipment - Array of required tools with calibration and availability data';
 COMMENT ON COLUMN work_package_templates.compliance_requirements_json IS 'Compliance Requirements - Array of AD/SB and regulatory requirements with sign-off tracking';
 
--- Add CHECK constraints to ensure valid JSON arrays
-ALTER TABLE work_package_templates
-ADD CONSTRAINT chk_work_package_templates_materials_json_is_array
-CHECK (jsonb_typeof(materials_json) = 'array');
+-- Add CHECK constraints to ensure valid JSON arrays (idempotent)
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_work_package_templates_materials_json_is_array'
+      AND conrelid = 'public.work_package_templates'::regclass
+  ) THEN
+    ALTER TABLE work_package_templates
+      ADD CONSTRAINT chk_work_package_templates_materials_json_is_array
+      CHECK (jsonb_typeof(materials_json) = 'array');
+  END IF;
+END
+$$;
 
-ALTER TABLE work_package_templates
-ADD CONSTRAINT chk_work_package_templates_tooling_json_is_array
-CHECK (jsonb_typeof(tooling_json) = 'array');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_work_package_templates_tooling_json_is_array'
+      AND conrelid = 'public.work_package_templates'::regclass
+  ) THEN
+    ALTER TABLE work_package_templates
+      ADD CONSTRAINT chk_work_package_templates_tooling_json_is_array
+      CHECK (jsonb_typeof(tooling_json) = 'array');
+  END IF;
+END
+$$;
 
-ALTER TABLE work_package_templates
-ADD CONSTRAINT chk_work_package_templates_compliance_requirements_json_is_array
-CHECK (jsonb_typeof(compliance_requirements_json) = 'array');
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1
+    FROM pg_constraint
+    WHERE conname = 'chk_work_package_templates_compliance_requirements_json_is_array'
+      AND conrelid = 'public.work_package_templates'::regclass
+  ) THEN
+    ALTER TABLE work_package_templates
+      ADD CONSTRAINT chk_work_package_templates_compliance_requirements_json_is_array
+      CHECK (jsonb_typeof(compliance_requirements_json) = 'array');
+  END IF;
+END
+$$;
 
 -- Create indexes for JSON querying (optional but recommended for future analytics)
 CREATE INDEX IF NOT EXISTS idx_work_package_templates_materials_count

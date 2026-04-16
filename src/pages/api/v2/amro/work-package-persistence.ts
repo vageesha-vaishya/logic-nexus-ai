@@ -4,6 +4,7 @@ type CreateWorkPackageInput = {
   tenantId: string;
   franchiseId: string;
   userId: string;
+  workPackageTemplateId?: string;
   aircraftId: string;
   maintenanceType: string;
   plannedWindowFrom: string;
@@ -54,6 +55,7 @@ export type PersistedWorkPackage = {
   updated_at: string;
   updated_by: string;
   inherited_tasks_count?: number;
+  generated_tasks_count?: number;
 };
 
 function parseRpcResponse(data: unknown): PersistedWorkPackage {
@@ -73,6 +75,9 @@ function parseRpcResponse(data: unknown): PersistedWorkPackage {
     inherited_tasks_count: record.inherited_tasks_count == null
       ? undefined
       : (Number.parseInt(String(record.inherited_tasks_count), 10) || 0),
+    generated_tasks_count: record.generated_tasks_count == null
+      ? undefined
+      : (Number.parseInt(String(record.generated_tasks_count), 10) || 0),
   };
 }
 
@@ -82,6 +87,7 @@ export async function persistCreateWorkPackage(input: CreateWorkPackageInput): P
     p_tenant_id: input.tenantId,
     p_franchise_id: input.franchiseId,
     p_user_id: input.userId,
+    p_work_package_template_id: String(input.workPackageTemplateId || '').trim() || null,
     p_aircraft_id: input.aircraftId,
     p_maintenance_type: input.maintenanceType,
     p_planned_window_from: input.plannedWindowFrom,

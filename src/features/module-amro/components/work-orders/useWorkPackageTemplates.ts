@@ -21,6 +21,9 @@ function useAuthHeaders(): HeadersInit | null {
 
 export interface WorkPackageTemplateOption {
   id: string;
+  tenant_id: string | null;
+  model_id: string | null;
+  aircraft_model: string | null;
   name: string;
   description: string | null;
   version: number;
@@ -51,6 +54,9 @@ async function fetchWorkPackageTemplates(
     .filter((row: any) => row && row.id)
     .map((row: any) => ({
       id: String(row.id),
+      tenant_id: row.tenant_id ? String(row.tenant_id) : null,
+      model_id: row.model_id ? String(row.model_id) : null,
+      aircraft_model: row.aircraft_model ? String(row.aircraft_model) : null,
       name: String(row.template_name || row.name || row.title || 'Untitled Template'),
       description: row.description || row.template_code || null,
       version: Number(row.version || row.version_number || 1),
@@ -90,5 +96,68 @@ export function useWorkPackageTemplateOptions(enabled = true) {
     isLoading,
     error,
     templates: data || [],
+  };
+}
+
+// ── Fetch single work package template detail ───────────────────────────────
+
+export interface WorkPackageTemplateDetail {
+  id: string;
+  tenant_id: string;
+  franchise_id: string | null;
+  template_code: string;
+  version: number;
+  active: boolean;
+  template_name: string;
+  maintenance_type: string;
+  model_id: string | null;
+  aircraft_model: string | null;
+  scope_json: any;
+  tasks_json: any[];
+  policy_snapshot_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+async function fetchWorkPackageTemplateDetail(
+  templateId: string,
+  headers: HeadersInit,
+): Promise<WorkPackageTemplateDetail | null> {
+  // Use the master-data entity endpoint with ID
+  const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${templateId}`, {
+    method: 'GET',
+    headers,
+  });
+
+  if (!response.ok) {
+    if (response.status === 404) return null;
+    throw new Error(`Failed to load template detail: ${response.status}`);
+  }
+
+  const json = await response.json();
+  return json.output || json.data || null;
+}
+
+export function useWorkPackageTemplateDetail(
+  templateId: string,
+  enabled = true,
+) {
+  const authHeaders = useAuthHeaders();
+
+  const { data, isLoading, error } = useQuery({
+    queryKey: [...TEMPLATES_KEY, 'detail', templateId] as const,
+    queryFn: () =>
+      authHeaders && templateId
+        ? fetchWorkPackageTemplateDetail(templateId, authHeaders)
+        : Promise.reject(new Error('Not authenticated')),
+    enabled: enabled && !!authHeaders && !!templateId,
+    staleTime: 2 * 60 * 1000,
+    retry: 2,
+  });
+
+  return {
+    data,
+    isLoading,
+    error,
   };
 }
