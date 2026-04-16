@@ -283,7 +283,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'work_package_templates',
     searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'model_id'],
     listColumns:
-      'id,tenant_id,franchise_id,model_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,materials_json,tooling_json,compliance_requirements_json,policy_snapshot_id,created_at,updated_at',
+      'id,tenant_id,franchise_id,model_id,template_code,version,active,template_name,maintenance_type,assembly_models,scope_json,tasks_json,materials_json,tooling_json,compliance_requirements_json,policy_snapshot_id,created_at,updated_at',
     requiredCreateFields: ['model_id', 'template_code', 'version', 'template_name', 'maintenance_type'],
     writeAllowedFields: [
       'model_id',
@@ -292,6 +292,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'active',
       'template_name',
       'maintenance_type',
+      'assembly_models',
       'scope_json',
       'tasks_json',
       'materials_json',

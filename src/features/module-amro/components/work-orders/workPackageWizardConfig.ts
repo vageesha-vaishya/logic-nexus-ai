@@ -55,6 +55,24 @@ export function buildWorkPackageWizardSteps({
           options: templateOptions,
           showWhen: (formData) => formData.creation_path === 'scheduled',
           placeholder: templateOptions.length ? 'Select template...' : 'No templates available',
+          validate: (value, formData) => {
+            if (!value) return 'Template is required';
+            const aircraftId = formData.aircraft_id;
+            if (!aircraftId) return null;
+            
+            const selectedAircraft = aircraftOptions.find((a: any) => a.value === aircraftId) as any;
+            const selectedTemplate = templateOptions.find((t: any) => t.value === value) as any;
+            
+            const aircraftModel = String(selectedAircraft?.assembly_models || '').trim();
+            const templateModel = String(selectedTemplate?.assembly_models || '').trim();
+            console.log(`[MODEL_COMPARE] Aircraft Model: ${aircraftModel}`);
+            console.log(`[MODEL_COMPARE] Template Model: ${templateModel}`);
+            if (aircraftModel !== templateModel) {
+              return 'Assembly model not matching';
+            }
+            
+            return null;
+          }
         },
         {
           id: 'defect_description',

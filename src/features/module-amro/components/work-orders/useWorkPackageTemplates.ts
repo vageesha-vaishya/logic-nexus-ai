@@ -24,6 +24,7 @@ export interface WorkPackageTemplateOption {
   tenant_id: string | null;
   model_id: string | null;
   aircraft_model: string | null;
+  assembly_models: string | null;
   name: string;
   description: string | null;
   version: number;
@@ -52,16 +53,24 @@ async function fetchWorkPackageTemplates(
 
   return (Array.isArray(rows) ? rows : [])
     .filter((row: any) => row && row.id)
-    .map((row: any) => ({
-      id: String(row.id),
-      tenant_id: row.tenant_id ? String(row.tenant_id) : null,
-      model_id: row.model_id ? String(row.model_id) : null,
-      aircraft_model: row.aircraft_model ? String(row.aircraft_model) : null,
-      name: String(row.template_name || row.name || row.title || 'Untitled Template'),
-      description: row.description || row.template_code || null,
-      version: Number(row.version || row.version_number || 1),
-      status: String(row.status || 'draft'),
-    }));
+    .map((row: any) => {
+      const parsed = {
+        id: String(row.id),
+        tenant_id: row.tenant_id ? String(row.tenant_id) : null,
+        model_id: row.model_id ? String(row.model_id) : null,
+        aircraft_model: row.aircraft_model ? String(row.aircraft_model) : null,
+        assembly_models: row.assembly_models ? String(row.assembly_models) : (row.assemblymodels ? String(row.assemblymodels) : null),
+        name: String(row.template_name || row.name || row.title || 'Untitled Template'),
+        description: row.description || row.template_code || null,
+        version: Number(row.version || row.version_number || 1),
+        status: String(row.status || 'draft'),
+      };
+      console.log(`[API_MAP] Template ${parsed.id}: mapped assembly_models to ${parsed.assembly_models} from raw data: `, {
+        assembly_models: row.assembly_models,
+        assemblymodels: row.assemblymodels
+      });
+      return parsed;
+    });
 }
 
 export function useWorkPackageTemplateOptions(enabled = true) {

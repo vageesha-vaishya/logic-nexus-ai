@@ -65,7 +65,7 @@ export interface WizardField {
   options?: Array<{ value: string; label: string }>;
   placeholder?: string;
   helperText?: string;
-  validate?: (value: any) => string | null;
+  validate?: (value: any, formData: Record<string, any>) => string | null;
   colSpan?: 1 | 2;
   /** Condition for showing this field */
   showWhen?: (formData: Record<string, any>) => boolean;
@@ -563,7 +563,7 @@ export function AmroRecordWizard({
 
       // Custom validation
       if (field.validate && value) {
-        const error = field.validate(value);
+        const error = field.validate(value, formData);
         if (error) {
           newErrors[field.id] = error;
           isValid = false;
@@ -581,7 +581,7 @@ export function AmroRecordWizard({
       return step.fields.every((field) => {
         if (field.showWhen && !field.showWhen(formData)) return true;
         if (field.required) return !!formData[field.id];
-        if (field.validate && formData[field.id]) return !field.validate(formData[field.id]);
+        if (field.validate && formData[field.id]) return !field.validate(formData[field.id], formData);
         return true;
       });
     });
