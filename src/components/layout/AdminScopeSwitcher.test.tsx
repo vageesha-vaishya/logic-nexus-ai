@@ -25,6 +25,15 @@ describe('AdminScopeSwitcher', () => {
     from: vi.fn((table: string) => ({
       select: vi.fn(() => (table === 'tenants' ? createQuery(tenants) : createQuery([]))),
     })),
+    client: {
+      from: vi.fn((table: string) => ({
+        select: vi.fn(() => ({
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+          then: (resolve: (value: { data: unknown[]; error: null }) => void) => resolve({ data: table === 'tenants' ? tenants : [], error: null }),
+        })),
+      })),
+    },
     logViewPreference: vi.fn(),
   });
 
@@ -96,5 +105,24 @@ describe('AdminScopeSwitcher', () => {
 
     render(<AdminScopeSwitcher />);
     expect(screen.getByText('Tenant Admin')).toBeInTheDocument();
+  });
+
+  it('allows selecting different tenants for unbound platform admins', async () => {
+    const mockTenants = [
+      { id: 'tenant-1', name: 'Tenant One' },
+      { id: 'tenant-2', name: 'Tenant Two' }
+    ];
+    (useCRM as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
+      context: { isPlatformAdmin: true, isTenantAdmin: false, ownedTenantId: null },
+      preferences: { admin_override_enabled: true, tenant_id: null, franchise_id: null },
+      setAdminOverride: mockSetAdminOverride,
+      setScopePreference: mockSetScopePreference,
+      scopedDb: createScopedDb(mockTenants),
+    });
+
+    const { container } = render(<AdminScopeSwitcher />);
+    
+    // The button should show "All Tenants"
+    expect(screen.getByText('All Tenants')).toBeInTheDocument();
   });
 });

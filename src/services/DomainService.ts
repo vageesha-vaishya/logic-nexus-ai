@@ -230,8 +230,8 @@ async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDoma
   if (tenantDomains.length === 0) {
     // Local-dev safety net: avoid domain-resolution deadlock when API routes are not hosted.
     tenantDomains = [
-      { id: 'local-amro', code: 'AMRO', name: 'AMRO', description: 'Local fallback AMRO domain', is_active: true },
-      { id: 'local-logistics', code: 'LOGISTICS', name: 'Logistics', description: 'Local fallback Logistics domain', is_active: true },
+      { id: '00eebc99-9c0b-4ef8-bb6d-6bb9bd380a17', code: 'AMRO', name: 'AMRO', description: 'Local fallback AMRO domain', is_active: true },
+      { id: '849b380e-3603-4530-94d3-e028126e2a2c', code: 'LOGISTICS', name: 'Logistics', description: 'Local fallback Logistics domain', is_active: true },
     ];
   }
 

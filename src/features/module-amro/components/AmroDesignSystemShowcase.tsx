@@ -22,7 +22,8 @@ import {
   ChevronDown, LayoutGrid, Columns3, Eye, EyeOff,
   LayoutDashboard, ArrowRight, ArrowLeft, Info,
   Monitor, Smartphone, Tablet, Download, Upload, RefreshCw,
-  Copy, Trash2, Pencil, ChevronsUpDown, ChevronUp
+  Copy, Trash2, Pencil, ChevronsUpDown, ChevronUp, Settings,
+  Save, X, PanelLeftClose, PanelBottomClose
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -67,6 +68,12 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useDataGridStore } from './data-grid/store/useDataGridStore';
@@ -709,21 +716,120 @@ function StandardFormShowcase() {
       </div>
 
       <Card className="border-slate-300">
-        <CardHeader className="pb-3">
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle className="text-base">Create Part Record</CardTitle>
-              <CardDescription className="text-xs">
-                Add a new part to the inventory catalog
-              </CardDescription>
+        {/* Action Toolbar - Icon-only buttons matching screenshot design */}
+        <CardHeader className="pb-3 border-b">
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-base">Record Detail</CardTitle>
+                <CardDescription className="text-xs">
+                  Shortcuts: Alt+Shift+C/R/U/D, Alt+Shift+S, Esc
+                </CardDescription>
+              </div>
             </div>
-            <div className="flex gap-2">
-              <Badge variant="outline" className="text-xs">parts.inventory</Badge>
-              <Badge variant="secondary" className="text-xs">create</Badge>
+            {/* Action Buttons - Icon only, matching screenshot */}
+            <div className="flex items-center gap-1.5">
+              {/* New/Create */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-10 w-10">
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Create</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {/* View */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-10 w-10">
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>View</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {/* Edit */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-10 w-10">
+                      <Pencil className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Edit</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {/* Delete */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-10 w-10 text-destructive hover:text-destructive">
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Delete</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {/* Save - highlighted primary button */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button size="icon" className="h-10 w-10 bg-primary text-primary-foreground hover:bg-primary/90">
+                      <Save className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Save (Alt+Shift+S)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {/* Cancel/Close */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" className="h-10 w-10">
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Close (Esc)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              {/* Divider */}
+              <Separator orientation="vertical" className="h-8 mx-1" />
+
+              {/* Panel Controls */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-10 w-10">
+                      <PanelLeftClose className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Collapse Panel</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="ghost" size="icon" className="h-10 w-10">
+                      <PanelBottomClose className="h-4 w-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Minimize</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           </div>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-6 pt-4">
           {/* Section 1: Identification */}
           <div className="space-y-3">
             <div className="flex items-center gap-2 pb-2 border-b">

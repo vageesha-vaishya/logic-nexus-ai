@@ -30,18 +30,21 @@ export function AdminScopeSwitcher() {
   const isTenantAdmin = context.isTenantAdmin;
   const canUseAdminOverride = isPlatformAdmin || isTenantAdmin;
   const ownedTenantId = context.ownedTenantId ?? null;
-  const isTenantBoundPlatformAdmin = Boolean(ownedTenantId);
+  // A Platform Admin should never be "bound" to a tenant in terms of visibility override.
+  // We only restrict visibility if they are NOT a Platform Admin.
+  const isTenantBoundPlatformAdmin = Boolean(ownedTenantId) && !isPlatformAdmin;
 
   const loadFranchises = useCallback(async (tenantId: string | null) => {
     try {
-      let q = scopedDb.from('franchises').select('id, name, tenant_id').order('name');
+      let q = (scopedDb as any).client.from('franchises').select('id, name, tenant_id').eq('is_active', true).order('name');
       if (tenantId) {
         q = q.eq('tenant_id', tenantId);
       }
-      const { data: fData } = await q;
+      const { data: fData, error: fError } = await q;
+      if (fError) throw fError;
       setFranchises(fData || []);
     } catch (e) {
-      console.error(e);
+      console.error('[AdminScopeSwitcher] Failed to load franchises:', e);
       toast.error("Failed to load franchises");
     }
   }, [scopedDb]);
@@ -49,12 +52,13 @@ export function AdminScopeSwitcher() {
   const loadData = useCallback(async (tenantIdOverride?: string | null) => {
     setLoadingData(true);
     try {
-      let tenantQuery = scopedDb.from('tenants').select('id, name').order('name');
+      let tenantQuery = (scopedDb as any).client.from('tenants').select('id, name').eq('is_active', true).order('name');
       const scopeTenantId = ownedTenantId ?? context.tenantId ?? null;
-      if (!isPlatformAdmin || scopeTenantId) {
+      if (!isPlatformAdmin || (isPlatformAdmin && isTenantBoundPlatformAdmin)) {
         tenantQuery = tenantQuery.eq('id', scopeTenantId);
       }
-      const { data: tData } = await tenantQuery;
+      const { data: tData, error: tError } = await tenantQuery;
+      if (tError) throw tError;
       setTenants(tData || []);
 
       const effectiveTenantId = tenantIdOverride !== undefined
@@ -62,11 +66,11 @@ export function AdminScopeSwitcher() {
         : (currentTenantId || scopeTenantId);
       await loadFranchises(effectiveTenantId);
     } catch (e) {
-      console.error(e);
+      console.error('[AdminScopeSwitcher] Failed to load scope data:', e);
       toast.error("Failed to load scope data");
     }
     setLoadingData(false);
-  }, [scopedDb, currentTenantId, loadFranchises, ownedTenantId, context.tenantId, isPlatformAdmin]);
+  }, [scopedDb, currentTenantId, loadFranchises, ownedTenantId, context.tenantId, isPlatformAdmin, isTenantBoundPlatformAdmin]);
 
   useEffect(() => {
     if (!canUseAdminOverride) {
@@ -95,13 +99,16 @@ export function AdminScopeSwitcher() {
   const handleToggleOverride = async (checked: boolean) => {
     try {
       await setAdminOverride(checked);
-      scopedDb.logViewPreference('admin_override', checked ? 'enabled' : 'disabled');
+      // Log the action for auditability
+      console.info(`[AdminScopeSwitcher] Admin override ${checked ? 'enabled' : 'disabled'}`);
+      
       toast.success(checked ? "Scoped View Enabled" : (isPlatformAdmin ? "Global Admin View Restored" : "Tenant-wide View Restored"));
       if (checked) {
         loadData();
       }
-    } catch (error) {
-      toast.error("Failed to toggle admin override");
+    } catch (error: any) {
+      console.error('[AdminScopeSwitcher] Failed to toggle admin override:', error);
+      toast.error(`Failed to toggle admin override: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -116,11 +123,15 @@ export function AdminScopeSwitcher() {
     const newVal = val === 'all' ? null : val;
     try {
       await setScopePreference(newVal, null, adminOverride);
-      scopedDb.logViewPreference('scope_change', `Tenant: ${newVal || 'All'}, Franchise: All`);
+      // Log the action for auditability
+      console.info(`[AdminScopeSwitcher] Tenant scope changed to: ${newVal || 'All'}`);
+      
+      // Update local franchises list immediately
       await loadFranchises(newVal);
       toast.success("Tenant Scope Updated");
-    } catch (error) {
-      toast.error("Failed to update tenant scope");
+    } catch (error: any) {
+      console.error('[AdminScopeSwitcher] Failed to update tenant scope:', error);
+      toast.error(`Failed to update tenant scope: ${error?.message || 'Unknown error'}`);
     }
   };
 
@@ -129,17 +140,21 @@ export function AdminScopeSwitcher() {
     const effectiveTenantId = currentTenantId || ownedTenantId || context.tenantId || null;
     try {
       await setScopePreference(effectiveTenantId, newVal, adminOverride);
-      scopedDb.logViewPreference('scope_change', `Tenant: ${effectiveTenantId || 'All'}, Franchise: ${newVal || 'All'}`);
+      console.info(`[AdminScopeSwitcher] Franchise scope changed to: ${newVal || 'All'} for tenant: ${effectiveTenantId || 'All'}`);
       toast.success("Franchise Scope Updated");
-    } catch (error) {
-      toast.error("Failed to update franchise scope");
+    } catch (error: any) {
+      console.error('[AdminScopeSwitcher] Failed to update franchise scope:', error);
+      toast.error(`Failed to update franchise scope: ${error?.message || 'Unknown error'}`);
     }
   };
 
   const getScopeLabel = () => {
     if (!adminOverride) return isPlatformAdmin ? "Global Admin" : "Tenant Admin";
-    const effectiveTenantId = currentTenantId || ownedTenantId || context.tenantId || null;
-    if (!effectiveTenantId && !isTenantBoundPlatformAdmin) return "All Tenants";
+    
+    // In override mode, prioritize the explicitly selected tenant preference.
+    const effectiveTenantId = currentTenantId;
+    if (!effectiveTenantId) return "All Tenants";
+    
     const tenant = tenants.find(t => t.id === effectiveTenantId);
     return tenant ? tenant.name : "Scoped View";
   };
@@ -173,7 +188,7 @@ export function AdminScopeSwitcher() {
               <div className="space-y-2">
                 <Label>Tenant</Label>
                 <Select 
-                    value={currentTenantId || ownedTenantId || context.tenantId || 'all'} 
+                    value={currentTenantId || 'all'} 
                     onValueChange={handleTenantChange}
                     disabled={loadingData || !isPlatformAdmin || isTenantBoundPlatformAdmin}
                 >

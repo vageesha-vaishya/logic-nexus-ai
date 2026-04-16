@@ -54,9 +54,11 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     let adminOverride = false;
 
     if (isPlatformAdmin) {
-      effectiveTenant = ownedTenantId ?? pref?.tenant_id ?? null;
-      effectiveFranchise = pref?.franchise_id ?? null;
       adminOverride = !!pref?.admin_override_enabled;
+      // If admin override is enabled, prioritize the selected tenant from preferences.
+      // If not enabled, prioritize the owned tenant id if it exists.
+      effectiveTenant = adminOverride ? (pref?.tenant_id ?? null) : (ownedTenantId ?? null);
+      effectiveFranchise = adminOverride ? (pref?.franchise_id ?? null) : null;
     } else if (isTenantAdmin) {
       effectiveTenant = baseTenant;
       adminOverride = !!pref?.admin_override_enabled;
@@ -117,11 +119,11 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         if (ownedFranchiseId) {
           nextFranchiseId = ownedFranchiseId;
         }
-      } else if (ownedTenantId) {
-        if (nextTenantId && nextTenantId !== ownedTenantId) {
-          throw new Error('Tenant scope must remain within your tenant boundary');
-        }
-        nextTenantId = ownedTenantId;
+      } else {
+        // Platform admins can switch to any tenant, but if they have an ownedTenantId,
+        // we should still allow them to switch to others if they are in admin override mode.
+        // The previous check was too restrictive.
+        nextTenantId = tenantId;
       }
 
       await (supabase as any).rpc('set_user_scope_preference', {
@@ -154,9 +156,9 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     try {
       const isPlatformAdmin = hasPlatformAdminAccess();
       if (isPlatformAdmin) {
-        const requestedTenantId = ownedTenantId
-          ? ownedTenantId
-          : (tenantIdOverride ?? pref?.tenant_id ?? null);
+        const requestedTenantId = tenantIdOverride !== undefined 
+          ? tenantIdOverride 
+          : (pref?.tenant_id ?? ownedTenantId ?? null);
 
         await (supabase as any).rpc('set_admin_override', {
           p_enabled: enabled,

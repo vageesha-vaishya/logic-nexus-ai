@@ -45,14 +45,14 @@ const MOCK_DECCAN_TENANT_ID = 'deccan';
 const MOCK_DECCAN_FRANCHISE_ID = 'deccan-franchise-1';
 const MOCK_PLATFORM_DOMAINS = [
   {
-    id: 'domain-amro',
+    id: '00eebc99-9c0b-4ef8-bb6d-6bb9bd380a17',
     code: 'AMRO',
     name: 'AMRO',
     description: 'Airline Maintenance, Repair and Overhaul',
     is_active: true,
   },
   {
-    id: 'domain-logistics',
+    id: '849b380e-3603-4530-94d3-e028126e2a2c',
     code: 'LOGISTICS',
     name: 'Logistics',
     description: 'Core logistics operations',

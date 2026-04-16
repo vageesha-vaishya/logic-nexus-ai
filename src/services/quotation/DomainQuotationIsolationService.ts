@@ -115,6 +115,12 @@ export class DomainQuotationIsolationService {
   }
 
   async resolveQuoteIdsForDomain(scopedDb: ScopedDb, domainId: string): Promise<string[]> {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    if (!domainId || !uuidRegex.test(domainId)) {
+      logger.warn('[DomainQuotationIsolationService] Invalid domainId (not a UUID), skipping resolution', { domainId });
+      return [];
+    }
+
     const { data, error } = await scopedDb
       .from('quotation_domain', true)
       .select('quote_id')
