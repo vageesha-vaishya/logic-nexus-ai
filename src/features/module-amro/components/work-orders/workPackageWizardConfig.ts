@@ -1,7 +1,7 @@
 import { Calendar, FileText, Plane, Shield } from 'lucide-react';
 import type { WizardStepConfig } from '@/features/module-amro/components/data-grid/AmroRecordWizard';
 
-type WizardOption = { value: string; label: string };
+type WizardOption = { value: string; label: string; [key: string]: unknown };
 
 const MAINTENANCE_TYPE_OPTIONS: WizardOption[] = [
   { value: 'line', label: 'Line' },
@@ -60,13 +60,29 @@ export function buildWorkPackageWizardSteps({
             const aircraftId = formData.aircraft_id;
             if (!aircraftId) return null;
             
-            const selectedAircraft = aircraftOptions.find((a: any) => a.value === aircraftId) as any;
-            const selectedTemplate = templateOptions.find((t: any) => t.value === value) as any;
-            
-            const aircraftModel = String(selectedAircraft?.assembly_models || '').trim();
-            const templateModel = String(selectedTemplate?.assembly_models || '').trim();
+            const selectedAircraft = aircraftOptions.find((a) => a.value === aircraftId) as Record<string, unknown> | undefined;
+            const selectedTemplate = templateOptions.find((t) => t.value === value) as Record<string, unknown> | undefined;
+
+            const aircraftModel = String(
+              selectedAircraft?.assembly_models
+              || selectedAircraft?.assembly_models_id
+              || '',
+            ).trim();
+            const templateModel = String(
+              selectedTemplate?.assembly_models_id
+              || selectedTemplate?.assembly_models
+              || '',
+            ).trim();
+            console.log('[MODEL_COMPARE] Aircraft payload:', selectedAircraft || null);
+            console.log('[MODEL_COMPARE] Template payload:', selectedTemplate || null);
             console.log(`[MODEL_COMPARE] Aircraft Model: ${aircraftModel}`);
             console.log(`[MODEL_COMPARE] Template Model: ${templateModel}`);
+            if (!templateModel) {
+              console.warn('[MODEL_COMPARE] template model key missing after mapping', {
+                selectedTemplateValue: value,
+                availableTemplateKeys: selectedTemplate ? Object.keys(selectedTemplate) : [],
+              });
+            }
             if (aircraftModel !== templateModel) {
               return 'Assembly model not matching';
             }
