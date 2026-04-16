@@ -1563,6 +1563,7 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
         status: getStringValue(row, ['status'], 'unknown'),
         current_flight_hours: getNumericValue(row, ['current_flight_hours'], 0),
         current_cycles: getNumericValue(row, ['current_cycles'], 0),
+        assembly_models: getStringValue(row, ['assembly_models', 'assemblymodels']) || null,
       })),
       maintenance_schedule: mappedMaintenanceSchedule.slice(0, 20),
       flight_logs: mappedFlightLogs.slice(0, 20),

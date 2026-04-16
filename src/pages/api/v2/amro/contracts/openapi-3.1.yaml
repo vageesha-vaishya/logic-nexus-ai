@@ -2294,6 +2294,27 @@ components:
             filters:
               type: object
               additionalProperties: true
+            aircraft_status:
+              type: array
+              items:
+                type: object
+                properties:
+                  aircraft_id:
+                    type: string
+                  registration:
+                    type: string
+                  status:
+                    type: string
+                  current_flight_hours:
+                    type: number
+                  current_cycles:
+                    type: integer
+                  assembly_models:
+                    oneOf:
+                      - type: string
+                        format: uuid
+                      - type: 'null'
+                additionalProperties: true
             engine_module:
               oneOf:
                 - $ref: '#/components/schemas/AircraftDashboardEngineModule'

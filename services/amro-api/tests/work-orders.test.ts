@@ -114,6 +114,10 @@ describe('AMRO Aircraft Dashboard API', () => {
     expect(response.body.error).toBeUndefined();
     expect(response.body.output).toBeDefined();
     expect(response.body.output.engine_module).not.toBeNull();
+    expect(Array.isArray(response.body.output.aircraft_status)).toBe(true);
+    if (response.body.output.aircraft_status.length > 0) {
+      expect(Object.prototype.hasOwnProperty.call(response.body.output.aircraft_status[0], 'assembly_models')).toBe(true);
+    }
     expect(response.body.output.engine_module).toHaveProperty('kpis');
     expect(response.body.output.engine_module).toHaveProperty('maintenance_schedule');
     expect(response.body.output.engine_module).toHaveProperty('work_orders');

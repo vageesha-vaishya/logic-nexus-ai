@@ -23,6 +23,7 @@ export interface AircraftRecord {
   tenant_id: string;
   franchise_id: string | null;
   model_id: string | null;
+  assembly_models: string | null;
   registration: string;
   tail_number: string | null;
   serial_number: string | null;
@@ -113,6 +114,7 @@ async function fetchAircraftList(headers: HeadersInit): Promise<AircraftListResp
       tenant_id: String(row.tenant_id || fallbackRow?.tenant_id || ''),
       franchise_id: (row.franchise_id || fallbackRow?.franchise_id || null) as string | null,
       model_id: String(row.model_id || fallbackRow?.model_id || '').trim() || null,
+      assembly_models: String(row.assembly_models || row.assemblymodels || fallbackRow?.assembly_models || fallbackRow?.assemblymodels || '').trim() || null,
       registration: String(row.registration || row.tail_number || fallbackRow?.registration || fallbackRow?.tail_number || ''),
       tail_number: (row.tail_number || row.registration || fallbackRow?.tail_number || fallbackRow?.registration || null) as string | null,
       serial_number: (row.serial_number || fallbackRow?.serial_number || null) as string | null,
