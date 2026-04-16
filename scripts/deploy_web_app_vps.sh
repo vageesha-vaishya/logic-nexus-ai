@@ -40,7 +40,7 @@ fi
 REMOTE_APP_DIR="/home/SOSLogicPro/logicProSupabaseDev/logic-nexus-ai"
 REMOTE_DOCKERFILE="$REMOTE_APP_DIR/Dockerfile"
 SUPABASE_URL="http://${VPS_IP}:${GATEWAY_PORT}"
-AMRO_API_UPSTREAM="${AMRO_API_UPSTREAM:-host.docker.internal:3001}"
+AMRO_API_UPSTREAM="${AMRO_API_UPSTREAM:-172.17.0.1:3001}"
 
 echo "Building LogicPro web on VPS (context: $REMOTE_APP_DIR, URL: $SUPABASE_URL) ..."
 "$EXPECT_EXEC" "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "\

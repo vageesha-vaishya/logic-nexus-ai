@@ -6,7 +6,7 @@ const password = process.env.VPS_PASSWORD;
 const gatewayPort = process.env.GATEWAY_PORT || '8100';
 const appPort = process.env.APP_PORT || '8099';
 const anonKey = process.env.SUPABASE_ANON_KEY;
-const amroApiUpstream = (process.env.AMRO_API_UPSTREAM || 'host.docker.internal:3001').trim();
+const amroApiUpstream = (process.env.AMRO_API_UPSTREAM || '172.17.0.1:3001').trim();
 const deployBranch = (process.env.DEPLOY_BRANCH || process.env.BRANCH_NAME || 'main').trim();
 
 if (!host || !password) {
