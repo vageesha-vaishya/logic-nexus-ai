@@ -485,9 +485,13 @@ export function AmroOwnedWorkspace({
       || session?.user?.app_metadata?.role
       || '',
   ).trim().toLowerCase();
+  const trainerUserMetadataRolesRaw = session?.user?.user_metadata?.roles;
+  const trainerAppMetadataRolesRaw = session?.user?.app_metadata?.roles;
+  const trainerUserMetadataRoles = Array.isArray(trainerUserMetadataRolesRaw) ? trainerUserMetadataRolesRaw : [];
+  const trainerAppMetadataRoles = Array.isArray(trainerAppMetadataRolesRaw) ? trainerAppMetadataRolesRaw : [];
   const trainerMetadataRoles = [
-    ...(Array.isArray(session?.user?.user_metadata?.roles) ? session?.user?.user_metadata?.roles : []),
-    ...(Array.isArray(session?.user?.app_metadata?.roles) ? session?.user?.app_metadata?.roles : []),
+    ...trainerUserMetadataRoles,
+    ...trainerAppMetadataRoles,
   ]
     .map((value) => String(value || '').trim().toLowerCase())
     .filter(Boolean);

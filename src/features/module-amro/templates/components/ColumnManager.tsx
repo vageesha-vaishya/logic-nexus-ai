@@ -281,7 +281,9 @@ export function ColumnManager({
   const handleSave = useCallback(() => {
     setColumnVisibility(localVisibility);
     setColumnOrder(localOrder);
-    setColumnSize('batch', localSizes); // Batch update
+    Object.entries(localSizes).forEach(([columnId, width]) => {
+      setColumnSize(columnId, Number(width));
+    });
     onOpenChange(false);
   }, [localVisibility, localOrder, localSizes, setColumnVisibility, setColumnOrder, setColumnSize, onOpenChange]);
 
@@ -346,7 +348,9 @@ export function ColumnManager({
                   onDragStart={() => colDef.reorderable && handleDragStart(index)}
                   onDragOver={(e) => {
                     e.preventDefault();
-                    colDef.reorderable && handleDragOver(index);
+                    if (colDef.reorderable) {
+                      handleDragOver(index);
+                    }
                   }}
                   onDragEnd={handleDragEnd}
                 >

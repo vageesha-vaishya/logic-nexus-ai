@@ -338,5 +338,5 @@ A page passes visual regression testing when:
 ---
 
 **Last Updated:** 2026-04-10  
-**Tested By:** [Your Name]  
+**Tested By:** Your Name  
 **Approved By:** Design Team Lead

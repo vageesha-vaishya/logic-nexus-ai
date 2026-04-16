@@ -1,4 +1,4 @@
-# AMRO Module Visibility Issue: deccanl@gmail.com
+# AMRO Module Visibility Issue: `<mailto:deccanl@gmail.com>`
 
 ## Root Cause Analysis
 
@@ -65,7 +65,7 @@ All AMRO routes have `requiredDomainCode="AMRO"`, which blocks access if the use
 
 ---
 
-## Why deccanl@gmail.com is Blocked
+## Why `<mailto:deccanl@gmail.com>` is Blocked
 
 ### Most Likely Cause: Missing AMRO Domain Assignment
 
@@ -102,7 +102,7 @@ WHERE tda.tenant_id = '<tenant_id>'
 
 ### Step 1: Apply the AMRO Domain Seeding Migration
 
-This will automatically assign AMRO domain to ALL active tenants (including deccanl@gmail.com's tenant):
+This will automatically assign AMRO domain to ALL active tenants (including `<mailto:deccanl@gmail.com>`'s tenant):
 
 ```bash
 SUPABASE_DB_PASSWORD='your-db-password' bash scripts/supabase-remote.sh push --include-all
@@ -115,7 +115,7 @@ This migration (`20260411000000_seed_amro_domain_and_assignments.sql`) does:
 
 ### Step 2: Manually Assign AMRO to Specific Tenant (Alternative)
 
-If you only want to assign AMRO to deccanl@gmail.com's tenant:
+If you only want to assign AMRO to `<mailto:deccanl@gmail.com>`'s tenant:
 
 ```sql
 -- Find the tenant ID
@@ -266,7 +266,7 @@ WHERE au.email = 'deccanl@gmail.com'
 
 ## Debug via Browser Console
 
-Have deccanl@gmail.com open browser console (F12) and look for:
+Have `<mailto:deccanl@gmail.com>` open browser console (F12) and look for:
 
 ```javascript
 // These logs will appear:

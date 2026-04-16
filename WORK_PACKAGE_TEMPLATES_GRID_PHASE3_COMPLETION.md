@@ -250,7 +250,7 @@ Dialog auto-closes after 2 seconds
 |-------------|--------------|-----------|---------|
 | Date Range | Calendar popover | Date range | Updated: Jan 1 - Mar 31 |
 | Number Range | Min/Max inputs | Number range | Tasks: 10-50 |
-| Multi-Select | Badge toggles | String array | Models: [A320, B737] |
+| Multi-Select | Badge toggles | String array | Models: `A320, B737` |
 | Preset | Saved filters | Object | "Q1 Active Templates" |
 
 ---

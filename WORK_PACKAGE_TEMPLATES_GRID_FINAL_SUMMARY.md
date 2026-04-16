@@ -460,9 +460,9 @@ docs/AMRO/
 - Priority levels: P0 (critical), P1 (high), P2 (medium), P3 (low)
 
 ### Contact
-- **Engineering Team**: amro-engineering@company.com
-- **Product Team**: amro-product@company.com
-- **Support Team**: support@company.com
+- **Engineering Team**: `<mailto:amro-engineering@company.com>`
+- **Product Team**: `<mailto:amro-product@company.com>`
+- **Support Team**: `<mailto:support@company.com>`
 
 ---
 

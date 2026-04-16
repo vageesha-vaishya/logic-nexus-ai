@@ -16,7 +16,7 @@ import { cn } from '@/lib/utils';
  *   secondaryActions={[{ label: 'Cancel', onClick: handleCancel }]}
  *   dangerAction={{ label: 'Delete', onClick: handleDelete }}
  * >
- *   {/* Form fields */}
+ *   Form fields here
  * </AmroForm>
  */
 
