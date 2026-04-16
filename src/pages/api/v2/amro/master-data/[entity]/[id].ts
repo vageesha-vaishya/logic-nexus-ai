@@ -485,8 +485,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       if (Object.prototype.hasOwnProperty.call(payload, 'policy_snapshot_id')) {
         payload.policy_snapshot_id = asNullableString(payload.policy_snapshot_id);
       }
-      if (Object.prototype.hasOwnProperty.call(payload, 'model_id')) {
-        payload.model_id = asNullableString(payload.model_id);
+      if (Object.prototype.hasOwnProperty.call(payload, 'assembly_models_id')) {
+        payload.assembly_models_id = asNullableString(payload.assembly_models_id);
       }
     }
     let manufacturerIssues: { field: string; message: string }[] = [];
@@ -528,7 +528,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const workPackageTemplateIssues: { field: string; message: string }[] = [];
     if (entity === 'work_package_templates') {
       const policySnapshotId = asNullableString(payload.policy_snapshot_id);
-      const modelId = asNullableString(payload.model_id);
+      const modelId = asNullableString(payload.assembly_models_id);
       if (policySnapshotId && !isUuid(policySnapshotId)) {
         workPackageTemplateIssues.push({
           field: 'policy_snapshot_id',
@@ -537,7 +537,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
       if (modelId && !isUuid(modelId)) {
         workPackageTemplateIssues.push({
-          field: 'model_id',
+          field: 'assembly_models_id',
           message: 'Aircraft Model reference must be a valid UUID.',
         });
       }
@@ -646,8 +646,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       // Make these fields authoritative after relationship sync to avoid stale/stateful overwrite paths.
       const finalPatch: Record<string, unknown> = {};
-      if (Object.prototype.hasOwnProperty.call(payload, 'model_id')) {
-        finalPatch.model_id = asNullableString(payload.model_id);
+      if (Object.prototype.hasOwnProperty.call(payload, 'assembly_models_id')) {
+        finalPatch.assembly_models_id = asNullableString(payload.assembly_models_id);
       }
       if (Object.prototype.hasOwnProperty.call(payload, 'aircraft_model')) {
         finalPatch.aircraft_model = asNullableString(payload.aircraft_model);

@@ -1544,8 +1544,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       if (Object.prototype.hasOwnProperty.call(payload, 'policy_snapshot_id')) {
         payload.policy_snapshot_id = asNullableString(payload.policy_snapshot_id);
       }
-      if (Object.prototype.hasOwnProperty.call(payload, 'model_id')) {
-        payload.model_id = asNullableString(payload.model_id);
+      if (Object.prototype.hasOwnProperty.call(payload, 'assembly_models_id')) {
+        payload.assembly_models_id = asNullableString(payload.assembly_models_id);
       }
     }
     let assemblyModelIssues: { field: string; message: string }[] = [];
@@ -1556,7 +1556,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const workPackageTemplateIssues: { field: string; message: string }[] = [];
     if (entity === 'work_package_templates') {
       const policySnapshotId = asNullableString(payload.policy_snapshot_id);
-      const modelId = asNullableString(payload.model_id);
+      const modelId = asNullableString(payload.assembly_models_id);
       if (policySnapshotId && !isUuid(policySnapshotId)) {
         workPackageTemplateIssues.push({
           field: 'policy_snapshot_id',
@@ -1565,7 +1565,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
       if (modelId && !isUuid(modelId)) {
         workPackageTemplateIssues.push({
-          field: 'model_id',
+          field: 'assembly_models_id',
           message: 'Aircraft Model reference must be a valid UUID.',
         });
       }
@@ -1713,12 +1713,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const createdRelationships = createdRelationshipsRaw
         .filter((item) => item && typeof item === 'object')
         .map((item) => item as Record<string, unknown>);
-      const requestedModelId = asNullableString(insertPayload.model_id);
+      const requestedModelId = asNullableString(insertPayload.assembly_models_id);
       const requestedAircraftModel = asNullableString(insertPayload.aircraft_model);
       let effectiveCreatedRecord = createdRecord;
       if (requestedModelId || requestedAircraftModel) {
         const patchPayload: Record<string, unknown> = {};
-        if (requestedModelId) patchPayload.model_id = requestedModelId;
+        if (requestedModelId) patchPayload.assembly_models_id = requestedModelId;
         if (requestedAircraftModel) patchPayload.aircraft_model = requestedAircraftModel;
         if (Object.keys(patchPayload).length > 0) {
           const { data: patchedRecord, error: patchError } = await supabase

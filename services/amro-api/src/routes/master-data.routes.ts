@@ -281,12 +281,12 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   },
   work_package_templates: {
     table: 'work_package_templates',
-    searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'model_id'],
+    searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'assembly_models_id'],
     listColumns:
-      'id,tenant_id,franchise_id,model_id,template_code,version,active,template_name,maintenance_type,assembly_models,scope_json,tasks_json,materials_json,tooling_json,compliance_requirements_json,policy_snapshot_id,created_at,updated_at',
-    requiredCreateFields: ['model_id', 'template_code', 'version', 'template_name', 'maintenance_type'],
+      'id,tenant_id,franchise_id,assembly_models_id,template_code,version,active,template_name,maintenance_type,assembly_models,scope_json,tasks_json,materials_json,tooling_json,compliance_requirements_json,policy_snapshot_id,created_at,updated_at',
+    requiredCreateFields: ['assembly_models_id', 'template_code', 'version', 'template_name', 'maintenance_type'],
     writeAllowedFields: [
-      'model_id',
+      'assembly_models_id',
       'template_code',
       'version',
       'active',
@@ -784,12 +784,13 @@ function normalizeShiftCalendar(payload: JsonRecord): JsonRecord {
 
 function normalizeWorkPackageTemplate(payload: JsonRecord): JsonRecord {
   return {
-    model_id: asString(payload.model_id),
+    assembly_models_id: asString(payload.assembly_models_id),
     template_code: asString(payload.template_code),
     version: asNumber(payload.version),
     active: asBoolean(payload.active, true),
     template_name: asString(payload.template_name),
     maintenance_type: asString(payload.maintenance_type),
+    assembly_models: asString(payload.assembly_models),
     scope_json: asJsonArray(payload.scope_json),
     tasks_json: asJsonArray(payload.tasks_json),
     materials_json: asJsonArray(payload.materials_json),

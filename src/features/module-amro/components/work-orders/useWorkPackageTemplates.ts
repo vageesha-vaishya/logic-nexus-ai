@@ -22,7 +22,7 @@ function useAuthHeaders(): HeadersInit | null {
 export interface WorkPackageTemplateOption {
   id: string;
   tenant_id: string | null;
-  model_id: string | null;
+  assembly_models_id: string | null;
   aircraft_model: string | null;
   assembly_models: string | null;
   name: string;
@@ -57,7 +57,7 @@ async function fetchWorkPackageTemplates(
       const parsed = {
         id: String(row.id),
         tenant_id: row.tenant_id ? String(row.tenant_id) : null,
-        model_id: row.model_id ? String(row.model_id) : null,
+        assembly_models_id: row.assembly_models_id ? String(row.assembly_models_id) : (row.model_id ? String(row.model_id) : null),
         aircraft_model: row.aircraft_model ? String(row.aircraft_model) : null,
         assembly_models: row.assembly_models ? String(row.assembly_models) : (row.assemblymodels ? String(row.assemblymodels) : null),
         name: String(row.template_name || row.name || row.title || 'Untitled Template'),
