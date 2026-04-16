@@ -209,7 +209,7 @@ Dashboard → AMRO → Work Orders
 
 **Button Location:**
 - Top right corner of work orders list
-- "[➕ Create Work Package]" button
+- "`➕ Create Work Package`" button
 - Will pre-select aircraft if coming from aircraft context
 
 ---

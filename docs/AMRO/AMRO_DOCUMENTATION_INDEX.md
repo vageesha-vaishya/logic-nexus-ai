@@ -27,6 +27,7 @@
 | **WPT Storybook gap analysis** | [AMRO_WPT_STORYBOOK_GAP_ANALYSIS.md](#wpt-storybook-gap-analysis) | Gap matrix of current implementation vs Storybook enterprise requirements |
 | **WPT Storybook migration guide** | [AMRO_WPT_STORYBOOK_MIGRATION_GUIDE.md](#wpt-storybook-migration-guide) | Story-to-module mapping, rollout, rollback, and implementation best practices |
 | **WPT aircraft model dropdown RCA** | [AMRO_WPT_AIRCRAFT_MODEL_DROPDOWN_RCA.md](#wpt-aircraft-model-dropdown-rca) | Root-cause analysis and deterministic scope-based fix for Aircraft Model options |
+| **Mobile security framework** | [AMRO_MOBILE_SECURITY_FRAMEWORK.md](#mobile-security-framework) | Android+iOS authentication, attestation, pinning, encryption, and OWASP controls |
 | **Business requirements** | [amro-plugin-requirements-spec-v1.0.md](#requirements-specification) | Requirements and acceptance criteria |
 | **Task details** | [2026-03-19-amro-plugin-implementation.md](#implementation-plan) | 13-week Phase A with granular task breakdown |
 | **API reference** | [2026-03-19-amro-plugin-implementation-reference.md](#implementation-reference) | API contracts and schema definitions |

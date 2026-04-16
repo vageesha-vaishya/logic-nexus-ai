@@ -188,7 +188,7 @@ export function TemplateCreateEditDialog({
   // ── Task filtering ─────────────────────────────────────────────────────────
 
   const filteredTasks = useMemo(() => {
-    let result = taskTemplates.filter(task => {
+    const result = taskTemplates.filter(task => {
       // apply individual column filters
       if (taskFilters.selected) {
         const val = taskFilters.selected.trim().toUpperCase();

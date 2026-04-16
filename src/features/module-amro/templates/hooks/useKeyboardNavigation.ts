@@ -187,6 +187,7 @@ export function useKeyboardNavigation({
           break;
 
         case 'PageUp':
+        {
           e.preventDefault();
           // Page up: Move up 10 rows
           const newRowUp = Math.max(0, position.rowIndex - 10);
@@ -195,8 +196,10 @@ export function useKeyboardNavigation({
           announce(`Page up, row ${newRowUp + 1}`);
           handled = true;
           break;
+        }
 
         case 'PageDown':
+        {
           e.preventDefault();
           // Page down: Move down 10 rows
           const newRowDown = Math.min(rowCount - 1, position.rowIndex + 10);
@@ -205,6 +208,7 @@ export function useKeyboardNavigation({
           announce(`Page down, row ${newRowDown + 1}`);
           handled = true;
           break;
+        }
 
         // Action keys
         case 'Enter':
