@@ -20,7 +20,7 @@ const columns: GridColumnDefinition<RecordRow>[] = [
 ];
 
 describe('AmroInventoryDataGridTemplate collapse/restore UX', () => {
-  it('supports grid-only, right-form, and split-view layout switching', () => {
+  it('renders create button and icon-only table/form view controls', () => {
     render(
       <AmroInventoryDataGridTemplate<RecordRow>
         records={rows}
@@ -29,15 +29,9 @@ describe('AmroInventoryDataGridTemplate collapse/restore UX', () => {
       />,
     );
 
-    expect(screen.getByRole('button', { name: 'Grid-only layout' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Grid with right form layout' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Split view layout' })).toBeInTheDocument();
-    expect(screen.getByText('Record Detail')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Grid-only layout' }));
-    expect(screen.queryByText('Record Detail')).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('button', { name: 'Grid with right form layout' }));
+    expect(screen.getByRole('button', { name: 'Create new record' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Table view' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Form view' })).toBeInTheDocument();
     expect(screen.getByText('Record Detail')).toBeInTheDocument();
   });
 

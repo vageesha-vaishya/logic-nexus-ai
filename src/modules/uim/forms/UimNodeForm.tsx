@@ -283,6 +283,7 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
   const [isQaSignoffSubmitting, setIsQaSignoffSubmitting] = useState(false);
   const [analyticsLatencyMs, setAnalyticsLatencyMs] = useState(0);
   const [analyticsLatencySamples, setAnalyticsLatencySamples] = useState<number[]>([]);
+  const [templateLayoutMode, setTemplateLayoutMode] = useState<'table' | 'side-form' | 'split'>('side-form');
   const projectionBacked = PROJECTION_BACKED_NODES.includes(node);
   const analyticsNodeActive = node === 'analytics';
 
@@ -353,6 +354,15 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
     if (!itemIdValue) return false;
     return !itemOptions.some((option) => option.id === itemIdValue);
   }, [node, itemIdValue, itemOptions]);
+  const referenceValidationMessages = useMemo(() => {
+    if (!fkValidationFailed) return [];
+    return ['Selected item reference is not available in current reference list options.'];
+  }, [fkValidationFailed]);
+  const referenceListSummary = useMemo(() => {
+    const itemFieldNodes: UimNodeKey[] = ['stock-ledger', 'reservations', 'issue-consume', 'restock'];
+    if (!itemFieldNodes.includes(node)) return [];
+    return [{ fieldKey: 'item_id', optionCount: itemOptions.length }];
+  }, [node, itemOptions.length]);
 
   const loadRecords = useCallback(async () => {
     setIsLoadingRecords(true);
@@ -1316,6 +1326,14 @@ export function UimNodeForm({ node, existingEntity }: UimNodeFormProps) {
           return String(metadata.mode || '') === 'derived-canonical';
         }) ? 'Derived from canonical inventory' : undefined}
         breadcrumbs={breadcrumbByNode[node]}
+        layoutMode={templateLayoutMode}
+        onLayoutModeChange={setTemplateLayoutMode}
+        availableLayoutModes={['table', 'side-form']}
+        referenceValidation={{
+          status: fkValidationFailed ? 'error' : 'ok',
+          messages: referenceValidationMessages,
+        }}
+        referenceListSummary={referenceListSummary}
         list={{
           records: filteredRecords,
           total: records.length,

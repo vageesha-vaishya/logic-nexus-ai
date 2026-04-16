@@ -21,18 +21,21 @@ import {
   PanelRightClose,
   PanelRightOpen,
   GripVertical,
-  ChevronLeft,
-  Maximize2,
-  Minimize2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Sheet,
   SheetContent,
   SheetHeader,
   SheetTitle,
   SheetDescription,
-  SheetClose,
 } from '@/components/ui/sheet';
 import {
   Dialog,
@@ -41,7 +44,6 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { Separator } from '@/components/ui/separator';
 import {
   Tooltip,
   TooltipContent,
@@ -77,7 +79,7 @@ export interface AmroSplitViewProps {
   /** CSS class name */
   className?: string;
   /** Layout configuration */
-  layoutConfig?: useGridLayout;
+  layoutConfig?: ReturnType<typeof useGridLayout>;
 }
 
 // ── Panel Resize Handle ────────────────────────────────────────────────────────
@@ -415,72 +417,38 @@ export function LayoutToggle({
   className,
 }: LayoutToggleProps) {
   return (
-    <div className={cn('flex items-center gap-1', className)}>
-      {/* Grid Only */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={mode === 'grid-only' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onModeChange('grid-only')}
-              className="h-8 px-3"
-            >
-              <Minimize2 className="h-3.5 w-3.5 mr-1.5" />
-              Grid
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Grid Only - Full width data grid</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      {/* Split View */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={mode === 'split-view' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => {
-                if (mode === 'split-view') {
-                  onTogglePanel();
-                } else {
-                  onModeChange('split-view');
-                }
-              }}
-              className="h-8 px-3"
-            >
-              {isPanelOpen ? (
-                <PanelRightClose className="h-3.5 w-3.5 mr-1.5" />
-              ) : (
-                <PanelRightOpen className="h-3.5 w-3.5 mr-1.5" />
-              )}
-              Split
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            {isPanelOpen ? 'Close side panel' : 'Open side panel with form'}
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-
-      {/* Modal */}
-      <TooltipProvider>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant={mode === 'modal' ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => onModeChange('modal')}
-              className="h-8 px-3"
-            >
-              <Maximize2 className="h-3.5 w-3.5 mr-1.5" />
-              Modal
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Modal - Detail in overlay dialog</TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
+    <div className={cn('flex items-center gap-2', className)}>
+      <Select
+        value={mode}
+        onValueChange={(next) => onModeChange(next as GridLayoutMode)}
+      >
+        <SelectTrigger className="h-8 w-[156px]" aria-label="Layout mode selector">
+          <SelectValue />
+        </SelectTrigger>
+        <SelectContent>
+          <SelectItem value="grid-only">Table</SelectItem>
+          <SelectItem value="split-view">Split</SelectItem>
+          <SelectItem value="modal">Modal</SelectItem>
+        </SelectContent>
+      </Select>
+      {mode === 'split-view' ? (
+        <TooltipProvider>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onTogglePanel}
+                className="h-8 px-2"
+                aria-label={isPanelOpen ? 'Close side panel' : 'Open side panel'}
+              >
+                {isPanelOpen ? <PanelRightClose className="h-3.5 w-3.5" /> : <PanelRightOpen className="h-3.5 w-3.5" />}
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>{isPanelOpen ? 'Close side panel' : 'Open side panel with form'}</TooltipContent>
+          </Tooltip>
+        </TooltipProvider>
+      ) : null}
     </div>
   );
 }

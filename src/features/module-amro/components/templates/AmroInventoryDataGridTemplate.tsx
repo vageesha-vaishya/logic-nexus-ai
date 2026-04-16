@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Columns3, Eye, EyeOff, GripVertical, LayoutPanelTop, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Rows3, Save, Trash2, X } from 'lucide-react';
+import { ArrowDown, ArrowUp, ChevronLeft, ChevronRight, Eye, EyeOff, GripVertical, LayoutPanelTop, PanelBottomClose, PanelBottomOpen, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Rows3, Save, Trash2, X } from 'lucide-react';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -214,6 +214,25 @@ function fieldSection(key: string, fieldType: InventoryDataType): 'identity' | '
   return 'identity';
 }
 
+function isBlankValue(value: unknown): boolean {
+  if (value == null) return true;
+  if (typeof value === 'string') return value.trim().length === 0;
+  return false;
+}
+
+function isReferenceFieldKey(key: string): boolean {
+  const normalizedKey = key.toLowerCase();
+  if (!normalizedKey.endsWith('_id')) return false;
+  return normalizedKey !== 'id' && normalizedKey !== 'tenant_id' && normalizedKey !== 'franchise_id';
+}
+
+function toReferenceLabelKey(key: string, record: Record<string, unknown>): string | null {
+  const base = key.replace(/_id$/i, '');
+  const candidates = [`${base}_name`, `${base}_number`, `${base}_code`, `${base}_label`];
+  const match = candidates.find((candidate) => Object.prototype.hasOwnProperty.call(record, candidate));
+  return match || null;
+}
+
 export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unknown>>({
   records,
   columns,
@@ -274,6 +293,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   const [infiniteCount, setInfiniteCount] = useState(Math.max(pageSize, INFINITE_CHUNK));
   const [screenReaderMessage, setScreenReaderMessage] = useState('');
   const [detailFormValues, setDetailFormValues] = useState<Record<string, unknown>>({});
+  const [detailValidationErrors, setDetailValidationErrors] = useState<Record<string, string>>({});
   const [isEditing, setIsEditing] = useState(false);
   const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
   const [deleteConfirmOpen, setDeleteConfirmOpen] = useState(false);
@@ -447,9 +467,11 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   useEffect(() => {
     if (!selectedRecord) {
       setDetailFormValues({});
+      setDetailValidationErrors({});
       return;
     }
     setDetailFormValues({ ...selectedRecord });
+    setDetailValidationErrors({});
     setIsEditing(false);
   }, [selectedRecord]);
   useEffect(() => {
@@ -893,6 +915,31 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     const unique = Array.from(new Set(values));
     return unique.length ? unique : ['available', 'reserved', 'low_stock', 'quarantined', 'unserviceable'];
   }, [records]);
+  const referenceOptionsByField = useMemo<Record<string, Array<{ value: string; label: string }>>>(() => {
+    const optionsMap = new Map<string, Map<string, string>>();
+    records.forEach((record) => {
+      Object.keys(record).forEach((key) => {
+        if (!isReferenceFieldKey(key)) return;
+        const rawValue = record[key];
+        const value = rawValue == null ? '' : String(rawValue).trim();
+        if (!value) return;
+        const labelKey = toReferenceLabelKey(key, record);
+        const labelRaw = labelKey ? record[labelKey] : null;
+        const label = labelRaw == null ? value : String(labelRaw).trim() || value;
+        if (!optionsMap.has(key)) {
+          optionsMap.set(key, new Map<string, string>());
+        }
+        optionsMap.get(key)?.set(value, label);
+      });
+    });
+    const result: Record<string, Array<{ value: string; label: string }>> = {};
+    optionsMap.forEach((valueMap, key) => {
+      result[key] = Array.from(valueMap.entries())
+        .map(([value, label]) => ({ value, label }))
+        .sort((a, b) => a.label.localeCompare(b.label));
+    });
+    return result;
+  }, [records]);
 
   const resolvedCrudPermissions = useMemo<Record<CrudAction, boolean>>(() => ({
     create: crudPermissions?.create ?? true,
@@ -909,6 +956,69 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     if (action === 'save' || action === 'cancel') return isEditing;
     return Boolean(selectedRecord);
   }, [isEditing, resolvedCrudPermissions, selectedRecord]);
+  const validateDetailForm = useCallback((): boolean => {
+    if (!selectedRecord) return true;
+    const nextErrors: Record<string, string> = {};
+    const visibleEntries = Object.entries(detailFormValues).filter(([key]) => {
+      const normalizedKey = normalizeDetailKey(key);
+      if (hiddenDetailFieldSet.has(normalizedKey)) return false;
+      if (defaultVisibleDetailFieldSet.size > 0 && !defaultVisibleDetailFieldSet.has(normalizedKey)) return false;
+      return true;
+    });
+    visibleEntries.forEach(([key, rawValue]) => {
+      const normalizedKey = key.toLowerCase();
+      const fieldType = inferFieldType(rawValue ?? selectedRecord[key], key);
+      const required = requiredDetailFieldSet.size > 0
+        ? requiredDetailFieldSet.has(normalizedKey)
+        : normalizedKey.includes('id') || normalizedKey.includes('part') || normalizedKey.includes('quantity');
+      if (required && isBlankValue(rawValue)) {
+        nextErrors[key] = 'This field is required.';
+        return;
+      }
+      if (isBlankValue(rawValue)) return;
+      if (fieldType === 'numeric' && Number.isNaN(Number(rawValue))) {
+        nextErrors[key] = 'Enter a valid number.';
+        return;
+      }
+      if (fieldType === 'date' && Number.isNaN(new Date(String(rawValue)).getTime())) {
+        nextErrors[key] = 'Enter a valid date.';
+        return;
+      }
+      if (fieldType === 'object' && typeof rawValue === 'string') {
+        try {
+          JSON.parse(rawValue);
+        } catch {
+          nextErrors[key] = 'Enter valid JSON.';
+          return;
+        }
+      }
+      if (normalizedKey.includes('status')) {
+        const value = String(rawValue);
+        if (!statusOptions.includes(value)) {
+          nextErrors[key] = 'Select a valid status.';
+          return;
+        }
+      }
+      if (isReferenceFieldKey(key)) {
+        const options = referenceOptionsByField[key] || [];
+        const value = String(rawValue).trim();
+        if (options.length > 0 && !options.some((option) => option.value === value)) {
+          nextErrors[key] = 'Select a valid reference value from the list.';
+        }
+      }
+    });
+    setDetailValidationErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  }, [
+    defaultVisibleDetailFieldSet,
+    detailFormValues,
+    hiddenDetailFieldSet,
+    normalizeDetailKey,
+    referenceOptionsByField,
+    requiredDetailFieldSet,
+    selectedRecord,
+    statusOptions,
+  ]);
 
   const handleCrud = useCallback((action: CrudAction, options?: { confirmedDelete?: boolean }) => {
     if (!canExecuteCrud(action)) return;
@@ -923,6 +1033,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     if (action === 'read') onReadRecord?.(typedRecord);
     if (action === 'update') {
       setIsEditing(true);
+      setDetailValidationErrors({});
       onUpdateRecord?.(typedRecord);
     }
     if (action === 'delete') {
@@ -935,11 +1046,16 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
       setDeleteConfirmOpen(false);
     }
     if (action === 'save') {
+      if (!validateDetailForm()) {
+        announce('Validation errors detected in record detail');
+        return;
+      }
       setIsEditing(false);
       onSaveRecord?.(typedRecord);
     }
     if (action === 'cancel') {
       setDetailFormValues({ ...selectedRecord });
+      setDetailValidationErrors({});
       setIsEditing(false);
       onCancelRecord?.(typedRecord);
     }
@@ -956,6 +1072,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     onSaveRecord,
     onUpdateRecord,
     selectedRecord,
+    validateDetailForm,
   ]);
 
   const handleWorkspaceShortcut = useCallback((event: React.KeyboardEvent<HTMLElement>) => {
@@ -996,6 +1113,15 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     }
   }, [detailVisible, handleCrud, restoreCollapsedPanels]);
 
+  const clearDetailFieldError = useCallback((fieldKey: string) => {
+    setDetailValidationErrors((current) => {
+      if (!current[fieldKey]) return current;
+      const next = { ...current };
+      delete next[fieldKey];
+      return next;
+    });
+  }, []);
+
   const renderDetailField = useCallback((key: string, value: unknown) => {
     const fieldType = inferFieldType(value, key);
     const label = toFieldLabel(key);
@@ -1004,10 +1130,60 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
       ? requiredDetailFieldSet.has(normalizedKey)
       : normalizedKey.includes('id') || normalizedKey.includes('part') || normalizedKey.includes('quantity');
     const currentValue = detailFormValues[key];
+    const fieldError = detailValidationErrors[key];
+    const fieldId = `detail-${key}`;
+    const errorId = fieldError ? `${fieldId}-error` : undefined;
+    const updateFieldValue = (nextValue: unknown) => {
+      setDetailFormValues((current) => ({ ...current, [key]: nextValue }));
+      clearDetailFieldError(key);
+    };
+
+    if (isReferenceFieldKey(key)) {
+      const options = referenceOptionsByField[key] || [];
+      const selected = currentValue == null ? '' : String(currentValue).trim();
+      const resolvedOptions = selected && !options.some((option) => option.value === selected)
+        ? [{ value: selected, label: `Unmapped Reference (${selected})` }, ...options]
+        : options;
+      return (
+        <div key={key} className="space-y-2 rounded-md border p-3">
+          <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
+            {label}
+            {required ? <span className="ml-1 text-destructive">*</span> : null}
+          </Label>
+          <Select
+            value={selected}
+            onValueChange={(next) => updateFieldValue(next)}
+            disabled={!isEditing}
+          >
+            <SelectTrigger
+              id={fieldId}
+              aria-label={label}
+              aria-required={required || undefined}
+              aria-invalid={Boolean(fieldError)}
+              aria-describedby={errorId}
+            >
+              <SelectValue placeholder={resolvedOptions.length > 0 ? 'Select reference...' : 'No references available'} />
+            </SelectTrigger>
+            <SelectContent>
+              {resolvedOptions.map((option) => (
+                <SelectItem key={`${key}:${option.value}`} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {fieldError ? (
+            <p id={errorId} className="text-xs text-destructive" role="alert">
+              {fieldError}
+            </p>
+          ) : (
+            <p className="text-xs text-muted-foreground">Reference values are restricted to known linked records.</p>
+          )}
+        </div>
+      );
+    }
 
     if (fieldType === 'boolean') {
-      const fieldId = `detail-${key}`;
-      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3">
           <div className="flex items-center justify-between">
@@ -1019,8 +1195,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
               id={fieldId}
               checked={Boolean(currentValue)}
               disabled={!isEditing}
-              onCheckedChange={(checked) => setDetailFormValues((current) => ({ ...current, [key]: checked }))}
-              // Issue AC-02: ARIA attributes for switch
+              onCheckedChange={(checked) => updateFieldValue(checked)}
               aria-label={`${label} toggle`}
               aria-required={required || undefined}
             />
@@ -1030,10 +1205,6 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     }
 
     if (fieldType === 'numeric') {
-      const invalid = Number.isNaN(Number(currentValue ?? 0));
-      const fieldId = `detail-${key}`;
-      const errorId = invalid ? `${fieldId}-error` : undefined;
-      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3">
           <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
@@ -1045,15 +1216,14 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
             type="number"
             value={currentValue == null ? '' : String(currentValue)}
             disabled={!isEditing}
-            onChange={(event) => setDetailFormValues((current) => ({ ...current, [key]: Number(event.target.value) }))}
-            // Issue AC-02: ARIA error association
-            aria-invalid={invalid}
+            onChange={(event) => updateFieldValue(event.target.value)}
+            aria-invalid={Boolean(fieldError)}
             aria-describedby={errorId}
             aria-required={required || undefined}
           />
-          {invalid ? (
+          {fieldError ? (
             <p id={errorId} className="text-xs text-destructive" role="alert">
-              Invalid numeric value
+              {fieldError}
             </p>
           ) : null}
         </div>
@@ -1061,10 +1231,6 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     }
 
     if (fieldType === 'date') {
-      const fieldId = `detail-${key}`;
-      const invalid = currentValue && isNaN(new Date(String(currentValue)).getTime());
-      const errorId = invalid ? `${fieldId}-error` : undefined;
-      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3">
           <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
@@ -1076,15 +1242,14 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
             type="date"
             value={toInputDateValue(currentValue)}
             disabled={!isEditing}
-            onChange={(event) => setDetailFormValues((current) => ({ ...current, [key]: event.target.value }))}
-            // Issue AC-02: ARIA error association
-            aria-invalid={!!invalid}
+            onChange={(event) => updateFieldValue(event.target.value)}
+            aria-invalid={Boolean(fieldError)}
             aria-describedby={errorId}
             aria-required={required || undefined}
           />
-          {invalid ? (
+          {fieldError ? (
             <p id={errorId} className="text-xs text-destructive" role="alert">
-              Invalid date format
+              {fieldError}
             </p>
           ) : null}
         </div>
@@ -1094,8 +1259,6 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     if (normalizedKey.includes('status')) {
       const selected = String(currentValue ?? '');
       const fallback = selected && !statusOptions.includes(selected) ? [selected, ...statusOptions] : statusOptions;
-      const fieldId = `detail-${key}`;
-      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3">
           <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
@@ -1104,13 +1267,14 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
           </Label>
           <Select
             value={selected || fallback[0]}
-            onValueChange={(next) => setDetailFormValues((current) => ({ ...current, [key]: next }))}
+            onValueChange={(next) => updateFieldValue(next)}
             disabled={!isEditing}
           >
             <SelectTrigger 
               id={fieldId} 
-              // Issue AC-02: ARIA attributes for select
               aria-label={label}
+              aria-invalid={Boolean(fieldError)}
+              aria-describedby={errorId}
               aria-required={required || undefined}
             >
               <SelectValue />
@@ -1123,22 +1287,16 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
               ))}
             </SelectContent>
           </Select>
+          {fieldError ? (
+            <p id={errorId} className="text-xs text-destructive" role="alert">
+              {fieldError}
+            </p>
+          ) : null}
         </div>
       );
     }
 
     if (fieldType === 'object') {
-      const fieldId = `detail-${key}`;
-      let invalid = false;
-      try {
-        if (typeof currentValue === 'string') {
-          JSON.parse(currentValue);
-        }
-      } catch {
-        invalid = true;
-      }
-      const errorId = invalid ? `${fieldId}-error` : undefined;
-      
       return (
         <div key={key} className="space-y-2 rounded-md border p-3 md:col-span-2">
           <Label htmlFor={fieldId} className="text-xs font-semibold text-muted-foreground">
@@ -1154,19 +1312,18 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
               const text = event.target.value;
               try {
                 const parsed = JSON.parse(text);
-                setDetailFormValues((current) => ({ ...current, [key]: parsed }));
+                updateFieldValue(parsed);
               } catch {
-                setDetailFormValues((current) => ({ ...current, [key]: text }));
+                updateFieldValue(text);
               }
             }}
-            // Issue AC-02: ARIA error association
-            aria-invalid={invalid}
+            aria-invalid={Boolean(fieldError)}
             aria-describedby={errorId}
             aria-required={required || undefined}
           />
-          {invalid ? (
+          {fieldError ? (
             <p id={errorId} className="text-xs text-destructive" role="alert">
-              Invalid JSON format
+              {fieldError}
             </p>
           ) : null}
         </div>
@@ -1174,7 +1331,6 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
     }
 
     const isLongText = String(currentValue ?? '').length > 64 || normalizedKey.includes('description') || normalizedKey.includes('notes');
-    const fieldId = `detail-${key}`;
     
     return (
       <div key={key} className={cn('space-y-2 rounded-md border p-3', isLongText ? 'md:col-span-2' : '')}>
@@ -1188,8 +1344,9 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
             value={String(currentValue ?? '')}
             disabled={!isEditing}
             rows={3}
-            onChange={(event) => setDetailFormValues((current) => ({ ...current, [key]: event.target.value }))}
-            // Issue AC-02: ARIA attributes for textarea
+            onChange={(event) => updateFieldValue(event.target.value)}
+            aria-invalid={Boolean(fieldError)}
+            aria-describedby={errorId}
             aria-required={required || undefined}
           />
         ) : (
@@ -1197,14 +1354,20 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
             id={fieldId}
             value={String(currentValue ?? '')}
             disabled={!isEditing}
-            onChange={(event) => setDetailFormValues((current) => ({ ...current, [key]: event.target.value }))}
-            // Issue AC-02: ARIA attributes for input
+            onChange={(event) => updateFieldValue(event.target.value)}
+            aria-invalid={Boolean(fieldError)}
+            aria-describedby={errorId}
             aria-required={required || undefined}
           />
         )}
+        {fieldError ? (
+          <p id={errorId} className="text-xs text-destructive" role="alert">
+            {fieldError}
+          </p>
+        ) : null}
       </div>
     );
-  }, [detailFormValues, isEditing, requiredDetailFieldSet, statusOptions]);
+  }, [clearDetailFieldError, detailFormValues, detailValidationErrors, isEditing, referenceOptionsByField, requiredDetailFieldSet, statusOptions]);
 
   const renderDefaultDetail = (record: TRecord) => {
     const entries = Object.entries(record).filter(([key]) => {
@@ -1277,8 +1440,8 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
             <CardDescription>{subtitle}</CardDescription>
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">Input: {interactionHints.input}</Badge>
-            <Badge variant="outline">Keyboard: {interactionHints.keyboard}</Badge>
+            <Badge variant="outline">Controls: {interactionHints.input} + Keyboard</Badge>
+            <Badge variant="outline">Keys: Arrows, Enter, Esc</Badge>
             {enableHighContrast ? <Badge>High Contrast</Badge> : null}
           </div>
         </div>
@@ -1287,7 +1450,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
           <Input
             value={query}
             onChange={(event) => setQuery(event.target.value)}
-            placeholder="Filter records..."
+            placeholder="Search records..."
             className="h-9 w-[240px]"
             aria-label="Filter records"
           />
@@ -1296,43 +1459,45 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
               <SelectValue placeholder="Group by" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="none">No grouping</SelectItem>
+              <SelectItem value="none">Group: None</SelectItem>
               {groupableColumns.map((column) => (
                 <SelectItem key={String(column.key)} value={String(column.key)}>
-                  Group by {column.header}
+                  Group: {column.header}
                 </SelectItem>
               ))}
             </SelectContent>
           </Select>
           <Button
             type="button"
-            variant={normalizedRequestedMode === 'grid-only' ? 'default' : 'outline'}
             size="sm"
-            onClick={() => setRequestedMode('grid-only')}
-            aria-label="Grid-only layout"
+            onClick={() => handleCrud('create')}
+            disabled={!canExecuteCrud('create')}
+            aria-label="Create new record"
           >
-            <Rows3 className="mr-1.5 h-4 w-4" />
-            Grid Only
+            <Plus className="mr-1.5 h-4 w-4" />
+            Create New
+          </Button>
+          <Button
+            type="button"
+            variant={normalizedRequestedMode === 'grid-only' ? 'default' : 'outline'}
+            size="icon"
+            className="h-9 w-9"
+            onClick={() => setRequestedMode('grid-only')}
+            aria-label="Table view"
+            title="Table view"
+          >
+            <Rows3 className="h-4 w-4" />
           </Button>
           <Button
             type="button"
             variant={normalizedRequestedMode === 'grid-with-right-form' ? 'default' : 'outline'}
-            size="sm"
+            size="icon"
+            className="h-9 w-9"
             onClick={() => setRequestedMode('grid-with-right-form')}
-            aria-label="Grid with right form layout"
+            aria-label="Form view"
+            title="Form view"
           >
-            <LayoutPanelTop className="mr-1.5 h-4 w-4" />
-            Right Form
-          </Button>
-          <Button
-            type="button"
-            variant={normalizedRequestedMode === 'split-view' ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => setRequestedMode('split-view')}
-            aria-label="Split view layout"
-          >
-            <Columns3 className="mr-1.5 h-4 w-4" />
-            Split View
+            <LayoutPanelTop className="h-4 w-4" />
           </Button>
           {enableDetailPanelToggle ? (
             <Button

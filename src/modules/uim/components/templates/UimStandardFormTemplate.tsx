@@ -1,15 +1,22 @@
 import { useMemo, useState, type ReactNode } from 'react';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, LayoutPanelTop, Plus, Rows3 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import type { UimDataListColumn } from '@/modules/uim/components/UimDataList';
 import { UimDataList } from '@/modules/uim/components/UimDataList';
 
 export type UimTemplateState = 'ready' | 'loading' | 'empty' | 'error';
 export type UimTemplateMode = 'create' | 'edit' | 'readonly';
+export type UimTemplateLayoutMode = 'table' | 'side-form' | 'split';
 
 export type UimTemplateValidationState = {
+  status: 'ok' | 'warning' | 'error';
+  messages: string[];
+};
+
+export type UimTemplateReferenceValidationState = {
   status: 'ok' | 'warning' | 'error';
   messages: string[];
 };
@@ -40,6 +47,11 @@ export type UimStandardFormTemplateProps = {
   statusBadge?: string;
   breadcrumbs?: string[];
   validation?: UimTemplateValidationState;
+  referenceValidation?: UimTemplateReferenceValidationState;
+  referenceListSummary?: Array<{ fieldKey: string; optionCount: number }>;
+  layoutMode?: UimTemplateLayoutMode;
+  onLayoutModeChange?: (mode: UimTemplateLayoutMode) => void;
+  availableLayoutModes?: UimTemplateLayoutMode[];
   list: UimTemplateListConfig;
   headerActionsSlot?: ReactNode;
   formSlot?: ReactNode;
@@ -59,6 +71,11 @@ export function UimStandardFormTemplate({
   statusBadge,
   breadcrumbs = [],
   validation = { status: 'ok', messages: [] },
+  referenceValidation = { status: 'ok', messages: [] },
+  referenceListSummary = [],
+  layoutMode,
+  onLayoutModeChange,
+  availableLayoutModes = ['table', 'side-form', 'split'],
   list,
   headerActionsSlot,
   formSlot,
@@ -78,6 +95,9 @@ export function UimStandardFormTemplate({
     setInternalSearchValue('');
     setInternalStatusValue('all');
   });
+  const [internalLayoutMode, setInternalLayoutMode] = useState<UimTemplateLayoutMode>('side-form');
+  const activeLayoutMode = layoutMode ?? internalLayoutMode;
+  const setActiveLayoutMode = onLayoutModeChange ?? setInternalLayoutMode;
 
   const filteredRecords = useMemo(() => {
     const q = searchValue.trim().toLowerCase();
@@ -106,6 +126,36 @@ export function UimStandardFormTemplate({
             </div>
             <div className="flex items-center gap-2">
               <Badge variant="secondary">Mode: {mode}</Badge>
+              <Button type="button" size="sm" onClick={onCreate} aria-label="Create new record">
+                <Plus className="mr-1.5 h-4 w-4" />
+                Create New
+              </Button>
+              {availableLayoutModes.includes('table') ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={activeLayoutMode === 'table' ? 'default' : 'outline'}
+                  className="h-8 w-8"
+                  onClick={() => setActiveLayoutMode('table')}
+                  aria-label="Table view"
+                  title="Table view"
+                >
+                  <Rows3 className="h-4 w-4" />
+                </Button>
+              ) : null}
+              {(availableLayoutModes.includes('side-form') || availableLayoutModes.includes('split')) ? (
+                <Button
+                  type="button"
+                  size="icon"
+                  variant={activeLayoutMode === 'table' ? 'outline' : 'default'}
+                  className="h-8 w-8"
+                  onClick={() => setActiveLayoutMode('side-form')}
+                  aria-label="Form view"
+                  title="Form view"
+                >
+                  <LayoutPanelTop className="h-4 w-4" />
+                </Button>
+              ) : null}
               {statusBadge ? <Badge variant="secondary">{statusBadge}</Badge> : null}
               {headerActionsSlot}
             </div>
@@ -129,6 +179,19 @@ export function UimStandardFormTemplate({
           </AlertDescription>
         </Alert>
       ) : null}
+      {referenceValidation.status !== 'ok' && referenceValidation.messages.length > 0 ? (
+        <Alert variant={referenceValidation.status === 'error' ? 'destructive' : 'default'}>
+          <AlertCircle className="h-4 w-4" />
+          <AlertTitle>{referenceValidation.status === 'error' ? 'Reference Validation Errors' : 'Reference Validation Warnings'}</AlertTitle>
+          <AlertDescription>
+            <ul className="list-disc pl-4">
+              {referenceValidation.messages.map((message) => (
+                <li key={message}>{message}</li>
+              ))}
+            </ul>
+          </AlertDescription>
+        </Alert>
+      ) : null}
 
       {state === 'error' ? (
         <Alert variant="destructive">
@@ -138,7 +201,7 @@ export function UimStandardFormTemplate({
         </Alert>
       ) : null}
 
-      <div className="grid gap-4 xl:grid-cols-[2fr_1fr]">
+      <div className={activeLayoutMode === 'split' ? 'grid gap-4 xl:grid-cols-2' : 'grid gap-4 xl:grid-cols-[2fr_1fr]'}>
         <UimDataList
           records={recordsForState}
           total={effectiveTotal}
@@ -160,16 +223,28 @@ export function UimStandardFormTemplate({
           replayLoading={replayLoading}
         />
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Form Panel</CardTitle>
-            <CardDescription>Module-agnostic slot for form sections and actions.</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            {formSlot || <div className="text-sm text-muted-foreground">Inject form fields via `formSlot`.</div>}
-            {sidePanelSlot}
-          </CardContent>
-        </Card>
+        {activeLayoutMode !== 'table' ? (
+          <Card>
+            <CardHeader>
+              <CardTitle>Record Detail</CardTitle>
+              <CardDescription>Simple edit panel with reference-safe inputs and validation feedback.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              {formSlot || <div className="text-sm text-muted-foreground">Inject form fields via `formSlot`.</div>}
+              {referenceListSummary.length > 0 ? (
+                <div className="rounded-md border border-border/70 p-2">
+                  <p className="text-xs font-medium">Reference List Coverage</p>
+                  <ul className="mt-1 space-y-1 text-xs text-muted-foreground">
+                    {referenceListSummary.map((item) => (
+                      <li key={item.fieldKey}>{item.fieldKey}: {item.optionCount} option(s)</li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+              {sidePanelSlot}
+            </CardContent>
+          </Card>
+        ) : null}
       </div>
 
       {footerSlot ? <div>{footerSlot}</div> : null}

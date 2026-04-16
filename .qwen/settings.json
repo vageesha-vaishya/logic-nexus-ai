@@ -1,45 +1,7 @@
 {
   "permissions": {
     "allow": [
-      "Bash(mkdir *)",
-      "Bash(npx *)",
-      "Bash(timeout *)",
-      "Bash(git checkout *)",
-      "Bash(wc *)",
-      "Bash(sed *)",
-      "Bash(npm run *)",
-      "Bash(mv *)",
-      "Bash(test *)",
-      "Bash(find *)",
-      "Bash(grep *)",
-      "Bash(rm *)",
-      "Bash(echo *)",
-      "Bash(tr *)",
-      "Bash(curl *)",
-      "Bash(head *)",
-      "Bash(npm exec *)",
-      "Bash(lsof *)",
-      "Bash(kill *)",
-      "Bash(sleep *)",
-      "Bash(npm install)",
-      "Bash(python3 *)",
-      "Bash(xargs *)",
-      "Bash(node *)",
-      "Bash(cp *)",
-      "Bash(ls *)",
-      "Bash(chmod *)",
-      "Bash(pkill *)",
-      "Bash(npm start)",
-      "Bash(supabase *)",
-      "Bash(cat)",
-      "Bash(const *)",
-      "Bash('fs')",
-      "Bash(let *)",
-      "Bash(file, *)",
-      "Bash(// *)",
-      "Bash(content *)",
-      "Bash($2] *)"
+      "Bash(mkdir *)"
     ]
-  },
-  "$version": 3
+  }
 }

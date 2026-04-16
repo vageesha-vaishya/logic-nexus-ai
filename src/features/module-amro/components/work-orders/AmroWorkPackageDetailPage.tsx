@@ -47,7 +47,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -58,6 +57,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AmroModuleSurface } from '@/features/module-amro/components/parts/AmroPartsUiStandards';
 import { AmroCrudMessageBanner } from '@/features/module-amro/components/parts/AmroCrudPrimitives';
+import { AmroStandardFormTemplate, type AmroTemplateFieldDefinition, type AmroTemplateSection } from '@/features/module-amro/components/templates/AmroStandardFormTemplate';
 import {
   useWorkPackage,
   useUpdateWorkPackage,
@@ -178,7 +178,7 @@ function InfoCard({ wp }: { wp: WorkPackageDetail }) {
               <Wrench className="h-4 w-4" />
               Maintenance Type
             </div>
-            <p className="mt-1 font-medium capitalize">{wp.maintenance_type.replace('_', ' ')}</p>
+            <p className="mt-1 font-medium">{wp.maintenance_type.replace('_', ' ').replace(/\b\w/g, (char) => char.toUpperCase())}</p>
           </div>
           <div>
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -287,7 +287,7 @@ function TasksTab({ wp }: { wp: WorkPackageDetail }) {
       </CardHeader>
       <CardContent>
         {tasks.length === 0 ? (
-          <p className="text-center py-8 text-muted-foreground">No tasks defined for this work package.</p>
+          <p className="text-center py-8 text-muted-foreground">No tasks defined for this work order.</p>
         ) : (
           <Table>
             <TableHeader>
@@ -476,8 +476,7 @@ function EditWorkPackageDialog({
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSave = async () => {
     if (!validate()) return;
 
     updateMutation.mutate(
@@ -530,134 +529,119 @@ function EditWorkPackageDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-6" noValidate>
-          <div className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="wp-title" className="text-sm font-medium">
-                Title <span className="text-destructive" aria-label="required">*</span>
-              </Label>
-              <Input
-                id="wp-title"
-                value={formData.title}
-                onChange={(e) => setField('title', e.target.value)}
-                placeholder="Enter work package title"
-                aria-required="true"
-                aria-invalid={!!errors.title}
-                aria-describedby={errors.title ? 'title-error' : undefined}
-                className={errors.title ? 'border-destructive' : ''}
-              />
-              {errors.title && (
-                <p id="title-error" className="text-sm text-destructive flex items-center gap-1" role="alert">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.title}
-                </p>
-              )}
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="wp-description" className="text-sm font-medium">
-                Description
-              </Label>
-              <Textarea
-                id="wp-description"
-                value={formData.description}
-                onChange={(e) => setField('description', e.target.value)}
-                placeholder="Provide a detailed description..."
-                rows={4}
-                aria-describedby="description-hint"
-              />
-              <p id="description-hint" className="text-xs text-muted-foreground">
-                Optional: Add details about scope, objectives, or special requirements.
-              </p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="wp-priority" className="text-sm font-medium">
-                  Priority
-                </Label>
-                <Select value={formData.priority} onValueChange={(value) => setField('priority', value)}>
-                  <SelectTrigger id="wp-priority" aria-label="Select priority level">
-                    <SelectValue placeholder="Select priority" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PRIORITY_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={opt.value}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="wp-assigned" className="text-sm font-medium">
-                  Assigned To
-                </Label>
-                <Input
-                  id="wp-assigned"
-                  value={formData.assigned_to}
-                  onChange={(e) => setField('assigned_to', e.target.value)}
-                  placeholder="Technician or team"
-                />
-              </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-              <div className="space-y-2">
-                <Label htmlFor="wp-start" className="text-sm font-medium">
-                  Planned Start Date
-                </Label>
-                <Input
-                  id="wp-start"
-                  type="date"
-                  value={formData.planned_start_date}
-                  onChange={(e) => setField('planned_start_date', e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="wp-end" className="text-sm font-medium">
-                  Planned End Date
-                </Label>
-                <Input
-                  id="wp-end"
-                  type="date"
-                  value={formData.planned_end_date}
-                  onChange={(e) => setField('planned_end_date', e.target.value)}
-                />
-              </div>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => onOpenChange(false)}
-              disabled={updateMutation.isPending}
-            >
-              Cancel
-            </Button>
-            <Button
-              type="submit"
-              disabled={updateMutation.isPending}
-              aria-busy={updateMutation.isPending}
-            >
-              {updateMutation.isPending ? (
-                <>
-                  <span className="animate-spin mr-2">⏳</span>
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <CheckCircle className="mr-2 h-4 w-4" />
-                  Save Changes
-                </>
-              )}
-            </Button>
-          </DialogFooter>
-        </form>
+        <AmroStandardFormTemplate
+          moduleKey="amro.work-package.detail"
+          title={`Edit ${workPackage.work_package_number}`}
+          subtitle="Template-driven edit form aligned with AMRO advanced module standards."
+          mode="edit"
+          state={updateMutation.isPending ? 'loading' : 'ready'}
+          values={formData}
+          fields={[
+            { key: 'title', label: 'Title', required: true, span: 2 },
+            { key: 'description', label: 'Description', span: 2 },
+            { key: 'priority', label: 'Priority' },
+            { key: 'assigned_to', label: 'Assigned To' },
+            { key: 'planned_start_date', label: 'Planned Start Date' },
+            { key: 'planned_end_date', label: 'Planned End Date' },
+          ] satisfies AmroTemplateFieldDefinition[]}
+          sections={[
+            { id: 'core', title: 'Core Details', fieldKeys: ['title', 'description', 'priority', 'assigned_to'] },
+            { id: 'schedule', title: 'Scheduling', fieldKeys: ['planned_start_date', 'planned_end_date'] },
+          ] satisfies AmroTemplateSection[]}
+          validation={{
+            level: Object.keys(errors).length > 0 ? 'error' : 'ok',
+            messages: Object.values(errors).filter(Boolean) as string[],
+          }}
+          renderField={(field) => {
+            if (field.key === 'title') {
+              return (
+                <div className="space-y-1.5">
+                  <Label htmlFor="wp-title">Title <span className="text-destructive">*</span></Label>
+                  <Input
+                    id="wp-title"
+                    value={formData.title}
+                    onChange={(event) => setField('title', event.target.value)}
+                    aria-invalid={!!errors.title}
+                    aria-required="true"
+                  />
+                  {errors.title ? <p className="text-sm text-destructive" role="alert">{errors.title}</p> : null}
+                </div>
+              );
+            }
+            if (field.key === 'description') {
+              return (
+                <div className="space-y-1.5">
+                  <Label htmlFor="wp-description">Description</Label>
+                  <Textarea
+                    id="wp-description"
+                    value={formData.description}
+                    onChange={(event) => setField('description', event.target.value)}
+                    rows={4}
+                  />
+                </div>
+              );
+            }
+            if (field.key === 'priority') {
+              return (
+                <div className="space-y-1.5">
+                  <Label htmlFor="wp-priority">Priority</Label>
+                  <Select value={formData.priority} onValueChange={(value) => setField('priority', value)}>
+                    <SelectTrigger id="wp-priority"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {PRIORITY_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              );
+            }
+            if (field.key === 'assigned_to') {
+              return (
+                <div className="space-y-1.5">
+                  <Label htmlFor="wp-assigned-to">Assigned To</Label>
+                  <Input id="wp-assigned-to" value={formData.assigned_to} onChange={(event) => setField('assigned_to', event.target.value)} />
+                </div>
+              );
+            }
+            if (field.key === 'planned_start_date') {
+              return (
+                <div className="space-y-1.5">
+                  <Label htmlFor="wp-planned-start-date">Planned Start Date</Label>
+                  <Input id="wp-planned-start-date" type="date" value={formData.planned_start_date} onChange={(event) => setField('planned_start_date', event.target.value)} />
+                </div>
+              );
+            }
+            if (field.key === 'planned_end_date') {
+              return (
+                <div className="space-y-1.5">
+                  <Label htmlFor="wp-planned-end-date">Planned End Date</Label>
+                  <Input id="wp-planned-end-date" type="date" value={formData.planned_end_date} onChange={(event) => setField('planned_end_date', event.target.value)} />
+                </div>
+              );
+            }
+            return null;
+          }}
+          primaryActions={[
+            {
+              id: 'save',
+              label: updateMutation.isPending ? 'Saving...' : 'Save Changes',
+              onClick: () => {
+                void handleSave();
+              },
+              disabled: updateMutation.isPending,
+            },
+          ]}
+          secondaryActions={[
+            {
+              id: 'cancel',
+              label: 'Cancel',
+              variant: 'outline',
+              disabled: updateMutation.isPending,
+              onClick: () => onOpenChange(false),
+            },
+          ]}
+        />
       </DialogContent>
     </Dialog>
   );
@@ -928,3 +912,5 @@ export function AmroWorkPackageDetailPage() {
     </DashboardLayout>
   );
 }
+
+export default AmroWorkPackageDetailPage;
