@@ -40,6 +40,7 @@ fi
 REMOTE_APP_DIR="/home/SOSLogicPro/logicProSupabaseDev/logic-nexus-ai"
 REMOTE_DOCKERFILE="$REMOTE_APP_DIR/Dockerfile"
 SUPABASE_URL="http://${VPS_IP}:${GATEWAY_PORT}"
+AMRO_API_UPSTREAM="${AMRO_API_UPSTREAM:-host.docker.internal:3001}"
 
 echo "Building LogicPro web on VPS (context: $REMOTE_APP_DIR, URL: $SUPABASE_URL) ..."
 "$EXPECT_EXEC" "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "\
@@ -54,7 +55,10 @@ echo "Building LogicPro web on VPS (context: $REMOTE_APP_DIR, URL: $SUPABASE_URL
 echo "Starting logicpro-web on port $APP_PORT ..."
 "$EXPECT_EXEC" "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "\
   (docker ps -a --format '{{.Names}}' | grep -q '^logicpro-web\$' && docker rm -f logicpro-web || true) && \
-  docker run -d --name logicpro-web --restart unless-stopped -p ${APP_PORT}:80 logicpro-web \
+  docker run -d --name logicpro-web --restart unless-stopped -p ${APP_PORT}:80 \
+    --add-host=host.docker.internal:host-gateway \
+    -e AMRO_API_UPSTREAM='${AMRO_API_UPSTREAM}' \
+    logicpro-web \
 "
 
 echo "LogicPro web is available at http://${VPS_IP}:${APP_PORT}"

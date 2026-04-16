@@ -60,11 +60,12 @@ import { useDataGridStore, WizardStep } from './store/useDataGridStore';
 export interface WizardField {
   id: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'textarea' | 'checkbox' | 'switch' | 'radio';
+  type: 'text' | 'number' | 'select' | 'textarea' | 'checkbox' | 'switch' | 'radio' | 'display';
   required?: boolean;
   options?: Array<{ value: string; label: string }>;
   placeholder?: string;
   helperText?: string;
+  displayValue?: (formData: Record<string, any>) => string;
   validate?: (value: any, formData: Record<string, any>) => string | null;
   colSpan?: 1 | 2;
   /** Condition for showing this field */
@@ -328,6 +329,16 @@ function WizardFieldRenderer({ field, value, error, onChange }: WizardFieldRende
         </div>
       );
 
+    case 'display':
+      return (
+        <div className={cn(
+          'rounded-md border bg-muted/30 px-3 py-2 text-sm whitespace-pre-line',
+          error && 'border-red-500',
+        )}>
+          {value ? String(value) : '-'}
+        </div>
+      );
+
     default:
       return null;
   }
@@ -368,13 +379,14 @@ function StepContent({ step, formData, errors, onChange }: StepContentProps) {
         {visibleFields.map((field) => {
           const colSpanClass = field.colSpan === 2 ? 'md:col-span-2' : '';
           const isCheckboxOrSwitch = field.type === 'checkbox' || field.type === 'switch';
+          const resolvedValue = field.displayValue ? field.displayValue(formData) : formData[field.id];
 
           if (isCheckboxOrSwitch) {
             return (
               <div key={field.id} className={colSpanClass}>
                 <WizardFieldRenderer
                   field={field}
-                  value={formData[field.id]}
+                  value={resolvedValue}
                   error={errors[field.id]}
                   onChange={onChange}
                 />
@@ -390,7 +402,7 @@ function StepContent({ step, formData, errors, onChange }: StepContentProps) {
               </Label>
               <WizardFieldRenderer
                 field={field}
-                value={formData[field.id]}
+                value={resolvedValue}
                 error={errors[field.id]}
                 onChange={onChange}
               />

@@ -6,6 +6,7 @@ const password = process.env.VPS_PASSWORD;
 const gatewayPort = process.env.GATEWAY_PORT || '8100';
 const appPort = process.env.APP_PORT || '8099';
 const anonKey = process.env.SUPABASE_ANON_KEY;
+const amroApiUpstream = (process.env.AMRO_API_UPSTREAM || 'host.docker.internal:3001').trim();
 const deployBranch = (process.env.DEPLOY_BRANCH || process.env.BRANCH_NAME || 'main').trim();
 
 if (!host || !password) {
@@ -38,7 +39,7 @@ conn.on('ready', () => {
     `echo "Building commit $(git rev-parse --short HEAD) on branch ${targetBranch}"`,
     `docker build -t logicpro-web --build-arg VITE_SUPABASE_URL='${SUPABASE_URL}' --build-arg VITE_SUPABASE_ANON_KEY='${escapedAnon}' --build-arg VITE_SUPABASE_PUBLISHABLE_KEY='${escapedAnon}' -f ${REMOTE_APP_DIR}/Dockerfile ${REMOTE_APP_DIR}`,
     `(docker ps -a --format '{{.Names}}' | grep -q '^logicpro-web$' && docker rm -f logicpro-web || true)`,
-    `docker run -d --name logicpro-web --restart unless-stopped -p ${appPort}:80 logicpro-web`
+    `docker run -d --name logicpro-web --restart unless-stopped -p ${appPort}:80 --add-host=host.docker.internal:host-gateway -e AMRO_API_UPSTREAM='${amroApiUpstream}' logicpro-web`
   ].join(' && ');
   conn.exec(buildCmd, (err, stream) => {
     if (err) return fail(err);

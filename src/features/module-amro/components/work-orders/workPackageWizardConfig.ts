@@ -37,6 +37,20 @@ export function buildWorkPackageWizardSteps({
           placeholder: aircraftOptions.length ? 'Select aircraft...' : 'No aircraft available',
         },
         {
+          id: 'selected_aircraft_info',
+          label: 'Selected Aircraft Info',
+          type: 'display',
+          colSpan: 2,
+          showWhen: (formData) => !!String(formData.aircraft_id || '').trim(),
+          displayValue: (formData) => {
+            const aircraftId = String(formData.aircraft_id || '').trim();
+            const selectedAircraft = aircraftOptions.find((aircraft) => aircraft.value === aircraftId) as Record<string, unknown> | undefined;
+            const modelName = String(selectedAircraft?.aircraft_model || selectedAircraft?.model || '').trim() || 'N/A';
+            const serialNumber = String(selectedAircraft?.serial_number || selectedAircraft?.msn || '').trim() || 'N/A';
+            return `Model Name: ${modelName}\nSerial Number: ${serialNumber}`;
+          },
+        },
+        {
           id: 'creation_path',
           label: 'Creation Path',
           type: 'radio',
