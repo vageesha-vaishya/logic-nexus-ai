@@ -1,7 +1,7 @@
 pipeline {
     agent any
     parameters {
-        string(name: 'DEPLOY_BRANCH', defaultValue: 'amroapi', description: 'Git branch to checkout and deploy')
+        string(name: 'DEPLOY_BRANCH', defaultValue: 'main', description: 'Git branch to checkout and deploy')
         booleanParam(name: 'ENABLE_COOLIFY_TRIGGER', defaultValue: false, description: 'Trigger Coolify webhook after VPS deploy (can overwrite VPS container config)')
         string(name: 'AMRO_API_UPSTREAM', defaultValue: 'host.docker.internal:8031', description: 'AMRO API upstream for logicpro-web container')
         choice(name: 'DB_TARGET', choices: ['auto', 'local', 'cloud'], description: 'Select Supabase instance for build')
@@ -40,7 +40,7 @@ pipeline {
         stage('Checkout') {
             steps {
                 script {
-                    def targetBranch = (params.DEPLOY_BRANCH ?: 'amroapi').trim()
+                    def targetBranch = 'main'
                     checkout([
                         $class: 'GitSCM',
                         branches: [[name: "*/${targetBranch}"]],
@@ -377,7 +377,7 @@ fi
                             "VITE_SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}",
                             "VITE_SUPABASE_PUBLISHABLE_KEY=${env.SELECTED_ANON_KEY}",
                             "AMRO_API_UPSTREAM=${params.AMRO_API_UPSTREAM ?: 'host.docker.internal:8031'}",
-                            "DEPLOY_BRANCH=${params.DEPLOY_BRANCH ?: env.BRANCH_NAME ?: 'amroapi'}"
+                            "DEPLOY_BRANCH=main"
                         ]) {
                             echo "App Port: ${env.APP_PORT}, Using Supabase: ${env.SELECTED_SUPABASE_URL}"
                             sh 'node scripts/deploy_web_app_vps.cjs'
