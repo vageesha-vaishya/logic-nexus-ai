@@ -130,7 +130,7 @@ services:
       - db
       - auth
     ports:
-      - "3001:3001"
+      - "${AMRO_API_HOST_PORT:-8031}:3001"
     environment:
       PORT: 3001
       NODE_ENV: ${NODE_ENV:-development}
