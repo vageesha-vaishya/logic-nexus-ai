@@ -2,6 +2,7 @@ pipeline {
     agent any
     parameters {
         string(name: 'DEPLOY_BRANCH', defaultValue: 'main', description: 'Git branch to checkout and deploy')
+        string(name: 'GIT_CREDENTIALS_ID', defaultValue: 'github-token', description: 'Jenkins credentialsId for GitHub access (PAT or app credential)')
         booleanParam(name: 'ENABLE_COOLIFY_TRIGGER', defaultValue: false, description: 'Trigger Coolify webhook after VPS deploy (can overwrite VPS container config)')
         string(name: 'AMRO_API_UPSTREAM', defaultValue: 'host.docker.internal:8031', description: 'AMRO API upstream for logicpro-web container')
         choice(name: 'DB_TARGET', choices: ['auto', 'local', 'cloud'], description: 'Select Supabase instance for build')
@@ -12,6 +13,7 @@ pipeline {
     }
     options {
         timestamps()
+        skipDefaultCheckout(true)
     }
     
     environment {
@@ -41,10 +43,15 @@ pipeline {
             steps {
                 script {
                     def targetBranch = 'main'
+                    def remoteConfig = [url: 'https://github.com/vageesha-vaishya/logic-nexus-ai.git']
+                    def credentialsId = (params.GIT_CREDENTIALS_ID ?: '').trim()
+                    if (credentialsId) {
+                        remoteConfig.credentialsId = credentialsId
+                    }
                     checkout([
                         $class: 'GitSCM',
                         branches: [[name: "*/${targetBranch}"]],
-                        userRemoteConfigs: [[url: 'https://github.com/vageesha-vaishya/logic-nexus-ai.git']]
+                        userRemoteConfigs: [remoteConfig]
                     ])
                     env.BRANCH_NAME = targetBranch
                     echo "Checked out branch: ${targetBranch}"
