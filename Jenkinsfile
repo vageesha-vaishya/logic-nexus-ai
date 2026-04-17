@@ -1,6 +1,7 @@
 pipeline {
     agent any
     parameters {
+        string(name: 'DEPLOY_BRANCH', defaultValue: 'amroapi', description: 'Git branch to checkout and deploy')
         choice(name: 'DB_TARGET', choices: ['auto', 'local', 'cloud'], description: 'Select Supabase instance for build')
         string(name: 'SUPABASE_URL_OVERRIDE', defaultValue: 'https://gzhxgoigflftharcmdqj.supabase.co', description: 'Optional: override Supabase URL')
         string(name: 'SUPABASE_ANON_KEY_OVERRIDE', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU', description: 'Optional: override Supabase anon key')
@@ -36,7 +37,16 @@ pipeline {
     stages {
         stage('Checkout') {
             steps {
-                checkout scm
+                script {
+                    def targetBranch = (params.DEPLOY_BRANCH ?: 'amroapi').trim()
+                    checkout([
+                        $class: 'GitSCM',
+                        branches: [[name: "*/${targetBranch}"]],
+                        userRemoteConfigs: [[url: 'https://github.com/vageesha-vaishya/logic-nexus-ai.git']]
+                    ])
+                    env.BRANCH_NAME = targetBranch
+                    echo "Checked out branch: ${targetBranch}"
+                }
                 echo "Workspace: ${env.WORKSPACE}"
                 sh 'pwd'
                 sh 'ls -la'
@@ -364,7 +374,7 @@ fi
                             "VITE_SUPABASE_URL=${env.SELECTED_SUPABASE_URL}",
                             "VITE_SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}",
                             "VITE_SUPABASE_PUBLISHABLE_KEY=${env.SELECTED_ANON_KEY}",
-                            "DEPLOY_BRANCH=${env.BRANCH_NAME ?: 'main'}"
+                            "DEPLOY_BRANCH=${params.DEPLOY_BRANCH ?: env.BRANCH_NAME ?: 'amroapi'}"
                         ]) {
                             echo "App Port: ${env.APP_PORT}, Using Supabase: ${env.SELECTED_SUPABASE_URL}"
                             sh 'node scripts/deploy_web_app_vps.cjs'

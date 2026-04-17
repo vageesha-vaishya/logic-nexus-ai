@@ -40,7 +40,10 @@ fi
 REMOTE_APP_DIR="/home/SOSLogicPro/logicProSupabaseDev/logic-nexus-ai"
 REMOTE_DOCKERFILE="$REMOTE_APP_DIR/Dockerfile"
 SUPABASE_URL="http://${VPS_IP}:${GATEWAY_PORT}"
-AMRO_API_UPSTREAM="${AMRO_API_UPSTREAM:-172.17.0.1:3001}"
+AMRO_API_UPSTREAM="${AMRO_API_UPSTREAM:-}"
+AMRO_API_CANDIDATE_PORTS="${AMRO_API_CANDIDATE_PORTS:-8031 3001}"
+AMRO_API_WAIT_RETRIES="${AMRO_API_WAIT_RETRIES:-20}"
+AMRO_API_WAIT_INTERVAL_SEC="${AMRO_API_WAIT_INTERVAL_SEC:-2}"
 
 echo "Building LogicPro web on VPS (context: $REMOTE_APP_DIR, URL: $SUPABASE_URL) ..."
 "$EXPECT_EXEC" "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "\
@@ -54,11 +57,54 @@ echo "Building LogicPro web on VPS (context: $REMOTE_APP_DIR, URL: $SUPABASE_URL
 
 echo "Starting logicpro-web on port $APP_PORT ..."
 "$EXPECT_EXEC" "$VPS_IP" "$VPS_USER" "$VPS_PASSWORD" "\
+  AMRO_PORT='' && \
+  if [ -n '${AMRO_API_UPSTREAM}' ]; then \
+    AMRO_PORT=\$(echo '${AMRO_API_UPSTREAM}' | awk -F: '{print \$NF}'); \
+  fi && \
+  if [ -n \"\${AMRO_PORT}\" ]; then \
+    curl -fsS --max-time 5 http://127.0.0.1:\${AMRO_PORT}/health >/dev/null 2>&1 || AMRO_PORT=''; \
+  fi && \
+  if [ -z \"\${AMRO_PORT}\" ]; then \
+    for p in ${AMRO_API_CANDIDATE_PORTS}; do \
+      curl -fsS --max-time 5 http://127.0.0.1:\${p}/health >/dev/null 2>&1 && AMRO_PORT=\${p} && break; \
+    done; \
+  fi && \
+  if [ -z \"\${AMRO_PORT}\" ]; then \
+    for i in \$(seq 1 ${AMRO_API_WAIT_RETRIES}); do \
+      for p in ${AMRO_API_CANDIDATE_PORTS}; do \
+        curl -fsS --max-time 5 http://127.0.0.1:\${p}/health >/dev/null 2>&1 && AMRO_PORT=\${p} && break; \
+      done; \
+      [ -n \"\${AMRO_PORT}\" ] && break; \
+      echo \"Waiting for AMRO API on host ports: ${AMRO_API_CANDIDATE_PORTS} (attempt \${i}/${AMRO_API_WAIT_RETRIES})\"; \
+      sleep ${AMRO_API_WAIT_INTERVAL_SEC}; \
+    done; \
+  fi && \
+  if [ -z \"\${AMRO_PORT}\" ]; then \
+    echo 'AMRO API is not reachable on host. Expected one of: ${AMRO_API_CANDIDATE_PORTS}'; \
+    echo '--- docker ps (amro) ---'; \
+    docker ps -a --format '{{.Names}}\t{{.Status}}\t{{.Ports}}' | grep -i amro || true; \
+    echo '--- amro-api logs ---'; \
+    docker logs --tail 120 amro-api || true; \
+    exit 1; \
+  fi && \
+  AMRO_API_UPSTREAM_EFFECTIVE='host.docker.internal:'\"\${AMRO_PORT}\" && \
+  echo \"Using AMRO upstream: \${AMRO_API_UPSTREAM_EFFECTIVE}\" && \
   (docker ps -a --format '{{.Names}}' | grep -q '^logicpro-web\$' && docker rm -f logicpro-web || true) && \
   docker run -d --name logicpro-web --restart unless-stopped -p ${APP_PORT}:80 \
     --add-host=host.docker.internal:host-gateway \
-    -e AMRO_API_UPSTREAM='${AMRO_API_UPSTREAM}' \
-    logicpro-web \
+    -e AMRO_API_UPSTREAM=\"\${AMRO_API_UPSTREAM_EFFECTIVE}\" \
+    logicpro-web && \
+  WEB_HEALTH_OK='' && \
+  for i in \$(seq 1 20); do \
+    curl -fsS --max-time 8 http://127.0.0.1:${APP_PORT}/api/v2/amro/health >/dev/null 2>&1 && WEB_HEALTH_OK='yes' && break; \
+    sleep 2; \
+  done && \
+  if [ -z \"\${WEB_HEALTH_OK}\" ]; then \
+    echo 'logicpro-web started but AMRO proxy health failed'; \
+    echo '--- logicpro-web logs ---'; \
+    docker logs --tail 120 logicpro-web || true; \
+    exit 1; \
+  fi \
 "
 
 echo "LogicPro web is available at http://${VPS_IP}:${APP_PORT}"
