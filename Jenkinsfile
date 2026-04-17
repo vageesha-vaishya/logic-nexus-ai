@@ -43,7 +43,7 @@ pipeline {
             steps {
                 script {
                     def targetBranch = 'main'
-                    def remoteConfig = [url: 'https://github.com/vageesha-vaishya/logic-nexus-ai.git']
+                    def remoteConfig = [url: 'https://github.com/vageesha-vaishya/logic-nexus-ai.git', credentialsId: 'logic-nexus-git']
                     def credentialsId = (params.GIT_CREDENTIALS_ID ?: '').trim()
                     if (credentialsId) {
                         remoteConfig.credentialsId = credentialsId
