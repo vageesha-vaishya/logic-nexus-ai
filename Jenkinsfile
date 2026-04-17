@@ -2,6 +2,7 @@ pipeline {
     agent any
     parameters {
         string(name: 'DEPLOY_BRANCH', defaultValue: 'amroapi', description: 'Git branch to checkout and deploy')
+        booleanParam(name: 'ENABLE_COOLIFY_TRIGGER', defaultValue: false, description: 'Trigger Coolify webhook after VPS deploy (can overwrite VPS container config)')
         choice(name: 'DB_TARGET', choices: ['auto', 'local', 'cloud'], description: 'Select Supabase instance for build')
         string(name: 'SUPABASE_URL_OVERRIDE', defaultValue: 'https://gzhxgoigflftharcmdqj.supabase.co', description: 'Optional: override Supabase URL')
         string(name: 'SUPABASE_ANON_KEY_OVERRIDE', defaultValue: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6aHhnb2lnZmxmdGhhcmNtZHFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njk1MTk2ODcsImV4cCI6MjA4NTA5NTY4N30.6xIZ3VYubUZ73pNPurzYuf-2RUpXj_9w-LpU-6d6kqU', description: 'Optional: override Supabase anon key')
@@ -383,6 +384,34 @@ fi
                 }
             }
         }
+        stage('Validate AMRO Proxy Post Deploy') {
+            steps {
+                script {
+                    echo "Validating AMRO proxy target and health from VPS..."
+                    sh 'npm install --no-save ssh2'
+                    withEnv([
+                        "VPS_IP=${env.VPS_IP}",
+                        "VPS_PASSWORD=${env.VPS_PASSWORD}",
+                        "APP_PORT=${env.APP_PORT}"
+                    ]) {
+                        sh '''
+node -e "
+const {Client}=require('ssh2');
+const conn=new Client();
+const cmd=[
+  \"docker inspect logicpro-web --format '{{range .Config.Env}}{{println .}}{{end}}' | grep AMRO_API_UPSTREAM || true\",
+  \"docker exec logicpro-web sh -c \\\"grep -n 'proxy_pass' /etc/nginx/conf.d/default.conf\\\" || true\",
+  \"curl -fsS --max-time 10 http://127.0.0.1:${process.env.APP_PORT}/api/v2/amro/health >/dev/null\"
+].join(' && ');
+conn.on('ready',()=>{conn.exec(cmd,(e,s)=>{if(e){console.error(e);process.exit(2);}s.on('data',d=>process.stdout.write(d));s.stderr.on('data',d=>process.stderr.write(d));s.on('close',c=>process.exit(c));});})
+  .on('error',err=>{console.error(err);process.exit(2);})
+  .connect({host:process.env.VPS_IP,username:'root',password:process.env.VPS_PASSWORD,readyTimeout:200000});
+"
+'''
+                    }
+                }
+            }
+        }
         /* sarvesh temporry disabled unit tests
         stage('Verify Containers') {
             steps {
@@ -409,6 +438,9 @@ fi
         }
         */
         stage('Trigger App Deployment') {
+            when {
+                expression { return params.ENABLE_COOLIFY_TRIGGER == true }
+            }
             steps {
                 script {
                     echo "Triggering Coolify Deployment..."
