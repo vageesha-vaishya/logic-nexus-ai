@@ -42,6 +42,9 @@ function createThenableBuilder(result: QueryResult) {
   const builder = {
     select: jest.fn(),
     eq: jest.fn(),
+    ilike: jest.fn(),
+    is: jest.fn(),
+    or: jest.fn(),
     neq: jest.fn(),
     order: jest.fn(),
     limit: jest.fn(),
@@ -57,6 +60,9 @@ function createThenableBuilder(result: QueryResult) {
 
   builder.select.mockReturnValue(builder);
   builder.eq.mockReturnValue(builder);
+  builder.ilike.mockReturnValue(builder);
+  builder.is.mockReturnValue(builder);
+  builder.or.mockReturnValue(builder);
   builder.neq.mockReturnValue(builder);
   builder.order.mockReturnValue(builder);
   builder.limit.mockReturnValue(builder);
@@ -99,24 +105,27 @@ describe('WorkOrdersService', () => {
 
   it('creates work package and publishes events', async () => {
     const service = new WorkOrdersService();
-    queuedResults.push({
-      data: [{ id: 'ac-1', status: 'active' }],
-      error: null,
-    });
-    queuedResults.push({
-      data: {
-        id: 'wp-9',
-        aircraft_id: 'ac-1',
-        title: 'Line Check',
-        description: 'A-check',
-        maintenance_type: 'line',
-        status: 'planning',
-        estimated_cost: 3000,
-        estimated_labor_hours: 12,
-        work_order_number: 'WP-9',
+    queuedResults.push(
+      { data: [{ id: 'ac-1', status: 'active' }], error: null },
+      { data: [{ registration: 'VT-DCN', tail_number: 'VT-DCN' }], error: null },
+      { data: [], error: null },
+      { data: [], error: null },
+      {
+        data: {
+          id: 'wp-9',
+          aircraft_id: 'ac-1',
+          title: 'Line Check',
+          description: 'A-check',
+          maintenance_type: 'line',
+          status: 'planning',
+          estimated_cost: 3000,
+          estimated_labor_hours: 12,
+          work_order_number: 'WP-9',
+          work_package_number: 'WP-9',
+        },
+        error: null,
       },
-      error: null,
-    });
+    );
 
     const created = await service.createWorkPackage('tenant-1', 'user-1', {
       aircraft_id: 'ac-1',
@@ -125,16 +134,75 @@ describe('WorkOrdersService', () => {
     });
 
     expect(created.id).toBe('wp-9');
-    const workPackageInsertBuilder = mockFrom.mock.results[1]?.value;
+    const workPackageInsertBuilder = mockFrom.mock.results[4]?.value;
     const insertPayload = workPackageInsertBuilder?.insert?.mock.calls?.[0]?.[0];
     expect(insertPayload).toEqual(
       expect.objectContaining({
-        work_order_number: expect.stringMatching(/^WP-/),
         work_package_number: expect.stringMatching(/^WP-/),
       }),
     );
     expect(amroEventsProducer.publishWorkOrderEvent).toHaveBeenCalledTimes(1);
     expect(workPackagesStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'created' }));
+  });
+
+  it('creates template tasks when work_package_template_id is provided', async () => {
+    const service = new WorkOrdersService();
+    queuedResults.push(
+      { data: [{ id: 'ac-1', status: 'active' }], error: null },
+      { data: [{ registration: 'VT-DCN', tail_number: 'VT-DCN' }], error: null },
+      { data: [], error: null },
+      { data: [], error: null },
+      {
+        data: {
+          id: 'wp-tpl-1',
+          aircraft_id: 'ac-1',
+          title: 'Template Run',
+          description: 'From template',
+          maintenance_type: 'line',
+          status: 'planning',
+          work_package_number: 'WP-VT-DCN-2026-0001-TEST',
+        },
+        error: null,
+      },
+      {
+        data: {
+          id: 'tpl-1',
+          tasks_json: [
+            {
+              task_template_id: '1e19ffd0-6fea-4257-b8c5-7f49c2fe2c50',
+              description: 'Vapor Cycle compressor motor drive belt',
+              category_code: 'OP*',
+              estimated_man_hours: 0,
+            },
+          ],
+          franchise_id: null,
+        },
+        error: null,
+      },
+      { data: null, error: null },
+      { data: null, error: null },
+    );
+
+    const created = await service.createWorkPackage('tenant-1', 'user-1', {
+      aircraft_id: 'ac-1',
+      title: 'Template Run',
+      maintenance_type: 'line',
+      work_package_template_id: 'tpl-1',
+    });
+
+    expect(created.id).toBe('wp-tpl-1');
+    expect((created as any).generated_tasks_count).toBe(1);
+
+    const tasksInsertBuilder = mockFrom.mock.results[7]?.value;
+    const tasksInsertPayload = tasksInsertBuilder?.insert?.mock.calls?.[0]?.[0];
+    expect(Array.isArray(tasksInsertPayload)).toBe(true);
+    expect(tasksInsertPayload[0]).toEqual(
+      expect.objectContaining({
+        work_package_id: 'wp-tpl-1',
+        task_category: 'OP*',
+        title: 'Vapor Cycle compressor motor drive belt',
+      }),
+    );
   });
 
   it('updates and deletes work packages with tenant checks', async () => {

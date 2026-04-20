@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient } from '@/pages/api/_utils/supabaseAdmin';
 import { logger } from '@/lib/logger';
+import { getDbPool } from '@/pages/api/_utils/dbPool';
 
 export type WorkPackageStatus = 'planning' | 'approved' | 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'closed' | 'cancelled';
 export type MaintenanceType = 'line' | 'base' | 'component' | 'inspection' | 'overhaul' | 'repair' | 'upgrade' | 'modification';
@@ -35,6 +36,7 @@ export interface PersistedWorkPackage {
   external_reference: string | null;
   created_at: string;
   updated_at: string;
+  generated_tasks_count?: number;
 }
 
 export interface WorkPackageTitleCatalogItem {
@@ -159,6 +161,336 @@ function toSafeWorkPackageSegment(value: string): string {
   return compact || 'NA';
 }
 
+const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+type TaskTemplateShape = {
+  task_template_id: string | null;
+  sequence_order: number;
+  title: string;
+  description: string | null;
+  task_category: string;
+  estimated_duration_hours: number | null;
+  complexity_level: number | null;
+  steps: Record<string, unknown> | Array<unknown> | null;
+  qualifications: Record<string, unknown> | null;
+  notes: string | null;
+};
+
+type TaskInsertShape = {
+  tenant_id: string;
+  franchise_id: string | null;
+  work_package_id: string;
+  task_number: string;
+  title: string;
+  description: string | null;
+  task_category: string;
+  estimated_duration_hours: number | null;
+  complexity_level: number | null;
+  steps: Record<string, unknown> | Array<unknown> | null;
+  qualifications: Record<string, unknown> | null;
+  sequence_order: number;
+  status: 'pending';
+  notes: string | null;
+  created_by: string;
+  updated_by: string;
+};
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function asOptionalText(value: unknown): string | null {
+  const normalized = String(value || '').trim();
+  return normalized || null;
+}
+
+function asPositiveIntegerOrFallback(value: unknown, fallback: number): number {
+  const parsed = Number.parseInt(String(value ?? ''), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+  return parsed;
+}
+
+function asNullableNumber(value: unknown): number | null {
+  if (value === undefined || value === null || value === '') return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function asNullableComplexity(value: unknown): number | null {
+  const parsed = asNullableNumber(value);
+  if (parsed === null) return null;
+  const rounded = Math.trunc(parsed);
+  if (rounded < 1 || rounded > 5) return null;
+  return rounded;
+}
+
+function asNullableJsonObject(value: unknown): Record<string, unknown> | null {
+  if (!isPlainObject(value)) return null;
+  return value;
+}
+
+function asNullableJsonContainer(value: unknown): Record<string, unknown> | Array<unknown> | null {
+  if (Array.isArray(value) || isPlainObject(value)) return value;
+  return null;
+}
+
+function parseTaskTemplateArray(rawTasksJson: unknown, templateId: string): TaskTemplateShape[] {
+  let parsed: unknown = rawTasksJson;
+  if (typeof rawTasksJson === 'string') {
+    const normalized = rawTasksJson.trim();
+    try {
+      parsed = normalized ? JSON.parse(normalized) : [];
+    } catch {
+      throw new Error(`Invalid tasks_json in template ${templateId}: JSON parse failed`);
+    }
+  }
+
+  if (!Array.isArray(parsed)) {
+    throw new Error(`Invalid tasks_json in template ${templateId}: expected JSON array`);
+  }
+
+  const normalizedTasks: TaskTemplateShape[] = parsed.map((entry, index) => {
+    if (!isPlainObject(entry)) {
+      throw new Error(`Invalid tasks_json in template ${templateId}: element at index ${index} must be an object`);
+    }
+
+    const metadata = isPlainObject(entry.metadata) ? entry.metadata : {};
+    const sequenceOrder = asPositiveIntegerOrFallback(entry.sequence_order, index + 1);
+    const title =
+      String(entry.title || metadata.title || entry.task_title || '').trim()
+      || `Template Task ${sequenceOrder}`;
+    const taskTemplateId = String(entry.task_template_id || '').trim() || null;
+    if (taskTemplateId && !UUID_V4_PATTERN.test(taskTemplateId)) {
+      throw new Error(
+        `Invalid tasks_json in template ${templateId}: task_template_id at index ${index} is not a valid UUID`
+      );
+    }
+
+    return {
+      task_template_id: taskTemplateId,
+      sequence_order: sequenceOrder,
+      title,
+      description: asOptionalText(entry.description ?? metadata.description),
+      task_category: String(entry.task_category || metadata.task_category || 'general').trim() || 'general',
+      estimated_duration_hours: asNullableNumber(entry.estimated_duration_hours ?? metadata.estimated_duration_hours),
+      complexity_level: asNullableComplexity(entry.complexity_level ?? metadata.complexity_level),
+      steps: asNullableJsonContainer(entry.steps ?? metadata.steps),
+      qualifications: asNullableJsonObject(entry.qualifications ?? metadata.qualifications),
+      notes: asOptionalText(entry.notes ?? metadata.notes),
+    };
+  });
+
+  const duplicateGuard = new Set<string>();
+  for (const task of normalizedTasks) {
+    const key = task.task_template_id
+      ? `task_template_id:${task.task_template_id}`
+      : `sequence:${task.sequence_order}|title:${task.title.toLowerCase()}`;
+    if (duplicateGuard.has(key)) {
+      throw new Error(`Duplicate task template entry detected in template ${templateId}: ${key}`);
+    }
+    duplicateGuard.add(key);
+  }
+
+  return normalizedTasks;
+}
+
+function buildTaskInsertRowsFromTemplateTasks(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  workPackageId: string;
+  workPackageNumber: string;
+  userId: string;
+  taskTemplates: TaskTemplateShape[];
+}): TaskInsertShape[] {
+  return params.taskTemplates.map((templateTask, index) => {
+    const sequence = asPositiveIntegerOrFallback(templateTask.sequence_order, index + 1);
+    return {
+      tenant_id: params.tenantId,
+      franchise_id: params.franchiseId,
+      work_package_id: params.workPackageId,
+      task_number: `${params.workPackageNumber}-${String(sequence).padStart(3, '0')}`,
+      title: templateTask.title,
+      description: templateTask.description,
+      task_category: templateTask.task_category || 'general',
+      estimated_duration_hours: templateTask.estimated_duration_hours,
+      complexity_level: templateTask.complexity_level,
+      steps: templateTask.steps,
+      qualifications: templateTask.qualifications,
+      sequence_order: sequence,
+      status: 'pending',
+      notes: templateTask.notes,
+      created_by: params.userId,
+      updated_by: params.userId,
+    };
+  });
+}
+
+function buildTaskInsertSqlValues(
+  rows: TaskInsertShape[],
+  offset = 0,
+): { sql: string; values: unknown[] } {
+  const values: unknown[] = [];
+  const tuples = rows.map((row, index) => {
+    const base = (offset + index) * 16;
+    values.push(
+      row.tenant_id,
+      row.franchise_id,
+      row.work_package_id,
+      row.task_number,
+      row.title,
+      row.description,
+      row.task_category,
+      row.estimated_duration_hours,
+      row.complexity_level,
+      row.steps,
+      row.qualifications,
+      row.sequence_order,
+      row.status,
+      row.notes,
+      row.created_by,
+      row.updated_by,
+    );
+    return `($${base + 1},$${base + 2},$${base + 3},$${base + 4},$${base + 5},$${base + 6},$${base + 7},$${base + 8},$${base + 9},$${base + 10},$${base + 11},$${base + 12},$${base + 13},$${base + 14},$${base + 15},$${base + 16})`;
+  });
+  return { sql: tuples.join(','), values };
+}
+
+async function createTemplateTasksWithSupabase(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  userId: string;
+  workPackageId: string;
+  workPackageNumber: string;
+  workPackageTemplateId: string;
+}): Promise<number> {
+  const supabase = getSupabaseAdminClient();
+  let query = supabase
+    .from('work_package_templates')
+    .select('id,tasks_json,franchise_id')
+    .eq('tenant_id', params.tenantId)
+    .eq('id', params.workPackageTemplateId)
+    .is('deleted_at', null)
+    .limit(1);
+
+  if (params.franchiseId) {
+    query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+  }
+
+  const { data: templateRow, error: templateError } = await query.maybeSingle();
+  if (templateError) {
+    throw new Error(`Failed to load work package template tasks: ${templateError.message}`);
+  }
+  if (!templateRow) {
+    throw new Error('Work package template not found for tenant/franchise scope');
+  }
+
+  const taskTemplates = parseTaskTemplateArray(templateRow.tasks_json, params.workPackageTemplateId);
+  if (taskTemplates.length === 0) return 0;
+
+  const { count: existingTasksCount, error: existingTasksError } = await supabase
+    .from('tasks')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', params.tenantId)
+    .eq('work_package_id', params.workPackageId);
+  if (existingTasksError) {
+    throw new Error(`Failed duplicate task guard check: ${existingTasksError.message}`);
+  }
+  if ((existingTasksCount || 0) > 0) {
+    throw new Error('Duplicate task creation prevented: tasks already exist for work package');
+  }
+
+  const taskRows = buildTaskInsertRowsFromTemplateTasks({
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    workPackageId: params.workPackageId,
+    workPackageNumber: params.workPackageNumber,
+    userId: params.userId,
+    taskTemplates,
+  });
+
+  const { error: insertTasksError } = await supabase.from('tasks').insert(taskRows);
+  if (insertTasksError) {
+    throw new Error(`Failed to create tasks from template: ${insertTasksError.message}`);
+  }
+
+  return taskRows.length;
+}
+
+async function createTemplateTasksWithPgTransaction(params: {
+  tx: { query: (queryText: string, values?: unknown[]) => Promise<{ rows: Array<Record<string, unknown>>; rowCount: number | null }> };
+  tenantId: string;
+  franchiseId: string | null;
+  userId: string;
+  workPackageId: string;
+  workPackageNumber: string;
+  workPackageTemplateId: string;
+}): Promise<number> {
+  const templateLookupSql = `
+    SELECT id, tasks_json
+    FROM public.work_package_templates
+    WHERE tenant_id = $1
+      AND id = $2
+      AND deleted_at IS NULL
+      AND ($3::uuid IS NULL OR franchise_id IS NULL OR franchise_id = $3::uuid)
+    LIMIT 1
+  `;
+  const templateLookup = await params.tx.query(templateLookupSql, [
+    params.tenantId,
+    params.workPackageTemplateId,
+    params.franchiseId,
+  ]);
+
+  if (!templateLookup.rows[0]) {
+    throw new Error('Work package template not found for tenant/franchise scope');
+  }
+
+  const taskTemplates = parseTaskTemplateArray(
+    templateLookup.rows[0].tasks_json,
+    params.workPackageTemplateId,
+  );
+  if (taskTemplates.length === 0) return 0;
+
+  const duplicateGuardSql = `
+    SELECT COUNT(*)::int AS existing_count
+    FROM public.tasks
+    WHERE tenant_id = $1
+      AND work_package_id = $2
+      AND deleted_at IS NULL
+  `;
+  const duplicateGuardResult = await params.tx.query(duplicateGuardSql, [params.tenantId, params.workPackageId]);
+  const existingCount = Number(duplicateGuardResult.rows[0]?.existing_count || 0);
+  if (existingCount > 0) {
+    throw new Error('Duplicate task creation prevented: tasks already exist for work package');
+  }
+
+  const taskRows = buildTaskInsertRowsFromTemplateTasks({
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    workPackageId: params.workPackageId,
+    workPackageNumber: params.workPackageNumber,
+    userId: params.userId,
+    taskTemplates,
+  });
+
+  const insertSqlPrefix = `
+    INSERT INTO public.tasks (
+      tenant_id, franchise_id, work_package_id, task_number, title, description,
+      task_category, estimated_duration_hours, complexity_level, steps, qualifications,
+      sequence_order, status, notes, created_by, updated_by
+    ) VALUES
+  `;
+
+  const chunkSize = 250;
+  let createdCount = 0;
+  for (let i = 0; i < taskRows.length; i += chunkSize) {
+    const chunk = taskRows.slice(i, i + chunkSize);
+    const { sql, values } = buildTaskInsertSqlValues(chunk, 0);
+    const insertResult = await params.tx.query(`${insertSqlPrefix} ${sql}`, values);
+    createdCount += Number(insertResult.rowCount || 0);
+  }
+  return createdCount;
+}
+
 function parseWorkPackageNumberSequence(workPackageNumber: string, year: number): number {
   const pattern = /^WP-(.+)-(\d{4})-(\d+)-([A-Z0-9-]+)$/;
   const match = String(workPackageNumber || '').match(pattern);
@@ -236,6 +568,92 @@ export async function persistCreateWorkPackage(params: {
     year,
   });
 
+  const pool = params.workPackageTemplateId ? getDbPool() : null;
+  if (pool) {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      const insertSql = `
+        INSERT INTO public.work_packages (
+          tenant_id, franchise_id, aircraft_id, work_package_number, title, description,
+          work_type, maintenance_type, priority, source, work_package_template_id, work_package_title_id,
+          planned_start_date, planned_end_date, estimated_labor_hours, estimated_cost, status, assigned_to,
+          supervisor_id, notes, reference_documents, external_reference, created_by, updated_by
+        )
+        VALUES (
+          $1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,'planning',$17,$18,$19,$20,$21,$22,$23
+        )
+        RETURNING *
+      `;
+      const insertResult = await client.query(insertSql, [
+        params.tenantId,
+        params.franchiseId,
+        params.aircraftId,
+        workOrderNumber,
+        titleRecord.title,
+        params.description || null,
+        params.workType || params.maintenanceType,
+        params.maintenanceType,
+        params.priority,
+        params.source || null,
+        params.workPackageTemplateId || null,
+        titleRecord.id || null,
+        params.plannedStartDate || null,
+        params.plannedEndDate || null,
+        params.estimatedLaborHours || null,
+        params.estimatedCost || null,
+        params.assignedTo || null,
+        params.supervisorId || null,
+        params.notes || null,
+        params.referenceDocuments || null,
+        params.externalReference || null,
+        params.userId,
+        params.userId,
+      ]);
+
+      const createdWorkPackage = insertResult.rows[0];
+      if (!createdWorkPackage?.id) {
+        throw new Error('Failed to persist work package in atomic transaction');
+      }
+
+      let generatedTasksCount = 0;
+      if (params.workPackageTemplateId) {
+        generatedTasksCount = await createTemplateTasksWithPgTransaction({
+          tx: client,
+          tenantId: params.tenantId,
+          franchiseId: params.franchiseId,
+          userId: params.userId,
+          workPackageId: String(createdWorkPackage.id),
+          workPackageNumber: String(createdWorkPackage.work_package_number || workOrderNumber),
+          workPackageTemplateId: params.workPackageTemplateId,
+        });
+      }
+
+      await client.query('COMMIT');
+      logger.info('amro-work-package-created-atomic', {
+        id: String(createdWorkPackage.id),
+        workPackageNumber: String(createdWorkPackage.work_package_number || workOrderNumber),
+        generatedTasksCount,
+        tenantId: params.tenantId,
+      });
+      const mapped = mapRowToWorkPackage(createdWorkPackage);
+      mapped.generated_tasks_count = generatedTasksCount;
+      return mapped;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      logger.error('amro-work-package-atomic-create-failed', {
+        tenantId: params.tenantId,
+        workPackageTemplateId: params.workPackageTemplateId || null,
+        message: error instanceof Error ? error.message : 'Unknown error',
+      });
+      throw error instanceof Error
+        ? error
+        : new Error('Failed to create work package and template tasks atomically');
+    } finally {
+      client.release();
+    }
+  }
+
   const { data, error } = await supabase
     .from('work_packages')
     .insert({
@@ -276,13 +694,51 @@ export async function persistCreateWorkPackage(params: {
     throw new Error(`Failed to persist work package: ${error.message}`);
   }
 
+  let generatedTasksCount = 0;
+  if (params.workPackageTemplateId) {
+    try {
+      generatedTasksCount = await createTemplateTasksWithSupabase({
+        tenantId: params.tenantId,
+        franchiseId: params.franchiseId,
+        userId: params.userId,
+        workPackageId: String(data.id),
+        workPackageNumber: String(data.work_package_number || workOrderNumber),
+        workPackageTemplateId: params.workPackageTemplateId,
+      });
+    } catch (taskCreationError) {
+      logger.error('amro-work-package-template-task-create-failed', {
+        tenantId: params.tenantId,
+        workPackageId: String(data.id || ''),
+        workPackageTemplateId: params.workPackageTemplateId,
+        message: taskCreationError instanceof Error ? taskCreationError.message : 'Unknown task creation error',
+      });
+      const { error: rollbackError } = await supabase
+        .from('work_packages')
+        .delete()
+        .eq('tenant_id', params.tenantId)
+        .eq('id', String(data.id || ''));
+      if (rollbackError) {
+        logger.error('amro-work-package-template-task-create-rollback-failed', {
+          tenantId: params.tenantId,
+          workPackageId: String(data.id || ''),
+          message: rollbackError.message,
+        });
+      }
+      const reason = taskCreationError instanceof Error ? taskCreationError.message : 'Unknown error';
+      throw new Error(`Failed to create template tasks and rolled back work package: ${reason}`);
+    }
+  }
+
   logger.info('amro-work-package-created', {
     id: data.id,
-    workOrderNumber: data.work_order_number,
+    workOrderNumber: data.work_package_number,
+    generatedTasksCount,
     tenantId: params.tenantId,
   });
 
-  return mapRowToWorkPackage(data);
+  const mapped = mapRowToWorkPackage(data);
+  mapped.generated_tasks_count = generatedTasksCount;
+  return mapped;
 }
 
 // ── Update work package ─────────────────────────────────────────────────────

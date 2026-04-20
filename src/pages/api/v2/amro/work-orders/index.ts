@@ -226,6 +226,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           work_order_number: persisted.work_package_number,
           status: persisted.status,
           created_at: persisted.created_at,
+          generated_tasks_count: Number(persisted.generated_tasks_count || 0),
         },
       });
       return;

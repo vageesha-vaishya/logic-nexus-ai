@@ -347,6 +347,7 @@ router.post(
         work_order_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
         work_package_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
         status: workPackage.status,
+        generated_tasks_count: Number(workPackage.generated_tasks_count || 0),
       },
     });
     return;
@@ -514,6 +515,7 @@ router.post(
         id: workPackage.id,
         code: workPackage.work_order_number || workPackage.work_package_number || workPackage.id,
         status: workPackage.status,
+        generated_tasks_count: Number(workPackage.generated_tasks_count || 0),
       },
     });
     return;

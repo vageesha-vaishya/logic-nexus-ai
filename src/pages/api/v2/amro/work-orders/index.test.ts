@@ -222,11 +222,47 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
           error: null,
         }),
       };
+      const templateLookupChain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        is: vi.fn().mockReturnThis(),
+        or: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            id: 'tpl-1',
+            tasks_json: [
+              {
+                sequence_order: 1,
+                title: 'Template Task 1',
+                task_category: 'general',
+              },
+            ],
+            franchise_id: null,
+          },
+          error: null,
+        }),
+      };
+      const tasksCountChain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn(),
+      };
+      tasksCountChain.eq
+        .mockReturnValueOnce(tasksCountChain)
+        .mockReturnValueOnce(Promise.resolve({ count: 0, error: null }));
+      const tasksInsertChain: any = {
+        insert: vi.fn().mockResolvedValue({ error: null }),
+      };
       let workPackagesCallCount = 0;
       vi.mocked(getSupabaseAdminClient).mockReturnValue({
         from: (table: string) => {
           if (table === 'work_packages_title') return titleLookupChain;
           if (table === 'aircraft') return aircraftLookupChain;
+          if (table === 'work_package_templates') return templateLookupChain;
+          if (table === 'tasks') {
+            // first tasks call = duplicate guard (select), second call = insert
+            return (tasksCountChain.select.mock.calls.length === 0) ? tasksCountChain : tasksInsertChain;
+          }
           if (table === 'work_packages') {
             workPackagesCallCount += 1;
             return workPackagesCallCount === 1 ? sequenceLookupChain : insertChain;

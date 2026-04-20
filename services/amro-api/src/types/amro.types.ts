@@ -80,6 +80,7 @@ export interface WorkPackage {
   estimated_cost?: number;
   actual_cost?: number;
   assigned_to?: string;
+  generated_tasks_count?: number;
   created_at: string;
   updated_at: string;
   created_by?: string;

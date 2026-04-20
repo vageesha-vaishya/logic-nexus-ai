@@ -24,6 +24,36 @@ import { withSpan } from '../instrumentation/amro-tracing';
 import { workPackagesStream } from '../realtime/work-packages-stream';
 import { logger } from '../utils/logger';
 
+type WorkPackageTemplateTaskItem = {
+  task_template_id: string | null;
+  sequence_order: number;
+  title: string;
+  description: string | null;
+  task_category: string;
+  estimated_duration_hours: number | null;
+  complexity_level: number | null;
+  notes: string | null;
+};
+
+type TaskInsertPayload = {
+  tenant_id: string;
+  franchise_id: string | null;
+  work_package_id: string;
+  task_number: string;
+  title: string;
+  description: string | null;
+  task_category: string;
+  estimated_duration_hours: number | null;
+  complexity_level: number | null;
+  sequence_order: number;
+  status: 'pending';
+  notes: string | null;
+  created_by: string;
+  updated_by: string;
+};
+
+const UUID_V4_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export class WorkOrdersService {
   private supabase: SupabaseClient;
 
@@ -189,6 +219,196 @@ export class WorkOrdersService {
     }
     const rating = task.qualifications?.rating;
     return typeof rating === 'string' ? rating : undefined;
+  }
+
+  private asNullableText(value: unknown): string | null {
+    const normalized = String(value || '').trim();
+    return normalized || null;
+  }
+
+  private asPositiveInt(value: unknown, fallback: number): number {
+    const parsed = Number.parseInt(String(value ?? ''), 10);
+    if (!Number.isFinite(parsed) || parsed < 1) return fallback;
+    return parsed;
+  }
+
+  private asNullableNumber(value: unknown): number | null {
+    if (value === undefined || value === null || value === '') return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+
+  private asNullableComplexity(value: unknown): number | null {
+    const parsed = this.asNullableNumber(value);
+    if (parsed === null) return null;
+    const rounded = Math.trunc(parsed);
+    if (rounded < 1 || rounded > 5) return null;
+    return rounded;
+  }
+
+  private parseTemplateTasks(rawTasksJson: unknown, templateId: string): WorkPackageTemplateTaskItem[] {
+    let parsed: unknown = rawTasksJson;
+    if (typeof rawTasksJson === 'string') {
+      const normalized = rawTasksJson.trim();
+      try {
+        parsed = normalized ? JSON.parse(normalized) : [];
+      } catch {
+        throw new Error(`Invalid tasks_json in template ${templateId}: JSON parse failed`);
+      }
+    }
+    if (!Array.isArray(parsed)) {
+      throw new Error(`Invalid tasks_json in template ${templateId}: expected JSON array`);
+    }
+
+    const normalizedTasks = parsed.map((entry, index) => {
+      if (!entry || typeof entry !== 'object' || Array.isArray(entry)) {
+        throw new Error(
+          `Invalid tasks_json in template ${templateId}: element at index ${index} must be an object`
+        );
+      }
+      const row = entry as Record<string, unknown>;
+      const sequenceOrder = this.asPositiveInt(row.sequence_order, index + 1);
+      const taskTemplateId = String(row.task_template_id || '').trim() || null;
+      if (taskTemplateId && !UUID_V4_REGEX.test(taskTemplateId)) {
+        throw new Error(
+          `Invalid tasks_json in template ${templateId}: task_template_id at index ${index} is not a valid UUID`
+        );
+      }
+
+      const title = String(
+        row.title ||
+        row.task_title ||
+        row.description ||
+        row.code_form_no ||
+        `Template Task ${sequenceOrder}`
+      ).trim();
+
+      return {
+        task_template_id: taskTemplateId,
+        sequence_order: sequenceOrder,
+        title: title || `Template Task ${sequenceOrder}`,
+        description: this.asNullableText(row.description),
+        task_category: String(row.task_category || row.category_code || 'general').trim() || 'general',
+        estimated_duration_hours: this.asNullableNumber(row.estimated_duration_hours ?? row.estimated_man_hours),
+        complexity_level: this.asNullableComplexity(row.complexity_level),
+        notes: this.asNullableText(row.reference_amp),
+      } as WorkPackageTemplateTaskItem;
+    });
+
+    const duplicateGuard = new Set<string>();
+    for (const task of normalizedTasks) {
+      const key = task.task_template_id
+        ? `task_template_id:${task.task_template_id}`
+        : `sequence:${task.sequence_order}|title:${task.title.toLowerCase()}`;
+      if (duplicateGuard.has(key)) {
+        throw new Error(`Duplicate task template entry detected in template ${templateId}: ${key}`);
+      }
+      duplicateGuard.add(key);
+    }
+    return normalizedTasks;
+  }
+
+  private buildTaskInsertPayloads(params: {
+    tenantId: string;
+    franchiseId?: string | null;
+    workPackageId: string;
+    workPackageNumber: string;
+    userId: string;
+    templateTasks: WorkPackageTemplateTaskItem[];
+  }): TaskInsertPayload[] {
+    return params.templateTasks.map((templateTask, index) => {
+      const sequence = this.asPositiveInt(templateTask.sequence_order, index + 1);
+      return {
+        tenant_id: params.tenantId,
+        franchise_id: params.franchiseId || null,
+        work_package_id: params.workPackageId,
+        task_number: `${params.workPackageNumber}-${String(sequence).padStart(3, '0')}`,
+        title: templateTask.title,
+        description: templateTask.description,
+        task_category: templateTask.task_category || 'general',
+        estimated_duration_hours: templateTask.estimated_duration_hours,
+        complexity_level: templateTask.complexity_level,
+        sequence_order: sequence,
+        status: 'pending',
+        notes: templateTask.notes,
+        created_by: params.userId,
+        updated_by: params.userId,
+      };
+    });
+  }
+
+  private async createTasksFromTemplateForWorkPackage(params: {
+    tenantId: string;
+    userId: string;
+    franchiseId?: string | null;
+    workPackageId: string;
+    workPackageNumber: string;
+    workPackageTemplateId: string;
+  }): Promise<number> {
+    let templateQuery = this.supabase
+      .from('work_package_templates')
+      .select('id,tasks_json,franchise_id')
+      .eq('tenant_id', params.tenantId)
+      .eq('id', params.workPackageTemplateId)
+      .is('deleted_at', null)
+      .limit(1);
+
+    if (params.franchiseId) {
+      templateQuery = templateQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+    }
+
+    const { data: template, error: templateError } = await templateQuery.single();
+    if (templateError) {
+      throw new Error(`Failed to load work package template tasks: ${templateError.message}`);
+    }
+
+    const templateTasks = this.parseTemplateTasks(
+      (template as Record<string, unknown>).tasks_json,
+      params.workPackageTemplateId
+    );
+    if (templateTasks.length === 0) {
+      logger.info('work-package-template-has-no-tasks', {
+        workPackageTemplateId: params.workPackageTemplateId,
+        workPackageId: params.workPackageId,
+        tenantId: params.tenantId,
+      });
+      return 0;
+    }
+
+    const { count: existingCount, error: duplicateCheckError } = await this.supabase
+      .from('tasks')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', params.tenantId)
+      .eq('work_package_id', params.workPackageId);
+
+    if (duplicateCheckError) {
+      throw new Error(`Failed duplicate task guard check: ${duplicateCheckError.message}`);
+    }
+    if ((existingCount || 0) > 0) {
+      throw new Error('Duplicate task creation prevented: tasks already exist for work package');
+    }
+
+    const payloads = this.buildTaskInsertPayloads({
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+      workPackageId: params.workPackageId,
+      workPackageNumber: params.workPackageNumber,
+      userId: params.userId,
+      templateTasks,
+    });
+
+    const chunkSize = 200;
+    let createdCount = 0;
+    for (let index = 0; index < payloads.length; index += chunkSize) {
+      const chunk = payloads.slice(index, index + chunkSize);
+      const { error: insertError } = await this.supabase.from('tasks').insert(chunk);
+      if (insertError) {
+        throw new Error(`Failed to create tasks from template: ${insertError.message}`);
+      }
+      createdCount += chunk.length;
+    }
+
+    return createdCount;
   }
 
   private async resolveValidAircraftId(
@@ -391,7 +611,49 @@ export class WorkOrdersService {
           throw new Error(`Failed to create work package: ${error.message}`);
         }
 
-        const workPackage = data as WorkPackage;
+        const workPackage = data as WorkPackage & { generated_tasks_count?: number };
+        let generatedTasksCount = 0;
+
+        if (request.work_package_template_id) {
+          try {
+            generatedTasksCount = await this.createTasksFromTemplateForWorkPackage({
+              tenantId,
+              userId,
+              franchiseId,
+              workPackageId: workPackage.id,
+              workPackageNumber: this.getWorkPackageNumber(workPackage) || workOrderNumber,
+              workPackageTemplateId: request.work_package_template_id,
+            });
+            workPackage.generated_tasks_count = generatedTasksCount;
+            logger.info('work-package-template-task-generation-complete', {
+              tenantId,
+              workPackageId: workPackage.id,
+              workPackageTemplateId: request.work_package_template_id,
+              generatedTasksCount,
+            });
+          } catch (taskCreationError) {
+            logger.error('work-package-template-task-generation-failed', {
+              tenantId,
+              workPackageId: workPackage.id,
+              workPackageTemplateId: request.work_package_template_id,
+              message: taskCreationError instanceof Error ? taskCreationError.message : String(taskCreationError),
+            });
+            const { error: rollbackError } = await this.supabase
+              .from('work_packages')
+              .delete()
+              .eq('tenant_id', tenantId)
+              .eq('id', workPackage.id);
+            if (rollbackError) {
+              logger.error('work-package-template-task-generation-rollback-failed', {
+                tenantId,
+                workPackageId: workPackage.id,
+                message: rollbackError.message,
+              });
+            }
+            const reason = taskCreationError instanceof Error ? taskCreationError.message : 'unknown task generation error';
+            throw new Error(`Failed to create tasks from template and rolled back work package: ${reason}`);
+          }
+        }
 
         // Publish work order created event (fire-and-forget)
         amroEventsProducer.publishWorkOrderEvent(
@@ -409,6 +671,7 @@ export class WorkOrdersService {
             status: workPackage.status,
             estimated_cost: workPackage.estimated_cost,
             estimated_labor_hours: workPackage.estimated_labor_hours,
+            generated_tasks_count: generatedTasksCount,
           },
         );
 
