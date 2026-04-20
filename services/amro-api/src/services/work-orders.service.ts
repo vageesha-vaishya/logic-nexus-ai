@@ -27,6 +27,122 @@ import { logger } from '../utils/logger';
 export class WorkOrdersService {
   private supabase: SupabaseClient;
 
+  private sanitizeSegment(value: string, fallback: string): string {
+    const normalized = String(value || '').trim().toUpperCase();
+    const compact = normalized.replace(/[^A-Z0-9-]/g, '');
+    return compact || fallback;
+  }
+
+  private parseWorkPackageSequence(workPackageNumber: string, targetYear: number): number {
+    const match = String(workPackageNumber || '').match(/^WP-(.+)-(\d{4})-(\d+)-([A-Z0-9-]+)$/);
+    if (!match) return 0;
+    const year = Number.parseInt(match[2], 10);
+    const seq = Number.parseInt(match[3], 10);
+    if (!Number.isFinite(year) || !Number.isFinite(seq) || year !== targetYear) return 0;
+    return seq;
+  }
+
+  private async resolveAircraftRegistration(tenantId: string, aircraftId: string): Promise<string> {
+    const { data, error } = await this.supabase
+      .from('aircraft')
+      .select('registration,tail_number')
+      .eq('tenant_id', tenantId)
+      .eq('id', aircraftId)
+      .limit(1);
+    if (error) {
+      throw new Error(`Failed to resolve aircraft registration: ${error.message}`);
+    }
+    const row = (Array.isArray(data) ? data[0] : null) as Record<string, unknown> | null;
+    const registration = String(row?.registration || row?.tail_number || '').trim();
+    return this.sanitizeSegment(registration, 'UNKNOWN');
+  }
+
+  private async resolveTitleCodeAndText(
+    tenantId: string,
+    params: { workPackageTitleId?: string; title?: string; franchiseId?: string | null },
+  ): Promise<{ title: string; wpTitle: string; workPackageTitleId: string | null }> {
+    const titleId = String(params.workPackageTitleId || '').trim();
+    const inputTitle = String(params.title || '').trim();
+
+    if (titleId) {
+      let query = this.supabase
+        .from('work_packages_title')
+        .select('id,title,wp_title,franchise_id')
+        .eq('tenant_id', tenantId)
+        .eq('id', titleId)
+        .limit(1);
+      if (params.franchiseId) {
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+      }
+      const { data, error } = await query;
+      if (error) {
+        throw new Error(`Failed to resolve work package title by id: ${error.message}`);
+      }
+      const row = (Array.isArray(data) ? data[0] : null) as Record<string, unknown> | null;
+      if (!row) {
+        throw new Error('Selected work package title is not available for tenant scope');
+      }
+      return {
+        title: String(row.title || '').trim(),
+        wpTitle: this.sanitizeSegment(String(row.wp_title || ''), 'GENERAL'),
+        workPackageTitleId: String(row.id || '').trim() || null,
+      };
+    }
+
+    if (inputTitle) {
+      let query = this.supabase
+        .from('work_packages_title')
+        .select('id,title,wp_title,franchise_id')
+        .eq('tenant_id', tenantId)
+        .eq('title', inputTitle)
+        .limit(1);
+      if (params.franchiseId) {
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+      }
+      const { data, error } = await query;
+      if (!error) {
+        const row = (Array.isArray(data) ? data[0] : null) as Record<string, unknown> | null;
+        if (row) {
+          return {
+            title: String(row.title || '').trim(),
+            wpTitle: this.sanitizeSegment(String(row.wp_title || ''), 'GENERAL'),
+            workPackageTitleId: String(row.id || '').trim() || null,
+          };
+        }
+      }
+      return {
+        title: inputTitle,
+        wpTitle: this.sanitizeSegment(inputTitle, 'GENERAL'),
+        workPackageTitleId: null,
+      };
+    }
+
+    throw new Error('Either title or work_package_title_id is required');
+  }
+
+  private async generateNextWorkPackageNumber(
+    tenantId: string,
+    aircraftRegistration: string,
+    wpTitle: string,
+  ): Promise<string> {
+    const currentYear = new Date().getUTCFullYear();
+    const { data, error } = await this.supabase
+      .from('work_packages')
+      .select('work_package_number')
+      .eq('tenant_id', tenantId)
+      .ilike('work_package_number', `WP-%-${currentYear}-%`);
+    if (error) {
+      throw new Error(`Failed to generate work package sequence: ${error.message}`);
+    }
+
+    const maxSeq = (Array.isArray(data) ? data : []).reduce((max, row) => {
+      const current = this.parseWorkPackageSequence(String((row as Record<string, unknown>).work_package_number || ''), currentYear);
+      return current > max ? current : max;
+    }, 0);
+    const nextSeq = String(maxSeq + 1).padStart(4, '0');
+    return `WP-${aircraftRegistration}-${currentYear}-${nextSeq}-${wpTitle}`;
+  }
+
   async getWorkPackageTitles(
     tenantId: string,
     franchiseId?: string | null,
@@ -229,13 +345,24 @@ export class WorkOrdersService {
     tenantId: string,
     userId: string,
     request: CreateWorkPackageRequest,
+    franchiseId?: string | null,
   ): Promise<WorkPackage> {
     return withSpan(
       'work_package.create',
       async () => {
-        const workOrderNumber = `WP-${Date.now()}`;
         const plannedEndDate = request.planned_end_date ?? request.planned_completion_date;
         const aircraftId = await this.resolveValidAircraftId(tenantId, request.aircraft_id, userId);
+        const aircraftRegistration = await this.resolveAircraftRegistration(tenantId, aircraftId);
+        const titleResolution = await this.resolveTitleCodeAndText(tenantId, {
+          workPackageTitleId: request.work_package_title_id,
+          title: request.title,
+          franchiseId: franchiseId || null,
+        });
+        const workOrderNumber = await this.generateNextWorkPackageNumber(
+          tenantId,
+          aircraftRegistration,
+          titleResolution.wpTitle,
+        );
 
         const { data, error } = await this.supabase
           .from('work_packages')
@@ -243,7 +370,9 @@ export class WorkOrdersService {
             tenant_id: tenantId,
             aircraft_id: aircraftId,
             work_package_number: workOrderNumber,
-            title: request.title,
+            title: titleResolution.title,
+            work_package_template_id: request.work_package_template_id || null,
+            work_package_title_id: titleResolution.workPackageTitleId,
             description: request.description,
             work_type: request.work_type ?? 'general',
             maintenance_type: request.maintenance_type,
@@ -304,6 +433,8 @@ export class WorkOrdersService {
         user_id: userId,
         aircraft_id: request.aircraft_id,
         maintenance_type: request.maintenance_type,
+        work_package_template_id: request.work_package_template_id,
+        work_package_title_id: request.work_package_title_id,
       },
     );
   }
