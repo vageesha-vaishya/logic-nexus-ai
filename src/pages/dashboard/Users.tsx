@@ -37,6 +37,7 @@ export default function Users() {
     is_active: boolean;
     created_at: string;
     user_roles?: UserRole[];
+    custom_role_names?: string[];
   };
   const [users, setUsers] = useState<UserRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -140,7 +141,37 @@ export default function Users() {
             : (user.user_roles || []).filter((role: UserRole) => role.role !== 'platform_admin'),
         }));
 
-      setUsers(filteredUsers);
+      const userIdsForCustomRoles = filteredUsers.map((user) => user.id).filter(Boolean);
+      const customRolesByUserId = new Map<string, string[]>();
+      if (userIdsForCustomRoles.length > 0) {
+        const { data: userCustomRoleRows, error: userCustomRolesError } = await scopedDb
+          .from('user_custom_roles')
+          .select('user_id, custom_roles(name,is_active)')
+          .in('user_id', userIdsForCustomRoles);
+        if (userCustomRolesError) throw userCustomRolesError;
+
+        for (const row of userCustomRoleRows || []) {
+          const roleRecord = Array.isArray((row as any).custom_roles)
+            ? (row as any).custom_roles[0]
+            : (row as any).custom_roles;
+          const roleName = String(roleRecord?.name || '').trim();
+          if (!roleName) continue;
+          const isActive = roleRecord?.is_active !== false;
+          if (!isActive) continue;
+          const existing = customRolesByUserId.get((row as any).user_id) || [];
+          if (!existing.includes(roleName)) {
+            existing.push(roleName);
+            customRolesByUserId.set((row as any).user_id, existing);
+          }
+        }
+      }
+
+      setUsers(
+        filteredUsers.map((user) => ({
+          ...user,
+          custom_role_names: customRolesByUserId.get(user.id) || [],
+        })),
+      );
     } catch (error: any) {
       toast({
         title: 'Error fetching users',
@@ -174,7 +205,10 @@ export default function Users() {
     const normalize = (value: unknown) => String(value ?? '').toLowerCase();
     const hasToken = (value: unknown, token: string) => normalize(value).includes(token.toLowerCase());
     const rows = users.filter((user) => {
-      const roleLabel = (user.user_roles || []).map((role) => role.role.replace(/_/g, ' ')).join(', ');
+      const roleLabel = [
+        ...(user.user_roles || []).map((role) => role.role.replace(/_/g, ' ')),
+        ...(user.custom_role_names || []),
+      ].join(', ');
       const tenantLabel = user.user_roles?.[0]?.tenant_name || '';
       const franchiseLabel = user.user_roles?.[0]?.franchise_name || '';
       const fullName = `${user.first_name || ''} ${user.last_name || ''}`.trim();
@@ -195,8 +229,14 @@ export default function Users() {
     });
 
     const sorted = [...rows].sort((left, right) => {
-      const leftRole = (left.user_roles || []).map((role) => role.role).join(',');
-      const rightRole = (right.user_roles || []).map((role) => role.role).join(',');
+      const leftRole = [
+        ...(left.user_roles || []).map((role) => role.role),
+        ...(left.custom_role_names || []),
+      ].join(',');
+      const rightRole = [
+        ...(right.user_roles || []).map((role) => role.role),
+        ...(right.custom_role_names || []),
+      ].join(',');
       const leftTenant = left.user_roles?.[0]?.tenant_name || '';
       const rightTenant = right.user_roles?.[0]?.tenant_name || '';
       const leftFranchise = left.user_roles?.[0]?.franchise_name || '';
@@ -472,6 +512,14 @@ export default function Users() {
                               {role.role.replace('_', ' ')}
                             </Badge>
                           ))}
+                          {user.custom_role_names?.map((customRoleName, idx) => (
+                            <Badge key={`custom-role-${idx}`} variant="outline" className="text-xs">
+                              {customRoleName}
+                            </Badge>
+                          ))}
+                          {!user.user_roles?.length && !user.custom_role_names?.length ? (
+                            <span className="text-muted-foreground text-xs">-</span>
+                          ) : null}
                         </div>
                       </TableCell>
                       <TableCell>
