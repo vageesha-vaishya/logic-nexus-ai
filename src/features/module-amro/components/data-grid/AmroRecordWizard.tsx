@@ -19,15 +19,13 @@ import {
   X,
   AlertCircle,
   CheckCircle2,
-  Package,
-  Settings,
-  Boxes,
   FileText,
   Info,
+  Calendar as CalendarIcon,
+  ChevronsUpDown,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -49,22 +47,27 @@ import {
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
-import { useDataGridStore, WizardStep } from './store/useDataGridStore';
+import { useDataGridStore } from './store/useDataGridStore';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
+import { useDebounce } from '@/hooks/useDebounce';
+import { formatDateToIso, isValidIsoDateString, normalizeIsoDateInput } from './wizardDateUtils';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface WizardField {
   id: string;
   label: string;
-  type: 'text' | 'number' | 'select' | 'textarea' | 'checkbox' | 'switch' | 'radio' | 'display';
+  type: 'text' | 'number' | 'select' | 'textarea' | 'checkbox' | 'switch' | 'radio' | 'display' | 'date' | 'searchable-select';
   required?: boolean;
-  options?: Array<{ value: string; label: string }>;
+  options?: Array<{ value: string; label: string; searchText?: string }>;
   placeholder?: string;
   helperText?: string;
+  maxResults?: number;
   displayValue?: (formData: Record<string, any>) => string;
   validate?: (value: any, formData: Record<string, any>) => string | null;
   colSpan?: 1 | 2;
@@ -183,6 +186,150 @@ interface WizardFieldRendererProps {
   value: any;
   error?: string | null;
   onChange: (id: string, value: any) => void;
+}
+
+function DateFieldRenderer({ field, value, error, onChange }: WizardFieldRendererProps) {
+  const [open, setOpen] = useState(false);
+  const rawValue = String(value || '');
+  const selectedDate = isValidIsoDateString(rawValue) ? new Date(`${rawValue}T00:00:00`) : undefined;
+
+  return (
+    <div className="space-y-1">
+      <div className="relative">
+        <Input
+          id={field.id}
+          value={rawValue}
+          onChange={(event) => onChange(field.id, event.target.value)}
+          onBlur={(event) => {
+            const normalized = normalizeIsoDateInput(event.target.value);
+            if (normalized) {
+              onChange(field.id, normalized);
+            }
+          }}
+          placeholder={field.placeholder || 'YYYY-MM-DD'}
+          className={cn(error && 'border-red-500 pr-9')}
+          aria-describedby={`${field.id}-helper`}
+        />
+        <Popover open={open} onOpenChange={setOpen}>
+          <PopoverTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              type="button"
+              className="absolute right-1 top-1/2 h-7 w-7 -translate-y-1/2"
+              aria-label={`Choose ${field.label}`}
+            >
+              <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent className="w-auto p-0" align="end">
+            <Calendar
+              mode="single"
+              selected={selectedDate}
+              onSelect={(date) => {
+                if (!date) return;
+                onChange(field.id, formatDateToIso(date));
+                setOpen(false);
+              }}
+              initialFocus
+            />
+          </PopoverContent>
+        </Popover>
+      </div>
+      {error ? (
+        <p className="text-xs text-red-500 flex items-center gap-1" role="alert" id={`${field.id}-helper`}>
+          <AlertCircle className="h-3 w-3" />
+          {error}
+        </p>
+      ) : field.helperText ? (
+        <p className="text-xs text-muted-foreground" id={`${field.id}-helper`}>{field.helperText}</p>
+      ) : null}
+    </div>
+  );
+}
+
+function SearchableSelectFieldRenderer({ field, value, error, onChange }: WizardFieldRendererProps) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const debouncedQuery = useDebounce(query, 300);
+  const normalizedQuery = debouncedQuery.trim();
+  const options = field.options || [];
+  const maxResults = field.maxResults ?? 10;
+  const selectedOption = options.find((option) => option.value === value);
+  const hasInvalidQuery = normalizedQuery.length > 0 && !/[a-z0-9]/i.test(normalizedQuery);
+
+  const filteredOptions = useMemo(() => {
+    if (!normalizedQuery || hasInvalidQuery) return [];
+    const token = normalizedQuery.toLowerCase();
+    return options
+      .filter((option) => {
+        const haystack = `${option.label} ${option.searchText || ''}`.toLowerCase();
+        return haystack.includes(token);
+      })
+      .slice(0, maxResults);
+  }, [hasInvalidQuery, maxResults, normalizedQuery, options]);
+
+  return (
+    <div className="space-y-1">
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="outline"
+            role="combobox"
+            aria-expanded={open}
+            className={cn('w-full justify-between text-left font-normal', error && 'border-red-500')}
+          >
+            <span className={cn('truncate', !selectedOption && 'text-muted-foreground')}>
+              {selectedOption?.label || field.placeholder || 'Search and select...'}
+            </span>
+            <ChevronsUpDown className="h-4 w-4 shrink-0 opacity-50" />
+          </Button>
+        </PopoverTrigger>
+        <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-0" align="start">
+          <Command shouldFilter={false}>
+            <CommandInput
+              value={query}
+              onValueChange={setQuery}
+              placeholder="Search franchise or tenant..."
+              aria-label={`Search options for ${field.label}`}
+            />
+            <CommandList>
+              {normalizedQuery.length === 0 ? (
+                <CommandEmpty>Type at least 1 character to search.</CommandEmpty>
+              ) : hasInvalidQuery ? (
+                <CommandEmpty>Use letters or numbers in your search query.</CommandEmpty>
+              ) : filteredOptions.length === 0 ? (
+                <CommandEmpty>No matching tenant or franchise found.</CommandEmpty>
+              ) : (
+                <CommandGroup>
+                  {filteredOptions.map((option) => (
+                    <CommandItem
+                      key={option.value}
+                      value={option.value}
+                      onSelect={() => {
+                        onChange(field.id, option.value);
+                        setOpen(false);
+                      }}
+                    >
+                      {option.label}
+                    </CommandItem>
+                  ))}
+                </CommandGroup>
+              )}
+            </CommandList>
+          </Command>
+        </PopoverContent>
+      </Popover>
+      {error ? (
+        <p className="text-xs text-red-500 flex items-center gap-1" role="alert">
+          <AlertCircle className="h-3 w-3" />
+          {error}
+        </p>
+      ) : field.helperText ? (
+        <p className="text-xs text-muted-foreground">{field.helperText}</p>
+      ) : null}
+    </div>
+  );
 }
 
 function WizardFieldRenderer({ field, value, error, onChange }: WizardFieldRendererProps) {
@@ -337,6 +484,26 @@ function WizardFieldRenderer({ field, value, error, onChange }: WizardFieldRende
         )}>
           {value ? String(value) : '-'}
         </div>
+      );
+
+    case 'date':
+      return (
+        <DateFieldRenderer
+          field={field}
+          value={value}
+          error={error}
+          onChange={onChange}
+        />
+      );
+
+    case 'searchable-select':
+      return (
+        <SearchableSelectFieldRenderer
+          field={field}
+          value={value}
+          error={error}
+          onChange={onChange}
+        />
       );
 
     default:
@@ -526,6 +693,13 @@ export function AmroRecordWizard({
   const [isSavingDraft, setIsSavingDraft] = useState(false);
   const [completedSteps, setCompletedSteps] = useState<Set<string>>(new Set());
 
+  const hasFieldValue = useCallback((value: unknown): boolean => {
+    if (typeof value === 'string') return value.trim().length > 0;
+    if (typeof value === 'boolean') return value;
+    if (typeof value === 'number') return !Number.isNaN(value);
+    return value !== null && value !== undefined;
+  }, []);
+
   // Filter visible steps based on conditions
   const visibleSteps = useMemo(
     () => steps.filter((step) => !step.showWhen || step.showWhen(formData)),
@@ -565,16 +739,17 @@ export function AmroRecordWizard({
       if (field.showWhen && !field.showWhen(formData)) return;
 
       const value = formData[field.id];
+      const hasValue = hasFieldValue(value);
 
       // Required validation
-      if (field.required && (!value || (typeof value === 'string' && !value.trim()))) {
+      if (field.required && !hasValue) {
         newErrors[field.id] = 'This field is required';
         isValid = false;
         return;
       }
 
       // Custom validation
-      if (field.validate && value) {
+      if (field.validate && (hasValue || field.required)) {
         const error = field.validate(value, formData);
         if (error) {
           newErrors[field.id] = error;
@@ -585,19 +760,21 @@ export function AmroRecordWizard({
 
     setErrors(newErrors);
     return isValid;
-  }, [visibleSteps, formData]);
+  }, [hasFieldValue, visibleSteps, formData]);
 
   // Check if all visible steps are valid
   const areAllStepsValid = useMemo(() => {
     return visibleSteps.every((step) => {
       return step.fields.every((field) => {
         if (field.showWhen && !field.showWhen(formData)) return true;
-        if (field.required) return !!formData[field.id];
-        if (field.validate && formData[field.id]) return !field.validate(formData[field.id], formData);
+        const value = formData[field.id];
+        const hasValue = hasFieldValue(value);
+        if (field.required && !hasValue) return false;
+        if (field.validate && (hasValue || field.required)) return !field.validate(value, formData);
         return true;
       });
     });
-  }, [visibleSteps, formData]);
+  }, [hasFieldValue, visibleSteps, formData]);
 
   // Go to next step
   const handleNext = useCallback(() => {

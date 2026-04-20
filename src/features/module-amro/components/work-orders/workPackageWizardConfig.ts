@@ -1,5 +1,6 @@
 import { Calendar, FileText, Plane, Shield } from 'lucide-react';
 import type { WizardStepConfig } from '@/features/module-amro/components/data-grid/AmroRecordWizard';
+import { compareIsoDateStrings, isValidIsoDateString } from '@/features/module-amro/components/data-grid/wizardDateUtils';
 
 type WizardOption = { value: string; label: string; [key: string]: unknown };
 
@@ -17,9 +18,15 @@ const MAINTENANCE_TYPE_OPTIONS: WizardOption[] = [
 export function buildWorkPackageWizardSteps({
   aircraftOptions,
   templateOptions,
+  assignmentOptions,
+  assignmentOptionsLoading,
+  assignmentOptionsError,
 }: {
   aircraftOptions: WizardOption[];
   templateOptions: WizardOption[];
+  assignmentOptions: WizardOption[];
+  assignmentOptionsLoading: boolean;
+  assignmentOptionsError?: string | null;
 }): WizardStepConfig[] {
   return [
     {
@@ -196,13 +203,55 @@ export function buildWorkPackageWizardSteps({
         {
           id: 'planned_start_date',
           label: 'Planned Start Date',
-          type: 'text',
+          type: 'date',
           required: true,
           placeholder: 'YYYY-MM-DD',
-          validate: (value) => (String(value || '').trim() ? null : 'Planned start date is required'),
+          validate: (value, formData) => {
+            const start = String(value || '').trim();
+            if (!start) return 'Planned start date is required';
+            if (!isValidIsoDateString(start)) return 'Use YYYY-MM-DD format';
+
+            const end = String(formData.planned_end_date || '').trim();
+            if (end && isValidIsoDateString(end) && compareIsoDateStrings(start, end) > 0) {
+              return 'Start date cannot be later than end date';
+            }
+
+            return null;
+          },
         },
-        { id: 'planned_end_date', label: 'Planned End Date', type: 'text', placeholder: 'YYYY-MM-DD' },
-        { id: 'assigned_to', label: 'Assigned To', type: 'text', placeholder: 'Technician or team' },
+        {
+          id: 'planned_end_date',
+          label: 'Planned End Date',
+          type: 'date',
+          placeholder: 'YYYY-MM-DD',
+          validate: (value, formData) => {
+            const end = String(value || '').trim();
+            if (!end) return null;
+            if (!isValidIsoDateString(end)) return 'Use YYYY-MM-DD format';
+
+            const start = String(formData.planned_start_date || '').trim();
+            if (start && isValidIsoDateString(start) && compareIsoDateStrings(end, start) < 0) {
+              return 'End date cannot be earlier than start date';
+            }
+
+            return null;
+          },
+        },
+        {
+          id: 'assigned_to',
+          label: 'Assigned to',
+          type: 'searchable-select',
+          placeholder: assignmentOptionsLoading ? 'Loading Franchise/Tenant list...' : 'Search Franchise/Tenant',
+          helperText: assignmentOptionsError || 'Search by partial name. Up to 10 matches are shown.',
+          maxResults: 10,
+          options: assignmentOptions,
+          validate: (value) => {
+            const selected = String(value || '').trim();
+            if (!selected) return null;
+            const valid = assignmentOptions.some((option) => option.value === selected);
+            return valid ? null : 'Select a valid franchise or tenant from the list';
+          },
+        },
         {
           id: 'estimated_ground_time_hours',
           label: 'Estimated Ground Time (hours)',

@@ -1,7 +1,7 @@
-import { useMemo } from 'react';
-import { Calendar, FileText, Plane, Shield } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { AmroRecordWizard, type WizardStepConfig } from '@/features/module-amro/components/data-grid/AmroRecordWizard';
+import { useCRM } from '@/hooks/useCRM';
 import {
   useCreateWorkPackage,
   type MaintenanceType,
@@ -10,6 +10,7 @@ import {
 import {
   useCreateEmergencyWP,
   type EmergencyType,
+  type UrgencyLevel,
 } from './useEmergencyWPState';
 import { useWorkPackageTemplateOptions } from './useWorkPackageTemplates';
 import { useAircraftOptions } from './useAircraftState';
@@ -22,20 +23,120 @@ type Props = {
   preselectedAircraftId?: string;
 };
 
+type CreationPath = 'scheduled' | 'non-scheduled' | 'emergency';
+
 export function AmroWorkPackageCreateWizard({
   open,
   onOpenChange,
   onSuccess,
   preselectedAircraftId,
 }: Props) {
+  const { scopedDb, context } = useCRM();
   const createWPMutation = useCreateWorkPackage();
   const createEmergencyWPMutation = useCreateEmergencyWP();
   const { options: aircraftOptions } = useAircraftOptions(open);
   const { options: templateOptions } = useWorkPackageTemplateOptions(open);
+  const [assignmentOptions, setAssignmentOptions] = useState<Array<{ value: string; label: string; searchText: string }>>([]);
+  const [assignmentOptionsLoading, setAssignmentOptionsLoading] = useState(false);
+  const [assignmentOptionsError, setAssignmentOptionsError] = useState<string | null>(null);
+
+  const loadAssignmentOptions = useCallback(async () => {
+    if (!open) return;
+
+    setAssignmentOptionsLoading(true);
+    setAssignmentOptionsError(null);
+
+    try {
+      let tenantQuery = (scopedDb as any)
+        .from('tenants', Boolean(context.isPlatformAdmin))
+        .select('id,name,is_active')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (!context.isPlatformAdmin && context.tenantId) {
+        tenantQuery = tenantQuery.eq('id', context.tenantId).limit(1);
+      }
+
+      const { data: tenantRows, error: tenantError } = await tenantQuery;
+      if (tenantError) {
+        throw new Error(String(tenantError.message || 'Failed to load tenants'));
+      }
+
+      let franchiseQuery = (scopedDb as any)
+        .from('franchises', Boolean(context.isPlatformAdmin || context.isTenantAdmin))
+        .select('id,name,tenant_id,is_active')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (context.tenantId) {
+        franchiseQuery = franchiseQuery.eq('tenant_id', context.tenantId);
+      }
+
+      const { data: franchiseRows, error: franchiseError } = await franchiseQuery;
+      if (franchiseError) {
+        throw new Error(String(franchiseError.message || 'Failed to load franchises'));
+      }
+
+      const tenantNameById = new Map<string, string>();
+      const normalizedTenantOptions = (Array.isArray(tenantRows) ? tenantRows : [])
+        .map((row) => {
+          const tenantId = String((row as Record<string, unknown>).id || '').trim();
+          const tenantName = String((row as Record<string, unknown>).name || '').trim();
+          if (!tenantId || !tenantName) return null;
+          tenantNameById.set(tenantId, tenantName);
+          return {
+            value: `Tenant: ${tenantName}`,
+            label: `Tenant: ${tenantName}`,
+            searchText: `${tenantName} tenant ${tenantId}`,
+          };
+        })
+        .filter(Boolean) as Array<{ value: string; label: string; searchText: string }>;
+
+      const normalizedFranchiseOptions = (Array.isArray(franchiseRows) ? franchiseRows : [])
+        .map((row) => {
+          const franchiseId = String((row as Record<string, unknown>).id || '').trim();
+          const franchiseName = String((row as Record<string, unknown>).name || '').trim();
+          const tenantId = String((row as Record<string, unknown>).tenant_id || '').trim();
+          if (!franchiseId || !franchiseName) return null;
+          const tenantName = tenantNameById.get(tenantId) || '';
+          const label = tenantName
+            ? `Franchise: ${franchiseName} (${tenantName})`
+            : `Franchise: ${franchiseName}`;
+          return {
+            value: label,
+            label,
+            searchText: `${franchiseName} franchise ${tenantName} tenant ${franchiseId}`,
+          };
+        })
+        .filter(Boolean) as Array<{ value: string; label: string; searchText: string }>;
+
+      const combined = [...normalizedTenantOptions, ...normalizedFranchiseOptions]
+        .sort((left, right) => left.label.localeCompare(right.label, undefined, { sensitivity: 'base' }));
+
+      setAssignmentOptions(combined);
+      setAssignmentOptionsError(null);
+    } catch (error) {
+      setAssignmentOptions([]);
+      setAssignmentOptionsError(String((error as Error).message || 'Failed to load assignment options'));
+    } finally {
+      setAssignmentOptionsLoading(false);
+    }
+  }, [context.isPlatformAdmin, context.isTenantAdmin, context.tenantId, open, scopedDb]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadAssignmentOptions();
+  }, [loadAssignmentOptions, open]);
 
   const steps = useMemo<WizardStepConfig[]>(
-    () => buildWorkPackageWizardSteps({ aircraftOptions, templateOptions }),
-    [aircraftOptions, templateOptions],
+    () => buildWorkPackageWizardSteps({
+      aircraftOptions,
+      templateOptions,
+      assignmentOptions,
+      assignmentOptionsLoading,
+      assignmentOptionsError,
+    }),
+    [aircraftOptions, templateOptions, assignmentOptions, assignmentOptionsLoading, assignmentOptionsError],
   );
 
   if (!open) return null;
@@ -71,6 +172,7 @@ export function AmroWorkPackageCreateWizard({
             priority: Number(formData.priority || 3) as WorkPackagePriority,
             planned_start_date: String(formData.planned_start_date || '').trim() || undefined,
             planned_end_date: String(formData.planned_end_date || '').trim() || undefined,
+            assigned_to: String(formData.assigned_to || '').trim() || undefined,
             source: creationPath === 'non-scheduled' ? 'non_scheduled' : 'scheduled',
           });
           toast.success('Work package created successfully');
