@@ -83,11 +83,17 @@ export default function UserDetail() {
       });
 
       if (error) {
+        const responseStatus = error.context?.response?.status;
+        const responsePayload = error.context?.json as { error?: string; message?: string } | undefined;
+        const responseMessage = responsePayload?.error || responsePayload?.message || '';
         // Enhance error for missing function
-        if (error.context?.response?.status === 404) {
+        if (responseStatus === 404) {
           throw new Error('Function not deployed. Run: npx supabase functions deploy delete-user');
         }
-        throw error;
+        if (responseMessage) {
+          throw new Error(responseMessage);
+        }
+        throw new Error(error.message || 'Failed to delete user');
       }
 
       toast({
