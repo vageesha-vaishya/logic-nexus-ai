@@ -2351,6 +2351,62 @@ Implementation Notes:
   - Migration: 20260325000000_amro_multi_tenant_isolation.sql
 ```
 
+```text
+Component Type: Table
+Component Name: public.work_packages_title
+Purpose: Tenant/franchise-scoped catalog for approved Work Package titles and numbering suffix (`wp_title`) consumed by AMRO work order creation.
+Estimated Row Count: 20-500 per tenant
+Primary Key: id
+Foreign Keys:
+  - work_packages.work_package_title_id -> public.work_packages_title(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_work_packages_title_tenant_title (tenant_id, title)
+Check Constraints:
+  - ck_work_packages_title_wp_title_not_blank (length(trim(wp_title)) > 0)
+Defaults:
+  - id: gen_random_uuid()
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_work_packages_title_tenant_id(tenant_id)
+  - idx_work_packages_title_franchise_id(franchise_id)
+  - idx_work_packages_work_package_title_id(work_packages.work_package_title_id)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:-
+  - franchise_id | uuid | nullable:yes | default:null
+  - title | text | nullable:no | default:-
+  - wp_title | text | nullable:no | default:-
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+Security Considerations:
+  - Tenant-scoped lookup enforced by API context before create/number generation.
+  - Franchise rows can be shared (`franchise_id IS NULL`) or franchise-restricted.
+Implementation Notes:
+  - Migration: 20260420131500_amro_work_package_titles_catalog.sql
+  - Seed data loaded for tenant `157b8d12-c115-446e-a4dc-d12077751fe2`.
+```
+
+```text
+Component Type: Module API
+Component Name: /api/v2/amro/work-orders (POST create-work-order)
+Purpose: Persist AMRO work orders from wizard payloads with title-catalog selection, template linkage, normalized planned dates, and deterministic work package numbering.
+Estimated Request Volume: 200-3000 create calls/day per tenant
+Field Contract:
+  - work_package_title_id | uuid | optional (preferred over free-text title)
+  - work_package_template_id | uuid | optional (links to work_packages.work_package_template_id)
+  - planned_start_date | ISO/date string | optional (stored as timestamptz)
+  - planned_end_date | ISO/date string | optional (stored as timestamptz)
+Output Contract:
+  - work_order_number | text | format `WP-<REG>-<YYYY>-<SeqNo>-<wp_title>`
+Security Considerations:
+  - Uses authenticated tenant scope and domain access checks before persistence.
+  - Title lookup restricted to tenant (and franchise when applicable).
+Implementation Notes:
+  - Handler: src/pages/api/v2/amro/work-orders/index.ts
+  - Persistence: src/pages/api/v2/amro/work-package-persistence-db.ts
+```
+
 #### Template: SQL Function / Trigger Function
 
 ```text

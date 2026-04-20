@@ -84,6 +84,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
               tenant_id: 'tenant-1',
               franchise_id: 'fr-1',
               aircraft_id: 'ac-1',
+              work_package_number: 'WP-20260411-ABC',
               work_order_number: 'WP-20260411-ABC',
               title: '500hr Inspection',
               description: null,
@@ -148,6 +149,41 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
 
   describe('POST /create work order', () => {
     it('creates work order in database', async () => {
+      const titleLookupChain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        or: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            id: 'ttl-1',
+            title: 'Starter Work Package',
+            wp_title: 'STARTER',
+            franchise_id: null,
+          },
+          error: null,
+        }),
+      };
+      const aircraftLookupChain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        maybeSingle: vi.fn().mockResolvedValue({
+          data: {
+            registration: 'VT-DCN',
+            tail_number: 'VT-DCN',
+          },
+          error: null,
+        }),
+      };
+      const sequenceLookupChain: any = {
+        select: vi.fn().mockReturnThis(),
+        eq: vi.fn().mockReturnThis(),
+        ilike: vi.fn().mockResolvedValue({
+          data: [{ work_package_number: 'WP-VT-DCN-2026-0004-HOTSEC' }],
+          error: null,
+        }),
+      };
       const insertChain: any = {
         insert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
@@ -157,8 +193,8 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
             tenant_id: 'tenant-1',
             franchise_id: 'fr-1',
             aircraft_id: 'ac-1',
-            work_order_number: 'WP-20260411-XYZ',
-            title: 'Engine Overhaul',
+            work_package_number: 'WP-VT-DCN-2026-0005-STARTER',
+            title: 'Starter Work Package',
             description: null,
             work_type: null,
             maintenance_type: 'overhaul',
@@ -180,21 +216,36 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
             external_reference: null,
             created_at: '2026-04-11T00:00:00Z',
             updated_at: '2026-04-11T00:00:00Z',
+            work_package_template_id: 'tpl-1',
+            work_package_title_id: 'ttl-1',
           },
           error: null,
         }),
       };
-      vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: () => insertChain } as any);
+      let workPackagesCallCount = 0;
+      vi.mocked(getSupabaseAdminClient).mockReturnValue({
+        from: (table: string) => {
+          if (table === 'work_packages_title') return titleLookupChain;
+          if (table === 'aircraft') return aircraftLookupChain;
+          if (table === 'work_packages') {
+            workPackagesCallCount += 1;
+            return workPackagesCallCount === 1 ? sequenceLookupChain : insertChain;
+          }
+          return insertChain;
+        },
+      } as any);
 
       const req = {
         method: 'POST',
         query: {},
         headers: {},
         body: {
-          title: 'Engine Overhaul',
+          work_package_title_id: 'ttl-1',
           maintenance_type: 'overhaul',
           priority: 1,
           notes: 'Urgent',
+          aircraft_id: 'ac-1',
+          work_package_template_id: 'tpl-1',
           planned_start_date: '2026-05-01',
           planned_end_date: '2026-05-15',
           estimated_labor_hours: 120,
@@ -207,8 +258,12 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
       expect(res.statusCode).toBe(201);
       const body = res.jsonBody as any;
       expect(body.output.id).toBe('wp-new');
-      expect(body.output.work_order_number).toBe('WP-20260411-XYZ');
+      expect(body.output.work_order_number).toBe('WP-VT-DCN-2026-0005-STARTER');
       expect(body.output.status).toBe('planning');
+      expect(insertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
+        work_package_template_id: 'tpl-1',
+        work_package_title_id: 'ttl-1',
+      }));
     });
 
     it('rejects creation without title', async () => {

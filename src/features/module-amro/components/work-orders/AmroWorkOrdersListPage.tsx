@@ -27,6 +27,8 @@ import {
 import { useAircraftOptions } from './useAircraftState';
 import { useWorkPackageTemplateOptions } from './useWorkPackageTemplates';
 import { buildWorkPackageWizardSteps, getWorkPackageWizardInitialData } from './workPackageWizardConfig';
+import { useAuth } from '@/hooks/useAuth';
+import { useCRM } from '@/hooks/useCRM';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
@@ -71,12 +73,13 @@ const DEFAULT_FORM = {
   assigned_to: '',
   notes: '',
   aircraft_id: '',
+  work_package_title_id: '',
+  template_version_id: '',
 };
 
 function cloneFormValue(record?: WorkPackageListItem | null) {
   if (!record) return { ...DEFAULT_FORM };
   return {
-    id: record.id,
     title: record.title || '',
     description: '',
     maintenance_type: record.maintenance_type || 'line',
@@ -86,6 +89,8 @@ function cloneFormValue(record?: WorkPackageListItem | null) {
     assigned_to: record.assigned_to || '',
     notes: '',
     aircraft_id: record.aircraft_id || '',
+    work_package_title_id: '',
+    template_version_id: '',
   };
 }
 
@@ -95,6 +100,8 @@ type WorkPackageGridRow = WorkPackageListItem & Record<string, unknown>;
 
 export function AmroWorkOrdersListPage() {
   const navigate = useNavigate();
+  const { session } = useAuth();
+  const { scopedDb, context } = useCRM();
   const [records, setRecords] = useState<WorkPackageListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -104,6 +111,8 @@ export function AmroWorkOrdersListPage() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formValue, setFormValue] = useState(DEFAULT_FORM);
   const [deleteCandidate, setDeleteCandidate] = useState<WorkPackageListItem | null>(null);
+  const [titleOptions, setTitleOptions] = useState<Array<{ value: string; label: string; title: string; wp_title: string }>>([]);
+  const [titleOptionsLoading, setTitleOptionsLoading] = useState(false);
 
   const { invalidate } = useWorkPackageActions();
   const createMutation = useCreateWorkPackage();
@@ -111,9 +120,79 @@ export function AmroWorkOrdersListPage() {
   const deleteMutation = useDeleteWorkPackage();
   const { options: aircraftOptions } = useAircraftOptions(wizardOpen);
   const { options: templateOptions } = useWorkPackageTemplateOptions(wizardOpen);
+  const loadTitleOptions = useCallback(async () => {
+    if (!wizardOpen) return;
+    setTitleOptionsLoading(true);
+    try {
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (session?.access_token) {
+        headers.Authorization = `Bearer ${session.access_token}`;
+      }
+      const mapOptions = (items: any[]) =>
+        items
+          .map((item: any) => ({
+            value: String(item.id || '').trim(),
+            label: `${String(item.title || '').trim()} (${String(item.wp_title || '').trim()})`,
+            title: String(item.title || '').trim(),
+            wp_title: String(item.wp_title || '').trim(),
+          }))
+          .filter((option: { value: string; label: string }) => option.value && option.label);
+
+      let mapped: Array<{ value: string; label: string; title: string; wp_title: string }> = [];
+      try {
+        const response = await fetch('/api/v2/amro/work-package-titles', { method: 'GET', headers });
+        if (!response.ok) {
+          throw new Error(`Failed to load work package titles: ${response.status}`);
+        }
+        const json = await response.json();
+        const items = Array.isArray(json?.output?.items) ? json.output.items : [];
+        mapped = mapOptions(items);
+      } catch {
+        // Fallback for environments where new endpoint is not yet routed/restarted.
+        let query = (scopedDb as any)
+          .from('work_packages_title', Boolean(context.isPlatformAdmin))
+          .select('id,title,wp_title,tenant_id,franchise_id')
+          .order('title', { ascending: true });
+
+        if (context.tenantId) {
+          query = query.eq('tenant_id', context.tenantId);
+        }
+
+        if (!context.isPlatformAdmin && context.franchiseId) {
+          query = query.or(`franchise_id.is.null,franchise_id.eq.${context.franchiseId}`);
+        }
+
+        const { data, error } = await query;
+        if (error) {
+          throw new Error(String(error.message || 'Failed to load title options'));
+        }
+        mapped = mapOptions(Array.isArray(data) ? data : []);
+      }
+
+      setTitleOptions(mapped);
+    } catch (err) {
+      setTitleOptions([]);
+      toast.error(err instanceof Error ? err.message : 'Failed to load title dropdown');
+    } finally {
+      setTitleOptionsLoading(false);
+    }
+  }, [context.franchiseId, context.isPlatformAdmin, context.tenantId, scopedDb, session?.access_token, wizardOpen]);
+
+  useEffect(() => {
+    if (!wizardOpen) return;
+    void loadTitleOptions();
+  }, [loadTitleOptions, wizardOpen]);
   const wizardSteps = useMemo(
-    () => buildWorkPackageWizardSteps({ aircraftOptions, templateOptions }),
-    [aircraftOptions, templateOptions],
+    () => buildWorkPackageWizardSteps({
+      aircraftOptions,
+      templateOptions,
+      assignmentOptions: [],
+      assignmentOptionsLoading: false,
+      assignmentOptionsError: null,
+      titleOptions,
+      titleOptionsLoading,
+    }),
+    [aircraftOptions, templateOptions, titleOptions, titleOptionsLoading],
   );
 
   const { data, isLoading, isError, error: listError } = useListWorkPackages({
@@ -168,19 +247,22 @@ export function AmroWorkOrdersListPage() {
       setWizardOpen(false);
       return;
     }
+    const selectedTitle = titleOptions.find((option) => option.value === String(payload.work_package_title_id || '').trim());
     await createMutation.mutateAsync({
       aircraft_id: String(payload.aircraft_id || '').trim() || undefined,
-      title: String(payload.title || '').trim(),
+      title: selectedTitle?.title || String(payload.title || '').trim(),
+      work_package_title_id: String(payload.work_package_title_id || '').trim() || undefined,
       description: String(payload.description || '').trim() || undefined,
       maintenance_type: (String(payload.maintenance_type || 'line').trim() as MaintenanceType),
       priority: Number(payload.priority || 3) as WorkPackagePriority,
       planned_start_date: String(payload.planned_start_date || '').trim() || undefined,
       planned_end_date: String(payload.planned_end_date || '').trim() || undefined,
+      work_package_template_id: String(payload.template_version_id || '').trim() || undefined,
     });
     toast.success('Work package created successfully');
     setWizardOpen(false);
     invalidate();
-  }, [createMutation, invalidate, wizardMode]);
+  }, [createMutation, invalidate, titleOptions, wizardMode]);
   const handleInlineSave = useCallback(async (record: WorkPackageGridRow) => {
     await updateMutation.mutateAsync({
       id: String(record.id),

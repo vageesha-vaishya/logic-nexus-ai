@@ -24,6 +24,31 @@ type Props = {
 };
 
 type CreationPath = 'scheduled' | 'non-scheduled' | 'emergency';
+const UUID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const DEFAULT_WORK_PACKAGE_TITLE_FALLBACK: Array<{ title: string; wp_title: string }> = [
+  { title: 'Hot section intervention planning', wp_title: 'HOTSEC' },
+  { title: 'LLP cycle projection and replacement prep', wp_title: 'LLPAUDIT' },
+  { title: 'Oil consumption exceedance corrective action', wp_title: 'OILANALYSIS' },
+  { title: 'Starter Work Package', wp_title: 'STARTER' },
+  { title: 'Engine borescope inspection package', wp_title: 'BORESCOPE' },
+  { title: 'Engine warranty status review', wp_title: 'WARRANTTY' },
+  { title: 'A-Check Deccan Fly', wp_title: 'ACHECK' },
+  { title: 'pre_docking', wp_title: 'PREDOCKING' },
+  { title: 'C-Check Deccan Fly Heavy', wp_title: 'CCHECK' },
+  { title: 'WiFi System Upgrade', wp_title: 'WIFI' },
+  { title: 'A-Check Inspection', wp_title: 'ACHECK' },
+  { title: 'Engine Overhaul - CFM56', wp_title: 'EOVERHAUL' },
+  { title: 'slotting', wp_title: 'SLOTTING' },
+  { title: 'Verify post-fix path', wp_title: 'VERIFYFIX' },
+  { title: 'Annual Airworthiness Review', wp_title: 'ANNUALREV' },
+  { title: 'Cabin Refurbishment - Deferred', wp_title: 'CABINREF' },
+  { title: 'Pre-Flight Inspection', wp_title: 'PREFLIGHT' },
+  { title: 'Landing Gear Inspection', wp_title: 'LANDGEAR' },
+  { title: 'Runtime path retry package', wp_title: 'PATHRETRY' },
+  { title: 'APU Repair', wp_title: 'APUREPAIR' },
+];
 
 export function AmroWorkPackageCreateWizard({
   open,
@@ -36,9 +61,22 @@ export function AmroWorkPackageCreateWizard({
   const createEmergencyWPMutation = useCreateEmergencyWP();
   const { options: aircraftOptions } = useAircraftOptions(open);
   const { options: templateOptions } = useWorkPackageTemplateOptions(open);
+  const [titleOptions, setTitleOptions] = useState<Array<{ value: string; label: string; wp_title: string; title: string }>>([]);
+  const [titleOptionsLoading, setTitleOptionsLoading] = useState(false);
   const [assignmentOptions, setAssignmentOptions] = useState<Array<{ value: string; label: string; searchText: string }>>([]);
   const [assignmentOptionsLoading, setAssignmentOptionsLoading] = useState(false);
   const [assignmentOptionsError, setAssignmentOptionsError] = useState<string | null>(null);
+
+  const getFallbackTitleOptions = useCallback(
+    () =>
+      DEFAULT_WORK_PACKAGE_TITLE_FALLBACK.map((item) => ({
+        value: `fallback:${item.wp_title}`,
+        label: `${item.title} (${item.wp_title})`,
+        title: item.title,
+        wp_title: item.wp_title,
+      })),
+    [],
+  );
 
   const loadAssignmentOptions = useCallback(async () => {
     if (!open) return;
@@ -123,10 +161,58 @@ export function AmroWorkPackageCreateWizard({
     }
   }, [context.isPlatformAdmin, context.isTenantAdmin, context.tenantId, open, scopedDb]);
 
+  const loadTitleOptions = useCallback(async () => {
+    if (!open) return;
+    setTitleOptionsLoading(true);
+    try {
+      let query = (scopedDb as any)
+        .from('work_packages_title', Boolean(context.isPlatformAdmin))
+        .select('id,title,wp_title,tenant_id,franchise_id')
+        .order('title', { ascending: true });
+
+      if (context.tenantId) {
+        query = query.eq('tenant_id', context.tenantId);
+      }
+
+      if (!context.isPlatformAdmin && context.franchiseId) {
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${context.franchiseId}`);
+      }
+
+      const { data, error } = await query;
+      if (error) throw new Error(String(error.message || 'Failed to load title options'));
+
+      const mapped = (Array.isArray(data) ? data : [])
+        .map((row) => {
+          const id = String((row as Record<string, unknown>).id || '').trim();
+          const title = String((row as Record<string, unknown>).title || '').trim();
+          const wpTitle = String((row as Record<string, unknown>).wp_title || '').trim();
+          if (!id || !title || !wpTitle) return null;
+          return {
+            value: id,
+            label: `${title} (${wpTitle})`,
+            title,
+            wp_title: wpTitle,
+          };
+        })
+        .filter(Boolean) as Array<{ value: string; label: string; wp_title: string; title: string }>;
+
+      setTitleOptions(mapped.length ? mapped : getFallbackTitleOptions());
+    } catch {
+      setTitleOptions(getFallbackTitleOptions());
+    } finally {
+      setTitleOptionsLoading(false);
+    }
+  }, [context.franchiseId, context.isPlatformAdmin, context.tenantId, getFallbackTitleOptions, open, scopedDb]);
+
   useEffect(() => {
     if (!open) return;
     void loadAssignmentOptions();
   }, [loadAssignmentOptions, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    void loadTitleOptions();
+  }, [loadTitleOptions, open]);
 
   const steps = useMemo<WizardStepConfig[]>(
     () => buildWorkPackageWizardSteps({
@@ -135,8 +221,10 @@ export function AmroWorkPackageCreateWizard({
       assignmentOptions,
       assignmentOptionsLoading,
       assignmentOptionsError,
+      titleOptions,
+      titleOptionsLoading,
     }),
-    [aircraftOptions, templateOptions, assignmentOptions, assignmentOptionsLoading, assignmentOptionsError],
+    [aircraftOptions, templateOptions, assignmentOptions, assignmentOptionsLoading, assignmentOptionsError, titleOptions, titleOptionsLoading],
   );
 
   if (!open) return null;
@@ -164,15 +252,20 @@ export function AmroWorkPackageCreateWizard({
           });
           toast.success('Emergency work package created successfully');
         } else {
+          const selectedTitle = titleOptions.find((option) => option.value === String(formData.work_package_title_id || '').trim());
+          const selectedTitleId = String(formData.work_package_title_id || '').trim();
+          const workPackageTitleId = UUID_PATTERN.test(selectedTitleId) ? selectedTitleId : undefined;
           await createWPMutation.mutateAsync({
             aircraft_id: String(formData.aircraft_id || '').trim(),
-            title: String(formData.title || '').trim(),
+            title: selectedTitle?.title || undefined,
+            work_package_title_id: workPackageTitleId,
             description: String(formData.description || '').trim() || undefined,
             maintenance_type: String(formData.maintenance_type || 'line') as MaintenanceType,
             priority: Number(formData.priority || 3) as WorkPackagePriority,
             planned_start_date: String(formData.planned_start_date || '').trim() || undefined,
             planned_end_date: String(formData.planned_end_date || '').trim() || undefined,
             assigned_to: String(formData.assigned_to || '').trim() || undefined,
+            work_package_template_id: String(formData.template_version_id || '').trim() || undefined,
             source: creationPath === 'non-scheduled' ? 'non_scheduled' : 'scheduled',
           });
           toast.success('Work package created successfully');

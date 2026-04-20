@@ -43,12 +43,20 @@ function parsePositiveInt(value: unknown, fallback = 1): number {
   return Number.isFinite(num) && num > 0 ? Math.floor(num) : fallback;
 }
 
-type ValidMaintenanceType = MaintenanceType;
-
 const VALID_MAINTENANCE_TYPES: Record<string, boolean> = {
   line: true, base: true, component: true, inspection: true,
   overhaul: true, repair: true, upgrade: true, modification: true,
 };
+
+function parseOptionalDate(value: unknown, fieldName: string): string | undefined {
+  const normalized = String(value || '').trim();
+  if (!normalized) return undefined;
+  const parsed = Date.parse(normalized.length === 10 ? `${normalized}T00:00:00.000Z` : normalized);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${fieldName} must be a valid date`);
+  }
+  return new Date(parsed).toISOString();
+}
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'POST', 'OPTIONS'] });
@@ -157,7 +165,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (req.method === 'POST') {
       const body = parseBody(req.body);
       const aircraftId = body.aircraft_id ? String(body.aircraft_id).trim() : null;
-      const title = assertNonEmpty(body.title, 'title');
+      const workPackageTitleId = body.work_package_title_id ? String(body.work_package_title_id).trim() : undefined;
+      const title = workPackageTitleId
+        ? String(body.title || '').trim() || undefined
+        : assertNonEmpty(body.title, 'title');
       const maintenanceType = assertNonEmpty(body.maintenance_type, 'maintenance_type').toLowerCase();
       const priority = Math.min(5, Math.max(1, Number(body.priority || 3)));
 
@@ -167,10 +178,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       // work_type is NOT NULL in DB; default to maintenance_type if not provided
       const workType = body.work_type ? String(body.work_type).trim() : maintenanceType;
+      const workPackageTemplateId = body.work_package_template_id ? String(body.work_package_template_id).trim() : undefined;
       const description = body.description ? String(body.description).trim() : undefined;
       const source = body.source ? String(body.source).trim() : undefined;
-      const plannedStartDate = body.planned_start_date ? String(body.planned_start_date).trim() : undefined;
-      const plannedEndDate = body.planned_end_date ? String(body.planned_end_date).trim() : undefined;
+      const plannedStartDate = parseOptionalDate(body.planned_start_date, 'planned_start_date');
+      const plannedEndDate = parseOptionalDate(body.planned_end_date, 'planned_end_date');
       const estimatedLaborHours = body.estimated_labor_hours ? Number(body.estimated_labor_hours) : undefined;
       const estimatedCost = body.estimated_cost ? Number(body.estimated_cost) : undefined;
       const assignedTo = body.assigned_to ? String(body.assigned_to).trim() : undefined;
@@ -201,6 +213,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         notes,
         referenceDocuments,
         externalReference,
+        workPackageTitleId,
+        workPackageTemplateId,
       });
 
       res.status(201).json({

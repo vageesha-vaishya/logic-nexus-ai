@@ -21,12 +21,16 @@ export function buildWorkPackageWizardSteps({
   assignmentOptions,
   assignmentOptionsLoading,
   assignmentOptionsError,
+  titleOptions,
+  titleOptionsLoading,
 }: {
   aircraftOptions: WizardOption[];
   templateOptions: WizardOption[];
   assignmentOptions: WizardOption[];
   assignmentOptionsLoading: boolean;
   assignmentOptionsError?: string | null;
+  titleOptions: WizardOption[];
+  titleOptionsLoading: boolean;
 }): WizardStepConfig[] {
   return [
     {
@@ -163,7 +167,21 @@ export function buildWorkPackageWizardSteps({
       description: 'Core work package details',
       icon: FileText,
       fields: [
-        { id: 'title', label: 'Title', type: 'text', required: true, colSpan: 2, placeholder: 'Enter work package title' },
+        {
+          id: 'work_package_title_id',
+          label: 'Title',
+          type: 'select',
+          required: true,
+          colSpan: 2,
+          options: titleOptions,
+          placeholder: titleOptionsLoading ? 'Loading titles...' : 'Select work package title...',
+          validate: (value) => {
+            const selected = String(value || '').trim();
+            if (!selected) return 'Title is required';
+            const exists = titleOptions.some((option) => option.value === selected);
+            return exists ? null : 'Please select a valid title from the list';
+          },
+        },
         { id: 'description', label: 'Description', type: 'textarea', colSpan: 2, placeholder: 'Describe scope and objectives' },
         {
           id: 'maintenance_type',
@@ -288,5 +306,6 @@ export function getWorkPackageWizardInitialData(preselectedAircraftId?: string):
     urgency_level: 'immediate',
     emergency_type: 'aog',
     submission_check: false,
+    work_package_title_id: '',
   };
 }

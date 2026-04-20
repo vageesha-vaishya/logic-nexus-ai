@@ -20,6 +20,13 @@ import { workPackagesStream } from '../realtime/work-packages-stream';
 const router = Router();
 const workOrdersService = new WorkOrdersService();
 
+function getFranchiseId(req: AuthRequest): string | null {
+  const fromHeader = String(req.header('x-franchise-id') || '').trim();
+  if (fromHeader) return fromHeader;
+  const fromUser = String((req.user as Record<string, unknown> | undefined)?.franchise_id || '').trim();
+  return fromUser || null;
+}
+
 type V2CreateWorkPackageRequest = {
   aircraft_id?: string;
   maintenance_type?: string;
@@ -70,6 +77,33 @@ function mapV2CreatePayloadToV1Request(request: V2CreateWorkPackageRequest): Cre
  * GET /api/v1/work-packages
  * Get all work packages for the tenant
  */
+router.get(
+  '/amro/work-package-titles',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    const items = await workOrdersService.getWorkPackageTitles(tenantId, franchiseId);
+    res.status(200).json({
+      version: 'v2',
+      interface: 'list-work-package-titles',
+      output: {
+        items,
+        total: items.length,
+      },
+    });
+    return;
+  }),
+);
+
 router.get(
   '/work-packages',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
@@ -268,6 +302,165 @@ router.post(
 
     const workPackage = await workOrdersService.createWorkPackage(tenantId, userId, request);
     res.status(201).json({ data: workPackage });
+    return;
+  }),
+);
+
+router.post(
+  '/amro/work-orders',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const userId = req.userId;
+
+    if (!tenantId || !userId) {
+      res.status(401).json({
+        error: 'Missing tenant or user context',
+        code: 'MISSING_CONTEXT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    const request = req.body as CreateWorkPackageRequest;
+    if (!request.aircraft_id || !request.title || !request.maintenance_type) {
+      res.status(400).json({
+        error: 'Missing required fields: aircraft_id, title, maintenance_type',
+        code: 'VALIDATION_ERROR',
+        statusCode: 400,
+      } as ErrorResponse);
+      return;
+    }
+
+    const workPackage = await workOrdersService.createWorkPackage(tenantId, userId, request);
+    res.status(201).json({
+      version: 'v2',
+      interface: 'create-work-order',
+      output: {
+        id: workPackage.id,
+        work_order_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
+        work_package_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
+        status: workPackage.status,
+      },
+    });
+    return;
+  }),
+);
+
+router.patch(
+  '/amro/work-orders/:id',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const userId = req.userId;
+    const { id } = req.params;
+    if (!tenantId || !userId) {
+      res.status(401).json({
+        error: 'Missing tenant or user context',
+        code: 'MISSING_CONTEXT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const request: UpdateWorkPackageRequest = req.body;
+    const workPackage = await workOrdersService.updateWorkPackage(tenantId, id, userId, request);
+    res.status(200).json({
+      version: 'v2',
+      interface: 'update-work-order',
+      output: {
+        id: workPackage.id,
+        work_order_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
+        work_package_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
+        status: workPackage.status,
+      },
+    });
+    return;
+  }),
+);
+
+router.delete(
+  '/amro/work-orders/:id',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const userId = req.userId;
+    const { id } = req.params;
+    if (!tenantId || !userId) {
+      res.status(401).json({
+        error: 'Missing tenant or user context',
+        code: 'MISSING_CONTEXT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    await workOrdersService.deleteWorkPackage(tenantId, id, userId);
+    res.status(204).send();
+    return;
+  }),
+);
+
+router.get(
+  '/amro/work-orders/:id',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    const { id } = req.params;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+    const workPackage = await workOrdersService.getWorkPackage(tenantId, id);
+    res.status(200).json({
+      version: 'v2',
+      interface: 'get-work-order',
+      output: {
+        work_package: workPackage,
+      },
+    });
+    return;
+  }),
+);
+
+router.get(
+  '/amro/work-orders',
+  asyncHandler(async (req: AuthRequest, res): Promise<void> => {
+    const tenantId = req.tenantId;
+    if (!tenantId) {
+      res.status(401).json({
+        error: 'Missing tenant context',
+        code: 'MISSING_TENANT',
+        statusCode: 401,
+      } as ErrorResponse);
+      return;
+    }
+
+    const workPackages = await workOrdersService.getWorkPackages(tenantId);
+    const records = workPackages.map((row) => ({
+      id: row.id,
+      work_order_number: row.work_package_number || row.work_order_number || row.id,
+      work_package_number: row.work_package_number || row.work_order_number || row.id,
+      title: row.title,
+      aircraft_id: row.aircraft_id,
+      status: row.status,
+      priority: 3,
+      maintenance_type: row.maintenance_type,
+      planned_start_date: row.planned_start_date,
+      planned_end_date: row.planned_end_date,
+      assigned_to: row.assigned_to,
+      source: null,
+      created_at: row.created_at,
+    }));
+
+    res.status(200).json({
+      version: 'v2',
+      interface: 'list-work-orders',
+      output: {
+        records,
+        total: records.length,
+        page: 1,
+        page_size: records.length,
+      },
+    });
     return;
   }),
 );

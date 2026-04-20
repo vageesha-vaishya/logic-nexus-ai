@@ -17,6 +17,8 @@ export interface PersistedWorkPackage {
   maintenance_type: MaintenanceType;
   priority: number;
   source: string | null;
+  work_package_template_id: string | null;
+  work_package_title_id: string | null;
   planned_start_date: string | null;
   planned_end_date: string | null;
   actual_start_date: string | null;
@@ -33,6 +35,14 @@ export interface PersistedWorkPackage {
   external_reference: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface WorkPackageTitleCatalogItem {
+  id: string;
+  title: string;
+  wp_title: string;
+  tenant_id: string;
+  franchise_id: string | null;
 }
 
 export interface PersistedTask {
@@ -77,11 +87,112 @@ function generateWorkOrderNumber(): string {
 
 // ── Generate next work order number for tenant ──────────────────────────────
 
-async function getNextWorkOrderNumber(supabase: ReturnType<typeof getSupabaseAdminClient>): Promise<string> {
-  const newNumber = generateWorkOrderNumber();
-  // In a production system, this would use a DB sequence. For now, we generate
-  // a unique number and rely on the UNIQUE constraint to catch collisions.
-  return newNumber;
+async function resolveAircraftRegistration(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  aircraftId: string | null,
+): Promise<string> {
+  if (!aircraftId) return 'UNKNOWN';
+  const { data, error } = await supabase
+    .from('aircraft')
+    .select('registration,tail_number')
+    .eq('id', aircraftId)
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    logger.warn('amro-work-package-aircraft-registration-lookup-failed', { message: error.message, aircraftId });
+    return 'UNKNOWN';
+  }
+  const registration = String(data?.registration || data?.tail_number || '').trim().toUpperCase();
+  return registration || 'UNKNOWN';
+}
+
+type WorkPackageTitleRecord = { id: string; title: string; wp_title: string };
+
+async function resolveWorkPackageTitleRecord(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  params: {
+    tenantId: string;
+    franchiseId: string | null;
+    workPackageTitleId?: string;
+    fallbackTitle: string;
+  },
+): Promise<WorkPackageTitleRecord> {
+  const selectedTitleId = String(params.workPackageTitleId || '').trim();
+  if (selectedTitleId) {
+    let titleQuery = supabase
+      .from('work_packages_title')
+      .select('id,title,wp_title,franchise_id')
+      .eq('tenant_id', params.tenantId)
+      .eq('id', selectedTitleId)
+      .limit(1);
+    if (params.franchiseId) {
+      titleQuery = titleQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+    }
+    const { data, error } = await titleQuery.maybeSingle();
+    if (error) {
+      throw new Error(`Failed to resolve work package title: ${error.message}`);
+    }
+    if (!data) {
+      throw new Error('Selected work package title is not available in current tenant scope');
+    }
+    return {
+      id: String(data.id || ''),
+      title: String(data.title || '').trim(),
+      wp_title: String(data.wp_title || '').trim().toUpperCase(),
+    };
+  }
+
+  const fallback = String(params.fallbackTitle || '').trim();
+  if (!fallback) {
+    throw new Error('title or work_package_title_id is required');
+  }
+  return {
+    id: '',
+    title: fallback,
+    wp_title: fallback.replace(/[^A-Za-z0-9]/g, '').toUpperCase().slice(0, 16) || 'GENERAL',
+  };
+}
+
+function toSafeWorkPackageSegment(value: string): string {
+  const normalized = String(value || '').trim().toUpperCase();
+  const compact = normalized.replace(/[^A-Z0-9-]/g, '');
+  return compact || 'NA';
+}
+
+function parseWorkPackageNumberSequence(workPackageNumber: string, year: number): number {
+  const pattern = /^WP-(.+)-(\d{4})-(\d+)-([A-Z0-9-]+)$/;
+  const match = String(workPackageNumber || '').match(pattern);
+  if (!match) return 0;
+  const parsedYear = Number.parseInt(match[2], 10);
+  const parsedSeq = Number.parseInt(match[3], 10);
+  if (parsedYear !== year || !Number.isFinite(parsedSeq)) return 0;
+  return parsedSeq;
+}
+
+async function getNextWorkOrderNumber(
+  supabase: ReturnType<typeof getSupabaseAdminClient>,
+  params: {
+    tenantId: string;
+    aircraftRegistration: string;
+    wpTitleCode: string;
+    year: number;
+  },
+): Promise<string> {
+  const likePattern = `WP-%-${params.year}-%`;
+  const { data, error } = await supabase
+    .from('work_packages')
+    .select('work_package_number')
+    .eq('tenant_id', params.tenantId)
+    .ilike('work_package_number', likePattern);
+  if (error) {
+    throw new Error(`Failed to generate work package sequence: ${error.message}`);
+  }
+  const maxSeq = (Array.isArray(data) ? data : []).reduce((max, row) => {
+    const current = parseWorkPackageNumberSequence(String((row as Record<string, unknown>).work_package_number || ''), params.year);
+    return current > max ? current : max;
+  }, 0);
+  const nextSeq = String(maxSeq + 1).padStart(4, '0');
+  return `WP-${toSafeWorkPackageSegment(params.aircraftRegistration)}-${params.year}-${nextSeq}-${toSafeWorkPackageSegment(params.wpTitleCode)}`;
 }
 
 // ── Create work package ─────────────────────────────────────────────────────
@@ -91,7 +202,7 @@ export async function persistCreateWorkPackage(params: {
   franchiseId: string | null;
   userId: string;
   aircraftId: string | null;
-  title: string;
+  title?: string;
   description?: string;
   workType?: string;
   maintenanceType: MaintenanceType;
@@ -106,9 +217,24 @@ export async function persistCreateWorkPackage(params: {
   notes?: string;
   referenceDocuments?: string[];
   externalReference?: string;
+  workPackageTemplateId?: string;
+  workPackageTitleId?: string;
 }): Promise<PersistedWorkPackage> {
   const supabase = getSupabaseAdminClient();
-  const workOrderNumber = await getNextWorkOrderNumber(supabase);
+  const titleRecord = await resolveWorkPackageTitleRecord(supabase, {
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    workPackageTitleId: params.workPackageTitleId,
+    fallbackTitle: params.title,
+  });
+  const aircraftRegistration = await resolveAircraftRegistration(supabase, params.aircraftId);
+  const year = new Date().getUTCFullYear();
+  const workOrderNumber = await getNextWorkOrderNumber(supabase, {
+    tenantId: params.tenantId,
+    aircraftRegistration,
+    wpTitleCode: titleRecord.wp_title,
+    year,
+  });
 
   const { data, error } = await supabase
     .from('work_packages')
@@ -117,12 +243,14 @@ export async function persistCreateWorkPackage(params: {
       franchise_id: params.franchiseId,
       aircraft_id: params.aircraftId,
       work_package_number: workOrderNumber,
-      title: params.title,
+      title: titleRecord.title,
       description: params.description || null,
       work_type: params.workType || params.maintenanceType, // NOT NULL in DB; default to maintenance type
       maintenance_type: params.maintenanceType,
       priority: params.priority,
       source: params.source || null,
+      work_package_template_id: params.workPackageTemplateId || null,
+      work_package_title_id: titleRecord.id || null,
       planned_start_date: params.plannedStartDate || null,
       planned_end_date: params.plannedEndDate || null,
       estimated_labor_hours: params.estimatedLaborHours || null,
@@ -439,6 +567,8 @@ function mapRowToWorkPackage(row: Record<string, unknown>): PersistedWorkPackage
     maintenance_type: (row.maintenance_type as MaintenanceType) || 'line',
     priority: Number(row.priority || 3),
     source: row.source ? String(row.source) : null,
+    work_package_template_id: row.work_package_template_id ? String(row.work_package_template_id) : null,
+    work_package_title_id: row.work_package_title_id ? String(row.work_package_title_id) : null,
     planned_start_date: row.planned_start_date ? String(row.planned_start_date) : null,
     planned_end_date: row.planned_end_date ? String(row.planned_end_date) : null,
     actual_start_date: row.actual_start_date ? String(row.actual_start_date) : null,
@@ -500,4 +630,42 @@ export async function checkPersistenceHealth(): Promise<{ ok: boolean; error?: s
   const { error } = await supabase.from('work_packages').select('id').limit(1);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
+}
+
+export async function fetchWorkPackageTitleCatalog(params: {
+  tenantId: string;
+  franchiseId: string | null;
+}): Promise<{ items: WorkPackageTitleCatalogItem[]; total: number }> {
+  const supabase = getSupabaseAdminClient();
+  let query = supabase
+    .from('work_packages_title')
+    .select('id,title,wp_title,tenant_id,franchise_id')
+    .eq('tenant_id', params.tenantId)
+    .order('title', { ascending: true });
+
+  if (params.franchiseId) {
+    query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+  }
+
+  const { data, error } = await query;
+  if (error) {
+    throw new Error(`Failed to fetch work package title catalog: ${error.message}`);
+  }
+
+  const items = (Array.isArray(data) ? data : [])
+    .map((row) => ({
+      id: String((row as Record<string, unknown>).id || ''),
+      title: String((row as Record<string, unknown>).title || ''),
+      wp_title: String((row as Record<string, unknown>).wp_title || ''),
+      tenant_id: String((row as Record<string, unknown>).tenant_id || ''),
+      franchise_id: (row as Record<string, unknown>).franchise_id
+        ? String((row as Record<string, unknown>).franchise_id)
+        : null,
+    }))
+    .filter((item) => item.id && item.title && item.wp_title);
+
+  return {
+    items,
+    total: items.length,
+  };
 }

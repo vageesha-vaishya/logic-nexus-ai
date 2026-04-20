@@ -27,6 +27,38 @@ import { logger } from '../utils/logger';
 export class WorkOrdersService {
   private supabase: SupabaseClient;
 
+  async getWorkPackageTitles(
+    tenantId: string,
+    franchiseId?: string | null,
+  ): Promise<Array<{ id: string; title: string; wp_title: string; tenant_id: string; franchise_id: string | null }>> {
+    let query = this.supabase
+      .from('work_packages_title')
+      .select('id,title,wp_title,tenant_id,franchise_id')
+      .eq('tenant_id', tenantId)
+      .order('title', { ascending: true });
+
+    if (franchiseId) {
+      query = query.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      throw new Error(`Failed to fetch work package titles: ${error.message}`);
+    }
+
+    return (Array.isArray(data) ? data : [])
+      .map((row) => ({
+        id: String((row as Record<string, unknown>).id || ''),
+        title: String((row as Record<string, unknown>).title || ''),
+        wp_title: String((row as Record<string, unknown>).wp_title || ''),
+        tenant_id: String((row as Record<string, unknown>).tenant_id || ''),
+        franchise_id: (row as Record<string, unknown>).franchise_id
+          ? String((row as Record<string, unknown>).franchise_id)
+          : null,
+      }))
+      .filter((item) => item.id && item.title && item.wp_title);
+  }
+
   private getWorkPackageNumber(workPackage: WorkPackage): string {
     return workPackage.work_package_number ?? workPackage.work_package_number ?? '';
   }
@@ -210,7 +242,6 @@ export class WorkOrdersService {
           .insert({
             tenant_id: tenantId,
             aircraft_id: aircraftId,
-            work_package_number: workOrderNumber,
             work_package_number: workOrderNumber,
             title: request.title,
             description: request.description,

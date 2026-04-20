@@ -103,6 +103,36 @@ export interface WorkPackageListResponse {
 
 const WORK_PACKAGES_KEY = ['amro', 'work-packages'] as const;
 
+function normalizeWorkPackageListResponse(json: any): WorkPackageListResponse {
+  const rawItems = json.items || json.data?.workPackages || json.output?.records || json.output?.items || json.data || [];
+  const recordsArray = Array.isArray(rawItems) ? rawItems : [];
+  return {
+    records: recordsArray.map((item: any) => ({
+      id: item.id || item.work_package_id || '',
+      work_package_number: item.work_package_number || item.work_order_number || item.package_number || item.code || item.id || '',
+      work_order_number: item.work_order_number || item.work_package_number || item.code || '',
+      title: item.title || 'Work Package',
+      aircraft_id: item.aircraft_id || null,
+      aircraft_registration: item.aircraft_registration || null,
+      status: (item.status || 'planning') as WorkPackageStatus,
+      priority: (item.priority || 3) as WorkPackagePriority,
+      maintenance_type: (item.maintenance_type || 'line') as MaintenanceType,
+      planned_start_date: item.planned_start_date || item.planned_start || null,
+      planned_end_date: item.planned_end_date || item.planned_end || item.due_at || null,
+      actual_start_date: item.actual_start_date || null,
+      actual_end_date: item.actual_end_date || null,
+      estimated_cost: item.estimated_cost || null,
+      actual_cost: item.actual_cost || null,
+      assigned_to: item.assigned_to || null,
+      source: item.source || null,
+      created_at: item.created_at || '',
+    })),
+    total: json.pagination?.total_items || json.count || json.output?.total || recordsArray.length,
+    page: json.pagination?.page || json.output?.page || 1,
+    page_size: json.pagination?.page_size || json.output?.page_size || recordsArray.length,
+  };
+}
+
 // ── List work packages ──────────────────────────────────────────────────────
 
 interface UseListWorkPackagesParams {
@@ -141,38 +171,27 @@ async function fetchWorkPackages(
     ...(params.search ? { search: params.search } : {}),
   });
 
-  const url = `/api/v2/amro/work-packages?${qs.toString()}`;
-  const response = await fetch(url, { method: 'GET', headers });
-  if (!response.ok) throw new Error(`Failed to list work packages: ${response.status}`);
-  const json = await response.json();
-  // Map API response to UI format - API returns { items: [...], pagination: {...} }
-  const rawItems = json.items || json.data?.workPackages || json.output?.records || json.output?.items || json.data || [];
-  const recordsArray = Array.isArray(rawItems) ? rawItems : [];
-  return {
-    records: recordsArray.map((item: any) => ({
-      id: item.id || item.work_package_id || '',
-      work_package_number: item.work_package_number || item.work_order_number || item.package_number || item.code || item.id || '',
-      work_order_number: item.work_order_number || item.work_package_number || item.code || '',
-      title: item.title || 'Work Package',
-      aircraft_id: item.aircraft_id || null,
-      aircraft_registration: item.aircraft_registration || null,
-      status: (item.status || 'planning') as WorkPackageStatus,
-      priority: (item.priority || 3) as WorkPackagePriority,
-      maintenance_type: (item.maintenance_type || 'line') as MaintenanceType,
-      planned_start_date: item.planned_start_date || item.planned_start || null,
-      planned_end_date: item.planned_end_date || item.planned_end || item.due_at || null,
-      actual_start_date: item.actual_start_date || null,
-      actual_end_date: item.actual_end_date || null,
-      estimated_cost: item.estimated_cost || null,
-      actual_cost: item.actual_cost || null,
-      assigned_to: item.assigned_to || null,
-      source: item.source || null,
-      created_at: item.created_at || '',
-    })),
-    total: json.pagination?.total_items || json.count || json.output?.total || recordsArray.length,
-    page: json.pagination?.page || json.output?.page || 1,
-    page_size: json.pagination?.page_size || json.output?.page_size || recordsArray.length,
+  const queryString = qs.toString();
+  const fetchList = async (endpoint: '/api/v2/amro/work-orders' | '/api/v2/amro/work-packages') => {
+    const response = await fetch(`${endpoint}?${queryString}`, { method: 'GET', headers });
+    if (!response.ok) throw new Error(`Failed to list work packages: ${response.status}`);
+    const json = await response.json();
+    return normalizeWorkPackageListResponse(json);
   };
+
+  let primaryError: Error | null = null;
+  try {
+    const primary = await fetchList('/api/v2/amro/work-orders');
+    if (primary.records.length > 0) return primary;
+  } catch (error) {
+    primaryError = error as Error;
+  }
+
+  try {
+    return await fetchList('/api/v2/amro/work-packages');
+  } catch (fallbackError) {
+    throw primaryError || fallbackError;
+  }
 }
 
 export function useListWorkPackages(params: UseListWorkPackagesParams = {}) {
@@ -227,43 +246,53 @@ export function useListWorkPackages(params: UseListWorkPackagesParams = {}) {
 // ── Get single work package ─────────────────────────────────────────────────
 
 async function fetchWorkPackage(id: string, headers: HeadersInit): Promise<WorkPackageDetail> {
-  const url = `/api/v2/amro/work-packages/${id}`;
-  const response = await fetch(url, { method: 'GET', headers });
-  if (!response.ok) throw new Error(`Failed to get work package: ${response.status}`);
-  const json = await response.json();
-  // API returns { data: { work_package: {...} } }
-  const dataBlock = json.data || json.output || {};
-  const item = dataBlock.work_package || dataBlock.record || dataBlock;
-  return {
-    id: item.id || id,
-    work_package_number: item.work_package_number || item.work_order_number || item.code || '',
-    work_order_number: item.work_order_number || item.work_package_number || item.code || '',
-    title: item.title || item.work_package_number || 'Work Package',
-    aircraft_id: item.aircraft_id || null,
-    aircraft_registration: item.aircraft_registration || item.aircraft || null,
-    status: (item.status || 'planning') as WorkPackageStatus,
-    priority: Number(item.priority || 3) as WorkPackagePriority,
-    maintenance_type: (item.maintenance_type || 'line') as MaintenanceType,
-    description: item.description || null,
-    planned_start_date: item.planned_start_date || item.planned_start || null,
-    planned_end_date: item.planned_end_date || item.planned_end || null,
-    actual_start_date: item.actual_start_date || null,
-    actual_end_date: item.actual_end_date || null,
-    estimated_cost: item.estimated_cost || null,
-    actual_cost: item.actual_cost || null,
-    estimated_labor_hours: item.estimated_labor_hours || null,
-    actual_labor_hours: item.actual_labor_hours || null,
-    assigned_to: item.assigned_to || null,
-    supervisor_id: item.supervisor_id || null,
-    source: item.source || null,
-    notes: item.notes || null,
-    reference_documents: item.reference_documents || [],
-    external_reference: item.external_reference || null,
-    tasks: item.tasks || item.task_list || [],
-    materials: item.materials || item.material_list || [],
-    maintenance_events: item.maintenance_events || [],
-    created_at: item.created_at || '',
+  const mapDetail = (json: any): WorkPackageDetail => {
+    const dataBlock = json.data || json.output || {};
+    const item = dataBlock.work_package || dataBlock.record || dataBlock;
+    return {
+      id: item.id || id,
+      work_package_number: item.work_package_number || item.work_order_number || item.code || '',
+      work_order_number: item.work_order_number || item.work_package_number || item.code || '',
+      title: item.title || item.work_package_number || 'Work Package',
+      aircraft_id: item.aircraft_id || null,
+      aircraft_registration: item.aircraft_registration || item.aircraft || null,
+      status: (item.status || 'planning') as WorkPackageStatus,
+      priority: Number(item.priority || 3) as WorkPackagePriority,
+      maintenance_type: (item.maintenance_type || 'line') as MaintenanceType,
+      description: item.description || null,
+      planned_start_date: item.planned_start_date || item.planned_start || null,
+      planned_end_date: item.planned_end_date || item.planned_end || null,
+      actual_start_date: item.actual_start_date || null,
+      actual_end_date: item.actual_end_date || null,
+      estimated_cost: item.estimated_cost || null,
+      actual_cost: item.actual_cost || null,
+      estimated_labor_hours: item.estimated_labor_hours || null,
+      actual_labor_hours: item.actual_labor_hours || null,
+      assigned_to: item.assigned_to || null,
+      supervisor_id: item.supervisor_id || null,
+      source: item.source || null,
+      notes: item.notes || null,
+      reference_documents: item.reference_documents || [],
+      external_reference: item.external_reference || null,
+      tasks: item.tasks || item.task_list || [],
+      materials: item.materials || item.material_list || [],
+      maintenance_events: item.maintenance_events || [],
+      created_at: item.created_at || '',
+    };
   };
+
+  const fetchDetail = async (endpoint: '/api/v2/amro/work-orders' | '/api/v2/amro/work-packages') => {
+    const response = await fetch(`${endpoint}/${id}`, { method: 'GET', headers });
+    if (!response.ok) throw new Error(`Failed to get work package: ${response.status}`);
+    const json = await response.json();
+    return mapDetail(json);
+  };
+
+  try {
+    return await fetchDetail('/api/v2/amro/work-orders');
+  } catch {
+    return fetchDetail('/api/v2/amro/work-packages');
+  }
 }
 
 export function useWorkPackage(id: string | null) {
@@ -281,7 +310,8 @@ export function useWorkPackage(id: string | null) {
 
 interface CreateWorkPackageInput {
   aircraft_id: string;
-  title: string;
+  title?: string;
+  work_package_title_id?: string;
   description?: string;
   work_type?: string;
   maintenance_type: MaintenanceType;
@@ -295,7 +325,7 @@ interface CreateWorkPackageInput {
   supervisor_id?: string;
   notes?: string;
   reference_documents?: string[];
-  template_id?: string;
+  work_package_template_id?: string;
 }
 
 async function mutateCreateWorkPackage(input: CreateWorkPackageInput, headers: HeadersInit): Promise<{
@@ -304,7 +334,7 @@ async function mutateCreateWorkPackage(input: CreateWorkPackageInput, headers: H
   work_order_number?: string;
   status: WorkPackageStatus;
 }> {
-  const response = await fetch('/api/v2/amro/work-packages', {
+  const response = await fetch('/api/v2/amro/work-orders', {
     method: 'POST',
     headers,
     body: JSON.stringify(input),
@@ -353,7 +383,7 @@ async function mutateUpdateWorkPackage(input: UpdateWorkPackageInput, headers: H
   work_package_number: string;
   work_order_number?: string;
 }> {
-  const response = await fetch(`/api/v2/amro/work-packages/${input.id}`, {
+  const response = await fetch(`/api/v2/amro/work-orders/${input.id}`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify(input),
@@ -394,7 +424,7 @@ async function mutateTransitionWorkPackage(input: TransitionWorkPackageInput, he
   new_status: WorkPackageStatus;
   transitioned_at: string;
 }> {
-  const response = await fetch(`/api/v2/amro/work-packages/${input.id}`, {
+  const response = await fetch(`/api/v2/amro/work-orders/${input.id}`, {
     method: 'PATCH',
     headers,
     body: JSON.stringify({ status: input.target_status }),
@@ -424,7 +454,7 @@ export function useTransitionWorkPackage() {
 // ── Delete work package ─────────────────────────────────────────────────────
 
 async function mutateDeleteWorkPackage(id: string, headers: HeadersInit): Promise<void> {
-  const response = await fetch(`/api/v2/amro/work-packages/${id}`, {
+  const response = await fetch(`/api/v2/amro/work-orders/${id}`, {
     method: 'DELETE',
     headers,
   });

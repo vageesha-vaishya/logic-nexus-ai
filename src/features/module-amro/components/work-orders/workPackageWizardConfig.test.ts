@@ -9,6 +9,8 @@ describe('workPackageWizardConfig template model validation', () => {
       assignmentOptions: [],
       assignmentOptionsLoading: false,
       assignmentOptionsError: null,
+      titleOptions: [{ value: 'ttl-1', label: 'Starter Work Package (STARTER)' }],
+      titleOptionsLoading: false,
     });
     const aircraftStep = steps.find((step) => step.id === 'aircraft-path');
     const templateField = aircraftStep?.fields.find((field) => field.id === 'template_version_id');
@@ -56,6 +58,8 @@ describe('workPackageWizardConfig schedule validation', () => {
     ],
     assignmentOptionsLoading: false,
     assignmentOptionsError: null,
+    titleOptions: [{ value: 'ttl-1', label: 'Starter Work Package (STARTER)' }],
+    titleOptionsLoading: false,
   });
 
   const scheduleStep = steps.find((step) => step.id === 'schedule');

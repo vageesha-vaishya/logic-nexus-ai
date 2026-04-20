@@ -8,6 +8,7 @@ import { workPackagesStream } from '../src/realtime/work-packages-stream';
 jest.mock('../src/services/work-orders.service', () => ({
   WorkOrdersService: jest.fn(() => ({
     getWorkPackages: jest.fn(),
+    getWorkPackageTitles: jest.fn(),
     getWorkPackage: jest.fn(),
     createWorkPackage: jest.fn(),
     updateWorkPackage: jest.fn(),
@@ -56,6 +57,7 @@ function createTestApp(withContext = true) {
 
 const mockService = (WorkOrdersService as unknown as jest.Mock).mock.results[0]?.value as {
   getWorkPackages: jest.Mock;
+  getWorkPackageTitles: jest.Mock;
   getWorkPackage: jest.Mock;
   createWorkPackage: jest.Mock;
   updateWorkPackage: jest.Mock;
@@ -85,6 +87,7 @@ describe('work-orders.routes', () => {
   it('serves work package and task CRUD endpoints', async () => {
     const app = createTestApp(true);
     mockService.getWorkPackages.mockResolvedValue([{ id: 'wp-1' }]);
+    mockService.getWorkPackageTitles.mockResolvedValue([{ id: 'ttl-1', title: 'Starter Work Package', wp_title: 'STARTER' }]);
     mockService.getWorkPackage.mockResolvedValue({ id: 'wp-1' });
     mockService.createWorkPackage.mockResolvedValue({ id: 'wp-2' });
     mockService.updateWorkPackage.mockResolvedValue({ id: 'wp-1', title: 'Updated' });
@@ -106,14 +109,24 @@ describe('work-orders.routes', () => {
     mockService.getIntegrationSummary.mockResolvedValue({ adapter_health: 'healthy' });
 
     await request(app).get('/api/v1/work-packages').expect(200);
+    await request(app).get('/api/v1/amro/work-orders').expect(200);
+    await request(app).get('/api/v1/amro/work-package-titles').expect(200);
     await request(app).get('/api/v1/work-packages/wp-1').expect(200);
+    await request(app).get('/api/v1/amro/work-orders/wp-1').expect(200);
     await request(app).post('/api/v1/work-packages').send({
       aircraft_id: 'ac-1',
       title: 'T',
       maintenance_type: 'line',
     }).expect(201);
+    await request(app).post('/api/v1/amro/work-orders').send({
+      aircraft_id: 'ac-1',
+      title: 'T',
+      maintenance_type: 'line',
+    }).expect(201);
     await request(app).patch('/api/v1/work-packages/wp-1').send({ title: 'Updated' }).expect(200);
+    await request(app).patch('/api/v1/amro/work-orders/wp-1').send({ title: 'Updated' }).expect(200);
     await request(app).delete('/api/v1/work-packages/wp-1').expect(204);
+    await request(app).delete('/api/v1/amro/work-orders/wp-1').expect(204);
 
     await request(app).get('/api/v1/work-packages/wp-1/tasks').expect(200);
     await request(app).get('/api/v1/tasks/task-1').expect(200);
