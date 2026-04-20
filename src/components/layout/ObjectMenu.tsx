@@ -148,7 +148,11 @@ export function ObjectMenu() {
   };
 
   return (
-    <NavigationMenu className="ml-2" value={menuValue} onValueChange={handleMenuValueChange}>
+    <NavigationMenu
+      className="ml-2 [&>div]:left-auto [&>div]:right-0 [&>div]:justify-end"
+      value={menuValue}
+      onValueChange={handleMenuValueChange}
+    >
       <NavigationMenuList>
         <NavigationMenuItem value={launcherValue}>
           <NavigationMenuTrigger
@@ -161,13 +165,13 @@ export function ObjectMenu() {
           >
             App Launcher
           </NavigationMenuTrigger>
-          <NavigationMenuContent>
+          <NavigationMenuContent className="md:left-auto md:right-0">
             <div
               data-testid="app-launcher-content"
               onPointerEnter={(event) => handlePointerEnter(event.pointerType)}
               onPointerLeave={(event) => handlePointerLeave(event.pointerType)}
               onPointerCancel={handlePointerCancel}
-              className="w-[92vw] max-w-[1000px] sm:w-[640px] lg:w-[900px] p-4 sm:p-6 max-h-[min(78vh,720px)] overflow-y-auto overflow-x-hidden [transform:translateZ(0)]"
+              className="w-[min(92vw,1000px)] sm:w-[min(90vw,900px)] p-4 sm:p-6 max-h-[min(78vh,720px)] overflow-y-auto overflow-x-hidden [transform:translateZ(0)]"
             >
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {OBJECT_GROUPS.map((group) => (
