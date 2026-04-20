@@ -586,10 +586,16 @@ function StepContent({ step, formData, errors, onChange }: StepContentProps) {
 interface ReviewStepProps {
   steps: WizardStepConfig[];
   formData: Record<string, any>;
+  errors: Record<string, string>;
+  onChange: (id: string, value: any) => void;
   onEditStep: (stepIndex: number) => void;
 }
 
-function ReviewStep({ steps, formData, onEditStep }: ReviewStepProps) {
+function ReviewStep({ steps, formData, errors, onChange, onEditStep }: ReviewStepProps) {
+  const reviewStep = steps.find((step) => step.id === 'review');
+  const confirmationField = reviewStep?.fields.find((field) => field.id === 'submission_check');
+  const confirmationError = errors.submission_check;
+
   return (
     <div className="space-y-6">
       {/* Review Header */}
@@ -655,13 +661,36 @@ function ReviewStep({ steps, formData, onEditStep }: ReviewStepProps) {
       </div>
 
       {/* Submission Notice */}
-      <Alert>
-        <Info className="h-4 w-4" />
-        <AlertTitle className="text-xs">Ready to Submit</AlertTitle>
-        <AlertDescription className="text-xs">
-          Please review all entries above. Click Submit to create the record, or go back to make changes.
-        </AlertDescription>
-      </Alert>
+      <div className="space-y-3">
+        {confirmationField ? (
+          <div className="space-y-1">
+            <div className="flex items-center space-x-2">
+              <Checkbox
+                id={confirmationField.id}
+                checked={Boolean(formData.submission_check)}
+                onCheckedChange={(checked) => onChange('submission_check', Boolean(checked))}
+              />
+              <Label htmlFor={confirmationField.id} className="text-sm cursor-pointer">
+                {confirmationField.label}
+                {confirmationField.required && <span className="text-red-500 ml-1">*</span>}
+              </Label>
+            </div>
+            {confirmationError ? (
+              <p className="text-xs text-red-500 flex items-center gap-1" role="alert">
+                <AlertCircle className="h-3 w-3" />
+                {confirmationError}
+              </p>
+            ) : null}
+          </div>
+        ) : null}
+        <Alert>
+          <Info className="h-4 w-4" />
+          <AlertTitle className="text-xs">Ready to Submit</AlertTitle>
+          <AlertDescription className="text-xs">
+            Please review all entries above. Click Submit to create the record, or go back to make changes.
+          </AlertDescription>
+        </Alert>
+      </div>
     </div>
   );
 }
@@ -882,6 +911,8 @@ export function AmroRecordWizard({
             <ReviewStep
               steps={visibleSteps}
               formData={formData}
+              errors={errors}
+              onChange={handleFieldChange}
               onEditStep={handleStepClick}
             />
           ) : (
