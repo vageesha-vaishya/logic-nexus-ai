@@ -176,6 +176,10 @@ export function AmroMpdManagementPage() {
   }, [records]);
 
   const handleCreate = useCallback(async () => {
+    if (!advancedFilters.model) {
+      toast.error('Model selection is required');
+      return;
+    }
     if (!createForm.description || !createForm.ata_code || !createForm.inspection_type) {
       toast.error('Description and ATA Code are required');
       return;
@@ -200,6 +204,7 @@ export function AmroMpdManagementPage() {
     try {
       await createMutation.mutateAsync({
         ...createForm,
+        assembly_model_id: advancedFilters.model,
         category_code: createForm.inspection_type || null,
         reference_amp: createForm.reference_amp || null,
         interval_hours: createForm.frequency_hours,
@@ -215,7 +220,7 @@ export function AmroMpdManagementPage() {
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to create MPD record');
     }
-  }, [createForm, createMutation, invalidate]);
+  }, [advancedFilters.model, createForm, createMutation, invalidate]);
 
   const handleSelectAttachment = useCallback(async (file: File | null) => {
     if (!file) return;
@@ -276,6 +281,10 @@ export function AmroMpdManagementPage() {
     if (!advancedFilters.assemblyType) return [];
     return source.filter((model) => model.assembly_type_id === advancedFilters.assemblyType);
   }, [advancedFilters.assemblyType, assemblyModelOptionsQuery.data]);
+  const selectedModelName = useMemo(
+    () => modelOptions.find((option) => option.id === advancedFilters.model)?.name || advancedFilters.model,
+    [advancedFilters.model, modelOptions],
+  );
 
   const categoryOptions = useMemo(() => ['all'], []);
   const ataOptions = useMemo(() => ['all'], []);
@@ -469,7 +478,9 @@ export function AmroMpdManagementPage() {
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Create MPD Record</DialogTitle>
+            <DialogTitle>
+              Create MPD Record for model {selectedModelName || 'Selected Model'}
+            </DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -598,18 +609,6 @@ export function AmroMpdManagementPage() {
                 value={createForm.estimated_man_hours ?? ''}
                 onChange={(event) => setCreateForm((current) => ({ ...current, estimated_man_hours: toNullableNumber(event.target.value) }))}
               />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="assembly-model-id">Model</Label>
-              <select
-                id="assembly-model-id"
-                className="h-10 w-full rounded-md border bg-background px-2"
-                value={createForm.assembly_model_id || ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, assembly_model_id: event.target.value }))}
-              >
-                <option value="">(SELECT)</option>
-                {modelOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
-              </select>
             </div>
             <div className="space-y-2 md:col-span-2">
               <Label>Attach File</Label>
