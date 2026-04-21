@@ -98,8 +98,11 @@ function mapTaskTemplateRowToMpd(row: JsonRecord): JsonRecord {
     interval_hours: normalizeInteger(row.interval_hours),
     interval_cycles: normalizeInteger(row.interval_cycles),
     interval_months: normalizeInteger(row.interval_months),
+    threshold_cycles: normalizeInteger(row.threshold_cycles),
     is_mandatory: normalizeBoolean(row.is_mandatory, true),
     assembly_model_id: normalizeString(row.assembly_models ?? row.model_id),
+    loc_json: normalizeJsonArray(row.loc_json),
+    other_details_json: normalizeJsonArray(row.other_details_json),
     task_template_detail_json: normalizeJsonArray(row.task_template_detail_json),
     task_template_scope_json: normalizeJsonArray(row.task_template_scope_json),
     tenant_id: normalizeString(row.tenant_id),
@@ -147,6 +150,15 @@ function mapMpdPayloadToTaskTemplateInput(payload: JsonRecord): JsonRecord {
   if (payload.interval_months !== undefined) {
     setIfDefined('interval_months', normalizeInteger(payload.interval_months));
   }
+  if (payload.threshold_cycles !== undefined) {
+    setIfDefined('threshold_cycles', normalizeInteger(payload.threshold_cycles));
+  }
+  if (payload.loc_json !== undefined) {
+    setIfDefined('loc_json', normalizeJsonArray(payload.loc_json));
+  }
+  if (payload.other_details_json !== undefined) {
+    setIfDefined('other_details_json', normalizeJsonArray(payload.other_details_json));
+  }
 
   return input;
 }
@@ -164,6 +176,14 @@ function validateMpdInput(payload: JsonRecord, mode: 'create' | 'patch'): Array<
     && normalizeDecimal(payload.estimated_man_hours) === null
   ) {
     issues.push({ field: 'estimated_man_hours', message: 'estimated_man_hours must be a valid number' });
+  }
+  if (
+    payload.threshold_cycles !== undefined
+    && payload.threshold_cycles !== null
+    && payload.threshold_cycles !== ''
+    && normalizeInteger(payload.threshold_cycles) === null
+  ) {
+    issues.push({ field: 'threshold_cycles', message: 'threshold_cycles must be an integer' });
   }
   return issues;
 }

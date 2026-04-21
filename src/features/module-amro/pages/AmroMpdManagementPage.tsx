@@ -14,12 +14,15 @@ import { AmroKpiGrid, AmroModuleSurface } from '@/features/module-amro/component
 import { AmroUnifiedGridRecordDetailShell } from '@/features/module-amro/components/parts/AmroUnifiedGridRecordDetailShell';
 import type { GridColumnDefinition } from '@/features/module-amro/components/templates/AmroInventoryDataGridTemplate';
 import {
+  useAtaCodeOptions,
   useAssemblyModelOptions,
   useAssemblyTypeOptions,
   useCreateMpd,
   useDeleteMpd,
   useListMpd,
   useMpdActions,
+  useUploadMpdAttachment,
+  type UploadedMpdAttachment,
   useUpdateMpd,
   type MpdRecord,
   type MpdUpsertInput,
@@ -27,21 +30,53 @@ import {
 
 type MpdGridRow = MpdRecord & Record<string, unknown>;
 
-const CREATE_DEFAULTS: MpdUpsertInput = {
+type MpdCreateFormState = MpdUpsertInput & {
+  inspection_type: string;
+  zone: string;
+  area: string;
+  note: string;
+  frequency_hours: number | null;
+  frequency_days: number | null;
+  frequency_cycles: number | null;
+  frequency_landings: number | null;
+  other_tools: string;
+  other_spares: string;
+  other_task_cards: string;
+  other_linked_activities: string;
+  attachment: UploadedMpdAttachment | null;
+};
+
+const CREATE_DEFAULTS: MpdCreateFormState = {
   mpd_code: '',
   ata_code: '',
   reference_amp: '',
   description: '',
   category_code: '',
   estimated_man_hours: null,
-  revision_status: '',
+  revision_status: null,
   interval_hours: null,
   interval_cycles: null,
   interval_months: null,
+  threshold_cycles: null,
   is_mandatory: true,
   assembly_model_id: '',
+  loc_json: [],
+  other_details_json: [],
   task_template_detail_json: [],
   task_template_scope_json: [],
+  inspection_type: '',
+  zone: '',
+  area: '',
+  note: '',
+  frequency_hours: null,
+  frequency_days: null,
+  frequency_cycles: null,
+  frequency_landings: null,
+  other_tools: '',
+  other_spares: '',
+  other_task_cards: '',
+  other_linked_activities: '',
+  attachment: null,
 };
 
 function toNullableNumber(value: string): number | null {
@@ -71,8 +106,13 @@ function toUpsertPayload(record: MpdGridRow): MpdUpsertInput {
     interval_months: record.interval_months === null || record.interval_months === undefined
       ? null
       : Number(record.interval_months),
+    threshold_cycles: record.threshold_cycles === null || record.threshold_cycles === undefined
+      ? null
+      : Number(record.threshold_cycles),
     is_mandatory: Boolean(record.is_mandatory),
     assembly_model_id: String(record.assembly_model_id || '').trim() || null,
+    loc_json: Array.isArray(record.loc_json) ? record.loc_json : [],
+    other_details_json: Array.isArray(record.other_details_json) ? record.other_details_json : [],
     task_template_detail_json: Array.isArray(record.task_template_detail_json) ? record.task_template_detail_json : [],
     task_template_scope_json: Array.isArray(record.task_template_scope_json) ? record.task_template_scope_json : [],
   };
@@ -83,7 +123,7 @@ export function AmroMpdManagementPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState<MpdRecord | null>(null);
-  const [createForm, setCreateForm] = useState<MpdUpsertInput>(CREATE_DEFAULTS);
+  const [createForm, setCreateForm] = useState<MpdCreateFormState>(CREATE_DEFAULTS);
   const [advancedFilters, setAdvancedFilters] = useState({
     assemblyType: 'all',
     model: 'all',
@@ -98,9 +138,11 @@ export function AmroMpdManagementPage() {
   const assemblyTypeOptionsQuery = useAssemblyTypeOptions(true);
   const assemblyModelOptionsQuery = useAssemblyModelOptions(true);
   const createMutation = useCreateMpd();
+  const uploadAttachmentMutation = useUploadMpdAttachment();
   const updateMutation = useUpdateMpd();
   const deleteMutation = useDeleteMpd();
   const { invalidate, exportCsv } = useMpdActions();
+  const ataCodeOptionsQuery = useAtaCodeOptions(true);
 
   useEffect(() => {
     if (data?.records) setRecords(data.records);
@@ -125,12 +167,38 @@ export function AmroMpdManagementPage() {
   }, [records]);
 
   const handleCreate = useCallback(async () => {
-    if (!createForm.description || !createForm.ata_code) {
+    if (!createForm.description || !createForm.ata_code || !createForm.inspection_type) {
       toast.error('Description and ATA Code are required');
       return;
     }
+    const locJson = [
+      {
+        zone: String(createForm.zone || '').trim(),
+        area: String(createForm.area || '').trim(),
+        notes: String(createForm.note || '').trim(),
+      },
+    ];
+    const otherDetailsJson = [
+      {
+        tools: String(createForm.other_tools || '').trim(),
+        spares: String(createForm.other_spares || '').trim(),
+        task_cards: String(createForm.other_task_cards || '').trim(),
+        linked_activities: String(createForm.other_linked_activities || '').trim(),
+        frequency_days: createForm.frequency_days,
+        attachments: createForm.attachment ? [createForm.attachment] : [],
+      },
+    ];
     try {
-      await createMutation.mutateAsync(createForm);
+      await createMutation.mutateAsync({
+        ...createForm,
+        category_code: createForm.inspection_type || null,
+        reference_amp: createForm.reference_amp || null,
+        interval_hours: createForm.frequency_hours,
+        interval_cycles: createForm.frequency_cycles,
+        threshold_cycles: createForm.frequency_landings,
+        loc_json: locJson,
+        other_details_json: otherDetailsJson,
+      });
       toast.success('MPD record created');
       setCreateOpen(false);
       setCreateForm(CREATE_DEFAULTS);
@@ -139,6 +207,17 @@ export function AmroMpdManagementPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to create MPD record');
     }
   }, [createForm, createMutation, invalidate]);
+
+  const handleSelectAttachment = useCallback(async (file: File | null) => {
+    if (!file) return;
+    try {
+      const attachment = await uploadAttachmentMutation.mutateAsync(file);
+      setCreateForm((current) => ({ ...current, attachment }));
+      toast.success('Attachment uploaded');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to upload attachment');
+    }
+  }, [uploadAttachmentMutation]);
 
   const handleInlineSave = useCallback(async (row: MpdGridRow) => {
     try {
@@ -361,6 +440,7 @@ export function AmroMpdManagementPage() {
             { key: 'description', header: 'Description', sortable: true, filterable: true, groupable: false, resizable: true, width: 280 },
             { key: 'category_code', header: 'Category', sortable: true, filterable: true, groupable: true, resizable: true, width: 120 },
             { key: 'estimated_man_hours', header: 'Man Hours', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'numeric' },
+            { key: 'threshold_cycles', header: 'Landings', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'numeric' },
             { key: 'is_mandatory', header: 'Mandatory', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'boolean' },
             { key: 'created_at', header: 'Created', sortable: true, filterable: true, groupable: true, resizable: true, width: 130, dataType: 'date' },
           ] satisfies GridColumnDefinition<MpdGridRow>[]}
@@ -390,8 +470,11 @@ export function AmroMpdManagementPage() {
             'interval_hours',
             'interval_cycles',
             'interval_months',
+            'threshold_cycles',
             'is_mandatory',
             'assembly_model_id',
+            'loc_json',
+            'other_details_json',
             'task_template_detail_json',
             'task_template_scope_json',
           ]}
@@ -415,11 +498,28 @@ export function AmroMpdManagementPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="ata-code">ATA Code *</Label>
-              <Input
+              <Label htmlFor="ata-code">ATA Chapter *</Label>
+              <select
                 id="ata-code"
+                className="h-10 w-full rounded-md border bg-background px-2"
                 value={createForm.ata_code || ''}
                 onChange={(event) => setCreateForm((current) => ({ ...current, ata_code: event.target.value }))}
+              >
+                <option value="">(SELECT)</option>
+                {(ataCodeOptionsQuery.data || []).map((option) => (
+                  <option key={option.id} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="reference-amp">Reference</Label>
+              <Textarea
+                id="reference-amp"
+                value={createForm.reference_amp || ''}
+                onChange={(event) => setCreateForm((current) => ({ ...current, reference_amp: event.target.value }))}
+                rows={2}
               />
             </div>
             <div className="space-y-2 md:col-span-2">
@@ -432,23 +532,82 @@ export function AmroMpdManagementPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="reference-amp">Reference AMP</Label>
+              <Label htmlFor="inspection-type">Inspection Type *</Label>
+              <select
+                id="inspection-type"
+                className="h-10 w-full rounded-md border bg-background px-2"
+                value={createForm.inspection_type}
+                onChange={(event) => setCreateForm((current) => ({ ...current, inspection_type: event.target.value }))}
+              >
+                <option value="">(SELECT)</option>
+                <option value="Routine">Routine</option>
+                <option value="Special">Special</option>
+                <option value="Conditional">Conditional</option>
+              </select>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="zone">Zone</Label>
               <Input
-                id="reference-amp"
-                value={createForm.reference_amp || ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, reference_amp: event.target.value }))}
+                id="zone"
+                value={createForm.zone}
+                onChange={(event) => setCreateForm((current) => ({ ...current, zone: event.target.value }))}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="category-code">Category Code</Label>
+              <Label htmlFor="area">Area</Label>
               <Input
-                id="category-code"
-                value={createForm.category_code || ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, category_code: event.target.value }))}
+                id="area"
+                value={createForm.area}
+                onChange={(event) => setCreateForm((current) => ({ ...current, area: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label htmlFor="note">Note</Label>
+              <Textarea
+                id="note"
+                value={createForm.note}
+                onChange={(event) => setCreateForm((current) => ({ ...current, note: event.target.value }))}
+                rows={2}
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="estimated-man-hours">Estimated Man Hours</Label>
+              <Label htmlFor="interval-hours">Hours</Label>
+              <Input
+                id="interval-hours"
+                type="number"
+                value={createForm.frequency_hours ?? ''}
+                onChange={(event) => setCreateForm((current) => ({ ...current, frequency_hours: toNullableNumber(event.target.value) }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="interval-days">Days</Label>
+              <Input
+                id="interval-days"
+                type="number"
+                value={createForm.frequency_days ?? ''}
+                onChange={(event) => setCreateForm((current) => ({ ...current, frequency_days: toNullableNumber(event.target.value) }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="interval-cycles">Interval Cycles</Label>
+              <Input
+                id="interval-cycles"
+                type="number"
+                value={createForm.frequency_cycles ?? ''}
+                onChange={(event) => setCreateForm((current) => ({ ...current, frequency_cycles: toNullableNumber(event.target.value) }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="threshold-cycles">Landings</Label>
+              <Input
+                id="threshold-cycles"
+                type="number"
+                value={createForm.frequency_landings ?? ''}
+                onChange={(event) => setCreateForm((current) => ({ ...current, frequency_landings: toNullableNumber(event.target.value) }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="estimated-man-hours">Estd. Man Hours</Label>
               <Input
                 id="estimated-man-hours"
                 type="number"
@@ -457,47 +616,63 @@ export function AmroMpdManagementPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="revision-status">Revision Status</Label>
-              <Input
-                id="revision-status"
-                value={createForm.revision_status || ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, revision_status: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="interval-hours">Interval Hours</Label>
-              <Input
-                id="interval-hours"
-                type="number"
-                value={createForm.interval_hours ?? ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, interval_hours: toNullableNumber(event.target.value) }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="interval-cycles">Interval Cycles</Label>
-              <Input
-                id="interval-cycles"
-                type="number"
-                value={createForm.interval_cycles ?? ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, interval_cycles: toNullableNumber(event.target.value) }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="interval-months">Interval Months</Label>
-              <Input
-                id="interval-months"
-                type="number"
-                value={createForm.interval_months ?? ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, interval_months: toNullableNumber(event.target.value) }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="assembly-model-id">Assembly Model ID</Label>
-              <Input
+              <Label htmlFor="assembly-model-id">Model</Label>
+              <select
                 id="assembly-model-id"
+                className="h-10 w-full rounded-md border bg-background px-2"
                 value={createForm.assembly_model_id || ''}
                 onChange={(event) => setCreateForm((current) => ({ ...current, assembly_model_id: event.target.value }))}
-              />
+              >
+                <option value="">(SELECT)</option>
+                {modelOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
+              </select>
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Attach File</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  type="file"
+                  onChange={(event) => void handleSelectAttachment(event.target.files?.[0] || null)}
+                  disabled={uploadAttachmentMutation.isPending}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setCreateForm((current) => ({ ...current, attachment: null }))}
+                >
+                  Remove Attachment
+                </Button>
+              </div>
+              {createForm.attachment ? (
+                <p className="text-xs text-muted-foreground">
+                  Attached: {createForm.attachment.file_name}
+                </p>
+              ) : null}
+            </div>
+            <div className="space-y-2 md:col-span-2">
+              <Label>Other Details</Label>
+              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                <Input
+                  placeholder="Tools"
+                  value={createForm.other_tools}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, other_tools: event.target.value }))}
+                />
+                <Input
+                  placeholder="Spares"
+                  value={createForm.other_spares}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, other_spares: event.target.value }))}
+                />
+                <Input
+                  placeholder="Task Cards"
+                  value={createForm.other_task_cards}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, other_task_cards: event.target.value }))}
+                />
+                <Input
+                  placeholder="Link Maint. Activity"
+                  value={createForm.other_linked_activities}
+                  onChange={(event) => setCreateForm((current) => ({ ...current, other_linked_activities: event.target.value }))}
+                />
+              </div>
             </div>
             <div className="flex items-center justify-between rounded-md border p-3 md:col-span-2">
               <div className="flex items-center gap-2 text-sm">

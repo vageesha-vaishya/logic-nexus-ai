@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
 
 export type MpdRecord = {
   id: string;
@@ -15,8 +16,11 @@ export type MpdRecord = {
   interval_hours: number | null;
   interval_cycles: number | null;
   interval_months: number | null;
+  threshold_cycles: number | null;
   is_mandatory: boolean;
   assembly_model_id: string | null;
+  loc_json: unknown[];
+  other_details_json: unknown[];
   task_template_detail_json: unknown[];
   task_template_scope_json: unknown[];
   created_at: string | null;
@@ -34,8 +38,11 @@ export type MpdUpsertInput = {
   interval_hours?: number | null;
   interval_cycles?: number | null;
   interval_months?: number | null;
+  threshold_cycles?: number | null;
   is_mandatory?: boolean;
   assembly_model_id?: string | null;
+  loc_json?: unknown[];
+  other_details_json?: unknown[];
   task_template_detail_json?: unknown[];
   task_template_scope_json?: unknown[];
 };
@@ -56,6 +63,13 @@ export type AssemblyModelOption = {
   id: string;
   name: string;
   assembly_type_id: string | null;
+};
+
+export type AtaCodeOption = {
+  id: string;
+  code: string;
+  description: string | null;
+  label: string;
 };
 
 const MPD_KEY = ['amro', 'mpd'] as const;
@@ -96,8 +110,11 @@ export function mapApiRecordToMpdRecord(record: Record<string, unknown>): MpdRec
     interval_hours: normalizeNumber(record.interval_hours),
     interval_cycles: normalizeNumber(record.interval_cycles),
     interval_months: normalizeNumber(record.interval_months),
+    threshold_cycles: normalizeNumber(record.threshold_cycles),
     is_mandatory: normalizeBoolean(record.is_mandatory, true),
     assembly_model_id: normalizeString(record.assembly_model_id),
+    loc_json: normalizeJsonArray(record.loc_json),
+    other_details_json: normalizeJsonArray(record.other_details_json),
     task_template_detail_json: normalizeJsonArray(record.task_template_detail_json),
     task_template_scope_json: normalizeJsonArray(record.task_template_scope_json),
     created_at: normalizeString(record.created_at),
@@ -117,8 +134,11 @@ export function mapMpdInputToApiPayload(input: MpdUpsertInput): Record<string, u
     interval_hours: normalizeNumber(input.interval_hours),
     interval_cycles: normalizeNumber(input.interval_cycles),
     interval_months: normalizeNumber(input.interval_months),
+    threshold_cycles: normalizeNumber(input.threshold_cycles),
     is_mandatory: normalizeBoolean(input.is_mandatory, true),
     assembly_model_id: normalizeString(input.assembly_model_id),
+    loc_json: normalizeJsonArray(input.loc_json),
+    other_details_json: normalizeJsonArray(input.other_details_json),
     task_template_detail_json: normalizeJsonArray(input.task_template_detail_json),
     task_template_scope_json: normalizeJsonArray(input.task_template_scope_json),
   };
@@ -227,7 +247,7 @@ async function exportMpdCsv(headers: HeadersInit): Promise<Blob> {
 }
 
 async function fetchMasterDataRecords(
-  entity: 'assembly-types' | 'assembly-models',
+  entity: 'assembly-types' | 'assembly-models' | 'ata-codes',
   headers: HeadersInit,
 ): Promise<Record<string, unknown>[]> {
   const query = new URLSearchParams({
@@ -274,6 +294,67 @@ async function fetchAssemblyModels(headers: HeadersInit): Promise<AssemblyModelO
     .map(({ id, name, assembly_type_id }) => ({ id, name, assembly_type_id }));
 }
 
+async function fetchAtaCodes(headers: HeadersInit): Promise<AtaCodeOption[]> {
+  const records = await fetchMasterDataRecords('ata-codes', headers);
+  return records
+    .map((record) => {
+      const id = String(record.id || '').trim();
+      const code = String(record.code || '').trim();
+      const description = normalizeString(record.description);
+      return {
+        id,
+        code,
+        description,
+        label: description ? `${code} - ${description}` : code,
+        is_active: normalizeBoolean(record.is_active, true),
+      };
+    })
+    .filter((record) => record.id && record.code && record.is_active)
+    .map(({ id, code, description, label }) => ({ id, code, description, label }));
+}
+
+const ATTACHMENT_BUCKET_CANDIDATES = ['amro-mpd-attachments', 'documents', 'tenant-docs'] as const;
+
+export type UploadedMpdAttachment = {
+  bucket: string;
+  path: string;
+  file_name: string;
+  content_type: string;
+  size_bytes: number;
+  public_url: string | null;
+  uploaded_at: string;
+};
+
+async function uploadMpdAttachment(file: File, tenantIdHint: string | null): Promise<UploadedMpdAttachment> {
+  const sanitizedName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_');
+  const tenantToken = String(tenantIdHint || 'unscoped').trim() || 'unscoped';
+  const basePath = `mpd/${tenantToken}/${Date.now()}-${sanitizedName}`;
+
+  let lastError: Error | null = null;
+  for (const bucket of ATTACHMENT_BUCKET_CANDIDATES) {
+    const { error } = await supabase.storage.from(bucket).upload(basePath, file, {
+      cacheControl: '3600',
+      upsert: false,
+      contentType: file.type || 'application/octet-stream',
+    });
+    if (error) {
+      lastError = new Error(error.message);
+      continue;
+    }
+    const { data: publicUrlData } = supabase.storage.from(bucket).getPublicUrl(basePath);
+    return {
+      bucket,
+      path: basePath,
+      file_name: file.name,
+      content_type: file.type || 'application/octet-stream',
+      size_bytes: file.size,
+      public_url: publicUrlData?.publicUrl || null,
+      uploaded_at: new Date().toISOString(),
+    };
+  }
+  throw lastError || new Error('Failed to upload MPD attachment');
+}
+
 export function useListMpd(params: { page?: number; pageSize?: number; search?: string; enabled?: boolean } = {}) {
   const authHeaders = useAuthHeaders();
   const { page = 1, pageSize = 200, search, enabled = true } = params;
@@ -305,6 +386,29 @@ export function useAssemblyModelOptions(enabled = true) {
     enabled: enabled && !!authHeaders,
     staleTime: 60_000,
     retry: 2,
+  });
+}
+
+export function useAtaCodeOptions(enabled = true) {
+  const authHeaders = useAuthHeaders();
+  return useQuery({
+    queryKey: [...MPD_KEY, 'ata-codes'] as const,
+    queryFn: () => authHeaders ? fetchAtaCodes(authHeaders) : Promise.reject(new Error('Not authenticated')),
+    enabled: enabled && !!authHeaders,
+    staleTime: 60_000,
+    retry: 2,
+  });
+}
+
+export function useUploadMpdAttachment() {
+  const { session } = useAuth();
+  const tenantIdHint = useMemo(() => {
+    const payload = session?.user?.app_metadata || {};
+    return String((payload as Record<string, unknown>).tenant_id || '').trim() || null;
+  }, [session?.user?.app_metadata]);
+
+  return useMutation({
+    mutationFn: async (file: File) => uploadMpdAttachment(file, tenantIdHint),
   });
 }
 
