@@ -97,6 +97,7 @@ export type AmroInventoryDataGridTemplateProps<TRecord extends Record<string, un
   onCancelRecord?: (record: TRecord) => void;
   onCrudAction?: (action: CrudAction, record: TRecord | null) => void;
   crudPermissions?: CrudPermissionMap;
+  enableColumnFilters?: boolean;
 };
 
 type FlattenedRow<TRecord> =
@@ -267,6 +268,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   onCancelRecord,
   onCrudAction,
   crudPermissions,
+  enableColumnFilters = false,
 }: AmroInventoryDataGridTemplateProps<TRecord>) {
   const listRef = useRef<HTMLDivElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -283,6 +285,7 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   const [sortState, setSortState] = useState<{ key: string; direction: SortDirection } | null>(null);
   const [groupByKey, setGroupByKey] = useState<string>('none');
   const [query, setQuery] = useState('');
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [columnWidths, setColumnWidths] = useState<Record<string, number>>(() => (
     columns.reduce<Record<string, number>>((acc, col) => {
       if (col.width) acc[String(col.key)] = col.width;
@@ -395,16 +398,31 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
 
   const filteredRecords = useMemo(() => {
     const normalized = query.trim().toLowerCase();
-    if (!normalized) return records;
+    const normalizedColumnFilters = Object.entries(columnFilters)
+      .map(([key, value]) => [key, value.trim().toLowerCase()] as const)
+      .filter(([, value]) => value.length > 0);
+
     return records.filter((record) => {
-      return filterableColumns.some((column) => {
+      const matchesGlobal = !normalized || filterableColumns.some((column) => {
         const key = String(column.key);
         const value = record[key];
         if (value == null) return false;
         return String(value).toLowerCase().includes(normalized);
       });
+      if (!matchesGlobal) return false;
+      if (!enableColumnFilters || normalizedColumnFilters.length === 0) return true;
+
+      return normalizedColumnFilters.every(([columnKey, filterValue]) => {
+        const raw = record[columnKey];
+        if (raw == null) return false;
+        if (typeof raw === 'boolean') {
+          if (filterValue === 'true') return raw === true;
+          if (filterValue === 'false') return raw === false;
+        }
+        return String(raw).toLowerCase().includes(filterValue);
+      });
     });
-  }, [records, query, filterableColumns]);
+  }, [records, query, filterableColumns, columnFilters, enableColumnFilters]);
 
   const sortedRecords = useMemo(() => {
     if (!sortState) return filteredRecords;
@@ -787,44 +805,83 @@ export function AmroInventoryDataGridTemplate<TRecord extends Record<string, unk
   }, [columnWidths, columns, density]);
 
   const headerRow = (
-    <div className={cn('sticky top-0 z-10 flex border-b bg-muted/80 backdrop-blur-sm', highContrastClassName)} role="row">
-      {columns.map((column) => {
-        const key = String(column.key);
-        const width = columnWidths[key] || column.width || 180;
-        const sortActive = sortState?.key === key;
-        const sortDirection = sortState?.direction;
-        return (
-          <div
-            key={key}
-            style={{ width }}
-            className="group relative shrink-0 border-r border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide last:border-r-0"
-            role="columnheader"
-            aria-sort={sortActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
-          >
-            <button
-              type="button"
-              className={cn('flex w-full items-center justify-between gap-2 text-left', column.sortable ? 'cursor-pointer' : 'cursor-default')}
-              onClick={() => toggleSort(column)}
-              aria-label={`${column.header}${column.sortable ? ', sortable' : ''}`}
+    <div className={cn('sticky top-0 z-10 border-b bg-muted/80 backdrop-blur-sm', highContrastClassName)}>
+      <div className="flex" role="row">
+        {columns.map((column) => {
+          const key = String(column.key);
+          const width = columnWidths[key] || column.width || 180;
+          const sortActive = sortState?.key === key;
+          const sortDirection = sortState?.direction;
+          return (
+            <div
+              key={key}
+              style={{ width }}
+              className="group relative shrink-0 border-r border-border px-3 py-2 text-xs font-semibold uppercase tracking-wide last:border-r-0"
+              role="columnheader"
+              aria-sort={sortActive ? (sortDirection === 'asc' ? 'ascending' : 'descending') : 'none'}
             >
-              <span className="truncate">{column.header}</span>
-              {column.sortable ? (
-                <span className="text-muted-foreground">
-                  {sortActive && sortDirection === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5 opacity-70" />}
-                </span>
-              ) : null}
-            </button>
-            {column.resizable ? (
               <button
                 type="button"
-                className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize opacity-0 transition-opacity group-hover:opacity-100"
-                aria-label={`Resize ${column.header} column`}
-                onMouseDown={(event) => startResize(column, event)}
-              />
-            ) : null}
-          </div>
-        );
-      })}
+                className={cn('flex w-full items-center justify-between gap-2 text-left', column.sortable ? 'cursor-pointer' : 'cursor-default')}
+                onClick={() => toggleSort(column)}
+                aria-label={`${column.header}${column.sortable ? ', sortable' : ''}`}
+              >
+                <span className="truncate">{column.header}</span>
+                {column.sortable ? (
+                  <span className="text-muted-foreground">
+                    {sortActive && sortDirection === 'desc' ? <ArrowDown className="h-3.5 w-3.5" /> : <ArrowUp className="h-3.5 w-3.5 opacity-70" />}
+                  </span>
+                ) : null}
+              </button>
+              {column.resizable ? (
+                <button
+                  type="button"
+                  className="absolute right-0 top-0 h-full w-1.5 cursor-col-resize opacity-0 transition-opacity group-hover:opacity-100"
+                  aria-label={`Resize ${column.header} column`}
+                  onMouseDown={(event) => startResize(column, event)}
+                />
+              ) : null}
+            </div>
+          );
+        })}
+      </div>
+      {enableColumnFilters ? (
+        <div className="flex border-t border-border/60 bg-background" role="row">
+          {columns.map((column) => {
+            const key = String(column.key);
+            const width = columnWidths[key] || column.width || 180;
+            const dataType = column.dataType || 'text';
+            const currentFilter = columnFilters[key] || '';
+            return (
+              <div key={`filter-${key}`} style={{ width }} className="shrink-0 border-r border-border px-2 py-1.5 last:border-r-0">
+                {dataType === 'boolean' ? (
+                  <Select
+                    value={currentFilter || 'all'}
+                    onValueChange={(value) => setColumnFilters((current) => ({ ...current, [key]: value === 'all' ? '' : value }))}
+                  >
+                    <SelectTrigger className="h-8 text-xs" aria-label={`Filter ${column.header}`}>
+                      <SelectValue placeholder="true / false" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">All</SelectItem>
+                      <SelectItem value="true">true</SelectItem>
+                      <SelectItem value="false">false</SelectItem>
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Input
+                    value={currentFilter}
+                    onChange={(event) => setColumnFilters((current) => ({ ...current, [key]: event.target.value }))}
+                    placeholder={`Filter ${column.header}`}
+                    className="h-8 text-xs"
+                    aria-label={`Filter ${column.header}`}
+                  />
+                )}
+              </div>
+            );
+          })}
+        </div>
+      ) : null}
     </div>
   );
 

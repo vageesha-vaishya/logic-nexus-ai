@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Download, FileText } from 'lucide-react';
 import { toast } from 'sonner';
+import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -81,6 +82,15 @@ export function AmroMpdManagementPage() {
   const [createOpen, setCreateOpen] = useState(false);
   const [deleteCandidate, setDeleteCandidate] = useState<MpdRecord | null>(null);
   const [createForm, setCreateForm] = useState<MpdUpsertInput>(CREATE_DEFAULTS);
+  const [advancedFilters, setAdvancedFilters] = useState({
+    assemblyType: 'all',
+    model: 'all',
+    mpdNo: '',
+    monitorType: 'all',
+    ata: 'all',
+    description: '',
+    serviceType: 'all',
+  });
 
   const { data, isLoading, isError, error } = useListMpd({ page: 1, pageSize: 500 });
   const createMutation = useCreateMpd();
@@ -164,16 +174,76 @@ export function AmroMpdManagementPage() {
     }
   }, [exportCsv]);
 
-  const gridRecords = useMemo<MpdGridRow[]>(() => records as MpdGridRow[], [records]);
+  const assemblyTypeOptions = useMemo(() => {
+    const values = Array.from(new Set(records.map((record) => String((record as Record<string, unknown>).assembly_type || '').trim()).filter(Boolean)));
+    return ['all', ...values];
+  }, [records]);
+
+  const modelOptions = useMemo(() => {
+    const values = Array.from(new Set(records.map((record) => String(record.assembly_model_id || '').trim()).filter(Boolean)));
+    return ['all', ...values];
+  }, [records]);
+
+  const monitorTypeOptions = useMemo(() => {
+    const values = Array.from(new Set(records.map((record) => String((record as Record<string, unknown>).monitor_type || '').trim()).filter(Boolean)));
+    return ['all', ...values];
+  }, [records]);
+
+  const ataOptions = useMemo(() => {
+    const values = Array.from(new Set(records.map((record) => String(record.ata_code || '').trim()).filter(Boolean)));
+    return ['all', ...values];
+  }, [records]);
+
+  const serviceTypeOptions = useMemo(() => {
+    const values = Array.from(new Set(records.map((record) => String(record.category_code || '').trim()).filter(Boolean)));
+    return ['all', ...values];
+  }, [records]);
+
+  const filteredRecords = useMemo(() => {
+    const mpdNoQuery = advancedFilters.mpdNo.trim().toLowerCase();
+    const descriptionQuery = advancedFilters.description.trim().toLowerCase();
+    return records.filter((record) => {
+      if (advancedFilters.assemblyType !== 'all') {
+        const value = String((record as Record<string, unknown>).assembly_type || '').trim();
+        if (value !== advancedFilters.assemblyType) return false;
+      }
+      if (advancedFilters.model !== 'all') {
+        if (String(record.assembly_model_id || '').trim() !== advancedFilters.model) return false;
+      }
+      if (advancedFilters.monitorType !== 'all') {
+        const value = String((record as Record<string, unknown>).monitor_type || '').trim();
+        if (value !== advancedFilters.monitorType) return false;
+      }
+      if (advancedFilters.ata !== 'all') {
+        if (String(record.ata_code || '').trim() !== advancedFilters.ata) return false;
+      }
+      if (advancedFilters.serviceType !== 'all') {
+        if (String(record.category_code || '').trim() !== advancedFilters.serviceType) return false;
+      }
+      if (mpdNoQuery) {
+        const code = String(record.mpd_code || '').toLowerCase();
+        const seq = String(record.mpd_sequence || '').toLowerCase();
+        if (!code.includes(mpdNoQuery) && !seq.includes(mpdNoQuery)) return false;
+      }
+      if (descriptionQuery) {
+        const value = String(record.description || '').toLowerCase();
+        if (!value.includes(descriptionQuery)) return false;
+      }
+      return true;
+    });
+  }, [advancedFilters, records]);
+
+  const gridRecords = useMemo<MpdGridRow[]>(() => filteredRecords as MpdGridRow[], [filteredRecords]);
 
   return (
-    <div className="mt-4 space-y-3">
-      <AmroModuleSurface
-        title="MPD Management"
-        subtitle="Maintenance Planning Document workspace with table and record-detail CRUD controls."
-        moduleId="amro.mpd"
-        status={errorMessage ? 'warning' : isLoading ? 'loading' : 'ready'}
-      >
+    <DashboardLayout>
+      <div className="space-y-3 p-4 lg:p-6">
+        <AmroModuleSurface
+          title="MPD Management"
+          subtitle="Maintenance Planning Document workspace with table and record-detail CRUD controls."
+          moduleId="amro.mpd"
+          status={errorMessage ? 'warning' : isLoading ? 'loading' : 'ready'}
+        >
         <div className="flex items-center justify-end">
           <Button variant="outline" onClick={() => void handleExport()}>
             <Download className="mr-2 h-4 w-4" />
@@ -181,9 +251,80 @@ export function AmroMpdManagementPage() {
           </Button>
         </div>
 
+        <div className="rounded-md border border-cyan-300 bg-cyan-50/20 p-3">
+          <h3 className="mb-3 text-xl font-semibold">MPD Advanced Filters</h3>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
+            <div className="space-y-1 md:col-span-2">
+              <Label>Assembly Type</Label>
+              <select
+                className="h-10 w-full rounded-md border bg-background px-2"
+                value={advancedFilters.assemblyType}
+                onChange={(event) => setAdvancedFilters((current) => ({ ...current, assemblyType: event.target.value }))}
+              >
+                {assemblyTypeOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1 md:col-span-3">
+              <Label>Model</Label>
+              <select
+                className="h-10 w-full rounded-md border bg-background px-2"
+                value={advancedFilters.model}
+                onChange={(event) => setAdvancedFilters((current) => ({ ...current, model: event.target.value }))}
+              >
+                {modelOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1 md:col-span-3">
+              <Label>MPD No.</Label>
+              <Input
+                value={advancedFilters.mpdNo}
+                onChange={(event) => setAdvancedFilters((current) => ({ ...current, mpdNo: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>Monitor Type</Label>
+              <select
+                className="h-10 w-full rounded-md border bg-background px-2"
+                value={advancedFilters.monitorType}
+                onChange={(event) => setAdvancedFilters((current) => ({ ...current, monitorType: event.target.value }))}
+              >
+                {monitorTypeOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1 md:col-span-2">
+              <Label>ATA</Label>
+              <select
+                className="h-10 w-full rounded-md border bg-background px-2"
+                value={advancedFilters.ata}
+                onChange={(event) => setAdvancedFilters((current) => ({ ...current, ata: event.target.value }))}
+              >
+                {ataOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1 md:col-span-4">
+              <Label>Description</Label>
+              <Textarea
+                rows={1}
+                value={advancedFilters.description}
+                onChange={(event) => setAdvancedFilters((current) => ({ ...current, description: event.target.value }))}
+              />
+            </div>
+            <div className="space-y-1 md:col-span-3">
+              <Label>Service Type</Label>
+              <select
+                className="h-10 w-full rounded-md border bg-background px-2"
+                value={advancedFilters.serviceType}
+                onChange={(event) => setAdvancedFilters((current) => ({ ...current, serviceType: event.target.value }))}
+              >
+                {serviceTypeOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
         <AmroKpiGrid
           items={[
-            { label: 'Total MPD Records', value: String(stats.total) },
+            { label: 'Total MPD Records', value: String(filteredRecords.length) },
             { label: 'Mandatory', value: String(stats.mandatory), tone: stats.mandatory > 0 ? 'warning' : 'default' },
             { label: 'Interval-driven', value: String(stats.withIntervals), tone: stats.withIntervals > 0 ? 'success' : 'default' },
             { label: 'Optional', value: String(stats.custom) },
@@ -210,6 +351,7 @@ export function AmroMpdManagementPage() {
           viewMode="grid-with-right-form"
           persistKey="amro-mpd-advanced-grid"
           ariaLabel="MPD advanced grid"
+          enableColumnFilters
           enableDetailPanelToggle
           onCreateRecord={() => setCreateOpen(true)}
           onReadRecord={() => {
@@ -382,7 +524,8 @@ export function AmroMpdManagementPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </div>
+      </div>
+    </DashboardLayout>
   );
 }
 
