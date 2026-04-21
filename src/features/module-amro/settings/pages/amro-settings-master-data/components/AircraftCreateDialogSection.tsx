@@ -22,8 +22,8 @@ type FieldDescriptor = {
 type AircraftTemplateModelOption = {
   id: string;
   name: string;
-  tenantId: string;
-  franchiseId: string;
+  tenantId?: string;
+  franchiseId?: string;
   assemblyModelId?: string;
   maintenanceProgram?: string;
   revisionNumber?: string;

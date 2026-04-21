@@ -237,8 +237,10 @@ type AircraftTempOption = {
 
 type AircraftTemplateFormValues = {
   template_name: string;
-  franchise_id: string;
-  assembly_models: string;
+  aircraft_type: string;
+  manufacturer: string;
+  manufacturer_id: string;
+  aircraft_model: string;
   maintenance_program: string;
   revision_number: string;
   amendment_number: string;
@@ -1425,7 +1427,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [loading, setLoading] = useState(false);
   const [search, setSearch] = useState(searchParams.get('search') || '');
   const [debouncedSearch, setDebouncedSearch] = useState(searchParams.get('search') || '');
-  const [statusFilter, setStatusFilter] = useState(searchParams.get('status') || 'all');
+  const [statusFilter, setStatusFilter] = useState('all');
   const [flightDateFrom, setFlightDateFrom] = useState(searchParams.get('flight_from') || '');
   const [flightDateTo, setFlightDateTo] = useState(searchParams.get('flight_to') || '');
   const [flightAircraftFilter, setFlightAircraftFilter] = useState(searchParams.get('flight_aircraft') || searchParams.get('aircraft_id') || '');
@@ -1581,6 +1583,20 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const recordsRequestControllerRef = useRef<AbortController | null>(null);
   const recordsRequestIdRef = useRef(0);
   const rowsRenderSignatureRef = useRef('');
+  const resolveRowStatusToken = useCallback((record: Record<string, unknown>): string => {
+    const directStatus = String(record.status ?? '').trim().toLowerCase();
+    if (directStatus) {
+      return directStatus;
+    }
+    const activeToken = String(record.is_active ?? record.active ?? '').trim().toLowerCase();
+    if (activeToken === 'true' || activeToken === '1' || activeToken === 'yes' || activeToken === 'on' || activeToken === 'active') {
+      return 'active';
+    }
+    if (activeToken === 'false' || activeToken === '0' || activeToken === 'no' || activeToken === 'off' || activeToken === 'inactive') {
+      return 'inactive';
+    }
+    return '';
+  }, []);
   const manufacturerSeedAttemptedRef = useRef(false);
   const assemblyTypeSeedAttemptedRef = useRef(false);
   const assemblyModelSeedAttemptedRef = useRef(false);
@@ -2599,8 +2615,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       let records = getPayloadRecords(payload);
       if (statusFilter !== 'all') {
         records = records.filter(
-          (record: Record<string, unknown>) =>
-            String(record.status ?? record.is_active ?? record.active).toLowerCase() === statusFilter.toLowerCase(),
+          (record: Record<string, unknown>) => resolveRowStatusToken(record) === statusFilter.toLowerCase(),
         );
       }
       const nextSignature = createRowsRenderSignature(records);
@@ -2621,7 +2636,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
       }
     }
-  }, [debouncedFlightFilters, debouncedSearch, entity, page, pageSize, scope, sortColumn, sortDirection, statusFilter]);
+  }, [debouncedFlightFilters, debouncedSearch, entity, page, pageSize, resolveRowStatusToken, scope, sortColumn, sortDirection, statusFilter]);
 
   useEffect(() => {
     setEntity(resolvedRouteEntity);

@@ -26,6 +26,10 @@ export type AircraftTemplateRecord = {
   franchise_id: string;
   template_name: string;
   assembly_models: string;
+  aircraft_type?: string;
+  manufacturer?: string;
+  manufacturer_id?: string;
+  aircraft_model?: string;
   maintenance_program: string;
   revision_number: string;
   amendment_number: string;
@@ -174,6 +178,10 @@ const normalizeAircraftTemplateRecord = (record: Record<string, unknown>): Aircr
     franchise_id: String(record.franchise_id || '').trim(),
     template_name: String(record.template_name || '').trim(),
     assembly_models: String(record.assembly_models || '').trim(),
+    aircraft_type: String(record.aircraft_type || '').trim(),
+    manufacturer: String(record.manufacturer || '').trim(),
+    manufacturer_id: String(record.manufacturer_id || '').trim(),
+    aircraft_model: String(record.aircraft_model || '').trim(),
     maintenance_program: String(record.maintenance_program || '').trim(),
     revision_number: String(record.revision_number || '').trim(),
     amendment_number: String(record.amendment_number || '').trim(),

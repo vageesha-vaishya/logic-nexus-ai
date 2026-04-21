@@ -131,4 +131,4 @@ export type AircraftCounterRow = {
   unit: string;
 };
 
-export type ReferenceEntity = MasterEntity | 'assembly_types';
+export type ReferenceEntity = MasterEntity | 'assembly_types' | 'franchises';
