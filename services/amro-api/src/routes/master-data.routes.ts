@@ -33,6 +33,7 @@ type MasterEntity =
   | 'assembly_types'
   | 'assembly_models'
   | 'ata_codes'
+  | 'task_categories'
   | 'regulator_profiles'
   | 'shift_calendars'
   | 'work_package_templates';
@@ -250,6 +251,14 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     listColumns: 'id,tenant_id,franchise_id,code,description,is_active,metadata,created_at,updated_at',
     requiredCreateFields: ['code', 'description'],
     writeAllowedFields: ['code', 'description', 'is_active', 'metadata'],
+    defaultSortColumn: 'updated_at',
+  },
+  task_categories: {
+    table: 'task_categories',
+    searchableColumns: ['code', 'name', 'description', 'task_category_type', 'id'],
+    listColumns: 'id,tenant_id,franchise_id,code,name,description,task_category_type,is_active,created_at,updated_at',
+    requiredCreateFields: ['code', 'name', 'task_category_type'],
+    writeAllowedFields: ['code', 'name', 'description', 'task_category_type', 'is_active'],
     defaultSortColumn: 'updated_at',
   },
   regulator_profiles: {
@@ -730,6 +739,16 @@ function normalizeAtaCode(payload: JsonRecord): JsonRecord {
   };
 }
 
+function normalizeTaskCategory(payload: JsonRecord): JsonRecord {
+  return {
+    code: asString(payload.code),
+    name: asString(payload.name),
+    description: asNullableString(payload.description),
+    task_category_type: asString(payload.task_category_type),
+    is_active: asBoolean(payload.is_active, true),
+  };
+}
+
 function normalizeMaintenanceFacility(payload: JsonRecord): JsonRecord {
   return {
     facility_code: asString(payload.facility_code),
@@ -841,6 +860,7 @@ function normalizePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord
   if (entity === 'manufacturers') return normalizeManufacturer(payload);
   if (entity === 'assembly_models') return normalizeAssemblyModel(payload);
   if (entity === 'ata_codes') return normalizeAtaCode(payload);
+  if (entity === 'task_categories') return normalizeTaskCategory(payload);
   if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
   if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
   return normalizeWorkPackageTemplate(payload);
@@ -1126,6 +1146,8 @@ router.get(
     const franchiseId = extractFranchiseId(req);
     const queryFranchiseId = String(req.query.franchise_id || req.query.franchiseId || '').trim();
     const queryManufacturerId = String(req.query.manufacturer_id || req.query.manufacturerId || '').trim();
+    const queryTaskCategoryType = String(req.query.task_category_type || req.query.taskCategoryType || '').trim();
+    const queryTaskCategoryActive = String(req.query.is_active || req.query.isActive || '').trim().toLowerCase();
     const tenantFilter = String(req.query.tenant_id || req.query.tenantId || '').trim();
     if (tenantFilter && tenantFilter !== String(req.tenantId || '').trim()) {
       throw new HttpError('tenant_id filter must match current tenant context', 403);
@@ -1157,6 +1179,14 @@ router.get(
         }
         if (queryManufacturerId) {
           query = query.eq('manufacturer_id', queryManufacturerId);
+        }
+      }
+      if (entity === 'task_categories') {
+        query = query.eq('task_category_type', queryTaskCategoryType || 'Inspection');
+        if (queryTaskCategoryActive) {
+          query = query.eq('is_active', queryTaskCategoryActive === 'true');
+        } else {
+          query = query.eq('is_active', true);
         }
       }
       if (search && !franchiseId && searchableColumns.length) {

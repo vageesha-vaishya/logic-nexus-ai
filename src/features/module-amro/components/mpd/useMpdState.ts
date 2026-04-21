@@ -72,6 +72,13 @@ export type AtaCodeOption = {
   label: string;
 };
 
+export type TaskCategoryOption = {
+  id: string;
+  code: string;
+  name: string;
+  label: string;
+};
+
 const MPD_KEY = ['amro', 'mpd'] as const;
 
 function normalizeString(value: unknown): string | null {
@@ -248,14 +255,16 @@ async function exportMpdCsv(headers: HeadersInit): Promise<Blob> {
 }
 
 async function fetchMasterDataRecords(
-  entity: 'assembly-types' | 'assembly-models' | 'ata-codes',
+  entity: 'assembly-types' | 'assembly-models' | 'ata-codes' | 'task-categories',
   headers: HeadersInit,
+  extraParams?: Record<string, string>,
 ): Promise<Record<string, unknown>[]> {
   const query = new URLSearchParams({
     page: '1',
     page_size: '500',
     sort_by: 'name',
     sort_dir: 'asc',
+    ...(extraParams || {}),
   });
   const response = await fetch(`/api/v2/amro/master-data/${entity}?${query.toString()}`, {
     method: 'GET',
@@ -268,6 +277,26 @@ async function fetchMasterDataRecords(
   const output = payload.output && typeof payload.output === 'object' ? payload.output as Record<string, unknown> : {};
   const records = Array.isArray(output.records) ? output.records : [];
   return records.filter((record): record is Record<string, unknown> => Boolean(record && typeof record === 'object'));
+}
+
+async function fetchTaskCategories(headers: HeadersInit): Promise<TaskCategoryOption[]> {
+  const records = await fetchMasterDataRecords('task-categories', headers, {
+    task_category_type: 'Inspection',
+    is_active: 'true',
+  });
+  return records
+    .map((record) => {
+      const id = String(record.id || '').trim();
+      const code = String(record.code || '').trim();
+      const name = String(record.name || '').trim();
+      return {
+        id,
+        code,
+        name,
+        label: code && name ? `${code} - ${name}` : code || name,
+      };
+    })
+    .filter((record) => record.id && record.code && record.name);
 }
 
 async function fetchAssemblyTypes(headers: HeadersInit): Promise<AssemblyTypeOption[]> {
@@ -395,6 +424,17 @@ export function useAtaCodeOptions(enabled = true) {
   return useQuery({
     queryKey: [...MPD_KEY, 'ata-codes'] as const,
     queryFn: () => authHeaders ? fetchAtaCodes(authHeaders) : Promise.reject(new Error('Not authenticated')),
+    enabled: enabled && !!authHeaders,
+    staleTime: 60_000,
+    retry: 2,
+  });
+}
+
+export function useTaskCategoryOptions(enabled = true) {
+  const authHeaders = useAuthHeaders();
+  return useQuery({
+    queryKey: [...MPD_KEY, 'task-categories', 'inspection', 'active'] as const,
+    queryFn: () => authHeaders ? fetchTaskCategories(authHeaders) : Promise.reject(new Error('Not authenticated')),
     enabled: enabled && !!authHeaders,
     staleTime: 60_000,
     retry: 2,

@@ -21,6 +21,7 @@ import {
   useDeleteMpd,
   useListMpd,
   useMpdActions,
+  useTaskCategoryOptions,
   useUploadMpdAttachment,
   type UploadedMpdAttachment,
   useUpdateMpd,
@@ -147,6 +148,7 @@ export function AmroMpdManagementPage() {
   const deleteMutation = useDeleteMpd();
   const { invalidate, exportCsv } = useMpdActions();
   const ataCodeOptionsQuery = useAtaCodeOptions(true);
+  const taskCategoryOptionsQuery = useTaskCategoryOptions(true);
 
   useEffect(() => {
     if (data?.records) setRecords(data.records);
@@ -286,7 +288,7 @@ export function AmroMpdManagementPage() {
     [advancedFilters.model, modelOptions],
   );
 
-  const categoryOptions = useMemo(() => ['all'], []);
+  const categoryOptions = useMemo(() => taskCategoryOptionsQuery.data || [], [taskCategoryOptionsQuery.data]);
   const ataOptions = useMemo(() => ataCodeOptionsQuery.data || [], [ataCodeOptionsQuery.data]);
 
   useEffect(() => {
@@ -394,7 +396,12 @@ export function AmroMpdManagementPage() {
                 value={advancedFilters.category}
                 onChange={(event) => setAdvancedFilters((current) => ({ ...current, category: event.target.value }))}
               >
-                {categoryOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+                <option value="all">(All)</option>
+                {categoryOptions.map((option) => (
+                  <option key={option.id} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="space-y-1 md:col-span-2">
