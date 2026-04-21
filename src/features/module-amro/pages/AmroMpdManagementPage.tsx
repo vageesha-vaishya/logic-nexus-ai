@@ -138,6 +138,8 @@ export function AmroMpdManagementPage() {
     page: 1,
     pageSize: 500,
     modelId: advancedFilters.model || undefined,
+    ataCode: advancedFilters.ata !== 'all' ? advancedFilters.ata : undefined,
+    categoryCode: advancedFilters.category !== 'all' ? advancedFilters.category : undefined,
     enabled: listEnabled,
   });
   const assemblyTypeOptionsQuery = useAssemblyTypeOptions(true);

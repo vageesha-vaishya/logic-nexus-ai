@@ -220,6 +220,8 @@ router.get(
     const franchiseId = String(req.headers['x-franchise-id'] || '').trim() || null;
     const search = String(req.query.search || '').trim();
     const modelId = String(req.query.model_id || req.query.modelId || '').trim();
+    const ataCode = String(req.query.ata_code || req.query.ataCode || '').trim();
+    const categoryCode = String(req.query.category_code || req.query.categoryCode || '').trim();
     const supabase = getSupabaseAdminClient();
 
     let query = supabase
@@ -238,6 +240,12 @@ router.get(
     }
     if (modelId) {
       query = query.eq('assembly_models', modelId);
+    }
+    if (ataCode) {
+      query = query.eq('ata_code', ataCode);
+    }
+    if (categoryCode) {
+      query = query.eq('category_code', categoryCode);
     }
 
     const { data, error, count } = await query;
