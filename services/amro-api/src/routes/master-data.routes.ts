@@ -32,6 +32,7 @@ type MasterEntity =
   | 'manufacturers'
   | 'assembly_types'
   | 'assembly_models'
+  | 'ata_codes'
   | 'regulator_profiles'
   | 'shift_calendars'
   | 'work_package_templates';
@@ -241,6 +242,14 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'is_active',
       'metadata',
     ],
+    defaultSortColumn: 'updated_at',
+  },
+  ata_codes: {
+    table: 'ata_codes',
+    searchableColumns: ['code', 'description', 'id'],
+    listColumns: 'id,tenant_id,franchise_id,code,description,is_active,metadata,created_at,updated_at',
+    requiredCreateFields: ['code', 'description'],
+    writeAllowedFields: ['code', 'description', 'is_active', 'metadata'],
     defaultSortColumn: 'updated_at',
   },
   regulator_profiles: {
@@ -712,6 +721,15 @@ function normalizeAssemblyModel(payload: JsonRecord): JsonRecord {
   };
 }
 
+function normalizeAtaCode(payload: JsonRecord): JsonRecord {
+  return {
+    code: asString(payload.code),
+    description: asString(payload.description),
+    is_active: asBoolean(payload.is_active, true),
+    metadata: asJsonObject(payload.metadata),
+  };
+}
+
 function normalizeMaintenanceFacility(payload: JsonRecord): JsonRecord {
   return {
     facility_code: asString(payload.facility_code),
@@ -822,6 +840,7 @@ function normalizePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord
   if (entity === 'skill_codes') return normalizeSkillCode(payload);
   if (entity === 'manufacturers') return normalizeManufacturer(payload);
   if (entity === 'assembly_models') return normalizeAssemblyModel(payload);
+  if (entity === 'ata_codes') return normalizeAtaCode(payload);
   if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
   if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
   return normalizeWorkPackageTemplate(payload);

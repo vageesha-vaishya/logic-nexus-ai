@@ -128,10 +128,8 @@ export function AmroMpdManagementPage() {
     assemblyType: '',
     model: '',
     mpdNo: '',
-    monitorType: 'all',
+    category: 'all',
     ata: 'all',
-    description: '',
-    serviceType: 'all',
   });
 
   const listEnabled = Boolean(advancedFilters.assemblyType && advancedFilters.model);
@@ -279,9 +277,8 @@ export function AmroMpdManagementPage() {
     return source.filter((model) => model.assembly_type_id === advancedFilters.assemblyType);
   }, [advancedFilters.assemblyType, assemblyModelOptionsQuery.data]);
 
-  const monitorTypeOptions = useMemo(() => ['all'], []);
+  const categoryOptions = useMemo(() => ['all'], []);
   const ataOptions = useMemo(() => ['all'], []);
-  const serviceTypeOptions = useMemo(() => ['all'], []);
 
   useEffect(() => {
     if (!advancedFilters.model) return;
@@ -382,13 +379,13 @@ export function AmroMpdManagementPage() {
               />
             </div>
             <div className="space-y-1 md:col-span-2">
-              <Label>Monitor Type</Label>
+              <Label>Category</Label>
               <select
                 className="h-10 w-full rounded-md border bg-background px-2"
-                value={advancedFilters.monitorType}
-                onChange={(event) => setAdvancedFilters((current) => ({ ...current, monitorType: event.target.value }))}
+                value={advancedFilters.category}
+                onChange={(event) => setAdvancedFilters((current) => ({ ...current, category: event.target.value }))}
               >
-                {monitorTypeOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+                {categoryOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
               </select>
             </div>
             <div className="space-y-1 md:col-span-2">
@@ -399,24 +396,6 @@ export function AmroMpdManagementPage() {
                 onChange={(event) => setAdvancedFilters((current) => ({ ...current, ata: event.target.value }))}
               >
                 {ataOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1 md:col-span-4">
-              <Label>Description</Label>
-              <Textarea
-                rows={1}
-                value={advancedFilters.description}
-                onChange={(event) => setAdvancedFilters((current) => ({ ...current, description: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-1 md:col-span-3">
-              <Label>Service Type</Label>
-              <select
-                className="h-10 w-full rounded-md border bg-background px-2"
-                value={advancedFilters.serviceType}
-                onChange={(event) => setAdvancedFilters((current) => ({ ...current, serviceType: event.target.value }))}
-              >
-                {serviceTypeOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
               </select>
             </div>
           </div>

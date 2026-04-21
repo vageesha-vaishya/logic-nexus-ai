@@ -136,7 +136,6 @@ function mapMpdPayloadToTaskTemplateInput(payload: JsonRecord): JsonRecord {
   ) {
     const modelValue = normalizeString(payload.assembly_model_id ?? payload.assembly_models ?? payload.model_id);
     setIfDefined('assembly_models', modelValue);
-    setIfDefined('model_id', modelValue);
   }
   if (payload.revision_status !== undefined) {
     setIfDefined('revision_status', normalizeString(payload.revision_status));
@@ -188,6 +187,22 @@ function validateMpdInput(payload: JsonRecord, mode: 'create' | 'patch'): Array<
   return issues;
 }
 
+function buildMpdQueryError(errorMessage: string): { error: string; code: string; statusCode: number } {
+  const normalized = String(errorMessage || '').toLowerCase();
+  if (normalized.includes('column task_templates.model_id does not exist')) {
+    return {
+      error: 'Failed to query MPD records: invalid model column mapping detected. Use task_templates.assembly_models for model filtering.',
+      code: 'MPD_MODEL_COLUMN_MAPPING_ERROR',
+      statusCode: 500,
+    };
+  }
+  return {
+    error: `Failed to query MPD records: ${errorMessage}`,
+    code: 'MPD_QUERY_FAILED',
+    statusCode: 500,
+  };
+}
+
 router.get(
   '/amro/mpd',
   asyncHandler(async (req: AuthRequest, res) => {
@@ -222,16 +237,13 @@ router.get(
       query = query.or(`description.ilike.%${escaped}%,ata_code.ilike.%${escaped}%,reference_amp.ilike.%${escaped}%,code_form_no.ilike.%${escaped}%`);
     }
     if (modelId) {
-      query = query.or(`assembly_models.eq.${modelId},model_id.eq.${modelId}`);
+      query = query.eq('assembly_models', modelId);
     }
 
     const { data, error, count } = await query;
     if (error) {
-      res.status(500).json({
-        error: `Failed to query MPD records: ${error.message}`,
-        code: 'MPD_QUERY_FAILED',
-        statusCode: 500,
-      });
+      const mappedError = buildMpdQueryError(error.message);
+      res.status(mappedError.statusCode).json(mappedError);
       return;
     }
 
