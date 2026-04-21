@@ -287,7 +287,7 @@ export function AmroMpdManagementPage() {
   );
 
   const categoryOptions = useMemo(() => ['all'], []);
-  const ataOptions = useMemo(() => ['all'], []);
+  const ataOptions = useMemo(() => ataCodeOptionsQuery.data || [], [ataCodeOptionsQuery.data]);
 
   useEffect(() => {
     if (!advancedFilters.model) return;
@@ -404,7 +404,12 @@ export function AmroMpdManagementPage() {
                 value={advancedFilters.ata}
                 onChange={(event) => setAdvancedFilters((current) => ({ ...current, ata: event.target.value }))}
               >
-                {ataOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+                <option value="all">(All)</option>
+                {ataOptions.map((option) => (
+                  <option key={option.id} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
           </div>
