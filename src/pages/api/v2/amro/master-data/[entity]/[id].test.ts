@@ -354,7 +354,7 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
         id: 'wpt-1',
         tenant_id: 'tenant-1',
         template_name: 'Line Check Updated',
-        model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        assembly_models_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         aircraft_model: 'A320neo',
         tasks_json: [{ task_template_id: '22222222-2222-4222-8222-222222222222' }],
       },
@@ -424,7 +424,7 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
       query: { entity: 'work_package_templates', id: 'wpt-1' },
       body: {
         template_name: 'Line Check Updated',
-        model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        assembly_models_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         aircraft_model: 'A320neo',
         tasks_json: [{ task_template_id: '22222222-2222-4222-8222-222222222222' }],
       },
@@ -436,11 +436,125 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
 
     expect(res.statusCode).toBe(200);
     const updatePayload = (updateMock.mock.calls[0]?.[0] || {}) as Record<string, unknown>;
-    expect(updatePayload.model_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(updatePayload.assembly_models_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect(updatePayload.aircraft_model).toBe('A320neo');
-    expect((res.jsonBody as any)?.output?.record?.model_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect((res.jsonBody as any)?.output?.record?.assembly_models_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect((res.jsonBody as any)?.output?.record?.aircraft_model).toBe('A320neo');
     expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
     expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
+  });
+
+  it('rejects ATA update when parent relationship introduces a circular chain', async () => {
+    const existingMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ata-1',
+        tenant_id: 'tenant-1',
+        code: '24',
+        parent_id: null,
+        franchise_id: null,
+        level: 1,
+      },
+      error: null,
+    });
+    const existingQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: existingMaybeSingleMock,
+    };
+    existingQuery.eq.mockReturnValue(existingQuery);
+    existingQuery.limit.mockReturnValue(existingQuery);
+    const existingSelectMock = vi.fn().mockReturnValue(existingQuery);
+
+    const ataSelectMaybeSingleMock = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({ data: { id: 'ata-child', parent_id: 'ata-1' }, error: null });
+    const ataSelectQuery: any = {
+      eq: vi.fn(),
+      neq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: ataSelectMaybeSingleMock,
+    };
+    ataSelectQuery.eq.mockReturnValue(ataSelectQuery);
+    ataSelectQuery.neq.mockReturnValue(ataSelectQuery);
+    ataSelectQuery.limit.mockReturnValue(ataSelectQuery);
+    const ataSelectMock = vi.fn().mockReturnValue(ataSelectQuery);
+    const ataUpdateMock = vi.fn();
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'ata_codes') {
+        if (fromMock.mock.calls.length === 1) return { select: existingSelectMock };
+        return { select: ataSelectMock, update: ataUpdateMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
+    const req: ApiRequest = {
+      method: 'PATCH',
+      query: { entity: 'ata_codes', id: 'ata-1' },
+      body: {
+        parent_id: 'ata-child',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(422);
+    expect(String((res.jsonBody as any)?.error || '')).toContain('Circular ATA hierarchy is not allowed');
+    expect(ataUpdateMock).not.toHaveBeenCalled();
+  });
+
+  it('soft deletes ATA code by setting is_active=false', async () => {
+    const existingMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ata-10',
+        tenant_id: 'tenant-1',
+        code: '10',
+        is_active: true,
+      },
+      error: null,
+    });
+    const existingQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: existingMaybeSingleMock,
+    };
+    existingQuery.eq.mockReturnValue(existingQuery);
+    existingQuery.limit.mockReturnValue(existingQuery);
+    const existingSelectMock = vi.fn().mockReturnValue(existingQuery);
+
+    const deleteEqTenantMock = vi.fn().mockResolvedValue({ error: null });
+    const deleteEqIdMock = vi.fn().mockReturnValue({ eq: deleteEqTenantMock });
+    const ataUpdateMock = vi.fn().mockReturnValue({ eq: deleteEqIdMock });
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'ata_codes') {
+        if (fromMock.mock.calls.length === 1) return { select: existingSelectMock };
+        return { update: ataUpdateMock };
+      }
+      if (table === 'maintenance_events') return { insert: auditInsertMock };
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
+    const req: ApiRequest = {
+      method: 'DELETE',
+      query: { entity: 'ata_codes', id: 'ata-10' },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect(ataUpdateMock).toHaveBeenCalledWith({
+      is_active: false,
+      updated_by: 'user-1',
+    });
+    expect(deleteEqIdMock).toHaveBeenCalledWith('id', 'ata-10');
+    expect(deleteEqTenantMock).toHaveBeenCalledWith('tenant_id', 'tenant-1');
   });
 });

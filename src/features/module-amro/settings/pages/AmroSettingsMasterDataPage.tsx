@@ -147,6 +147,7 @@ export { verifyReferenceExists } from './amro-settings-master-data/services';
 
 export type MasterEntity =
   | 'aircraft'
+  | 'ata_codes'
   | 'flight_logs'
   | 'parts_inventory'
   | 'suppliers'
@@ -161,6 +162,7 @@ export type MasterEntity =
 
 export const ENTITY_LABEL: Record<MasterEntity, string> = {
   aircraft: 'Aircraft',
+  ata_codes: 'ATA',
   flight_logs: 'Flight Logs',
   parts_inventory: 'Parts Inventory',
   suppliers: 'Suppliers',
@@ -219,6 +221,7 @@ type SelectOption = {
   value: string;
   label: string;
   disabled?: boolean;
+  depth?: number;
 };
 
 type AircraftTempOption = {
@@ -512,6 +515,7 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
     'thrust_rating_change_log',
     'on_wing_lifecycle_records',
   ],
+  ata_codes: ['code', 'description', 'level', 'chapter_code', 'parent_code_ref', 'is_active', 'updated_at'],
   flight_logs: [
     'aircraft_id',
     'flight_date',
@@ -1067,6 +1071,14 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'on_wing_lifecycle_records', label: 'On-Wing Lifecycle Records', type: 'json' },
     { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'maintenance', 'grounded', 'retired', 'storage'] },
   ],
+  ata_codes: [
+    { key: 'code', label: 'Code', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'chapter_code', label: 'Chapter Code', type: 'text', required: true },
+    { key: 'parent_id', label: 'Parent ATA', type: 'select', placeholder: 'Select parent ATA (optional)' },
+    { key: 'franchise_id', label: 'Franchise', type: 'select', placeholder: 'Select franchise (optional)' },
+    { key: 'is_active', label: 'Active', type: 'boolean' },
+  ],
   flight_logs: [
     { key: 'aircraft_id', label: 'Aircraft Id', type: 'text', required: true },
     { key: 'flight_date', label: 'Flight Date', type: 'date', required: true },
@@ -1193,6 +1205,7 @@ export const AMRO_MASTER_ENTITY_FORM_FIELDS = ENTITY_FORM_FIELDS;
 const MASTER_ENTITY_SEQUENCE = Object.keys(ENTITY_LABEL) as MasterEntity[];
 const ENTITY_ROUTE_SEGMENT: Record<MasterEntity, string> = {
   aircraft: 'aircraft',
+  ata_codes: 'ata-codes',
   flight_logs: 'flight-logs',
   parts_inventory: 'parts-inventory',
   suppliers: 'suppliers',
@@ -1228,6 +1241,16 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     thrust_rating_change_log: '[]',
     on_wing_lifecycle_records: '[]',
     status: 'active',
+  },
+  ata_codes: {
+    code: '',
+    description: '',
+    chapter_code: '',
+    parent_id: '',
+    parent_code_ref: '',
+    level: 1,
+    franchise_id: '',
+    is_active: true,
   },
   flight_logs: {
     aircraft_id: '',
@@ -1487,6 +1510,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftFranchiseOptions, setAircraftFranchiseOptions] = useState<SelectOption[]>([]);
   const [aircraftFranchiseOptionsLoading, setAircraftFranchiseOptionsLoading] = useState(false);
   const [aircraftFranchiseOptionsError, setAircraftFranchiseOptionsError] = useState('');
+  const [ataParentOptions, setAtaParentOptions] = useState<SelectOption[]>([]);
   const [aircraftWorkPackageDialogOpen, setAircraftWorkPackageDialogOpen] = useState(false);
   const [aircraftWorkPackageValues, setAircraftWorkPackageValues] = useState<AircraftWorkPackageFormValues>(getDefaultAircraftWorkPackageValues());
   const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState<Record<string, string>>({});
@@ -3015,6 +3039,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           }
         }
       }
+      if (entity === 'ata_codes') {
+        const franchiseId = String(payload.franchise_id || '').trim();
+        if (franchiseId) {
+          const exists = await verifyReferenceExists(headers, 'franchises', franchiseId, ['id']);
+          if (!exists) {
+            setFormErrors((previous) => ({ ...previous, franchise_id: 'Franchise was not found' }));
+            toast.error('Franchise reference is invalid');
+            return false;
+          }
+        }
+      }
       if (entity === 'work_package_templates') {
         const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
         const selectedTaskTemplateIds = tasksJson
@@ -3134,6 +3169,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           }
         }
       }
+      if (entity === 'ata_codes') {
+        const franchiseId = String(payload.franchise_id || '').trim();
+        if (franchiseId) {
+          const exists = await verifyReferenceExists(headers, 'franchises', franchiseId, ['id']);
+          if (!exists) {
+            setFormErrors((previous) => ({ ...previous, franchise_id: 'Franchise was not found' }));
+            toast.error('Franchise reference is invalid');
+            return false;
+          }
+        }
+      }
       if (entity === 'assembly_models') {
         const manufacturerId = String(payload.manufacturer_id || '').trim();
         if (manufacturerId) {
@@ -3236,8 +3282,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error('Select a record first');
       return;
     }
+    if (entity === 'ata_codes') {
+      const dependencyCount = rows.filter((row) => String(row.parent_id || '') === selectedId).length;
+      if (dependencyCount > 0) {
+        toast.info(`This ATA has ${dependencyCount} active child references. Deleting will mark this row inactive only.`);
+      }
+    }
     setDeleteDialogOpen(true);
-  }, [selectedId]);
+  }, [entity, rows, selectedId]);
 
   const confirmDelete = useCallback(async () => {
     if (!selectedId) return;
@@ -3629,6 +3681,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     ],
     [aircraftFranchiseOptions, aircraftFranchiseOptionsLoading],
   );
+  const ataFranchiseSelectOptions = useMemo<SelectOption[]>(
+    () => [
+      { value: '', label: aircraftFranchiseOptionsLoading ? 'Loading franchises...' : 'Select franchise', disabled: true },
+      ...aircraftFranchiseOptions,
+    ],
+    [aircraftFranchiseOptions, aircraftFranchiseOptionsLoading],
+  );
   const aircraftBaseSelectOptions = useMemo<SelectOption[]>(() => {
     const seen = new Set<string>();
     const options: SelectOption[] = [];
@@ -3672,6 +3731,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (isSystemSelectValue(value)) {
       return;
     }
+    if (fieldKey === 'parent_id' && value) {
+      const selectedParent = rows.find((row) => String(row.id || '') === value);
+      const parentLevel = Number(selectedParent?.level ?? 0);
+      const parentCode = String(selectedParent?.code || '').trim();
+      setFormValues((previous) => ({
+        ...previous,
+        [fieldKey]: value,
+        level: Number.isFinite(parentLevel) ? parentLevel + 1 : 1,
+        parent_code_ref: parentCode || '',
+      }));
+      setFormErrors((previous) => ({ ...previous, [fieldKey]: '' }));
+      return;
+    }
     setFormValues((previous) => ({
       ...previous,
       [fieldKey]: value,
@@ -3682,7 +3754,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       [fieldKey]: '',
       ...(fieldKey === 'manufacturer_id' ? { aircraft_model: '', aircraft_type: '' } : {}),
     }));
-  }, []);
+  }, [rows]);
   const setAircraftCounterValue = useCallback((key: string, field: 'initialValue' | 'initialDate', value: string) => {
     setAircraftCounterRows((previous) =>
       previous.map((row) => (row.key === key ? { ...row, [field]: value } : row)),
@@ -4055,6 +4127,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (field.key === 'aircraft_type') {
         return aircraftTypeSelectOptions;
       }
+      if (field.key === 'parent_id') {
+        if (entity === 'ata_codes' && ataParentOptions.length > 0) {
+          return [
+            { value: '', label: 'No parent (chapter/root)' },
+            ...ataParentOptions,
+          ];
+        }
+        return [{ value: '__empty_ata_parent__', label: 'No parent ATA available', disabled: true }];
+      }
+      if (field.key === 'franchise_id') {
+        if (entity === 'ata_codes') {
+          return ataFranchiseSelectOptions;
+        }
+        return aircraftFranchiseSelectOptions;
+      }
       if (field.key === 'status') {
         return aircraftStatusSelectOptions;
       }
@@ -4064,6 +4151,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       aircraftStatusSelectOptions,
       aircraftTypeSelectOptions,
       aircraftModelSelectOptions,
+      ataFranchiseSelectOptions,
+      ataParentOptions,
+      aircraftFranchiseSelectOptions,
       assemblyTypeOptionsError,
       assemblyTypeOptionsLoading,
       assemblyTypeSelectOptions,
@@ -4073,6 +4163,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       manufacturerOptionsError,
       manufacturerOptionsLoading,
       manufacturerSelectOptions,
+      entity,
     ],
   );
 
@@ -4208,8 +4299,55 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     supplierTypeFilter,
     workCenterTypeFilter,
   ]);
-
-  const renderedRows = filteredRows;
+  const hierarchicalAtaRows = useMemo(() => {
+    if (entity !== 'ata_codes') {
+      return filteredRows;
+    }
+    const childrenByParent = new Map<string | null, RecordRow[]>();
+    filteredRows.forEach((row) => {
+      const parentId = String(row.parent_id || '').trim() || null;
+      const bucket = childrenByParent.get(parentId) || [];
+      bucket.push(row);
+      childrenByParent.set(parentId, bucket);
+    });
+    const sortRows = (rowsToSort: RecordRow[]) =>
+      [...rowsToSort].sort((left, right) => {
+        const leftCode = String(left.code || '');
+        const rightCode = String(right.code || '');
+        if (sortColumn === 'description') {
+          return String(left.description || '').localeCompare(String(right.description || ''), undefined, { numeric: true, sensitivity: 'base' });
+        }
+        return leftCode.localeCompare(rightCode, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    const flattened: RecordRow[] = [];
+    const visit = (parentId: string | null, depth: number) => {
+      const children = sortRows(childrenByParent.get(parentId) || []);
+      children.forEach((child) => {
+        flattened.push({ ...child, __tree_depth: depth });
+        visit(String(child.id || '').trim() || null, depth + 1);
+      });
+    };
+    visit(null, 0);
+    return flattened;
+  }, [entity, filteredRows, sortColumn]);
+  const renderedRows = entity === 'ata_codes' ? hierarchicalAtaRows : filteredRows;
+  useEffect(() => {
+    if (entity !== 'ata_codes') {
+      return;
+    }
+    const options = renderedRows
+      .filter((row) => String(row.is_active ?? true).toLowerCase() !== 'false')
+      .map((row) => {
+        const depth = Number(row.__tree_depth ?? 0);
+        const code = String(row.code || '').trim();
+        const description = String(row.description || '').trim();
+        const indent = depth > 0 ? `${'  '.repeat(depth)}↳ ` : '';
+        const label = `${indent}${code}${description ? ` - ${description}` : ''}`;
+        return { value: String(row.id || ''), label, depth };
+      })
+      .filter((option) => Boolean(option.value));
+    setAtaParentOptions(options);
+  }, [entity, renderedRows]);
   const renderedRowIds = useMemo(() => renderedRows.map((row) => row.id), [renderedRows]);
   const renderedRowIdSet = useMemo(() => new Set(renderedRowIds), [renderedRowIds]);
 
@@ -4639,7 +4777,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
     setModalMode('create');
     setSelectedId(null);
-    setFormValues(getInitialFormValues(entity));
+    if (entity === 'ata_codes') {
+      setFormValues({
+        ...getInitialFormValues(entity),
+        level: 1,
+        is_active: true,
+      });
+    } else {
+      setFormValues(getInitialFormValues(entity));
+    }
     setFormErrors({});
     setActiveFormTab('basic');
     setModalOpen(true);
@@ -9070,7 +9216,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                       <span className="truncate">{resolveTableCellValue(row, column)}</span>
                                     </Link>
                                   ) : (
-                                    <span className="block truncate">{resolveTableCellValue(row, column)}</span>
+                                    <span className="block truncate">
+                                      {entity === 'ata_codes' && column === 'code'
+                                        ? `${'  '.repeat(Math.max(0, Number(row.__tree_depth ?? 0)))}${String(resolveTableCellValue(row, column) || '')}`
+                                        : resolveTableCellValue(row, column)}
+                                    </span>
                                   )}
                                 </div>
                               </ContextMenuTrigger>
@@ -9093,9 +9243,26 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                     if (entity === 'aircraft' && AIRCRAFT_EDITABLE_COLUMNS.has(column)) {
                                       handleInlineEditStart(row.id, column, row[column]);
                                     }
+                                    if (entity === 'ata_codes' && column === 'code') {
+                                      const parentLevel = Number(row.level ?? 0);
+                                      setModalMode('create');
+                                      setSelectedId('');
+                                      setFormValues({
+                                        ...getInitialFormValues(entity),
+                                        parent_id: row.id,
+                                        parent_code_ref: String(row.code || ''),
+                                        level: Number.isFinite(parentLevel) ? parentLevel + 1 : 1,
+                                        chapter_code: String(row.chapter_code || ''),
+                                        franchise_id: String(row.franchise_id || ''),
+                                        is_active: true,
+                                      });
+                                      setFormErrors({});
+                                      setActiveFormTab('basic');
+                                      setModalOpen(true);
+                                    }
                                   }}
                                 >
-                                  Inline Edit
+                                  {entity === 'ata_codes' && column === 'code' ? 'Add Child ATA' : 'Inline Edit'}
                                 </ContextMenuItem>
                               </ContextMenuContent>
                             </ContextMenu>

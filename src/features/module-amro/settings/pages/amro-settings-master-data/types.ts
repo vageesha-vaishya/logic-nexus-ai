@@ -1,5 +1,6 @@
 export type MasterEntity =
   | 'aircraft'
+  | 'ata_codes'
   | 'flight_logs'
   | 'parts_inventory'
   | 'suppliers'

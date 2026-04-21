@@ -17,10 +17,23 @@ vi.mock('@/lib/logger', () => ({
 
 vi.mock('./hooks/useAuth', () => ({
   AuthProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useAuth: () => ({
+    session: null,
+    user: null,
+    profile: null,
+    roles: [],
+    signOut: vi.fn(),
+    refreshProfile: vi.fn(),
+    loading: false,
+  }),
 }));
 
 vi.mock('./hooks/useCRM', () => ({
   CRMProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  useCRM: () => ({
+    context: { tenantId: null, franchiseId: null, userId: null },
+    scopedDb: {},
+  }),
 }));
 
 vi.mock('./contexts/DomainContext', () => ({
@@ -33,6 +46,15 @@ vi.mock('./contexts/TenantBrandingContext', () => ({
 
 vi.mock('./hooks/useTheme', () => ({
   ThemeProvider: ({ children }: { children: React.ReactNode }) => <>{children}</>,
+  DEFAULT_MENU_GROUP_STRIP_COLORS: {
+    crm: '272 85% 55%',
+    sales: '217 91% 60%',
+    financials: '150 83% 40%',
+    logistics: '38 92% 50%',
+    amro: '190 95% 42%',
+    administration: '310 78% 55%',
+    other: '220 15% 60%',
+  },
 }));
 
 vi.mock('@/components/ui/tooltip', () => ({
@@ -94,6 +116,7 @@ vi.mock('./pages/SelfServiceOnboarding', () => ({
 vi.mock('./features/module-amro/settings/pages/AmroMasterDataEntityPages', () => ({
   AircraftMasterDataPage: () => <div data-testid="route-aircraft">aircraft</div>,
   AircraftSubModulePage: () => <div data-testid="route-aircraft-sub-module">aircraft-sub-module</div>,
+  AtaCodesMasterDataPage: () => <div data-testid="route-ata-codes">ata-codes</div>,
   PartsInventoryMasterDataPage: () => <div data-testid="route-parts-inventory">parts-inventory</div>,
   SuppliersMasterDataPage: () => <div data-testid="route-suppliers">suppliers</div>,
   MaintenanceFacilitiesMasterDataPage: () => <div data-testid="route-maintenance-facilities">maintenance-facilities</div>,
@@ -114,6 +137,7 @@ describe('App AMRO master data route mapping', () => {
 
   it.each([
     { path: '/dashboard/amro/settings/master-data/aircraft', marker: 'route-aircraft' },
+    { path: '/dashboard/amro/settings/master-data/ata-codes', marker: 'route-ata-codes' },
     { path: '/dashboard/amro/settings/master-data/parts-inventory', marker: 'route-parts-inventory' },
     { path: '/dashboard/amro/settings/master-data/suppliers', marker: 'route-suppliers' },
     { path: '/dashboard/amro/settings/master-data/maintenance-facilities', marker: 'route-maintenance-facilities' },
@@ -125,7 +149,6 @@ describe('App AMRO master data route mapping', () => {
     { path: '/dashboard/amro/settings/master-data/shift-calendars', marker: 'route-shift-calendars' },
     { path: '/dashboard/amro/settings/master-data/work-packages', marker: 'route-work-packages' },
     { path: '/dashboard/amro/settings/master-data/work-package-templates', marker: 'route-work-package-templates' },
-    { path: '/dashboard/amro/settings/work-package-templates', marker: 'route-work-package-templates' },
   ])('resolves $path to the expected AMRO wrapper component', async ({ path, marker }) => {
     window.history.pushState({}, 'Route Test', path);
     render(<App />);

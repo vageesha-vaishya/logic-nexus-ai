@@ -12,7 +12,11 @@ import {
 } from '../../../../_utils/http';
 import { getSupabaseAdminClient } from '../../../../_utils/supabaseAdmin';
 import {
+  ensureAtaCodeUnique,
+  ensureAtaFranchiseExists,
+  ensureNoAtaCircularReference,
   getEntityConfig,
+  resolveAtaHierarchyContext,
   resolveEntity,
   sanitizeWritePayload,
   sendError,
@@ -439,6 +443,14 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
                 updated_by: auth.userId,
               })
               .eq('id', id)
+          : entity === 'ata_codes'
+            ? supabase
+                .from(entityConfig.table)
+                .update({
+                  is_active: false,
+                  updated_by: auth.userId,
+                })
+                .eq('id', id)
           : supabase.from(entityConfig.table).delete().eq('id', id);
       const { error } = await deleteQuery.eq('tenant_id', tenantId);
       if (error) throw new HttpError(error.message, 400);
@@ -469,6 +481,30 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       requireCreateFields: false,
       includeOnlyProvidedFields: true,
     });
+    if (entity === 'ata_codes') {
+      const existingAtaCode = asNullableString((existingRecord as Record<string, unknown>).code);
+      const existingAtaFranchiseId = asNullableString((existingRecord as Record<string, unknown>).franchise_id);
+      const existingParentId = asNullableString((existingRecord as Record<string, unknown>).parent_id);
+      const effectiveCode = String(payload.code || existingAtaCode || '').trim().toUpperCase();
+      const effectiveFranchiseId = asNullableString(payload.franchise_id) ?? existingAtaFranchiseId ?? franchiseId;
+      const effectiveParentId = Object.prototype.hasOwnProperty.call(payload, 'parent_id')
+        ? asNullableString(payload.parent_id)
+        : existingParentId;
+      payload.code = effectiveCode;
+      payload.franchise_id = effectiveFranchiseId;
+      await ensureAtaFranchiseExists(supabase, tenantId, effectiveFranchiseId);
+      await ensureAtaCodeUnique(supabase, tenantId, effectiveCode, id);
+      await ensureNoAtaCircularReference(supabase, tenantId, id, effectiveParentId);
+      const hierarchyContext = await resolveAtaHierarchyContext(
+        supabase,
+        tenantId,
+        effectiveFranchiseId,
+        effectiveParentId,
+      );
+      payload.parent_id = effectiveParentId;
+      payload.level = hierarchyContext.level;
+      payload.parent_code_ref = hierarchyContext.parentCodeRef;
+    }
     if (entity === 'work_package_templates') {
       const existingVersion = (existingRecord as Record<string, unknown>).version;
       const existingScope = (existingRecord as Record<string, unknown>).scope_json;

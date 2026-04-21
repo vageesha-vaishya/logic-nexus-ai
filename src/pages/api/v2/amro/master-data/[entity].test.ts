@@ -910,7 +910,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         template_code: 'WP-MODEL-001',
         template_name: 'Model Context Package',
         maintenance_type: 'line',
-        model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        assembly_models_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         aircraft_model: 'A320neo',
       },
       error: null,
@@ -949,7 +949,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         active: true,
         template_name: 'Model Context Package',
         maintenance_type: 'line',
-        model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+        assembly_models_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
         aircraft_model: 'A320neo',
         scope_json: [],
         tasks_json: [{ task_template_id: '11111111-1111-4111-8111-111111111111' }],
@@ -963,13 +963,13 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(res.statusCode).toBe(201);
     const rpcArgs = rpcMock.mock.calls[0]?.[1] as Record<string, unknown>;
     const rpcPayload = (rpcArgs?.p_payload || {}) as Record<string, unknown>;
-    expect(rpcPayload.model_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(rpcPayload.assembly_models_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect(rpcPayload.aircraft_model).toBe('A320neo');
     expect(patchUpdateMock).toHaveBeenCalledWith({
-      model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      assembly_models_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       aircraft_model: 'A320neo',
     });
-    expect((res.jsonBody as any)?.output?.record?.model_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect((res.jsonBody as any)?.output?.record?.assembly_models_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect((res.jsonBody as any)?.output?.record?.aircraft_model).toBe('A320neo');
   });
 
@@ -1058,5 +1058,130 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(Array.isArray((res.jsonBody as any)?.output?.created_task_relationships)).toBe(true);
     expect(((res.jsonBody as any)?.output?.created_task_relationships || []).length).toBe(0);
     expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-empty-1');
+  });
+
+  it('creates ATA code with parent hierarchy context', async () => {
+    const franchiseMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: { id: '22222222-2222-4222-8222-222222222222' },
+      error: null,
+    });
+    const franchiseQuery: any = {
+      eq: vi.fn(),
+      maybeSingle: franchiseMaybeSingleMock,
+    };
+    franchiseQuery.eq.mockReturnValue(franchiseQuery);
+    const franchiseSelectMock = vi.fn().mockReturnValue(franchiseQuery);
+
+    const ataSelectMaybeSingleMock = vi
+      .fn()
+      .mockResolvedValueOnce({ data: null, error: null })
+      .mockResolvedValueOnce({
+        data: {
+          id: '11111111-1111-4111-8111-111111111111',
+          franchise_id: '22222222-2222-4222-8222-222222222222',
+          level: 2,
+          code: '24',
+          is_active: true,
+        },
+        error: null,
+      });
+    const ataSelectQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: ataSelectMaybeSingleMock,
+    };
+    ataSelectQuery.eq.mockReturnValue(ataSelectQuery);
+    ataSelectQuery.limit.mockReturnValue(ataSelectQuery);
+    const ataSelectMock = vi.fn().mockReturnValue(ataSelectQuery);
+    const ataInsertMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: {
+        id: 'ata-child',
+        tenant_id: 'tenant-1',
+        franchise_id: '22222222-2222-4222-8222-222222222222',
+        code: '24-10',
+        parent_id: '11111111-1111-4111-8111-111111111111',
+        level: 3,
+        chapter_code: '24',
+        parent_code_ref: '24',
+        is_active: true,
+      },
+      error: null,
+    });
+    const ataInsertSelectMock = vi.fn().mockReturnValue({ maybeSingle: ataInsertMaybeSingleMock });
+    const ataInsertMock = vi.fn().mockReturnValue({ select: ataInsertSelectMock });
+    const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'franchises') return { select: franchiseSelectMock };
+      if (table === 'ata_codes') return { select: ataSelectMock, insert: ataInsertMock };
+      if (table === 'maintenance_events') return { insert: auditInsertMock };
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { entity: 'ata_codes' },
+      body: {
+        code: '24-10',
+        description: 'Electrical Power',
+        chapter_code: '24',
+        parent_id: '11111111-1111-4111-8111-111111111111',
+        franchise_id: '22222222-2222-4222-8222-222222222222',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    const insertPayload = (ataInsertMock.mock.calls[0]?.[0] || {}) as Record<string, unknown>;
+    expect(insertPayload.code).toBe('24-10');
+    expect(insertPayload.level).toBe(3);
+    expect(insertPayload.parent_code_ref).toBe('24');
+    expect(insertPayload.tenant_id).toBe('tenant-1');
+    expect(res.statusCode).toBe(201);
+  });
+
+  it('returns ATA chapter_code validation issue for malformed values', async () => {
+    const ataSelectMaybeSingleMock = vi.fn().mockResolvedValue({
+      data: null,
+      error: null,
+    });
+    const ataSelectQuery: any = {
+      eq: vi.fn(),
+      limit: vi.fn(),
+      maybeSingle: ataSelectMaybeSingleMock,
+    };
+    ataSelectQuery.eq.mockReturnValue(ataSelectQuery);
+    ataSelectQuery.limit.mockReturnValue(ataSelectQuery);
+    const ataSelectMock = vi.fn().mockReturnValue(ataSelectQuery);
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'ata_codes') return { select: ataSelectMock };
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({ from: fromMock } as any);
+
+    const req: ApiRequest = {
+      method: 'POST',
+      query: { entity: 'ata_codes', validate_only: 'true' },
+      body: {
+        code: '24',
+        chapter_code: '240',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    expect((res.jsonBody as any)?.output?.validation?.is_valid).toBe(false);
+    expect(
+      ((res.jsonBody as any)?.output?.validation?.issues || []).some(
+        (issue: any) => issue?.field === 'chapter_code' && String(issue?.message || '').includes('exactly 2 characters'),
+      ),
+    ).toBe(true);
+    expect(fromMock).toHaveBeenCalledWith('ata_codes');
   });
 });

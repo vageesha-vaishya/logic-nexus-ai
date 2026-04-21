@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import {
+  AtaCodesMasterDataPage,
   AircraftMasterDataPage,
   AircraftSubModulePage,
   MaintenanceFacilitiesMasterDataPage,
@@ -32,6 +33,7 @@ describe('AmroMasterDataEntityPages', () => {
     const matrix: Array<{ component: () => JSX.Element; expected: string }> = [
       { component: AircraftMasterDataPage, expected: 'aircraft:master-data' },
       { component: AircraftSubModulePage, expected: 'aircraft:aircraft-sub-module' },
+      { component: AtaCodesMasterDataPage, expected: 'ata_codes:master-data' },
       { component: PartsInventoryMasterDataPage, expected: 'parts_inventory:master-data' },
       { component: SuppliersMasterDataPage, expected: 'suppliers:master-data' },
       { component: MaintenanceFacilitiesMasterDataPage, expected: 'maintenance_facilities:master-data' },

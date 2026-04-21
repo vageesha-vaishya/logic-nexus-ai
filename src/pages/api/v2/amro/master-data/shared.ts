@@ -5,6 +5,7 @@ import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
 export type AmroMasterDataEntity =
   | 'aircraft'
   | 'aircraft_template'
+  | 'ata_codes'
   | 'flight_logs'
   | 'parts_inventory'
   | 'suppliers'
@@ -326,6 +327,24 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'amendment_number',
     ],
     defaultSortColumn: 'updated_at',
+  },
+  ata_codes: {
+    table: 'ata_codes',
+    searchableColumns: ['code', 'description', 'chapter_code', 'parent_code_ref'],
+    listColumns:
+      'id,tenant_id,franchise_id,code,description,parent_id,level,chapter_code,parent_code_ref,is_active,created_at,updated_at',
+    requiredCreateFields: ['code'],
+    writeAllowedFields: [
+      'franchise_id',
+      'code',
+      'description',
+      'parent_id',
+      'level',
+      'chapter_code',
+      'parent_code_ref',
+      'is_active',
+    ],
+    defaultSortColumn: 'code',
   },
 };
 
@@ -667,8 +686,23 @@ function normalizeAircraftTemplate(payload: Record<string, unknown>) {
   };
 }
 
+function normalizeAtaCode(payload: Record<string, unknown>) {
+  const chapterCode = asNullableString(payload.chapter_code);
+  return {
+    franchise_id: asNullableString(payload.franchise_id),
+    code: asString(payload.code).toUpperCase(),
+    description: asNullableString(payload.description),
+    parent_id: asNullableString(payload.parent_id),
+    level: asNumber(payload.level),
+    chapter_code: chapterCode ? chapterCode.toUpperCase() : null,
+    parent_code_ref: asNullableString(payload.parent_code_ref),
+    is_active: asBoolean(payload.is_active, true),
+  };
+}
+
 export function normalizePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>) {
   if (entity === 'aircraft') return normalizeAircraft(payload);
+  if (entity === 'ata_codes') return normalizeAtaCode(payload);
   if (entity === 'flight_logs') return normalizeFlightLog(payload);
   if (entity === 'parts_inventory') return normalizePartsInventory(payload);
   if (entity === 'suppliers') return normalizeSupplier(payload);
@@ -691,6 +725,22 @@ export type MasterDataValidationIssue = {
 
 export function validatePayload(entity: AmroMasterDataEntity, payload: Record<string, unknown>): MasterDataValidationIssue[] {
   const issues: MasterDataValidationIssue[] = [];
+  if (entity === 'ata_codes') {
+    const code = asString(payload.code);
+    const chapterCode = asNullableString(payload.chapter_code);
+    if (code && code.length > 20) {
+      issues.push({
+        field: 'code',
+        message: 'code cannot exceed 20 characters',
+      });
+    }
+    if (chapterCode && chapterCode.length !== 2) {
+      issues.push({
+        field: 'chapter_code',
+        message: 'chapter_code must be exactly 2 characters',
+      });
+    }
+  }
   if (entity === 'aircraft') {
     const manufacturingDate = asNullableString(payload.manufacturing_date);
     if (manufacturingDate && !/^\d{4}-\d{2}-\d{2}$/.test(manufacturingDate)) {
@@ -939,6 +989,137 @@ export function sanitizeWritePayload(
     }
   }
   return writePayload;
+}
+
+type SupabaseAdminClient = ReturnType<typeof getSupabaseAdminClient>;
+
+function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+export async function ensureAtaFranchiseExists(
+  supabase: SupabaseAdminClient,
+  tenantId: string,
+  franchiseId: string | null,
+): Promise<void> {
+  if (!franchiseId) return;
+  if (!isUuid(franchiseId)) {
+    throw new HttpError('franchise_id must be a valid UUID', 422);
+  }
+  const { data, error } = await supabase
+    .from('franchises')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('id', franchiseId)
+    .maybeSingle();
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  if (!data) {
+    throw new HttpError('franchise_id does not exist in current tenant scope', 422);
+  }
+}
+
+export async function ensureAtaCodeUnique(
+  supabase: SupabaseAdminClient,
+  tenantId: string,
+  code: string,
+  excludeId?: string | null,
+): Promise<void> {
+  const normalizedCode = asString(code).toUpperCase();
+  if (!normalizedCode) return;
+  let query = supabase
+    .from('ata_codes')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .eq('code', normalizedCode)
+    .limit(1);
+  if (excludeId) {
+    query = query.neq('id', excludeId);
+  }
+  const { data, error } = await query.maybeSingle();
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  if (data) {
+    throw new HttpError('ATA code already exists for this tenant', 409);
+  }
+}
+
+export async function resolveAtaHierarchyContext(
+  supabase: SupabaseAdminClient,
+  tenantId: string,
+  franchiseId: string | null,
+  parentId: string | null,
+): Promise<{ level: number; parentCodeRef: string | null }> {
+  if (!parentId) {
+    return { level: 1, parentCodeRef: null };
+  }
+  if (!isUuid(parentId)) {
+    throw new HttpError('parent_id must be a valid UUID', 422);
+  }
+  const { data, error } = await supabase
+    .from('ata_codes')
+    .select('id,franchise_id,level,code,is_active')
+    .eq('tenant_id', tenantId)
+    .eq('id', parentId)
+    .maybeSingle();
+  if (error) {
+    throw new HttpError(error.message, 400);
+  }
+  if (!data) {
+    throw new HttpError('parent_id does not exist in current tenant scope', 422);
+  }
+  const parentFranchiseId = asNullableString((data as Record<string, unknown>).franchise_id);
+  if (franchiseId && parentFranchiseId && parentFranchiseId !== franchiseId) {
+    throw new HttpError('parent_id must belong to current franchise scope', 422);
+  }
+  if ((data as Record<string, unknown>).is_active === false) {
+    throw new HttpError('parent_id must reference an active ATA code', 422);
+  }
+  const parentLevel = Number((data as Record<string, unknown>).level ?? 0);
+  return {
+    level: Number.isFinite(parentLevel) ? parentLevel + 1 : 1,
+    parentCodeRef: asNullableString((data as Record<string, unknown>).code),
+  };
+}
+
+export async function ensureNoAtaCircularReference(
+  supabase: SupabaseAdminClient,
+  tenantId: string,
+  recordId: string,
+  parentId: string | null,
+): Promise<void> {
+  if (!parentId) return;
+  if (recordId === parentId) {
+    throw new HttpError('parent_id cannot reference the same ATA code', 422);
+  }
+  const visited = new Set<string>([recordId]);
+  let cursor: string | null = parentId;
+  let hopCount = 0;
+  while (cursor && hopCount < 64) {
+    if (visited.has(cursor)) {
+      throw new HttpError('Circular ATA hierarchy is not allowed', 422);
+    }
+    visited.add(cursor);
+    const { data, error } = await supabase
+      .from('ata_codes')
+      .select('id,parent_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', cursor)
+      .maybeSingle();
+    if (error) {
+      throw new HttpError(error.message, 400);
+    }
+    if (!data) {
+      throw new HttpError('parent_id does not exist in current tenant scope', 422);
+    }
+    cursor = asNullableString((data as Record<string, unknown>).parent_id);
+    hopCount += 1;
+  }
+  if (hopCount >= 64) {
+    throw new HttpError('ATA hierarchy depth exceeded while validating parent chain', 422);
+  }
 }
 
 export async function writeAuditRecord(params: {

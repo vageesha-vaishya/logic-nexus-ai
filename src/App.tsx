@@ -196,6 +196,7 @@ const AmroSettings = lazy(() => import("./features/module-amro").then((module) =
 const AmroMasterData = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroMasterDataPage })));
 const AmroAircraftMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.AircraftMasterDataPage })));
 const AmroAircraftSubModule = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.AircraftSubModulePage })));
+const AmroAtaCodesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.AtaCodesMasterDataPage })));
 const AmroPartsInventoryMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.PartsInventoryMasterDataPage })));
 const AmroSuppliersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.SuppliersMasterDataPage })));
 const AmroMaintenanceFacilitiesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.MaintenanceFacilitiesMasterDataPage })));
@@ -896,6 +897,7 @@ const App = () => (
             <Route path="/dashboard/amro/settings" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroSettings /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><Navigate to="/dashboard/amro/settings/master-data/aircraft" replace /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/aircraft" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/ata-codes" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAtaCodesMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/parts-inventory" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroPartsInventoryMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/suppliers" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroSuppliersMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/maintenance-facilities" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroMaintenanceFacilitiesMasterData /></ProtectedRoute>} />

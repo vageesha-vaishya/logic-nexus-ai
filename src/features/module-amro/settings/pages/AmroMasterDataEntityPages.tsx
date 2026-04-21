@@ -8,6 +8,10 @@ export function AircraftSubModulePage() {
   return <AmroSettingsMasterDataPage entityOverride="aircraft" variant="aircraft-sub-module" />;
 }
 
+export function AtaCodesMasterDataPage() {
+  return <AmroSettingsMasterDataPage entityOverride="ata_codes" />;
+}
+
 export function PartsInventoryMasterDataPage() {
   return <AmroSettingsMasterDataPage entityOverride="parts_inventory" />;
 }

@@ -13,12 +13,15 @@ import {
 import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
 import {
   buildCsv,
+  ensureAtaCodeUnique,
+  ensureAtaFranchiseExists,
   getEntityConfig,
   parseBulkOperation,
   parseExportRequested,
   parsePagination,
   parseSearch,
   parseSort,
+  resolveAtaHierarchyContext,
   resolveEntity,
   sanitizeWritePayload,
   sendError,
@@ -32,7 +35,9 @@ import { logger } from '@/lib/logger';
 const ENTITY_UNAVAILABLE = new Map<string, number>();
 const ENTITY_COLUMN_OVERRIDES = new Map<string, Set<string>>();
 const ENTITY_SEARCH_COLUMN_OVERRIDES = new Map<string, Set<string>>();
+const ATA_TREE_CACHE = new Map<string, { expiresAt: number; rows: Record<string, unknown>[]; total: number }>();
 const ENTITY_UNAVAILABLE_TTL_MS = 30_000;
+const ATA_TREE_CACHE_TTL_MS = 30_000;
 
 function asNullableString(value: unknown): string | null {
   if (value === null || value === undefined) return null;
@@ -1222,6 +1227,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const exportRequested = parseExportRequested(req);
       const { page, pageSize, start, end } = parsePagination(req);
       const { sortBy, ascending } = parseSort(req, entity);
+      const ataCacheKey = `${tenantId}:${franchiseId || 'all'}:${search}:${sortBy}:${ascending ? 'asc' : 'desc'}:${page}:${pageSize}`;
+      if (entity === 'ata_codes') {
+        const cached = ATA_TREE_CACHE.get(ataCacheKey);
+        if (cached && cached.expiresAt > Date.now()) {
+          res.status(200).json({
+            version: 'v2',
+            correlationId: ctx.correlationId,
+            output: {
+              entity,
+              records: cached.rows,
+              page,
+              page_size: pageSize,
+              total: cached.total,
+              cached: true,
+            },
+          });
+          return;
+        }
+      }
       const flightLogFilters = entity === 'flight_logs' ? parseFlightLogQueryFilters(req) : null;
       const registrationAircraftIds =
         flightLogFilters?.aircraftRegistration
@@ -1412,6 +1436,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         res.status(200).end(csv);
         return;
       }
+      if (entity === 'ata_codes') {
+        ATA_TREE_CACHE.set(ataCacheKey, {
+          expiresAt: Date.now() + ATA_TREE_CACHE_TTL_MS,
+          rows,
+          total: finalCount || rows.length,
+        });
+      }
       res.status(200).json({
         version: 'v2',
         correlationId: ctx.correlationId,
@@ -1507,6 +1538,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         .insert(insertRows)
         .select(entityConfig.listColumns);
       if (error) throw new HttpError(error.message, 400);
+      if (entity === 'ata_codes') {
+        ATA_TREE_CACHE.clear();
+      }
       await writeAuditRecord({
         tenantId,
         franchiseId,
@@ -1540,6 +1574,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       aircraftModelIssues = validation.get(0) || [];
     }
     const payload = sanitizeWritePayload(entity, resolvedBody, { requireCreateFields: entity !== 'aircraft' });
+    if (entity === 'ata_codes') {
+      payload.code = String(payload.code || '').trim().toUpperCase();
+      const ataFranchiseId = asNullableString(payload.franchise_id) || franchiseId;
+      payload.franchise_id = ataFranchiseId;
+      await ensureAtaFranchiseExists(supabase, tenantId, ataFranchiseId);
+      await ensureAtaCodeUnique(supabase, tenantId, String(payload.code || ''));
+      const hierarchyContext = await resolveAtaHierarchyContext(
+        supabase,
+        tenantId,
+        ataFranchiseId,
+        asNullableString(payload.parent_id),
+      );
+      payload.level = hierarchyContext.level;
+      payload.parent_code_ref = hierarchyContext.parentCodeRef;
+      if (!Object.prototype.hasOwnProperty.call(payload, 'is_active')) {
+        payload.is_active = true;
+      }
+    }
     if (entity === 'work_package_templates') {
       if (Object.prototype.hasOwnProperty.call(payload, 'policy_snapshot_id')) {
         payload.policy_snapshot_id = asNullableString(payload.policy_snapshot_id);
@@ -1618,7 +1670,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     };
     logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP -001] ', {function: 'insertPayload'});
     if (supportsFranchiseScope) {
-      insertPayload.franchise_id = franchiseId;
+      insertPayload.franchise_id = entity === 'ata_codes'
+        ? (asNullableString(payload.franchise_id) || franchiseId)
+        : franchiseId;
     }
     if (entity === 'work_package_templates') {
       const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(payload);
@@ -1822,6 +1876,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       .maybeSingle();
     if (error) {
       throw new HttpError(error.message, 400);
+    }
+    if (entity === 'ata_codes') {
+      ATA_TREE_CACHE.clear();
     }
     await writeAuditRecord({
       tenantId,

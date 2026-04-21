@@ -8,6 +8,7 @@ import type {
 
 export const ENTITY_LABEL: Record<MasterEntity, string> = {
   aircraft: 'Aircraft',
+  ata_codes: 'ATA',
   flight_logs: 'Flight Logs',
   parts_inventory: 'Parts Inventory',
   suppliers: 'Suppliers',
@@ -37,6 +38,7 @@ export const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
     'thrust_rating_change_log',
     'on_wing_lifecycle_records',
   ],
+  ata_codes: ['code', 'description', 'level', 'chapter_code', 'parent_code_ref', 'is_active', 'updated_at'],
   flight_logs: ['aircraft_id', 'flight_date', 'flight_number', 'departure_airport', 'arrival_airport', 'pilot_name', 'flight_hours', 'block_hours', 'flight_cycles', 'regulatory_authority'],
   parts_inventory: ['id', 'part_number', 'serial_number', 'description', 'quantity_available', 'warehouse_location', 'status', 'updated_at'],
   suppliers: ['id', 'supplier_code', 'name', 'contact_name', 'email', 'phone', 'is_active', 'updated_at'],
@@ -148,6 +150,14 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'thrust_rating_change_log', label: 'Thrust Rating Change Log', type: 'json' },
     { key: 'on_wing_lifecycle_records', label: 'On-Wing Lifecycle Records', type: 'json' },
     { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'maintenance', 'grounded', 'retired', 'storage'] },
+  ],
+  ata_codes: [
+    { key: 'code', label: 'Code', type: 'text', required: true },
+    { key: 'description', label: 'Description', type: 'textarea' },
+    { key: 'chapter_code', label: 'Chapter Code', type: 'text', required: true },
+    { key: 'parent_id', label: 'Parent ATA', type: 'select', placeholder: 'Select parent ATA (optional)' },
+    { key: 'franchise_id', label: 'Franchise', type: 'select', placeholder: 'Select franchise (optional)' },
+    { key: 'is_active', label: 'Active', type: 'boolean' },
   ],
   flight_logs: [
     { key: 'aircraft_id', label: 'Aircraft Id', type: 'text', required: true },
@@ -276,6 +286,7 @@ export const AMRO_MASTER_ENTITY_FORM_FIELDS = ENTITY_FORM_FIELDS;
 export const MASTER_ENTITY_SEQUENCE = Object.keys(ENTITY_LABEL) as MasterEntity[];
 export const ENTITY_ROUTE_SEGMENT: Record<MasterEntity, string> = {
   aircraft: 'aircraft',
+  ata_codes: 'ata-codes',
   flight_logs: 'flight-logs',
   parts_inventory: 'parts-inventory',
   suppliers: 'suppliers',
@@ -313,6 +324,7 @@ export const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     on_wing_lifecycle_records: '[]',
     status: 'active',
   },
+  ata_codes: { code: '', description: '', chapter_code: '', parent_id: '', parent_code_ref: '', level: 1, franchise_id: '', is_active: true },
   flight_logs: { aircraft_id: '', flight_date: new Date().toISOString().slice(0, 10), flight_number: '', departure_airport: '', arrival_airport: '', pilot_name: '', flight_hours: 0, block_hours: 0, flight_cycles: 0, crew_details: '', fuel_burn_kg: 0, oil_uplift_liters: 0, pirep_discrepancy: '', regulatory_authority: 'DGCA', metadata: '{}' },
   parts_inventory: { part_number: '', serial_number: '', description: '', category: '', unit_of_measure: 'EA', min_stock_level: 0, quantity_on_hand: 0, supplier_id: '', warehouse_location: '', status: 'active' },
   suppliers: { supplier_code: '', name: '', contact_name: '', email: '', phone: '', lead_time_days: 0, rating: 0, is_active: true, metadata: '{}' },

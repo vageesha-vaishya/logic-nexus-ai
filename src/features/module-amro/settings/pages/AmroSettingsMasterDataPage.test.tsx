@@ -953,11 +953,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     vi.unstubAllEnvs();
   });
 
-  it('renders all ten master data modules with shared list layout controls', async () => {
+  it('renders all master data modules with shared list layout controls', async () => {
     renderAircraftPage();
 
     const matrix = [
       { tab: 'Aircraft', entity: 'aircraft', labels: ['Tail Number', 'Aircraft Type'] },
+      { tab: 'ATA', entity: 'ata_codes', labels: ['Code', 'Chapter Code'] },
       { tab: 'Parts Inventory', entity: 'parts_inventory', labels: ['Part Number', 'Min Stock Level'] },
       { tab: 'Suppliers', entity: 'suppliers', labels: ['Supplier Code', 'Lead Time (Days)'] },
       { tab: 'Maintenance Facilities', entity: 'maintenance_facilities', labels: ['Facility Code', 'Station Code'] },
@@ -2402,6 +2403,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   it('enforces required fields and rejects malformed date, time, and json values', () => {
     const requiredMatrix: Array<{ entity: keyof typeof AMRO_MASTER_ENTITY_FORM_FIELDS; field: string; message: string }> = [
       { entity: 'aircraft', field: 'tail_number', message: 'Tail Number is required' },
+      { entity: 'ata_codes', field: 'code', message: 'Code is required' },
       { entity: 'parts_inventory', field: 'part_number', message: 'Part Number is required' },
       { entity: 'suppliers', field: 'supplier_code', message: 'Supplier Code is required' },
       { entity: 'maintenance_facilities', field: 'facility_code', message: 'Facility Code is required' },
@@ -2522,6 +2524,12 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       scope_json: '[{"phase":"inspection"}',
     });
     expect(templateMalformedJson.errors.scope_json).toBe('Scope JSON must be valid JSON');
+
+    const ataMalformedChapterCode = buildPayloadFromForm('ata_codes', {
+      code: '27-10',
+      chapter_code: '270',
+    });
+    expect(ataMalformedChapterCode.errors.chapter_code).toBe('Chapter Code must be exactly 2 characters');
   });
 
   it('fails referential checks when linked supplier or facility records are missing', async () => {

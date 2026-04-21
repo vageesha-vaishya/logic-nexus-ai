@@ -667,5 +667,26 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     }
   }
 
+  if (entity === 'ata_codes') {
+    const code = String(payload.code ?? '').trim().toUpperCase();
+    const chapterCode = String(payload.chapter_code ?? '').trim().toUpperCase();
+    payload.code = code;
+    payload.chapter_code = chapterCode;
+    if (code.length > 20) {
+      errors.code = 'Code cannot exceed 20 characters';
+    }
+    if (chapterCode.length !== 2) {
+      errors.chapter_code = 'Chapter Code must be exactly 2 characters';
+    }
+    const parentId = String(values.parent_id ?? '').trim();
+    if (parentId) {
+      payload.parent_id = parentId;
+    }
+    const franchiseId = String(values.franchise_id ?? '').trim();
+    if (franchiseId) {
+      payload.franchise_id = franchiseId;
+    }
+  }
+
   return { payload, errors };
 }
