@@ -14,6 +14,8 @@ import { AmroKpiGrid, AmroModuleSurface } from '@/features/module-amro/component
 import { AmroUnifiedGridRecordDetailShell } from '@/features/module-amro/components/parts/AmroUnifiedGridRecordDetailShell';
 import type { GridColumnDefinition } from '@/features/module-amro/components/templates/AmroInventoryDataGridTemplate';
 import {
+  useAssemblyModelOptions,
+  useAssemblyTypeOptions,
   useCreateMpd,
   useDeleteMpd,
   useListMpd,
@@ -93,6 +95,8 @@ export function AmroMpdManagementPage() {
   });
 
   const { data, isLoading, isError, error } = useListMpd({ page: 1, pageSize: 500 });
+  const assemblyTypeOptionsQuery = useAssemblyTypeOptions(true);
+  const assemblyModelOptionsQuery = useAssemblyModelOptions(true);
   const createMutation = useCreateMpd();
   const updateMutation = useUpdateMpd();
   const deleteMutation = useDeleteMpd();
@@ -174,15 +178,16 @@ export function AmroMpdManagementPage() {
     }
   }, [exportCsv]);
 
-  const assemblyTypeOptions = useMemo(() => {
-    const values = Array.from(new Set(records.map((record) => String((record as Record<string, unknown>).assembly_type || '').trim()).filter(Boolean)));
-    return ['all', ...values];
-  }, [records]);
+  const assemblyTypeOptions = useMemo(
+    () => assemblyTypeOptionsQuery.data || [],
+    [assemblyTypeOptionsQuery.data],
+  );
 
   const modelOptions = useMemo(() => {
-    const values = Array.from(new Set(records.map((record) => String(record.assembly_model_id || '').trim()).filter(Boolean)));
-    return ['all', ...values];
-  }, [records]);
+    const source = assemblyModelOptionsQuery.data || [];
+    if (advancedFilters.assemblyType === 'all') return source;
+    return source.filter((model) => model.assembly_type_id === advancedFilters.assemblyType);
+  }, [advancedFilters.assemblyType, assemblyModelOptionsQuery.data]);
 
   const monitorTypeOptions = useMemo(() => {
     const values = Array.from(new Set(records.map((record) => String((record as Record<string, unknown>).monitor_type || '').trim()).filter(Boolean)));
@@ -204,8 +209,9 @@ export function AmroMpdManagementPage() {
     const descriptionQuery = advancedFilters.description.trim().toLowerCase();
     return records.filter((record) => {
       if (advancedFilters.assemblyType !== 'all') {
-        const value = String((record as Record<string, unknown>).assembly_type || '').trim();
-        if (value !== advancedFilters.assemblyType) return false;
+        const modelId = String(record.assembly_model_id || '').trim();
+        const model = (assemblyModelOptionsQuery.data || []).find((item) => item.id === modelId);
+        if (!model || model.assembly_type_id !== advancedFilters.assemblyType) return false;
       }
       if (advancedFilters.model !== 'all') {
         if (String(record.assembly_model_id || '').trim() !== advancedFilters.model) return false;
@@ -231,7 +237,15 @@ export function AmroMpdManagementPage() {
       }
       return true;
     });
-  }, [advancedFilters, records]);
+  }, [advancedFilters, assemblyModelOptionsQuery.data, records]);
+
+  useEffect(() => {
+    if (advancedFilters.model === 'all') return;
+    const exists = modelOptions.some((item) => item.id === advancedFilters.model);
+    if (!exists) {
+      setAdvancedFilters((current) => ({ ...current, model: 'all' }));
+    }
+  }, [advancedFilters.model, modelOptions]);
 
   const gridRecords = useMemo<MpdGridRow[]>(() => filteredRecords as MpdGridRow[], [filteredRecords]);
 
@@ -261,7 +275,8 @@ export function AmroMpdManagementPage() {
                 value={advancedFilters.assemblyType}
                 onChange={(event) => setAdvancedFilters((current) => ({ ...current, assemblyType: event.target.value }))}
               >
-                {assemblyTypeOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+                <option value="all">(All)</option>
+                {assemblyTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
               </select>
             </div>
             <div className="space-y-1 md:col-span-3">
@@ -271,7 +286,8 @@ export function AmroMpdManagementPage() {
                 value={advancedFilters.model}
                 onChange={(event) => setAdvancedFilters((current) => ({ ...current, model: event.target.value }))}
               >
-                {modelOptions.map((option) => <option key={option} value={option}>{option === 'all' ? '(All)' : option}</option>)}
+                <option value="all">(All)</option>
+                {modelOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
               </select>
             </div>
             <div className="space-y-1 md:col-span-3">

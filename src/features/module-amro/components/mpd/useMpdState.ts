@@ -47,6 +47,17 @@ type MpdListResponse = {
   page_size: number;
 };
 
+export type AssemblyTypeOption = {
+  id: string;
+  name: string;
+};
+
+export type AssemblyModelOption = {
+  id: string;
+  name: string;
+  assembly_type_id: string | null;
+};
+
 const MPD_KEY = ['amro', 'mpd'] as const;
 
 function normalizeString(value: unknown): string | null {
@@ -215,6 +226,54 @@ async function exportMpdCsv(headers: HeadersInit): Promise<Blob> {
   return new Blob([text], { type: 'text/csv;charset=utf-8;' });
 }
 
+async function fetchMasterDataRecords(
+  entity: 'assembly-types' | 'assembly-models',
+  headers: HeadersInit,
+): Promise<Record<string, unknown>[]> {
+  const query = new URLSearchParams({
+    page: '1',
+    page_size: '500',
+    sort_by: 'name',
+    sort_dir: 'asc',
+  });
+  const response = await fetch(`/api/v2/amro/master-data/${entity}?${query.toString()}`, {
+    method: 'GET',
+    headers,
+  });
+  const payload = await parseApiResponse(response);
+  if (!response.ok) {
+    throw new Error(String(payload.error || `Failed to load ${entity} (${response.status})`));
+  }
+  const output = payload.output && typeof payload.output === 'object' ? payload.output as Record<string, unknown> : {};
+  const records = Array.isArray(output.records) ? output.records : [];
+  return records.filter((record): record is Record<string, unknown> => Boolean(record && typeof record === 'object'));
+}
+
+async function fetchAssemblyTypes(headers: HeadersInit): Promise<AssemblyTypeOption[]> {
+  const records = await fetchMasterDataRecords('assembly-types', headers);
+  return records
+    .map((record) => ({
+      id: String(record.id || '').trim(),
+      name: String(record.name || '').trim(),
+      is_active: normalizeBoolean(record.is_active, true),
+    }))
+    .filter((record) => record.id && record.name && record.is_active)
+    .map(({ id, name }) => ({ id, name }));
+}
+
+async function fetchAssemblyModels(headers: HeadersInit): Promise<AssemblyModelOption[]> {
+  const records = await fetchMasterDataRecords('assembly-models', headers);
+  return records
+    .map((record) => ({
+      id: String(record.id || '').trim(),
+      name: String(record.name || '').trim(),
+      assembly_type_id: normalizeString(record.assembly_type_id),
+      is_active: normalizeBoolean(record.is_active, true),
+    }))
+    .filter((record) => record.id && record.name && record.is_active)
+    .map(({ id, name, assembly_type_id }) => ({ id, name, assembly_type_id }));
+}
+
 export function useListMpd(params: { page?: number; pageSize?: number; search?: string; enabled?: boolean } = {}) {
   const authHeaders = useAuthHeaders();
   const { page = 1, pageSize = 200, search, enabled = true } = params;
@@ -223,6 +282,28 @@ export function useListMpd(params: { page?: number; pageSize?: number; search?: 
     queryFn: () => authHeaders ? fetchMpdList(authHeaders, { page, pageSize, search }) : Promise.reject(new Error('Not authenticated')),
     enabled: enabled && !!authHeaders,
     staleTime: 30_000,
+    retry: 2,
+  });
+}
+
+export function useAssemblyTypeOptions(enabled = true) {
+  const authHeaders = useAuthHeaders();
+  return useQuery({
+    queryKey: [...MPD_KEY, 'assembly-types'] as const,
+    queryFn: () => authHeaders ? fetchAssemblyTypes(authHeaders) : Promise.reject(new Error('Not authenticated')),
+    enabled: enabled && !!authHeaders,
+    staleTime: 60_000,
+    retry: 2,
+  });
+}
+
+export function useAssemblyModelOptions(enabled = true) {
+  const authHeaders = useAuthHeaders();
+  return useQuery({
+    queryKey: [...MPD_KEY, 'assembly-models'] as const,
+    queryFn: () => authHeaders ? fetchAssemblyModels(authHeaders) : Promise.reject(new Error('Not authenticated')),
+    enabled: enabled && !!authHeaders,
+    staleTime: 60_000,
     retry: 2,
   });
 }
