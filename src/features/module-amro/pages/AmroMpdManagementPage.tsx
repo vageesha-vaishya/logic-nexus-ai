@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { AmroCrudMessageBanner } from '@/features/module-amro/components/parts/AmroCrudPrimitives';
-import { AmroKpiGrid, AmroModuleSurface } from '@/features/module-amro/components/parts/AmroPartsUiStandards';
+import { AmroModuleSurface } from '@/features/module-amro/components/parts/AmroPartsUiStandards';
 import { AmroUnifiedGridRecordDetailShell } from '@/features/module-amro/components/parts/AmroUnifiedGridRecordDetailShell';
 import type { GridColumnDefinition } from '@/features/module-amro/components/templates/AmroInventoryDataGridTemplate';
 import {
@@ -424,14 +424,15 @@ export function AmroMpdManagementPage() {
           </div>
         </div>
 
-        <AmroKpiGrid
-          items={[
-            { label: 'Total MPD Records', value: String(records.length) },
-            { label: 'Mandatory', value: String(stats.mandatory), tone: stats.mandatory > 0 ? 'warning' : 'default' },
-            { label: 'Interval-driven', value: String(stats.withIntervals), tone: stats.withIntervals > 0 ? 'success' : 'default' },
-            { label: 'Optional', value: String(stats.custom) },
-          ]}
-        />
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-1.5 text-xs">
+          <span className="font-medium">Total MPD Records: {records.length}</span>
+          <span className="text-muted-foreground">|</span>
+          <span className="font-medium text-amber-700">Mandatory: {stats.mandatory}</span>
+          <span className="text-muted-foreground">|</span>
+          <span className="font-medium text-emerald-700">Interval-driven: {stats.withIntervals}</span>
+          <span className="text-muted-foreground">|</span>
+          <span className="font-medium">Optional: {stats.custom}</span>
+        </div>
 
         <AmroCrudMessageBanner message={errorMessage} tone="error" />
 
