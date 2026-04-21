@@ -204,6 +204,7 @@ router.get(
     const tenantId = String(req.tenantId);
     const franchiseId = String(req.headers['x-franchise-id'] || '').trim() || null;
     const search = String(req.query.search || '').trim();
+    const modelId = String(req.query.model_id || req.query.modelId || '').trim();
     const supabase = getSupabaseAdminClient();
 
     let query = supabase
@@ -219,6 +220,9 @@ router.get(
     if (search) {
       const escaped = search.replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
       query = query.or(`description.ilike.%${escaped}%,ata_code.ilike.%${escaped}%,reference_amp.ilike.%${escaped}%,code_form_no.ilike.%${escaped}%`);
+    }
+    if (modelId) {
+      query = query.or(`assembly_models.eq.${modelId},model_id.eq.${modelId}`);
     }
 
     const { data, error, count } = await query;

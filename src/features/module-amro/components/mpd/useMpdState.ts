@@ -169,12 +169,13 @@ async function parseApiResponse(response: Response): Promise<Record<string, unkn
 
 async function fetchMpdList(
   headers: HeadersInit,
-  params: { page: number; pageSize: number; search?: string },
+  params: { page: number; pageSize: number; search?: string; modelId?: string },
 ): Promise<MpdListResponse> {
   const query = new URLSearchParams({
     page: String(params.page),
     page_size: String(params.pageSize),
     ...(params.search ? { search: params.search } : {}),
+    ...(params.modelId ? { model_id: params.modelId } : {}),
   });
   const response = await fetch(`/api/v2/amro/mpd?${query.toString()}`, {
     method: 'GET',
@@ -355,12 +356,12 @@ async function uploadMpdAttachment(file: File, tenantIdHint: string | null): Pro
   throw lastError || new Error('Failed to upload MPD attachment');
 }
 
-export function useListMpd(params: { page?: number; pageSize?: number; search?: string; enabled?: boolean } = {}) {
+export function useListMpd(params: { page?: number; pageSize?: number; search?: string; modelId?: string; enabled?: boolean } = {}) {
   const authHeaders = useAuthHeaders();
-  const { page = 1, pageSize = 200, search, enabled = true } = params;
+  const { page = 1, pageSize = 200, search, modelId, enabled = true } = params;
   return useQuery({
-    queryKey: [...MPD_KEY, 'list', page, pageSize, search || 'all'] as const,
-    queryFn: () => authHeaders ? fetchMpdList(authHeaders, { page, pageSize, search }) : Promise.reject(new Error('Not authenticated')),
+    queryKey: [...MPD_KEY, 'list', page, pageSize, search || 'all', modelId || 'no-model'] as const,
+    queryFn: () => authHeaders ? fetchMpdList(authHeaders, { page, pageSize, search, modelId }) : Promise.reject(new Error('Not authenticated')),
     enabled: enabled && !!authHeaders,
     staleTime: 30_000,
     retry: 2,

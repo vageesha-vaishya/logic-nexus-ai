@@ -39,6 +39,7 @@ type QueryBuildInput = {
   ataCode: string;
   categoryCode: string;
   isMandatory: string;
+  modelId: string;
   sortBy: string;
   ascending: boolean;
   start?: number;
@@ -50,7 +51,11 @@ function toSortColumn(sortBy: string, sequenceColumn: TaskTemplateSequenceColumn
   return sortBy;
 }
 
-function applyListFilters(query: any, args: QueryBuildInput) {
+function applyListFilters(
+  query: any,
+  args: QueryBuildInput,
+  modelColumn: TaskTemplateModelColumn,
+) {
   if (args.franchiseId) {
     query = query.or(`franchise_id.is.null,franchise_id.eq.${args.franchiseId}`);
   }
@@ -61,6 +66,7 @@ function applyListFilters(query: any, args: QueryBuildInput) {
   if (args.ataCode) query = query.eq('ata_code', args.ataCode);
   if (args.categoryCode) query = query.eq('category_code', args.categoryCode);
   if (args.isMandatory) query = query.eq('is_mandatory', args.isMandatory === 'true');
+  if (args.modelId) query = query.eq(modelColumn, args.modelId);
   if (args.start !== undefined && args.end !== undefined) {
     query = query.range(args.start, args.end);
   }
@@ -74,7 +80,7 @@ async function runListQuery(
     args: QueryBuildInput;
     withRange: boolean;
   },
-) {
+): Promise<{ data: Record<string, unknown>[] | null; error: { message?: string } | null; count: number | null }> {
   const supabase = getSupabaseAdminClient();
   const sortColumn = toSortColumn(options.args.sortBy, options.sequenceColumn);
 
@@ -84,12 +90,12 @@ async function runListQuery(
     .eq('tenant_id', options.args.tenantId)
     .order(sortColumn, { ascending: options.args.ascending, nullsFirst: false });
 
-  query = applyListFilters(query, options.args);
+  query = applyListFilters(query, options.args, options.modelColumn);
   if (!options.withRange) {
     query = query.limit(5000);
   }
 
-  return query;
+  return query as unknown as { data: Record<string, unknown>[] | null; error: { message?: string } | null; count: number | null };
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
@@ -133,6 +139,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const ataCode = String(req.query.ata_code || '').trim();
       const categoryCode = String(req.query.category_code || '').trim();
       const isMandatory = String(req.query.is_mandatory || '').trim().toLowerCase();
+      const modelId = String(req.query.model_id || req.query.modelId || '').trim();
       const { sortBy, ascending } = parseSort(req);
 
       const listArgs: QueryBuildInput = {
@@ -142,6 +149,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         ataCode,
         categoryCode,
         isMandatory,
+        modelId,
         sortBy,
         ascending,
         start,
@@ -202,19 +210,20 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const insertWithFallback = async (
       sequenceColumn: TaskTemplateSequenceColumn,
       modelColumn: TaskTemplateModelColumn,
-    ) => {
+    ): Promise<{ data: Record<string, unknown> | null; error: { message?: string } | null }> => {
       const supabase = getSupabaseAdminClient();
       const row = {
         ...mapMpdPayloadToTaskTemplateInput(payload, modelColumn),
         tenant_id: tenantId,
         franchise_id: franchiseId,
       };
-      return supabase
+      const result = await supabase
         .from('task_templates')
         .insert(row)
         .select(taskTemplateSelectColumns(sequenceColumn, modelColumn))
         .limit(1)
         .maybeSingle();
+      return result as unknown as { data: Record<string, unknown> | null; error: { message?: string } | null };
     };
 
     const {

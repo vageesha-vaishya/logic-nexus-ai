@@ -125,8 +125,8 @@ export function AmroMpdManagementPage() {
   const [deleteCandidate, setDeleteCandidate] = useState<MpdRecord | null>(null);
   const [createForm, setCreateForm] = useState<MpdCreateFormState>(CREATE_DEFAULTS);
   const [advancedFilters, setAdvancedFilters] = useState({
-    assemblyType: 'all',
-    model: 'all',
+    assemblyType: '',
+    model: '',
     mpdNo: '',
     monitorType: 'all',
     ata: 'all',
@@ -134,7 +134,13 @@ export function AmroMpdManagementPage() {
     serviceType: 'all',
   });
 
-  const { data, isLoading, isError, error } = useListMpd({ page: 1, pageSize: 500 });
+  const listEnabled = Boolean(advancedFilters.assemblyType && advancedFilters.model);
+  const { data, isLoading, isError, error } = useListMpd({
+    page: 1,
+    pageSize: 500,
+    modelId: advancedFilters.model || undefined,
+    enabled: listEnabled,
+  });
   const assemblyTypeOptionsQuery = useAssemblyTypeOptions(true);
   const assemblyModelOptionsQuery = useAssemblyModelOptions(true);
   const createMutation = useCreateMpd();
@@ -146,12 +152,17 @@ export function AmroMpdManagementPage() {
 
   useEffect(() => {
     if (data?.records) setRecords(data.records);
+    if (!listEnabled) {
+      setErrorMessage('Select Assembly Type and Model to load MPD records');
+      setRecords([]);
+      return;
+    }
     if (isError) {
       setErrorMessage(error instanceof Error ? error.message : 'Failed to load MPD records');
     } else {
       setErrorMessage(null);
     }
-  }, [data, error, isError]);
+  }, [data, error, isError, listEnabled]);
 
   const stats = useMemo(() => {
     const mandatory = records.filter((record) => record.is_mandatory).length;
@@ -264,69 +275,48 @@ export function AmroMpdManagementPage() {
 
   const modelOptions = useMemo(() => {
     const source = assemblyModelOptionsQuery.data || [];
-    if (advancedFilters.assemblyType === 'all') return source;
+    if (!advancedFilters.assemblyType) return [];
     return source.filter((model) => model.assembly_type_id === advancedFilters.assemblyType);
   }, [advancedFilters.assemblyType, assemblyModelOptionsQuery.data]);
 
-  const monitorTypeOptions = useMemo(() => {
-    const values = Array.from(new Set(records.map((record) => String((record as Record<string, unknown>).monitor_type || '').trim()).filter(Boolean)));
-    return ['all', ...values];
-  }, [records]);
-
-  const ataOptions = useMemo(() => {
-    const values = Array.from(new Set(records.map((record) => String(record.ata_code || '').trim()).filter(Boolean)));
-    return ['all', ...values];
-  }, [records]);
-
-  const serviceTypeOptions = useMemo(() => {
-    const values = Array.from(new Set(records.map((record) => String(record.category_code || '').trim()).filter(Boolean)));
-    return ['all', ...values];
-  }, [records]);
-
-  const filteredRecords = useMemo(() => {
-    const mpdNoQuery = advancedFilters.mpdNo.trim().toLowerCase();
-    const descriptionQuery = advancedFilters.description.trim().toLowerCase();
-    return records.filter((record) => {
-      if (advancedFilters.assemblyType !== 'all') {
-        const modelId = String(record.assembly_model_id || '').trim();
-        const model = (assemblyModelOptionsQuery.data || []).find((item) => item.id === modelId);
-        if (!model || model.assembly_type_id !== advancedFilters.assemblyType) return false;
-      }
-      if (advancedFilters.model !== 'all') {
-        if (String(record.assembly_model_id || '').trim() !== advancedFilters.model) return false;
-      }
-      if (advancedFilters.monitorType !== 'all') {
-        const value = String((record as Record<string, unknown>).monitor_type || '').trim();
-        if (value !== advancedFilters.monitorType) return false;
-      }
-      if (advancedFilters.ata !== 'all') {
-        if (String(record.ata_code || '').trim() !== advancedFilters.ata) return false;
-      }
-      if (advancedFilters.serviceType !== 'all') {
-        if (String(record.category_code || '').trim() !== advancedFilters.serviceType) return false;
-      }
-      if (mpdNoQuery) {
-        const code = String(record.mpd_code || '').toLowerCase();
-        const seq = String(record.mpd_sequence || '').toLowerCase();
-        if (!code.includes(mpdNoQuery) && !seq.includes(mpdNoQuery)) return false;
-      }
-      if (descriptionQuery) {
-        const value = String(record.description || '').toLowerCase();
-        if (!value.includes(descriptionQuery)) return false;
-      }
-      return true;
-    });
-  }, [advancedFilters, assemblyModelOptionsQuery.data, records]);
+  const monitorTypeOptions = useMemo(() => ['all'], []);
+  const ataOptions = useMemo(() => ['all'], []);
+  const serviceTypeOptions = useMemo(() => ['all'], []);
 
   useEffect(() => {
-    if (advancedFilters.model === 'all') return;
+    if (!advancedFilters.model) return;
     const exists = modelOptions.some((item) => item.id === advancedFilters.model);
     if (!exists) {
-      setAdvancedFilters((current) => ({ ...current, model: 'all' }));
+      setAdvancedFilters((current) => ({ ...current, model: '' }));
     }
   }, [advancedFilters.model, modelOptions]);
 
-  const gridRecords = useMemo<MpdGridRow[]>(() => filteredRecords as MpdGridRow[], [filteredRecords]);
+  useEffect(() => {
+    if (!assemblyTypeOptions.length) return;
+    const preferred = assemblyTypeOptions.find((option) => option.name.trim().toLowerCase() === 'airframe');
+    if (!preferred?.id) {
+      setErrorMessage('Assembly Type "Airframe" is not available for this tenant');
+      return;
+    }
+    const nextAssemblyType = preferred.id;
+    setAdvancedFilters((current) => (
+      current.assemblyType ? current : { ...current, assemblyType: nextAssemblyType }
+    ));
+  }, [assemblyTypeOptions]);
+
+  useEffect(() => {
+    if (!advancedFilters.assemblyType || !modelOptions.length) return;
+    const hasCurrent = modelOptions.some((model) => model.id === advancedFilters.model);
+    if (hasCurrent) return;
+    const firstValidModel = modelOptions.find((model) => model.id && model.name.trim());
+    if (!firstValidModel) {
+      setErrorMessage('No valid models found for selected Assembly Type');
+      return;
+    }
+    setAdvancedFilters((current) => ({ ...current, model: firstValidModel.id }));
+  }, [advancedFilters.assemblyType, advancedFilters.model, modelOptions]);
+
+  const gridRecords = useMemo<MpdGridRow[]>(() => records as MpdGridRow[], [records]);
 
   return (
     <DashboardLayout>
@@ -352,9 +342,16 @@ export function AmroMpdManagementPage() {
               <select
                 className="h-10 w-full rounded-md border bg-background px-2"
                 value={advancedFilters.assemblyType}
-                onChange={(event) => setAdvancedFilters((current) => ({ ...current, assemblyType: event.target.value }))}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (!value) {
+                    setErrorMessage('Assembly Type cannot be empty');
+                    return;
+                  }
+                  setAdvancedFilters((current) => ({ ...current, assemblyType: value, model: '' }));
+                }}
+                required
               >
-                <option value="all">(All)</option>
                 {assemblyTypeOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
               </select>
             </div>
@@ -363,9 +360,17 @@ export function AmroMpdManagementPage() {
               <select
                 className="h-10 w-full rounded-md border bg-background px-2"
                 value={advancedFilters.model}
-                onChange={(event) => setAdvancedFilters((current) => ({ ...current, model: event.target.value }))}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  if (!value) {
+                    setErrorMessage('Model cannot be empty');
+                    return;
+                  }
+                  setAdvancedFilters((current) => ({ ...current, model: value }));
+                }}
+                required
+                disabled={!modelOptions.length}
               >
-                <option value="all">(All)</option>
                 {modelOptions.map((option) => <option key={option.id} value={option.id}>{option.name}</option>)}
               </select>
             </div>
@@ -419,7 +424,7 @@ export function AmroMpdManagementPage() {
 
         <AmroKpiGrid
           items={[
-            { label: 'Total MPD Records', value: String(filteredRecords.length) },
+            { label: 'Total MPD Records', value: String(records.length) },
             { label: 'Mandatory', value: String(stats.mandatory), tone: stats.mandatory > 0 ? 'warning' : 'default' },
             { label: 'Interval-driven', value: String(stats.withIntervals), tone: stats.withIntervals > 0 ? 'success' : 'default' },
             { label: 'Optional', value: String(stats.custom) },
