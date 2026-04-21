@@ -14,3 +14,4 @@ export {
   AmroWorkspaceDocumentationPage,
   AmroWorkPackagesPage,
 } from './pages/AmroHubVerticalPage';
+export { AmroPlanDirectivesBulletinPage } from './pages/AmroPlanDirectivesBulletinPage';

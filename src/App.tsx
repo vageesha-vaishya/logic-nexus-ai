@@ -182,6 +182,7 @@ const SalesPlaceholder = lazy(() => import("./pages/dashboard/SalesPlaceholder")
 const SalesCommandCenter = lazy(() => import("./pages/dashboard/SalesCommandCenter"));
 const UimShell = lazy(() => import("./pages/dashboard/UimShell"));
 const AmroOverview = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroOverviewPage })));
+const AmroPlanDirectivesBulletin = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroPlanDirectivesBulletinPage })));
 const AmroWorkPackages = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroWorkPackagesPage })));
 const AmroWorkPackageDetail = lazy(() => import("./features/module-amro/components/work-orders").then((module) => ({ default: module.AmroWorkPackageDetailPage })));
 const AmroTaskExecution = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroTaskExecutionPage })));
@@ -883,6 +884,7 @@ const App = () => (
             <Route path="/dashboard/amro/overview" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroOverview /></ProtectedRoute>} />
             <Route path="/dashboard/amro/aircraft" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
             <Route path="/dashboard/amro/aircraft/:view" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/plan-directives-bulletin" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroPlanDirectivesBulletin /></ProtectedRoute>} />
             <Route path="/dashboard/amro/aircraft/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackages /></ProtectedRoute>} />
             <Route path="/dashboard/amro/work-packages" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackages /></ProtectedRoute>} />
             <Route path="/dashboard/amro/work-packages/:id" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkPackageDetail /></ProtectedRoute>} />
