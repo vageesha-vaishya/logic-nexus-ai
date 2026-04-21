@@ -20,7 +20,7 @@ const DIRECTIVE_CARDS: DirectiveCardConfig[] = [
     title: 'MPD',
     description: 'Manage aircraft, parts inventory, suppliers, maintenance facilities, work centers, and skill codes.',
     ctaLabel: 'Open MPD',
-    href: '/dashboard/amro/settings/master-data/aircraft',
+    href: '/dashboard/amro/plan-directives-bulletin/mpd',
     icon: Database,
     variant: 'default',
   },

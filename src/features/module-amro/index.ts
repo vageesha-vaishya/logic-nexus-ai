@@ -15,3 +15,4 @@ export {
   AmroWorkPackagesPage,
 } from './pages/AmroHubVerticalPage';
 export { AmroPlanDirectivesBulletinPage } from './pages/AmroPlanDirectivesBulletinPage';
+export { AmroMpdManagementPage } from './pages/AmroMpdManagementPage';
