@@ -1580,7 +1580,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const aircraftColumnPreferencesHydratedRef = useRef(false);
   const clickDelayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const firstFieldRef = useRef<HTMLInputElement | null>(null);
-  const recordsRequestControllerRef = useRef<AbortController | null>(null);
   const recordsRequestIdRef = useRef(0);
   const rowsRenderSignatureRef = useRef('');
   const resolveRowStatusToken = useCallback((record: Record<string, unknown>): string => {
@@ -2580,9 +2579,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const loadRecords = useCallback(async () => {
     const requestId = recordsRequestIdRef.current + 1;
     recordsRequestIdRef.current = requestId;
-    recordsRequestControllerRef.current?.abort();
-    const controller = typeof AbortController === 'undefined' ? null : new AbortController();
-    recordsRequestControllerRef.current = controller;
     const shouldShowLoading = rowsRenderSignatureRef.current.length === 0;
     if (shouldShowLoading) {
       setLoading(true);
@@ -2605,7 +2601,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const response = await fetch(`/api/v2/amro/master-data/${entity}?${query.toString()}`, {
         method: 'GET',
         headers,
-        signal: controller?.signal,
       });
       const payload = await parseApiPayload(response);
       if (recordsRequestIdRef.current !== requestId) {
@@ -2630,7 +2625,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error(String((error as Error).message || 'Failed to load records'));
     } finally {
       if (recordsRequestIdRef.current === requestId) {
-        recordsRequestControllerRef.current = null;
         if (shouldShowLoading) {
           setLoading(false);
         }
@@ -2885,7 +2879,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (clickDelayTimerRef.current) {
         clearTimeout(clickDelayTimerRef.current);
       }
-      recordsRequestControllerRef.current?.abort();
     },
     [],
   );
