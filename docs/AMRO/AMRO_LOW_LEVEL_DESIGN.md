@@ -2388,6 +2388,305 @@ Implementation Notes:
 ```
 
 ```text
+Component Type: Table
+Component Name: public.directives
+Purpose: Tenant/franchise-scoped directive register for recurring maintenance/compliance directives, thresholds, and applicability context.
+Estimated Row Count: 1,000-50,000 per tenant
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - category_id -> public.task_categories(id) ON DELETE SET NULL
+  - assembly_models -> public.assembly_models(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_directives_tenant_sequence (tenant_id, directive_sequence)
+Check Constraints:
+  - none
+Defaults:
+  - id: gen_random_uuid()
+  - is_mandatory: true
+  - created_at: now()
+  - repeat_interval: false
+  - directive_detail_json: '[]'::jsonb
+  - directive_scope_json: '[]'::jsonb
+  - location_json: '[]'::jsonb
+  - other_details_json: '[]'::jsonb
+  - show_in_c_of_a: true
+  - attach_file: '[]'::jsonb
+Indexes:
+  - uq_directives_tenant_sequence(tenant_id, directive_sequence)
+  - idx_directives_tenant_id(tenant_id)
+  - idx_directives_franchise_id(franchise_id)
+  - idx_directives_ata_code(ata_code)
+  - idx_directives_directive_no(directive_no)
+  - idx_directives_assembly_models(assembly_models)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - directive_sequence | integer identity | nullable:no | default:generated always
+  - tenant_id | uuid | nullable:no | default:-
+  - franchise_id | uuid | nullable:yes | default:null
+  - code_form_no | varchar(50) | nullable:yes | default:null
+  - ata_code | varchar(10) | nullable:yes | default:null
+  - reference_amp | text | nullable:yes | default:null
+  - description | text | nullable:yes | default:null
+  - category_code | varchar(10) | nullable:yes | default:null
+  - estimated_man_hours | numeric(5,2) | nullable:yes | default:null
+  - revision_status | text | nullable:yes | default:null
+  - threshold_hours | numeric(10,2) | nullable:yes | default:null
+  - threshold_cycles | integer | nullable:yes | default:null
+  - threshold_calendar | integer | nullable:yes | default:null
+  - threshold_landings | integer | nullable:yes | default:null
+  - is_mandatory | boolean | nullable:no | default:true
+  - created_at | timestamptz | nullable:no | default:now()
+  - category_id | uuid | nullable:yes | default:null
+  - calendar_unit | public.calendar_unit | nullable:yes | default:null
+  - repeat_interval | boolean | nullable:no | default:false
+  - assembly_models | uuid | nullable:yes | default:null
+  - directive_detail_json | jsonb | nullable:no | default:'[]'::jsonb
+  - directive_scope_json | jsonb | nullable:no | default:'[]'::jsonb
+  - location_json | jsonb | nullable:no | default:'[]'::jsonb
+  - other_details_json | jsonb | nullable:no | default:'[]'::jsonb
+  - directive_no | text | nullable:yes | default:null
+  - show_in_c_of_a | boolean | nullable:no | default:true
+  - applicability | text | nullable:yes | default:null
+  - effective_date | timestamptz | nullable:yes | default:null
+  - superseded_ad_number | text | nullable:yes | default:null
+  - method_of_compliance | text | nullable:yes | default:null
+  - attach_file | jsonb | nullable:no | default:'[]'::jsonb
+Security Considerations:
+  - RLS enabled; tenant + franchise scoping enforced through public.get_user_tenant_id/public.get_user_franchise_id.
+  - Platform admin override policy using public.is_platform_admin(auth.uid()).
+Implementation Notes:
+  - Migration: 20260422120000_amro_directives_and_attachment_backend.sql
+  - Attachments are normalized into public.directive_attachments for upload telemetry and retrieval tracking.
+```
+
+```text
+Component Type: Table
+Component Name: public.directive_attachments
+Purpose: Canonical file metadata and upload lifecycle state for directive form attachments stored in Supabase Storage bucket directive-attachments.
+Estimated Row Count: 5,000-500,000 per tenant
+Primary Key: id
+Foreign Keys:
+  - directive_id -> public.directives(id) ON DELETE CASCADE
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - uploaded_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_directive_attachments_file_path (file_path)
+Check Constraints:
+  - file_size IS NULL OR file_size >= 0
+  - upload_status IN ('pending','uploaded','failed','deleted')
+Defaults:
+  - id: gen_random_uuid()
+  - upload_status: 'pending'
+  - download_count: 0
+  - metadata: '{}'::jsonb
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - uq_directive_attachments_file_path(file_path)
+  - idx_directive_attachments_directive_id(directive_id)
+  - idx_directive_attachments_tenant_id(tenant_id)
+  - idx_directive_attachments_status(upload_status)
+  - idx_directive_attachments_created_at(created_at desc)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - directive_id | uuid | nullable:no | default:-
+  - tenant_id | uuid | nullable:no | default:-
+  - franchise_id | uuid | nullable:yes | default:null
+  - file_name | text | nullable:no | default:-
+  - file_path | text | nullable:no | default:-
+  - mime_type | text | nullable:yes | default:null
+  - file_size | bigint | nullable:yes | default:null
+  - checksum | text | nullable:yes | default:null
+  - upload_status | text | nullable:no | default:'pending'
+  - failure_reason | text | nullable:yes | default:null
+  - uploaded_by | uuid | nullable:yes | default:null
+  - uploaded_at | timestamptz | nullable:yes | default:null
+  - last_accessed_at | timestamptz | nullable:yes | default:null
+  - download_count | integer | nullable:no | default:0
+  - metadata | jsonb | nullable:no | default:'{}'::jsonb
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+Security Considerations:
+  - RLS enabled with tenant/franchise constraints and platform-admin override.
+  - Storage path policy requires tenant folder alignment and directive folder ownership validation.
+Implementation Notes:
+  - Migration: 20260422120000_amro_directives_and_attachment_backend.sql
+  - Upload flow uses RPC-assisted session creation before storage upload commit.
+```
+
+```text
+Component Type: Table
+Component Name: public.directive_attachment_events
+Purpose: Immutable event stream for directive attachment lifecycle, usage telemetry, and monitoring dashboards.
+Estimated Row Count: 20,000-5,000,000 per tenant
+Primary Key: id
+Foreign Keys:
+  - attachment_id -> public.directive_attachments(id) ON DELETE CASCADE
+  - directive_id -> public.directives(id) ON DELETE CASCADE
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - event_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - none
+Check Constraints:
+  - event_type IN ('upload_session_created','upload_completed','upload_failed','status_changed','downloaded','previewed','metadata_updated','deleted')
+Defaults:
+  - id: gen_random_uuid()
+  - event_payload: '{}'::jsonb
+  - event_at: now()
+Indexes:
+  - idx_directive_attachment_events_attachment_id(attachment_id)
+  - idx_directive_attachment_events_directive_id(directive_id)
+  - idx_directive_attachment_events_tenant_id(tenant_id)
+  - idx_directive_attachment_events_event_at(event_at desc)
+  - idx_directive_attachment_events_event_type(event_type)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - attachment_id | uuid | nullable:no | default:-
+  - directive_id | uuid | nullable:no | default:-
+  - tenant_id | uuid | nullable:no | default:-
+  - franchise_id | uuid | nullable:yes | default:null
+  - event_type | text | nullable:no | default:-
+  - event_payload | jsonb | nullable:no | default:'{}'::jsonb
+  - event_by | uuid | nullable:yes | default:null
+  - event_at | timestamptz | nullable:no | default:now()
+Security Considerations:
+  - RLS enabled; tenant/franchise scoped reads and writes with platform-admin override.
+  - Event payload excludes binary content and stores metadata only.
+Implementation Notes:
+  - Migration: 20260422120000_amro_directives_and_attachment_backend.sql
+  - Trigger and RPC functions append lifecycle events for monitoring/reporting.
+```
+
+```text
+Component Type: SQL Function
+Component Name: public.create_directive_attachment_upload_session(uuid,text,text,bigint,text)
+Purpose: Creates upload session metadata, validates tenant/franchise access to directive, and returns deterministic storage target path.
+Estimated Request Volume: 500-50,000/day
+Primary Key: n/a
+Foreign Keys:
+  - Uses public.directives and public.directive_attachments scope validation
+Unique Constraints:
+  - n/a
+Check Constraints:
+  - File name must be non-empty
+Defaults:
+  - p_mime_type: null
+  - p_file_size: null
+  - p_checksum: null
+Indexes:
+  - n/a
+Columns:
+  - Returns attachment_id, storage_bucket, storage_path
+Security Considerations:
+  - SECURITY DEFINER with explicit tenant/franchise validation before insert.
+  - Rejects out-of-scope tenants/franchises unless platform admin.
+Implementation Notes:
+  - Migration: 20260422120000_amro_directives_and_attachment_backend.sql
+```
+
+```text
+Component Type: SQL Function
+Component Name: public.complete_directive_attachment_upload(uuid,boolean,text)
+Purpose: Marks attachment upload completion/failure and emits telemetry event.
+Estimated Request Volume: 500-50,000/day
+Primary Key: n/a
+Foreign Keys:
+  - Uses public.directive_attachments row scope
+Unique Constraints:
+  - n/a
+Check Constraints:
+  - n/a
+Defaults:
+  - p_upload_success: true
+  - p_failure_reason: null
+Indexes:
+  - n/a
+Columns:
+  - Returns full public.directive_attachments row
+Security Considerations:
+  - SECURITY DEFINER with tenant/franchise authorization checks.
+Implementation Notes:
+  - Migration: 20260422120000_amro_directives_and_attachment_backend.sql
+```
+
+```text
+Component Type: SQL Function
+Component Name: public.record_directive_attachment_access(uuid,text)
+Purpose: Records retrieval telemetry (download/preview), updates counters, and appends event tracking record.
+Estimated Request Volume: 5,000-250,000/day
+Primary Key: n/a
+Foreign Keys:
+  - Uses public.directive_attachments and public.directive_attachment_events
+Unique Constraints:
+  - n/a
+Check Constraints:
+  - p_event_type IN ('downloaded','previewed')
+Defaults:
+  - p_event_type: 'downloaded'
+Indexes:
+  - n/a
+Columns:
+  - Returns void
+Security Considerations:
+  - SECURITY DEFINER with tenant scope authorization for attachment access events.
+Implementation Notes:
+  - Migration: 20260422120000_amro_directives_and_attachment_backend.sql
+```
+
+```text
+Component Type: SQL Function
+Component Name: public.get_directive_attachments(uuid)
+Purpose: Retrieval API surface for directive form attachment metadata listing.
+Estimated Request Volume: 2,000-100,000/day
+Primary Key: n/a
+Foreign Keys:
+  - Uses public.directives access checks
+Unique Constraints:
+  - n/a
+Check Constraints:
+  - n/a
+Defaults:
+  - n/a
+Indexes:
+  - Uses directive_attachments indexes by directive_id and created_at
+Columns:
+  - Returns id, file_name, file_path, mime_type, file_size, upload_status, uploaded_by, uploaded_at, last_accessed_at, download_count, metadata
+Security Considerations:
+  - SECURITY DEFINER with strict tenant guard and platform admin override.
+Implementation Notes:
+  - Migration: 20260422120000_amro_directives_and_attachment_backend.sql
+```
+
+```text
+Component Type: SQL Function
+Component Name: public.get_directive_attachment_monitoring(timestamptz,timestamptz)
+Purpose: Monitoring aggregation for file counts, bytes, failed uploads, and download volume by tenant over a date window.
+Estimated Request Volume: 100-10,000/day
+Primary Key: n/a
+Foreign Keys:
+  - Aggregates public.directive_attachments + public.directive_attachment_events
+Unique Constraints:
+  - n/a
+Check Constraints:
+  - n/a
+Defaults:
+  - p_from: now() - interval '30 days'
+  - p_to: now()
+Indexes:
+  - Uses attachment tenant/status and event type/date indexes
+Columns:
+  - Returns tenant_id, total_files, total_bytes, uploaded_count, failed_count, download_events, last_event_at
+Security Considerations:
+  - SECURITY DEFINER and tenant-limited aggregation for non-platform users.
+Implementation Notes:
+  - Migration: 20260422120000_amro_directives_and_attachment_backend.sql
+```
+
+```text
 Component Type: Module API
 Component Name: /api/v2/amro/work-orders (POST create-work-order)
 Purpose: Persist AMRO work orders from wizard payloads with title-catalog selection, template linkage, normalized planned dates, and deterministic work package numbering.
