@@ -1,5 +1,8 @@
 {
   "recommendations": [
     "denoland.vscode-deno"
+  ],
+  "unwantedRecommendations": [
+    "eamodio.gitlens"
   ]
 }
