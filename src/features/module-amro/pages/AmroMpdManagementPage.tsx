@@ -185,7 +185,7 @@ export function AmroMpdManagementPage() {
       return;
     }
     if (!createForm.description || !createForm.ata_code || !createForm.inspection_type) {
-      toast.error('Description and ATA Code are required');
+      toast.error('Description, ATA Code, and Category are required');
       return;
     }
     const locJson = [
@@ -542,7 +542,7 @@ export function AmroMpdManagementPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="inspection-type">Inspection Type *</Label>
+              <Label htmlFor="inspection-type">Category *</Label>
               <select
                 id="inspection-type"
                 className="h-10 w-full rounded-md border bg-background px-2"
@@ -550,9 +550,11 @@ export function AmroMpdManagementPage() {
                 onChange={(event) => setCreateForm((current) => ({ ...current, inspection_type: event.target.value }))}
               >
                 <option value="">(SELECT)</option>
-                <option value="Routine">Routine</option>
-                <option value="Special">Special</option>
-                <option value="Conditional">Conditional</option>
+                {categoryOptions.map((option) => (
+                  <option key={option.id} value={option.code}>
+                    {option.label}
+                  </option>
+                ))}
               </select>
             </div>
             <div className="space-y-2">
