@@ -12,6 +12,7 @@ interface ParsedFrequency {
   threshold_landings: number | null;
   threshold_rins: number | null;
   threshold_hobbs: number | null;
+  is_parsed_success?: boolean;
 }
 
 const TOKEN_PATTERN = /(\d+(?::\d{1,2})?|\d+(?:\.\d+)?)\s*(Ho|RI|Dy|Mt|Yr|L|C|H)\b/gi;
@@ -152,15 +153,28 @@ serveWithLogger(async (req, logger, supabase) => {
 
     for (const row of rows) {
       const sequence = Number(row.frequency_sequence);
+      if (row.is_parsed_success === true) {
+        skippedCount += 1;
+        continue;
+      }
+
       const sourceText = String((row as Record<string, unknown>).frequency ?? (row as Record<string, unknown>).frequecny ?? "").trim();
 
       if (!sourceText) {
+        await supabase
+          .from("directive_frequency_temp")
+          .update({ is_parsed_success: false })
+          .eq("frequency_sequence", sequence);
         skippedCount += 1;
         continue;
       }
 
       const { parsed, errors } = parseFrequency(sourceText);
       if (errors.length > 0) {
+        await supabase
+          .from("directive_frequency_temp")
+          .update({ is_parsed_success: false })
+          .eq("frequency_sequence", sequence);
         failedCount += 1;
         failures.push({
           frequency_sequence: sequence,
@@ -171,10 +185,14 @@ serveWithLogger(async (req, logger, supabase) => {
 
       const { error: updateError } = await supabase
         .from("directive_frequency_temp")
-        .update(parsed)
+        .update({ ...parsed, is_parsed_success: true })
         .eq("frequency_sequence", sequence);
 
       if (updateError) {
+        await supabase
+          .from("directive_frequency_temp")
+          .update({ is_parsed_success: false })
+          .eq("frequency_sequence", sequence);
         failedCount += 1;
         failures.push({
           frequency_sequence: sequence,
