@@ -16,6 +16,8 @@ interface ParsedFrequency {
 }
 
 const TOKEN_PATTERN = /(\d+(?::\d{1,2})?|\d+(?:\.\d+)?)\s*(Ho|RI|Dy|Mt|Yr|L|C|H)\b/gi;
+const DEFAULT_BATCH_SIZE = 500;
+const MAX_FAILURES_IN_RESPONSE = 200;
 
 function toRoundedInt(value: string): number | null {
   const n = Number(value);
@@ -125,6 +127,22 @@ function parseFrequency(raw: string): { parsed: ParsedFrequency; errors: string[
   return { parsed, errors };
 }
 
+async function setParsedStatus(
+  supabase: any,
+  frequencySequence: number,
+  isParsedSuccess: boolean,
+): Promise<string | null> {
+  try {
+    const { error } = await supabase
+      .from("directive_frequency_temp")
+      .update({ is_parsed_success: isParsedSuccess })
+      .eq("frequency_sequence", frequencySequence);
+    return error ? error.message : null;
+  } catch (err: unknown) {
+    return err instanceof Error ? err.message : String(err);
+  }
+}
+
 serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers });
@@ -138,80 +156,115 @@ serveWithLogger(async (req, logger, supabase) => {
   }
 
   try {
-    const { data, error } = await supabase
-      .from("directive_frequency_temp")
-      .select("*")
-      .order("frequency_sequence", { ascending: true });
+    const requestUrl = new URL(req.url);
+    const batchSizeRaw = Number(requestUrl.searchParams.get("batch_size") || DEFAULT_BATCH_SIZE);
+    const batchSize = Number.isFinite(batchSizeRaw) && batchSizeRaw > 0
+      ? Math.min(Math.floor(batchSizeRaw), 5000)
+      : DEFAULT_BATCH_SIZE;
 
-    if (error) throw error;
-
-    const rows = data || [];
+    let totalRows = 0;
     let parsedCount = 0;
     let skippedCount = 0;
     let failedCount = 0;
     const failures: Array<{ frequency_sequence: number; reason: string }> = [];
+    let offset = 0;
 
-    for (const row of rows) {
-      const sequence = Number(row.frequency_sequence);
-      if (row.is_parsed_success === true) {
-        skippedCount += 1;
-        continue;
-      }
-
-      const sourceText = String((row as Record<string, unknown>).frequency ?? (row as Record<string, unknown>).frequecny ?? "").trim();
-
-      if (!sourceText) {
-        await supabase
-          .from("directive_frequency_temp")
-          .update({ is_parsed_success: false })
-          .eq("frequency_sequence", sequence);
-        skippedCount += 1;
-        continue;
-      }
-
-      const { parsed, errors } = parseFrequency(sourceText);
-      if (errors.length > 0) {
-        await supabase
-          .from("directive_frequency_temp")
-          .update({ is_parsed_success: false })
-          .eq("frequency_sequence", sequence);
-        failedCount += 1;
-        failures.push({
-          frequency_sequence: sequence,
-          reason: errors.join("; "),
-        });
-        continue;
-      }
-
-      const { error: updateError } = await supabase
+    while (true) {
+      const { data: rows, error } = await supabase
         .from("directive_frequency_temp")
-        .update({ ...parsed, is_parsed_success: true })
-        .eq("frequency_sequence", sequence);
+        .select("*")
+        .order("frequency_sequence", { ascending: true })
+        .range(offset, offset + batchSize - 1);
 
-      if (updateError) {
-        await supabase
-          .from("directive_frequency_temp")
-          .update({ is_parsed_success: false })
-          .eq("frequency_sequence", sequence);
-        failedCount += 1;
-        failures.push({
-          frequency_sequence: sequence,
-          reason: updateError.message,
-        });
-        continue;
+      if (error) throw error;
+      if (!rows || rows.length === 0) break;
+
+      totalRows += rows.length;
+
+      for (const row of rows) {
+        const sequence = Number(row.frequency_sequence);
+        try {
+          if (row.is_parsed_success === true) {
+            skippedCount += 1;
+            continue;
+          }
+
+          const sourceText = String((row as Record<string, unknown>).frequency ?? (row as Record<string, unknown>).frequecny ?? "").trim();
+          if (!sourceText) {
+            const markError = await setParsedStatus(supabase, sequence, false);
+            if (markError) {
+              failedCount += 1;
+              if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+                failures.push({ frequency_sequence: sequence, reason: `Failed to mark parse status: ${markError}` });
+              }
+            } else {
+              skippedCount += 1;
+            }
+            continue;
+          }
+
+          const { parsed, errors } = parseFrequency(sourceText);
+          if (errors.length > 0) {
+            const markError = await setParsedStatus(supabase, sequence, false);
+            failedCount += 1;
+            const reason = markError ? `${errors.join("; ")} | status update failed: ${markError}` : errors.join("; ");
+            if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+              failures.push({
+                frequency_sequence: sequence,
+                reason,
+              });
+            }
+            continue;
+          }
+
+          const { error: updateError } = await supabase
+            .from("directive_frequency_temp")
+            .update({ ...parsed, is_parsed_success: true })
+            .eq("frequency_sequence", sequence);
+
+          if (updateError) {
+            const markError = await setParsedStatus(supabase, sequence, false);
+            failedCount += 1;
+            const reason = markError
+              ? `${updateError.message} | status update failed: ${markError}`
+              : updateError.message;
+            if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+              failures.push({
+                frequency_sequence: sequence,
+                reason,
+              });
+            }
+            continue;
+          }
+
+          parsedCount += 1;
+        } catch (rowErr: unknown) {
+          const rowMessage = rowErr instanceof Error ? rowErr.message : String(rowErr);
+          await setParsedStatus(supabase, sequence, false);
+          failedCount += 1;
+          if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+            failures.push({
+              frequency_sequence: sequence,
+              reason: rowMessage,
+            });
+          }
+          continue;
+        }
       }
 
-      parsedCount += 1;
+      offset += rows.length;
     }
 
     return new Response(
       JSON.stringify({
         success: true,
-        total_rows: rows.length,
+        total_rows: totalRows,
         parsed_rows: parsedCount,
         skipped_rows: skippedCount,
         failed_rows: failedCount,
         failures,
+        failures_truncated: failedCount > failures.length,
+        batch_size: batchSize,
       }),
       {
         headers: { ...headers, "Content-Type": "application/json" },
