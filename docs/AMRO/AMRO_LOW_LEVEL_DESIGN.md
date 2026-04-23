@@ -2706,6 +2706,66 @@ Implementation Notes:
   - Persistence: src/pages/api/v2/amro/work-package-persistence-db.ts
 ```
 
+```text
+Component Type: Table
+Component Name: public.directive_frequency_temp
+Purpose: Temporary staging table used to ingest directive frequency expressions before parsing into normalized threshold columns.
+Estimated Row Count: 100-200,000 per load batch
+Primary Key: none
+Foreign Keys:
+  - none
+Unique Constraints:
+  - none
+Check Constraints:
+  - none
+Defaults:
+  - frequency_sequence: generated always as identity
+Indexes:
+  - none
+Columns:
+  - frequency_sequence | integer identity | nullable:no | default:generated always
+  - frequency | text | nullable:yes | default:null
+  - threshold_hours | interval | nullable:yes | default:null
+  - threshold_cycles | integer | nullable:yes | default:null
+  - threshold_calendar | integer | nullable:yes | default:null
+  - threshold_landings | integer | nullable:yes | default:null
+  - calendar_unit | public.calendar_unit | nullable:yes | default:null
+  - threshold_rins | integer | nullable:yes | default:null
+  - threshold_hobbs | integer | nullable:yes | default:null
+Security Considerations:
+  - Table is intended for controlled ETL parsing workflows only.
+  - No tenant/franchise columns; use privileged execution paths for staging runs.
+Implementation Notes:
+  - Migration: 20260423113000_create_directive_frequency_temp.sql
+```
+
+```text
+Component Type: Edge Function
+Component Name: parse-directive-frequency-temp
+Purpose: Parse free-form directive frequency strings (any token order) and populate normalized threshold columns in public.directive_frequency_temp.
+Input Contract:
+  - HTTP method: POST (OPTIONS preflight supported)
+  - Body: optional, no required payload fields
+Output Contract:
+  - JSON: { success, total_rows, parsed_rows, skipped_rows, failed_rows, failures[] }
+Dependencies:
+  - Table: public.directive_frequency_temp
+  - Shared modules: _shared/logger.ts, _shared/cors.ts, _shared/auth.ts
+Idempotency and Replay:
+  - Re-runs are idempotent for identical source text because updates target the same row by frequency_sequence.
+  - Missing frequency values are skipped; invalid tokens are reported in failures.
+Security Considerations:
+  - Access restricted via requireServiceRoleOrAdmin (service role header or admin user role).
+  - Uses service-role database client injected by serveWithLogger.
+Operational Limits:
+  - Processes rows sequentially in a single request; suited for controlled batch sizes.
+  - Token parsing handles compact tokens (e.g., 20RI, 500C) and spaced forms (e.g., 660:00 H).
+Validation:
+  - Manual verification by invoking function and inspecting updated threshold columns in directive_frequency_temp.
+Implementation Notes:
+  - Handler: supabase/functions/parse-directive-frequency-temp/index.ts
+```
+
 #### Template: SQL Function / Trigger Function
 
 ```text
