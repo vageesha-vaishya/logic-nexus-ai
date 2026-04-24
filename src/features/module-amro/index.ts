@@ -16,3 +16,4 @@ export {
 } from './pages/AmroHubVerticalPage';
 export { AmroPlanDirectivesBulletinPage } from './pages/AmroPlanDirectivesBulletinPage';
 export { AmroMpdManagementPage } from './pages/AmroMpdManagementPage';
+export { AmroDirectivesManagementPage } from './pages/AmroDirectivesManagementPage';

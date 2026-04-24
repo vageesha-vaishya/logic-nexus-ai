@@ -36,7 +36,7 @@ const DIRECTIVE_CARDS: DirectiveCardConfig[] = [
     title: 'New ADs/SBs',
     description: 'Configure reusable work package templates for aircraft maintenance planning and execution.',
     ctaLabel: 'View New ADs/SBs',
-    href: '/dashboard/amro/aircraft/ad-sb',
+    href: '/dashboard/amro/plan-directives-bulletin/directives',
     icon: FileCheck2,
     variant: 'outline',
   },
