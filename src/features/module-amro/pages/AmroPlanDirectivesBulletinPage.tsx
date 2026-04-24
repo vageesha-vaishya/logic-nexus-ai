@@ -28,7 +28,7 @@ const DIRECTIVE_CARDS: DirectiveCardConfig[] = [
     title: 'Configure MPD',
     description: 'Open the dedicated AMRO aircraft sub-module with full CRUD, validation, filters, sorting, and exports.',
     ctaLabel: 'Open Configure MPD',
-    href: '/dashboard/amro/aircraft',
+    href: '/dashboard/amro/plan-directives-bulletin/configure_mpd',
     icon: Plane,
     variant: 'default',
   },
