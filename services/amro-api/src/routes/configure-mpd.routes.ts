@@ -70,6 +70,15 @@ function normalizeJsonArray(value: unknown): unknown[] {
   return [];
 }
 
+function resolveFranchiseId(req: AuthRequest): string | null {
+  const fromHeader = String(req.headers['x-franchise-id'] || '').trim();
+  if (fromHeader) return fromHeader;
+  const fromQuery = String(req.query.franchise_id || req.query.franchiseId || '').trim();
+  if (fromQuery) return fromQuery;
+  const fromUser = String((req.user as Record<string, unknown> | undefined)?.franchise_id || '').trim();
+  return fromUser || null;
+}
+
 function parsePagination(req: AuthRequest): { page: number; pageSize: number; from: number; to: number } {
   const pageRaw = Number(req.query.page || 1);
   const pageSizeRaw = Number(req.query.page_size || req.query.pageSize || 50);
@@ -191,7 +200,7 @@ async function fetchAircraftOptions(params: {
     .eq('tenant_id', params.tenantId)
     .order('registration', { ascending: true });
   if (params.franchiseId) {
-    query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+    query = query.eq('franchise_id', params.franchiseId);
   }
   if (params.modelId) {
     query = query.eq('assembly_models', params.modelId);
@@ -371,7 +380,7 @@ router.get(
       return;
     }
     const tenantId = String(req.tenantId);
-    const franchiseId = String(req.headers['x-franchise-id'] || '').trim() || null;
+    const franchiseId = resolveFranchiseId(req);
     const modelId = String(req.query.model_id || '').trim();
     const supabase = getSupabaseAdminClient();
     const records = await fetchAircraftOptions({ supabase, tenantId, franchiseId, modelId });
