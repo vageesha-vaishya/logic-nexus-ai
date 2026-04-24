@@ -31,6 +31,26 @@ import {
 
 type DirectiveGridRow = DirectiveRecord & Record<string, unknown>;
 
+function isPresent(value: unknown): boolean {
+  if (value === null || value === undefined) return false;
+  if (typeof value === 'string') return value.trim().length > 0;
+  return true;
+}
+
+function formatFrequency(record: DirectiveRecord): string {
+  const parts: string[] = [];
+  if (isPresent(record.interval_hours)) parts.push(`${record.interval_hours} H`);
+  if (isPresent(record.interval_cycles)) parts.push(`${record.interval_cycles} C`);
+  if (isPresent(record.interval_months)) {
+    const unit = (record.calendar_unit || '').trim();
+    parts.push(unit ? `${record.interval_months} ${unit}` : `${record.interval_months}`);
+  }
+  if (isPresent(record.threshold_landings)) parts.push(`${record.threshold_landings} L`);
+  if (isPresent(record.threshold_rins)) parts.push(`${record.threshold_rins} RI`);
+  if (isPresent(record.threshold_hobbs)) parts.push(`${record.threshold_hobbs} HOB`);
+  return parts.join(', ');
+}
+
 type DirectiveCreateFormState = DirectiveUpsertInput & {
   directive_type_id: string;
   zone: string;
@@ -329,7 +349,14 @@ export function AmroDirectivesManagementPage() {
     setAdvancedFilters((current) => ({ ...current, model: firstValidModel.id }));
   }, [advancedFilters.assemblyType, advancedFilters.model, modelOptions]);
 
-  const gridRecords = useMemo<DirectiveGridRow[]>(() => records as DirectiveGridRow[], [records]);
+  const gridRecords = useMemo<DirectiveGridRow[]>(
+    () =>
+      records.map((record) => ({
+        ...(record as DirectiveGridRow),
+        frequency_display: formatFrequency(record),
+      })),
+    [records],
+  );
 
   return (
     <DashboardLayout>
@@ -451,7 +478,7 @@ export function AmroDirectivesManagementPage() {
               { key: 'description', header: 'Description', sortable: true, filterable: true, groupable: false, resizable: true, width: 280 },
               { key: 'directives_type_label', header: 'Directive Type', sortable: true, filterable: true, groupable: true, resizable: true, width: 180 },
               { key: 'estimated_man_hours', header: 'Man Hours', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'numeric' },
-              { key: 'threshold_cycles', header: 'Landings', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'numeric' },
+              { key: 'frequency_display', header: 'Frequency', sortable: true, filterable: true, groupable: true, resizable: true, width: 220 },
               { key: 'is_mandatory', header: 'Mandatory', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'boolean' },
               { key: 'created_at', header: 'Created', sortable: true, filterable: true, groupable: true, resizable: true, width: 130, dataType: 'date' },
             ] satisfies GridColumnDefinition<DirectiveGridRow>[]}

@@ -124,6 +124,10 @@ function mapDirectivesRow(row: JsonRecord): JsonRecord {
     interval_hours: parseHoursFromInterval(row.threshold_hours),
     interval_cycles: normalizeInteger(row.threshold_cycles),
     interval_months: normalizeInteger(row.threshold_calendar),
+    calendar_unit: normalizeString(row.calendar_unit),
+    threshold_landings: normalizeInteger(row.threshold_landings),
+    threshold_rins: normalizeInteger(row.threshold_rins),
+    threshold_hobbs: normalizeInteger(row.threshold_hobbs),
     threshold_cycles: normalizeInteger(row.threshold_landings),
     is_mandatory: normalizeBoolean(row.is_mandatory, true),
     assembly_model_id: normalizeString(row.assembly_models),
@@ -244,11 +248,57 @@ router.get(
     const { page, pageSize, from, to } = parsePagination(req);
     const tenantId = String(req.tenantId);
     const franchiseId = String(req.headers['x-franchise-id'] || '').trim() || null;
+    const lookup = String(req.query.lookup || '').trim().toLowerCase();
     const search = String(req.query.search || '').trim();
     const modelId = String(req.query.model_id || req.query.modelId || '').trim();
     const ataCode = String(req.query.ata_code || req.query.ataCode || '').trim();
     const directiveTypeId = String(req.query.directives_type_id || '').trim();
     const supabase = getSupabaseAdminClient();
+
+    if (lookup === 'directive-types') {
+      let typeQuery = supabase
+        .from('directives_type')
+        .select('id,code,name,is_active')
+        .eq('tenant_id', tenantId)
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (franchiseId) {
+        typeQuery = typeQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+      }
+
+      const { data: typeRows, error: typeError } = await typeQuery.limit(1000);
+      if (typeError) {
+        res.status(500).json({
+          error: `Failed to load directive types: ${typeError.message}`,
+          code: 'DIRECTIVES_TYPE_LOOKUP_FAILED',
+          statusCode: 500,
+        });
+        return;
+      }
+
+      const records = (Array.isArray(typeRows) ? typeRows : [])
+        .map((row) => {
+          const item = asObject(row);
+          const id = String(item.id || '').trim();
+          const code = String(item.code || '').trim();
+          const name = String(item.name || '').trim();
+          return {
+            id,
+            code,
+            name,
+            label: code && name ? `${code} - ${name}` : (code || name),
+          };
+        })
+        .filter((row) => row.id && row.label);
+
+      res.status(200).json({
+        version: 'v2',
+        interface: 'amro-directives-type-list',
+        output: { records },
+      });
+      return;
+    }
 
     let query = supabase
       .from('directives')
