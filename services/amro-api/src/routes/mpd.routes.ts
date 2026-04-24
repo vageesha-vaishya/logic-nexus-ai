@@ -85,6 +85,8 @@ function parsePagination(req: AuthRequest): { page: number; pageSize: number; fr
 }
 
 function mapTaskTemplateRowToMpd(row: JsonRecord): JsonRecord {
+  const intervalMonths = normalizeInteger(row.interval_months);
+  const thresholdLandings = normalizeInteger(row.threshold_cycles);
   return {
     id: String(row.id || ''),
     mpd_sequence: normalizeInteger(row.tt_sequence ?? row.task_template_id),
@@ -97,8 +99,12 @@ function mapTaskTemplateRowToMpd(row: JsonRecord): JsonRecord {
     revision_status: normalizeString(row.revision_status),
     interval_hours: normalizeInteger(row.interval_hours),
     interval_cycles: normalizeInteger(row.interval_cycles),
-    interval_months: normalizeInteger(row.interval_months),
-    threshold_cycles: normalizeInteger(row.threshold_cycles),
+    interval_months: intervalMonths,
+    calendar_unit: intervalMonths === null ? null : 'Mt',
+    threshold_landings: thresholdLandings,
+    threshold_rins: normalizeInteger(row.threshold_rins),
+    threshold_hobbs: normalizeInteger(row.threshold_hobbs),
+    threshold_cycles: thresholdLandings,
     is_mandatory: normalizeBoolean(row.is_mandatory, true),
     assembly_model_id: normalizeString(row.assembly_models ?? row.model_id),
     loc_json: normalizeJsonArray(row.loc_json),
@@ -152,6 +158,15 @@ function mapMpdPayloadToTaskTemplateInput(payload: JsonRecord): JsonRecord {
   if (payload.threshold_cycles !== undefined) {
     setIfDefined('threshold_cycles', normalizeInteger(payload.threshold_cycles));
   }
+  if (payload.threshold_landings !== undefined) {
+    setIfDefined('threshold_cycles', normalizeInteger(payload.threshold_landings));
+  }
+  if (payload.threshold_rins !== undefined) {
+    setIfDefined('threshold_rins', normalizeInteger(payload.threshold_rins));
+  }
+  if (payload.threshold_hobbs !== undefined) {
+    setIfDefined('threshold_hobbs', normalizeInteger(payload.threshold_hobbs));
+  }
   if (payload.loc_json !== undefined) {
     setIfDefined('loc_json', normalizeJsonArray(payload.loc_json));
   }
@@ -183,6 +198,30 @@ function validateMpdInput(payload: JsonRecord, mode: 'create' | 'patch'): Array<
     && normalizeInteger(payload.threshold_cycles) === null
   ) {
     issues.push({ field: 'threshold_cycles', message: 'threshold_cycles must be an integer' });
+  }
+  if (
+    payload.threshold_landings !== undefined
+    && payload.threshold_landings !== null
+    && payload.threshold_landings !== ''
+    && normalizeInteger(payload.threshold_landings) === null
+  ) {
+    issues.push({ field: 'threshold_landings', message: 'threshold_landings must be an integer' });
+  }
+  if (
+    payload.threshold_rins !== undefined
+    && payload.threshold_rins !== null
+    && payload.threshold_rins !== ''
+    && normalizeInteger(payload.threshold_rins) === null
+  ) {
+    issues.push({ field: 'threshold_rins', message: 'threshold_rins must be an integer' });
+  }
+  if (
+    payload.threshold_hobbs !== undefined
+    && payload.threshold_hobbs !== null
+    && payload.threshold_hobbs !== ''
+    && normalizeInteger(payload.threshold_hobbs) === null
+  ) {
+    issues.push({ field: 'threshold_hobbs', message: 'threshold_hobbs must be an integer' });
   }
   return issues;
 }

@@ -28,6 +28,7 @@ import {
   type MpdRecord,
   type MpdUpsertInput,
 } from '@/features/module-amro/components/mpd/useMpdState';
+import { formatThresholdFrequency } from '@/features/module-amro/components/mpd/frequencyFormatter';
 
 type MpdGridRow = MpdRecord & Record<string, unknown>;
 
@@ -326,7 +327,14 @@ export function AmroMpdManagementPage() {
     setAdvancedFilters((current) => ({ ...current, model: firstValidModel.id }));
   }, [advancedFilters.assemblyType, advancedFilters.model, modelOptions]);
 
-  const gridRecords = useMemo<MpdGridRow[]>(() => records as MpdGridRow[], [records]);
+  const gridRecords = useMemo<MpdGridRow[]>(
+    () =>
+      records.map((record) => ({
+        ...(record as MpdGridRow),
+        frequency_display: formatThresholdFrequency(record),
+      })),
+    [records],
+  );
 
   return (
     <DashboardLayout>
@@ -448,7 +456,7 @@ export function AmroMpdManagementPage() {
             { key: 'description', header: 'Description', sortable: true, filterable: true, groupable: false, resizable: true, width: 280 },
             { key: 'category_code', header: 'Category', sortable: true, filterable: true, groupable: true, resizable: true, width: 120 },
             { key: 'estimated_man_hours', header: 'Man Hours', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'numeric' },
-            { key: 'threshold_cycles', header: 'Landings', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'numeric' },
+            { key: 'frequency_display', header: 'Frequency', sortable: true, filterable: true, groupable: true, resizable: true, width: 240 },
             { key: 'is_mandatory', header: 'Mandatory', sortable: true, filterable: true, groupable: true, resizable: true, width: 120, dataType: 'boolean' },
             { key: 'created_at', header: 'Created', sortable: true, filterable: true, groupable: true, resizable: true, width: 130, dataType: 'date' },
           ] satisfies GridColumnDefinition<MpdGridRow>[]}

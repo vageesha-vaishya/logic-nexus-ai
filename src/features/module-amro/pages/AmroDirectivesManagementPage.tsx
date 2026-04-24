@@ -28,28 +28,9 @@ import {
   type DirectiveUpsertInput,
   type UploadedDirectiveAttachment,
 } from '@/features/module-amro/components/mpd/useDirectivesState';
+import { formatThresholdFrequency } from '@/features/module-amro/components/mpd/frequencyFormatter';
 
 type DirectiveGridRow = DirectiveRecord & Record<string, unknown>;
-
-function isPresent(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
-  if (typeof value === 'string') return value.trim().length > 0;
-  return true;
-}
-
-function formatFrequency(record: DirectiveRecord): string {
-  const parts: string[] = [];
-  if (isPresent(record.interval_hours)) parts.push(`${record.interval_hours} H`);
-  if (isPresent(record.interval_cycles)) parts.push(`${record.interval_cycles} C`);
-  if (isPresent(record.interval_months)) {
-    const unit = (record.calendar_unit || '').trim();
-    parts.push(unit ? `${record.interval_months} ${unit}` : `${record.interval_months}`);
-  }
-  if (isPresent(record.threshold_landings)) parts.push(`${record.threshold_landings} L`);
-  if (isPresent(record.threshold_rins)) parts.push(`${record.threshold_rins} RI`);
-  if (isPresent(record.threshold_hobbs)) parts.push(`${record.threshold_hobbs} HOB`);
-  return parts.join(', ');
-}
 
 type DirectiveCreateFormState = DirectiveUpsertInput & {
   directive_type_id: string;
@@ -353,7 +334,7 @@ export function AmroDirectivesManagementPage() {
     () =>
       records.map((record) => ({
         ...(record as DirectiveGridRow),
-        frequency_display: formatFrequency(record),
+        frequency_display: formatThresholdFrequency(record),
       })),
     [records],
   );
