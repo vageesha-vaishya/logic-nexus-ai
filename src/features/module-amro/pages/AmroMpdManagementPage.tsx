@@ -214,7 +214,7 @@ export function AmroMpdManagementPage() {
         reference_amp: createForm.reference_amp || null,
         interval_hours: createForm.frequency_hours,
         interval_cycles: createForm.frequency_cycles,
-        threshold_cycles: createForm.frequency_landings,
+        threshold_cycles: createForm.frequency_cycles,
         loc_json: locJson,
         other_details_json: otherDetailsJson,
       });
@@ -609,7 +609,7 @@ export function AmroMpdManagementPage() {
               />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="interval-cycles">Interval Cycles</Label>
+              <Label htmlFor="interval-cycles">Cycles</Label>
               <Input
                 id="interval-cycles"
                 type="number"

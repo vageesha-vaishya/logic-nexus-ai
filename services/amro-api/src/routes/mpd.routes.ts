@@ -85,8 +85,10 @@ function parsePagination(req: AuthRequest): { page: number; pageSize: number; fr
 }
 
 function mapTaskTemplateRowToMpd(row: JsonRecord): JsonRecord {
-  const intervalMonths = normalizeInteger(row.interval_months);
-  const thresholdLandings = normalizeInteger(row.threshold_cycles);
+  const intervalHours = normalizeDecimal(row.threshold_hours ?? row.interval_hours);
+  const intervalCycles = normalizeInteger(row.threshold_cycles ?? row.interval_cycles);
+  const intervalMonths = normalizeInteger(row.threshold_calendar ?? row.interval_months);
+  const thresholdLandings = normalizeInteger(row.threshold_landings);
   return {
     id: String(row.id || ''),
     mpd_sequence: normalizeInteger(row.tt_sequence ?? row.task_template_id),
@@ -97,14 +99,14 @@ function mapTaskTemplateRowToMpd(row: JsonRecord): JsonRecord {
     category_code: normalizeString(row.category_code),
     estimated_man_hours: normalizeDecimal(row.estimated_man_hours),
     revision_status: normalizeString(row.revision_status),
-    interval_hours: normalizeInteger(row.interval_hours),
-    interval_cycles: normalizeInteger(row.interval_cycles),
+    interval_hours: intervalHours,
+    interval_cycles: intervalCycles,
     interval_months: intervalMonths,
     calendar_unit: intervalMonths === null ? null : 'Mt',
     threshold_landings: thresholdLandings,
     threshold_rins: normalizeInteger(row.threshold_rins),
     threshold_hobbs: normalizeInteger(row.threshold_hobbs),
-    threshold_cycles: thresholdLandings,
+    threshold_cycles: intervalCycles,
     is_mandatory: normalizeBoolean(row.is_mandatory, true),
     assembly_model_id: normalizeString(row.assembly_models ?? row.model_id),
     loc_json: normalizeJsonArray(row.loc_json),
@@ -146,14 +148,26 @@ function mapMpdPayloadToTaskTemplateInput(payload: JsonRecord): JsonRecord {
   if (payload.revision_status !== undefined) {
     setIfDefined('revision_status', normalizeString(payload.revision_status));
   }
-  if (payload.interval_hours !== undefined) {
-    setIfDefined('interval_hours', normalizeInteger(payload.interval_hours));
+  // Backward-compatible remap: old clients may still send interval_hours.
+  // task_templates uses threshold_hours.
+  if (payload.interval_hours !== undefined && payload.threshold_hours === undefined) {
+    setIfDefined('threshold_hours', normalizeDecimal(payload.interval_hours));
   }
-  if (payload.interval_cycles !== undefined) {
-    setIfDefined('interval_cycles', normalizeInteger(payload.interval_cycles));
+  if (payload.threshold_hours !== undefined) {
+    setIfDefined('threshold_hours', normalizeDecimal(payload.threshold_hours));
   }
-  if (payload.interval_months !== undefined) {
-    setIfDefined('interval_months', normalizeInteger(payload.interval_months));
+  // Backward-compatible remap: old clients may still send interval_cycles.
+  // task_templates uses threshold_cycles for cycle-based frequency.
+  if (payload.interval_cycles !== undefined && payload.threshold_cycles === undefined) {
+    setIfDefined('threshold_cycles', normalizeInteger(payload.interval_cycles));
+  }
+  // Backward-compatible remap: old clients may still send interval_months.
+  // task_templates uses threshold_calendar.
+  if (payload.interval_months !== undefined && payload.threshold_calendar === undefined) {
+    setIfDefined('threshold_calendar', normalizeInteger(payload.interval_months));
+  }
+  if (payload.threshold_calendar !== undefined) {
+    setIfDefined('threshold_calendar', normalizeInteger(payload.threshold_calendar));
   }
   if (payload.threshold_cycles !== undefined) {
     setIfDefined('threshold_cycles', normalizeInteger(payload.threshold_cycles));
@@ -190,6 +204,38 @@ function validateMpdInput(payload: JsonRecord, mode: 'create' | 'patch'): Array<
     && normalizeDecimal(payload.estimated_man_hours) === null
   ) {
     issues.push({ field: 'estimated_man_hours', message: 'estimated_man_hours must be a valid number' });
+  }
+  if (
+    payload.interval_hours !== undefined
+    && payload.interval_hours !== null
+    && payload.interval_hours !== ''
+    && normalizeDecimal(payload.interval_hours) === null
+  ) {
+    issues.push({ field: 'interval_hours', message: 'interval_hours must be a valid number' });
+  }
+  if (
+    payload.threshold_hours !== undefined
+    && payload.threshold_hours !== null
+    && payload.threshold_hours !== ''
+    && normalizeDecimal(payload.threshold_hours) === null
+  ) {
+    issues.push({ field: 'threshold_hours', message: 'threshold_hours must be a valid number' });
+  }
+  if (
+    payload.interval_months !== undefined
+    && payload.interval_months !== null
+    && payload.interval_months !== ''
+    && normalizeInteger(payload.interval_months) === null
+  ) {
+    issues.push({ field: 'interval_months', message: 'interval_months must be an integer' });
+  }
+  if (
+    payload.threshold_calendar !== undefined
+    && payload.threshold_calendar !== null
+    && payload.threshold_calendar !== ''
+    && normalizeInteger(payload.threshold_calendar) === null
+  ) {
+    issues.push({ field: 'threshold_calendar', message: 'threshold_calendar must be an integer' });
   }
   if (
     payload.threshold_cycles !== undefined
