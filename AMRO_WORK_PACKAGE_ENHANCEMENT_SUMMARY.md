@@ -60,7 +60,7 @@ Transform the AMRO Work Package Management module from a basic work order system
 | Table | Purpose | Compliance |
 |-------|---------|------------|
 | `amro_work_package_template_versions` | Template versioning with approval workflow | Change control |
-| `amro_work_package_template_categories` | Template classification system | MPD/MRB alignment |
+| `amro_work_order_template_categories` | Template classification system | MPD/MRB alignment |
 | `amro_task_dependencies` | Task dependency graph | Critical path analysis |
 | `amro_task_time_logs` | Actual labor hour tracking | Cost accounting |
 | `amro_compliance_directives` | AD/SB directive tracking | FAA/EASA compliance |

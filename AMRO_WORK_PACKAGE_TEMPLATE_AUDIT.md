@@ -89,7 +89,7 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 - Has version_number, status (draft/pending_review/approved/active/deprecated/archived), approval workflow columns, materials_json, tooling_json, compliance_requirements_json, effective dates, aircraft/engine model arrays.
 - **Status:** Schema exists but has ZERO API routes, ZERO UI, ZERO React Query hooks.
 
-**`amro_work_package_template_categories`** (migration `20260412100000`)
+**`amro_work_order_template_categories`** (migration `20260412100000`, renamed by `20260425162000`)
 - Has category_code, category_type, typical duration/intervals.
 - **Status:** Schema exists but unused.
 
@@ -244,7 +244,7 @@ The template creation form has these sections:
 
 | Feature | Status | Gap Severity | Enterprise Standard |
 |---------|--------|-------------|---------------------|
-| Template libraries and categories | Schema only (`amro_work_package_template_categories`) | P1 High | TRAX: 500+ predefined check templates |
+| Template libraries and categories | Schema only (`amro_work_order_template_categories`) | P1 High | TRAX: 500+ predefined check templates |
 | Template cloning/duplication | Not implemented | P1 High | All: Clone with modification tracking |
 | Template inheritance/variants by aircraft model | Not implemented | P2 Medium | AMOS: Base template + model-specific overrides |
 | Sub-templates and nested structures | Not implemented | P2 Medium | SAP: Composite templates |

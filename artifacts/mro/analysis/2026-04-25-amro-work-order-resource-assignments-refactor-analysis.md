@@ -34,6 +34,13 @@
 - Refactor migration references:
   - `supabase/migrations/20260425153000_amro_rename_wp_resource_assignments_to_wo.sql`.
 
+### Foreign key dependency check (`...resource_assignments.id`)
+- Repository-wide SQL/code scan found no explicit FK definitions targeting:
+  - `public.amro_work_package_resource_assignments(id)`
+  - `public.amro_work_order_resource_assignments(id)`
+- Added defensive live-DB remediation migration:
+  - `supabase/migrations/20260425171000_amro_fix_resource_assignment_fk_targets.sql`
+
 ### Documentation updates completed
 - `AMRO_WORK_PACKAGE_IMPLEMENTATION_ROADMAP.md`
 - `AMRO_WORK_PACKAGE_ENHANCEMENT_SUMMARY.md`
@@ -61,3 +68,5 @@
 3. Verify policy/index names via:
    - `pg_policies` for `amro_platform_admin_access_wo_resource_assignments`, `amro_tenant_franchise_scope_wo_resource_assignments_read`
    - `pg_indexes` entries prefixed `idx_wo_resource_assignments_...`
+4. Optional FK verification query:
+  - `select conrelid::regclass as table_name, conname, pg_get_constraintdef(oid) as definition from pg_constraint where contype = 'f' and pg_get_constraintdef(oid) ilike '%amro_work%resource_assignments%';`

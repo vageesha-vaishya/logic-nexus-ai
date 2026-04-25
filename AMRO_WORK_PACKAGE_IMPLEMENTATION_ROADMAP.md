@@ -98,7 +98,7 @@ This document provides a complete implementation roadmap for transforming the AM
 ├─────────────────────────────────────────────────────────────┤
 │  Enhanced Schema (14 NEW tables):                           │
 │  ├─ amro_work_package_template_versions                     │
-│  ├─ amro_work_package_template_categories                   │
+│  ├─ amro_work_order_template_categories                     │
 │  ├─ amro_task_dependencies                                  │
 │  ├─ amro_task_time_logs                                    │
 │  ├─ amro_compliance_directives                              │

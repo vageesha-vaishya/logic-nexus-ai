@@ -114,7 +114,7 @@
 | Functionality | Existing Table | Created |
 |--------------|----------------|---------|
 | Template versioning | `amro_work_package_template_versions` | 2026-04-12 |
-| Template categories | `amro_work_package_template_categories` | 2026-04-12 |
+| Template categories | `amro_work_order_template_categories` | 2026-04-12 |
 | Emergency WPs | `amro_emergency_work_packages` | 2026-04-12 |
 | Non-scheduled tasks | `amro_non_scheduled_tasks` | 2026-04-12 |
 | Compliance directives | `amro_compliance_directives` | 2026-04-12 |

@@ -321,7 +321,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 | Table | Purpose | Priority |
 |-------|---------|----------|
 | `amro_work_package_template_versions` | Template versioning with approval | P0 |
-| `amro_work_package_template_categories` | Template classification | P1 |
+| `amro_work_order_template_categories` | Template classification | P1 |
 | `amro_task_dependencies` | Task dependency graph | P0 |
 | `amro_task_time_logs` | Actual labor hour tracking | P1 |
 | `amro_compliance_directives` | AD/SB tracking | P0 |

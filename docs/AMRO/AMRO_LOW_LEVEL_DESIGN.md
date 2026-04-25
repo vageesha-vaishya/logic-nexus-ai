@@ -3878,6 +3878,48 @@ Implementation Notes:
   - Migration: 20260425153000_amro_rename_wp_resource_assignments_to_wo.sql
 ```
 
+```text
+Component Type: Table
+Component Name: public.amro_work_order_template_categories
+Purpose: Tenant-scoped classification taxonomy for work-order template grouping and planning semantics.
+Estimated Row Count: 100-50,000 per tenant
+Primary Key:
+  - id
+Foreign Keys:
+  - none
+Unique Constraints:
+  - uq_work_order_template_category_code (tenant_id, category_code)
+Check Constraints:
+  - category_type IN ('maintenance_check','engine_maintenance','component_repair','modification','inspection','repair','overhaul')
+  - typical_interval_type IN ('flight_hours','flight_cycles','calendar_days','condition_based')
+Defaults:
+  - id: gen_random_uuid()
+  - is_active: true
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_work_order_template_categories_tenant(tenant_id)
+  - idx_work_order_template_categories_type(category_type)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - category_code | text | nullable:no | default:none
+  - category_name | text | nullable:no | default:none
+  - category_type | text | nullable:no | default:none
+  - description | text | nullable:yes | default:null
+  - typical_duration_hours | numeric(10,2) | nullable:yes | default:null
+  - typical_interval_type | text | nullable:yes | default:null
+  - typical_interval_value | numeric(10,2) | nullable:yes | default:null
+  - is_active | boolean | nullable:yes | default:true
+  - created_at | timestamptz | nullable:yes | default:now()
+  - updated_at | timestamptz | nullable:yes | default:now()
+Security Considerations:
+  - RLS enabled; policy identifiers follow work-order naming for platform-admin and tenant-franchise read scopes.
+  - Tenant scoping is mandatory for all read/write access paths.
+Implementation Notes:
+  - Migration: 20260425162000_amro_rename_wp_template_categories_to_wo.sql
+```
+
 ---
 
 ## 25. Global Market Research and Technical Evaluation: MRO Aircraft Template Modules (2026)
