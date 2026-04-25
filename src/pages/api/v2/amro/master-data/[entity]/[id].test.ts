@@ -397,7 +397,7 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     const assemblyModelsEqMock = vi.fn().mockReturnValue({ or: assemblyModelsOrPrimaryMock });
     const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqMock });
     const fromMock = vi.fn((table: string) => {
-      if (table === 'work_package_templates') {
+      if (table === 'work_order_templates') {
         if (fromMock.mock.calls.length === 1) {
           return { select: existingSelectMock };
         }
@@ -421,7 +421,7 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
 
     const req: ApiRequest = {
       method: 'PATCH',
-      query: { entity: 'work_package_templates', id: 'wpt-1' },
+      query: { entity: 'work_order_templates', id: 'wpt-1' },
       body: {
         template_name: 'Line Check Updated',
         assembly_models_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',

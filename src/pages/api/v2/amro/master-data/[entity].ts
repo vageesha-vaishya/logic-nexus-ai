@@ -1349,7 +1349,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new HttpError(errorMessage, 400);
       }
 
-      const allowTenantNullFallback = entity !== 'work_package_templates';
+      const allowTenantNullFallback = entity !== 'work_order_templates';
       if (tenantId && finalData.length === 0 && allowTenantNullFallback) {
         let fallbackData: unknown[] = [];
         let fallbackCount = 0;
@@ -1592,7 +1592,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         payload.is_active = true;
       }
     }
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       if (Object.prototype.hasOwnProperty.call(payload, 'policy_snapshot_id')) {
         payload.policy_snapshot_id = asNullableString(payload.policy_snapshot_id);
       }
@@ -1606,7 +1606,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       assemblyModelIssues = validation.get(0) || [];
     }
     const workPackageTemplateIssues: { field: string; message: string }[] = [];
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       const policySnapshotId = asNullableString(payload.policy_snapshot_id);
       const modelId = asNullableString(payload.assembly_models_id);
       if (policySnapshotId && !isUuid(policySnapshotId)) {
@@ -1674,7 +1674,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         ? (asNullableString(payload.franchise_id) || franchiseId)
         : franchiseId;
     }
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(payload);
       logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP 000] ', {function: 'insertPayload'});
       logger.info('[AMRO Master Data API] create request received for work package template', {
@@ -1776,7 +1776,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         if (requestedAircraftModel) patchPayload.aircraft_model = requestedAircraftModel;
         if (Object.keys(patchPayload).length > 0) {
           const { data: patchedRecord, error: patchError } = await supabase
-            .from('work_package_templates')
+            .from('work_order_templates')
             .update(patchPayload)
             .eq('tenant_id', tenantId)
             .eq('id', createdTemplateId)

@@ -109,7 +109,7 @@ export function createSeedRecords(entity: MasterEntity): Record<string, unknown>
       },
     ];
   }
-  if (entity === 'work_package_templates') {
+  if (entity === 'work_order_templates' || entity === 'work_package_templates') {
     return [
       {
         template_code: 'TMP-A320-LINE-48H',
@@ -436,7 +436,7 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       next[field.key] = normalizeFormValue(field, row[field.key]);
     }
   });
-  if (entity === 'work_package_templates' && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
+  if ((entity === 'work_order_templates' || entity === 'work_package_templates') && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
     next.model_id = String(row.model_id ?? '').trim();
   }
   if (entity === 'parts_inventory' && !String(next.part_number ?? '').trim()) {
@@ -487,7 +487,7 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
   const payload: Record<string, unknown> = {};
   fields.forEach((field) => {
     const raw = values[field.key];
-    const isWorkPackageAircraftModelSatisfiedByModelId = entity === 'work_package_templates'
+    const isWorkPackageAircraftModelSatisfiedByModelId = (entity === 'work_order_templates' || entity === 'work_package_templates')
       && field.key === 'aircraft_model'
       && !isBlank(values.model_id);
     if (field.required && isBlank(raw) && field.type !== 'boolean' && !isWorkPackageAircraftModelSatisfiedByModelId) {
@@ -657,7 +657,7 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     });
   }
 
-  if (entity === 'work_package_templates') {
+  if (entity === 'work_order_templates' || entity === 'work_package_templates') {
     const modelId = String(values.model_id ?? '').trim();
     // model_id is required by database constraint ck_work_package_templates_model_id_required
     if (!modelId) {

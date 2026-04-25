@@ -166,7 +166,7 @@ function transformTemplate(template: WorkPackageTemplate, columns: string[]): Re
  */
 function generateFileName(format: ExportFormat, customName?: string): string {
   const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-  const baseName = customName || `work_package_templates_${timestamp}`;
+  const baseName = customName || `work_order_templates_${timestamp}`;
   
   const extensions: Record<ExportFormat, string> = {
     csv: '.csv',

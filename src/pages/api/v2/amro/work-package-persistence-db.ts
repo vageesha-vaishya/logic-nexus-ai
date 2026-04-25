@@ -365,7 +365,7 @@ async function createTemplateTasksWithSupabase(params: {
 }): Promise<number> {
   const supabase = getSupabaseAdminClient();
   let query = supabase
-    .from('work_package_templates')
+    .from('work_order_templates')
     .select('id,tasks_json,franchise_id')
     .eq('tenant_id', params.tenantId)
     .eq('id', params.workPackageTemplateId)
@@ -427,7 +427,7 @@ async function createTemplateTasksWithPgTransaction(params: {
 }): Promise<number> {
   const templateLookupSql = `
     SELECT id, tasks_json
-    FROM public.work_package_templates
+    FROM public.work_order_templates
     WHERE tenant_id = $1
       AND id = $2
       AND deleted_at IS NULL

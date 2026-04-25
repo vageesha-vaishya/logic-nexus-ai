@@ -20,6 +20,7 @@ export const ENTITY_LABEL: Record<MasterEntity, string> = {
   regulator_profiles: 'Regulator Profiles',
   shift_calendars: 'Shift Calendars',
   work_package_templates: 'Work Package Templates',
+  work_order_templates: 'Work Package Templates',
 };
 
 export const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
@@ -50,6 +51,7 @@ export const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   regulator_profiles: ['id', 'regulator_code', 'regulator_name', 'jurisdiction', 'policy_version', 'effective_from', 'is_active', 'updated_at'],
   shift_calendars: ['id', 'station_code', 'shift_name', 'shift_start_time', 'shift_end_time', 'capacity', 'is_active', 'updated_at'],
   work_package_templates: ['id', 'template_code', 'template_name', 'model_id', 'maintenance_type', 'version', 'active', 'updated_at'],
+  work_order_templates: ['id', 'template_code', 'template_name', 'model_id', 'maintenance_type', 'version', 'active', 'updated_at'],
 };
 
 export const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
@@ -93,7 +95,7 @@ export const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
 
 export const AIRCRAFT_NAV_RAIL = [
   { label: 'Overview', path: '/dashboard/amro/overview' },
-  { label: 'Work Packages', path: '/dashboard/amro/work-packages' },
+  { label: 'Work Orders', path: '/dashboard/amro/work-orders' },
   { label: 'Scheduling', path: '/dashboard/amro/scheduling' },
   { label: 'Compliance', path: '/dashboard/amro/compliance' },
   { label: 'Task Execution', path: '/dashboard/amro/task-execution' },
@@ -280,6 +282,18 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'scope_json', label: 'Scope JSON', type: 'json' },
     { key: 'tasks_json', label: 'Tasks JSON', type: 'json' },
   ],
+  work_order_templates: [
+    { key: 'template_code', label: 'Template Code', type: 'text', required: true },
+    { key: 'template_name', label: 'Template Name', type: 'text', required: true },
+    { key: 'model_id', label: 'Model ID', type: 'text', required: true },
+    { key: 'aircraft_model', label: 'Aircraft Model', type: 'select', required: true },
+    { key: 'maintenance_type', label: 'Maintenance Type', type: 'select', required: true, options: ['inspection','service', 'line', 'base', 'component', 'overhaul', 'repair', 'upgrade', 'modification'] },
+    { key: 'version', label: 'Version', type: 'number', required: true, min: 1 },
+    { key: 'active', label: 'Active', type: 'boolean' },
+    { key: 'policy_snapshot_id', label: 'Policy Snapshot ID', type: 'text' },
+    { key: 'scope_json', label: 'Scope JSON', type: 'json' },
+    { key: 'tasks_json', label: 'Tasks JSON', type: 'json' },
+  ],
 };
 
 export const AMRO_MASTER_ENTITY_FORM_FIELDS = ENTITY_FORM_FIELDS;
@@ -298,6 +312,7 @@ export const ENTITY_ROUTE_SEGMENT: Record<MasterEntity, string> = {
   regulator_profiles: 'regulator-profiles',
   shift_calendars: 'shift-calendars',
   work_package_templates: 'work-package-templates',
+  work_order_templates: 'work-order-templates',
 };
 
 export const ROUTE_SEGMENT_ENTITY: Record<string, MasterEntity> = Object.entries(ENTITY_ROUTE_SEGMENT).reduce(
@@ -336,4 +351,5 @@ export const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
   regulator_profiles: { regulator_code: '', regulator_name: '', jurisdiction: '', policy_version: '', effective_from: new Date().toISOString().slice(0, 10), effective_to: '', is_active: true, metadata: '{}' },
   shift_calendars: { station_code: '', shift_name: '', shift_start_time: '08:00:00', shift_end_time: '16:00:00', capacity: 1, effective_from: new Date().toISOString().slice(0, 10), effective_to: '', is_active: true },
   work_package_templates: { template_code: '', template_name: '', model_id: '', aircraft_model: '', maintenance_type: 'line', version: 1, active: true, policy_snapshot_id: '', scope_json: '[]', tasks_json: '[]' },
+  work_order_templates: { template_code: '', template_name: '', model_id: '', aircraft_model: '', maintenance_type: 'line', version: 1, active: true, policy_snapshot_id: '', scope_json: '[]', tasks_json: '[]' },
 };

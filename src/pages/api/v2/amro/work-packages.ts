@@ -865,7 +865,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const body = parseBody(req.body);
       req.query = {
         ...req.query,
-        entity: 'work_package_templates',
+        entity: 'work_order_templates',
       };
       req.body = body;
       return masterDataEntityHandler(req, res);

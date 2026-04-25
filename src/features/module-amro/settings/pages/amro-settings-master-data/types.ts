@@ -11,6 +11,7 @@ export type MasterEntity =
   | 'assembly_models'
   | 'regulator_profiles'
   | 'shift_calendars'
+  | 'work_order_templates'
   | 'work_package_templates';
 
 export type RecordRow = {

@@ -258,7 +258,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
         from: (table: string) => {
           if (table === 'work_packages_title') return titleLookupChain;
           if (table === 'aircraft') return aircraftLookupChain;
-          if (table === 'work_package_templates') return templateLookupChain;
+          if (table === 'work_order_templates') return templateLookupChain;
           if (table === 'tasks') {
             // first tasks call = duplicate guard (select), second call = insert
             return (tasksCountChain.select.mock.calls.length === 0) ? tasksCountChain : tasksInsertChain;

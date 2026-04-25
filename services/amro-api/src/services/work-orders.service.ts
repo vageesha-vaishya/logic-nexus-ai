@@ -346,7 +346,7 @@ export class WorkOrdersService {
     workPackageTemplateId: string;
   }): Promise<number> {
     let templateQuery = this.supabase
-      .from('work_package_templates')
+      .from('work_order_templates')
       .select('id,tasks_json,franchise_id')
       .eq('tenant_id', params.tenantId)
       .eq('id', params.workPackageTemplateId)

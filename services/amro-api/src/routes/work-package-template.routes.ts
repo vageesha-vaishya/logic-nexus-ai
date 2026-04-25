@@ -102,8 +102,9 @@ function isMissingWorkPackageTemplateFranchiseColumnError(errorLike: unknown): b
       || (errorLike as string)
       || '',
   ).toLowerCase();
-  return message.includes('work_package_templates.franchise_id')
-    || (message.includes('franchise_id') && message.includes('work_package_templates'));
+  return message.includes('work_order_templates.franchise_id')
+    || message.includes('work_package_templates.franchise_id')
+    || (message.includes('franchise_id') && (message.includes('work_order_templates') || message.includes('work_package_templates')));
 }
 
 function normalizeTaskTemplateIds(input: unknown): string[] {
@@ -268,7 +269,7 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     updated_by: userId,
   };
   const { data: insertedTemplate, error: insertError } = await supabase
-    .from('work_package_templates')
+    .from('work_order_templates')
     .insert(insertPayload)
     .select('*')
     .single();
@@ -310,7 +311,7 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
         message,
       });
       let rollbackQuery = supabase
-        .from('work_package_templates')
+        .from('work_order_templates')
         .delete()
         .eq('tenant_id', tenantId)
         .eq('id', createdTemplateId);
@@ -385,7 +386,7 @@ async function createTemplateTaskRelationshipsFromRequest(
 
   const runTemplateQuery = async (includeFranchiseColumn: boolean) => {
     let query = supabase
-      .from('work_package_templates')
+      .from('work_order_templates')
       .select(includeFranchiseColumn ? 'id,tenant_id,franchise_id,model_id' : 'id,tenant_id,model_id')
       .eq('tenant_id', tenantId)
       .eq('id', resolvedTemplateId);
@@ -529,7 +530,7 @@ async function buildTemplateListResponse(
   templateIds?: string[],
 ): Promise<Array<Record<string, unknown>>> {
   let templatesQuery = supabase
-    .from('work_package_templates')
+    .from('work_order_templates')
     .select('id,tenant_id,model_id,template_code,version,active,template_name,maintenance_type,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at')
     .eq('tenant_id', tenantId)
     .order('updated_at', { ascending: false });
@@ -793,7 +794,7 @@ async function updateWorkPackageTemplateWithoutAtomicRpc(params: {
 
   const runUpdateQuery = async (withFranchiseScope: boolean) => {
     let query = supabase
-      .from('work_package_templates')
+      .from('work_order_templates')
       .update({
         template_code: payload.template_code,
         version: payload.version,
@@ -1253,7 +1254,7 @@ router.delete(
 
     const runDeleteQuery = async (withFranchiseScope: boolean) => {
       let query = supabase
-        .from('work_package_templates')
+        .from('work_order_templates')
         .delete()
         .eq('tenant_id', tenantId)
         .eq('id', id);

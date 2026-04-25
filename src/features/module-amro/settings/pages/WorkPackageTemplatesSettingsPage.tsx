@@ -81,7 +81,7 @@ async function fetchTemplates(
     ...(params.status && params.status !== 'all' ? { status: params.status } : {}),
   });
 
-  const response = await fetch(`/api/v2/amro/master-data/work_package_templates?${query.toString()}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_order_templates?${query.toString()}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -98,7 +98,7 @@ async function fetchTemplates(
 }
 
 async function createTemplate(accessToken: string, tenantId: string, data: WorkPackageTemplateFormData): Promise<WorkPackageTemplate> {
-  const response = await fetch('/api/v2/amro/master-data/work_package_templates', {
+  const response = await fetch('/api/v2/amro/master-data/work_order_templates', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -117,7 +117,7 @@ async function createTemplate(accessToken: string, tenantId: string, data: WorkP
 }
 
 async function updateTemplate(accessToken: string, id: string, data: Partial<WorkPackageTemplateFormData>): Promise<WorkPackageTemplate> {
-  const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${id}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_order_templates/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -136,7 +136,7 @@ async function updateTemplate(accessToken: string, id: string, data: Partial<Wor
 }
 
 async function deleteTemplate(accessToken: string, id: string): Promise<void> {
-  const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${id}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_order_templates/${id}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${accessToken}` },
   });

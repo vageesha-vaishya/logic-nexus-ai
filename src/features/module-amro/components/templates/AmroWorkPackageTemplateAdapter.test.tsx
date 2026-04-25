@@ -16,7 +16,7 @@ describe('AmroWorkPackageTemplateAdapter', () => {
         ? tenantRows
         : table === 'franchises'
           ? franchiseRows
-          : table === 'work_package_templates'
+          : table === 'work_order_templates'
             ? templateRows
             : [];
       const chain = {

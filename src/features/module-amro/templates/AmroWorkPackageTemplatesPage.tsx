@@ -66,6 +66,7 @@ export interface WorkPackageTemplate {
   version: number;
   active: boolean;
   status: string;
+  scope_items_count?: number;
   scope_json: Record<string, unknown>;
   tasks_json: any[];
   materials_json: any[];
@@ -137,7 +138,7 @@ async function fetchTemplates(
     page_size: String(params.pageSize || 20),
   });
 
-  const response = await fetch(`/api/v2/amro/master-data/work_package_templates?${query.toString()}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_order_templates?${query.toString()}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -235,7 +236,7 @@ async function fetchTaskTemplates(
 }
 
 async function deleteTemplate(accessToken: string, id: string): Promise<void> {
-  const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${id}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_order_templates/${id}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -751,7 +752,9 @@ export function AmroWorkPackageTemplatesPage() {
         <TemplatePreviewDialog
           open={!!previewTemplate}
           onOpenChange={(open) => { if (!open) setPreviewTemplate(null); }}
-          template={previewTemplate}
+          template={previewTemplate as any}
+          versions={[]}
+          loading={false}
         />
       )}
 

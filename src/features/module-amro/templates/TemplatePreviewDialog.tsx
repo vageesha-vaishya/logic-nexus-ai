@@ -34,7 +34,7 @@ interface TemplateRecord {
   version: number;
   active: boolean;
   status: string;
-  scope_items_count: number;
+  scope_items_count?: number;
   tasks_count: number;
   estimated_labor_hours: number | null;
   created_at: string;
@@ -115,7 +115,7 @@ export function TemplatePreviewDialog({
 
     const fetchFresh = async () => {
       try {
-        const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${template.id}`, {
+        const response = await fetch(`/api/v2/amro/master-data/work_order_templates/${template.id}`, {
           method: 'GET',
           headers: { Authorization: `Bearer ${accessToken}` },
         });

@@ -148,7 +148,7 @@ export async function fetchTemplates(
     params.aircraftModels.forEach(model => queryParams.append('aircraft_model[]', model));
   }
 
-  const url = `${API_BASE_URL}/master-data/work_package_templates?${queryParams.toString()}`;
+  const url = `${API_BASE_URL}/master-data/work_order_templates?${queryParams.toString()}`;
 
   try {
     const response = await fetchWithTimeout(url, {
@@ -184,7 +184,7 @@ export async function createTemplate(
   accessToken: string,
   templateData: Partial<WorkPackageTemplate>
 ): Promise<WorkPackageTemplate> {
-  const url = `${API_BASE_URL}/master-data/work_package_templates`;
+  const url = `${API_BASE_URL}/master-data/work_order_templates`;
 
   try {
     const response = await fetchWithTimeout(url, {
@@ -223,7 +223,7 @@ export async function updateTemplate(
   templateData: Partial<WorkPackageTemplate>,
   expectedUpdatedAt?: string
 ): Promise<WorkPackageTemplate> {
-  const url = `${API_BASE_URL}/master-data/work_package_templates/${templateId}`;
+  const url = `${API_BASE_URL}/master-data/work_order_templates/${templateId}`;
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -268,7 +268,7 @@ export async function updateTemplate(
  * Delete a template
  */
 export async function deleteTemplate(accessToken: string, templateId: string): Promise<void> {
-  const url = `${API_BASE_URL}/master-data/work_package_templates/${templateId}`;
+  const url = `${API_BASE_URL}/master-data/work_order_templates/${templateId}`;
 
   try {
     const response = await fetchWithTimeout(url, {
@@ -295,7 +295,7 @@ export async function cloneTemplate(
   newName: string,
   newCode: string
 ): Promise<WorkPackageTemplate> {
-  const url = `${API_BASE_URL}/master-data/work_package_templates/${templateId}/clone`;
+  const url = `${API_BASE_URL}/master-data/work_order_templates/${templateId}/clone`;
 
   try {
     const response = await fetchWithTimeout(url, {
@@ -335,7 +335,7 @@ export async function bulkDeleteTemplates(
   accessToken: string,
   templateIds: string[]
 ): Promise<{ success: number; failed: number; errors: Array<{ id: string; error: string }> }> {
-  const url = `${API_BASE_URL}/master-data/work_package_templates/bulk-delete`;
+  const url = `${API_BASE_URL}/master-data/work_order_templates/bulk-delete`;
 
   try {
     const response = await fetchWithTimeout(url, {
@@ -371,7 +371,7 @@ export async function bulkUpdateTemplateStatus(
   status: string,
   reason?: string
 ): Promise<{ success: number; failed: number; errors: Array<{ id: string; error: string }> }> {
-  const url = `${API_BASE_URL}/master-data/work_package_templates/bulk-status`;
+  const url = `${API_BASE_URL}/master-data/work_order_templates/bulk-status`;
 
   try {
     const response = await fetchWithTimeout(url, {

@@ -136,7 +136,7 @@ describe('/api/v2/amro/module-catalog', () => {
     });
     expect((res.jsonBody as any)?.data?.moduleCatalog?.databaseMappingMatrix?.[1]).toEqual({
       moduleId: 'MOD-AMRO-02',
-      primaryTables: ['work_orders', 'work_package_templates', 'tasks'],
+      primaryTables: ['work_orders', 'work_order_templates', 'tasks'],
       keyFieldsUsedByModule: ['work_package_number', 'maintenance_type', 'priority', 'status'],
       criticalConstraintsAndRules: ['Unique (tenant_id, work_package_number)', 'Transition policy validation required'],
     });

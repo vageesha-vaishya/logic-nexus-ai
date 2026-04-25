@@ -348,7 +348,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     let existing = initialExisting;
     if (existingError) throw new HttpError(existingError.message, 400);
     if (!existing) {
-      if (entity === 'work_package_templates') {
+      if (entity === 'work_order_templates') {
         const { data: crossScopeRecord } = await supabase
           .from(entityConfig.table)
           .select('id,tenant_id,franchise_id')
@@ -505,7 +505,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       payload.level = hierarchyContext.level;
       payload.parent_code_ref = hierarchyContext.parentCodeRef;
     }
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       const existingVersion = (existingRecord as Record<string, unknown>).version;
       const existingScope = (existingRecord as Record<string, unknown>).scope_json;
       const existingTasks = (existingRecord as Record<string, unknown>).tasks_json;
@@ -562,7 +562,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       );
     }
     const workPackageTemplateIssues: { field: string; message: string }[] = [];
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       const policySnapshotId = asNullableString(payload.policy_snapshot_id);
       const modelId = asNullableString(payload.assembly_models_id);
       if (policySnapshotId && !isUuid(policySnapshotId)) {
@@ -614,7 +614,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       ...payload,
       updated_by: auth.userId,
     };
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(updatePayload);
       logger.info('[AMRO Master Data API] update request received for work package template', {
         correlationId: ctx.correlationId,
@@ -642,7 +642,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const { data: initialData, error } = await updateBaseQuery.eq('tenant_id', tenantId).maybeSingle();
     let data = initialData;
     if (error) {
-      if (entity === 'work_package_templates') {
+      if (entity === 'work_order_templates') {
         logger.error('[AMRO Master Data API] failed to update work package template', {
           correlationId: ctx.correlationId,
           workPackageTemplateId: id,
@@ -651,7 +651,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
       throw new HttpError(error.message, 400);
     }
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(updatePayload);
       try {
         await syncWorkPackageTemplateTaskLinks({
@@ -736,7 +736,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       },
     });
   } catch (error) {
-    if (String(req.query.entity || '') === 'work_package_templates') {
+    if (String(req.query.entity || '') === 'work_order_templates') {
       logger.error('[AMRO Master Data API] work package template update failed', {
         correlationId: ctx.correlationId,
         workPackageTemplateId: String(req.query.id || ''),

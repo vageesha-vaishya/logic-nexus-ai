@@ -35,6 +35,13 @@ This Low Level Design defines the executable technical blueprint for delivering 
 - Enable real-time and offline-first operations with conflict-safe synchronization.
 - Build differentiating capabilities through IoT ingestion, predictive analytics, and AI maintenance forecasting.
 
+### 1.3 Database Rename Addendum (2026-04-25)
+
+- Canonical AMRO template table name is `public.work_order_templates`.
+- Legacy name `public.work_package_templates` is retained as a compatibility view during transition.
+- API and service layers normalize legacy entity tokens to `work_order_templates`.
+- Rollback path restores physical table name to `work_package_templates` and removes compatibility view.
+
 ---
 
 ## 2. Architecture Context and System Decomposition

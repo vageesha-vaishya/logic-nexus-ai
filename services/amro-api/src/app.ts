@@ -1088,7 +1088,7 @@ app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, a
 
     // Verify template exists
     const { data: template, error: templateError } = await supabase
-      .from('work_package_templates')
+      .from('work_order_templates')
       .select('id, tenant_id, franchise_id')
       .eq('id', template_id)
       .eq('tenant_id', tenantId)

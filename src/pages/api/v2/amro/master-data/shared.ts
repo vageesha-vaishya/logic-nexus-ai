@@ -17,7 +17,7 @@ export type AmroMasterDataEntity =
   | 'assembly_models'
   | 'regulator_profiles'
   | 'shift_calendars'
-  | 'work_package_templates';
+  | 'work_order_templates';
 
 type EntityConfig = {
   table: string;
@@ -291,8 +291,8 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
     ],
     defaultSortColumn: 'updated_at',
   },
-  work_package_templates: {
-    table: 'work_package_templates',
+  work_order_templates: {
+    table: 'work_order_templates',
     searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'aircraft_model', 'assembly_models_id'],
     listColumns:
       'id,tenant_id,franchise_id,template_code,version,active,template_name,maintenance_type,assembly_models_id,aircraft_model,assembly_models,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
@@ -407,7 +407,8 @@ function parseTimeToSeconds(value: string | null): number | null {
 }
 
 export function resolveEntity(rawEntity: unknown): AmroMasterDataEntity {
-  const entity = asString(rawEntity).toLowerCase().replace(/-/g, '_') as AmroMasterDataEntity;
+  const normalizedEntity = asString(rawEntity).toLowerCase().replace(/-/g, '_');
+  const entity = (normalizedEntity === 'work_package_templates' ? 'work_order_templates' : normalizedEntity) as AmroMasterDataEntity;
   if (!ENTITY_CONFIG[entity]) {
     throw new HttpError('Unsupported master data entity', 404);
   }
@@ -907,7 +908,7 @@ export function validatePayload(entity: AmroMasterDataEntity, payload: Record<st
       });
     }
   }
-  if (entity === 'work_package_templates') {
+  if (entity === 'work_order_templates') {
     const version = Number(payload.version ?? 0);
     if (!(version > 0)) {
       issues.push({

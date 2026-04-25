@@ -290,7 +290,7 @@ describe('work-package-template.routes create endpoint', () => {
       .expect(409);
 
     expect(response.body.code).toBe('CREATE_FAILED');
-    expect(fromMock).toHaveBeenCalledWith('work_package_templates');
+    expect(fromMock).toHaveBeenCalledWith('work_order_templates');
   });
 });
 

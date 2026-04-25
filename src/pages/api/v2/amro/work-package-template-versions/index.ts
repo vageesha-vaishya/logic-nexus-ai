@@ -3,7 +3,7 @@
  * 
  * DATABASE SCHEMA ANALYSIS:
  * - Uses existing table: amro_work_package_template_versions (created 2026-04-12)
- * - Uses existing table: work_package_templates (created 2026-03-22, enhanced 2026-04-05)
+ * - Uses existing table: work_order_templates (created 2026-03-22, enhanced 2026-04-05, renamed 2026-04-25)
  * - NO NEW TABLES REQUIRED - schema is comprehensive
  * 
  * ENDPOINTS:

@@ -223,13 +223,13 @@ describe('master-data.routes', () => {
   it('bulk imports master data records', async () => {
     const app = await createTestApp();
     const response = await request(app)
-      .post('/api/v2/amro/master-data/work_package_templates')
+      .post('/api/v2/amro/master-data/work_order_templates')
       .send({
         operation: 'bulk_import',
         records: [{ template_code: 'TMP-1', template_name: 'Template 1', maintenance_type: 'line', version: 1 }],
       })
       .expect(200);
-    expect(response.body.output.entity).toBe('work_package_templates');
+    expect(response.body.output.entity).toBe('work_order_templates');
     expect(response.body.output.imported_count).toBe(1);
     expect(Array.isArray(response.body.output.records)).toBe(true);
   });

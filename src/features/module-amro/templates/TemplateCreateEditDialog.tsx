@@ -348,8 +348,8 @@ export function TemplateCreateEditDialog({
       console.log('===================');
 
       const url = isEditMode
-        ? `/api/v2/amro/master-data/work_package_templates/${template!.id}`
-        : '/api/v2/amro/master-data/work_package_templates';
+        ? `/api/v2/amro/master-data/work_order_templates/${template!.id}`
+        : '/api/v2/amro/master-data/work_order_templates';
 
       const method = isEditMode ? 'PATCH' : 'POST';
 

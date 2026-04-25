@@ -36,7 +36,7 @@ type MasterEntity =
   | 'task_categories'
   | 'regulator_profiles'
   | 'shift_calendars'
-  | 'work_package_templates';
+  | 'work_order_templates';
 
 type EntityConfig = {
   table: string;
@@ -297,8 +297,8 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     ],
     defaultSortColumn: 'updated_at',
   },
-  work_package_templates: {
-    table: 'work_package_templates',
+  work_order_templates: {
+    table: 'work_order_templates',
     searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'assembly_models_id'],
     listColumns:
       'id,tenant_id,franchise_id,assembly_models_id,template_code,version,active,template_name,maintenance_type,assembly_models,scope_json,tasks_json,materials_json,tooling_json,compliance_requirements_json,policy_snapshot_id,created_at,updated_at',
@@ -408,9 +408,10 @@ function firstQueryValue(value: unknown): string {
 }
 
 function resolveEntity(rawEntity: unknown): MasterEntity {
-  const entity = asString(rawEntity)
+  const normalizedEntity = asString(rawEntity)
     .toLowerCase()
-    .replace(/[-\s]+/g, '_') as MasterEntity;
+    .replace(/[-\s]+/g, '_');
+  const entity = (normalizedEntity === 'work_package_templates' ? 'work_order_templates' : normalizedEntity) as MasterEntity;
   if (!ENTITY_CONFIG[entity]) {
     throw new HttpError('Unsupported master data entity', 404);
   }
@@ -1338,7 +1339,7 @@ router.post(
     logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP -001] ', {function: 'insertPayload'});
     
     // DEBUG: Log what we received
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       logger.info('[WPT DEBUG] Received body keys:', Object.keys(body));
       logger.info('[WPT DEBUG] materials_json present:', 'materials_json' in body);
       logger.info('[WPT DEBUG] materials_json value:', body.materials_json);
@@ -1352,7 +1353,7 @@ router.post(
     const payload = sanitizeWritePayload(entity, hydratedBody);
     
     // DEBUG: Log what passed through sanitization
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       logger.info('[WPT DEBUG] After sanitizeWritePayload keys:', Object.keys(payload));
       logger.info('[WPT DEBUG] payload.materials_json:', payload.materials_json);
       logger.info('[WPT DEBUG] payload.tooling_json:', payload.tooling_json);

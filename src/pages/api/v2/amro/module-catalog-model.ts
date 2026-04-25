@@ -203,7 +203,7 @@ export const AMRO_DATABASE_MAPPING_MATRIX: ReadonlyArray<AmroDatabaseMappingMatr
   },
   {
     moduleId: 'MOD-AMRO-02',
-    primaryTables: ['work_orders', 'work_package_templates', 'tasks'],
+    primaryTables: ['work_orders', 'work_order_templates', 'tasks'],
     keyFieldsUsedByModule: ['work_package_number', 'maintenance_type', 'priority', 'status'],
     criticalConstraintsAndRules: ['Unique (tenant_id, work_package_number)', 'Transition policy validation required'],
   },
@@ -508,7 +508,7 @@ export const AMRO_QUICK_LOOKUP_CROSS_REFERENCE: ReadonlyArray<AmroQuickLookupCro
     module: 'Work Package Management',
     subModules: 'CRUD, Transitions, Detail Context',
     uiUx: 'SCR-002, SCR-003, SCR-004',
-    dbTables: 'work_orders, work_package_templates, tasks',
+    dbTables: 'work_orders, work_order_templates, tasks',
     workflow: '17.1',
     apis: 'API-001, API-002, API-003',
     implementationSequence: 'S2',

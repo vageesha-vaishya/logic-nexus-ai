@@ -38,7 +38,7 @@ async function fetchWorkPackageTemplates(
 ): Promise<WorkPackageTemplateOption[]> {
   // FIXED: Use the correct master-data endpoint for work package templates
   // Previously was calling /model-options which returns assembly_models instead
-  const response = await fetch('/api/v2/amro/master-data/work_package_templates?page=1&page_size=200', {
+  const response = await fetch('/api/v2/amro/master-data/work_order_templates?page=1&page_size=200', {
     method: 'GET',
     headers,
   });
@@ -144,7 +144,7 @@ async function fetchWorkPackageTemplateDetail(
   headers: HeadersInit,
 ): Promise<WorkPackageTemplateDetail | null> {
   // Use the master-data entity endpoint with ID
-  const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${templateId}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_order_templates/${templateId}`, {
     method: 'GET',
     headers,
   });

@@ -73,7 +73,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
   if (req.method === 'GET' || req.method === 'DELETE') {
     req.query = {
       ...req.query,
-      entity: 'work_package_templates',
+      entity: 'work_order_templates',
       id: req.query.id,
     };
     await masterDataEntityIdHandler(req, res);
@@ -143,7 +143,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const supabase = getSupabaseAdminClient();
     const { data: existingTemplate, error: existingTemplateError } = await supabase
-      .from('work_package_templates')
+      .from('work_order_templates')
       .select('id')
       .eq('tenant_id', tenantId)
       .eq('id', id)
@@ -235,7 +235,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       version: 'v2',
       correlationId: ctx.correlationId,
       output: {
-        entity: 'work_package_templates',
+        entity: 'work_order_templates',
         record: (rpcResult as Record<string, unknown>)?.record || null,
         updated_relationships: (rpcResult as Record<string, unknown>)?.updated_relationships || [],
       },

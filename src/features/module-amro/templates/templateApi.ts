@@ -163,7 +163,7 @@ export async function cloneTemplate(
   newName: string
 ): Promise<void> {
   // First get the template details
-  const getResponse = await fetch(`/api/v2/amro/master-data/work_package_templates/${templateId}`, {
+  const getResponse = await fetch(`/api/v2/amro/master-data/work_order_templates/${templateId}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -188,7 +188,7 @@ export async function cloneTemplate(
     compliance_requirements_json: template.compliance_requirements_json,
   };
 
-  const response = await fetch('/api/v2/amro/master-data/work_package_templates', {
+  const response = await fetch('/api/v2/amro/master-data/work_order_templates', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

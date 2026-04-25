@@ -283,7 +283,7 @@ export function ExportDialog({
               </Label>
               <Input
                 id="file-name"
-                placeholder={`work_package_templates_${new Date().toISOString().split('T')[0]}`}
+                placeholder={`work_order_templates_${new Date().toISOString().split('T')[0]}`}
                 value={fileName}
                 onChange={(e) => setFileName(e.target.value)}
                 disabled={isExporting}

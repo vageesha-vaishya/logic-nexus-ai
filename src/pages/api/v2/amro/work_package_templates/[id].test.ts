@@ -63,7 +63,7 @@ function createSupabaseClientMock(options?: {
 }) {
   return {
     from: vi.fn((table: string) => {
-      if (table === 'work_package_templates') {
+      if (table === 'work_order_templates') {
         const chain: any = {
           select: vi.fn(() => chain),
           eq: vi.fn(() => chain),

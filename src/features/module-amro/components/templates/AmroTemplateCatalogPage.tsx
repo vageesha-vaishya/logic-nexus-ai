@@ -96,7 +96,7 @@ async function fetchTemplates(
     page_size: String(params.pageSize || 50),
   });
 
-  const response = await fetch(`/api/v2/amro/master-data/work_package_templates?${query.toString()}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_order_templates?${query.toString()}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -377,7 +377,7 @@ export function AmroTemplateCatalogPage() {
   const confirmDelete = async () => {
     if (!deleteCandidate || !accessToken) return;
     try {
-      const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${deleteCandidate.id}`, {
+      const response = await fetch(`/api/v2/amro/master-data/work_order_templates/${deleteCandidate.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -648,7 +648,7 @@ export function AmroTemplateCatalogPage() {
       <TemplatePreviewDialog
         open={!!previewTemplate}
         onOpenChange={(open) => { if (!open) { setPreviewTemplate(null); setPreviewVersions([]); } }}
-        template={previewTemplate}
+        template={previewTemplate as any}
         versions={previewVersions}
         loading={previewLoading}
       />

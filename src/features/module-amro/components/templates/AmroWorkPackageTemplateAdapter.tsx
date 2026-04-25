@@ -147,7 +147,7 @@ export function AmroWorkPackageTemplateAdapter({
         let record: Record<string, unknown> | null = null;
         if (props.scopedDb && typeof (props.scopedDb as any).from === 'function') {
           const { data } = await (props.scopedDb as any)
-            .from('work_package_templates')
+            .from('work_order_templates')
             .select('template_code,template_name,model_id,tenant_id,franchise_id')
             .eq('id', props.selectedTemplateId)
             .maybeSingle();
@@ -399,7 +399,7 @@ export function AmroWorkPackageTemplateAdapter({
         let hydratedRecord: Record<string, unknown> | null = null;
         if (props.scopedDb && typeof (props.scopedDb as any).from === 'function') {
           const { data } = await (props.scopedDb as any)
-            .from('work_package_templates')
+            .from('work_order_templates')
             .select('model_id')
             .eq('id', props.selectedTemplateId)
             .maybeSingle();
@@ -605,7 +605,7 @@ export function AmroWorkPackageTemplateAdapter({
 
   return (
     <AmroStandardFormTemplate
-      moduleKey="work_package_templates"
+      moduleKey="work_order_templates"
       title="Work Package Templates"
       subtitle="Standard template adapter (feature-flagged rollout path)"
       mode={mode === 'create' ? 'create' : 'edit'}

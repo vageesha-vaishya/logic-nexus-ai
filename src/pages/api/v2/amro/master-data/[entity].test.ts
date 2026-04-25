@@ -385,7 +385,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const req: ApiRequest = {
       method: 'GET',
       query: {
-        entity: 'work_package_templates',
+        entity: 'work_order_templates',
         page: '1',
         page_size: '25',
       },
@@ -851,7 +851,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     const req: ApiRequest = {
       method: 'POST',
-      query: { entity: 'work_package_templates' },
+      query: { entity: 'work_order_templates' },
       body: {
         template_code: 'WP-LINE-001',
         version: 1,
@@ -930,7 +930,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
       if (table === 'work_package_template_task_templates') {
         return { select: linkSelectMock };
       }
-      if (table === 'work_package_templates') {
+      if (table === 'work_order_templates') {
         return { update: patchUpdateMock };
       }
       if (table === 'maintenance_events') {
@@ -942,7 +942,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     const req: ApiRequest = {
       method: 'POST',
-      query: { entity: 'work_package_templates' },
+      query: { entity: 'work_order_templates' },
       body: {
         template_code: 'WP-MODEL-001',
         version: 1,
@@ -983,7 +983,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     const req: ApiRequest = {
       method: 'POST',
-      query: { entity: 'work_package_templates' },
+      query: { entity: 'work_order_templates' },
       body: {
         template_code: 'WP-LINE-ROLLBACK',
         version: 1,
@@ -1038,7 +1038,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     const req: ApiRequest = {
       method: 'POST',
-      query: { entity: 'work_package_templates' },
+      query: { entity: 'work_order_templates' },
       body: {
         template_code: 'WP-EMPTY-001',
         version: 1,
