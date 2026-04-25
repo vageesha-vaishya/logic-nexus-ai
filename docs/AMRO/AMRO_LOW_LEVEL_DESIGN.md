@@ -3831,6 +3831,53 @@ Implementation Notes:
   - Migration: 20260425123000_amro_task_due_extensions_and_tasks_cleanup.sql
 ```
 
+```text
+Component Type: Table
+Component Name: public.amro_work_order_resource_assignments
+Purpose: Tenant-scoped resource allocation schedule for AMRO work orders and optional per-task assignment granularity.
+Estimated Row Count: 500-1,000,000 per tenant
+Primary Key:
+  - id
+Foreign Keys:
+  - work_order_id -> public.work_packages(id) ON DELETE CASCADE
+  - task_id -> public.tasks(id) ON DELETE SET NULL
+  - resource_id -> public.amro_resource_pools(id) ON DELETE NO ACTION
+Unique Constraints:
+  - none
+Check Constraints:
+  - chk_assignment_dates (assigned_start IS NULL OR assigned_end IS NULL OR assigned_start <= assigned_end)
+  - assignment_type IN ('primary','support','inspection','certification')
+  - assignment_status IN ('planned','confirmed','in_progress','completed','cancelled')
+Defaults:
+  - id: gen_random_uuid()
+  - assignment_status: 'planned'
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_wo_resource_assignments_tenant(tenant_id)
+  - idx_wo_resource_assignments_wo(work_order_id)
+  - idx_wo_resource_assignments_task(task_id)
+  - idx_wo_resource_assignments_resource(resource_id)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - work_order_id | uuid | nullable:no | default:none
+  - task_id | uuid | nullable:yes | default:null
+  - resource_id | uuid | nullable:no | default:none
+  - assignment_type | text | nullable:no | default:none
+  - assigned_start | timestamptz | nullable:yes | default:null
+  - assigned_end | timestamptz | nullable:yes | default:null
+  - allocated_hours | numeric(10,2) | nullable:yes | default:null
+  - assignment_status | text | nullable:no | default:'planned'
+  - created_at | timestamptz | nullable:yes | default:now()
+  - updated_at | timestamptz | nullable:yes | default:now()
+Security Considerations:
+  - RLS remains enabled and policy names are normalized to work-order terminology.
+  - Tenant scope must always be enforced by scoped access controls in application paths.
+Implementation Notes:
+  - Migration: 20260425153000_amro_rename_wp_resource_assignments_to_wo.sql
+```
+
 ---
 
 ## 25. Global Market Research and Technical Evaluation: MRO Aircraft Template Modules (2026)

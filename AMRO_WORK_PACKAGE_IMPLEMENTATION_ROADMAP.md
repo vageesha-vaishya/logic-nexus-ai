@@ -106,7 +106,7 @@ This document provides a complete implementation roadmap for transforming the AM
 │  ├─ amro_certificates_release_service                       │
 │  ├─ amro_predictive_maintenance_recommendations            │
 │  ├─ amro_resource_pools                                     │
-│  ├─ amro_work_package_resource_assignments                  │
+│  ├─ amro_work_order_resource_assignments                    │
 │  ├─ amro_emergency_work_packages                            │
 │  ├─ amro_maintenance_triggers                               │
 │  ├─ amro_non_scheduled_tasks                                │

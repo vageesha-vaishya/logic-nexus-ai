@@ -200,7 +200,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 **Implementation:**
 - Frontend: Resource allocation Gantt chart
 - Backend: Optimization algorithm service
-- Database: `amro_resource_pools` + `amro_work_package_resource_assignments`
+- Database: `amro_resource_pools` + `amro_work_order_resource_assignments`
 
 **3.5 Real-Time Progress Monitoring**
 
@@ -329,7 +329,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 | `amro_certificates_release_service` | CRS generation | P0 |
 | `amro_predictive_maintenance_recommendations` | AI predictions | P2 |
 | `amro_resource_pools` | Resource management | P1 |
-| `amro_work_package_resource_assignments` | Resource allocation | P1 |
+| `amro_work_order_resource_assignments` | Resource allocation | P1 |
 | `amro_emergency_work_packages` | Emergency/AOG tracking | P0 |
 | `amro_maintenance_triggers` | Scheduled maintenance triggers | P0 |
 | `amro_non_scheduled_tasks` | Non-scheduled task registry | P0 |

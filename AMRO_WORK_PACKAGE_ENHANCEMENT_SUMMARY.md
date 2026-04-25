@@ -68,7 +68,7 @@ Transform the AMRO Work Package Management module from a basic work order system
 | `amro_certificates_release_service` | CRS generation | EASA Part-145 |
 | `amro_predictive_maintenance_recommendations` | AI/ML predictions | Condition-based maintenance |
 | `amro_resource_pools` | Resource management | Qualification tracking |
-| `amro_work_package_resource_assignments` | Resource allocation | Conflict detection |
+| `amro_work_order_resource_assignments` | Resource allocation | Conflict detection |
 | `amro_emergency_work_packages` | Emergency/AOP registry | Rapid response |
 | `amro_maintenance_triggers` | Scheduled maintenance triggers | MPD compliance |
 | `amro_non_scheduled_tasks` | Non-scheduled task registry | Pilot/mechanic reports |

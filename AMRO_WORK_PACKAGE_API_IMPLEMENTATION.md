@@ -123,7 +123,7 @@
 | Task dependencies | `amro_task_dependencies` | 2026-04-12 |
 | Task time logs | `amro_task_time_logs` | 2026-04-12 |
 | Resource pools | `amro_resource_pools` | 2026-04-12 |
-| Resource assignments | `amro_work_package_resource_assignments` | 2026-04-12 |
+| Resource assignments | `amro_work_order_resource_assignments` | 2026-04-12 |
 | Maintenance triggers | `amro_maintenance_triggers` | 2026-04-12 |
 | Predictive recommendations | `amro_predictive_maintenance_recommendations` | 2026-04-12 |
 | Audit log | `amro_work_package_audit_log` | 2026-04-12 |
