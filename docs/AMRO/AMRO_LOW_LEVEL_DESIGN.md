@@ -1529,7 +1529,7 @@ All database implementation and review activities must treat this section as nor
 | `public.staff_qualifications` | Certification and authority records | 200-50,000 | `id` | RLS enabled; tenant-isolated; certifier authority controls |
 | `public.maintenance_events` | Operational maintenance event stream | 50,000-5,000,000 | `id` | RLS enabled; tenant-isolated; performed-by user required |
 | `public.work_package_materials` | Parts/material demand, reservation, and sourcing lines | 5,000-750,000 | `id` | RLS enabled; tenant-isolated; material lifecycle status controls |
-| `public.work_package_templates` | Reusable work-package scope and task templates | 500-250,000 | `id` | RLS enabled; tenant/franchise-scoped business key uniqueness |
+| `public.work_order_templates` | Reusable work-package scope and task templates | 500-250,000 | `id` | RLS enabled; tenant/franchise-scoped business key uniqueness |
 | `public.task_evidence` | Structured evidence metadata and integrity records | 100,000-30,000,000 | `(id, captured_at)` | RLS enabled; append-only trigger; monthly partitions |
 | `public.policy_snapshots` | Immutable policy version captures for decision replay | 5,000-1,000,000 | `id` | RLS enabled; append-only trigger; policy key uniqueness |
 | `public.sync_conflicts` | Offline/online merge conflict cockpit and resolutions | 1,000-2,000,000 | `id` | RLS enabled; active-conflict partial index |
@@ -1862,7 +1862,7 @@ All database implementation and review activities must treat this section as nor
 
 - Indexes: `idx_mro_audit_trails_tenant_id`, `idx_mro_audit_trails_tenant_created`, `idx_mro_audit_trails_entity`, `idx_mro_audit_trails_created_at`, `idx_mro_audit_trails_timestamp`, `idx_mro_audit_trails_event_type`
 
-#### 28.2.10 `public.work_package_templates`
+#### 28.2.10 `public.work_order_templates`
 
 - Namespace prefix: `public`
 - Purpose: Reusable planning templates for standardized work-package scope and task decomposition.
@@ -1891,7 +1891,8 @@ All database implementation and review activities must treat this section as nor
 
 - Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), template_code, version)` for active rows (`deleted_at IS NULL`)
 - Check constraints: `version > 0`, `jsonb_typeof(scope_json) = 'array'`, `jsonb_typeof(tasks_json) = 'array'`
-- Indexes: `idx_work_package_templates_tenant_active`, `uq_work_package_templates_tenant_franchise_code_version_active`
+- Indexes: `idx_work_order_templates_tenant_active`, `uq_work_order_templates_tenant_franchise_code_version_active`
+- Compatibility: legacy `public.work_package_templates` is an updatable compatibility view mapped to `public.work_order_templates` for transition-safe callers.
 
 #### 28.2.11 `public.task_evidence`
 
