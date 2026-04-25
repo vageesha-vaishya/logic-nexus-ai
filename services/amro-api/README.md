@@ -211,7 +211,7 @@ The service requires these Supabase tables (created by M0-1 and M0-2 migrations)
 - `tenants` - Tenant data with multi-tenant support
 - `user_roles` - User-to-tenant mappings with role information
 - `aircraft` - Aircraft asset registry
-- `work_packages` - Maintenance work packages with tenant isolation
+- `work_orders` - Maintenance work packages with tenant isolation
 - `tasks` - Individual tasks within work packages
 - `materials` - Materials/parts used in work packages
 

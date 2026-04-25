@@ -62,8 +62,8 @@ export interface WorkPackage {
   aircraft_id: string;
   work_order_number: string;
   work_package_number?: string;
-  work_package_template_id?: string;
-  work_package_title_id?: string;
+  work_order_template_id?: string;
+  work_order_title_id?: string;
   title: string;
   description?: string;
   work_type?: string;
@@ -198,8 +198,8 @@ export interface AmroForecastRecommendation {
 export interface CreateWorkPackageRequest {
   aircraft_id: string;
   title?: string;
-  work_package_title_id?: string;
-  work_package_template_id?: string;
+  work_order_title_id?: string;
+  work_order_template_id?: string;
   description?: string;
   work_type?: string;
   maintenance_type: MaintenanceType;

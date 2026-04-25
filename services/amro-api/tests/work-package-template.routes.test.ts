@@ -156,7 +156,7 @@ describe('work-package-template.routes create endpoint', () => {
       .mockReturnValueOnce(createThenable({
         data: [{
           id: 'rel-1',
-          work_package_template_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          work_order_template_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           task_template_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           model_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
         }],
@@ -186,7 +186,7 @@ describe('work-package-template.routes create endpoint', () => {
       })
       .expect(201);
 
-    expect(response.body.work_package_template_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
+    expect(response.body.work_order_template_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect(response.body.relationship_count).toBe(1);
   });
 
@@ -227,7 +227,7 @@ describe('work-package-template.routes create endpoint', () => {
       .mockReturnValueOnce(createThenable({
         data: [{
           id: 'rel-1',
-          work_package_template_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+          work_order_template_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
           task_template_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
           model_id: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
         }],

@@ -90,7 +90,7 @@ async function fetchWorkPackages(
     ...(params.status && params.status !== 'all' ? { status: params.status } : {}),
   });
 
-  const response = await fetch(`/api/v2/amro/master-data/work_packages?${query.toString()}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_orders?${query.toString()}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -107,7 +107,7 @@ async function fetchWorkPackages(
 }
 
 async function createWorkPackage(accessToken: string, tenantId: string, data: WorkPackageFormData): Promise<WorkPackage> {
-  const response = await fetch('/api/v2/amro/master-data/work_packages', {
+  const response = await fetch('/api/v2/amro/master-data/work_orders', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -126,7 +126,7 @@ async function createWorkPackage(accessToken: string, tenantId: string, data: Wo
 }
 
 async function updateWorkPackage(accessToken: string, id: string, data: Partial<WorkPackageFormData>): Promise<WorkPackage> {
-  const response = await fetch(`/api/v2/amro/master-data/work_packages/${id}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_orders/${id}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -145,7 +145,7 @@ async function updateWorkPackage(accessToken: string, id: string, data: Partial<
 }
 
 async function deleteWorkPackage(accessToken: string, id: string): Promise<void> {
-  const response = await fetch(`/api/v2/amro/master-data/work_packages/${id}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_orders/${id}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${accessToken}` },
   });

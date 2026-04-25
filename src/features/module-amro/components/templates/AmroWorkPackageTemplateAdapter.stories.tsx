@@ -92,7 +92,7 @@ const baseTables: MockTables = {
     },
   ],
   work_package_template_task_templates: [
-    { work_package_template_id: 'wpt-1', task_template_id: 'tt-001', model_id: 'mdl-a320', tenant_id: 'tenant-1', franchise_id: 'franchise-1' },
+    { work_order_template_id: 'wpt-1', task_template_id: 'tt-001', model_id: 'mdl-a320', tenant_id: 'tenant-1', franchise_id: 'franchise-1' },
   ],
 };
 

@@ -100,7 +100,7 @@ export const AMRO_PHASE_PLAN_MATRIX: ReadonlyArray<AmroPhasePlanRow> = [
     label: 'P1 Core Workflows',
     backendBuildScope: 'Implement work package lifecycle APIs (create/transition/clone), task step update APIs, parts reserve/shortage APIs',
     frontendBuildScope: 'Implement SCR-AMRO-001/002/003/004/005/006/007 baseline views and forms',
-    dataAndSecurityScope: 'Implement schema for work_packages, tasks, reservations, stock movements with policy-safe transitions',
+    dataAndSecurityScope: 'Implement schema for work_orders, tasks, reservations, stock movements with policy-safe transitions',
     testScope: 'Add integration tests for plan-to-execute flow and API validation rules',
     deliverables: 'End-to-end flow: create WP -> schedule -> execute task -> reserve parts',
   },

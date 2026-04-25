@@ -73,10 +73,10 @@ async function resolveTaskId(params: {
 
   const { data, error } = await supabase
     .from('tasks')
-    .select('id, tenant_id, franchise_id, planned_end_date, status, task_category, work_packages!inner(aircraft_id)')
+    .select('id, tenant_id, franchise_id, planned_end_date, status, task_category, work_orders!inner(aircraft_id)')
     .eq('tenant_id', params.tenantId)
     .eq('task_template_id', params.taskTemplateId)
-    .eq('work_packages.aircraft_id', params.aircraftId)
+    .eq('work_orders.aircraft_id', params.aircraftId)
     .is('deleted_at', null)
     .order('updated_at', { ascending: false })
     .limit(1)

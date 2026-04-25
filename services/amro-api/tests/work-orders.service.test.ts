@@ -145,7 +145,7 @@ describe('WorkOrdersService', () => {
     expect(workPackagesStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'created' }));
   });
 
-  it('creates template tasks when work_package_template_id is provided', async () => {
+  it('creates template tasks when work_order_template_id is provided', async () => {
     const service = new WorkOrdersService();
     queuedResults.push(
       { data: [{ id: 'ac-1', status: 'active' }], error: null },
@@ -187,7 +187,7 @@ describe('WorkOrdersService', () => {
       aircraft_id: 'ac-1',
       title: 'Template Run',
       maintenance_type: 'line',
-      work_package_template_id: 'tpl-1',
+      work_order_template_id: 'tpl-1',
     });
 
     expect(created.id).toBe('wp-tpl-1');

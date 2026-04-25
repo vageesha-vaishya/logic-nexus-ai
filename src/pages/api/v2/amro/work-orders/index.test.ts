@@ -216,8 +216,8 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
             external_reference: null,
             created_at: '2026-04-11T00:00:00Z',
             updated_at: '2026-04-11T00:00:00Z',
-            work_package_template_id: 'tpl-1',
-            work_package_title_id: 'ttl-1',
+            work_order_template_id: 'tpl-1',
+            work_order_title_id: 'ttl-1',
           },
           error: null,
         }),
@@ -263,7 +263,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
             // first tasks call = duplicate guard (select), second call = insert
             return (tasksCountChain.select.mock.calls.length === 0) ? tasksCountChain : tasksInsertChain;
           }
-          if (table === 'work_packages') {
+          if (table === 'work_orders') {
             workPackagesCallCount += 1;
             return workPackagesCallCount === 1 ? sequenceLookupChain : insertChain;
           }
@@ -276,12 +276,12 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
         query: {},
         headers: {},
         body: {
-          work_package_title_id: 'ttl-1',
+          work_order_title_id: 'ttl-1',
           maintenance_type: 'overhaul',
           priority: 1,
           notes: 'Urgent',
           aircraft_id: 'ac-1',
-          work_package_template_id: 'tpl-1',
+          work_order_template_id: 'tpl-1',
           planned_start_date: '2026-05-01',
           planned_end_date: '2026-05-15',
           estimated_labor_hours: 120,
@@ -297,8 +297,8 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
       expect(body.output.work_order_number).toBe('WP-VT-DCN-2026-0005-STARTER');
       expect(body.output.status).toBe('planning');
       expect(insertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
-        work_package_template_id: 'tpl-1',
-        work_package_title_id: 'ttl-1',
+        work_order_template_id: 'tpl-1',
+        work_order_title_id: 'ttl-1',
       }));
     });
 

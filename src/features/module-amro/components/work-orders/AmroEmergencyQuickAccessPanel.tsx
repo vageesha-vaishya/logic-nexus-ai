@@ -85,7 +85,7 @@ export function AmroEmergencyQuickAccessPanel(): JSX.Element {
     return allEmergencies.filter(
       (e) =>
         e.reason.toLowerCase().includes(searchLower) ||
-        e.work_packages?.title.toLowerCase().includes(searchLower),
+        e.work_orders?.title.toLowerCase().includes(searchLower),
     );
   }, [data?.records, search]);
 
@@ -287,7 +287,7 @@ export function AmroEmergencyQuickAccessPanel(): JSX.Element {
                       <TypeIcon className={`h-6 w-6 ${typeCfg.color}`} />
                       <div>
                         <h3 className="text-lg font-semibold">
-                          {emergency.work_packages?.title || 'Emergency Work Package'}
+                          {emergency.work_orders?.title || 'Emergency Work Package'}
                         </h3>
                         <div className="flex items-center gap-2 mt-1">
                           <Badge variant="destructive">{typeCfg.label}</Badge>

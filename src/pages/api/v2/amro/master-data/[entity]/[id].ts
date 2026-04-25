@@ -289,7 +289,7 @@ async function logWorkPackageTemplateLinkSnapshot(params: {
     .from('work_package_template_task_templates')
     .select('task_template_id', { count: 'exact' })
     .eq('tenant_id', params.tenantId)
-    .eq('work_package_template_id', params.templateId);
+    .eq('work_order_template_id', params.templateId);
   if (error) {
     logger.warn('[AMRO Master Data API] failed to read work package template link snapshot', {
       correlationId: params.correlationId,

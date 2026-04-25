@@ -230,9 +230,9 @@ async function resolveLatestTasksByTemplate(params: {
 }): Promise<JsonRecord[]> {
   let query = params.supabase
     .from('tasks')
-    .select('id,tenant_id,franchise_id,task_template_id,work_package_id,task_number,title,description,task_category,status,sequence_order,assigned_to,planned_start_date,planned_end_date,actual_start_date,actual_end_date,created_at,updated_at,work_packages!inner(aircraft_id)')
+    .select('id,tenant_id,franchise_id,task_template_id,work_package_id,task_number,title,description,task_category,status,sequence_order,assigned_to,planned_start_date,planned_end_date,actual_start_date,actual_end_date,created_at,updated_at,work_orders!inner(aircraft_id)')
     .eq('tenant_id', params.tenantId)
-    .eq('work_packages.aircraft_id', params.aircraftId)
+    .eq('work_orders.aircraft_id', params.aircraftId)
     .not('task_template_id', 'is', null)
     .order('updated_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false, nullsFirst: false });
@@ -262,7 +262,7 @@ async function ensureConfigureWorkPackage(params: {
   userId: string;
 }): Promise<JsonRecord> {
   let existingQuery = params.supabase
-    .from('work_packages')
+    .from('work_orders')
     .select('id,work_order_number')
     .eq('tenant_id', params.tenantId)
     .eq('aircraft_id', params.aircraftId)
@@ -281,7 +281,7 @@ async function ensureConfigureWorkPackage(params: {
 
   const workOrderNumber = `CFG-${params.aircraftId.slice(0, 8)}-${Date.now()}`;
   const { data: created, error: createError } = await params.supabase
-    .from('work_packages')
+    .from('work_orders')
     .insert({
       tenant_id: params.tenantId,
       franchise_id: params.franchiseId,

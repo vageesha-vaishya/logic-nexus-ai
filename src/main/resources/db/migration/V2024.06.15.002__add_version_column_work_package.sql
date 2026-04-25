@@ -32,9 +32,9 @@ begin
     select 1
     from information_schema.tables
     where table_schema = 'public'
-      and table_name = 'work_packages'
+      and table_name = 'work_orders'
   ) then
-    alter table public.work_packages add column if not exists version integer not null default 1;
+    alter table public.work_orders add column if not exists version integer not null default 1;
   end if;
 end
 $$;

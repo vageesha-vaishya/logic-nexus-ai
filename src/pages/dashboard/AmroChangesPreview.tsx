@@ -209,7 +209,7 @@ export default function AmroChangesPreview() {
     }
     setLoadingList(true);
     const { data, error } = await scopedDb
-      .from("work_packages")
+      .from("work_orders")
       .select(
         "id, work_package_number, work_order_number, title, description, maintenance_type, work_type, priority, status, aircraft_id, assigned_to, planned_start_date, planned_end_date, actual_start_date, actual_end_date, estimated_labor_hours, estimated_cost, actual_labor_hours, actual_cost, updated_at",
       )
@@ -272,7 +272,7 @@ export default function AmroChangesPreview() {
         scopedDb
           .from("audit_logs")
           .select("id, action, resource_type, user_id, details, created_at")
-          .or("resource_type.eq.tasks,resource_type.eq.work_packages,resource_type.eq.maintenance_events")
+          .or("resource_type.eq.tasks,resource_type.eq.work_orders,resource_type.eq.maintenance_events")
           .order("created_at", { ascending: false })
           .limit(120),
       ]);

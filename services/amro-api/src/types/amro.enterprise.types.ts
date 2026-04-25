@@ -267,7 +267,7 @@ export interface ToolReservation {
   id: string;
   tool_id: string;
   tool_instance_id?: string;
-  work_package_template_id: string;
+  work_order_template_id: string;
   reserved_by: string;
   reservation_date: string;
   return_date: string;
@@ -548,7 +548,7 @@ export interface MaterialSearchResponse {
 export interface ReserveMaterialRequest {
   material_id: string;
   quantity: number;
-  work_package_template_id: string;
+  work_order_template_id: string;
   reserved_by: string;
   notes?: string;
 }
@@ -559,7 +559,7 @@ export interface GeneratePurchaseOrderRequest {
     quantity: number;
     supplier_id: string;
   }>;
-  work_package_template_id: string;
+  work_order_template_id: string;
   requested_by: string;
   priority: 'standard' | 'urgent' | 'aog';
 }
@@ -568,14 +568,14 @@ export interface ToolAvailabilityRequest {
   tool_code: string;
   quantity_required: number;
   required_date: string;
-  work_package_template_id: string;
+  work_order_template_id: string;
 }
 
 export interface ReserveToolRequest {
   tool_id: string;
   tool_instance_id?: string;
   quantity: number;
-  work_package_template_id: string;
+  work_order_template_id: string;
   reservation_date: string;
   return_date: string;
   reserved_by: string;

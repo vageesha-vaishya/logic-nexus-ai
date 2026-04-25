@@ -187,7 +187,7 @@ async function handleReserve(req: ApiRequest, res: ApiResponse, tenantId: string
     const {
       tool_instance_id,
       quantity = 1,
-      work_package_template_id,
+      work_order_template_id,
       work_package_id,
       reservation_date,
       return_date,
@@ -223,7 +223,7 @@ async function handleReserve(req: ApiRequest, res: ApiResponse, tenantId: string
         tenant_id: tenantId,
         tool_id: toolId,
         tool_instance_id,
-        work_package_template_id,
+        work_order_template_id,
         work_package_id,
         quantity_reserved: quantity,
         reserved_by: userId,
@@ -246,7 +246,7 @@ async function handleReserve(req: ApiRequest, res: ApiResponse, tenantId: string
         .from('amro_tooling_instances')
         .update({
           current_status: 'in_use',
-          current_assignment_id: work_package_template_id || work_package_id,
+          current_assignment_id: work_order_template_id || work_package_id,
           updated_by: userId,
         })
         .eq('id', tool_instance_id);

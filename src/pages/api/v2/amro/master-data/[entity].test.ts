@@ -822,7 +822,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         },
         created_relationships: [
           {
-            work_package_template_id: 'wpt-1',
+            work_order_template_id: 'wpt-1',
             task_template_id: '11111111-1111-4111-8111-111111111111',
             tenant_id: 'tenant-1',
             model_id: 'model-1',
@@ -874,7 +874,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(Array.isArray(rpcPayload.tasks_json)).toBe(true);
     expect(Array.isArray(rpcPayload.scope_json)).toBe(true);
     expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
-    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_order_template_id', 'wpt-1');
   });
 
   it('roundtrips model_id and aircraft_model in work package template create flow', async () => {
@@ -889,7 +889,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         },
         created_relationships: [
           {
-            work_package_template_id: 'wpt-model-1',
+            work_order_template_id: 'wpt-model-1',
             task_template_id: '11111111-1111-4111-8111-111111111111',
             tenant_id: 'tenant-1',
             model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -1057,7 +1057,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(res.statusCode).toBe(201);
     expect(Array.isArray((res.jsonBody as any)?.output?.created_task_relationships)).toBe(true);
     expect(((res.jsonBody as any)?.output?.created_task_relationships || []).length).toBe(0);
-    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-empty-1');
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_order_template_id', 'wpt-empty-1');
   });
 
   it('creates ATA code with parent hierarchy context', async () => {

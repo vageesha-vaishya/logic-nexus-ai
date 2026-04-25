@@ -441,7 +441,7 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     expect((res.jsonBody as any)?.output?.record?.assembly_models_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect((res.jsonBody as any)?.output?.record?.aircraft_model).toBe('A320neo');
     expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
-    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_order_template_id', 'wpt-1');
   });
 
   it('rejects ATA update when parent relationship introduces a circular chain', async () => {

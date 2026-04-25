@@ -311,7 +311,7 @@ export function useWorkPackage(id: string | null) {
 interface CreateWorkPackageInput {
   aircraft_id: string;
   title?: string;
-  work_package_title_id?: string;
+  work_order_title_id?: string;
   description?: string;
   work_type?: string;
   maintenance_type: MaintenanceType;
@@ -325,7 +325,7 @@ interface CreateWorkPackageInput {
   supervisor_id?: string;
   notes?: string;
   reference_documents?: string[];
-  work_package_template_id?: string;
+  work_order_template_id?: string;
 }
 
 async function mutateCreateWorkPackage(input: CreateWorkPackageInput, headers: HeadersInit): Promise<{

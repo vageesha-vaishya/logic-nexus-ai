@@ -30,8 +30,8 @@ function getFranchiseId(req: AuthRequest): string | null {
 type V2CreateWorkPackageRequest = {
   aircraft_id?: string;
   title?: string;
-  work_package_title_id?: string;
-  work_package_template_id?: string;
+  work_order_title_id?: string;
+  work_order_template_id?: string;
   maintenance_type?: string;
   planned_window?: string;
   planned_start_date?: string;
@@ -66,8 +66,8 @@ function mapV2CreatePayloadToV1Request(request: V2CreateWorkPackageRequest): Cre
   return {
     aircraft_id: String(request.aircraft_id || '').trim(),
     title: String(request.title || title || '').trim() || undefined,
-    work_package_title_id: String(request.work_package_title_id || '').trim() || undefined,
-    work_package_template_id: String(request.work_package_template_id || '').trim() || undefined,
+    work_order_title_id: String(request.work_order_title_id || '').trim() || undefined,
+    work_order_template_id: String(request.work_order_template_id || '').trim() || undefined,
     description: scopeItems.length > 1 ? scopeItems.join('; ') : undefined,
     maintenance_type: maintenanceType,
     work_type: maintenanceType,
@@ -298,9 +298,9 @@ router.post(
 
     const request: CreateWorkPackageRequest = req.body;
 
-    if (!request.aircraft_id || (!request.title && !request.work_package_title_id) || !request.maintenance_type) {
+    if (!request.aircraft_id || (!request.title && !request.work_order_title_id) || !request.maintenance_type) {
       res.status(400).json({
-        error: 'Missing required fields: aircraft_id, (title or work_package_title_id), maintenance_type',
+        error: 'Missing required fields: aircraft_id, (title or work_order_title_id), maintenance_type',
         code: 'VALIDATION_ERROR',
         statusCode: 400,
       } as ErrorResponse);
@@ -329,9 +329,9 @@ router.post(
     }
 
     const request = req.body as CreateWorkPackageRequest;
-    if (!request.aircraft_id || (!request.title && !request.work_package_title_id) || !request.maintenance_type) {
+    if (!request.aircraft_id || (!request.title && !request.work_order_title_id) || !request.maintenance_type) {
       res.status(400).json({
-        error: 'Missing required fields: aircraft_id, (title or work_package_title_id), maintenance_type',
+        error: 'Missing required fields: aircraft_id, (title or work_order_title_id), maintenance_type',
         code: 'VALIDATION_ERROR',
         statusCode: 400,
       } as ErrorResponse);

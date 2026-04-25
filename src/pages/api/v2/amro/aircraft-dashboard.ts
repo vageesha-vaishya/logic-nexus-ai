@@ -1080,7 +1080,7 @@ async function loadWorkPackageRows(supabase: SupabaseClient, tenantId: string, f
     franchiseId,
     limit,
     stats,
-    candidateTables: ['work_packages', 'work_package_master'],
+    candidateTables: ['work_orders', 'work_package_master'],
     columns: 'id,aircraft_id,work_package_number,title,status,priority,planned_start,planned_end,due_at,compliance_state,updated_at',
   });
 }

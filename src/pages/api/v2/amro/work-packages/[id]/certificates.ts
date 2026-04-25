@@ -3,7 +3,7 @@
  * 
  * DATABASE SCHEMA:
  * - Uses: amro_certificates_release_service (existing)
- * - Uses: work_packages (existing)
+ * - Uses: work_orders (existing)
  * - Uses: aircraft (existing)
  * - Auto-generates certificate number
  * - Validates certifying staff license
@@ -83,7 +83,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // Verify work package exists
     const { data: wp, error: wpError } = await supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('id, aircraft_id, title, status')
       .eq('id', workPackageId)
       .eq('tenant_id', tenantId)
@@ -172,7 +172,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     // Update work package status to 'completed' if not already
     if (wp.status !== 'completed') {
       await supabase
-        .from('work_packages')
+        .from('work_orders')
         .update({
           status: 'completed',
           updated_by: authUser.userId,

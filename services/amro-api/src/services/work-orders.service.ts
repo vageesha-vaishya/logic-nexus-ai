@@ -147,7 +147,7 @@ export class WorkOrdersService {
       };
     }
 
-    throw new Error('Either title or work_package_title_id is required');
+    throw new Error('Either title or work_order_title_id is required');
   }
 
   private async generateNextWorkPackageNumber(
@@ -157,7 +157,7 @@ export class WorkOrdersService {
   ): Promise<string> {
     const currentYear = new Date().getUTCFullYear();
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('work_package_number')
       .eq('tenant_id', tenantId)
       .ilike('work_package_number', `WP-%-${currentYear}-%`);
@@ -521,7 +521,7 @@ export class WorkOrdersService {
    */
   async getWorkPackages(tenantId: string): Promise<WorkPackage[]> {
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
@@ -539,7 +539,7 @@ export class WorkOrdersService {
    */
   async getWorkPackage(tenantId: string, id: string): Promise<WorkPackage> {
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('id', id)
@@ -574,7 +574,7 @@ export class WorkOrdersService {
         const aircraftId = await this.resolveValidAircraftId(tenantId, request.aircraft_id, userId);
         const aircraftRegistration = await this.resolveAircraftRegistration(tenantId, aircraftId);
         const titleResolution = await this.resolveTitleCodeAndText(tenantId, {
-          workPackageTitleId: request.work_package_title_id,
+          workPackageTitleId: request.work_order_title_id,
           title: request.title,
           franchiseId: franchiseId || null,
         });
@@ -585,14 +585,14 @@ export class WorkOrdersService {
         );
 
         const { data, error } = await this.supabase
-          .from('work_packages')
+          .from('work_orders')
           .insert({
             tenant_id: tenantId,
             aircraft_id: aircraftId,
             work_package_number: workOrderNumber,
             title: titleResolution.title,
-            work_package_template_id: request.work_package_template_id || null,
-            work_package_title_id: titleResolution.workPackageTitleId,
+            work_order_template_id: request.work_order_template_id || null,
+            work_order_title_id: titleResolution.workPackageTitleId,
             description: request.description,
             work_type: request.work_type ?? 'general',
             maintenance_type: request.maintenance_type,
@@ -614,7 +614,7 @@ export class WorkOrdersService {
         const workPackage = data as WorkPackage & { generated_tasks_count?: number };
         let generatedTasksCount = 0;
 
-        if (request.work_package_template_id) {
+        if (request.work_order_template_id) {
           try {
             generatedTasksCount = await this.createTasksFromTemplateForWorkPackage({
               tenantId,
@@ -622,24 +622,24 @@ export class WorkOrdersService {
               franchiseId,
               workPackageId: workPackage.id,
               workPackageNumber: this.getWorkPackageNumber(workPackage) || workOrderNumber,
-              workPackageTemplateId: request.work_package_template_id,
+              workPackageTemplateId: request.work_order_template_id,
             });
             workPackage.generated_tasks_count = generatedTasksCount;
             logger.info('work-package-template-task-generation-complete', {
               tenantId,
               workPackageId: workPackage.id,
-              workPackageTemplateId: request.work_package_template_id,
+              workPackageTemplateId: request.work_order_template_id,
               generatedTasksCount,
             });
           } catch (taskCreationError) {
             logger.error('work-package-template-task-generation-failed', {
               tenantId,
               workPackageId: workPackage.id,
-              workPackageTemplateId: request.work_package_template_id,
+              workPackageTemplateId: request.work_order_template_id,
               message: taskCreationError instanceof Error ? taskCreationError.message : String(taskCreationError),
             });
             const { error: rollbackError } = await this.supabase
-              .from('work_packages')
+              .from('work_orders')
               .delete()
               .eq('tenant_id', tenantId)
               .eq('id', workPackage.id);
@@ -696,8 +696,8 @@ export class WorkOrdersService {
         user_id: userId,
         aircraft_id: request.aircraft_id,
         maintenance_type: request.maintenance_type,
-        work_package_template_id: request.work_package_template_id,
-        work_package_title_id: request.work_package_title_id,
+        work_order_template_id: request.work_order_template_id,
+        work_order_title_id: request.work_order_title_id,
       },
     );
   }
@@ -742,7 +742,7 @@ export class WorkOrdersService {
     if (request.assigned_to !== undefined) updateData.assigned_to = request.assigned_to;
 
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .update(updateData)
       .eq('tenant_id', tenantId)
       .eq('id', id)
@@ -802,7 +802,7 @@ export class WorkOrdersService {
     const workPackage = await this.getWorkPackage(tenantId, id);
 
     const { error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .delete()
       .eq('tenant_id', tenantId)
       .eq('id', id);
@@ -1300,7 +1300,7 @@ export class WorkOrdersService {
 
   async getForecastRecommendations(tenantId: string): Promise<AmroForecastRecommendation[]> {
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('id,work_package_number,status,maintenance_type,planned_start_date')
       .eq('tenant_id', tenantId)
       .order('updated_at', { ascending: false })
@@ -1355,7 +1355,7 @@ export class WorkOrdersService {
     next_slot_at: string | null;
   }> {
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('status,planned_start_date')
       .eq('tenant_id', tenantId);
 

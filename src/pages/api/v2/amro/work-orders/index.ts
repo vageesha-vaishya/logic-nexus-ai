@@ -165,7 +165,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (req.method === 'POST') {
       const body = parseBody(req.body);
       const aircraftId = body.aircraft_id ? String(body.aircraft_id).trim() : null;
-      const workPackageTitleId = body.work_package_title_id ? String(body.work_package_title_id).trim() : undefined;
+      const workPackageTitleId = body.work_order_title_id ? String(body.work_order_title_id).trim() : undefined;
       const title = workPackageTitleId
         ? String(body.title || '').trim() || undefined
         : assertNonEmpty(body.title, 'title');
@@ -178,7 +178,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       // work_type is NOT NULL in DB; default to maintenance_type if not provided
       const workType = body.work_type ? String(body.work_type).trim() : maintenanceType;
-      const workPackageTemplateId = body.work_package_template_id ? String(body.work_package_template_id).trim() : undefined;
+      const workPackageTemplateId = body.work_order_template_id ? String(body.work_order_template_id).trim() : undefined;
       const description = body.description ? String(body.description).trim() : undefined;
       const source = body.source ? String(body.source).trim() : undefined;
       const plannedStartDate = parseOptionalDate(body.planned_start_date, 'planned_start_date');

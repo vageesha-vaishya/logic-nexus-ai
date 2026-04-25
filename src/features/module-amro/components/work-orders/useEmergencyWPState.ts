@@ -52,7 +52,7 @@ export interface EmergencyWorkPackage {
   updated_at: string;
   
   // Joined data
-  work_packages?: {
+  work_orders?: {
     id: string;
     work_package_number: string;
     title: string;

@@ -41,7 +41,7 @@ function resolveContractsDir(): string {
 }
 
 const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
-  work_package_master: ['work_packages'],
+  work_package_master: ['work_orders'],
   materials_inventory: ['parts_inventory', 'work_package_materials'],
   compliance_gates: ['compliance_records', 'compliance_obligations'],
   integration_logs: ['integration_jobs', 'webhook_outbox'],

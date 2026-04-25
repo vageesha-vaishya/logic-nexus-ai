@@ -252,20 +252,20 @@ export function AmroWorkPackageCreateWizard({
           });
           toast.success('Emergency work package created successfully');
         } else {
-          const selectedTitle = titleOptions.find((option) => option.value === String(formData.work_package_title_id || '').trim());
-          const selectedTitleId = String(formData.work_package_title_id || '').trim();
+          const selectedTitle = titleOptions.find((option) => option.value === String(formData.work_order_title_id || '').trim());
+          const selectedTitleId = String(formData.work_order_title_id || '').trim();
           const workPackageTitleId = UUID_PATTERN.test(selectedTitleId) ? selectedTitleId : undefined;
           await createWPMutation.mutateAsync({
             aircraft_id: String(formData.aircraft_id || '').trim(),
             title: selectedTitle?.title || undefined,
-            work_package_title_id: workPackageTitleId,
+            work_order_title_id: workPackageTitleId,
             description: String(formData.description || '').trim() || undefined,
             maintenance_type: String(formData.maintenance_type || 'line') as MaintenanceType,
             priority: Number(formData.priority || 3) as WorkPackagePriority,
             planned_start_date: String(formData.planned_start_date || '').trim() || undefined,
             planned_end_date: String(formData.planned_end_date || '').trim() || undefined,
             assigned_to: String(formData.assigned_to || '').trim() || undefined,
-            work_package_template_id: String(formData.template_version_id || '').trim() || undefined,
+            work_order_template_id: String(formData.template_version_id || '').trim() || undefined,
             source: creationPath === 'non-scheduled' ? 'non_scheduled' : 'scheduled',
           });
           toast.success('Work package created successfully');

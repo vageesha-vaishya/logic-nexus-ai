@@ -526,7 +526,7 @@ export function WorkPackageTemplateCreateSection({
           .from('work_package_template_task_templates')
           .select('task_template_id,model_id')
           .eq('tenant_id', scope.tenantId)
-          .eq('work_package_template_id', selectedTemplateId);
+          .eq('work_order_template_id', selectedTemplateId);
         query = applyFranchiseScope(query);
         const { data, error } = await query;
         if (error) {

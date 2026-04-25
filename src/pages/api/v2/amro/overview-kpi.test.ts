@@ -473,7 +473,7 @@ describe('/api/v2/amro/overview-kpi', () => {
     } as any);
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: createSupabaseFromMock(async (tableName, state) => {
-        if (tableName === 'work_package_master' || tableName === 'work_packages') {
+        if (tableName === 'work_package_master' || tableName === 'work_orders') {
           const hasTenantFilter = state.eqCalls.some((call) => call.column === 'tenant_id');
           if (hasTenantFilter) {
             return {
@@ -529,7 +529,7 @@ describe('/api/v2/amro/overview-kpi', () => {
   it('uses fallback AMRO tables when overview aliases are missing from schema cache', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     const fallbackRows: Record<string, unknown[]> = {
-      work_packages: [
+      work_orders: [
         {
           id: 'wp-9',
           work_package_number: 'WP-009',

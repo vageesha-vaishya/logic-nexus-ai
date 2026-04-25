@@ -53,7 +53,7 @@ type WorkPackageTemplateRequest = {
 };
 
 type CreateWorkPackageTemplateTaskTemplateRequest = {
-  work_package_template_id?: string;
+  work_order_template_id?: string;
   task_template_id?: string;
   selected_task_template_ids?: string[];
 };
@@ -293,7 +293,7 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
     const relationshipRows = selectedTaskTemplateIds.map((taskTemplateId) => ({
       tenant_id: tenantId,
       franchise_id: franchiseId,
-      work_package_template_id: createdTemplateId,
+      work_order_template_id: createdTemplateId,
       model_id: resolvedModelId,
       task_template_id: taskTemplateId,
       created_by: userId,
@@ -335,7 +335,7 @@ async function createWorkPackageTemplateFromRequest(req: AuthRequest, res: { sta
   const records = await buildTemplateListResponse(tenantId, franchiseId, [createdTemplateId]);
   res.status(201).json({
     data: records[0] || insertedTemplate || null,
-    work_package_template_id: createdTemplateId,
+    work_order_template_id: createdTemplateId,
     relationship_count: relationshipCount,
   });
 }
@@ -354,10 +354,10 @@ async function createTemplateTaskRelationshipsFromRequest(
   }
 
   const request = (req.body || {}) as CreateWorkPackageTemplateTaskTemplateRequest;
-  const resolvedTemplateId = String(request.work_package_template_id || workPackageTemplateId || '').trim();
+  const resolvedTemplateId = String(request.work_order_template_id || workPackageTemplateId || '').trim();
   if (!resolvedTemplateId || !isUuid(resolvedTemplateId)) {
     res.status(400).json(
-      toErrorResponse('Missing or invalid work_package_template_id', 'VALIDATION_ERROR', 400),
+      toErrorResponse('Missing or invalid work_order_template_id', 'VALIDATION_ERROR', 400),
     );
     return;
   }
@@ -458,7 +458,7 @@ async function createTemplateTaskRelationshipsFromRequest(
   const relationshipRows = selectedTaskTemplateIds.map((taskTemplateId) => ({
     tenant_id: tenantId,
     franchise_id: franchiseId,
-    work_package_template_id: resolvedTemplateId,
+    work_order_template_id: resolvedTemplateId,
     model_id: resolvedModelId,
     task_template_id: taskTemplateId,
     created_by: userId,
@@ -546,9 +546,9 @@ async function buildTemplateListResponse(
   const templateIdList = templates.map((row) => String(row.id || '')).filter((value) => value.length > 0);
   let relationQuery = supabase
     .from('work_package_template_task_templates')
-    .select('id,work_package_template_id,task_template_id,model_id,created_at,updated_at')
+    .select('id,work_order_template_id,task_template_id,model_id,created_at,updated_at')
     .eq('tenant_id', tenantId)
-    .in('work_package_template_id', templateIdList);
+    .in('work_order_template_id', templateIdList);
   if (franchiseId) {
     relationQuery = relationQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
   }
@@ -585,7 +585,7 @@ async function buildTemplateListResponse(
   }
 
   const relationshipsByTemplate = relationships.reduce((map, row) => {
-    const templateId = String(row.work_package_template_id || '');
+    const templateId = String(row.work_order_template_id || '');
     if (!templateId) return map;
     const existing = map.get(templateId) || [];
     existing.push(row);
@@ -829,7 +829,7 @@ async function updateWorkPackageTemplateWithoutAtomicRpc(params: {
     .from('work_package_template_task_templates')
     .delete()
     .eq('tenant_id', tenantId)
-    .eq('work_package_template_id', templateId);
+    .eq('work_order_template_id', templateId);
   if (franchiseId) {
     deleteRelationsQuery = deleteRelationsQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
   }
@@ -843,7 +843,7 @@ async function updateWorkPackageTemplateWithoutAtomicRpc(params: {
     const rows = selectedTaskTemplateIds.map((taskTemplateId) => ({
       tenant_id: tenantId,
       franchise_id: franchiseId,
-      work_package_template_id: templateId,
+      work_order_template_id: templateId,
       model_id: targetModelId,
       task_template_id: taskTemplateId,
     }));
@@ -886,7 +886,7 @@ async function updateWorkPackageTemplateWithoutAtomicRpc(params: {
  *               data:
  *                 id: "33333333-4444-4555-8666-777777777777"
  *                 template_code: "WP-LINE-001"
- *               work_package_template_id: "33333333-4444-4555-8666-777777777777"
+ *               work_order_template_id: "33333333-4444-4555-8666-777777777777"
  *               relationship_count: 2
  *       400:
  *         description: Validation or insert failure (template or relationship)

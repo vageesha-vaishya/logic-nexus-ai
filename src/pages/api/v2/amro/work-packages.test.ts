@@ -348,7 +348,7 @@ describe('/api/v2/amro/work-packages', () => {
         station: 'station-a',
         priority: 'high',
         scope_items: ['inspection'],
-        work_package_template_id: '11111111-1111-4111-8111-111111111111',
+        work_order_template_id: '11111111-1111-4111-8111-111111111111',
       },
       headers: {},
     };

@@ -197,13 +197,13 @@ export const AMRO_MODULE_CATALOG: ReadonlyArray<AmroModuleCatalogRow> = [
 export const AMRO_DATABASE_MAPPING_MATRIX: ReadonlyArray<AmroDatabaseMappingMatrixRow> = [
   {
     moduleId: 'MOD-AMRO-01',
-    primaryTables: ['work_packages', 'maintenance_events', 'forecast_outputs'],
+    primaryTables: ['work_orders', 'maintenance_events', 'forecast_outputs'],
     keyFieldsUsedByModule: ['status', 'planned_start', 'risk_score', 'created_at'],
     criticalConstraintsAndRules: ['Tenant/franchise scope enforced', 'KPI queries use indexed status/time fields'],
   },
   {
     moduleId: 'MOD-AMRO-02',
-    primaryTables: ['work_packages', 'work_package_templates', 'tasks'],
+    primaryTables: ['work_orders', 'work_package_templates', 'tasks'],
     keyFieldsUsedByModule: ['work_package_number', 'maintenance_type', 'priority', 'status'],
     criticalConstraintsAndRules: ['Unique (tenant_id, work_package_number)', 'Transition policy validation required'],
   },
@@ -259,17 +259,17 @@ export const AMRO_DATABASE_MAPPING_MATRIX: ReadonlyArray<AmroDatabaseMappingMatr
 
 export const AMRO_TABLE_RELATIONSHIP_CROSS_REFERENCE: ReadonlyArray<AmroTableRelationshipCrossReferenceRow> = [
   {
-    relationshipPath: 'aircraft -> work_packages -> tasks -> maintenance_events',
+    relationshipPath: 'aircraft -> work_orders -> tasks -> maintenance_events',
     purpose: 'End-to-end execution trace',
     modulesConsumingPath: ['MOD-AMRO-02', 'MOD-AMRO-03', 'MOD-AMRO-10'],
   },
   {
-    relationshipPath: 'work_packages -> reservations -> parts_inventory',
+    relationshipPath: 'work_orders -> reservations -> parts_inventory',
     purpose: 'Material readiness and shortage control',
     modulesConsumingPath: ['MOD-AMRO-05'],
   },
   {
-    relationshipPath: 'work_packages -> compliance_records -> compliance_obligations',
+    relationshipPath: 'work_orders -> compliance_records -> compliance_obligations',
     purpose: 'Gate pass/fail rationale',
     modulesConsumingPath: ['MOD-AMRO-06'],
   },
@@ -284,7 +284,7 @@ export const AMRO_TABLE_RELATIONSHIP_CROSS_REFERENCE: ReadonlyArray<AmroTableRel
     modulesConsumingPath: ['MOD-AMRO-08', 'MOD-AMRO-10'],
   },
   {
-    relationshipPath: 'asset_health_signals -> forecast_outputs -> work_packages',
+    relationshipPath: 'asset_health_signals -> forecast_outputs -> work_orders',
     purpose: 'Predictive recommendation to planned work creation',
     modulesConsumingPath: ['MOD-AMRO-09', 'MOD-AMRO-02'],
   },
@@ -499,7 +499,7 @@ export const AMRO_QUICK_LOOKUP_CROSS_REFERENCE: ReadonlyArray<AmroQuickLookupCro
     module: 'Overview and KPI Intelligence',
     subModules: 'KPI Aggregation, Risk Heatmap, Forecast Panel',
     uiUx: 'SCR-001, SCR-012',
-    dbTables: 'work_packages, maintenance_events, forecast_outputs',
+    dbTables: 'work_orders, maintenance_events, forecast_outputs',
     workflow: '17.1, 18.1',
     apis: 'API-001, API-015',
     implementationSequence: 'S8',
@@ -508,7 +508,7 @@ export const AMRO_QUICK_LOOKUP_CROSS_REFERENCE: ReadonlyArray<AmroQuickLookupCro
     module: 'Work Package Management',
     subModules: 'CRUD, Transitions, Detail Context',
     uiUx: 'SCR-002, SCR-003, SCR-004',
-    dbTables: 'work_packages, work_package_templates, tasks',
+    dbTables: 'work_orders, work_package_templates, tasks',
     workflow: '17.1',
     apis: 'API-001, API-002, API-003',
     implementationSequence: 'S2',

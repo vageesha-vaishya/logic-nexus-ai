@@ -168,7 +168,7 @@ export function buildWorkPackageWizardSteps({
       icon: FileText,
       fields: [
         {
-          id: 'work_package_title_id',
+          id: 'work_order_title_id',
           label: 'Title',
           type: 'select',
           required: true,
@@ -306,6 +306,6 @@ export function getWorkPackageWizardInitialData(preselectedAircraftId?: string):
     urgency_level: 'immediate',
     emergency_type: 'aog',
     submission_check: false,
-    work_package_title_id: '',
+    work_order_title_id: '',
   };
 }

@@ -883,7 +883,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const plannedWindow = parseDateWindow(body.planned_window);
       const station = assertNonEmpty(body.station, 'station');
       const priority = assertNonEmpty(body.priority, 'priority').toLowerCase();
-      const workPackageTemplateId = String(body.work_package_template_id || '').trim();
+      const workPackageTemplateId = String(body.work_order_template_id || '').trim();
       const scopeItems = parseStringArray(body.scope_items);
       const creationTrigger = parseCreationTrigger(body);
       const engineerPlan = parseEngineerPlan(body, scopeItems);

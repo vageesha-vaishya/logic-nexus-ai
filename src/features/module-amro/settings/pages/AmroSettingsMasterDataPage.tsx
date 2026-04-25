@@ -5302,7 +5302,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           .from('work_package_template_task_templates')
           .select('task_template_id')
           .eq('tenant_id', scope.tenantId)
-          .eq('work_package_template_id', normalizedTemplateId);
+          .eq('work_order_template_id', normalizedTemplateId);
         if (withFranchiseScope && scope.franchiseId) {
           query = query.or(`franchise_id.is.null,franchise_id.eq.${scope.franchiseId}`);
         }

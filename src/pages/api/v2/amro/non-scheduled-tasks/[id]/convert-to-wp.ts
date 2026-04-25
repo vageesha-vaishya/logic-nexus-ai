@@ -4,7 +4,7 @@
  * DATABASE SCHEMA:
  * - Uses: amro_non_scheduled_tasks (existing)
  * - Uses: amro_emergency_work_packages (existing)
- * - Uses: work_packages (existing)
+ * - Uses: work_orders (existing)
  * - Updates: non-scheduled task status to 'converted_to_wp'
  * - Creates: emergency work package linked to original task
  * 
@@ -136,7 +136,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // Create work package
     const { data: wp, error: wpError } = await supabase
-      .from('work_packages')
+      .from('work_orders')
       .insert({
         tenant_id: tenantId,
         franchise_id: franchiseId,

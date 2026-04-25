@@ -367,7 +367,7 @@ describe('AMRO Tracing - Real-World Scenarios', () => {
         },
         {
           tenant_id: 'tenant-001',
-          table: 'work_packages',
+          table: 'work_orders',
           operation: 'insert',
         },
       ),

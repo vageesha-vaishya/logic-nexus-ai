@@ -5,7 +5,7 @@
  * - Uses existing table: amro_work_package_compliance_records (created 2026-04-12)
  * - Uses existing table: amro_compliance_directives (created 2026-04-12)
  * - Uses existing table: amro_certificates_release_service (created 2026-04-12)
- * - Uses existing table: work_packages (created 2026-03-22)
+ * - Uses existing table: work_orders (created 2026-03-22)
  * - Uses existing table: tasks (for task-level compliance)
  * - NO NEW TABLES REQUIRED
  * 
@@ -84,7 +84,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // Verify work package exists and belongs to tenant
     const { data: wp, error: wpError } = await supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('id, aircraft_id')
       .eq('id', workPackageId)
       .eq('tenant_id', tenantId)

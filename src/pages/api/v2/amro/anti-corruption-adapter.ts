@@ -141,7 +141,7 @@ export const AMRO_DATA_OWNERSHIP = {
   operationalTables: [
     'aircraft',
     'components',
-    'work_packages',
+    'work_orders',
     'tasks',
     'staff_qualifications',
     'maintenance_events',

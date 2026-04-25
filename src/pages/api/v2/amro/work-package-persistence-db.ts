@@ -18,8 +18,8 @@ export interface PersistedWorkPackage {
   maintenance_type: MaintenanceType;
   priority: number;
   source: string | null;
-  work_package_template_id: string | null;
-  work_package_title_id: string | null;
+  work_order_template_id: string | null;
+  work_order_title_id: string | null;
   planned_start_date: string | null;
   planned_end_date: string | null;
   actual_start_date: string | null;
@@ -146,7 +146,7 @@ async function resolveWorkPackageTitleRecord(
 
   const fallback = String(params.fallbackTitle || '').trim();
   if (!fallback) {
-    throw new Error('title or work_package_title_id is required');
+    throw new Error('title or work_order_title_id is required');
   }
   return {
     id: '',
@@ -512,7 +512,7 @@ async function getNextWorkOrderNumber(
 ): Promise<string> {
   const likePattern = `WP-%-${params.year}-%`;
   const { data, error } = await supabase
-    .from('work_packages')
+    .from('work_orders')
     .select('work_package_number')
     .eq('tenant_id', params.tenantId)
     .ilike('work_package_number', likePattern);
@@ -574,9 +574,9 @@ export async function persistCreateWorkPackage(params: {
     try {
       await client.query('BEGIN');
       const insertSql = `
-        INSERT INTO public.work_packages (
+        INSERT INTO public.work_orders (
           tenant_id, franchise_id, aircraft_id, work_package_number, title, description,
-          work_type, maintenance_type, priority, source, work_package_template_id, work_package_title_id,
+          work_type, maintenance_type, priority, source, work_order_template_id, work_order_title_id,
           planned_start_date, planned_end_date, estimated_labor_hours, estimated_cost, status, assigned_to,
           supervisor_id, notes, reference_documents, external_reference, created_by, updated_by
         )
@@ -655,7 +655,7 @@ export async function persistCreateWorkPackage(params: {
   }
 
   const { data, error } = await supabase
-    .from('work_packages')
+    .from('work_orders')
     .insert({
       tenant_id: params.tenantId,
       franchise_id: params.franchiseId,
@@ -667,8 +667,8 @@ export async function persistCreateWorkPackage(params: {
       maintenance_type: params.maintenanceType,
       priority: params.priority,
       source: params.source || null,
-      work_package_template_id: params.workPackageTemplateId || null,
-      work_package_title_id: titleRecord.id || null,
+      work_order_template_id: params.workPackageTemplateId || null,
+      work_order_title_id: titleRecord.id || null,
       planned_start_date: params.plannedStartDate || null,
       planned_end_date: params.plannedEndDate || null,
       estimated_labor_hours: params.estimatedLaborHours || null,
@@ -713,7 +713,7 @@ export async function persistCreateWorkPackage(params: {
         message: taskCreationError instanceof Error ? taskCreationError.message : 'Unknown task creation error',
       });
       const { error: rollbackError } = await supabase
-        .from('work_packages')
+        .from('work_orders')
         .delete()
         .eq('tenant_id', params.tenantId)
         .eq('id', String(data.id || ''));
@@ -752,7 +752,7 @@ export async function persistUpdateWorkPackage(params: {
   const supabase = getSupabaseAdminClient();
 
   const { data, error } = await supabase
-    .from('work_packages')
+    .from('work_orders')
     .update({
       ...params.patch,
       updated_by: params.userId,
@@ -802,7 +802,7 @@ export async function persistTransitionWorkPackage(params: {
   }
 
   const { data, error } = await supabase
-    .from('work_packages')
+    .from('work_orders')
     .update(updates)
     .eq('id', params.id)
     .eq('tenant_id', params.tenantId)
@@ -839,7 +839,7 @@ export async function persistDeleteWorkPackage(params: {
   const supabase = getSupabaseAdminClient();
 
   const { error } = await supabase
-    .from('work_packages')
+    .from('work_orders')
     .delete()
     .eq('id', params.id)
     .eq('tenant_id', params.tenantId);
@@ -878,7 +878,7 @@ export async function fetchWorkPackageList(params: {
   const offset = (params.page - 1) * params.pageSize;
 
   let query = supabase
-    .from('work_packages')
+    .from('work_orders')
     .select('*', { count: 'exact', head: false });
 
   // Only filter by tenant if a valid UUID is provided
@@ -943,7 +943,7 @@ export async function fetchWorkPackageDetail(params: {
   const supabase = getSupabaseAdminClient();
 
   // Fetch work package
-  let wpQuery = supabase.from('work_packages').select('*').eq('id', params.id);
+  let wpQuery = supabase.from('work_orders').select('*').eq('id', params.id);
   if (params.tenantId) wpQuery = wpQuery.eq('tenant_id', params.tenantId);
   const { data: wp, error: wpError } = await wpQuery.single();
 
@@ -1023,8 +1023,8 @@ function mapRowToWorkPackage(row: Record<string, unknown>): PersistedWorkPackage
     maintenance_type: (row.maintenance_type as MaintenanceType) || 'line',
     priority: Number(row.priority || 3),
     source: row.source ? String(row.source) : null,
-    work_package_template_id: row.work_package_template_id ? String(row.work_package_template_id) : null,
-    work_package_title_id: row.work_package_title_id ? String(row.work_package_title_id) : null,
+    work_order_template_id: row.work_order_template_id ? String(row.work_order_template_id) : null,
+    work_order_title_id: row.work_order_title_id ? String(row.work_order_title_id) : null,
     planned_start_date: row.planned_start_date ? String(row.planned_start_date) : null,
     planned_end_date: row.planned_end_date ? String(row.planned_end_date) : null,
     actual_start_date: row.actual_start_date ? String(row.actual_start_date) : null,
@@ -1083,7 +1083,7 @@ function mapRowToMaterial(row: Record<string, unknown>): PersistedMaterial {
 
 export async function checkPersistenceHealth(): Promise<{ ok: boolean; error?: string }> {
   const supabase = getSupabaseAdminClient();
-  const { error } = await supabase.from('work_packages').select('id').limit(1);
+  const { error } = await supabase.from('work_orders').select('id').limit(1);
   if (error) return { ok: false, error: error.message };
   return { ok: true };
 }

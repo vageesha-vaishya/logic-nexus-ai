@@ -675,7 +675,7 @@ export function useAmroOverviewKpi(scope: AmroRequestScope = {}) {
     }
     const realtimeTables = [
       'amro_overview_kpi_snapshots',
-      'work_packages',
+      'work_orders',
       'parts_inventory',
       'compliance_records',
       'integration_jobs',

@@ -637,7 +637,7 @@ async function logWorkPackageTemplateLinkSnapshot(params: {
     .from('work_package_template_task_templates')
     .select('task_template_id', { count: 'exact' })
     .eq('tenant_id', params.tenantId)
-    .eq('work_package_template_id', params.templateId);
+    .eq('work_order_template_id', params.templateId);
   if (error) {
     logger.warn('[AMRO Master Data API] failed to read work package template link snapshot', {
       correlationId: params.correlationId,
@@ -850,7 +850,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
       .from('work_package_template_task_templates')
       .delete()
       .eq('tenant_id', params.tenantId)
-      .eq('work_package_template_id', params.workPackageTemplateId);
+      .eq('work_order_template_id', params.workPackageTemplateId);
     if (params.franchiseId) {
       cleanupQuery = cleanupQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
     }
@@ -902,7 +902,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     .from('work_package_template_task_templates')
     .delete()
     .eq('tenant_id', params.tenantId)
-    .eq('work_package_template_id', params.workPackageTemplateId);
+    .eq('work_order_template_id', params.workPackageTemplateId);
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-09 deleting-existing-links', {
     correlationId: params.correlationId,
     workPackageTemplateId: params.workPackageTemplateId,
@@ -924,7 +924,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   const relationshipRows = resolvedTaskTemplateIds.map((taskTemplateId) => ({
     tenant_id: params.tenantId,
     franchise_id: params.franchiseId,
-    work_package_template_id: params.workPackageTemplateId,
+    work_order_template_id: params.workPackageTemplateId,
     model_id: modelId,
     task_template_id: taskTemplateId,
     created_by: params.userId,
@@ -1813,7 +1813,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         .from('work_package_template_task_templates')
         .select('task_template_id')
         .eq('tenant_id', tenantId)
-        .eq('work_package_template_id', createdTemplateId);
+        .eq('work_order_template_id', createdTemplateId);
       if (verificationError) {
         logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-07 verification-query-failed', {
           correlationId: ctx.correlationId,

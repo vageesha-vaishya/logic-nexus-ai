@@ -3,7 +3,7 @@
  * 
  * DATABASE SCHEMA ANALYSIS:
  * - Uses existing table: amro_emergency_work_packages (created 2026-04-12)
- * - Uses existing table: work_packages (created 2026-03-22, enhanced 2026-04-11)
+ * - Uses existing table: work_orders (created 2026-03-22, enhanced 2026-04-11)
  * - Uses existing table: amro_non_scheduled_tasks (created 2026-04-12) - optional conversion source
  * - NO NEW TABLES REQUIRED
  * 
@@ -88,7 +88,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         .from('amro_emergency_work_packages')
         .select(`
           *,
-          work_packages:work_package_id (
+          work_orders:work_package_id (
             id,
             work_package_number,
             title,
@@ -102,7 +102,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         .range((page - 1) * pageSize, page * pageSize - 1);
 
       if (franchiseId) {
-        query = query.eq('work_packages.franchise_id', franchiseId);
+        query = query.eq('work_orders.franchise_id', franchiseId);
       }
 
       if (emergencyType && VALID_EMERGENCY_TYPES.includes(emergencyType)) {
@@ -173,7 +173,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       // Start transaction
       const { data: wp, error: wpError } = await supabase
-        .from('work_packages')
+        .from('work_orders')
         .insert({
           tenant_id: tenantId,
           franchise_id: franchiseId,

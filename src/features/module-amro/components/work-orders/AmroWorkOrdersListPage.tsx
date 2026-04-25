@@ -73,7 +73,7 @@ const DEFAULT_FORM = {
   assigned_to: '',
   notes: '',
   aircraft_id: '',
-  work_package_title_id: '',
+  work_order_title_id: '',
   template_version_id: '',
 };
 
@@ -89,7 +89,7 @@ function cloneFormValue(record?: WorkPackageListItem | null) {
     assigned_to: record.assigned_to || '',
     notes: '',
     aircraft_id: record.aircraft_id || '',
-    work_package_title_id: '',
+    work_order_title_id: '',
     template_version_id: '',
   };
 }
@@ -247,17 +247,17 @@ export function AmroWorkOrdersListPage() {
       setWizardOpen(false);
       return;
     }
-    const selectedTitle = titleOptions.find((option) => option.value === String(payload.work_package_title_id || '').trim());
+    const selectedTitle = titleOptions.find((option) => option.value === String(payload.work_order_title_id || '').trim());
     await createMutation.mutateAsync({
       aircraft_id: String(payload.aircraft_id || '').trim() || undefined,
       title: selectedTitle?.title || String(payload.title || '').trim(),
-      work_package_title_id: String(payload.work_package_title_id || '').trim() || undefined,
+      work_order_title_id: String(payload.work_order_title_id || '').trim() || undefined,
       description: String(payload.description || '').trim() || undefined,
       maintenance_type: (String(payload.maintenance_type || 'line').trim() as MaintenanceType),
       priority: Number(payload.priority || 3) as WorkPackagePriority,
       planned_start_date: String(payload.planned_start_date || '').trim() || undefined,
       planned_end_date: String(payload.planned_end_date || '').trim() || undefined,
-      work_package_template_id: String(payload.template_version_id || '').trim() || undefined,
+      work_order_template_id: String(payload.template_version_id || '').trim() || undefined,
     });
     toast.success('Work package created successfully');
     setWizardOpen(false);
