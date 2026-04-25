@@ -10,6 +10,9 @@ import { AmroCrudMessageBanner } from '@/features/module-amro/components/parts/A
 import { AmroModuleSurface } from '@/features/module-amro/components/parts/AmroPartsUiStandards';
 import { AmroUnifiedGridRecordDetailShell } from '@/features/module-amro/components/parts/AmroUnifiedGridRecordDetailShell';
 import type { GridColumnDefinition } from '@/features/module-amro/components/templates/AmroInventoryDataGridTemplate';
+import ConfigureMpdInspectionDialog, {
+  type ConfigureMpdInspectionDialogContext,
+} from '@/features/module-amro/components/mpd/ConfigureMpdInspectionDialog';
 import {
   useConfigureMpdActions,
   useConfigureMpdAircraftOptions,
@@ -17,6 +20,7 @@ import {
   useListConfigureMpdConfigured,
   useListConfigureMpdNonConfigured,
   type ConfigureMpdConfiguredRecord,
+  type ConfigureMpdInspectionFormValues,
 } from '@/features/module-amro/components/mpd/useConfigureMpdState';
 import type { MpdRecord } from '@/features/module-amro/components/mpd/useMpdState';
 import { formatThresholdFrequency } from '@/features/module-amro/components/mpd/frequencyFormatter';
@@ -48,6 +52,10 @@ export function AmroConfigureMpdPage() {
   const [activeTab, setActiveTab] = useState<ConfigureTab>('non-configured');
   const [selectedTemplateIds, setSelectedTemplateIds] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [configureDialog, setConfigureDialog] = useState<{
+    open: boolean;
+    context: ConfigureMpdInspectionDialogContext | null;
+  }>({ open: false, context: null });
   const [advancedFilters, setAdvancedFilters] = useState({
     assemblyType: '',
     model: '',
@@ -88,7 +96,8 @@ export function AmroConfigureMpdPage() {
     || actions.updateConfiguredTask.isPending
     || actions.deleteConfiguredTask.isPending
     || actions.updateNonConfiguredTemplate.isPending
-    || actions.deleteNonConfiguredTemplate.isPending;
+    || actions.deleteNonConfiguredTemplate.isPending
+    || actions.submitInspectionConfiguration.isPending;
 
   const assemblyTypeOptions = useMemo(() => assemblyTypeOptionsQuery.data || [], [assemblyTypeOptionsQuery.data]);
   const modelOptions = useMemo(() => {
@@ -240,6 +249,46 @@ export function AmroConfigureMpdPage() {
     }
   }, [actions.configure, advancedFilters.aircraftId]);
 
+  const openInspectionDialog = useCallback((context: ConfigureMpdInspectionDialogContext) => {
+    setConfigureDialog({ open: true, context });
+  }, []);
+
+  const handleSaveInspectionDialog = useCallback(async (values: ConfigureMpdInspectionFormValues) => {
+    const context = configureDialog.context;
+    if (!context) return;
+    if (!advancedFilters.aircraftId) {
+      toast.error('Aircraft selection is required');
+      return;
+    }
+    try {
+      if (context.mode === 'non-configured' && context.taskTemplateId) {
+        await actions.configure.mutateAsync({
+          aircraftId: advancedFilters.aircraftId,
+          taskTemplateIds: [context.taskTemplateId],
+        });
+      }
+
+      await actions.submitInspectionConfiguration.mutateAsync({
+        aircraftId: advancedFilters.aircraftId,
+        taskTemplateId: context.taskTemplateId,
+        taskId: context.taskId,
+        details: values,
+        templateSnapshot: context.mode === 'non-configured'
+          ? {
+              id: context.taskTemplateId || context.recordId,
+              ata_code: context.ataCode || null,
+              reference_amp: context.reference || null,
+              description: context.description || null,
+            } as Partial<MpdRecord>
+          : undefined,
+      });
+      toast.success('Inspection configuration saved');
+      setConfigureDialog({ open: false, context: null });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to save inspection configuration');
+    }
+  }, [actions.configure, actions.submitInspectionConfiguration, advancedFilters.aircraftId, configureDialog.context]);
+
   const handleBulkConfigure = useCallback(() => {
     void handleConfigureTemplates(Array.from(selectedTemplateIds));
   }, [handleConfigureTemplates, selectedTemplateIds]);
@@ -386,14 +435,22 @@ export function AmroConfigureMpdPage() {
           disabled={isBusy}
           onClick={(event) => {
             event.stopPropagation();
-            void handleConfigureTemplates([record.id]);
+            openInspectionDialog({
+              mode: 'non-configured',
+              recordId: String(record.id),
+              taskTemplateId: String(record.id),
+              title: record.mpd_code || record.description || String(record.id),
+              ataCode: record.ata_code || undefined,
+              reference: record.reference_amp || undefined,
+              description: record.description || undefined,
+            });
           }}
         >
           Configure
         </Button>
       ),
     },
-  ], [handleConfigureTemplates, handleToggleSelected, isBusy, selectedTemplateIds]);
+  ], [handleToggleSelected, isBusy, openInspectionDialog, selectedTemplateIds]);
 
   const configuredColumns = useMemo<GridColumnDefinition<ConfiguredGridRow>[]>(() => [
     { key: 'task_number', header: 'Task Number', sortable: true, filterable: true, groupable: true, resizable: true, width: 180 },
@@ -408,7 +465,38 @@ export function AmroConfigureMpdPage() {
     { key: 'description', header: 'Description', sortable: true, filterable: true, groupable: false, resizable: true, width: 280 },
     { key: 'frequency_display', header: 'Frequency', sortable: true, filterable: true, groupable: true, resizable: true, width: 240 },
     { key: 'created_at', header: 'Created', sortable: true, filterable: true, groupable: true, resizable: true, width: 130, dataType: 'date' },
-  ], []);
+    {
+      key: 'configure_action',
+      header: 'Configure',
+      width: 130,
+      sortable: false,
+      filterable: false,
+      groupable: false,
+      resizable: false,
+      render: (record) => (
+        <Button
+          size="sm"
+          variant="outline"
+          disabled={isBusy}
+          onClick={(event) => {
+            event.stopPropagation();
+            openInspectionDialog({
+              mode: 'configured',
+              recordId: String(record.id),
+              taskId: String(record.task_id || ''),
+              taskTemplateId: record.task_template_id || undefined,
+              title: record.task_title || record.mpd_code || String(record.id),
+              ataCode: record.ata_code || undefined,
+              reference: record.reference_amp || undefined,
+              description: record.task_description || record.description || undefined,
+            });
+          }}
+        >
+          Configure
+        </Button>
+      ),
+    },
+  ], [isBusy, openInspectionDialog]);
 
   const revisionStatuses = useMemo(() => {
     const values = nonConfiguredRecords
@@ -669,6 +757,19 @@ export function AmroConfigureMpdPage() {
           </Tabs>
         </AmroModuleSurface>
       </div>
+      <ConfigureMpdInspectionDialog
+        open={configureDialog.open}
+        context={configureDialog.context}
+        saving={actions.submitInspectionConfiguration.isPending || actions.configure.isPending}
+        onOpenChange={(open) => {
+          if (!open) {
+            setConfigureDialog({ open: false, context: null });
+            return;
+          }
+          setConfigureDialog((current) => ({ ...current, open: true }));
+        }}
+        onSubmit={handleSaveInspectionDialog}
+      />
     </DashboardLayout>
   );
 }

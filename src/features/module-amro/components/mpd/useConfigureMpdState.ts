@@ -44,6 +44,40 @@ export type ConfigureMpdConfiguredRecord = MpdRecord & {
   task_updated_at: string | null;
 };
 
+export type ConfigureMpdInspectionFormValues = {
+  inspection_type: string;
+  ata_chapter: string;
+  reference: string;
+  description: string;
+  done_on_date: string;
+  applicable: boolean;
+  work_order_no: string;
+  license_no: string;
+  place: string;
+  actual_man_hours: string;
+  remark: string;
+  elapsed_hours: string;
+  remaining_hours: string;
+  elapsed_months: string;
+  remaining_months: string;
+  calculate_due_for_period_later: boolean;
+  started_on_hours: string;
+  current_hours: string;
+  extension_hours: string;
+  due_at_hours: string;
+  started_on_months_date: string;
+  current_months_date: string;
+  extension_months: string;
+  due_at_months_date: string;
+  revision_no: string;
+  page_no: string;
+  book_no: string;
+  source_doc: string;
+  attachment_file_name: string;
+  extension_date: string;
+  approval_remark: string;
+};
+
 const CONFIGURE_MPD_KEY = ['amro', 'configure-mpd'] as const;
 
 function normalizeString(value: unknown): string | null {
@@ -400,6 +434,35 @@ export function useConfigureMpdActions() {
     onSuccess: () => invalidate(),
   });
 
+  const submitInspectionConfiguration = useMutation({
+    mutationFn: async (input: {
+      aircraftId: string;
+      taskTemplateId?: string;
+      taskId?: string;
+      details: ConfigureMpdInspectionFormValues;
+      templateSnapshot?: Partial<MpdRecord>;
+    }) => {
+      if (!authHeaders) throw new Error('Not authenticated');
+      const response = await fetch('/api/v2/amro/configure-mpd/inspection-configure', {
+        method: 'POST',
+        headers: authHeaders,
+        body: JSON.stringify({
+          aircraft_id: input.aircraftId,
+          task_template_id: input.taskTemplateId,
+          task_id: input.taskId,
+          details: input.details,
+          template_snapshot: input.templateSnapshot || null,
+        }),
+      });
+      const payload = await parseApiResponse(response);
+      if (!response.ok) {
+        throw new Error(String(payload.error || `Failed to save inspection configuration (${response.status})`));
+      }
+      return payload;
+    },
+    onSuccess: () => invalidate(),
+  });
+
   const exportNonConfiguredCsv = useCallback(async (params: {
     modelId?: string;
     aircraftId?: string;
@@ -458,6 +521,7 @@ export function useConfigureMpdActions() {
     deleteNonConfiguredTemplate,
     updateConfiguredTask,
     deleteConfiguredTask,
+    submitInspectionConfiguration,
     exportNonConfiguredCsv,
     exportConfiguredCsv,
   };
