@@ -3684,6 +3684,145 @@ Performance Targets:
   - p99 <= 50ms for indexed transition lookup
 ```
 
+```text
+Component Type: Table
+Component Name: public.task_due_extensions
+Purpose: Tenant/franchise-scoped extension approval ledger for task due windows (time/value based) with complete request/approval traceability.
+Estimated Row Count: 1,000-250,000 per tenant
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - task_id -> public.tasks(id) ON DELETE CASCADE
+  - requested_by -> auth.users(id) ON DELETE SET NULL
+  - approved_by -> auth.users(id) ON DELETE SET NULL
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - none
+Check Constraints:
+  - extension_scope IN ('hours','cycles','calendar_days','due_date','mixed')
+  - extension_unit IS NULL OR extension_unit IN ('hours','cycles','days','months','years')
+  - status IN ('pending','approved','rejected','cancelled')
+  - status <> 'approved' OR (approved_by IS NOT NULL AND approved_at IS NOT NULL)
+  - original_due_at IS NULL OR extended_due_at IS NULL OR extended_due_at >= original_due_at
+Defaults:
+  - id: gen_random_uuid()
+  - status: 'pending'
+  - requested_at: now()
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_task_due_extensions_tenant(tenant_id)
+  - idx_task_due_extensions_tenant_franchise(tenant_id, franchise_id)
+  - idx_task_due_extensions_task(task_id)
+  - idx_task_due_extensions_status(status)
+  - idx_task_due_extensions_active_requested(tenant_id, requested_at desc) WHERE deleted_at IS NULL
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:-
+  - franchise_id | uuid | nullable:yes | default:null
+  - task_id | uuid | nullable:no | default:-
+  - extension_scope | text | nullable:no | default:-
+  - extension_value | numeric(10,2) | nullable:yes | default:null
+  - extension_unit | text | nullable:yes | default:null
+  - original_due_at | timestamptz | nullable:yes | default:null
+  - extended_due_at | timestamptz | nullable:yes | default:null
+  - original_remaining_value | numeric(12,2) | nullable:yes | default:null
+  - extended_remaining_value | numeric(12,2) | nullable:yes | default:null
+  - reason | text | nullable:no | default:-
+  - approval_remark | text | nullable:yes | default:null
+  - source_type | varchar(50) | nullable:yes | default:null
+  - source_ref | varchar(100) | nullable:yes | default:null
+  - status | text | nullable:no | default:'pending'
+  - requested_by | uuid | nullable:yes | default:null
+  - requested_at | timestamptz | nullable:no | default:now()
+  - approved_by | uuid | nullable:yes | default:null
+  - approved_at | timestamptz | nullable:yes | default:null
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+  - created_by | uuid | nullable:yes | default:null
+  - updated_by | uuid | nullable:yes | default:null
+  - deleted_at | timestamptz | nullable:yes | default:null
+Security Considerations:
+  - RLS enabled with tenant/franchise policies and platform-admin override.
+  - Approval actors are stored for non-repudiation and audit trail replay.
+Implementation Notes:
+  - Migration: 20260425123000_amro_task_due_extensions_and_tasks_cleanup.sql
+```
+
+```text
+Component Type: Table
+Component Name: public.tasks
+Purpose: Core tenant/franchise task execution entity within work packages, including compatibility aliases for legacy consumers during phased cleanup.
+Estimated Row Count: 10,000-5,000,000 per tenant
+Primary Key: id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE SET NULL
+  - work_package_id -> public.work_packages(id) ON DELETE CASCADE
+  - assigned_to -> auth.users(id) ON DELETE SET NULL
+  - assigned_technician_id -> auth.users(id) ON DELETE SET NULL
+  - qa_verified_by -> auth.users(id) ON DELETE SET NULL
+  - created_by -> auth.users(id) ON DELETE SET NULL
+  - updated_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_tasks_work_package_sequence_active (work_package_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
+Check Constraints:
+  - ck_tasks_sequence_positive (sequence IS NULL OR sequence > 0)
+  - ck_tasks_sequence_order_positive (sequence_order IS NULL OR sequence_order > 0)
+  - ck_tasks_assignment_alias_consistency (assigned_to IS NULL OR assigned_technician_id IS NULL OR assigned_to = assigned_technician_id)
+  - ck_tasks_sequence_alias_consistency (sequence IS NULL OR sequence_order IS NULL OR sequence = sequence_order)
+Defaults:
+  - id: gen_random_uuid()
+  - status: 'pending'::task_status
+  - progress_percentage: 0
+  - complexity_level: 3
+  - checklist: '{}'::jsonb
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_tasks_assigned_technician_id(assigned_technician_id)
+  - idx_tasks_sequence_active(work_package_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
+Columns:
+  - sequence | integer | nullable:yes | default:null
+  - sequence_order | integer | nullable:yes | default:null (deprecated alias)
+  - assigned_technician_id | uuid | nullable:yes | default:null
+  - assigned_to | uuid | nullable:yes | default:null (deprecated alias)
+  - steps_json | jsonb | nullable:yes | default:null
+  - steps | jsonb | nullable:yes | default:null (deprecated alias)
+  - qualifications_json | jsonb | nullable:yes | default:null
+  - qualifications | jsonb | nullable:yes | default:null (deprecated alias)
+Security Considerations:
+  - Existing RLS on tasks remains in force; cleanup preserves compatibility while preventing cross-tenant leakage.
+  - Canonical-vs-alias sync is enforced at DB layer to reduce divergence risk.
+Implementation Notes:
+  - Migration: 20260425123000_amro_task_due_extensions_and_tasks_cleanup.sql
+  - Backfill maps alias values into canonical columns and keeps both representations synchronized.
+```
+
+```text
+Component Type: SQL Function
+Component Name: public.sync_tasks_alias_columns()
+Purpose: Normalize and synchronize canonical task columns with legacy alias columns before insert/update to keep backward-compatible readers safe.
+Input Parameters:
+  - none (trigger context NEW row)
+Output Contract:
+  - trigger row with synchronized values and updated timestamp
+Dependencies:
+  - public.tasks
+Security:
+  - SECURITY INVOKER
+  - Executed via trigger on public.tasks writes
+  - Tenant/franchise authorization is inherited from table RLS and calling query context
+Performance:
+  - O(1) per row mutation; expected negligible overhead for task DML workloads
+Validation:
+  - Migration-level data backfill plus constraints ensure alias consistency after deployment
+Implementation Notes:
+  - Migration: 20260425123000_amro_task_due_extensions_and_tasks_cleanup.sql
+```
+
 ---
 
 ## 25. Global Market Research and Technical Evaluation: MRO Aircraft Template Modules (2026)
