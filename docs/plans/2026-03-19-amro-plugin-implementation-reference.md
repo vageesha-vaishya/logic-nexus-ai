@@ -58,7 +58,7 @@ Created operational database schema with 7 core tables, 46 optimized indexes, 14
 - **Indexes:** task_id, created_at DESC
 - **Domain Type:** signature_method
 
-### 7. work_package_materials
+### 7. amro_work_order_materials
 - **Purpose:** Parts procurement and allocation for work packages
 - **Key Columns:** id, tenant_id, work_package_id, component_id, action (install/remove/inspect/repair), required_quantity, allocated_quantity, status, warehouse_location, supplier_id, supplier_eta
 - **Indexes:** work_package_id

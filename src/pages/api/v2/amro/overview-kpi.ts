@@ -37,7 +37,7 @@ const DEFAULT_PAGE_SIZE = 15;
 const MAX_PAGE_SIZE = 200;
 const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
   work_package_master: ['work_orders'],
-  materials_inventory: ['parts_inventory', 'work_package_materials'],
+  materials_inventory: ['parts_inventory', 'amro_work_order_materials', 'work_package_materials'],
   compliance_gates: ['compliance_records', 'compliance_obligations'],
   integration_logs: ['integration_jobs', 'webhook_outbox'],
   forecast_recommendations: ['forecast_outputs', 'forecast_decisions'],

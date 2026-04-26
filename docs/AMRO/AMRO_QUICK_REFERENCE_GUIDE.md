@@ -188,7 +188,7 @@ staff_qualifications (id, tenant_id, technician_id, rating, scope, issued_date, 
 maintenance_events (id, tenant_id, task_id, executed_by, execution_start, execution_end, evidence, signed_by, signature_method)
 
 -- Materials/Parts Planning
-work_package_materials (id, tenant_id, work_package_id, component_id, action, required_qty, allocated_qty, status)
+amro_work_order_materials (id, tenant_id, work_order_id, component_id, action, required_qty, allocated_qty, status)
 ```
 
 ### Immutable Audit Tables (mro_audit schema)

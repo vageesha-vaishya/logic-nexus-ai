@@ -962,9 +962,18 @@ export async function fetchWorkPackageDetail(params: {
   }
 
   // Fetch materials
-  let matQuery = supabase.from('work_package_materials').select('*').eq('work_package_id', params.id);
+  let matQuery = supabase.from('amro_work_order_materials').select('*').eq('work_order_id', params.id);
   if (params.tenantId) matQuery = matQuery.eq('tenant_id', params.tenantId);
-  const { data: materials, error: materialsError } = await matQuery;
+  let { data: materials, error: materialsError } = await matQuery;
+
+  // Transition-safe fallback while environments converge on the renamed table/column.
+  if (materialsError && /amro_work_order_materials|work_order_id/i.test(String(materialsError.message || ''))) {
+    let legacyMatQuery = supabase.from('work_package_materials').select('*').eq('work_package_id', params.id);
+    if (params.tenantId) legacyMatQuery = legacyMatQuery.eq('tenant_id', params.tenantId);
+    const legacyResult = await legacyMatQuery;
+    materials = legacyResult.data;
+    materialsError = legacyResult.error;
+  }
 
   if (materialsError) {
     logger.warn('amro-work-package-materials-fetch-failed', {

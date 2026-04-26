@@ -872,11 +872,11 @@ const run = async () => {
 
   const [workPackageMaterial, componentPosition, shiftCalendar, schedule, stockMovement, reservation, complianceObligation, certificationAction, integrationJob, integrationMapping, webhookOutbox, assetHealthSignal, forecastOutput, workPackageTemplate, syncConflict, regulatorDossier, forecastFeature, taskEvidence, taskQualificationRequirement] = await Promise.all([
     upsertReturning(
-      'work_package_materials',
+      'amro_work_order_materials',
       {
         tenant_id: tenant.id,
         franchise_id: franchise.id,
-        work_package_id: workPackage.id,
+        work_order_id: workPackage.id,
         part_number: partsInventory.part_number,
         description: partsInventory.description,
         component_id: component.id,

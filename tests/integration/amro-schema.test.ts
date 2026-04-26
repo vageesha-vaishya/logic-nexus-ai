@@ -31,12 +31,13 @@ const amroOperationalSchemaSuite = (await resolveSupabaseAvailability()) ? descr
  * - tasks
  * - staff_qualifications
  * - maintenance_events
- * - work_package_materials
+ * - amro_work_order_materials
  *
  * Tests ensure RLS policies are correctly applied for tenant isolation.
  */
 amroOperationalSchemaSuite('AMRO Operational Schema', () => {
-  let supabase: ReturnType<typeof createClient>;
+  // Use an untyped client for schema-validation integration tests to avoid strict generated-schema coupling.
+  let supabase: any;
   const testTenantId = 'test-tenant-amro-001';
   const testFranchiseId = 'test-franchise-amro-001';
 
@@ -110,9 +111,9 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       expect(Array.isArray(data)).toBe(true);
     });
 
-    it('should have work_package_materials table with correct columns', async () => {
+    it('should have amro_work_order_materials table with correct columns', async () => {
       const { data, error } = await supabase
-        .from('work_package_materials')
+        .from('amro_work_order_materials')
         .select('*')
         .limit(1);
 
@@ -241,7 +242,7 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       expect(error).toBeNull();
       // All returned records should have a tenant_id (enforced by RLS)
       if (data && data.length > 0) {
-        data.forEach(record => {
+        data.forEach((record: any) => {
           expect(record.tenant_id).toBeDefined();
         });
       }
@@ -294,7 +295,7 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
         'tasks',
         'staff_qualifications',
         'maintenance_events',
-        'work_package_materials'
+        'amro_work_order_materials'
       ];
 
       for (const table of tables) {
@@ -319,7 +320,7 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
         'tasks',
         'staff_qualifications',
         'maintenance_events',
-        'work_package_materials'
+        'amro_work_order_materials'
       ];
 
       for (const table of tables) {

@@ -145,7 +145,7 @@ export const AMRO_DATA_OWNERSHIP = {
     'tasks',
     'staff_qualifications',
     'maintenance_events',
-    'work_package_materials',
+    'amro_work_order_materials',
   ],
   immutableSchema: ['mro_audit.records', 'mro_audit.trails'],
   mandatoryIsolationFields: ['tenant_id', 'franchise_id', 'domain_id', 'version'],

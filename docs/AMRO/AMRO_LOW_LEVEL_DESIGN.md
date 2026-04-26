@@ -1528,7 +1528,7 @@ All database implementation and review activities must treat this section as nor
 | `public.tasks` | Unit execution tasks inside work packages | 10,000-1,000,000 | `id` | RLS enabled; tenant-isolated; execution evidence fields |
 | `public.staff_qualifications` | Certification and authority records | 200-50,000 | `id` | RLS enabled; tenant-isolated; certifier authority controls |
 | `public.maintenance_events` | Operational maintenance event stream | 50,000-5,000,000 | `id` | RLS enabled; tenant-isolated; performed-by user required |
-| `public.work_package_materials` | Parts/material demand, reservation, and sourcing lines | 5,000-750,000 | `id` | RLS enabled; tenant-isolated; material lifecycle status controls |
+| `public.amro_work_order_materials` | Parts/material demand, reservation, and sourcing lines | 5,000-750,000 | `id` | RLS enabled; tenant-isolated; material lifecycle status controls |
 | `public.work_order_templates` | Reusable work-package scope and task templates | 500-250,000 | `id` | RLS enabled; tenant/franchise-scoped business key uniqueness |
 | `public.task_evidence` | Structured evidence metadata and integrity records | 100,000-30,000,000 | `(id, captured_at)` | RLS enabled; append-only trigger; monthly partitions |
 | `public.policy_snapshots` | Immutable policy version captures for decision replay | 5,000-1,000,000 | `id` | RLS enabled; append-only trigger; policy key uniqueness |
@@ -1774,7 +1774,7 @@ All database implementation and review activities must treat this section as nor
 
 - Indexes: `idx_maintenance_events_tenant_id`, `idx_maintenance_events_franchise_id`, `idx_maintenance_events_aircraft_id`, `idx_maintenance_events_component_id`, `idx_maintenance_events_work_package_id`, `idx_maintenance_events_task_id`, `idx_maintenance_events_event_type`, `idx_maintenance_events_event_timestamp`, `idx_maintenance_events_performed_by`
 
-#### 28.2.7 `public.work_package_materials`
+#### 28.2.7 `public.amro_work_order_materials`
 
 - Namespace prefix: `public`
 - Purpose: Parts/material demand lines for reservation, shortage handling, and procurement.
@@ -1786,7 +1786,7 @@ All database implementation and review activities must treat this section as nor
 | `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
 | `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
 | `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
-| `work_package_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `work_order_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
 | `part_number` | `text` | No | — | — |
 | `description` | `text` | No | — | — |
 | `manufacturer` | `text` | Yes | — | — |
@@ -1813,7 +1813,7 @@ All database implementation and review activities must treat this section as nor
 | `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 
-- Indexes: `idx_work_package_materials_tenant_id`, `idx_work_package_materials_franchise_id`, `idx_work_package_materials_work_package_id`, `idx_work_package_materials_part_number`, `idx_work_package_materials_status`, `idx_work_package_materials_order_date`
+- Indexes: `idx_work_order_materials_tenant_id`, `idx_work_order_materials_franchise_id`, `idx_work_order_materials_work_order_id`, `idx_work_order_materials_part_number`, `idx_work_order_materials_status`, `idx_work_order_materials_order_date`
 
 #### 28.2.8 `mro_audit.records`
 

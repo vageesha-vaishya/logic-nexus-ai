@@ -1176,7 +1176,7 @@ Service decomposition:
 - `amro-audit-ledger-service` (append-only `mro_audit` writers and replay API).
 
 Data ownership:
-- Operational tables: `aircraft`, `components`, `work_packages`, `tasks`, `staff_qualifications`, `maintenance_events`, `work_package_materials`.
+- Operational tables: `aircraft`, `components`, `work_packages`, `tasks`, `staff_qualifications`, `maintenance_events`, `amro_work_order_materials`.
 - Immutable schema: `mro_audit.records`, `mro_audit.trails`.
 - Mandatory isolation fields: `tenant_id`, `franchise_id`, `domain_id`, `version`.
 - Access rule: all AMRO data operations must use scoped access and enforce AMRO tenant assignment through `platform_domains` + `tenant_domain_assignments` with active subscription validation.

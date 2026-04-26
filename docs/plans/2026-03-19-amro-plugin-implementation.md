@@ -209,7 +209,7 @@ CREATE INDEX idx_maintenance_events_task ON public.maintenance_events(task_id);
 CREATE INDEX idx_maintenance_events_created_at ON public.maintenance_events(created_at DESC);
 
 -- Work Package Materials & Parts Planning
-CREATE TABLE IF NOT EXISTS public.work_package_materials (
+CREATE TABLE IF NOT EXISTS public.amro_work_order_materials (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   work_package_id UUID NOT NULL REFERENCES public.work_packages(id) ON DELETE CASCADE,
@@ -225,7 +225,7 @@ CREATE TABLE IF NOT EXISTS public.work_package_materials (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_work_package_materials_work_package ON public.work_package_materials(work_package_id);
+CREATE INDEX idx_work_order_materials_work_order ON public.amro_work_order_materials(work_order_id);
 
 -- Enable RLS on all AMRO tables
 ALTER TABLE public.aircraft ENABLE ROW LEVEL SECURITY;
@@ -234,7 +234,7 @@ ALTER TABLE public.work_packages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_qualifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.maintenance_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.work_package_materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.amro_work_order_materials ENABLE ROW LEVEL SECURITY;
 
 -- RLS Policies: All tables use tenant_id for isolation
 CREATE POLICY tenant_isolation_aircraft ON public.aircraft
@@ -255,7 +255,7 @@ CREATE POLICY tenant_isolation_staff_qualifications ON public.staff_qualificatio
 CREATE POLICY tenant_isolation_maintenance_events ON public.maintenance_events
   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
-CREATE POLICY tenant_isolation_work_package_materials ON public.work_package_materials
+CREATE POLICY tenant_isolation_work_order_materials ON public.amro_work_order_materials
   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 ```
 
