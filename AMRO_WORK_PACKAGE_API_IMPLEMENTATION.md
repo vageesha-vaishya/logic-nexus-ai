@@ -126,7 +126,7 @@
 | Resource assignments | `amro_work_order_resource_assignments` | 2026-04-12 |
 | Maintenance triggers | `amro_maintenance_triggers` | 2026-04-12 |
 | Predictive recommendations | `amro_predictive_maintenance_recommendations` | 2026-04-12 |
-| Audit log | `amro_work_package_audit_log` | 2026-04-12 |
+| Audit log | `amro_work_order_audit_log` | 2026-04-12 |
 
 **Enhancement Strategy:** All APIs are built on top of existing comprehensive schema. No schema changes required.
 

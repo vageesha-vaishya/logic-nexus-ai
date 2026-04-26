@@ -333,7 +333,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 | `amro_emergency_work_packages` | Emergency/AOG tracking | P0 |
 | `amro_maintenance_triggers` | Scheduled maintenance triggers | P0 |
 | `amro_non_scheduled_tasks` | Non-scheduled task registry | P0 |
-| `amro_work_package_audit_log` | Immutable audit trail | P0 |
+| `amro_work_order_audit_log` | Immutable audit trail | P0 |
 
 ### Enhanced Existing Tables
 

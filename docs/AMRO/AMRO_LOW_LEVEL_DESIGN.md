@@ -4054,6 +4054,54 @@ Implementation Notes:
   - Migration: 20260425181000_amro_rename_wp_template_versions_to_wo.sql
 ```
 
+```text
+Component Type: Table
+Component Name: public.amro_work_order_audit_log
+Purpose: Immutable tenant-scoped audit evidence for AMRO work-order entities and workflow transitions.
+Estimated Row Count: 100,000-10,000,000 per tenant
+Primary Key:
+  - id
+Foreign Keys:
+  - tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - franchise_id -> public.franchises(id) ON DELETE CASCADE
+  - performed_by -> auth.users(id) ON DELETE SET NULL
+Unique Constraints:
+  - none
+Check Constraints:
+  - entity_type IN ('work_package','task','resource','compliance','certificate','template','directive')
+  - action IN ('create','update','delete','approve','reject','activate','deactivate','assign','unassign','complete','defer')
+Defaults:
+  - id: gen_random_uuid()
+  - previous_values: '{}'::jsonb
+  - new_values: '{}'::jsonb
+  - metadata: '{}'::jsonb
+  - checksum: encode(sha256(...), 'hex')
+  - performed_at: now()
+Indexes:
+  - idx_wo_audit_log_tenant(tenant_id)
+  - idx_wo_audit_log_entity(entity_type, entity_id)
+  - idx_wo_audit_log_action(action)
+  - idx_wo_audit_log_performed_at(performed_at)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - franchise_id | uuid | nullable:yes | default:null
+  - entity_type | text | nullable:no | default:none
+  - entity_id | uuid | nullable:no | default:none
+  - action | text | nullable:no | default:none
+  - previous_values | jsonb | nullable:yes | default:'{}'::jsonb
+  - new_values | jsonb | nullable:yes | default:'{}'::jsonb
+  - metadata | jsonb | nullable:yes | default:'{}'::jsonb
+  - performed_by | uuid | nullable:yes | default:null
+  - performed_at | timestamptz | nullable:yes | default:now()
+  - checksum | text | nullable:no | default:encode(...)
+Security Considerations:
+  - RLS enabled with platform-admin and tenant/franchise-scoped read/write policies.
+  - Hash checksum is required for tamper-evidence and audit chain integrity.
+Implementation Notes:
+  - Migration: 20260425183000_amro_rename_wp_audit_log_to_wo.sql
+```
+
 ---
 
 ## 25. Global Market Research and Technical Evaluation: MRO Aircraft Template Modules (2026)

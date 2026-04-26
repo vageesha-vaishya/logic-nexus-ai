@@ -224,7 +224,7 @@ The template creation form has these sections:
 | Approval workflow with role-based permissions | Not implemented | P0 Critical | Swiss-AS: Multi-level approval with role enforcement |
 | Effectivity dates (effective_from/effective_until) | Schema only | P1 High | IBS: Calendar-based effectivity control |
 | Aircraft model applicability (per-version) | Schema only | P1 High | All: Multi-model template applicability |
-| Audit trail (immutable) | Schema only (`amro_work_package_audit_log`) | P0 Critical | All: Cryptographic integrity required |
+| Audit trail (immutable) | Schema only (`amro_work_order_audit_log`) | P0 Critical | All: Cryptographic integrity required |
 | Soft delete / deprecation | Schema only | P1 High | AMOS: Deprecation with grace period |
 
 ### 3.2 Template Content Structure

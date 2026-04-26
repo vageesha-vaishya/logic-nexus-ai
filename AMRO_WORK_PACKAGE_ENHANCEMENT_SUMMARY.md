@@ -72,7 +72,7 @@ Transform the AMRO Work Package Management module from a basic work order system
 | `amro_emergency_work_packages` | Emergency/AOP registry | Rapid response |
 | `amro_maintenance_triggers` | Scheduled maintenance triggers | MPD compliance |
 | `amro_non_scheduled_tasks` | Non-scheduled task registry | Pilot/mechanic reports |
-| `amro_work_package_audit_log` | Immutable audit trail | Cryptographic integrity |
+| `amro_work_order_audit_log` | Immutable audit trail | Cryptographic integrity |
 
 **Features:**
 - ✅ Row Level Security (RLS) policies for all tables

@@ -110,7 +110,7 @@ This document provides a complete implementation roadmap for transforming the AM
 │  ├─ amro_emergency_work_packages                            │
 │  ├─ amro_maintenance_triggers                               │
 │  ├─ amro_non_scheduled_tasks                                │
-│  └─ amro_work_package_audit_log                             │
+│  └─ amro_work_order_audit_log                               │
 │                                                             │
 │  Enhanced Existing Tables:                                  │
 │  ├─ amro_work_packages (add fields)                         │
@@ -792,7 +792,7 @@ WHERE id NOT IN (
 );
 
 -- 4. Create audit log entries for all historical WPs
-INSERT INTO amro_work_package_audit_log (
+INSERT INTO amro_work_order_audit_log (
     tenant_id,
     entity_type,
     entity_id,
