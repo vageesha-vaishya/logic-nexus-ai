@@ -654,6 +654,7 @@ router.post(
 
     const request: CreateTaskRequest = {
       ...req.body,
+      work_order_id: req.body?.work_order_id || req.body?.work_package_id || workPackageId,
       work_package_id: req.body?.work_package_id || workPackageId,
     };
     const sequenceOrder = request.sequence_order ?? request.sequence_number;

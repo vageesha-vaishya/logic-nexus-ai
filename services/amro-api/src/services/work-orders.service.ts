@@ -38,12 +38,12 @@ type WorkPackageTemplateTaskItem = {
 type TaskInsertPayload = {
   tenant_id: string;
   franchise_id: string | null;
-  work_package_id: string;
+  work_order_id: string;
   task_number: string;
   title: string;
   description: string | null;
   task_category: string;
-  estimated_duration_hours: number | null;
+  estimated_duration_hours: string | null;
   complexity_level: number | null;
   sequence_order: number;
   status: 'pending';
@@ -61,6 +61,32 @@ export class WorkOrdersService {
     const normalized = String(value || '').trim().toUpperCase();
     const compact = normalized.replace(/[^A-Z0-9-]/g, '');
     return compact || fallback;
+  }
+
+  private parseHoursFromInterval(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+    const text = String(value).trim();
+    if (!text) return null;
+    if (/^-?\d+(\.\d+)?$/.test(text)) return Number(Number(text).toFixed(2));
+    const daysMatch = text.match(/(-?\d+)\s+day/);
+    const days = daysMatch ? Number(daysMatch[1]) : 0;
+    const timeMatch = text.match(/(\d+):(\d{2})(?::(\d{2}))?/);
+    if (timeMatch) {
+      const hours = Number(timeMatch[1]);
+      const mins = Number(timeMatch[2]);
+      const secs = Number(timeMatch[3] || 0);
+      const total = (days * 24) + hours + (mins / 60) + (secs / 3600);
+      return Number(total.toFixed(2));
+    }
+    const hourWord = text.match(/(-?\d+(?:\.\d+)?)\s*hour/);
+    if (hourWord) return Number(Number(hourWord[1]).toFixed(2));
+    return null;
+  }
+
+  private toIntervalLiteral(value: unknown): string | null {
+    const hours = this.asNullableNumber(value);
+    return hours === null ? null : `${hours} hours`;
   }
 
   private parseWorkPackageSequence(workPackageNumber: string, targetYear: number): number {
@@ -289,7 +315,7 @@ export class WorkOrdersService {
         title: title || `Template Task ${sequenceOrder}`,
         description: this.asNullableText(row.description),
         task_category: String(row.task_category || row.category_code || 'general').trim() || 'general',
-        estimated_duration_hours: this.asNullableNumber(row.estimated_duration_hours ?? row.estimated_man_hours),
+        estimated_duration_hours: this.parseHoursFromInterval(row.estimated_duration_hours ?? row.estimated_man_hours),
         complexity_level: this.asNullableComplexity(row.complexity_level),
         notes: this.asNullableText(row.reference_amp),
       } as WorkPackageTemplateTaskItem;
@@ -321,12 +347,12 @@ export class WorkOrdersService {
       return {
         tenant_id: params.tenantId,
         franchise_id: params.franchiseId || null,
-        work_package_id: params.workPackageId,
+        work_order_id: params.workPackageId,
         task_number: `${params.workPackageNumber}-${String(sequence).padStart(3, '0')}`,
         title: templateTask.title,
         description: templateTask.description,
         task_category: templateTask.task_category || 'general',
-        estimated_duration_hours: templateTask.estimated_duration_hours,
+        estimated_duration_hours: this.toIntervalLiteral(templateTask.estimated_duration_hours),
         complexity_level: templateTask.complexity_level,
         sequence_order: sequence,
         status: 'pending',
@@ -379,7 +405,7 @@ export class WorkOrdersService {
       .from('tasks')
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', params.tenantId)
-      .eq('work_package_id', params.workPackageId);
+      .eq('work_order_id', params.workPackageId);
 
     if (duplicateCheckError) {
       throw new Error(`Failed duplicate task guard check: ${duplicateCheckError.message}`);
@@ -853,7 +879,7 @@ export class WorkOrdersService {
       .from('tasks')
       .select('*')
       .eq('tenant_id', tenantId)
-      .eq('work_package_id', workPackageId)
+      .eq('work_order_id', workPackageId)
       .order('sequence_order', { ascending: true });
 
     if (error) {
@@ -902,9 +928,9 @@ export class WorkOrdersService {
         const taskNumber = `TASK-${Date.now()}`;
         const sequenceOrder = request.sequence_order ?? request.sequence_number;
         const plannedEndDate = request.planned_end_date ?? request.planned_completion_date;
-        const workPackageId = request.work_package_id;
+        const workPackageId = request.work_order_id ?? request.work_package_id;
         if (!workPackageId) {
-          throw new Error('work_package_id is required');
+          throw new Error('work_order_id is required');
         }
         const taskQualifications = request.qualifications
           ?? (request.required_qualification ? { rating: request.required_qualification } : undefined);
@@ -913,7 +939,7 @@ export class WorkOrdersService {
           .from('tasks')
           .insert({
             tenant_id: tenantId,
-            work_package_id: workPackageId,
+            work_order_id: workPackageId,
             task_number: taskNumber,
             title: request.title,
             description: request.description,
@@ -944,7 +970,7 @@ export class WorkOrdersService {
             id: task.id,
             task_id: task.id,
             task_number: task.task_number,
-            work_package_id: task.work_package_id,
+            work_package_id: task.work_order_id ?? task.work_package_id,
             title: task.title,
             description: task.description,
             status: task.status,
@@ -958,7 +984,7 @@ export class WorkOrdersService {
       {
         tenant_id: tenantId,
         user_id: userId,
-        work_package_id: request.work_package_id,
+        work_package_id: request.work_order_id ?? request.work_package_id,
         sequence_order: request.sequence_order ?? request.sequence_number,
       },
     );
@@ -1027,7 +1053,7 @@ export class WorkOrdersService {
         id: task.id,
         task_id: task.id,
         task_number: task.task_number,
-        work_package_id: task.work_package_id,
+        work_package_id: task.work_order_id ?? task.work_package_id,
         title: task.title,
         description: task.description,
         status: task.status,
@@ -1047,7 +1073,7 @@ export class WorkOrdersService {
           id: task.id,
           task_id: task.id,
           task_number: task.task_number,
-          work_package_id: task.work_package_id,
+          work_package_id: task.work_order_id ?? task.work_package_id,
           title: task.title,
           description: task.description,
           status: task.status,
@@ -1067,7 +1093,7 @@ export class WorkOrdersService {
           id: task.id,
           task_id: task.id,
           task_number: task.task_number,
-          work_package_id: task.work_package_id,
+          work_package_id: task.work_order_id ?? task.work_package_id,
           title: task.title,
           description: task.description,
           status: task.status,
@@ -1107,7 +1133,7 @@ export class WorkOrdersService {
         id: task.id,
         task_id: task.id,
         task_number: task.task_number,
-        work_package_id: task.work_package_id,
+        work_package_id: task.work_order_id ?? task.work_package_id,
         title: task.title,
       },
     );
@@ -1141,7 +1167,7 @@ export class WorkOrdersService {
           id: `maint-${Date.now()}`,
           task_id: task.id,
           task_number: task.task_number,
-          work_package_id: task.work_package_id,
+          work_package_id: task.work_order_id ?? task.work_package_id,
           executed_by: eventData.executed_by,
           evidence_captured: eventData.evidence_captured,
           event_type: eventData.event_type || 'execution',
@@ -1172,7 +1198,7 @@ export class WorkOrdersService {
       .from('materials')
       .select('*')
       .eq('tenant_id', tenantId)
-      .eq('work_package_id', workPackageId)
+      .eq('work_order_id', workPackageId)
       .order('created_at', { ascending: false });
 
     if (error) {

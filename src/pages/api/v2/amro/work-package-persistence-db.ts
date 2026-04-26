@@ -179,12 +179,12 @@ type TaskTemplateShape = {
 type TaskInsertShape = {
   tenant_id: string;
   franchise_id: string | null;
-  work_package_id: string;
+  work_order_id: string;
   task_number: string;
   title: string;
   description: string | null;
   task_category: string;
-  estimated_duration_hours: number | null;
+  estimated_duration_hours: string | null;
   complexity_level: number | null;
   steps: Record<string, unknown> | Array<unknown> | null;
   qualifications: Record<string, unknown> | null;
@@ -214,6 +214,32 @@ function asNullableNumber(value: unknown): number | null {
   if (value === undefined || value === null || value === '') return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseHoursFromInterval(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+  const text = String(value).trim();
+  if (!text) return null;
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(Number(text).toFixed(2));
+  const daysMatch = text.match(/(-?\d+)\s+day/);
+  const days = daysMatch ? Number(daysMatch[1]) : 0;
+  const timeMatch = text.match(/(\d+):(\d{2})(?::(\d{2}))?/);
+  if (timeMatch) {
+    const hours = Number(timeMatch[1]);
+    const mins = Number(timeMatch[2]);
+    const secs = Number(timeMatch[3] || 0);
+    const total = (days * 24) + hours + (mins / 60) + (secs / 3600);
+    return Number(total.toFixed(2));
+  }
+  const hourWord = text.match(/(-?\d+(?:\.\d+)?)\s*hour/);
+  if (hourWord) return Number(Number(hourWord[1]).toFixed(2));
+  return null;
+}
+
+function toIntervalLiteral(value: unknown): string | null {
+  const hours = asNullableNumber(value);
+  return hours === null ? null : `${hours} hours`;
 }
 
 function asNullableComplexity(value: unknown): number | null {
@@ -307,12 +333,12 @@ function buildTaskInsertRowsFromTemplateTasks(params: {
     return {
       tenant_id: params.tenantId,
       franchise_id: params.franchiseId,
-      work_package_id: params.workPackageId,
+      work_order_id: params.workPackageId,
       task_number: `${params.workPackageNumber}-${String(sequence).padStart(3, '0')}`,
       title: templateTask.title,
       description: templateTask.description,
       task_category: templateTask.task_category || 'general',
-      estimated_duration_hours: templateTask.estimated_duration_hours,
+      estimated_duration_hours: toIntervalLiteral(templateTask.estimated_duration_hours),
       complexity_level: templateTask.complexity_level,
       steps: templateTask.steps,
       qualifications: templateTask.qualifications,
@@ -335,7 +361,7 @@ function buildTaskInsertSqlValues(
     values.push(
       row.tenant_id,
       row.franchise_id,
-      row.work_package_id,
+      row.work_order_id,
       row.task_number,
       row.title,
       row.description,
@@ -391,7 +417,7 @@ async function createTemplateTasksWithSupabase(params: {
     .from('tasks')
     .select('id', { count: 'exact', head: true })
     .eq('tenant_id', params.tenantId)
-    .eq('work_package_id', params.workPackageId);
+    .eq('work_order_id', params.workPackageId);
   if (existingTasksError) {
     throw new Error(`Failed duplicate task guard check: ${existingTasksError.message}`);
   }
@@ -454,7 +480,7 @@ async function createTemplateTasksWithPgTransaction(params: {
     SELECT COUNT(*)::int AS existing_count
     FROM public.tasks
     WHERE tenant_id = $1
-      AND work_package_id = $2
+      AND work_order_id = $2
       AND deleted_at IS NULL
   `;
   const duplicateGuardResult = await params.tx.query(duplicateGuardSql, [params.tenantId, params.workPackageId]);
@@ -474,7 +500,7 @@ async function createTemplateTasksWithPgTransaction(params: {
 
   const insertSqlPrefix = `
     INSERT INTO public.tasks (
-      tenant_id, franchise_id, work_package_id, task_number, title, description,
+      tenant_id, franchise_id, work_order_id, task_number, title, description,
       task_category, estimated_duration_hours, complexity_level, steps, qualifications,
       sequence_order, status, notes, created_by, updated_by
     ) VALUES
@@ -950,7 +976,7 @@ export async function fetchWorkPackageDetail(params: {
   if (wpError || !wp) return null;
 
   // Fetch tasks
-  let tasksQuery = supabase.from('tasks').select('*').eq('work_package_id', params.id);
+  let tasksQuery = supabase.from('tasks').select('*').eq('work_order_id', params.id);
   if (params.tenantId) tasksQuery = tasksQuery.eq('tenant_id', params.tenantId);
   const { data: tasks, error: tasksError } = await tasksQuery.order('sequence_order', { ascending: true });
 
@@ -1060,7 +1086,7 @@ function mapRowToTask(row: Record<string, unknown>): PersistedTask {
     title: String(row.title || ''),
     description: row.description ? String(row.description) : null,
     task_category: row.task_category ? String(row.task_category) : null,
-    estimated_duration_hours: row.estimated_duration_hours ? Number(row.estimated_duration_hours) : null,
+    estimated_duration_hours: parseHoursFromInterval(row.estimated_duration_hours),
     complexity_level: row.complexity_level ? String(row.complexity_level) : null,
     sequence_order: row.sequence_order ? Number(row.sequence_order) : null,
     status: String(row.status || 'planning'),

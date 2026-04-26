@@ -15,6 +15,27 @@ import { logger } from '@/lib/logger';
 
 type TaskTemplateRow = Record<string, unknown>;
 
+const parseHoursFromInterval = (value: unknown): number | null => {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+  const text = String(value).trim();
+  if (!text) return null;
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(Number(text).toFixed(2));
+  const daysMatch = text.match(/(-?\d+)\s+day/);
+  const days = daysMatch ? Number(daysMatch[1]) : 0;
+  const timeMatch = text.match(/(\d+):(\d{2})(?::(\d{2}))?/);
+  if (timeMatch) {
+    const hours = Number(timeMatch[1]);
+    const mins = Number(timeMatch[2]);
+    const secs = Number(timeMatch[3] || 0);
+    const total = (days * 24) + hours + (mins / 60) + (secs / 3600);
+    return Number(total.toFixed(2));
+  }
+  const hourWord = text.match(/(-?\d+(?:\.\d+)?)\s*hour/);
+  if (hourWord) return Number(Number(hourWord[1]).toFixed(2));
+  return null;
+};
+
 const isMissingColumnError = (error: unknown, columnName: string) => {
   const message = String((error as { message?: string })?.message || '').toLowerCase();
   return message.includes(columnName.toLowerCase()) && (message.includes('column') || message.includes('does not exist'));
@@ -112,7 +133,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       reference_amp: String(row.reference_amp || ''),
       description: String(row.description || ''),
       category_code: String(row.category_code || ''),
-      estimated_man_hours: row.estimated_man_hours ?? null,
+      estimated_man_hours: parseHoursFromInterval(row.estimated_man_hours),
       is_mandatory: Boolean(row.is_mandatory),
       task_template_detail_json: row.task_template_detail_json ?? null,
       tenant_id: String(row.tenant_id || ''),

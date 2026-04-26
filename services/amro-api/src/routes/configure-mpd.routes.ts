@@ -50,6 +50,32 @@ function normalizeDecimal(value: unknown): number | null {
   return Number(parsed.toFixed(2));
 }
 
+function parseHoursFromInterval(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+  const text = String(value).trim();
+  if (!text) return null;
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(Number(text).toFixed(2));
+  const daysMatch = text.match(/(-?\d+)\s+day/);
+  const days = daysMatch ? Number(daysMatch[1]) : 0;
+  const timeMatch = text.match(/(\d+):(\d{2})(?::(\d{2}))?/);
+  if (timeMatch) {
+    const hours = Number(timeMatch[1]);
+    const mins = Number(timeMatch[2]);
+    const secs = Number(timeMatch[3] || 0);
+    const total = (days * 24) + hours + (mins / 60) + (secs / 3600);
+    return Number(total.toFixed(2));
+  }
+  const hourWord = text.match(/(-?\d+(?:\.\d+)?)\s*hour/);
+  if (hourWord) return Number(Number(hourWord[1]).toFixed(2));
+  return null;
+}
+
+function toIntervalLiteral(value: unknown): string | null {
+  const hours = normalizeDecimal(value);
+  return hours === null ? null : `${hours} hours`;
+}
+
 function normalizeBoolean(value: unknown, fallback = true): boolean {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'boolean') return value;
@@ -90,7 +116,7 @@ function parsePagination(req: AuthRequest): { page: number; pageSize: number; fr
 }
 
 function parseHoursFromThresholdHours(value: unknown): number | null {
-  return normalizeDecimal(value);
+  return parseHoursFromInterval(value);
 }
 
 function mapTaskTemplateToMpdRecord(row: JsonRecord): JsonRecord {
@@ -106,7 +132,7 @@ function mapTaskTemplateToMpdRecord(row: JsonRecord): JsonRecord {
     reference_amp: normalizeString(row.reference_amp),
     description: normalizeString(row.description),
     category_code: normalizeString(row.category_code),
-    estimated_man_hours: normalizeDecimal(row.estimated_man_hours),
+    estimated_man_hours: parseHoursFromInterval(row.estimated_man_hours),
     revision_status: normalizeString(row.revision_status),
     interval_hours: intervalHours,
     interval_cycles: intervalCycles,
@@ -138,7 +164,7 @@ function mapTaskWithTemplateToConfiguredRecord(taskRow: JsonRecord, templateRow:
     id: String(taskRow.id || ''),
     task_id: String(taskRow.id || ''),
     task_template_id: normalizeString(taskRow.task_template_id),
-    work_package_id: normalizeString(taskRow.work_package_id),
+    work_package_id: normalizeString(taskRow.work_order_id ?? taskRow.work_package_id),
     task_number: normalizeString(taskRow.task_number),
     task_title: normalizeString(taskRow.title),
     task_description: normalizeString(taskRow.description),
@@ -230,7 +256,7 @@ async function resolveLatestTasksByTemplate(params: {
 }): Promise<JsonRecord[]> {
   let query = params.supabase
     .from('tasks')
-    .select('id,tenant_id,franchise_id,task_template_id,work_package_id,task_number,title,description,task_category,status,sequence_order,assigned_to,planned_start_date,planned_end_date,actual_start_date,actual_end_date,created_at,updated_at,work_orders!inner(aircraft_id)')
+    .select('id,tenant_id,franchise_id,task_template_id,work_order_id,task_number,title,description,task_category,status,sequence_order,assigned_to,planned_start_date,planned_end_date,actual_start_date,actual_end_date,created_at,updated_at,work_orders!inner(aircraft_id)')
     .eq('tenant_id', params.tenantId)
     .eq('work_orders.aircraft_id', params.aircraftId)
     .not('task_template_id', 'is', null)
@@ -318,13 +344,13 @@ function mapTemplateToTaskInsert(params: {
   return {
     tenant_id: params.tenantId,
     franchise_id: params.franchiseId,
-    work_package_id: params.workPackageId,
+    work_order_id: params.workPackageId,
     task_template_id: taskTemplateId,
     task_number: `${params.workOrderNumber}-${String(fallbackSequence).padStart(3, '0')}`,
     title: String(params.template.code_form_no || params.template.description || `Template Task ${fallbackSequence}`),
     description: normalizeString(params.template.description),
     task_category: String(params.template.category_code || 'general'),
-    estimated_duration_hours: normalizeDecimal(params.template.estimated_man_hours),
+    estimated_duration_hours: toIntervalLiteral(params.template.estimated_man_hours),
     sequence_order: fallbackSequence,
     status: 'pending',
     notes: normalizeString(params.template.reference_amp),
@@ -343,10 +369,10 @@ function mapTemplatePatchPayload(payload: JsonRecord): JsonRecord {
   if (has('reference_amp')) patch.reference_amp = normalizeString(payload.reference_amp);
   if (has('description')) patch.description = normalizeString(payload.description);
   if (has('category_code')) patch.category_code = normalizeString(payload.category_code);
-  if (has('estimated_man_hours')) patch.estimated_man_hours = normalizeDecimal(payload.estimated_man_hours);
+  if (has('estimated_man_hours')) patch.estimated_man_hours = toIntervalLiteral(payload.estimated_man_hours);
   if (has('revision_status')) patch.revision_status = normalizeString(payload.revision_status);
   if (has('interval_hours') || has('threshold_hours')) {
-    patch.threshold_hours = normalizeDecimal(payload.interval_hours ?? payload.threshold_hours);
+    patch.threshold_hours = toIntervalLiteral(payload.interval_hours ?? payload.threshold_hours);
   }
   if (has('interval_cycles') || has('threshold_cycles')) {
     patch.threshold_cycles = normalizeInteger(payload.interval_cycles ?? payload.threshold_cycles);
@@ -723,7 +749,7 @@ router.post(
       .from('tasks')
       .select('id,task_template_id')
       .eq('tenant_id', tenantId)
-      .eq('work_package_id', workPackageId)
+      .or(`work_order_id.eq.${workPackageId},work_package_id.eq.${workPackageId}`)
       .in('task_template_id', targetTemplateIds);
     if (createdError) {
       res.status(500).json({

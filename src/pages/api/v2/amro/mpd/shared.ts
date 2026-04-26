@@ -65,6 +65,32 @@ export function normalizeDecimal(value: unknown): number | null {
   return Number(parsed.toFixed(2));
 }
 
+export function parseHoursFromInterval(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+  const text = String(value).trim();
+  if (!text) return null;
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(Number(text).toFixed(2));
+  const daysMatch = text.match(/(-?\d+)\s+day/);
+  const days = daysMatch ? Number(daysMatch[1]) : 0;
+  const timeMatch = text.match(/(\d+):(\d{2})(?::(\d{2}))?/);
+  if (timeMatch) {
+    const hours = Number(timeMatch[1]);
+    const mins = Number(timeMatch[2]);
+    const secs = Number(timeMatch[3] || 0);
+    const total = (days * 24) + hours + (mins / 60) + (secs / 3600);
+    return Number(total.toFixed(2));
+  }
+  const hourWord = text.match(/(-?\d+(?:\.\d+)?)\s*hour/);
+  if (hourWord) return Number(Number(hourWord[1]).toFixed(2));
+  return null;
+}
+
+export function toIntervalLiteral(value: unknown): string | null {
+  const hours = normalizeDecimal(value);
+  return hours === null ? null : `${hours} hours`;
+}
+
 export function normalizeBoolean(value: unknown, fallback = true): boolean {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'boolean') return value;
@@ -120,28 +146,9 @@ export function taskTemplateSelectColumns(
   sequenceColumn: TaskTemplateSequenceColumn,
   modelColumn: TaskTemplateModelColumn,
 ): string {
-  return [
-    'id',
-    'tenant_id',
-    'franchise_id',
-    sequenceColumn,
-    'code_form_no',
-    'ata_code',
-    'reference_amp',
-    'description',
-    'category_code',
-    'estimated_man_hours',
-    'revision_status',
-    'interval_hours',
-    'interval_cycles',
-    'interval_months',
-    'is_mandatory',
-    modelColumn,
-    'task_template_detail_json',
-    'task_template_scope_json',
-    'created_at',
-    'updated_at',
-  ].join(',');
+  void sequenceColumn;
+  void modelColumn;
+  return '*';
 }
 
 export function mapTaskTemplateRowToMpd(
@@ -157,11 +164,11 @@ export function mapTaskTemplateRowToMpd(
     reference_amp: normalizeString(row.reference_amp),
     description: normalizeString(row.description),
     category_code: normalizeString(row.category_code),
-    estimated_man_hours: normalizeDecimal(row.estimated_man_hours),
+    estimated_man_hours: parseHoursFromInterval(row.estimated_man_hours),
     revision_status: normalizeString(row.revision_status),
-    interval_hours: normalizeInteger(row.interval_hours),
-    interval_cycles: normalizeInteger(row.interval_cycles),
-    interval_months: normalizeInteger(row.interval_months),
+    interval_hours: parseHoursFromInterval(row.threshold_hours ?? row.interval_hours),
+    interval_cycles: normalizeInteger(row.threshold_cycles ?? row.interval_cycles),
+    interval_months: normalizeInteger(row.threshold_calendar ?? row.interval_months),
     is_mandatory: normalizeBoolean(row.is_mandatory, true),
     assembly_model_id: normalizeString(row[modelColumn]),
     task_template_detail_json: normalizeJsonArray(row.task_template_detail_json),
@@ -195,19 +202,28 @@ export function mapMpdPayloadToTaskTemplateInput(
     row.category_code = normalizeString(payload.category_code);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'estimated_man_hours')) {
-    row.estimated_man_hours = normalizeDecimal(payload.estimated_man_hours);
+    row.estimated_man_hours = toIntervalLiteral(payload.estimated_man_hours);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'revision_status')) {
     row.revision_status = normalizeString(payload.revision_status);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'interval_hours')) {
-    row.interval_hours = normalizeInteger(payload.interval_hours);
+    row.threshold_hours = toIntervalLiteral(payload.interval_hours);
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'threshold_hours')) {
+    row.threshold_hours = toIntervalLiteral(payload.threshold_hours);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'interval_cycles')) {
-    row.interval_cycles = normalizeInteger(payload.interval_cycles);
+    row.threshold_cycles = normalizeInteger(payload.interval_cycles);
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'threshold_cycles')) {
+    row.threshold_cycles = normalizeInteger(payload.threshold_cycles);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'interval_months')) {
-    row.interval_months = normalizeInteger(payload.interval_months);
+    row.threshold_calendar = normalizeInteger(payload.interval_months);
+  }
+  if (Object.prototype.hasOwnProperty.call(payload, 'threshold_calendar')) {
+    row.threshold_calendar = normalizeInteger(payload.threshold_calendar);
   }
   if (Object.prototype.hasOwnProperty.call(payload, 'is_mandatory')) {
     row.is_mandatory = normalizeBoolean(payload.is_mandatory, true);
@@ -248,8 +264,8 @@ export function validateMpdInput(payload: Record<string, unknown>, mode: 'create
   if (estimatedManHours !== undefined && estimatedManHours !== null && estimatedManHours !== '' && normalizeDecimal(estimatedManHours) === null) {
     issues.push({ field: 'estimated_man_hours', message: 'estimated_man_hours must be a valid number' });
   }
-  if (intervalHours !== undefined && intervalHours !== null && intervalHours !== '' && normalizeInteger(intervalHours) === null) {
-    issues.push({ field: 'interval_hours', message: 'interval_hours must be an integer' });
+  if (intervalHours !== undefined && intervalHours !== null && intervalHours !== '' && normalizeDecimal(intervalHours) === null) {
+    issues.push({ field: 'interval_hours', message: 'interval_hours must be a valid number' });
   }
   if (intervalCycles !== undefined && intervalCycles !== null && intervalCycles !== '' && normalizeInteger(intervalCycles) === null) {
     issues.push({ field: 'interval_cycles', message: 'interval_cycles must be an integer' });
@@ -259,7 +275,7 @@ export function validateMpdInput(payload: Record<string, unknown>, mode: 'create
   }
 
   const intervalValues = [
-    normalizeInteger(intervalHours),
+    normalizeDecimal(intervalHours),
     normalizeInteger(intervalCycles),
     normalizeInteger(intervalMonths),
   ].filter((value): value is number => value !== null);

@@ -91,7 +91,8 @@ export interface Task {
   id: string;
   tenant_id: string;
   franchise_id?: string;
-  work_package_id: string;
+  work_order_id?: string;
+  work_package_id?: string;
   task_number: string;
   title: string;
   description?: string;
@@ -229,6 +230,7 @@ export interface UpdateWorkPackageRequest {
 }
 
 export interface CreateTaskRequest {
+  work_order_id?: string;
   work_package_id?: string;
   title: string;
   description?: string;

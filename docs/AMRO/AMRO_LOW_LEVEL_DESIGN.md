@@ -1669,12 +1669,13 @@ All database implementation and review activities must treat this section as nor
 | `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
 | `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
 | `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
-| `work_package_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `work_order_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `work_package_id` | `uuid` | Yes | — | Compatibility alias FK -> `public.work_packages(id)` ON DELETE CASCADE |
 | `task_number` | `text` | No | — | — |
 | `title` | `text` | No | — | — |
 | `description` | `text` | Yes | — | — |
 | `task_category` | `text` | No | — | — |
-| `estimated_duration_hours` | `decimal(10,2)` | Yes | — | — |
+| `estimated_duration_hours` | `interval` | Yes | — | Duration-safe arithmetic for task runtime estimates |
 | `complexity_level` | `integer` | Yes | `3` | Check: `complexity_level >= 1 AND complexity_level <= 5` |
 | `procedure_reference` | `varchar(255)` | Yes | — | — |
 | `steps` | `jsonb` | Yes | — | — |
@@ -1697,7 +1698,7 @@ All database implementation and review activities must treat this section as nor
 | `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 
-- Indexes: `idx_tasks_tenant_id`, `idx_tasks_franchise_id`, `idx_tasks_work_package_id`, `idx_tasks_status`, `idx_tasks_assigned_to`, `idx_tasks_task_category`
+- Indexes: `idx_tasks_tenant_id`, `idx_tasks_franchise_id`, `idx_tasks_work_order_id`, `idx_tasks_work_package_id_compat`, `idx_tasks_status`, `idx_tasks_assigned_to`, `idx_tasks_task_category`
 
 #### 28.2.5 `public.staff_qualifications`
 
@@ -3762,20 +3763,21 @@ Implementation Notes:
 ```text
 Component Type: Table
 Component Name: public.tasks
-Purpose: Core tenant/franchise task execution entity within work packages, including compatibility aliases for legacy consumers during phased cleanup.
+Purpose: Core tenant/franchise task execution entity within work orders, including compatibility aliases for legacy consumers during phased cleanup.
 Estimated Row Count: 10,000-5,000,000 per tenant
 Primary Key: id
 Foreign Keys:
   - tenant_id -> public.tenants(id) ON DELETE CASCADE
   - franchise_id -> public.franchises(id) ON DELETE SET NULL
-  - work_package_id -> public.work_packages(id) ON DELETE CASCADE
+  - work_order_id -> public.work_packages(id) ON DELETE CASCADE
+  - work_package_id -> public.work_packages(id) ON DELETE CASCADE (compatibility alias)
   - assigned_to -> auth.users(id) ON DELETE SET NULL
   - assigned_technician_id -> auth.users(id) ON DELETE SET NULL
   - qa_verified_by -> auth.users(id) ON DELETE SET NULL
   - created_by -> auth.users(id) ON DELETE SET NULL
   - updated_by -> auth.users(id) ON DELETE SET NULL
 Unique Constraints:
-  - uq_tasks_work_package_sequence_active (work_package_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
+  - uq_tasks_work_package_sequence_active (work_order_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
 Check Constraints:
   - ck_tasks_sequence_positive (sequence IS NULL OR sequence > 0)
   - ck_tasks_sequence_order_positive (sequence_order IS NULL OR sequence_order > 0)
@@ -3791,8 +3793,13 @@ Defaults:
   - updated_at: now()
 Indexes:
   - idx_tasks_assigned_technician_id(assigned_technician_id)
-  - idx_tasks_sequence_active(work_package_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
+  - idx_tasks_work_order_id(work_order_id)
+  - idx_tasks_work_package_id_compat(work_package_id)
+  - idx_tasks_sequence_active(work_order_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
 Columns:
+  - work_order_id | uuid | nullable:no | default:none
+  - work_package_id | uuid | nullable:yes | default:null (compatibility alias kept in sync with work_order_id)
+  - estimated_duration_hours | interval | nullable:yes | default:null
   - sequence | integer | nullable:yes | default:null
   - sequence_order | integer | nullable:yes | default:null (deprecated alias)
   - assigned_technician_id | uuid | nullable:yes | default:null
@@ -3806,6 +3813,7 @@ Security Considerations:
   - Canonical-vs-alias sync is enforced at DB layer to reduce divergence risk.
 Implementation Notes:
   - Migration: 20260425123000_amro_task_due_extensions_and_tasks_cleanup.sql
+  - Migration: 20260426123000_amro_task_templates_and_tasks_interval_work_order_alignment.sql
   - Backfill maps alias values into canonical columns and keeps both representations synchronized.
 ```
 

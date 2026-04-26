@@ -54,6 +54,32 @@ function normalizeDecimal(value: unknown): number | null {
   return Number(parsed.toFixed(2));
 }
 
+function parseHoursFromInterval(value: unknown): number | null {
+  if (value === null || value === undefined || value === '') return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+  const text = String(value).trim();
+  if (!text) return null;
+  if (/^-?\d+(\.\d+)?$/.test(text)) return Number(Number(text).toFixed(2));
+  const daysMatch = text.match(/(-?\d+)\s+day/);
+  const days = daysMatch ? Number(daysMatch[1]) : 0;
+  const timeMatch = text.match(/(\d+):(\d{2})(?::(\d{2}))?/);
+  if (timeMatch) {
+    const hours = Number(timeMatch[1]);
+    const mins = Number(timeMatch[2]);
+    const secs = Number(timeMatch[3] || 0);
+    const total = (days * 24) + hours + (mins / 60) + (secs / 3600);
+    return Number(total.toFixed(2));
+  }
+  const hourWord = text.match(/(-?\d+(?:\.\d+)?)\s*hour/);
+  if (hourWord) return Number(Number(hourWord[1]).toFixed(2));
+  return null;
+}
+
+function toIntervalLiteral(value: unknown): string | null {
+  const hours = normalizeDecimal(value);
+  return hours === null ? null : `${hours} hours`;
+}
+
 function normalizeBoolean(value: unknown, fallback = true): boolean {
   if (value === null || value === undefined || value === '') return fallback;
   if (typeof value === 'boolean') return value;
@@ -85,7 +111,7 @@ function parsePagination(req: AuthRequest): { page: number; pageSize: number; fr
 }
 
 function mapTaskTemplateRowToMpd(row: JsonRecord): JsonRecord {
-  const intervalHours = normalizeDecimal(row.threshold_hours ?? row.interval_hours);
+  const intervalHours = parseHoursFromInterval(row.threshold_hours ?? row.interval_hours);
   const intervalCycles = normalizeInteger(row.threshold_cycles ?? row.interval_cycles);
   const intervalMonths = normalizeInteger(row.threshold_calendar ?? row.interval_months);
   const thresholdLandings = normalizeInteger(row.threshold_landings);
@@ -97,7 +123,7 @@ function mapTaskTemplateRowToMpd(row: JsonRecord): JsonRecord {
     reference_amp: normalizeString(row.reference_amp),
     description: normalizeString(row.description),
     category_code: normalizeString(row.category_code),
-    estimated_man_hours: normalizeDecimal(row.estimated_man_hours),
+    estimated_man_hours: parseHoursFromInterval(row.estimated_man_hours),
     revision_status: normalizeString(row.revision_status),
     interval_hours: intervalHours,
     interval_cycles: intervalCycles,
@@ -133,7 +159,7 @@ function mapMpdPayloadToTaskTemplateInput(payload: JsonRecord): JsonRecord {
   if (payload.reference_amp !== undefined) setIfDefined('reference_amp', normalizeString(payload.reference_amp));
   if (payload.description !== undefined) setIfDefined('description', normalizeString(payload.description));
   if (payload.category_code !== undefined) setIfDefined('category_code', normalizeString(payload.category_code));
-  if (payload.estimated_man_hours !== undefined) setIfDefined('estimated_man_hours', normalizeDecimal(payload.estimated_man_hours));
+  if (payload.estimated_man_hours !== undefined) setIfDefined('estimated_man_hours', toIntervalLiteral(payload.estimated_man_hours));
   if (payload.is_mandatory !== undefined) setIfDefined('is_mandatory', normalizeBoolean(payload.is_mandatory, true));
   if (payload.task_template_detail_json !== undefined) setIfDefined('task_template_detail_json', normalizeJsonArray(payload.task_template_detail_json));
   if (payload.task_template_scope_json !== undefined) setIfDefined('task_template_scope_json', normalizeJsonArray(payload.task_template_scope_json));
@@ -151,10 +177,10 @@ function mapMpdPayloadToTaskTemplateInput(payload: JsonRecord): JsonRecord {
   // Backward-compatible remap: old clients may still send interval_hours.
   // task_templates uses threshold_hours.
   if (payload.interval_hours !== undefined && payload.threshold_hours === undefined) {
-    setIfDefined('threshold_hours', normalizeDecimal(payload.interval_hours));
+    setIfDefined('threshold_hours', toIntervalLiteral(payload.interval_hours));
   }
   if (payload.threshold_hours !== undefined) {
-    setIfDefined('threshold_hours', normalizeDecimal(payload.threshold_hours));
+    setIfDefined('threshold_hours', toIntervalLiteral(payload.threshold_hours));
   }
   // Backward-compatible remap: old clients may still send interval_cycles.
   // task_templates uses threshold_cycles for cycle-based frequency.
