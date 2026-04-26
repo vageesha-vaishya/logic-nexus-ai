@@ -2,7 +2,7 @@
  * AMRO Work Package Template Version - Approve/Reject
  * 
  * DATABASE SCHEMA:
- * - Uses: amro_work_package_template_versions (existing)
+ * - Uses: amro_work_order_template_versions (existing, renamed)
  * - Transition: pending_review → approved (or active if first approved version)
  * - Transition: pending_review → draft (rejected)
  * - Sets: approved_by, approved_at OR rejection_reason
@@ -17,7 +17,7 @@
  * - set_active?: boolean (optional, if true sets status to 'active')
  */
 
-import type { ApiRequest, ApiResponse } from '../../../../../_utils/types';
+import type { ApiRequest, ApiResponse } from '../../../../_utils/types';
 import {
   applyCors,
   authenticateRequest,
@@ -28,8 +28,8 @@ import {
   enforceRateLimit,
   handlePreflight,
   resolveAndApplyAccessContext,
-} from '../../../../../_utils/http';
-import { sendErrorResponse } from '../../../../../_utils/errorHandler';
+} from '../../../../_utils/http';
+import { sendErrorResponse } from '../../../../_utils/errorHandler';
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
@@ -81,7 +81,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // Fetch current version
     const { data: currentVersion, error: fetchError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('id, status, version_number, template_id')
       .eq('id', versionId)
       .eq('tenant_id', tenantId)
@@ -120,7 +120,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       // Reject - return to draft
       const { data: version, error: updateError } = await supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .update({
           status: 'draft',
           rejection_reason: rejectionReason,
@@ -152,7 +152,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // Approve - check if this is the first approved version
     const { data: approvedCount, error: countError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('id', { count: 'exact' })
       .eq('template_id', currentVersion.template_id)
       .eq('tenant_id', tenantId)
@@ -167,7 +167,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const newStatus = setActive ? 'active' : 'approved';
 
     const { data: version, error: updateError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .update({
         status: newStatus,
         approved_by: authUser.userId,

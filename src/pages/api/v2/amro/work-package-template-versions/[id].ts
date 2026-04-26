@@ -2,7 +2,7 @@
  * AMRO Work Package Template Version - Individual Resource API
  * 
  * DATABASE SCHEMA:
- * - Uses: amro_work_package_template_versions (existing)
+ * - Uses: amro_work_order_template_versions (existing, renamed)
  * - Workflow: draft → pending_review → approved → active → deprecated
  * - Only draft versions can be updated/deleted
  * - Approval requires platform admin or template_manager role
@@ -13,7 +13,7 @@
  * - DELETE /api/v2/amro/work-package-template-versions/[id] (only if status=draft)
  */
 
-import type { ApiRequest, ApiResponse } from '../../../../../_utils/types';
+import type { ApiRequest, ApiResponse } from '../../../_utils/types';
 import {
   applyCors,
   authenticateRequest,
@@ -24,11 +24,10 @@ import {
   enforceRateLimit,
   handlePreflight,
   resolveAndApplyAccessContext,
-} from '../../../../../_utils/http';
-import { sendErrorResponse } from '../../../../../_utils/errorHandler';
+} from '../../../_utils/http';
+import { sendErrorResponse } from '../../../_utils/errorHandler';
 import { createClient } from '@supabase/supabase-js';
 
-const VALID_STATUSES = ['draft', 'pending_review', 'approved', 'active', 'deprecated', 'archived'];
 const EDITABLE_STATUSES = ['draft'];
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
@@ -60,7 +59,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     // ── GET: single version details ─────────────────────────────────────────
     if (req.method === 'GET') {
       const { data: version, error } = await supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .select('*')
         .eq('id', versionId)
         .eq('tenant_id', tenantId)
@@ -90,7 +89,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       // Fetch current version
       const { data: currentVersion, error: fetchError } = await supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .select('id, status, version_number, template_id')
         .eq('id', versionId)
         .eq('tenant_id', tenantId)
@@ -135,7 +134,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
 
       const { data: version, error: updateError } = await supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .update(updateData)
         .eq('id', versionId)
         .select()
@@ -158,7 +157,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (req.method === 'DELETE') {
       // Fetch current version
       const { data: currentVersion, error: fetchError } = await supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .select('status')
         .eq('id', versionId)
         .eq('tenant_id', tenantId)
@@ -184,7 +183,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
 
       const { error: deleteError } = await supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .delete()
         .eq('id', versionId)
         .eq('tenant_id', tenantId);

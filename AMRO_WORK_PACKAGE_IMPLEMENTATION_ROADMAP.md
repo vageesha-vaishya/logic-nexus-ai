@@ -97,7 +97,7 @@ This document provides a complete implementation roadmap for transforming the AM
 │                    DATABASE LAYER                            │
 ├─────────────────────────────────────────────────────────────┤
 │  Enhanced Schema (14 NEW tables):                           │
-│  ├─ amro_work_package_template_versions                     │
+│  ├─ amro_work_order_template_versions                       │
 │  ├─ amro_work_order_template_categories                     │
 │  ├─ amro_task_dependencies                                  │
 │  ├─ amro_task_time_logs                                    │
@@ -756,7 +756,7 @@ ALTER TABLE amro_work_packages
 ADD COLUMN IF NOT EXISTS is_emergency BOOLEAN DEFAULT false;
 
 -- 3. Create initial template versions from existing templates
-INSERT INTO amro_work_package_template_versions (
+INSERT INTO amro_work_order_template_versions (
     tenant_id,
     franchise_id,
     template_id,
@@ -788,7 +788,7 @@ SELECT
 FROM amro_work_package_templates
 WHERE id NOT IN (
     SELECT DISTINCT template_id 
-    FROM amro_work_package_template_versions
+    FROM amro_work_order_template_versions
 );
 
 -- 4. Create audit log entries for all historical WPs

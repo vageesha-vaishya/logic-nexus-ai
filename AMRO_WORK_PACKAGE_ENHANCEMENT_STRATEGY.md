@@ -83,7 +83,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 **Implementation:**
 - Frontend: Enhanced `AmroWorkPackageTemplateAdapter` with version selector
 - Backend: Template version CRUD with approval workflow
-- Database: `amro_work_package_template_versions` table
+- Database: `amro_work_order_template_versions` table
 
 **2.2 Dual-Path Work Package Creation**
 
@@ -320,7 +320,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 
 | Table | Purpose | Priority |
 |-------|---------|----------|
-| `amro_work_package_template_versions` | Template versioning with approval | P0 |
+| `amro_work_order_template_versions` | Template versioning with approval | P0 |
 | `amro_work_order_template_categories` | Template classification | P1 |
 | `amro_task_dependencies` | Task dependency graph | P0 |
 | `amro_task_time_logs` | Actual labor hour tracking | P1 |

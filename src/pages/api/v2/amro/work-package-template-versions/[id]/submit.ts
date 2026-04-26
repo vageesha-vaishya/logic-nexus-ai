@@ -2,7 +2,7 @@
  * AMRO Work Package Template Version - Submit for Review
  * 
  * DATABASE SCHEMA:
- * - Uses: amro_work_package_template_versions (existing)
+ * - Uses: amro_work_order_template_versions (existing, renamed)
  * - Transition: draft → pending_review
  * - Sets: submitted_by, submitted_at
  * 
@@ -10,7 +10,7 @@
  * - POST /api/v2/amro/work-package-template-versions/[id]/submit
  */
 
-import type { ApiRequest, ApiResponse } from '../../../../../_utils/types';
+import type { ApiRequest, ApiResponse } from '../../../../_utils/types';
 import {
   applyCors,
   authenticateRequest,
@@ -21,8 +21,8 @@ import {
   enforceRateLimit,
   handlePreflight,
   resolveAndApplyAccessContext,
-} from '../../../../../_utils/http';
-import { sendErrorResponse } from '../../../../../_utils/errorHandler';
+} from '../../../../_utils/http';
+import { sendErrorResponse } from '../../../../_utils/errorHandler';
 import { createClient } from '@supabase/supabase-js';
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
@@ -59,7 +59,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // Fetch current version
     const { data: currentVersion, error: fetchError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('id, status, version_number, template_id')
       .eq('id', versionId)
       .eq('tenant_id', tenantId)
@@ -86,7 +86,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // Submit for review
     const { data: version, error: updateError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .update({
         status: 'pending_review',
         submitted_by: authUser.userId,

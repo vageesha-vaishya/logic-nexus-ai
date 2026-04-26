@@ -21,7 +21,7 @@
 | `work-package-template-versions/[id]/approve.ts` | `/api/v2/amro/work-package-template-versions/:id/approve` | POST | Approve/reject (pending_review → approved/draft) |
 
 **Database Tables Used:**
-- `amro_work_package_template_versions` (created 2026-04-12)
+- `amro_work_order_template_versions` (created 2026-04-12, renamed)
 - `work_package_templates` (created 2026-03-22)
 
 **Key Features:**
@@ -113,7 +113,7 @@
 
 | Functionality | Existing Table | Created |
 |--------------|----------------|---------|
-| Template versioning | `amro_work_package_template_versions` | 2026-04-12 |
+| Template versioning | `amro_work_order_template_versions` | 2026-04-12 |
 | Template categories | `amro_work_order_template_categories` | 2026-04-12 |
 | Emergency WPs | `amro_emergency_work_packages` | 2026-04-12 |
 | Non-scheduled tasks | `amro_non_scheduled_tasks` | 2026-04-12 |

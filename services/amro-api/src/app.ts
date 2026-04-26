@@ -993,7 +993,7 @@ app.get('/api/v2/amro/work-package-template-versions', authMiddleware as any, as
 
     // Query template versions from database
     const { data: versions, error, count } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('*', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .eq('template_id', templateId)
@@ -1101,7 +1101,7 @@ app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, a
 
     // Get next version number
     const { data: maxVersion } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('version_number')
       .eq('template_id', template_id)
       .eq('tenant_id', tenantId)
@@ -1140,7 +1140,7 @@ app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, a
     };
 
     const { data: created, error: createError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .insert(versionData)
       .select()
       .single();
@@ -1178,7 +1178,7 @@ app.put('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any
     const supabase = getSupabaseAdminClient();
 
     const { data: existing, error: fetchError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('*')
       .eq('id', id)
       .eq('tenant_id', tenantId)
@@ -1201,7 +1201,7 @@ app.put('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any
     }
 
     const { data: updated, error: updateError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .update(updateData)
       .eq('id', id)
       .eq('tenant_id', tenantId)
@@ -1234,7 +1234,7 @@ app.post('/api/v2/amro/work-package-template-versions/:id/submit', authMiddlewar
   try {
     const supabase = getSupabaseAdminClient();
 
-    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
+    const { data: existing } = await supabase.from('amro_work_order_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
     if (!existing) {
       res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
       return;
@@ -1244,7 +1244,7 @@ app.post('/api/v2/amro/work-package-template-versions/:id/submit', authMiddlewar
       return;
     }
 
-    const { data: updated } = await supabase.from('amro_work_package_template_versions').update({ status: 'pending_review', submitted_by: userId, submitted_at: new Date().toISOString(), updated_by: userId }).eq('id', id).eq('tenant_id', tenantId).select().single();
+    const { data: updated } = await supabase.from('amro_work_order_template_versions').update({ status: 'pending_review', submitted_by: userId, submitted_at: new Date().toISOString(), updated_by: userId }).eq('id', id).eq('tenant_id', tenantId).select().single();
 
     res.json({ version: 'v2', correlationId: requestId, output: updated });
   } catch (error) {
@@ -1272,7 +1272,7 @@ app.post('/api/v2/amro/work-package-template-versions/:id/approve', authMiddlewa
   try {
     const supabase = getSupabaseAdminClient();
 
-    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
+    const { data: existing } = await supabase.from('amro_work_order_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
     if (!existing) {
       res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
       return;
@@ -1293,7 +1293,7 @@ app.post('/api/v2/amro/work-package-template-versions/:id/approve', authMiddlewa
       updateData.approved_at = new Date().toISOString();
     }
 
-    const { data: updated } = await supabase.from('amro_work_package_template_versions').update(updateData).eq('id', id).eq('tenant_id', tenantId).select().single();
+    const { data: updated } = await supabase.from('amro_work_order_template_versions').update(updateData).eq('id', id).eq('tenant_id', tenantId).select().single();
     res.json({ version: 'v2', correlationId: requestId, output: updated });
   } catch (error) {
     res.status(500).json({ error: 'Failed to review', statusCode: 500, requestId, version: 'v2' });
@@ -1314,7 +1314,7 @@ app.delete('/api/v2/amro/work-package-template-versions/:id', authMiddleware as 
   try {
     const supabase = getSupabaseAdminClient();
 
-    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('id, status').eq('id', id).eq('tenant_id', tenantId).single();
+    const { data: existing } = await supabase.from('amro_work_order_template_versions').select('id, status').eq('id', id).eq('tenant_id', tenantId).single();
     if (!existing) {
       res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
       return;
@@ -1324,7 +1324,7 @@ app.delete('/api/v2/amro/work-package-template-versions/:id', authMiddleware as 
       return;
     }
 
-    await supabase.from('amro_work_package_template_versions').delete().eq('id', id).eq('tenant_id', tenantId);
+    await supabase.from('amro_work_order_template_versions').delete().eq('id', id).eq('tenant_id', tenantId);
     res.json({ version: 'v2', correlationId: requestId, output: { deleted: true, id } });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete', statusCode: 500, requestId, version: 'v2' });

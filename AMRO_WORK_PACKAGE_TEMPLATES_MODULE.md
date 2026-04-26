@@ -214,7 +214,7 @@ Centralized API functions:
 | `created_at` | ✅ | Audit trail |
 | `updated_at` | ✅ | Audit trail |
 
-### amro_work_package_template_versions Table
+### amro_work_order_template_versions Table
 | Column | Used? | Notes |
 |--------|-------|-------|
 | `id` | ✅ | Primary key |

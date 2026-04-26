@@ -3983,6 +3983,77 @@ Implementation Notes:
   - Migration: 20260425174000_amro_rename_wp_compliance_records_to_wo.sql
 ```
 
+```text
+Component Type: Table
+Component Name: public.amro_work_order_template_versions
+Purpose: Tenant-scoped version-history and approval workflow state for AMRO work-order templates.
+Estimated Row Count: 500-500,000 per tenant
+Primary Key:
+  - id
+Foreign Keys:
+  - template_id -> public.work_order_templates(id) ON DELETE CASCADE
+  - submitted_by -> auth.users(id) ON DELETE SET NULL
+  - reviewed_by -> auth.users(id) ON DELETE SET NULL
+  - approved_by -> auth.users(id) ON DELETE SET NULL
+  - created_by -> auth.users(id) ON DELETE NO ACTION
+  - updated_by -> auth.users(id) ON DELETE NO ACTION
+Unique Constraints:
+  - uq_template_versions_number (tenant_id, template_id, version_number)
+Check Constraints:
+  - status IN ('draft','pending_review','approved','active','deprecated','archived')
+Defaults:
+  - id: gen_random_uuid()
+  - status: 'draft'
+  - version_number: 1
+  - scope_json: '{}'::jsonb
+  - tasks_json: '[]'::jsonb
+  - materials_json: '[]'::jsonb
+  - tooling_json: '[]'::jsonb
+  - compliance_requirements_json: '[]'::jsonb
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_template_versions_tenant(tenant_id)
+  - idx_template_versions_template(template_id)
+  - idx_template_versions_status(status)
+  - idx_template_versions_effective(effective_from, effective_until)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - franchise_id | uuid | nullable:yes | default:null
+  - template_id | uuid | nullable:no | default:none
+  - version_number | integer | nullable:no | default:1
+  - version_label | text | nullable:yes | default:null
+  - change_description | text | nullable:no | default:none
+  - change_reason | text | nullable:yes | default:null
+  - status | text | nullable:no | default:'draft'
+  - submitted_by | uuid | nullable:yes | default:null
+  - submitted_at | timestamptz | nullable:yes | default:null
+  - reviewed_by | uuid | nullable:yes | default:null
+  - reviewed_at | timestamptz | nullable:yes | default:null
+  - approved_by | uuid | nullable:yes | default:null
+  - approved_at | timestamptz | nullable:yes | default:null
+  - rejection_reason | text | nullable:yes | default:null
+  - scope_json | jsonb | nullable:yes | default:'{}'::jsonb
+  - tasks_json | jsonb | nullable:yes | default:'[]'::jsonb
+  - materials_json | jsonb | nullable:yes | default:'[]'::jsonb
+  - tooling_json | jsonb | nullable:yes | default:'[]'::jsonb
+  - compliance_requirements_json | jsonb | nullable:yes | default:'[]'::jsonb
+  - effective_from | timestamptz | nullable:yes | default:null
+  - effective_until | timestamptz | nullable:yes | default:null
+  - aircraft_models | text[] | nullable:yes | default:null
+  - engine_models | text[] | nullable:yes | default:null
+  - created_by | uuid | nullable:no | default:none
+  - created_at | timestamptz | nullable:yes | default:now()
+  - updated_by | uuid | nullable:no | default:none
+  - updated_at | timestamptz | nullable:yes | default:now()
+Security Considerations:
+  - RLS enabled; policy names normalized to explicit work-order template version semantics.
+  - Tenant and franchise boundaries are mandatory for every CRUD path.
+Implementation Notes:
+  - Migration: 20260425181000_amro_rename_wp_template_versions_to_wo.sql
+```
+
 ---
 
 ## 25. Global Market Research and Technical Evaluation: MRO Aircraft Template Modules (2026)

@@ -14,7 +14,7 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 
 ### Top 5 Recommendations (Immediate Impact)
 
-1. **P0 - Template Versioning Implementation**: The schema exists (`amro_work_package_template_versions`) but has zero API or UI. This is the single most critical gap.
+1. **P0 - Template Versioning Implementation**: The schema exists (`amro_work_order_template_versions`, renamed from `amro_work_package_template_versions`) but has zero API or UI. This is the single most critical gap.
 2. **P0 - Approval Workflow**: No draft/review/approve lifecycle exists. Templates go directly from creation to "active" with no governance.
 3. **P1 - Template Catalog/Browser UI**: Templates are only editable via a modal dialog. There is no browse/search/catalog view.
 4. **P1 - Material/BOM/Tooling Support**: Template content is limited to task IDs. No materials, tooling, or equipment requirements can be defined.
@@ -85,7 +85,7 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 
 #### Schema Created but Unused
 
-**`amro_work_package_template_versions`** (migration `20260412100000`)
+**`amro_work_order_template_versions`** (migration `20260412100000`, renamed by `20260425181000`)
 - Has version_number, status (draft/pending_review/approved/active/deprecated/archived), approval workflow columns, materials_json, tooling_json, compliance_requirements_json, effective dates, aircraft/engine model arrays.
 - **Status:** Schema exists but has ZERO API routes, ZERO UI, ZERO React Query hooks.
 
@@ -591,7 +591,7 @@ The template creation form has these sections:
 
 ### QW6: Implement Template Version API Endpoints
 - **File:** New routes in `services/amro-api/src/routes/work-package-template.routes.ts`
-- **Change:** Implement GET/POST/PUT for `amro_work_package_template_versions` table. These are simple CRUD endpoints backed by an existing schema.
+- **Change:** Implement GET/POST/PUT for `amro_work_order_template_versions` table. These are simple CRUD endpoints backed by an existing schema.
 - **Impact:** Enables all future versioning features.
 - **Effort:** 2 days
 

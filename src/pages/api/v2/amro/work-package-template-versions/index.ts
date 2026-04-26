@@ -2,7 +2,7 @@
  * AMRO Work Package Template Version Management API
  * 
  * DATABASE SCHEMA ANALYSIS:
- * - Uses existing table: amro_work_package_template_versions (created 2026-04-12)
+ * - Uses existing table: amro_work_order_template_versions (created 2026-04-12, renamed)
  * - Uses existing table: work_order_templates (created 2026-03-22, enhanced 2026-04-05, renamed 2026-04-25)
  * - NO NEW TABLES REQUIRED - schema is comprehensive
  * 
@@ -18,7 +18,7 @@
  * - Status filtering
  */
 
-import type { ApiRequest, ApiResponse } from '../../../../_utils/types';
+import type { ApiRequest, ApiResponse } from '../../../_utils/types';
 import {
   applyCors,
   authenticateRequest,
@@ -29,8 +29,8 @@ import {
   enforceRateLimit,
   handlePreflight,
   resolveAndApplyAccessContext,
-} from '../../../../_utils/http';
-import { sendErrorResponse } from '../../../../_utils/errorHandler';
+} from '../../../_utils/http';
+import { sendErrorResponse } from '../../../_utils/errorHandler';
 import { createClient } from '@supabase/supabase-js';
 
 function parseBody(body: unknown): Record<string, unknown> {
@@ -86,7 +86,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const status = String(req.query.status || '').trim() || undefined;
 
       let query = supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .select('*', { count: 'exact' })
         .eq('tenant_id', tenantId)
         .eq('template_id', templateId)
@@ -140,7 +140,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       // Get the latest version number to increment
       const { data: latestVersion, error: versionError } = await supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .select('version_number')
         .eq('tenant_id', tenantId)
         .eq('template_id', templateId)
@@ -155,7 +155,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const newVersionNumber = (latestVersion?.version_number || 0) + 1;
 
       const { data: version, error: createError } = await supabase
-        .from('amro_work_package_template_versions')
+        .from('amro_work_order_template_versions')
         .insert({
           tenant_id: tenantId,
           franchise_id: franchiseId,

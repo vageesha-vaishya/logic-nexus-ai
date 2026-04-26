@@ -3,7 +3,7 @@
 -- ============================================================================
 -- The Materials+, Tooling+, and Compliance+ data cannot be saved because
 -- these columns don't exist in the main work_package_templates table.
--- They only exist in the amro_work_package_template_versions table.
+-- They only exist in the amro_work_order_template_versions table.
 -- 
 -- RUN THIS SQL in your Supabase SQL Editor immediately!
 -- ============================================================================
