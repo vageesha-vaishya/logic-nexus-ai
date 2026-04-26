@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Download, FileText } from 'lucide-react';
+import { ClipboardList, Cog, Download, FileText, Link2, Wrench } from 'lucide-react';
 import { toast } from 'sonner';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
@@ -37,9 +37,15 @@ type MpdCreateFormState = MpdUpsertInput & {
   zone: string;
   area: string;
   note: string;
+  estimated_man_hours_hms: string;
   frequency_hours: number | null;
+  frequency_hours_hms: string;
+  frequency_hobbs: number | null;
   frequency_days: number | null;
+  frequency_months: number | null;
+  frequency_years: number | null;
   frequency_cycles: number | null;
+  frequency_rins: number | null;
   frequency_landings: number | null;
   other_tools: string;
   other_spares: string;
@@ -70,9 +76,15 @@ const CREATE_DEFAULTS: MpdCreateFormState = {
   zone: '',
   area: '',
   note: '',
+  estimated_man_hours_hms: '',
   frequency_hours: null,
+  frequency_hours_hms: '',
+  frequency_hobbs: null,
   frequency_days: null,
+  frequency_months: null,
+  frequency_years: null,
   frequency_cycles: null,
+  frequency_rins: null,
   frequency_landings: null,
   other_tools: '',
   other_spares: '',
@@ -86,6 +98,17 @@ function toNullableNumber(value: string): number | null {
   if (!trimmed) return null;
   const parsed = Number(trimmed);
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function parseHoursHmsToNumber(value: string): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const match = /^(\d+):([0-5]\d):([0-5]\d)$/.exec(trimmed);
+  if (!match) return null;
+  const hours = Number(match[1]);
+  const minutes = Number(match[2]);
+  const seconds = Number(match[3]);
+  return hours + (minutes / 60) + (seconds / 3600);
 }
 
 function toUpsertPayload(record: MpdGridRow): MpdUpsertInput {
@@ -180,6 +203,20 @@ export function AmroMpdManagementPage() {
     };
   }, [records]);
 
+  const hasHoursValue = createForm.frequency_hours_hms.trim().length > 0;
+  const hasHobbsValue = createForm.frequency_hobbs !== null;
+  const hasDaysValue = createForm.frequency_days !== null;
+  const hasMonthsValue = createForm.frequency_months !== null;
+  const hasYearsValue = createForm.frequency_years !== null;
+  const hourHobbsSelected: 'hours' | 'hobbs' | null = hasHoursValue ? 'hours' : hasHobbsValue ? 'hobbs' : null;
+  const dayMonthYearSelected: 'days' | 'months' | 'years' | null = hasDaysValue
+    ? 'days'
+    : hasMonthsValue
+      ? 'months'
+      : hasYearsValue
+        ? 'years'
+        : null;
+
   const handleCreate = useCallback(async () => {
     if (!advancedFilters.model) {
       toast.error('Model selection is required');
@@ -187,6 +224,16 @@ export function AmroMpdManagementPage() {
     }
     if (!createForm.description || !createForm.ata_code || !createForm.inspection_type) {
       toast.error('Description, ATA Code, and Category are required');
+      return;
+    }
+    const parsedIntervalHours = parseHoursHmsToNumber(createForm.frequency_hours_hms);
+    if (createForm.frequency_hours_hms.trim().length > 0 && parsedIntervalHours === null) {
+      toast.error('Hours must be in HH:MM:SS format. MM and SS cannot exceed 59.');
+      return;
+    }
+    const parsedEstimatedManHours = parseHoursHmsToNumber(createForm.estimated_man_hours_hms);
+    if (createForm.estimated_man_hours_hms.trim().length > 0 && parsedEstimatedManHours === null) {
+      toast.error('Estd. Man Hours must be in HH:MM:SS format. MM and SS cannot exceed 59.');
       return;
     }
     const locJson = [
@@ -206,14 +253,24 @@ export function AmroMpdManagementPage() {
         attachments: createForm.attachment ? [createForm.attachment] : [],
       },
     ];
+    const computedIntervalMonths = (() => {
+      const months = createForm.frequency_months ?? 0;
+      const years = createForm.frequency_years ?? 0;
+      const totalMonths = months + (years * 12);
+      return totalMonths > 0 ? totalMonths : null;
+    })();
     try {
       await createMutation.mutateAsync({
         ...createForm,
         assembly_model_id: advancedFilters.model,
         category_code: createForm.inspection_type || null,
         reference_amp: createForm.reference_amp || null,
-        interval_hours: createForm.frequency_hours,
+        estimated_man_hours: parsedEstimatedManHours,
+        interval_hours: parsedIntervalHours,
+        threshold_hobbs: createForm.frequency_hobbs,
         interval_cycles: createForm.frequency_cycles,
+        threshold_rins: createForm.frequency_rins,
+        interval_months: computedIntervalMonths,
         threshold_cycles: createForm.frequency_cycles,
         loc_json: locJson,
         other_details_json: otherDetailsJson,
@@ -499,205 +556,364 @@ export function AmroMpdManagementPage() {
       </AmroModuleSurface>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-5xl border-2 border-sky-500 p-0">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="bg-[#37589b] px-4 py-2 text-xl font-bold text-white">
               Create MPD Record for model {selectedModelName || 'Selected Model'}
             </DialogTitle>
           </DialogHeader>
+          <div className="space-y-4 px-4 pb-4">
+            <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.4fr_0.9fr]">
+              <section className="rounded-none border border-sky-500 p-3">
+                <h3 className="mb-3 text-2xl font-semibold">Inspection Details</h3>
+                <div className="space-y-2.5">
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-center">
+                    <Label htmlFor="mpd-code" className="text-xl font-medium">Code/Form No</Label>
+                    <Input
+                      id="mpd-code"
+                      className="h-10 border-2 border-black"
+                      value={createForm.mpd_code || ''}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, mpd_code: event.target.value }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-center">
+                    <Label htmlFor="ata-code" className="text-xl font-medium">ATA Chapter *</Label>
+                    <select
+                      id="ata-code"
+                      className="h-10 w-full rounded-md border-2 border-black bg-background px-2 text-base"
+                      value={createForm.ata_code || ''}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, ata_code: event.target.value }))}
+                    >
+                      <option value="">(SELECT)</option>
+                      {(ataCodeOptionsQuery.data || []).map((option) => (
+                        <option key={option.id} value={option.code}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-start">
+                    <Label htmlFor="reference-amp" className="pt-2 text-xl font-medium">Reference</Label>
+                    <Textarea
+                      id="reference-amp"
+                      className="min-h-20 border-2 border-black"
+                      value={createForm.reference_amp || ''}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, reference_amp: event.target.value }))}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-start">
+                    <Label htmlFor="description" className="pt-2 text-xl font-medium">Description *</Label>
+                    <Textarea
+                      id="description"
+                      className="min-h-20 border-2 border-black"
+                      value={createForm.description || ''}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-center">
+                    <Label htmlFor="inspection-type" className="text-xl font-medium">Inspection Type *</Label>
+                    <select
+                      id="inspection-type"
+                      className="h-10 w-full rounded-md border-2 border-black bg-background px-2 text-base"
+                      value={createForm.inspection_type}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, inspection_type: event.target.value }))}
+                    >
+                      <option value="">(SELECT)</option>
+                      {categoryOptions.map((option) => (
+                        <option key={option.id} value={option.code}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-center">
+                    <Label htmlFor="zone" className="text-xl font-medium">Zone</Label>
+                    <Input
+                      id="zone"
+                      className="h-10 border-2 border-black"
+                      value={createForm.zone}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, zone: event.target.value }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-center">
+                    <Label htmlFor="area" className="text-xl font-medium">Area</Label>
+                    <Input
+                      id="area"
+                      className="h-10 border-2 border-black"
+                      value={createForm.area}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, area: event.target.value }))}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-start">
+                    <Label htmlFor="note" className="pt-2 text-xl font-medium">Note</Label>
+                    <Textarea
+                      id="note"
+                      className="min-h-20 border-2 border-black"
+                      value={createForm.note}
+                      onChange={(event) => setCreateForm((current) => ({ ...current, note: event.target.value }))}
+                      rows={2}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-center">
+                    <Label htmlFor="estimated-man-hours" className="text-xl font-medium">Estd. Man Hours</Label>
+                    <Input
+                      id="estimated-man-hours"
+                      type="text"
+                      className="h-10 border-2 border-black"
+                      value={createForm.estimated_man_hours_hms}
+                      placeholder="HH:MM:SS"
+                      onChange={(event) => {
+                        const sanitized = event.target.value.replace(/[^\d:]/g, '');
+                        if (!/^\d{0,8}(?::\d{0,2}){0,2}$/.test(sanitized)) {
+                          return;
+                        }
+                        setCreateForm((current) => ({
+                          ...current,
+                          estimated_man_hours_hms: sanitized,
+                          estimated_man_hours: parseHoursHmsToNumber(sanitized),
+                        }));
+                      }}
+                    />
+                  </div>
+                  <div className="grid grid-cols-1 gap-2 md:grid-cols-[0.48fr_1fr] md:items-center">
+                    <Label className="text-xl font-medium">Attach File</Label>
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Input
+                          type="file"
+                          className="h-10 border-2 border-black"
+                          onChange={(event) => void handleSelectAttachment(event.target.files?.[0] || null)}
+                          disabled={uploadAttachmentMutation.isPending}
+                        />
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={() => setCreateForm((current) => ({ ...current, attachment: null }))}
+                        >
+                          Remove Attachment
+                        </Button>
+                      </div>
+                      {createForm.attachment ? (
+                        <p className="text-xs text-muted-foreground">
+                          Attached: {createForm.attachment.file_name}
+                        </p>
+                      ) : null}
+                    </div>
+                  </div>
+                </div>
+              </section>
 
-          <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="mpd-code">Code / Form No</Label>
-              <Input
-                id="mpd-code"
-                value={createForm.mpd_code || ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, mpd_code: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="ata-code">ATA Chapter *</Label>
-              <select
-                id="ata-code"
-                className="h-10 w-full rounded-md border bg-background px-2"
-                value={createForm.ata_code || ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, ata_code: event.target.value }))}
-              >
-                <option value="">(SELECT)</option>
-                {(ataCodeOptionsQuery.data || []).map((option) => (
-                  <option key={option.id} value={option.code}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="reference-amp">Reference</Label>
-              <Textarea
-                id="reference-amp"
-                value={createForm.reference_amp || ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, reference_amp: event.target.value }))}
-                rows={2}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="description">Description *</Label>
-              <Textarea
-                id="description"
-                value={createForm.description || ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, description: event.target.value }))}
-                rows={3}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="inspection-type">Category *</Label>
-              <select
-                id="inspection-type"
-                className="h-10 w-full rounded-md border bg-background px-2"
-                value={createForm.inspection_type}
-                onChange={(event) => setCreateForm((current) => ({ ...current, inspection_type: event.target.value }))}
-              >
-                <option value="">(SELECT)</option>
-                {categoryOptions.map((option) => (
-                  <option key={option.id} value={option.code}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="zone">Zone</Label>
-              <Input
-                id="zone"
-                value={createForm.zone}
-                onChange={(event) => setCreateForm((current) => ({ ...current, zone: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="area">Area</Label>
-              <Input
-                id="area"
-                value={createForm.area}
-                onChange={(event) => setCreateForm((current) => ({ ...current, area: event.target.value }))}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label htmlFor="note">Note</Label>
-              <Textarea
-                id="note"
-                value={createForm.note}
-                onChange={(event) => setCreateForm((current) => ({ ...current, note: event.target.value }))}
-                rows={2}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="interval-hours">Hours</Label>
-              <Input
-                id="interval-hours"
-                type="number"
-                value={createForm.frequency_hours ?? ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, frequency_hours: toNullableNumber(event.target.value) }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="interval-days">Days</Label>
-              <Input
-                id="interval-days"
-                type="number"
-                value={createForm.frequency_days ?? ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, frequency_days: toNullableNumber(event.target.value) }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="interval-cycles">Cycles</Label>
-              <Input
-                id="interval-cycles"
-                type="number"
-                value={createForm.frequency_cycles ?? ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, frequency_cycles: toNullableNumber(event.target.value) }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="threshold-cycles">Landings</Label>
-              <Input
-                id="threshold-cycles"
-                type="number"
-                value={createForm.frequency_landings ?? ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, frequency_landings: toNullableNumber(event.target.value) }))}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="estimated-man-hours">Estd. Man Hours</Label>
-              <Input
-                id="estimated-man-hours"
-                type="number"
-                value={createForm.estimated_man_hours ?? ''}
-                onChange={(event) => setCreateForm((current) => ({ ...current, estimated_man_hours: toNullableNumber(event.target.value) }))}
-              />
-            </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Attach File</Label>
-              <div className="flex items-center gap-2">
-                <Input
-                  type="file"
-                  onChange={(event) => void handleSelectAttachment(event.target.files?.[0] || null)}
-                  disabled={uploadAttachmentMutation.isPending}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setCreateForm((current) => ({ ...current, attachment: null }))}
-                >
-                  Remove Attachment
-                </Button>
+              <div className="space-y-4">
+                <section className="rounded-none border border-sky-500 p-3">
+                  <h3 className="mb-2 text-2xl font-semibold">Frequency of Inspection</h3>
+                  <div className="overflow-hidden rounded-md border-2 border-black">
+                    <div className="grid grid-cols-[1fr_1fr] border-b-2 border-black bg-[#37589b] text-lg font-semibold text-white">
+                      <span className="border-r-2 border-black px-2 py-1">Period</span>
+                      <span className="px-2 py-1">Frequency</span>
+                    </div>
+                    {[
+                      {
+                        id: 'interval-hours',
+                        label: 'Hours',
+                        value: createForm.frequency_hours_hms,
+                        disabled: hourHobbsSelected === 'hobbs',
+                        inputType: 'text',
+                        placeholder: 'HH:MM:SS',
+                        onChange: (value: string) => {
+                          const sanitized = value.replace(/[^\d:]/g, '');
+                          if (!/^\d{0,8}(?::\d{0,2}){0,2}$/.test(sanitized)) {
+                            return;
+                          }
+                          setCreateForm((current) => ({
+                            ...current,
+                            frequency_hours_hms: sanitized,
+                            frequency_hours: parseHoursHmsToNumber(sanitized),
+                          }));
+                        },
+                      },
+                      {
+                        id: 'interval-hobbs',
+                        label: 'Hobbs',
+                        value: createForm.frequency_hobbs,
+                        disabled: hourHobbsSelected === 'hours',
+                        onChange: (value: string) => setCreateForm((current) => ({ ...current, frequency_hobbs: toNullableNumber(value) })),
+                      },
+                      {
+                        id: 'interval-days',
+                        label: 'Days',
+                        value: createForm.frequency_days,
+                        disabled: dayMonthYearSelected !== null && dayMonthYearSelected !== 'days',
+                        onChange: (value: string) => setCreateForm((current) => ({ ...current, frequency_days: toNullableNumber(value) })),
+                      },
+                      {
+                        id: 'interval-months',
+                        label: 'Months',
+                        value: createForm.frequency_months,
+                        disabled: dayMonthYearSelected !== null && dayMonthYearSelected !== 'months',
+                        onChange: (value: string) => setCreateForm((current) => ({ ...current, frequency_months: toNullableNumber(value) })),
+                      },
+                      {
+                        id: 'interval-years',
+                        label: 'Years',
+                        value: createForm.frequency_years,
+                        disabled: dayMonthYearSelected !== null && dayMonthYearSelected !== 'years',
+                        onChange: (value: string) => setCreateForm((current) => ({ ...current, frequency_years: toNullableNumber(value) })),
+                      },
+                      {
+                        id: 'interval-cycles',
+                        label: 'Cycles',
+                        value: createForm.frequency_cycles,
+                        disabled: false,
+                        inputType: 'text',
+                        inputMode: 'numeric',
+                        pattern: '[0-9]*',
+                        onChange: (value: string) => {
+                          const digitsOnly = value.replace(/\D/g, '');
+                          setCreateForm((current) => ({ ...current, frequency_cycles: toNullableNumber(digitsOnly) }));
+                        },
+                      },
+                      {
+                        id: 'interval-rins',
+                        label: 'RINS',
+                        value: createForm.frequency_rins,
+                        disabled: false,
+                        inputType: 'text',
+                        inputMode: 'numeric',
+                        pattern: '[0-9]*',
+                        onChange: (value: string) => {
+                          const digitsOnly = value.replace(/\D/g, '');
+                          setCreateForm((current) => ({ ...current, frequency_rins: toNullableNumber(digitsOnly) }));
+                        },
+                      },
+                      {
+                        id: 'threshold-cycles',
+                        label: 'Landings',
+                        value: createForm.frequency_landings,
+                        disabled: false,
+                        inputType: 'text',
+                        inputMode: 'numeric',
+                        pattern: '[0-9]*',
+                        onChange: (value: string) => {
+                          const digitsOnly = value.replace(/\D/g, '');
+                          setCreateForm((current) => ({ ...current, frequency_landings: toNullableNumber(digitsOnly) }));
+                        },
+                      },
+                    ].map((row, index, list) => (
+                      <div
+                        key={row.id}
+                        className={`grid grid-cols-[1fr_1fr] ${index < list.length - 1 ? 'border-b border-black' : ''}`}
+                      >
+                        <Label htmlFor={row.id} className="border-r border-black px-2 py-1.5 text-lg font-medium">
+                          {row.label}
+                        </Label>
+                        <div className="p-1">
+                          <Input
+                            id={row.id}
+                            type={row.inputType || 'number'}
+                            className={`h-9 border-2 border-black ${row.disabled ? 'cursor-not-allowed bg-muted text-muted-foreground' : ''}`}
+                            value={row.value ?? ''}
+                            placeholder={row.placeholder || undefined}
+                            inputMode={row.inputMode === 'numeric' ? 'numeric' : undefined}
+                            pattern={row.pattern || undefined}
+                            onChange={(event) => row.onChange(event.target.value)}
+                            disabled={row.disabled}
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <section className="rounded-none border border-sky-500 p-3">
+                  <h3 className="mb-2 text-2xl font-semibold">Other Details</h3>
+                  <div className="space-y-2">
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md border border-sky-500 px-2 py-1.5 text-left text-blue-700 underline-offset-2 hover:underline"
+                    >
+                      <Wrench className="h-4 w-4" />
+                      Tools {createForm.other_tools ? '(1 record)' : '(0 record(s))'}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md border border-sky-500 px-2 py-1.5 text-left text-blue-700 underline-offset-2 hover:underline"
+                    >
+                      <Cog className="h-4 w-4" />
+                      Spares {createForm.other_spares ? '(1 record)' : '(0 record(s))'}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md border border-sky-500 px-2 py-1.5 text-left text-blue-700 underline-offset-2 hover:underline"
+                    >
+                      <ClipboardList className="h-4 w-4" />
+                      Task Cards {createForm.other_task_cards ? '(1 record)' : '(0 record(s))'}
+                    </button>
+                    <button
+                      type="button"
+                      className="flex w-full items-center gap-2 rounded-md border border-sky-500 px-2 py-1.5 text-left text-blue-700 underline-offset-2 hover:underline"
+                    >
+                      <Link2 className="h-4 w-4" />
+                      Link Maint. Activity {createForm.other_linked_activities ? '(1 record)' : '(0 record(s))'}
+                    </button>
+                  </div>
+                </section>
               </div>
-              {createForm.attachment ? (
-                <p className="text-xs text-muted-foreground">
-                  Attached: {createForm.attachment.file_name}
-                </p>
-              ) : null}
             </div>
-            <div className="space-y-2 md:col-span-2">
-              <Label>Other Details</Label>
-              <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+
+            <div className="grid grid-cols-1 gap-3 rounded-none border border-sky-500 p-3 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="other-tools">Tools</Label>
                 <Input
-                  placeholder="Tools"
+                  id="other-tools"
                   value={createForm.other_tools}
                   onChange={(event) => setCreateForm((current) => ({ ...current, other_tools: event.target.value }))}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="other-spares">Spares</Label>
                 <Input
-                  placeholder="Spares"
+                  id="other-spares"
                   value={createForm.other_spares}
                   onChange={(event) => setCreateForm((current) => ({ ...current, other_spares: event.target.value }))}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="other-task-cards">Task Cards</Label>
                 <Input
-                  placeholder="Task Cards"
+                  id="other-task-cards"
                   value={createForm.other_task_cards}
                   onChange={(event) => setCreateForm((current) => ({ ...current, other_task_cards: event.target.value }))}
                 />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="other-linked-activities">Link Maint. Activity</Label>
                 <Input
-                  placeholder="Link Maint. Activity"
+                  id="other-linked-activities"
                   value={createForm.other_linked_activities}
                   onChange={(event) => setCreateForm((current) => ({ ...current, other_linked_activities: event.target.value }))}
                 />
               </div>
-            </div>
-            <div className="flex items-center justify-between rounded-md border p-3 md:col-span-2">
-              <div className="flex items-center gap-2 text-sm">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                Mandatory Task Template
+              <div className="flex items-center justify-between rounded-md border p-3 md:col-span-2">
+                <div className="flex items-center gap-2 text-sm">
+                  <FileText className="h-4 w-4 text-muted-foreground" />
+                  Mandatory Task Template
+                </div>
+                <Switch
+                  checked={Boolean(createForm.is_mandatory)}
+                  onCheckedChange={(checked) => setCreateForm((current) => ({ ...current, is_mandatory: checked }))}
+                />
               </div>
-              <Switch
-                checked={Boolean(createForm.is_mandatory)}
-                onCheckedChange={(checked) => setCreateForm((current) => ({ ...current, is_mandatory: checked }))}
-              />
             </div>
           </div>
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setCreateOpen(false)}>Cancel</Button>
-            <Button onClick={() => void handleCreate()} disabled={createMutation.isPending}>
-              {createMutation.isPending ? 'Creating...' : 'Create MPD'}
+          <DialogFooter className="border-t px-4 pb-4 pt-3">
+            <Button variant="outline" className="min-w-28 border-2 border-sky-500" onClick={() => setCreateOpen(false)}>
+              Back
+            </Button>
+            <Button className="min-w-28 border-2 border-sky-500 bg-[#efefef] text-black hover:bg-[#dfdfdf]" onClick={() => void handleCreate()} disabled={createMutation.isPending}>
+              {createMutation.isPending ? 'Saving...' : 'Save'}
             </Button>
           </DialogFooter>
         </DialogContent>

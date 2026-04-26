@@ -42,6 +42,8 @@ export type MpdUpsertInput = {
   interval_hours?: number | null;
   interval_cycles?: number | null;
   interval_months?: number | null;
+  threshold_rins?: number | null;
+  threshold_hobbs?: number | null;
   threshold_cycles?: number | null;
   is_mandatory?: boolean;
   assembly_model_id?: string | null;
@@ -149,6 +151,8 @@ export function mapMpdInputToApiPayload(input: MpdUpsertInput): Record<string, u
     interval_hours: normalizeNumber(input.interval_hours),
     interval_cycles: normalizeNumber(input.interval_cycles),
     interval_months: normalizeNumber(input.interval_months),
+    threshold_rins: normalizeNumber(input.threshold_rins),
+    threshold_hobbs: normalizeNumber(input.threshold_hobbs),
     threshold_cycles: normalizeNumber(input.threshold_cycles),
     is_mandatory: normalizeBoolean(input.is_mandatory, true),
     assembly_model_id: normalizeString(input.assembly_model_id),
