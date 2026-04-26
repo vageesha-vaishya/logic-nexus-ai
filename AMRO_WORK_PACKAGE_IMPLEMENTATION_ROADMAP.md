@@ -102,7 +102,7 @@ This document provides a complete implementation roadmap for transforming the AM
 │  ├─ amro_task_dependencies                                  │
 │  ├─ amro_task_time_logs                                    │
 │  ├─ amro_compliance_directives                              │
-│  ├─ amro_work_package_compliance_records                    │
+│  ├─ amro_work_order_compliance_records                      │
 │  ├─ amro_certificates_release_service                       │
 │  ├─ amro_predictive_maintenance_recommendations            │
 │  ├─ amro_resource_pools                                     │

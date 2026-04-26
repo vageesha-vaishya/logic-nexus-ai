@@ -64,7 +64,7 @@ Transform the AMRO Work Package Management module from a basic work order system
 | `amro_task_dependencies` | Task dependency graph | Critical path analysis |
 | `amro_task_time_logs` | Actual labor hour tracking | Cost accounting |
 | `amro_compliance_directives` | AD/SB directive tracking | FAA/EASA compliance |
-| `amro_work_package_compliance_records` | Task-level compliance records | Digital signatures |
+| `amro_work_order_compliance_records` | Task-level compliance records | Digital signatures |
 | `amro_certificates_release_service` | CRS generation | EASA Part-145 |
 | `amro_predictive_maintenance_recommendations` | AI/ML predictions | Condition-based maintenance |
 | `amro_resource_pools` | Resource management | Qualification tracking |

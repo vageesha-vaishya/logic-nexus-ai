@@ -88,7 +88,7 @@
 | `work-packages/[id]/certificates.ts` | `/api/v2/amro/work-packages/:id/certificates` | POST | Generate CRS |
 
 **Database Tables Used:**
-- `amro_work_package_compliance_records` (created 2026-04-12)
+- `amro_work_order_compliance_records` (created 2026-04-12, renamed)
 - `amro_compliance_directives` (created 2026-04-12)
 - `amro_certificates_release_service` (created 2026-04-12)
 - `work_packages` (created 2026-03-22)
@@ -118,7 +118,7 @@
 | Emergency WPs | `amro_emergency_work_packages` | 2026-04-12 |
 | Non-scheduled tasks | `amro_non_scheduled_tasks` | 2026-04-12 |
 | Compliance directives | `amro_compliance_directives` | 2026-04-12 |
-| WP compliance records | `amro_work_package_compliance_records` | 2026-04-12 |
+| WP compliance records | `amro_work_order_compliance_records` | 2026-04-12 |
 | CRS certificates | `amro_certificates_release_service` | 2026-04-12 |
 | Task dependencies | `amro_task_dependencies` | 2026-04-12 |
 | Task time logs | `amro_task_time_logs` | 2026-04-12 |

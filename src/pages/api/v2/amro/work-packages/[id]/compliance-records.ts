@@ -2,7 +2,7 @@
  * AMRO Compliance Records API
  * 
  * DATABASE SCHEMA ANALYSIS:
- * - Uses existing table: amro_work_package_compliance_records (created 2026-04-12)
+ * - Uses existing table: amro_work_order_compliance_records (created 2026-04-12, renamed)
  * - Uses existing table: amro_compliance_directives (created 2026-04-12)
  * - Uses existing table: amro_certificates_release_service (created 2026-04-12)
  * - Uses existing table: work_orders (created 2026-03-22)
@@ -83,7 +83,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Verify work package exists and belongs to tenant
-    const { data: wp, error: wpError } = await supabase
+    const { error: wpError } = await supabase
       .from('work_orders')
       .select('id, aircraft_id')
       .eq('id', workPackageId)
@@ -105,7 +105,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const status = String(req.query.status || '').trim() || undefined;
 
       let query = supabase
-        .from('amro_work_package_compliance_records')
+        .from('amro_work_order_compliance_records')
         .select(`
           *,
           directive:directive_id (
@@ -117,7 +117,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           )
         `, { count: 'exact' })
         .eq('tenant_id', tenantId)
-        .eq('work_package_id', workPackageId)
+        .eq('work_order_id', workPackageId)
         .order('created_at', { ascending: false });
 
       if (complianceType && VALID_COMPLIANCE_TYPES.includes(complianceType)) {
@@ -128,7 +128,38 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         query = query.eq('compliance_status', status);
       }
 
-      const { data: records, error, count } = await query;
+      let { data: records, error, count } = await query;
+
+      // Transition-safe fallback while environments converge on rename migration.
+      if (error && /amro_work_order_compliance_records|work_order_id/i.test(String(error.message || ''))) {
+        let legacyQuery = supabase
+          .from('amro_work_package_compliance_records')
+          .select(`
+            *,
+            directive:directive_id (
+              id,
+              directive_type,
+              directive_number,
+              issuing_authority,
+              title
+            )
+          `, { count: 'exact' })
+          .eq('tenant_id', tenantId)
+          .eq('work_package_id', workPackageId)
+          .order('created_at', { ascending: false });
+
+        if (complianceType && VALID_COMPLIANCE_TYPES.includes(complianceType)) {
+          legacyQuery = legacyQuery.eq('compliance_type', complianceType);
+        }
+        if (status && VALID_COMPLIANCE_STATUSES.includes(status)) {
+          legacyQuery = legacyQuery.eq('compliance_status', status);
+        }
+
+        const legacyResult = await legacyQuery;
+        records = legacyResult.data;
+        error = legacyResult.error;
+        count = legacyResult.count ?? count;
+      }
 
       if (error) {
         throw new Error(`Failed to fetch compliance records: ${error.message}`);
@@ -179,11 +210,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const licenseNumber = body.license_number ? String(body.license_number).trim() : null;
       const licenseExpiry = body.license_expiry ? String(body.license_expiry).trim() : null;
 
-      const { data: record, error: createError } = await supabase
-        .from('amro_work_package_compliance_records')
+      let { data: record, error: createError } = await supabase
+        .from('amro_work_order_compliance_records')
         .insert({
           tenant_id: tenantId,
-          work_package_id: workPackageId,
+          work_order_id: workPackageId,
           task_id: taskId,
           directive_id: directiveId,
           compliance_type: complianceType,
@@ -204,6 +235,36 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         })
         .select()
         .single();
+
+      if (createError && /amro_work_order_compliance_records|work_order_id/i.test(String(createError.message || ''))) {
+        const legacyResult = await supabase
+          .from('amro_work_package_compliance_records')
+          .insert({
+            tenant_id: tenantId,
+            work_package_id: workPackageId,
+            task_id: taskId,
+            directive_id: directiveId,
+            compliance_type: complianceType,
+            compliance_reference: complianceReference,
+            compliance_method: complianceMethod,
+            compliance_status: complianceStatus,
+            certified_by: certifiedBy,
+            certified_at: certifiedBy ? new Date().toISOString() : null,
+            certificate_number: certificateNumber,
+            license_number: licenseNumber,
+            license_expiry: licenseExpiry,
+            evidence_attachments: evidenceAttachments,
+            evidence_captured: evidenceCaptured,
+            inspection_result: inspectionResult,
+            findings: findings,
+            created_by: authUser.userId,
+            updated_by: authUser.userId,
+          })
+          .select()
+          .single();
+        record = legacyResult.data;
+        createError = legacyResult.error;
+      }
 
       if (createError) {
         throw new Error(`Failed to create compliance record: ${createError.message}`);

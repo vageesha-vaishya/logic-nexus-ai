@@ -325,7 +325,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 | `amro_task_dependencies` | Task dependency graph | P0 |
 | `amro_task_time_logs` | Actual labor hour tracking | P1 |
 | `amro_compliance_directives` | AD/SB tracking | P0 |
-| `amro_work_package_compliance_records` | Task-level compliance | P0 |
+| `amro_work_order_compliance_records` | Task-level compliance | P0 |
 | `amro_certificates_release_service` | CRS generation | P0 |
 | `amro_predictive_maintenance_recommendations` | AI predictions | P2 |
 | `amro_resource_pools` | Resource management | P1 |

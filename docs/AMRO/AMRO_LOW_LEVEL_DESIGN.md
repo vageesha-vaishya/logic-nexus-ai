@@ -3920,6 +3920,69 @@ Implementation Notes:
   - Migration: 20260425162000_amro_rename_wp_template_categories_to_wo.sql
 ```
 
+```text
+Component Type: Table
+Component Name: public.amro_work_order_compliance_records
+Purpose: Tenant-scoped task-level compliance evidence, certification, and directive traceability for AMRO work orders.
+Estimated Row Count: 500-1,000,000 per tenant
+Primary Key:
+  - id
+Foreign Keys:
+  - work_order_id -> public.work_packages(id) ON DELETE CASCADE
+  - task_id -> public.tasks(id) ON DELETE SET NULL
+  - directive_id -> public.amro_compliance_directives(id) ON DELETE SET NULL
+  - certified_by -> auth.users(id) ON DELETE NO ACTION
+  - created_by -> auth.users(id) ON DELETE NO ACTION
+  - updated_by -> auth.users(id) ON DELETE NO ACTION
+Unique Constraints:
+  - none
+Check Constraints:
+  - compliance_type IN ('AD','SB','inspection','certification','routine')
+  - compliance_status IN ('pending','in_progress','completed','deferred','exempted')
+Defaults:
+  - id: gen_random_uuid()
+  - compliance_status: 'pending'
+  - evidence_attachments: '[]'::jsonb
+  - evidence_captured: false
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_wo_compliance_records_tenant(tenant_id)
+  - idx_wo_compliance_records_wo(work_order_id)
+  - idx_wo_compliance_records_task(task_id)
+  - idx_wo_compliance_records_directive(directive_id)
+  - idx_wo_compliance_records_status(compliance_status)
+  - idx_wo_compliance_records_certified_by(certified_by)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:none
+  - work_order_id | uuid | nullable:no | default:none
+  - task_id | uuid | nullable:yes | default:null
+  - directive_id | uuid | nullable:yes | default:null
+  - compliance_type | text | nullable:no | default:none
+  - compliance_reference | text | nullable:yes | default:null
+  - compliance_method | text | nullable:yes | default:null
+  - compliance_status | text | nullable:no | default:'pending'
+  - certified_by | uuid | nullable:yes | default:null
+  - certified_at | timestamptz | nullable:yes | default:null
+  - certificate_number | text | nullable:yes | default:null
+  - license_number | text | nullable:yes | default:null
+  - license_expiry | date | nullable:yes | default:null
+  - evidence_attachments | jsonb | nullable:no | default:'[]'::jsonb
+  - evidence_captured | boolean | nullable:yes | default:false
+  - inspection_result | text | nullable:yes | default:null
+  - findings | text | nullable:yes | default:null
+  - created_by | uuid | nullable:yes | default:null
+  - created_at | timestamptz | nullable:yes | default:now()
+  - updated_by | uuid | nullable:yes | default:null
+  - updated_at | timestamptz | nullable:yes | default:now()
+Security Considerations:
+  - RLS remains enabled; policy names are normalized to work-order terminology.
+  - Tenant and franchise scope enforcement is mandatory for all reads and writes.
+Implementation Notes:
+  - Migration: 20260425174000_amro_rename_wp_compliance_records_to_wo.sql
+```
+
 ---
 
 ## 25. Global Market Research and Technical Evaluation: MRO Aircraft Template Modules (2026)
