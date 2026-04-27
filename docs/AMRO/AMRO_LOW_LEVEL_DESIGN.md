@@ -3777,7 +3777,7 @@ Foreign Keys:
   - created_by -> auth.users(id) ON DELETE SET NULL
   - updated_by -> auth.users(id) ON DELETE SET NULL
 Unique Constraints:
-  - uq_tasks_work_package_sequence_active (work_order_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
+  - uq_tasks_work_order_sequence_active (work_order_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
 Check Constraints:
   - ck_tasks_sequence_positive (sequence IS NULL OR sequence > 0)
   - ck_tasks_sequence_order_positive (sequence_order IS NULL OR sequence_order > 0)
