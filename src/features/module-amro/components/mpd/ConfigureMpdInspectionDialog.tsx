@@ -67,6 +67,9 @@ export function ConfigureMpdInspectionDialog({
   onSubmit,
 }: Props) {
   const [values, setValues] = useState<ConfigureMpdInspectionFormValues>(DEFAULT_VALUES);
+  const sectionClassName = 'space-y-2 rounded-md border border-blue-500 p-3';
+  const blueInputClassName = 'border-blue-400 focus-visible:ring-blue-500';
+  const monitoringReadOnlyClassName = 'border-blue-300 bg-blue-50 text-slate-700';
 
   const initialValues = useMemo<ConfigureMpdInspectionFormValues>(() => ({
     ...DEFAULT_VALUES,
@@ -99,54 +102,54 @@ export function ConfigureMpdInspectionDialog({
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-          <section className="space-y-2 rounded-md border p-3">
+          <section className={sectionClassName}>
             <h3 className="font-semibold">Monitoring Details</h3>
             <div className="space-y-2">
               <Label>Inspection Type</Label>
-              <Input value={values.inspection_type} onChange={(e) => setField('inspection_type', e.target.value)} />
+              <Input value={values.inspection_type} readOnly className={monitoringReadOnlyClassName} />
             </div>
             <div className="space-y-2">
               <Label>ATA Chapter</Label>
-              <Input value={values.ata_chapter} onChange={(e) => setField('ata_chapter', e.target.value)} />
+              <Input value={values.ata_chapter} readOnly className={monitoringReadOnlyClassName} />
             </div>
             <div className="space-y-2">
               <Label>Reference</Label>
-              <Input value={values.reference} onChange={(e) => setField('reference', e.target.value)} />
+              <Input value={values.reference} readOnly className={monitoringReadOnlyClassName} />
             </div>
             <div className="space-y-2">
               <Label>Description</Label>
-              <Textarea value={values.description} onChange={(e) => setField('description', e.target.value)} rows={3} />
+              <Textarea value={values.description} readOnly rows={3} className={monitoringReadOnlyClassName} />
             </div>
           </section>
 
-          <section className="space-y-2 rounded-md border p-3">
+          <section className={sectionClassName}>
             <h3 className="font-semibold">Elapsed and Remaining Values</h3>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Elapsed Hours</Label>
-                <Input value={values.elapsed_hours} onChange={(e) => setField('elapsed_hours', e.target.value)} />
+                <Input className={blueInputClassName} value={values.elapsed_hours} onChange={(e) => setField('elapsed_hours', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Remaining Hours</Label>
-                <Input value={values.remaining_hours} onChange={(e) => setField('remaining_hours', e.target.value)} />
+                <Input className={blueInputClassName} value={values.remaining_hours} onChange={(e) => setField('remaining_hours', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Elapsed Months</Label>
-                <Input value={values.elapsed_months} onChange={(e) => setField('elapsed_months', e.target.value)} />
+                <Input className={blueInputClassName} value={values.elapsed_months} onChange={(e) => setField('elapsed_months', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Remaining Months</Label>
-                <Input value={values.remaining_months} onChange={(e) => setField('remaining_months', e.target.value)} />
+                <Input className={blueInputClassName} value={values.remaining_months} onChange={(e) => setField('remaining_months', e.target.value)} />
               </div>
             </div>
           </section>
 
-          <section className="space-y-2 rounded-md border p-3">
+          <section className={sectionClassName}>
             <h3 className="font-semibold">Done On Details</h3>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Done On</Label>
-                <Input type="date" value={values.done_on_date} onChange={(e) => setField('done_on_date', e.target.value)} />
+                <Input className={blueInputClassName} type="date" value={values.done_on_date} onChange={(e) => setField('done_on_date', e.target.value)} />
               </div>
               <div className="flex items-end gap-2 pb-2">
                 <input
@@ -159,28 +162,28 @@ export function ConfigureMpdInspectionDialog({
               </div>
               <div className="space-y-1">
                 <Label>Work Order No.</Label>
-                <Input value={values.work_order_no} onChange={(e) => setField('work_order_no', e.target.value)} />
+                <Input className={blueInputClassName} value={values.work_order_no} onChange={(e) => setField('work_order_no', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>License No.</Label>
-                <Input value={values.license_no} onChange={(e) => setField('license_no', e.target.value)} />
+                <Input className={blueInputClassName} value={values.license_no} onChange={(e) => setField('license_no', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Place</Label>
-                <Input value={values.place} onChange={(e) => setField('place', e.target.value)} />
+                <Input className={blueInputClassName} value={values.place} onChange={(e) => setField('place', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Actual Man Hours</Label>
-                <Input value={values.actual_man_hours} onChange={(e) => setField('actual_man_hours', e.target.value)} />
+                <Input className={blueInputClassName} value={values.actual_man_hours} onChange={(e) => setField('actual_man_hours', e.target.value)} />
               </div>
             </div>
             <div className="space-y-1">
               <Label>Remark</Label>
-              <Textarea value={values.remark} onChange={(e) => setField('remark', e.target.value)} rows={3} />
+              <Textarea className={blueInputClassName} value={values.remark} onChange={(e) => setField('remark', e.target.value)} rows={3} />
             </div>
           </section>
 
-          <section className="space-y-2 rounded-md border p-3">
+          <section className={sectionClassName}>
             <h3 className="font-semibold">Airframe Values</h3>
             <div className="flex items-center gap-2">
               <input
@@ -194,63 +197,64 @@ export function ConfigureMpdInspectionDialog({
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Started On (Hours)</Label>
-                <Input value={values.started_on_hours} onChange={(e) => setField('started_on_hours', e.target.value)} />
+                <Input className={blueInputClassName} value={values.started_on_hours} onChange={(e) => setField('started_on_hours', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Current (Hours)</Label>
-                <Input value={values.current_hours} onChange={(e) => setField('current_hours', e.target.value)} />
+                <Input className={blueInputClassName} value={values.current_hours} onChange={(e) => setField('current_hours', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Extension (Hours)</Label>
-                <Input value={values.extension_hours} onChange={(e) => setField('extension_hours', e.target.value)} />
+                <Input className={blueInputClassName} value={values.extension_hours} onChange={(e) => setField('extension_hours', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Due At (Hours)</Label>
-                <Input value={values.due_at_hours} onChange={(e) => setField('due_at_hours', e.target.value)} />
+                <Input className={blueInputClassName} value={values.due_at_hours} onChange={(e) => setField('due_at_hours', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Started On (Months)</Label>
-                <Input type="date" value={values.started_on_months_date} onChange={(e) => setField('started_on_months_date', e.target.value)} />
+                <Input className={blueInputClassName} type="date" value={values.started_on_months_date} onChange={(e) => setField('started_on_months_date', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Current (Months)</Label>
-                <Input type="date" value={values.current_months_date} onChange={(e) => setField('current_months_date', e.target.value)} />
+                <Input className={blueInputClassName} type="date" value={values.current_months_date} onChange={(e) => setField('current_months_date', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Extension (Months)</Label>
-                <Input value={values.extension_months} onChange={(e) => setField('extension_months', e.target.value)} />
+                <Input className={blueInputClassName} value={values.extension_months} onChange={(e) => setField('extension_months', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Due At (Months)</Label>
-                <Input type="date" value={values.due_at_months_date} onChange={(e) => setField('due_at_months_date', e.target.value)} />
+                <Input className={blueInputClassName} type="date" value={values.due_at_months_date} onChange={(e) => setField('due_at_months_date', e.target.value)} />
               </div>
             </div>
           </section>
 
-          <section className="space-y-2 rounded-md border p-3">
+          <section className={sectionClassName}>
             <h3 className="font-semibold">Document Details</h3>
             <div className="grid grid-cols-2 gap-2">
               <div className="space-y-1">
                 <Label>Revision No.</Label>
-                <Input value={values.revision_no} onChange={(e) => setField('revision_no', e.target.value)} />
+                <Input className={blueInputClassName} value={values.revision_no} onChange={(e) => setField('revision_no', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Page No.</Label>
-                <Input value={values.page_no} onChange={(e) => setField('page_no', e.target.value)} />
+                <Input className={blueInputClassName} value={values.page_no} onChange={(e) => setField('page_no', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Book No.</Label>
-                <Input value={values.book_no} onChange={(e) => setField('book_no', e.target.value)} />
+                <Input className={blueInputClassName} value={values.book_no} onChange={(e) => setField('book_no', e.target.value)} />
               </div>
               <div className="space-y-1">
                 <Label>Source Doc</Label>
-                <Input value={values.source_doc} onChange={(e) => setField('source_doc', e.target.value)} />
+                <Input className={blueInputClassName} value={values.source_doc} onChange={(e) => setField('source_doc', e.target.value)} />
               </div>
             </div>
             <div className="space-y-1">
               <Label>Attach File</Label>
               <Input
                 type="file"
+                className={blueInputClassName}
                 onChange={(e) => {
                   const fileName = e.target.files?.[0]?.name || '';
                   setField('attachment_file_name', fileName);
@@ -262,15 +266,15 @@ export function ConfigureMpdInspectionDialog({
             </div>
           </section>
 
-          <section className="space-y-2 rounded-md border p-3">
+          <section className={sectionClassName}>
             <h3 className="font-semibold">Extension Details</h3>
             <div className="space-y-1">
               <Label>Extension Date</Label>
-              <Input type="date" value={values.extension_date} onChange={(e) => setField('extension_date', e.target.value)} />
+              <Input className={blueInputClassName} type="date" value={values.extension_date} onChange={(e) => setField('extension_date', e.target.value)} />
             </div>
             <div className="space-y-1">
               <Label>Approval Remark</Label>
-              <Textarea value={values.approval_remark} onChange={(e) => setField('approval_remark', e.target.value)} rows={3} />
+              <Textarea className={blueInputClassName} value={values.approval_remark} onChange={(e) => setField('approval_remark', e.target.value)} rows={3} />
             </div>
           </section>
         </div>
