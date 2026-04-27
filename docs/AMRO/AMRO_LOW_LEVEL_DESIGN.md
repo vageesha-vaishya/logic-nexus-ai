@@ -2733,6 +2733,13 @@ Indexes:
   - none
 Columns:
   - frequency_sequence | integer identity | nullable:no | default:generated always
+  - code_form_no | varchar(50) | nullable:yes | default:null
+  - ata_code | varchar(10) | nullable:yes | default:null
+  - reference_amp | text | nullable:yes | default:null
+  - description | text | nullable:yes | default:null
+  - category_code | varchar(10) | nullable:yes | default:null
+  - estimated_man_hours | interval | nullable:yes | default:null
+  - revision_status | text | nullable:yes | default:null
   - frequency | text | nullable:yes | default:null
   - threshold_hours | interval | nullable:yes | default:null
   - threshold_cycles | integer | nullable:yes | default:null
@@ -2741,11 +2748,13 @@ Columns:
   - calendar_unit | public.calendar_unit | nullable:yes | default:null
   - threshold_rins | integer | nullable:yes | default:null
   - threshold_hobbs | integer | nullable:yes | default:null
+  - is_parsed_success | boolean | nullable:yes | default:null
 Security Considerations:
   - Table is intended for controlled ETL parsing workflows only.
   - No tenant/franchise columns; use privileged execution paths for staging runs.
 Implementation Notes:
   - Migration: 20260423113000_create_directive_frequency_temp.sql
+  - Migration: 20260426191500_redefine_directive_frequency_temp.sql
 ```
 
 ```text
