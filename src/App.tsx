@@ -919,9 +919,6 @@ const App = () => (
             <Route path="/dashboard/amro/settings/master-data/shift-calendars" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroShiftCalendarsMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/work-orders" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrdersMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/master-data/work-order-templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/work-order-templates" element={<Navigate to="/dashboard/amro/settings/work-order-templates" replace />} />
-            <Route path="/dashboard/amro/settings/work-order-templates/new" element={<Navigate to="/dashboard/amro/settings/work-order-templates/new" replace />} />
-            <Route path="/dashboard/amro/settings/work-order-templates/:id" element={<Navigate to="/dashboard/amro/settings/work-order-templates" replace />} />
             <Route path="/dashboard/amro/settings/work-order-templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroTemplateCatalog /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/work-order-templates/new" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
             <Route path="/dashboard/amro/settings/work-order-templates/:id" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
