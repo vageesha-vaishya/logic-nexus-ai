@@ -28,8 +28,8 @@
 | 8 | Model | `/dashboard/amro/settings/master-data/model` | Medium | 3 hours | P1 |
 | 9 | Regulator Profiles | `/dashboard/amro/settings/master-data/regulator-profiles` | Medium | 3 hours | P2 |
 | 10 | Shift Calendars | `/dashboard/amro/settings/master-data/shift-calendars` | Low | 2 hours | P2 |
-| 11 | Work Packages | `/dashboard/amro/settings/master-data/work-packages` | High | 4 hours | P2 |
-| 12 | Work Package Templates | `/dashboard/amro/settings/master-data/work_package_templates` | High | 4 hours | P2 |
+| 11 | Work Packages | `/dashboard/amro/settings/master-data/work-orders` | High | 4 hours | P2 |
+| 12 | Work Package Templates | `/dashboard/amro/settings/master-data/work_order_templates` | High | 4 hours | P2 |
 
 **Estimated Remaining Time:** ~27 hours
 

@@ -662,10 +662,10 @@ This section provides a complete scan-based mapping analysis for the nine specif
 | LLD 15.2 requirement | Codebase status | Gap type | Impact |
 |---|---|---|---|
 | Overview export requires governed export privilege and capped rows | Implemented (`overview-kpi.ts`) | Partial | Privilege and cap checks exist, but export lifecycle is not persisted for audit/download governance |
-| Work package create/transition/clone contracts | Implemented (`work-packages.ts`) | Closed | Durable persistence, registry-backed template authorization, and immutable workflow transaction logging are implemented |
+| Work package create/transition/clone contracts | Implemented (`work-orders.ts`) | Closed | Durable persistence, registry-backed template authorization, and immutable workflow transaction logging are implemented |
 | Task step/evidence/signature non-repudiation flow | Implemented (`tasks.ts`) | Partial | Integrity checks exist, but immutable evidence/signature persistence path is incomplete |
-| Scheduling assign/replan/confirm with conflict constraints | Implemented (`schedules/index.ts`, `schedules/replan.ts`, `work-packages.ts`) | Partial | Constraint checks exist, but no canonical scheduling state engine persistence |
-| Parts reserve/shortage/supplier ETA trusted adapter flow | Implemented (`work-packages.ts`) | Partial | API-level trust checks exist, but adapter delivery traceability storage is incomplete |
+| Scheduling assign/replan/confirm with conflict constraints | Implemented (`schedules/index.ts`, `schedules/replan.ts`, `work-orders.ts`) | Partial | Constraint checks exist, but no canonical scheduling state engine persistence |
+| Parts reserve/shortage/supplier ETA trusted adapter flow | Implemented (`work-orders.ts`) | Partial | API-level trust checks exist, but adapter delivery traceability storage is incomplete |
 | Compliance gate/exception/dossier obligations | Implemented (`compliance-gates.ts`) | Partial | Gate logic exists, but dossier artifact finalization and review workflow persistence are incomplete |
 | Certification validate/decision/escalation authority chain | Implemented (`certification.ts`) | Partial | Decision path exists, but authority chain is not fully backed by externalized registry source |
 | Integration ingest/replay/callback with schema and retry contracts | Implemented (`integration-hub.ts`) | Partial | Runtime contracts exist, but job lifecycle durability and callback evidence persistence are incomplete |
@@ -678,7 +678,7 @@ This section provides a complete scan-based mapping analysis for the nine specif
 | Module | Automated test status | Coverage snapshot (lines %) | Integration test result | UAT status |
 |---|---|---:|---|---|
 | Overview | `overview-kpi.test.ts` passed | 82.85% | Pass (19/19 tests) | Not executed (0% complete) |
-| Work Packages | `work-packages.test.ts` passed | 86.82% | Pass (33/33 tests) | Not executed (0% complete) |
+| Work Packages | `work-orders.test.ts` passed | 86.82% | Pass (33/33 tests) | Not executed (0% complete) |
 | Task Execution | `tasks.test.ts` passed | 85.10% | Pass (19/19 tests) | Not executed (0% complete) |
 | Scheduling | `schedules/index.test.ts`, `schedules/replan.test.ts` passed | 92.59% / 93.33% | Pass (13/13 tests) | Not executed (0% complete) |
 | Parts | `inventory/reservations.test.ts`, `inventory/availability.test.ts` passed | 79.54% / 81.57% | Pass (2/2 tests) | Not executed (0% complete) |

@@ -145,7 +145,7 @@ AS $$
 DECLARE
   v_aircraft record;
   v_flight_log_id uuid;
-  v_work_package_id uuid;
+  v_work_order_id uuid;
   v_task_id uuid;
   v_now timestamptz := now();
   v_near_due_records jsonb := '[]'::jsonb;
@@ -301,7 +301,7 @@ BEGIN
       substr(md5(random()::text), 1, 6)
     );
 
-    INSERT INTO public.work_packages (
+    INSERT INTO public.work_orders (
       tenant_id,
       franchise_id,
       aircraft_id,
@@ -337,12 +337,12 @@ BEGIN
       p_user_id,
       p_user_id
     )
-    RETURNING id INTO v_work_package_id;
+    RETURNING id INTO v_work_order_id;
 
     INSERT INTO public.tasks (
       tenant_id,
       franchise_id,
-      work_package_id,
+      work_order_id,
       task_number,
       title,
       description,
@@ -355,7 +355,7 @@ BEGIN
     VALUES (
       p_tenant_id,
       p_franchise_id,
-      v_work_package_id,
+      v_work_order_id,
       'SNAG-1',
       'Inspect and rectify pilot reported discrepancy',
       p_pirep_discrepancy,
@@ -370,7 +370,7 @@ BEGIN
 
   RETURN jsonb_build_object(
     'flight_log_id', v_flight_log_id,
-    'snag_work_package_id', v_work_package_id,
+    'snag_work_order_id', v_work_order_id,
     'snag_task_id', v_task_id,
     'aircraft_counter', jsonb_build_object(
       'current_flight_hours', coalesce(v_aircraft.current_flight_hours, 0) + GREATEST(coalesce(p_flight_hours, 0), 0),

@@ -1,7 +1,7 @@
 import type {
   AircraftPresenceCollaborator,
-  AircraftWorkPackageFormValues,
-  AircraftWorkPackageSnapshot,
+  AircraftWorkOrderFormValues,
+  AircraftWorkOrderSnapshot,
   EntityFormField,
   FormValues,
   MasterEntity,
@@ -109,7 +109,7 @@ export function createSeedRecords(entity: MasterEntity): Record<string, unknown>
       },
     ];
   }
-  if (entity === 'work_order_templates' || entity === 'work_package_templates') {
+  if (entity === 'work_order_templates' || entity === 'work_order_templates') {
     return [
       {
         template_code: 'TMP-A320-LINE-48H',
@@ -197,7 +197,7 @@ export function toDateTimeInputValue(value: Date): string {
   return local.toISOString().slice(0, 16);
 }
 
-export function getDefaultAircraftWorkPackageValues(stationHint?: string): AircraftWorkPackageFormValues {
+export function getDefaultAircraftWorkOrderValues(stationHint?: string): AircraftWorkOrderFormValues {
   const now = new Date();
   const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
   const nowDate = now.toISOString().slice(0, 10);
@@ -210,7 +210,7 @@ export function getDefaultAircraftWorkPackageValues(stationHint?: string): Aircr
     plannedStart: toDateTimeInputValue(now),
     plannedEnd: toDateTimeInputValue(end),
     station: stationHint || '',
-    workPackageNumber: '',
+    workOrderNumber: '',
     topic: '',
     ttafHours: '',
     openingDate: nowDate,
@@ -231,12 +231,12 @@ export function getDefaultAircraftWorkPackageValues(stationHint?: string): Aircr
   };
 }
 
-export function parseWorkPackageItems(payload: Record<string, unknown>): Record<string, unknown>[] {
+export function parseWorkOrderItems(payload: Record<string, unknown>): Record<string, unknown>[] {
   const data = payload.data;
   if (data && typeof data === 'object') {
-    const workPackages = (data as Record<string, unknown>).workPackages;
-    if (Array.isArray(workPackages)) {
-      return workPackages.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+    const workOrders = (data as Record<string, unknown>).workOrders;
+    if (Array.isArray(workOrders)) {
+      return workOrders.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
     }
   }
   const items = payload.items;
@@ -306,7 +306,7 @@ export function normalizeTemplateTaskRows(tasksSource: unknown): Array<{
   }));
 }
 
-export function buildAircraftWorkPackageSnapshot(items: Record<string, unknown>[]): AircraftWorkPackageSnapshot {
+export function buildAircraftWorkOrderSnapshot(items: Record<string, unknown>[]): AircraftWorkOrderSnapshot {
   let open = 0;
   let inProgress = 0;
   let deferred = 0;
@@ -436,7 +436,7 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       next[field.key] = normalizeFormValue(field, row[field.key]);
     }
   });
-  if ((entity === 'work_order_templates' || entity === 'work_package_templates') && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
+  if ((entity === 'work_order_templates' || entity === 'work_order_templates') && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
     next.model_id = String(row.model_id ?? '').trim();
   }
   if (entity === 'parts_inventory' && !String(next.part_number ?? '').trim()) {
@@ -487,10 +487,10 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
   const payload: Record<string, unknown> = {};
   fields.forEach((field) => {
     const raw = values[field.key];
-    const isWorkPackageAircraftModelSatisfiedByModelId = (entity === 'work_order_templates' || entity === 'work_package_templates')
+    const isWorkOrderAircraftModelSatisfiedByModelId = (entity === 'work_order_templates' || entity === 'work_order_templates')
       && field.key === 'aircraft_model'
       && !isBlank(values.model_id);
-    if (field.required && isBlank(raw) && field.type !== 'boolean' && !isWorkPackageAircraftModelSatisfiedByModelId) {
+    if (field.required && isBlank(raw) && field.type !== 'boolean' && !isWorkOrderAircraftModelSatisfiedByModelId) {
       errors[field.key] = `${field.label} is required`;
       return;
     }
@@ -657,9 +657,9 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     });
   }
 
-  if (entity === 'work_order_templates' || entity === 'work_package_templates') {
+  if (entity === 'work_order_templates' || entity === 'work_order_templates') {
     const modelId = String(values.model_id ?? '').trim();
-    // model_id is required by database constraint ck_work_package_templates_model_id_required
+    // model_id is required by database constraint ck_work_order_templates_model_id_required
     if (!modelId) {
       errors.model_id = 'Model ID is required';
     } else {

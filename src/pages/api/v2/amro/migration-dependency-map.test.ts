@@ -19,7 +19,7 @@ describe('AMRO 13.4 migration dependency map', () => {
     expect(AMRO_MIGRATION_DEPENDENCY_ORDER.map((item) => item.id)).toEqual([
       'domain-access-governance',
       'schema-activation-rls-scoped-data-access',
-      'work-package-task-command-paths',
+      'work-order-task-command-paths',
       'compliance-gate-audit-ledger-cutover',
       'materials-predictive-integrations',
       'external-adapters-retry-dead-letter',
@@ -28,8 +28,8 @@ describe('AMRO 13.4 migration dependency map', () => {
     expect(AMRO_FLOW_COMMAND_EVENT_MAP).toEqual([
       {
         legacyFlow: 'legacy_work_orders.create',
-        amroCommandPath: '/api/v2/amro/work-packages',
-        emittedEvent: 'amro.work_package.created.v1',
+        amroCommandPath: '/api/v2/amro/work-orders',
+        emittedEvent: 'amro.work_order.created.v1',
       },
       {
         legacyFlow: 'legacy_work_orders.tasks.complete',
@@ -79,7 +79,7 @@ describe('AMRO 13.4 migration dependency map', () => {
   it('builds dependency envelope with rollout phase sequence', () => {
     process.env.AMRO_MIGRATION_ROLLOUT_PHASE = 'regional-cohorts';
     const envelope = buildAmroMigrationDependencyEnvelope({
-      capability: 'work-packages',
+      capability: 'work-orders',
       tenantId: 'tenant-1',
       franchiseId: 'fr-1',
       subscriptionStatus: 'active',
@@ -90,7 +90,7 @@ describe('AMRO 13.4 migration dependency map', () => {
         tenantInCanary: true,
         franchiseInCanary: true,
         capabilityInCanary: true,
-        capability: 'work-packages',
+        capability: 'work-orders',
       },
       auditLedgerCutover: {
         enabled: true,
@@ -98,7 +98,7 @@ describe('AMRO 13.4 migration dependency map', () => {
         tenantInCanary: true,
         franchiseInCanary: true,
         capabilityInCanary: true,
-        capability: 'work-packages',
+        capability: 'work-orders',
       },
       validation: evaluateAmroMigrationValidation({
         crossTenantLeakageCount: 0,

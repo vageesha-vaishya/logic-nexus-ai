@@ -186,7 +186,7 @@ Total files inventoried: 106
 5. `services/amro-api/src/instrumentation/amro-tracing.ts`
 6. `services/amro-api/src/instrumentation/tracer-provider.ts`
 7. `services/amro-api/src/middleware/auth.middleware.ts`
-8. `services/amro-api/src/realtime/work-packages-stream.ts`
+8. `services/amro-api/src/realtime/work-orders-stream.ts`
 9. `services/amro-api/src/routes/work-orders.routes.ts`
 10. `services/amro-api/src/services/work-orders.service.ts`
 11. `services/amro-api/src/types/amro.types.ts`
@@ -286,11 +286,11 @@ Total files inventoried: 106
 75. `src/pages/api/v2/amro/tasks.ts`
 76. `src/pages/api/v2/amro/tasks/[id]/evidence.test.ts`
 77. `src/pages/api/v2/amro/tasks/[id]/evidence.ts`
-78. `src/pages/api/v2/amro/work-packages.test.ts`
-79. `src/pages/api/v2/amro/work-packages.ts`
-80. `src/pages/api/v2/amro/work-packages/[id].test.ts`
-81. `src/pages/api/v2/amro/work-packages/[id].ts`
-82. `src/pages/api/v2/amro/work-packages/[id]/transitions.ts`
+78. `src/pages/api/v2/amro/work-orders.test.ts`
+79. `src/pages/api/v2/amro/work-orders.ts`
+80. `src/pages/api/v2/amro/work-orders/[id].test.ts`
+81. `src/pages/api/v2/amro/work-orders/[id].ts`
+82. `src/pages/api/v2/amro/work-orders/[id]/transitions.ts`
 
 ## 7) Root Cause Matrix
 

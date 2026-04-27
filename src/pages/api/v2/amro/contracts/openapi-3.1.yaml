@@ -2,13 +2,13 @@ openapi: 3.1.0
 info:
   title: AMRO V2 Integration API
   version: 2.0.0
-  description: AMRO Integration and Coexistence contract for work-packages, schedules, tasks, inventory, compliance, certifications, audit replay, forecast recommendations, integration-hub, overview-kpi, module-catalog, screen-inventory, phase-plan, phase-1-readiness, and migration-plan.
+  description: AMRO Integration and Coexistence contract for work-orders, schedules, tasks, inventory, compliance, certifications, audit replay, forecast recommendations, integration-hub, overview-kpi, module-catalog, screen-inventory, phase-plan, phase-1-readiness, and migration-plan.
 servers:
   - url: /
 paths:
-  /api/v2/amro/work-packages:
+  /api/v2/amro/work-orders:
     get:
-      operationId: listAmroWorkPackages
+      operationId: listAmroWorkOrders
       tags: [AMRO]
       parameters:
         - in: query
@@ -22,11 +22,11 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkPackagesResponse'
+                $ref: '#/components/schemas/WorkOrdersResponse'
     post:
-      operationId: mutateAmroWorkPackages
+      operationId: mutateAmroWorkOrders
       tags: [AMRO]
-      description: Supports work package lifecycle mutations. For New WP template flow, clients call `interface=create-work-package` with a selected `template_id` and authenticated Bearer token.
+      description: Supports work package lifecycle mutations. For New WP template flow, clients call `interface=create-work-order` with a selected `template_id` and authenticated Bearer token.
       parameters:
         - in: query
           name: interface
@@ -35,8 +35,8 @@ paths:
             type: string
             enum:
               [
-                create-work-package,
-                transition-work-package,
+                create-work-order,
+                transition-work-order,
                 clone-template,
                 assign-maintenance-slot,
                 run-replan-simulation,
@@ -96,9 +96,9 @@ paths:
                         type: string
                       description: Selected template/scope task row identifiers submitted from New WP.
                 - type: object
-                  required: [work_package_id, target_status, reason_code, actor_signature]
+                  required: [work_order_id, target_status, reason_code, actor_signature]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     expected_version:
                       type: integer
@@ -122,9 +122,9 @@ paths:
                       type: object
                       additionalProperties: true
                 - type: object
-                  required: [work_package_id, station_code, slot_start, slot_end, assigned_team]
+                  required: [work_order_id, station_code, slot_start, slot_end, assigned_team]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     station_code:
                       type: string
@@ -160,9 +160,9 @@ paths:
                     reason:
                       type: string
                 - type: object
-                  required: [work_package_id, demand_lines]
+                  required: [work_order_id, demand_lines]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     demand_lines:
                       type: array
@@ -215,9 +215,9 @@ paths:
                       type: string
                       enum: [verify, quarantine, release]
                 - type: object
-                  required: [work_package_id, forecast_signal_ids, optimization_window]
+                  required: [work_order_id, forecast_signal_ids, optimization_window]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     forecast_signal_ids:
                       type: array
@@ -239,7 +239,7 @@ paths:
                       items:
                         type: object
                         additionalProperties: true
-                    impacted_work_packages:
+                    impacted_work_orders:
                       type: array
                       items:
                         type: string
@@ -249,7 +249,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkPackageMutationResponse'
+                $ref: '#/components/schemas/WorkOrderMutationResponse'
         '400':
           description: Validation failure (for example missing template selection or malformed payload)
         '401':
@@ -288,9 +288,9 @@ paths:
                     items:
                       type: object
                       additionalProperties: true
-  /api/v2/amro/work-packages/{id}:
+  /api/v2/amro/work-orders/{id}:
     get:
-      operationId: getAmroWorkPackageDetail
+      operationId: getAmroWorkOrderDetail
       tags: [AMRO]
       parameters:
         - in: path
@@ -304,9 +304,9 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkPackageDetailResponse'
+                $ref: '#/components/schemas/WorkOrderDetailResponse'
     patch:
-      operationId: patchAmroWorkPackage
+      operationId: patchAmroWorkOrder
       tags: [AMRO]
       parameters:
         - in: path
@@ -327,10 +327,10 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkPackageUpdateResponse'
-  /api/v2/amro/work-packages/{id}/transitions:
+                $ref: '#/components/schemas/WorkOrderUpdateResponse'
+  /api/v2/amro/work-orders/{id}/transitions:
     post:
-      operationId: transitionAmroWorkPackage
+      operationId: transitionAmroWorkOrder
       tags: [AMRO]
       parameters:
         - in: path
@@ -360,7 +360,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/WorkPackageTransitionResponse'
+                $ref: '#/components/schemas/WorkOrderTransitionResponse'
   /api/v2/amro/ops/health/persistence:
     get:
       operationId: amroOpsPersistenceHealth
@@ -458,9 +458,9 @@ paths:
             schema:
               oneOf:
                 - type: object
-                  required: [work_package_id, station_code, slot_start, slot_end, assigned_team]
+                  required: [work_order_id, station_code, slot_start, slot_end, assigned_team]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     station_code:
                       type: string
@@ -481,11 +481,11 @@ paths:
                         type: object
                         additionalProperties: true
                 - type: object
-                  required: [schedule_id, work_package_id, acknowledged_at, device_id]
+                  required: [schedule_id, work_order_id, acknowledged_at, device_id]
                   properties:
                     schedule_id:
                       type: string
-                    work_package_id:
+                    work_order_id:
                       type: string
                     acknowledged_at:
                       type: string
@@ -539,7 +539,7 @@ paths:
                     tenant_calendar_id:
                       type: string
                 - type: object
-                  required: [selected_option_id, approver_id, reason, affected_work_packages]
+                  required: [selected_option_id, approver_id, reason, affected_work_orders]
                   properties:
                     selected_option_id:
                       type: string
@@ -547,7 +547,7 @@ paths:
                       type: string
                     reason:
                       type: string
-                    affected_work_packages:
+                    affected_work_orders:
                       type: array
                       items:
                         type: object
@@ -579,7 +579,7 @@ paths:
       tags: [AMRO]
       parameters:
         - in: query
-          name: workPackageId
+          name: workOrderId
           required: false
           schema:
             type: string
@@ -720,9 +720,9 @@ paths:
           application/json:
             schema:
               type: object
-              required: [work_package_id, line_items]
+              required: [work_order_id, line_items]
               properties:
-                work_package_id:
+                work_order_id:
                   type: string
                 line_items:
                   type: array
@@ -1056,7 +1056,7 @@ paths:
       tags: [AMRO]
       parameters:
         - in: query
-          name: work_package_id
+          name: work_order_id
           required: false
           schema:
             type: string
@@ -1179,7 +1179,7 @@ paths:
       tags: [AMRO]
       parameters:
         - in: query
-          name: work_package_id
+          name: work_order_id
           required: false
           schema:
             type: string
@@ -1253,7 +1253,7 @@ paths:
                       properties:
                         type:
                           type: string
-                          enum: [work_package, task]
+                          enum: [work_order, task]
                         id:
                           type: string
                     regulator_profile:
@@ -1265,9 +1265,9 @@ paths:
                         type: object
                         additionalProperties: true
                 - type: object
-                  required: [work_package_id, obligation_id, justification, requested_by]
+                  required: [work_order_id, obligation_id, justification, requested_by]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     obligation_id:
                       type: string
@@ -1276,9 +1276,9 @@ paths:
                     requested_by:
                       type: string
                 - type: object
-                  required: [work_package_id, profile, include_artifacts]
+                  required: [work_order_id, profile, include_artifacts]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     profile:
                       type: string
@@ -1288,9 +1288,9 @@ paths:
                       items:
                         type: string
                 - type: object
-                  required: [work_package_id, aircraft_status]
+                  required: [work_order_id, aircraft_status]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     aircraft_status:
                       type: string
@@ -1310,9 +1310,9 @@ paths:
                     certification_valid:
                       type: boolean
                 - type: object
-                  required: [work_package_id, open_findings, unresolved_deferrals, pending_signatures, evidence_coverage_pct]
+                  required: [work_order_id, open_findings, unresolved_deferrals, pending_signatures, evidence_coverage_pct]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     open_findings:
                       type: integer
@@ -1323,9 +1323,9 @@ paths:
                     evidence_coverage_pct:
                       type: number
                 - type: object
-                  required: [work_package_id, release_decision_id, evidence_link_hash]
+                  required: [work_order_id, release_decision_id, evidence_link_hash]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     release_decision_id:
                       type: string
@@ -1382,9 +1382,9 @@ paths:
                       type: object
                       additionalProperties: true
                 - type: object
-                  required: [work_package_id, decision, signatures]
+                  required: [work_order_id, decision, signatures]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     decision:
                       type: string
@@ -1399,9 +1399,9 @@ paths:
                       items:
                         type: string
                 - type: object
-                  required: [work_package_id, block_reason, escalation_target]
+                  required: [work_order_id, block_reason, escalation_target]
                   properties:
-                    work_package_id:
+                    work_order_id:
                       type: string
                     block_reason:
                       type: string
@@ -1514,13 +1514,13 @@ paths:
                       items:
                         type: string
                 - type: object
-                  required: [source_system, adapter_version, work_package_id, financial_posting]
+                  required: [source_system, adapter_version, work_order_id, financial_posting]
                   properties:
                     source_system:
                       type: string
                     adapter_version:
                       type: string
-                    work_package_id:
+                    work_order_id:
                       type: string
                     financial_posting:
                       type: object
@@ -1808,7 +1808,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [open_work_packages, schedule_adherence, aog_count, compliance_risk, parts_fill_rate]
+            enum: [open_work_orders, schedule_adherence, aog_count, compliance_risk, parts_fill_rate]
         - in: query
           name: window
           required: false
@@ -1887,7 +1887,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [work-packages, tasks, compliance-gates]
+            enum: [work-orders, tasks, compliance-gates]
         - in: query
           name: crossTenantLeakageCount
           required: false
@@ -2095,7 +2095,7 @@ components:
           type: string
           enum:
             [
-              work-packages,
+              work-orders,
               tasks,
               compliance-gates,
               certification,
@@ -2128,13 +2128,13 @@ components:
           type: string
         eventType:
           type: string
-          enum: [amro.work_package.created.v1, amro.task.completed.v1, amro.compliance.gate_decided.v1]
+          enum: [amro.work_order.created.v1, amro.task.completed.v1, amro.compliance.gate_decided.v1]
         idempotencyKey:
           type: string
         queueMode:
           type: string
           enum: [redis, memory, disabled]
-    WorkPackage:
+    WorkOrder:
       type: object
       required: [id, code, title, status, tenantId, domainId, version]
       properties:
@@ -2159,11 +2159,11 @@ components:
           const: v2
     Task:
       type: object
-      required: [id, workPackageId, taskCode, title, status, certifierAuthorityLevel, tenantId, domainId, version]
+      required: [id, workOrderId, taskCode, title, status, certifierAuthorityLevel, tenantId, domainId, version]
       properties:
         id:
           type: string
-        workPackageId:
+        workOrderId:
           type: string
         taskCode:
           type: string
@@ -2187,11 +2187,11 @@ components:
           const: v2
     ComplianceGate:
       type: object
-      required: [gateId, workPackageId, taskCode, decision, tenantId, domainId, version]
+      required: [gateId, workOrderId, taskCode, decision, tenantId, domainId, version]
       properties:
         gateId:
           type: string
-        workPackageId:
+        workOrderId:
           type: string
         taskCode:
           type: string
@@ -2213,7 +2213,7 @@ components:
         version:
           type: string
           const: v2
-    WorkPackagesResponse:
+    WorkOrdersResponse:
       allOf:
         - $ref: '#/components/schemas/ApiEnvelope'
         - type: object
@@ -2221,12 +2221,12 @@ components:
           properties:
             data:
               type: object
-              required: [workPackages]
+              required: [workOrders]
               properties:
-                workPackages:
+                workOrders:
                   type: array
                   items:
-                    $ref: '#/components/schemas/WorkPackage'
+                    $ref: '#/components/schemas/WorkOrder'
     TasksResponse:
       allOf:
         - $ref: '#/components/schemas/ApiEnvelope'
@@ -3103,7 +3103,7 @@ components:
           type: string
         acceptanceCriteria:
           type: string
-    WorkPackageMutationResponse:
+    WorkOrderMutationResponse:
       type: object
       required: [version, interface, correlationId]
       properties:
@@ -3114,8 +3114,8 @@ components:
           type: string
           enum:
             [
-              create-work-package,
-              transition-work-package,
+              create-work-order,
+              transition-work-order,
               clone-template,
               assign-maintenance-slot,
               run-replan-simulation,
@@ -3129,7 +3129,7 @@ components:
         output:
           type: object
           additionalProperties: true
-    WorkPackageDetailResponse:
+    WorkOrderDetailResponse:
       type: object
       required: [version, interface, correlationId, data]
       properties:
@@ -3138,17 +3138,17 @@ components:
           const: v2
         interface:
           type: string
-          enum: [detail-work-package]
+          enum: [detail-work-order]
         correlationId:
           type: string
         data:
           type: object
-          required: [work_package]
+          required: [work_order]
           properties:
-            work_package:
+            work_order:
               type: object
               additionalProperties: true
-    WorkPackageUpdateResponse:
+    WorkOrderUpdateResponse:
       type: object
       required: [version, interface, correlationId, data]
       properties:
@@ -3157,17 +3157,17 @@ components:
           const: v2
         interface:
           type: string
-          enum: [update-work-package]
+          enum: [update-work-order]
         correlationId:
           type: string
         data:
           type: object
-          required: [work_package]
+          required: [work_order]
           properties:
-            work_package:
+            work_order:
               type: object
               additionalProperties: true
-    WorkPackageTransitionResponse:
+    WorkOrderTransitionResponse:
       type: object
       required: [version, interface, correlationId, output]
       properties:
@@ -3176,14 +3176,14 @@ components:
           const: v2
         interface:
           type: string
-          enum: [transition-work-package]
+          enum: [transition-work-order]
         correlationId:
           type: string
         output:
           type: object
-          required: [work_package_id, from_status, to_status, audit_event_id]
+          required: [work_order_id, from_status, to_status, audit_event_id]
           properties:
-            work_package_id:
+            work_order_id:
               type: string
             from_status:
               type: string

@@ -839,7 +839,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const linkSelectMock = vi.fn().mockReturnValue({ eq: linkEqTenantMock });
     const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
     const fromMock = vi.fn((table: string) => {
-      if (table === 'work_package_template_task_templates') {
+      if (table === 'work_order_template_task_templates') {
         return { select: linkSelectMock };
       }
       if (table === 'maintenance_events') {
@@ -873,7 +873,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const rpcPayload = (rpcArgs?.p_payload || {}) as Record<string, unknown>;
     expect(Array.isArray(rpcPayload.tasks_json)).toBe(true);
     expect(Array.isArray(rpcPayload.scope_json)).toBe(true);
-    expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
+    expect(fromMock).toHaveBeenCalledWith('work_order_template_task_templates');
     expect(linkEqTemplateMock).toHaveBeenCalledWith('work_order_template_id', 'wpt-1');
   });
 
@@ -927,7 +927,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const patchUpdateMock = vi.fn().mockReturnValue(patchQuery);
     const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
     const fromMock = vi.fn((table: string) => {
-      if (table === 'work_package_template_task_templates') {
+      if (table === 'work_order_template_task_templates') {
         return { select: linkSelectMock };
       }
       if (table === 'work_order_templates') {
@@ -1026,7 +1026,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const linkSelectMock = vi.fn().mockReturnValue({ eq: linkEqTenantMock });
     const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
     const fromMock = vi.fn((table: string) => {
-      if (table === 'work_package_template_task_templates') {
+      if (table === 'work_order_template_task_templates') {
         return { select: linkSelectMock };
       }
       if (table === 'maintenance_events') {

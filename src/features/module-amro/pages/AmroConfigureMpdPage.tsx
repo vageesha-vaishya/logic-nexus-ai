@@ -744,7 +744,7 @@ export function AmroConfigureMpdPage() {
                   'task_created_at',
                   'task_updated_at',
                   'task_template_id',
-                  'work_package_id',
+                  'work_order_id',
                   'mpd_code',
                   'ata_code',
                   'description',

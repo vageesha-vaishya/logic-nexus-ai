@@ -408,7 +408,7 @@ function parseTimeToSeconds(value: string | null): number | null {
 
 export function resolveEntity(rawEntity: unknown): AmroMasterDataEntity {
   const normalizedEntity = asString(rawEntity).toLowerCase().replace(/-/g, '_');
-  const entity = (normalizedEntity === 'work_package_templates' ? 'work_order_templates' : normalizedEntity) as AmroMasterDataEntity;
+  const entity = (normalizedEntity === 'work_order_templates' ? 'work_order_templates' : normalizedEntity) as AmroMasterDataEntity;
   if (!ENTITY_CONFIG[entity]) {
     throw new HttpError('Unsupported master data entity', 404);
   }
@@ -661,7 +661,7 @@ function normalizeShiftCalendar(payload: Record<string, unknown>) {
   };
 }
 
-function normalizeWorkPackageTemplate(payload: Record<string, unknown>) {
+function normalizeWorkOrderTemplate(payload: Record<string, unknown>) {
   return {
     template_code: asString(payload.template_code),
     version: asNumber(payload.version),
@@ -716,7 +716,7 @@ export function normalizePayload(entity: AmroMasterDataEntity, payload: Record<s
   if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
   if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
   if (entity === 'aircraft_template') return normalizeAircraftTemplate(payload);
-  return normalizeWorkPackageTemplate(payload);
+  return normalizeWorkOrderTemplate(payload);
 }
 
 export type MasterDataValidationIssue = {

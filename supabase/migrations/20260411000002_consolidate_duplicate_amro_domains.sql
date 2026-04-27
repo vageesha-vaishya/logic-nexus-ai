@@ -84,15 +84,15 @@ BEGIN
   END IF;
 
   -- Step 5: Check if there are any other tables referencing platform_domains
-  -- (e.g., amro_work_packages, amro_aircraft, etc. might have domain_id references)
+  -- (e.g., amro_work_orders, amro_aircraft, etc. might have domain_id references)
   -- For safety, we'll check common AMRO tables
 
-  -- Update amro_work_packages if they have domain_id references
+  -- Update amro_work_orders if they have domain_id references
   IF EXISTS (
     SELECT 1 FROM information_schema.columns 
-    WHERE table_name = 'amro_work_packages' AND column_name = 'domain_id'
+    WHERE table_name = 'amro_work_orders' AND column_name = 'domain_id'
   ) THEN
-    UPDATE amro_work_packages
+    UPDATE amro_work_orders
     SET domain_id = v_new_domain_id
     WHERE domain_id = v_old_domain_id;
     

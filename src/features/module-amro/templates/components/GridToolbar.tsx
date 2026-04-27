@@ -33,7 +33,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { useTemplateGridStore, GridDensity, GridViewMode } from '../store/useTemplateGridStore';
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 

@@ -15,7 +15,7 @@ const MAINTENANCE_TYPE_OPTIONS: WizardOption[] = [
   { value: 'modification', label: 'Modification' },
 ];
 
-export function buildWorkPackageWizardSteps({
+export function buildWorkOrderWizardSteps({
   aircraftOptions,
   templateOptions,
   assignmentOptions,
@@ -297,7 +297,7 @@ export function buildWorkPackageWizardSteps({
   ];
 }
 
-export function getWorkPackageWizardInitialData(preselectedAircraftId?: string): Record<string, unknown> {
+export function getWorkOrderWizardInitialData(preselectedAircraftId?: string): Record<string, unknown> {
   return {
     aircraft_id: preselectedAircraftId || '',
     creation_path: 'scheduled',

@@ -208,7 +208,7 @@ parts_inventory (existing)          amro_materials_catalog (duplicate)
 
 reservations (existing)             amro_material_reservations (duplicate)
 ├── inventory_id                    ├── material_id (DUPLICATE)
-├── work_package_id                 └── work_package_template_id (DUPLICATE)
+├── work_order_id                 └── work_order_template_id (DUPLICATE)
 └── reserved_quantity                   └── quantity_reserved (DUPLICATE)
 
 amro_purchase_orders (Apr 10)       amro_purchase_orders (Apr 13 - CONFLICT)
@@ -238,7 +238,7 @@ parts_inventory (EXISTING + ENHANCED)
 
 reservations (EXISTING - no changes needed)
 ├── inventory_id (FK to parts_inventory)
-├── work_package_id
+├── work_order_id
 └── reserved_quantity
 
 amro_purchase_orders (EXISTING from Apr 10 - no changes needed)

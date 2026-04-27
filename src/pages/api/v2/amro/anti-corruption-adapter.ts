@@ -1,6 +1,6 @@
 import { AMRO_COEXISTENCE_SAFEGUARDS, AMRO_INTEGRATION_CONTRACTS } from './integration-contracts';
 
-export type WorkPackageStatus = 'planned' | 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+export type WorkOrderStatus = 'planned' | 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 export type TaskStatus = 'planned' | 'in_progress' | 'completed';
 export type ComplianceDecision = 'approved' | 'rejected' | 'pending';
 export type AmroServiceName =
@@ -12,7 +12,7 @@ export type AmroServiceName =
   | 'amro-integration-hub-service'
   | 'amro-forecast-service';
 export type AmroCapability =
-  | 'work-packages'
+  | 'work-orders'
   | 'schedules'
   | 'tasks'
   | 'compliance-gates'
@@ -22,11 +22,11 @@ export type AmroCapability =
 export type AmroDomainId = 'amro';
 export type AmroApiVersion = 'v2';
 
-export type LegacyWorkPackageRow = {
+export type LegacyWorkOrderRow = {
   legacy_id: string;
   legacy_code: string;
   legacy_title: string;
-  legacy_status: WorkPackageStatus;
+  legacy_status: WorkOrderStatus;
   tenant_id: string;
   franchise_id: string | null;
   domain_id: AmroDomainId;
@@ -35,7 +35,7 @@ export type LegacyWorkPackageRow = {
 
 export type LegacyTaskRow = {
   legacy_id: string;
-  work_package_id: string;
+  work_order_id: string;
   task_code: string;
   legacy_title: string;
   legacy_status: TaskStatus;
@@ -48,7 +48,7 @@ export type LegacyTaskRow = {
 
 export type LegacyComplianceGateRow = {
   legacy_gate_id: string;
-  work_package_id: string;
+  work_order_id: string;
   task_code: string;
   decision: ComplianceDecision;
   decided_by: string | null;
@@ -59,11 +59,11 @@ export type LegacyComplianceGateRow = {
   version: AmroApiVersion;
 };
 
-export type WorkPackageItem = {
+export type WorkOrderItem = {
   id: string;
   code: string;
   title: string;
-  status: WorkPackageStatus;
+  status: WorkOrderStatus;
   tenantId: string;
   franchiseId: string | null;
   domainId: AmroDomainId;
@@ -72,7 +72,7 @@ export type WorkPackageItem = {
 
 export type TaskItem = {
   id: string;
-  workPackageId: string;
+  workOrderId: string;
   taskCode: string;
   title: string;
   status: TaskStatus;
@@ -85,7 +85,7 @@ export type TaskItem = {
 
 export type ComplianceGateItem = {
   gateId: string;
-  workPackageId: string;
+  workOrderId: string;
   taskCode: string;
   decision: ComplianceDecision;
   decidedBy: string | null;
@@ -187,7 +187,7 @@ export function buildAmroServiceBoundaryEnvelope(params: {
   validatedAt: string;
 }) {
   const capabilityServiceMap: Record<AmroCapability, AmroServiceName[]> = {
-    'work-packages': ['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'],
+    'work-orders': ['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'],
     schedules: ['amro-scheduling-service', 'amro-work-order-service'],
     tasks: ['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'],
     'compliance-gates': ['amro-compliance-service', 'amro-audit-ledger-service'],
@@ -243,7 +243,7 @@ function toModuleTitle(legacyTitle: string): string {
   return legacyTitle.startsWith('Legacy ') ? `AMRO ${legacyTitle.slice(7)}` : legacyTitle;
 }
 
-export function adaptLegacyWorkPackages(rows: LegacyWorkPackageRow[]): WorkPackageItem[] {
+export function adaptLegacyWorkOrders(rows: LegacyWorkOrderRow[]): WorkOrderItem[] {
   return rows.map((row) => ({
     id: row.legacy_id,
     code: row.legacy_code,
@@ -256,7 +256,7 @@ export function adaptLegacyWorkPackages(rows: LegacyWorkPackageRow[]): WorkPacka
   }));
 }
 
-export function adaptModuleWorkPackagesFromLegacy(rows: LegacyWorkPackageRow[]): WorkPackageItem[] {
+export function adaptModuleWorkOrdersFromLegacy(rows: LegacyWorkOrderRow[]): WorkOrderItem[] {
   return rows.map((row) => ({
     id: row.legacy_id,
     code: row.legacy_code,
@@ -272,7 +272,7 @@ export function adaptModuleWorkPackagesFromLegacy(rows: LegacyWorkPackageRow[]):
 export function adaptLegacyTasks(rows: LegacyTaskRow[]): TaskItem[] {
   return rows.map((row) => ({
     id: row.legacy_id,
-    workPackageId: row.work_package_id,
+    workOrderId: row.work_order_id,
     taskCode: row.task_code,
     title: row.legacy_title,
     status: row.legacy_status,
@@ -287,7 +287,7 @@ export function adaptLegacyTasks(rows: LegacyTaskRow[]): TaskItem[] {
 export function adaptModuleTasksFromLegacy(rows: LegacyTaskRow[]): TaskItem[] {
   return rows.map((row) => ({
     id: toModuleId(row.legacy_id),
-    workPackageId: row.work_package_id,
+    workOrderId: row.work_order_id,
     taskCode: row.task_code,
     title: toModuleTitle(row.legacy_title),
     status: row.legacy_status,
@@ -302,7 +302,7 @@ export function adaptModuleTasksFromLegacy(rows: LegacyTaskRow[]): TaskItem[] {
 export function adaptLegacyComplianceGates(rows: LegacyComplianceGateRow[]): ComplianceGateItem[] {
   return rows.map((row) => ({
     gateId: row.legacy_gate_id,
-    workPackageId: row.work_package_id,
+    workOrderId: row.work_order_id,
     taskCode: row.task_code,
     decision: row.decision,
     decidedBy: row.decided_by,
@@ -317,7 +317,7 @@ export function adaptLegacyComplianceGates(rows: LegacyComplianceGateRow[]): Com
 export function adaptModuleComplianceGatesFromLegacy(rows: LegacyComplianceGateRow[]): ComplianceGateItem[] {
   return rows.map((row) => ({
     gateId: toModuleId(row.legacy_gate_id),
-    workPackageId: row.work_package_id,
+    workOrderId: row.work_order_id,
     taskCode: row.task_code,
     decision: row.decision,
     decidedBy: row.decided_by,

@@ -18,7 +18,7 @@ The application's authentication/authorization gate (`enforceAmroDomainAccess()`
 - An active AMRO domain entry in `platform_domains`
 - An active assignment linking the user's tenant to the AMRO domain with proper subscription status
 
-Since neither existed, all requests to `/api/v2/amro/work-packages` were rejected with **403 Forbidden**, causing the frontend to display the error message.
+Since neither existed, all requests to `/api/v2/amro/work-orders` were rejected with **403 Forbidden**, causing the frontend to display the error message.
 
 ---
 
@@ -28,9 +28,9 @@ Since neither existed, all requests to `/api/v2/amro/work-packages` were rejecte
 
 ```
 [User] → [AmroWorkOrdersListPage.tsx]
-  → useListWorkPackages() [React Query hook]
-    → GET /api/v2/amro/work-packages
-      → [Next.js API Route: work-packages.ts]
+  → useListWorkOrders() [React Query hook]
+    → GET /api/v2/amro/work-orders
+      → [Next.js API Route: work-orders.ts]
         → enforceHttps() ✅
         → authenticateRequest() ✅ (validates Supabase JWT)
         → resolveAndApplyAccessContext() ✅ (extracts tenantId from user_roles/preferences)
@@ -115,7 +115,7 @@ When the check fails, the API returns:
 }
 ```
 
-The frontend then throws in `useWorkPackageState.ts`:
+The frontend then throws in `useWorkOrderState.ts`:
 ```typescript
 if (!response.ok) throw new Error(`Failed to list work packages: ${response.status}`);
 ```
@@ -183,7 +183,7 @@ This migration:
 
 ## Additional Fix Applied
 
-**File:** `src/features/module-amro/components/work-orders/useWorkPackageState.ts`
+**File:** `src/features/module-amro/components/work-orders/useWorkOrderState.ts`
 
 Fixed response format mapping to correctly handle the API's actual response structure:
 
@@ -194,7 +194,7 @@ const rawItems = json.data || json.output?.records || json.output?.items || [];
 
 **After:**
 ```typescript
-const rawItems = json.items || json.data?.workPackages || json.output?.records || json.output?.items || json.data || [];
+const rawItems = json.items || json.data?.workOrders || json.output?.records || json.output?.items || json.data || [];
 const recordsArray = Array.isArray(rawItems) ? rawItems : [];
 ```
 
@@ -219,10 +219,10 @@ This ensures robustness against different response formats and prevents silent d
 
 ### Frontend
 - `src/features/module-amro/components/work-orders/AmroWorkOrdersListPage.tsx` - UI component
-- `src/features/module-amro/components/work-orders/useWorkPackageState.ts` - Data fetching hook
+- `src/features/module-amro/components/work-orders/useWorkOrderState.ts` - Data fetching hook
 
 ### Backend
-- `src/pages/api/v2/amro/work-packages.ts` - API route handler
+- `src/pages/api/v2/amro/work-orders.ts` - API route handler
 - `src/pages/api/_utils/http.ts` - Authentication/authorization utilities (enforceAmroDomainAccess)
 
 ### Database

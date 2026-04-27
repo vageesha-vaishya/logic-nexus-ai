@@ -23,7 +23,7 @@ export async function fetchTaskTemplates(
   const query = new URLSearchParams({ tenant_id: tenantId });
   if (aircraftModelId) query.set('aircraft_model_id', aircraftModelId);
 
-  const response = await fetch(`/api/v2/amro/work-package-templates/task-template-options?${query.toString()}`, {
+  const response = await fetch(`/api/v2/amro/work-order-templates/task-template-options?${query.toString()}`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -63,7 +63,7 @@ export async function fetchTemplateVersions(
   accessToken: string,
   templateId: string
 ): Promise<TemplateVersion[]> {
-  const response = await fetch(`/api/v2/amro/work-package-template-versions?template_id=${templateId}&page=1&page_size=50`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions?template_id=${templateId}&page=1&page_size=50`, {
     method: 'GET',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -85,7 +85,7 @@ export async function createTemplateVersion(
     compliance_requirements_json?: any[];
   }
 ): Promise<TemplateVersion> {
-  const response = await fetch('/api/v2/amro/work-package-template-versions', {
+  const response = await fetch('/api/v2/amro/work-order-template-versions', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -103,7 +103,7 @@ export async function updateTemplateVersion(
   versionId: string,
   data: Record<string, unknown>
 ): Promise<TemplateVersion> {
-  const response = await fetch(`/api/v2/amro/work-package-template-versions/${versionId}`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions/${versionId}`, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
@@ -120,7 +120,7 @@ export async function submitTemplateVersion(
   accessToken: string,
   versionId: string
 ): Promise<void> {
-  const response = await fetch(`/api/v2/amro/work-package-template-versions/${versionId}/submit`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions/${versionId}/submit`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${accessToken}` },
   });
@@ -134,7 +134,7 @@ export async function reviewTemplateVersion(
   rejectionReason?: string,
   setActive?: boolean
 ): Promise<void> {
-  const response = await fetch(`/api/v2/amro/work-package-template-versions/${versionId}/approve`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions/${versionId}/approve`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -149,7 +149,7 @@ export async function deleteTemplateVersion(
   accessToken: string,
   versionId: string
 ): Promise<void> {
-  const response = await fetch(`/api/v2/amro/work-package-template-versions/${versionId}`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions/${versionId}`, {
     method: 'DELETE',
     headers: { Authorization: `Bearer ${accessToken}` },
   });

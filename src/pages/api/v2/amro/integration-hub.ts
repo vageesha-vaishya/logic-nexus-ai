@@ -18,7 +18,7 @@ import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState }
 import { enforceAmroSequentialMilestoneForIntegrationHubInterface } from './phase-plan-model';
 
 const ALLOWLISTED_SOURCES = new Set(['sap-pm', 'maximo', 'oracle-eam', 'boeing-partner-gateway', 'regulatory-feed']);
-const MUTATING_EVENT_TYPES = new Set(['work_package_update', 'task_update', 'part_reservation', 'callback_trigger']);
+const MUTATING_EVENT_TYPES = new Set(['work_order_update', 'task_update', 'part_reservation', 'callback_trigger']);
 type ExternalAdapterDescriptor = {
   adapter: string;
   systems: string[];
@@ -469,7 +469,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const sourceSystem = assertNonEmpty(body.source_system, 'source_system').toLowerCase();
       assertAllowlistedSource(sourceSystem);
       const adapterVersion = assertNonEmpty(body.adapter_version, 'adapter_version');
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
       assertNonEmpty(body.financial_posting, 'financial_posting');
       const contractCompatibility = resolvePartnerContractCompatibility(body, adapterVersion);
       const adapter = resolveAdapterCatalogEntry(sourceSystem);
@@ -480,7 +480,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         correlationId: ctx.correlationId,
         output: {
           adapter,
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           sync_status: 'posted',
           canonical_event_id: sync.canonicalEventId,
           normalizer: sync.normalizer,

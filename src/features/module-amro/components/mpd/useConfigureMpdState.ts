@@ -28,7 +28,7 @@ export type ConfigureAircraftOption = {
 export type ConfigureMpdConfiguredRecord = MpdRecord & {
   task_id: string;
   task_template_id: string | null;
-  work_package_id: string | null;
+  work_order_id: string | null;
   task_number: string | null;
   task_title: string | null;
   task_description: string | null;
@@ -120,7 +120,7 @@ function mapConfiguredRecord(record: Record<string, unknown>): ConfigureMpdConfi
     ...base,
     task_id: String(record.task_id || record.id || ''),
     task_template_id: normalizeString(record.task_template_id),
-    work_package_id: normalizeString(record.work_package_id),
+    work_order_id: normalizeString(record.work_order_id),
     task_number: normalizeString(record.task_number),
     task_title: normalizeString(record.task_title),
     task_description: normalizeString(record.task_description),

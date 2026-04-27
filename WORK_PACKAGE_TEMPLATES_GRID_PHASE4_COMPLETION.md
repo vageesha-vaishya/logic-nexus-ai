@@ -355,7 +355,7 @@ Reconnected or max attempts reached
 ```
 src/features/module-amro/templates/
 ├── components/ (12 components, 3,600+ lines)
-│   ├── WorkPackageTemplatesGrid.tsx ✅ Phase 1
+│   ├── WorkOrderTemplatesGrid.tsx ✅ Phase 1
 │   ├── TemplateRow.tsx ✅ Phase 1
 │   ├── TemplateCard.tsx ✅ Phase 4 ⭐
 │   ├── GridToolbar.tsx ✅ Phase 1
@@ -426,7 +426,7 @@ function TemplatesView({ templates, selectedIds, actions }) {
   }
 
   // Render grid view for desktop
-  return <WorkPackageTemplatesGrid {...props} />;
+  return <WorkOrderTemplatesGrid {...props} />;
 }
 ```
 
@@ -475,7 +475,7 @@ function TemplatesPage() {
       </div>
 
       {/* Grid content */}
-      <WorkPackageTemplatesGrid />
+      <WorkOrderTemplatesGrid />
     </div>
   );
 }
@@ -486,7 +486,7 @@ function TemplatesPage() {
 ```typescript
 import { useKeyboardNavigation } from './hooks';
 
-function WorkPackageTemplatesGrid({ templates, columns }) {
+function WorkOrderTemplatesGrid({ templates, columns }) {
   const gridRef = useRef<HTMLDivElement>(null);
   
   const {

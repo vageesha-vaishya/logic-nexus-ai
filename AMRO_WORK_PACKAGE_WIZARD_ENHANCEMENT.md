@@ -1,8 +1,8 @@
 # AMRO Work Package Creation Wizard - UX Enhancement Summary
 
 **Date:** 2026-04-12  
-**Old Component:** `AircraftWorkPackageCreateDialog.tsx` (905 lines)  
-**New Component:** `AmroWorkPackageCreateWizard.tsx` (680 lines)  
+**Old Component:** `AircraftWorkOrderCreateDialog.tsx` (905 lines)  
+**New Component:** `AmroWorkOrderCreateWizard.tsx` (680 lines)  
 **Improvement:** 25% code reduction, 300% UX improvement
 
 ---
@@ -166,7 +166,7 @@
 ### Type Safety
 ```typescript
 // Old: Any-typed form values
-type AircraftWorkPackageFormValues = {
+type AircraftWorkOrderFormValues = {
   source: string;
   maintenanceType: string;
   // 25+ string fields
@@ -178,7 +178,7 @@ interface WizardFormData {
   aircraftId: string;
   creationPath: CreationPath;
   maintenanceType: MaintenanceType; // From existing types
-  priority: WorkPackagePriority; // From existing types
+  priority: WorkOrderPriority; // From existing types
   plannedStartDate: Date | undefined; // Date objects, not strings
   // ...
 }
@@ -187,7 +187,7 @@ interface WizardFormData {
 ### Validation
 ```typescript
 // Old: No validation function, errors set ad-hoc
-if (aircraftWorkPackageErrors.workPackageNumber) {
+if (aircraftWorkOrderErrors.workOrderNumber) {
   <p className="mdm-template-danger">{error}</p>
 }
 
@@ -205,10 +205,10 @@ const validateStep = (step: WizardStep): boolean => {
 ### Integration with New APIs
 ```typescript
 // Old: Manual fetch calls
-const response = await fetch('/api/v2/amro/work-packages', {...});
+const response = await fetch('/api/v2/amro/work-orders', {...});
 
 // New: React Query mutations
-const createWPMutation = useCreateWorkPackage();
+const createWPMutation = useCreateWorkOrder();
 await createWPMutation.mutateAsync({
   aircraft_id: formData.aircraftId,
   title: formData.title,
@@ -228,7 +228,7 @@ await createEmergencyWPMutation.mutateAsync({
 ### State Management
 ```typescript
 // Old: 20+ individual state variables
-const [workPackageNumber, setWorkPackageNumber] = useState('');
+const [workOrderNumber, setWorkOrderNumber] = useState('');
 const [topic, setTopic] = useState('');
 // ...
 
@@ -283,7 +283,7 @@ const updateField = <K extends keyof WizardFormData>(
 
 ### Basic Usage
 ```typescript
-import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/work-orders';
+import { AmroWorkOrderCreateWizard } from '@/features/module-amro/components/work-orders';
 
 function MyComponent() {
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -293,7 +293,7 @@ function MyComponent() {
       <Button onClick={() => setWizardOpen(true)}>
         Create Work Package
       </Button>
-      <AmroWorkPackageCreateWizard
+      <AmroWorkOrderCreateWizard
         open={wizardOpen}
         onOpenChange={setWizardOpen}
         onSuccess={() => {
@@ -307,7 +307,7 @@ function MyComponent() {
 
 ### Integration with Aircraft Detail Page
 ```typescript
-import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/work-orders';
+import { AmroWorkOrderCreateWizard } from '@/features/module-amro/components/work-orders';
 
 function AircraftDetailPage({ aircraftId }: { aircraftId: string }) {
   const [wizardOpen, setWizardOpen] = useState(false);
@@ -318,10 +318,10 @@ function AircraftDetailPage({ aircraftId }: { aircraftId: string }) {
         <Plus className="mr-2 h-4 w-4" />
         Create Work Package
       </Button>
-      <AmroWorkPackageCreateWizard
+      <AmroWorkOrderCreateWizard
         open={wizardOpen}
         onOpenChange={setWizardOpen}
-        onSuccess={() => refetchWorkPackages()}
+        onSuccess={() => refetchWorkOrders()}
       />
     </>
   );
@@ -357,7 +357,7 @@ function AircraftDetailPage({ aircraftId }: { aircraftId: string }) {
 ### Phase 3: Deprecation (Week 3)
 - Remove old dialog
 - Update all references to use wizard
-- Delete `AircraftWorkPackageCreateDialog.tsx`
+- Delete `AircraftWorkOrderCreateDialog.tsx`
 
 ---
 

@@ -103,7 +103,7 @@
   - AtaCodeService
   - MaintenanceTaskService
   - AircraftMaintenanceService
-  - WorkPackageService
+  - WorkOrderService
   - ComplianceReportingService
   - SkillCertificationService
 

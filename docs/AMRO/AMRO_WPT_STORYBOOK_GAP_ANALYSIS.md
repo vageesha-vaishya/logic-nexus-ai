@@ -19,10 +19,10 @@ Analysis compares current AMRO Work Package Templates (WPT) implementation again
 - Core template stories:
   - `AmroStandardFormTemplate.stories.tsx`
 - WPT production parity stories:
-  - `WorkPackageTemplates_ProductionParity`
-  - `WorkPackageTemplates_ProductionParity_ValidationError`
-  - `WorkPackageTemplates_ProductionParity_Loading`
-  - `WorkPackageTemplates_ProductionParity_FeatureFlagOffFallback`
+  - `WorkOrderTemplates_ProductionParity`
+  - `WorkOrderTemplates_ProductionParity_ValidationError`
+  - `WorkOrderTemplates_ProductionParity_Loading`
+  - `WorkOrderTemplates_ProductionParity_FeatureFlagOffFallback`
 - Enterprise option stories:
   - `DesktopOperations`
   - `TabletGlovedHandMode`
@@ -82,4 +82,4 @@ Analysis compares current AMRO Work Package Templates (WPT) implementation again
 - CI play assertions cover parity-critical and enterprise-critical scenarios.
 
 ## Recommendation
-Use `WorkPackageTemplates_ProductionParity` as implementation baseline and treat enterprise stories as progressive rollout references. Keep adapter-first architecture and feature-flag rollback controls until KPI and parity gates complete.
+Use `WorkOrderTemplates_ProductionParity` as implementation baseline and treat enterprise stories as progressive rollout references. Keep adapter-first architecture and feature-flag rollback controls until KPI and parity gates complete.

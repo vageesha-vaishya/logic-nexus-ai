@@ -20,7 +20,7 @@ Three enterprise-grade editor components have been created and are ready to inte
 interface EnterpriseMaterialsEditorProps {
   materials: MaterialLineItem[];
   onChange: (materials: MaterialLineItem[]) => void;
-  workPackageTemplateId?: string;
+  workOrderTemplateId?: string;
   readOnly?: boolean;
 }
 ```
@@ -36,7 +36,7 @@ function TemplateEditor({ templateId }) {
     <EnterpriseMaterialsEditor
       materials={materials}
       onChange={setMaterials}
-      workPackageTemplateId={templateId}
+      workOrderTemplateId={templateId}
       readOnly={false}
     />
   );
@@ -58,7 +58,7 @@ function TemplateEditor({ templateId }) {
 interface EnterpriseToolingEditorProps {
   tools: ToolingLineItem[];
   onChange: (tools: ToolingLineItem[]) => void;
-  workPackageTemplateId?: string;
+  workOrderTemplateId?: string;
   readOnly?: boolean;
 }
 ```
@@ -74,7 +74,7 @@ function TemplateToolingSection({ templateId }) {
     <EnterpriseToolingEditor
       tools={tools}
       onChange={setTools}
-      workPackageTemplateId={templateId}
+      workOrderTemplateId={templateId}
       readOnly={false}
     />
   );
@@ -98,7 +98,7 @@ function TemplateToolingSection({ templateId }) {
 interface EnterpriseComplianceEditorProps {
   requirements: ComplianceRequirement[];
   onChange: (requirements: ComplianceRequirement[]) => void;
-  workPackageTemplateId?: string;
+  workOrderTemplateId?: string;
   readOnly?: boolean;
 }
 ```
@@ -114,7 +114,7 @@ function TemplateComplianceSection({ templateId }) {
     <EnterpriseComplianceEditor
       requirements={requirements}
       onChange={setRequirements}
-      workPackageTemplateId={templateId}
+      workOrderTemplateId={templateId}
       readOnly={false}
     />
   );
@@ -127,7 +127,7 @@ function TemplateComplianceSection({ templateId }) {
 
 ### Option 1: Add as New Tabs (Recommended)
 
-Update `AmroWorkPackageTemplatesPage.tsx` to include enterprise tabs:
+Update `AmroWorkOrderTemplatesPage.tsx` to include enterprise tabs:
 
 ```typescript
 import { EnterpriseMaterialsEditor } from './EnterpriseMaterialsEditor';
@@ -148,7 +148,7 @@ import { EnterpriseComplianceEditor } from './EnterpriseComplianceEditor';
     <EnterpriseMaterialsEditor
       materials={editTemplate.materials_json || []}
       onChange={(materials) => updateTemplateField('materials_json', materials)}
-      workPackageTemplateId={editTemplate.id}
+      workOrderTemplateId={editTemplate.id}
       readOnly={viewMode}
     />
   </TabsContent>
@@ -157,7 +157,7 @@ import { EnterpriseComplianceEditor } from './EnterpriseComplianceEditor';
     <EnterpriseToolingEditor
       tools={editTemplate.tooling_json || []}
       onChange={(tools) => updateTemplateField('tooling_json', tools)}
-      workPackageTemplateId={editTemplate.id}
+      workOrderTemplateId={editTemplate.id}
       readOnly={viewMode}
     />
   </TabsContent>
@@ -166,7 +166,7 @@ import { EnterpriseComplianceEditor } from './EnterpriseComplianceEditor';
     <EnterpriseComplianceEditor
       requirements={editTemplate.compliance_requirements_json || []}
       onChange={(reqs) => updateTemplateField('compliance_requirements_json', reqs)}
-      workPackageTemplateId={editTemplate.id}
+      workOrderTemplateId={editTemplate.id}
       readOnly={viewMode}
     />
   </TabsContent>

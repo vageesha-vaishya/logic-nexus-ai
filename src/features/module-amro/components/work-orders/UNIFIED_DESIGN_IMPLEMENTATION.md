@@ -52,8 +52,8 @@ The refactored implementation now uses:
 ```
 src/features/module-amro/components/work-orders/
 ├── AmroWorkOrdersListPage.tsx          # Unified list view (NEW)
-├── AmroWorkPackageDetailPage.tsx       # Unified detail view (UPDATED)
-├── useWorkPackageState.ts              # React Query hooks (EXISTING - ALIGNED)
+├── AmroWorkOrderDetailPage.tsx       # Unified detail view (UPDATED)
+├── useWorkOrderState.ts              # React Query hooks (EXISTING - ALIGNED)
 └── index.ts                            # Barrel exports (EXISTING)
 ```
 
@@ -98,7 +98,7 @@ AmroWorkOrdersListPage
 
 #### Work Package Detail Page
 ```
-AmroWorkPackageDetailPage
+AmroWorkOrderDetailPage
 ├── AmroModuleSurface (header section)
 │   ├── Title & subtitle
 │   ├── Navigation (back button)
@@ -260,23 +260,23 @@ The Work Orders module already uses React Query hooks that align with the Item M
 
 ```typescript
 // List query
-useListWorkPackages({ page, pageSize, filters... })
+useListWorkOrders({ page, pageSize, filters... })
 
 // Single item query
-useWorkPackage(id)
+useWorkOrder(id)
 
 // Mutations
-useCreateWorkPackage()
-useUpdateWorkPackage()
-useDeleteWorkPackage()
-useTransitionWorkPackage()
+useCreateWorkOrder()
+useUpdateWorkOrder()
+useDeleteWorkOrder()
+useTransitionWorkOrder()
 
 // Invalidation helper
-useWorkPackageActions()
+useWorkOrderActions()
 ```
 
 **Consistency Features:**
-- Query key structure: `['amro', 'work-packages', ...]`
+- Query key structure: `['amro', 'work-orders', ...]`
 - Stale time: 15,000ms (list), 10,000ms (detail)
 - Retry policy: 2 attempts
 - Automatic cache invalidation on mutations

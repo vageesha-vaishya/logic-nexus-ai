@@ -11,7 +11,7 @@ import {
   handlePreflight,
   resolveAndApplyAccessContext,
 } from '../../../../_utils/http';
-import { checkAmroOpsPersistenceHealth } from '../../work-package-persistence';
+import { checkAmroOpsPersistenceHealth } from '../../work-order-persistence';
 
 vi.mock('../../../../_utils/http', () => ({
   applyCors: vi.fn(),
@@ -24,7 +24,7 @@ vi.mock('../../../../_utils/http', () => ({
   resolveAndApplyAccessContext: vi.fn(),
 }));
 
-vi.mock('../../work-package-persistence', () => ({
+vi.mock('../../work-order-persistence', () => ({
   checkAmroOpsPersistenceHealth: vi.fn(),
 }));
 

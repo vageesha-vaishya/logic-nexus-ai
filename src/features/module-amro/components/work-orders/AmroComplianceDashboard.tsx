@@ -39,7 +39,7 @@ import {
 } from './useComplianceState';
 
 type Props = {
-  workPackageId: string;
+  workOrderId: string;
 };
 
 const COMPLIANCE_TYPE_CONFIG: Record<ComplianceType, { label: string; icon: any; color: string }> = {
@@ -81,7 +81,7 @@ const DEFAULT_CERT_FORM = {
   remarks: '',
 };
 
-export function AmroComplianceDashboard({ workPackageId }: Props): JSX.Element {
+export function AmroComplianceDashboard({ workOrderId }: Props): JSX.Element {
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -101,7 +101,7 @@ export function AmroComplianceDashboard({ workPackageId }: Props): JSX.Element {
 
   // Data fetching
   const { data, isLoading, error } = useListComplianceRecords({
-    workPackageId,
+    workOrderId,
     complianceType: typeFilter === 'all' ? undefined : typeFilter as ComplianceType,
     status: statusFilter === 'all' ? undefined : statusFilter as ComplianceStatus,
   });
@@ -157,7 +157,7 @@ export function AmroComplianceDashboard({ workPackageId }: Props): JSX.Element {
     setRecordFormLoading(true);
     try {
       await createRecordMutation.mutateAsync({
-        work_package_id: workPackageId,
+        work_order_id: workOrderId,
         compliance_type: recordForm.compliance_type,
         compliance_reference: recordForm.compliance_reference,
         compliance_method: recordForm.compliance_method || undefined,
@@ -176,7 +176,7 @@ export function AmroComplianceDashboard({ workPackageId }: Props): JSX.Element {
     } finally {
       setRecordFormLoading(false);
     }
-  }, [workPackageId, recordForm, createRecordMutation]);
+  }, [workOrderId, recordForm, createRecordMutation]);
 
   const handleCertFormSubmit = useCallback(async () => {
     if (!certForm.certifying_staff_id || !certForm.staff_license_number || !certForm.work_description || !certForm.regulations_complied) {
@@ -187,7 +187,7 @@ export function AmroComplianceDashboard({ workPackageId }: Props): JSX.Element {
     setCertFormLoading(true);
     try {
       await createCertMutation.mutateAsync({
-        work_package_id: workPackageId,
+        work_order_id: workOrderId,
         certifying_staff_id: certForm.certifying_staff_id,
         staff_license_number: certForm.staff_license_number,
         staff_license_type: certForm.staff_license_type,
@@ -205,7 +205,7 @@ export function AmroComplianceDashboard({ workPackageId }: Props): JSX.Element {
     } finally {
       setCertFormLoading(false);
     }
-  }, [workPackageId, certForm, createCertMutation]);
+  }, [workOrderId, certForm, createCertMutation]);
 
   const formatTimeAgo = useCallback((dateStr: string) => {
     const date = new Date(dateStr);

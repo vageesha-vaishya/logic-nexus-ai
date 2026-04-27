@@ -64,7 +64,7 @@ function buildLegacyTaskRows(tenantId: string, franchiseId: string | null): Lega
   return [
     {
       legacy_id: 'legacy-task-001',
-      work_package_id: 'WP-001',
+      work_order_id: 'WP-001',
       task_code: 'T-001',
       legacy_title: 'Legacy Fuselage Integrity Review',
       legacy_status: 'planned',
@@ -76,7 +76,7 @@ function buildLegacyTaskRows(tenantId: string, franchiseId: string | null): Lega
     },
     {
       legacy_id: 'legacy-task-002',
-      work_package_id: 'WP-001',
+      work_order_id: 'WP-001',
       task_code: 'T-002',
       legacy_title: 'Legacy Avionics Wiring Continuity Test',
       legacy_status: 'in_progress',
@@ -88,7 +88,7 @@ function buildLegacyTaskRows(tenantId: string, franchiseId: string | null): Lega
     },
     {
       legacy_id: 'legacy-task-003',
-      work_package_id: 'WP-002',
+      work_order_id: 'WP-002',
       task_code: 'T-003',
       legacy_title: 'Legacy Cabin Pressure Seal Validation',
       legacy_status: 'completed',
@@ -115,9 +115,9 @@ function reconcileTaskSurface(legacyTasks: TaskItem[], moduleTasks: TaskItem[]) 
   };
 }
 
-function filterByWorkPackage(items: TaskItem[], workPackageId: string): TaskItem[] {
-  if (!workPackageId) return items;
-  return items.filter((item) => item.workPackageId === workPackageId);
+function filterByWorkOrder(items: TaskItem[], workOrderId: string): TaskItem[] {
+  if (!workOrderId) return items;
+  return items.filter((item) => item.workOrderId === workOrderId);
 }
 
 type TaskStepAction = 'start' | 'complete' | 'block' | 'reopen';
@@ -485,7 +485,7 @@ function appendTaskAuditRecord(params: {
   correlationId: string;
   compatMode: string;
   mode: 'dual-run' | 'module' | 'legacy-fallback';
-  workPackageId: string;
+  workOrderId: string;
   legacyTasks: TaskItem[];
   moduleTasks: TaskItem[];
   queueMode: 'redis' | 'memory' | 'disabled' | null;
@@ -498,7 +498,7 @@ function appendTaskAuditRecord(params: {
     tenantId: params.tenantId,
     franchiseId: params.franchiseId,
     compatMode: params.compatMode,
-    requestedFilters: { workPackageId: params.workPackageId || null },
+    requestedFilters: { workOrderId: params.workOrderId || null },
     reconciliation,
   });
 
@@ -508,7 +508,7 @@ function appendTaskAuditRecord(params: {
     capability: 'tasks',
     eventType: 'amro.audit.recorded.v1',
     entityType: 'task',
-    entityId: params.workPackageId ? `workPackage:${params.workPackageId}` : 'workPackage:all',
+    entityId: params.workOrderId ? `workOrder:${params.workOrderId}` : 'workOrder:all',
     correlationId: params.correlationId,
     action: `${params.mode}.read`,
     compatMode: params.compatMode,
@@ -517,7 +517,7 @@ function appendTaskAuditRecord(params: {
     replayCheckpoint: params.snapshotCheckpoint || historicalBackfill.replayCheckpoint,
     context: {
       mode: params.mode,
-      requestedFilters: { workPackageId: params.workPackageId || null },
+      requestedFilters: { workOrderId: params.workOrderId || null },
       queueMode: params.queueMode,
       reconciliation,
     },
@@ -621,7 +621,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     applyCompatibilityResponseHeaders(res, compatDecision, ctx.correlationId);
 
     const amroAccess = await enforceAmroDomainAccess(access, { correlationId: ctx.correlationId });
-    const workPackageId = sanitizeQueryId(req.query.workPackageId, 'workPackageId');
+    const workOrderId = sanitizeQueryId(req.query.workOrderId, 'workOrderId');
     const tenantId = String(access.tenantId || '');
     const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
     const isolationScope = createAmroIsolationScope(tenantId, franchiseId);
@@ -1046,8 +1046,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const legacyFallback = isLegacyFallbackEnabled();
     const legacyRows = enforceAmroScopedLegacyRows(buildLegacyTaskRows(tenantId, franchiseId), isolationScope);
 
-    const moduleTasks = filterByWorkPackage(adaptModuleTasksFromLegacy(legacyRows), workPackageId);
-    const legacyTasks = filterByWorkPackage(adaptLegacyTasks(legacyRows), workPackageId);
+    const moduleTasks = filterByWorkOrder(adaptModuleTasksFromLegacy(legacyRows), workOrderId);
+    const legacyTasks = filterByWorkOrder(adaptLegacyTasks(legacyRows), workOrderId);
     const integrationContracts = buildAmroIntegrationContractEnvelope({
       capability: 'tasks',
       tenantId,
@@ -1062,7 +1062,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tenantId,
       franchiseId,
       compatMode: compatDecision.compatMode,
-      requestedFilters: { workPackageId: workPackageId || null },
+      requestedFilters: { workOrderId: workOrderId || null },
       reconciliation,
     });
     const dualWrite = await enqueueTaskDualWriteOperations({
@@ -1087,7 +1087,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           compatMode: compatDecision.compatMode,
           mode: 'legacy-fallback',
-          workPackageId,
+          workOrderId,
           legacyTasks,
           moduleTasks,
           queueMode: fallback.queueMode,
@@ -1113,7 +1113,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           },
           dualWrite,
         },
-        filters: { workPackageId: workPackageId || null },
+        filters: { workOrderId: workOrderId || null },
         fallback: {
           legacyMode: true,
           queueDrained: fallback.drained,
@@ -1144,7 +1144,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           compatMode: compatDecision.compatMode,
           mode: 'module',
-          workPackageId,
+          workOrderId,
           legacyTasks,
           moduleTasks,
           queueMode: null,
@@ -1170,7 +1170,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           },
           dualWrite,
         },
-        filters: { workPackageId: workPackageId || null },
+        filters: { workOrderId: workOrderId || null },
         endpointRollout: rolloutState,
         auditLedgerCutover: cutoverState,
         auditLedger: auditRecord ? {
@@ -1190,7 +1190,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tenantId,
       franchiseId,
       compatMode: compatDecision.compatMode,
-      requestedFilters: { workPackageId: workPackageId || null },
+      requestedFilters: { workOrderId: workOrderId || null },
       reconciliation,
     });
     logApiEvent('info', '[AmroTasksV2] dual-run reconciliation', {
@@ -1198,7 +1198,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tenantId,
       franchiseId,
       compatMode: compatDecision.compatMode,
-      workPackageId: workPackageId || null,
+      workOrderId: workOrderId || null,
       reconciliation,
       queue: queueResult,
     });
@@ -1209,7 +1209,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         correlationId: ctx.correlationId,
         compatMode: compatDecision.compatMode,
         mode: 'dual-run',
-        workPackageId,
+        workOrderId,
         legacyTasks,
         moduleTasks,
         queueMode: queueResult.queueMode,
@@ -1236,7 +1236,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         dualWrite,
       },
-      filters: { workPackageId: workPackageId || null },
+      filters: { workOrderId: workOrderId || null },
       data: { tasks: moduleTasks },
       legacy: { tasks: legacyTasks },
       reconciliation,

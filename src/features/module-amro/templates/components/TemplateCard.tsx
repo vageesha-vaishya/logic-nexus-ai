@@ -34,19 +34,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface TemplateCardProps {
-  template: WorkPackageTemplate;
+  template: WorkOrderTemplate;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
-  onEdit: (template: WorkPackageTemplate) => void;
-  onDelete: (template: WorkPackageTemplate) => void;
-  onClone: (template: WorkPackageTemplate) => void;
-  onPreview: (template: WorkPackageTemplate) => void;
-  onManageVersions: (template: WorkPackageTemplate) => void;
+  onEdit: (template: WorkOrderTemplate) => void;
+  onDelete: (template: WorkOrderTemplate) => void;
+  onClone: (template: WorkOrderTemplate) => void;
+  onPreview: (template: WorkOrderTemplate) => void;
+  onManageVersions: (template: WorkOrderTemplate) => void;
 }
 
 // ── Constants ──────────────────────────────────────────────────────────────────

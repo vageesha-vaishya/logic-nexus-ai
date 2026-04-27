@@ -166,8 +166,8 @@ CREATE TABLE IF NOT EXISTS public.amro_tool_reservations (
     tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
     tool_id UUID NOT NULL REFERENCES public.amro_tooling_registry(id) ON DELETE CASCADE,
     tool_instance_id UUID REFERENCES public.amro_tooling_instances(id) ON DELETE SET NULL,
-    work_package_id UUID REFERENCES public.work_packages(id) ON DELETE SET NULL,
-    work_package_template_id UUID,
+    work_order_id UUID REFERENCES public.work_orders(id) ON DELETE SET NULL,
+    work_order_template_id UUID,
     task_id UUID,
     
     quantity_reserved INTEGER NOT NULL DEFAULT 1,
@@ -368,7 +368,7 @@ CREATE TABLE IF NOT EXISTS public.amro_compliance_requirements_enhanced (
     internal_notes TEXT,
     regulatory_notes TEXT,
     
-    -- Audit trail (JSONB for flexibility, also logged to amro_work_package_audit_log)
+    -- Audit trail (JSONB for flexibility, also logged to amro_work_order_audit_log)
     audit_trail JSONB DEFAULT '[]', -- Array of {timestamp, action, performed_by, reason, before_state, after_state}
     
     -- Metadata
@@ -421,7 +421,7 @@ CREATE INDEX IF NOT EXISTS idx_tooling_instances_calibration_overdue ON public.a
 -- Tool Reservations Indexes
 CREATE INDEX IF NOT EXISTS idx_tool_reservations_tool ON public.amro_tool_reservations(tool_id);
 CREATE INDEX IF NOT EXISTS idx_tool_reservations_instance ON public.amro_tool_reservations(tool_instance_id);
-CREATE INDEX IF NOT EXISTS idx_tool_reservations_work_package ON public.amro_tool_reservations(work_package_id);
+CREATE INDEX IF NOT EXISTS idx_tool_reservations_work_order ON public.amro_tool_reservations(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_tool_reservations_status ON public.amro_tool_reservations(status);
 CREATE INDEX IF NOT EXISTS idx_tool_reservations_dates ON public.amro_tool_reservations(reservation_date, return_date);
 

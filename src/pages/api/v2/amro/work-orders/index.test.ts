@@ -84,7 +84,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
               tenant_id: 'tenant-1',
               franchise_id: 'fr-1',
               aircraft_id: 'ac-1',
-              work_package_number: 'WP-20260411-ABC',
+              work_order_number: 'WP-20260411-ABC',
               work_order_number: 'WP-20260411-ABC',
               title: '500hr Inspection',
               description: null,
@@ -180,7 +180,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         ilike: vi.fn().mockResolvedValue({
-          data: [{ work_package_number: 'WP-VT-DCN-2026-0004-HOTSEC' }],
+          data: [{ work_order_number: 'WP-VT-DCN-2026-0004-HOTSEC' }],
           error: null,
         }),
       };
@@ -193,7 +193,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
             tenant_id: 'tenant-1',
             franchise_id: 'fr-1',
             aircraft_id: 'ac-1',
-            work_package_number: 'WP-VT-DCN-2026-0005-STARTER',
+            work_order_number: 'WP-VT-DCN-2026-0005-STARTER',
             title: 'Starter Work Package',
             description: null,
             work_type: null,
@@ -253,10 +253,10 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
       const tasksInsertChain: any = {
         insert: vi.fn().mockResolvedValue({ error: null }),
       };
-      let workPackagesCallCount = 0;
+      let workOrdersCallCount = 0;
       vi.mocked(getSupabaseAdminClient).mockReturnValue({
         from: (table: string) => {
-          if (table === 'work_packages_title') return titleLookupChain;
+          if (table === 'work_orders_title') return titleLookupChain;
           if (table === 'aircraft') return aircraftLookupChain;
           if (table === 'work_order_templates') return templateLookupChain;
           if (table === 'tasks') {
@@ -264,8 +264,8 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
             return (tasksCountChain.select.mock.calls.length === 0) ? tasksCountChain : tasksInsertChain;
           }
           if (table === 'work_orders') {
-            workPackagesCallCount += 1;
-            return workPackagesCallCount === 1 ? sequenceLookupChain : insertChain;
+            workOrdersCallCount += 1;
+            return workOrdersCallCount === 1 ? sequenceLookupChain : insertChain;
           }
           return insertChain;
         },

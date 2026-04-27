@@ -14,7 +14,7 @@ export const tracer = trace.getTracer('amro-service', '0.1.0');
 
 /**
  * Create a span with service and version attributes
- * @param name - Span name (e.g., 'work_package.create')
+ * @param name - Span name (e.g., 'work_order.create')
  * @param attributes - Optional span attributes for context
  * @returns A new span with service metadata
  */
@@ -37,16 +37,16 @@ export function createSpan(name: string, attributes?: Record<string, any>): Span
  * Usage:
  * ```typescript
  * const result = await withSpan(
- *   'work_package.create',
+ *   'work_order.create',
  *   async () => {
  *     // Your async operation
- *     return workOrdersService.createWorkPackage(tenantId, data);
+ *     return workOrdersService.createWorkOrder(tenantId, data);
  *   },
  *   { tenant_id: tenantId, user_id: userId }
  * );
  * ```
  *
- * @param spanName - Name of the span (e.g., 'work_package.create')
+ * @param spanName - Name of the span (e.g., 'work_order.create')
  * @param fn - Async function to execute within the span
  * @param attributes - Optional span attributes
  * @returns Promise resolving to the function result

@@ -6,7 +6,7 @@ BEGIN;
 DO $$
 DECLARE
   has_work_order boolean;
-  has_work_package boolean;
+  has_work_order boolean;
 BEGIN
   SELECT EXISTS (
     SELECT 1
@@ -17,23 +17,23 @@ BEGIN
   SELECT EXISTS (
     SELECT 1
     FROM information_schema.columns
-    WHERE table_schema = 'public' AND table_name = 'tasks' AND column_name = 'work_package_id'
-  ) INTO has_work_package;
+    WHERE table_schema = 'public' AND table_name = 'tasks' AND column_name = 'work_order_id'
+  ) INTO has_work_order;
 
-  IF has_work_package AND NOT has_work_order THEN
-    EXECUTE 'ALTER TABLE public.tasks RENAME COLUMN work_package_id TO work_order_id';
+  IF has_work_order AND NOT has_work_order THEN
+    EXECUTE 'ALTER TABLE public.tasks RENAME COLUMN work_order_id TO work_order_id';
     has_work_order := true;
-    has_work_package := false;
+    has_work_order := false;
   END IF;
 
-  IF has_work_order AND has_work_package THEN
-    EXECUTE 'UPDATE public.tasks SET work_order_id = COALESCE(work_order_id, work_package_id)';
+  IF has_work_order AND has_work_order THEN
+    EXECUTE 'UPDATE public.tasks SET work_order_id = COALESCE(work_order_id, work_order_id)';
   END IF;
 END $$;
 
--- Remove compatibility artifacts and any constraints/indexes tied to tasks.work_package_id.
+-- Remove compatibility artifacts and any constraints/indexes tied to tasks.work_order_id.
 ALTER TABLE public.tasks
-  DROP CONSTRAINT IF EXISTS tasks_work_package_id_compat_fkey;
+  DROP CONSTRAINT IF EXISTS tasks_work_order_id_compat_fkey;
 ALTER TABLE public.tasks
   DROP CONSTRAINT IF EXISTS ck_tasks_work_order_alias_consistency;
 
@@ -52,7 +52,7 @@ BEGIN
     JOIN pg_attribute a ON a.attrelid = t.oid
     WHERE n.nspname = 'public'
       AND t.relname = 'tasks'
-      AND a.attname = 'work_package_id'
+      AND a.attname = 'work_order_id'
       AND a.attnum = ANY (c.conkey)
   LOOP
     EXECUTE format('ALTER TABLE public.tasks DROP CONSTRAINT IF EXISTS %I', v_constraint_name);
@@ -72,7 +72,7 @@ BEGIN
     JOIN pg_attribute a ON a.attrelid = t.oid
     WHERE n.nspname = 'public'
       AND t.relname = 'tasks'
-      AND a.attname = 'work_package_id'
+      AND a.attname = 'work_order_id'
       AND a.attnum = ANY (i.indkey)
   LOOP
     EXECUTE format('DROP INDEX IF EXISTS public.%I', v_index_name);
@@ -80,45 +80,45 @@ BEGIN
 END $$;
 
 ALTER TABLE public.tasks
-  DROP COLUMN IF EXISTS work_package_id;
+  DROP COLUMN IF EXISTS work_order_id;
 
--- Normalize naming conventions from work_package -> work_order on tasks indexes.
+-- Normalize naming conventions from work_order -> work_order on tasks indexes.
 DO $$
 BEGIN
   IF EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relname = 'uq_tasks_work_package_sequence_active' AND c.relkind = 'i'
+    WHERE n.nspname = 'public' AND c.relname = 'uq_tasks_work_order_sequence_active' AND c.relkind = 'i'
   ) AND NOT EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relname = 'uq_tasks_work_order_sequence_active' AND c.relkind = 'i'
   ) THEN
-    EXECUTE 'ALTER INDEX public.uq_tasks_work_package_sequence_active RENAME TO uq_tasks_work_order_sequence_active';
+    EXECUTE 'ALTER INDEX public.uq_tasks_work_order_sequence_active RENAME TO uq_tasks_work_order_sequence_active';
   END IF;
 
   IF EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relname = 'idx_tasks_tenant_work_package_status' AND c.relkind = 'i'
+    WHERE n.nspname = 'public' AND c.relname = 'idx_tasks_tenant_work_order_status' AND c.relkind = 'i'
   ) AND NOT EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relname = 'idx_tasks_tenant_work_order_status' AND c.relkind = 'i'
   ) THEN
-    EXECUTE 'ALTER INDEX public.idx_tasks_tenant_work_package_status RENAME TO idx_tasks_tenant_work_order_status';
+    EXECUTE 'ALTER INDEX public.idx_tasks_tenant_work_order_status RENAME TO idx_tasks_tenant_work_order_status';
   END IF;
 
   IF EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
-    WHERE n.nspname = 'public' AND c.relname = 'idx_tasks_work_package_id' AND c.relkind = 'i'
+    WHERE n.nspname = 'public' AND c.relname = 'idx_tasks_work_order_id' AND c.relkind = 'i'
   ) AND NOT EXISTS (
     SELECT 1 FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public' AND c.relname = 'idx_tasks_work_order_id' AND c.relkind = 'i'
   ) THEN
-    EXECUTE 'ALTER INDEX public.idx_tasks_work_package_id RENAME TO idx_tasks_work_order_id';
+    EXECUTE 'ALTER INDEX public.idx_tasks_work_order_id RENAME TO idx_tasks_work_order_id';
   END IF;
 END $$;
 

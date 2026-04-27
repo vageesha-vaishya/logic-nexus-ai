@@ -4,7 +4,7 @@
  * Barrel export for all grid-related components
  */
 
-export { WorkPackageTemplatesGrid } from './WorkPackageTemplatesGrid';
+export { WorkOrderTemplatesGrid } from './WorkOrderTemplatesGrid';
 export { TemplateRow } from './TemplateRow';
 export { TemplateCard } from './TemplateCard';
 export { GridToolbar } from './GridToolbar';

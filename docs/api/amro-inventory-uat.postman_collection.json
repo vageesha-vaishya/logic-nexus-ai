@@ -52,7 +52,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"part_number\": \"{{partNumber}}\",\n  \"quantity\": {{reserveQty}},\n  \"work_package_id\": \"{{workPackageId}}\",\n  \"task_id\": \"{{taskId}}\",\n  \"expires_at\": \"{{reservationExpiryIso}}\"\n}"
+          "raw": "{\n  \"part_number\": \"{{partNumber}}\",\n  \"quantity\": {{reserveQty}},\n  \"work_order_id\": \"{{workOrderId}}\",\n  \"task_id\": \"{{taskId}}\",\n  \"expires_at\": \"{{reservationExpiryIso}}\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v2/amro/inventory/work-order-sync?interface=reserve",
@@ -93,7 +93,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"part_number\": \"{{partNumber}}\",\n  \"quantity\": {{consumeQty}},\n  \"reservation_id\": \"{{reservationId}}\",\n  \"work_package_id\": \"{{workPackageId}}\",\n  \"task_id\": \"{{taskId}}\",\n  \"notes\": \"Auto-consumption from UAT flow\"\n}"
+          "raw": "{\n  \"part_number\": \"{{partNumber}}\",\n  \"quantity\": {{consumeQty}},\n  \"reservation_id\": \"{{reservationId}}\",\n  \"work_order_id\": \"{{workOrderId}}\",\n  \"task_id\": \"{{taskId}}\",\n  \"notes\": \"Auto-consumption from UAT flow\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v2/amro/inventory/work-order-sync?interface=consume",
@@ -132,7 +132,7 @@
         ],
         "body": {
           "mode": "raw",
-          "raw": "{\n  \"part_number\": \"{{partNumber}}\",\n  \"reservation_id\": \"{{reservationId}}\",\n  \"quantity\": {{releaseQty}},\n  \"work_package_id\": \"{{workPackageId}}\",\n  \"task_id\": \"{{taskId}}\"\n}"
+          "raw": "{\n  \"part_number\": \"{{partNumber}}\",\n  \"reservation_id\": \"{{reservationId}}\",\n  \"quantity\": {{releaseQty}},\n  \"work_order_id\": \"{{workOrderId}}\",\n  \"task_id\": \"{{taskId}}\"\n}"
         },
         "url": {
           "raw": "{{baseUrl}}/api/v2/amro/inventory/work-order-sync?interface=release",

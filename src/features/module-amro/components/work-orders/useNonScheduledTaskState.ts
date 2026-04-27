@@ -1,7 +1,7 @@
 /**
  * React Query Hooks for AMRO Non-Scheduled Tasks
  * 
- * Follows the pattern established in useWorkPackageState.ts
+ * Follows the pattern established in useWorkOrderState.ts
  * Provides hooks for:
  * - Listing non-scheduled tasks
  * - Creating non-scheduled tasks
@@ -223,8 +223,8 @@ interface ConvertToWPInput {
 }
 
 async function mutateConvertToWP(input: ConvertToWPInput, headers: HeadersInit): Promise<{
-  work_package_id: string;
-  work_package_number: string;
+  work_order_id: string;
+  work_order_number: string;
   emergency_wp_id: string | null;
   converted_from_task_id: string;
   conversion_timestamp: string;

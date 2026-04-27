@@ -204,14 +204,14 @@ export const AMRO_DATABASE_MAPPING_MATRIX: ReadonlyArray<AmroDatabaseMappingMatr
   {
     moduleId: 'MOD-AMRO-02',
     primaryTables: ['work_orders', 'work_order_templates', 'tasks'],
-    keyFieldsUsedByModule: ['work_package_number', 'maintenance_type', 'priority', 'status'],
-    criticalConstraintsAndRules: ['Unique (tenant_id, work_package_number)', 'Transition policy validation required'],
+    keyFieldsUsedByModule: ['work_order_number', 'maintenance_type', 'priority', 'status'],
+    criticalConstraintsAndRules: ['Unique (tenant_id, work_order_number)', 'Transition policy validation required'],
   },
   {
     moduleId: 'MOD-AMRO-03',
     primaryTables: ['tasks', 'task_evidence', 'maintenance_events', 'sync_conflicts'],
     keyFieldsUsedByModule: ['sequence', 'steps_json', 'checksum', 'signature metadata'],
-    criticalConstraintsAndRules: ['Unique (work_package_id, sequence)', 'Evidence checksum mandatory'],
+    criticalConstraintsAndRules: ['Unique (work_order_id, sequence)', 'Evidence checksum mandatory'],
   },
   {
     moduleId: 'MOD-AMRO-04',

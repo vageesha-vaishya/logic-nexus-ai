@@ -216,9 +216,9 @@ export const PartsInventoryVariant: Story = {
   },
 };
 
-export const WorkPackageVariant: Story = {
+export const WorkOrderVariant: Story = {
   args: {
-    moduleKey: 'work-packages',
+    moduleKey: 'work-orders',
     title: 'Work Package',
     breadcrumbs: ['AMRO', 'Maintenance', 'Work Packages'],
     values: {
@@ -347,15 +347,15 @@ export const FormStandardContract: Story = {
   },
 };
 
-export const WorkPackageTemplates_ProductionParity: Story = {
-  name: 'WorkPackageTemplates_ProductionParity',
+export const WorkOrderTemplates_ProductionParity: Story = {
+  name: 'WorkOrderTemplates_ProductionParity',
   parameters: {
     docs: {
       description: {
         story: `
 **State Switch Guide**
-- \`WorkPackageTemplates_ProductionParity\` = ready state (no validation errors expected)
-- \`WorkPackageTemplates_ProductionParity_ValidationError\` = validation state (error summary + 2 expected messages)
+- \`WorkOrderTemplates_ProductionParity\` = ready state (no validation errors expected)
+- \`WorkOrderTemplates_ProductionParity_ValidationError\` = validation state (error summary + 2 expected messages)
 - QA rule: both stories must keep the same field/block layout; only validation state should differ.
 
 **Visual Sign-off Checklist (QA)**
@@ -391,7 +391,7 @@ export const WorkPackageTemplates_ProductionParity: Story = {
     );
   },
   args: {
-    moduleKey: 'work_package_templates',
+    moduleKey: 'work_order_templates',
     title: 'Work Package Templates - Production Parity',
     subtitle: 'Exact visual parity contract for adapter-standardized rollout path.',
     mode: 'edit',
@@ -433,15 +433,15 @@ export const WorkPackageTemplates_ProductionParity: Story = {
   },
 };
 
-export const WorkPackageTemplates_ProductionParity_ValidationError: Story = {
-  name: 'WorkPackageTemplates_ProductionParity_ValidationError',
+export const WorkOrderTemplates_ProductionParity_ValidationError: Story = {
+  name: 'WorkOrderTemplates_ProductionParity_ValidationError',
   parameters: {
     docs: {
       description: {
         story: `
 **State Switch Guide**
-- \`WorkPackageTemplates_ProductionParity\` = ready state (no validation errors expected)
-- \`WorkPackageTemplates_ProductionParity_ValidationError\` = expected validation summary state
+- \`WorkOrderTemplates_ProductionParity\` = ready state (no validation errors expected)
+- \`WorkOrderTemplates_ProductionParity_ValidationError\` = expected validation summary state
 - QA rule: both stories must keep the same field/block layout; only validation state should differ.
 
 **Expected Validation Output**
@@ -452,9 +452,9 @@ export const WorkPackageTemplates_ProductionParity_ValidationError: Story = {
       },
     },
   },
-  render: WorkPackageTemplates_ProductionParity.render,
+  render: WorkOrderTemplates_ProductionParity.render,
   args: {
-    ...WorkPackageTemplates_ProductionParity.args,
+    ...WorkOrderTemplates_ProductionParity.args,
     state: 'ready',
     validation: {
       level: 'error',
@@ -503,17 +503,17 @@ export const WorkPackageTemplates_ProductionParity_ValidationError: Story = {
   },
 };
 
-export const WorkPackageTemplates_ProductionParity_Loading: Story = {
-  name: 'WorkPackageTemplates_ProductionParity_Loading',
-  render: WorkPackageTemplates_ProductionParity.render,
+export const WorkOrderTemplates_ProductionParity_Loading: Story = {
+  name: 'WorkOrderTemplates_ProductionParity_Loading',
+  render: WorkOrderTemplates_ProductionParity.render,
   args: {
-    ...WorkPackageTemplates_ProductionParity.args,
+    ...WorkOrderTemplates_ProductionParity.args,
     state: 'loading',
   },
 };
 
-export const WorkPackageTemplates_ProductionParity_FeatureFlagOffFallback: Story = {
-  name: 'WorkPackageTemplates_ProductionParity_FeatureFlagOffFallback',
+export const WorkOrderTemplates_ProductionParity_FeatureFlagOffFallback: Story = {
+  name: 'WorkOrderTemplates_ProductionParity_FeatureFlagOffFallback',
   parameters: {
     docs: {
       description: {
@@ -541,7 +541,7 @@ export const WorkPackageTemplates_ProductionParity_FeatureFlagOffFallback: Story
     </div>
   ),
   args: {
-    moduleKey: 'work_package_templates',
+    moduleKey: 'work_order_templates',
     title: 'Work Package Templates - Legacy Fallback',
     subtitle: 'Feature flag OFF fallback reference',
     mode: 'edit',

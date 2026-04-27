@@ -4,11 +4,11 @@ info:
   version: 1.0.0
 defaultContentType: application/json
 channels:
-  amro.work_package.created.v1:
+  amro.work_order.created.v1:
     publish:
-      operationId: publishWorkPackageCreated
+      operationId: publishWorkOrderCreated
       message:
-        $ref: '#/components/messages/WorkPackageCreated'
+        $ref: '#/components/messages/WorkOrderCreated'
   amro.task.completed.v1:
     publish:
       operationId: publishTaskCompleted
@@ -41,10 +41,10 @@ channels:
         $ref: '#/components/messages/AuditRecorded'
 components:
   messages:
-    WorkPackageCreated:
-      name: amro.work_package.created.v1
+    WorkOrderCreated:
+      name: amro.work_order.created.v1
       payload:
-        $ref: '#/components/schemas/WorkPackageCreatedPayload'
+        $ref: '#/components/schemas/WorkOrderCreatedPayload'
     TaskCompleted:
       name: amro.task.completed.v1
       payload:
@@ -93,16 +93,16 @@ components:
         mode:
           type: string
           enum: [dual-run, module, legacy-fallback]
-    WorkPackageCreatedPayload:
+    WorkOrderCreatedPayload:
       allOf:
         - $ref: '#/components/schemas/EventEnvelope'
         - type: object
-          required: [workPackageId]
+          required: [workOrderId]
           properties:
             eventType:
               type: string
-              const: amro.work_package.created.v1
-            workPackageId:
+              const: amro.work_order.created.v1
+            workOrderId:
               type: string
     TaskCompletedPayload:
       allOf:
@@ -133,14 +133,14 @@ components:
       allOf:
         - $ref: '#/components/schemas/EventEnvelope'
         - type: object
-          required: [certificationActionId, workPackageId, decision]
+          required: [certificationActionId, workOrderId, decision]
           properties:
             eventType:
               type: string
               const: amro.certification.decision.submitted.v1
             certificationActionId:
               type: string
-            workPackageId:
+            workOrderId:
               type: string
             decision:
               type: string

@@ -92,7 +92,7 @@ test_endpoint \
   "Reserve Material" \
   "POST" \
   "${API_BASE}/materials/00000000-0000-0000-0000-000000000000/reserve" \
-  '{"quantity": 5, "work_package_id": "test-wp-id"}'
+  '{"quantity": 5, "work_order_id": "test-wp-id"}'
 
 # Test 5: Get Shortages
 test_endpoint \

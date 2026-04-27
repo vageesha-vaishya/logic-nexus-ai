@@ -209,7 +209,7 @@ CREATE TRIGGER trg_sync_tasks_alias_columns
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned_technician_id
   ON public.tasks(assigned_technician_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_sequence_active
-  ON public.tasks(work_package_id, sequence)
+  ON public.tasks(work_order_id, sequence)
   WHERE deleted_at IS NULL AND sequence IS NOT NULL;
 
 COMMENT ON COLUMN public.tasks.assigned_to IS

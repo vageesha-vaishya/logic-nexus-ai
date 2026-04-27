@@ -164,7 +164,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
     const body = parseBody(req.body);
     const entityType = parseNonEmpty(body.entity_type, 'entity_type').toLowerCase();
-    if (entityType !== 'work_package' && entityType !== 'task') {
+    if (entityType !== 'work_order' && entityType !== 'task') {
       throw new Error('invalid:entity_type');
     }
     const entityId = parseNonEmpty(body.entity_id, 'entity_id');

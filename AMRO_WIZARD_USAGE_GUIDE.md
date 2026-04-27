@@ -1,8 +1,8 @@
 # How to Use the AMRO Work Package Creation Wizard
 
 **Date:** 2026-04-12  
-**Component:** `AmroWorkPackageCreateWizard`  
-**Location:** `src/features/module-amro/components/work-orders/AmroWorkPackageCreateWizard.tsx`
+**Component:** `AmroWorkOrderCreateWizard`  
+**Location:** `src/features/module-amro/components/work-orders/AmroWorkOrderCreateWizard.tsx`
 
 ---
 
@@ -11,7 +11,7 @@
 ### Step 1: Import the Wizard
 
 ```typescript
-import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/work-orders';
+import { AmroWorkOrderCreateWizard } from '@/features/module-amro/components/work-orders';
 ```
 
 ### Step 2: Add State Management
@@ -30,12 +30,12 @@ const [wizardOpen, setWizardOpen] = useState(false);
 </Button>
 
 // Wizard component
-<AmroWorkPackageCreateWizard
+<AmroWorkOrderCreateWizard
   open={wizardOpen}
   onOpenChange={setWizardOpen}
   onSuccess={() => {
     // Refresh your data after successful creation
-    refetchWorkPackages();
+    refetchWorkOrders();
     toast.success('Work package created successfully');
   }}
 />
@@ -51,36 +51,36 @@ const [wizardOpen, setWizardOpen] = useState(false);
 
 **Current Code (Line ~9244):**
 ```typescript
-<AddWorkPackageDialog
-  aircraftWorkPackageDialogOpen={aircraftWorkPackageDialogOpen}
-  setAircraftWorkPackageDialogOpen={setAircraftWorkPackageDialogOpen}
-  aircraftWorkPackageActiveTab={aircraftWorkPackageActiveTab}
-  setAircraftWorkPackageActiveTab={setAircraftWorkPackageActiveTab}
+<AddWorkOrderDialog
+  aircraftWorkOrderDialogOpen={aircraftWorkOrderDialogOpen}
+  setAircraftWorkOrderDialogOpen={setAircraftWorkOrderDialogOpen}
+  aircraftWorkOrderActiveTab={aircraftWorkOrderActiveTab}
+  setAircraftWorkOrderActiveTab={setAircraftWorkOrderActiveTab}
   // ... 30+ props
 />
 ```
 
 **New Code:**
 ```typescript
-<AmroWorkPackageCreateWizard
-  open={aircraftWorkPackageDialogOpen}
+<AmroWorkOrderCreateWizard
+  open={aircraftWorkOrderDialogOpen}
   onOpenChange={(isOpen) => {
-    setAircraftWorkPackageDialogOpen(isOpen);
+    setAircraftWorkOrderDialogOpen(isOpen);
     if (!isOpen) {
       // Reset all form state when closing
-      resetAircraftWorkPackageForm();
+      resetAircraftWorkOrderForm();
     }
   }}
   onSuccess={() => {
     // Refresh aircraft work package list
-    loadWorkPackageTemplateRegistry();
+    loadWorkOrderTemplateRegistry();
     toast.success('Work package created successfully');
   }}
 />
 ```
 
 **Changes Needed:**
-1. Replace `<AddWorkPackageDialog>` with `<AmroWorkPackageCreateWizard>`
+1. Replace `<AddWorkOrderDialog>` with `<AmroWorkOrderCreateWizard>`
 2. Simplify props from 30+ to just 3 (`open`, `onOpenChange`, `onSuccess`)
 3. Remove all the old form state management (it's now internal to the wizard)
 4. Delete unused state variables (see cleanup list below)
@@ -93,7 +93,7 @@ const [wizardOpen, setWizardOpen] = useState(false);
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/work-orders';
+import { AmroWorkOrderCreateWizard } from '@/features/module-amro/components/work-orders';
 import { toast } from 'sonner';
 
 function AircraftDetailPage({ aircraftId }: { aircraftId: string }) {
@@ -101,7 +101,7 @@ function AircraftDetailPage({ aircraftId }: { aircraftId: string }) {
   
   const handleSuccess = () => {
     // Refresh work packages for this aircraft
-    refetchWorkPackages(aircraftId);
+    refetchWorkOrders(aircraftId);
     toast.success('Work package created successfully');
   };
 
@@ -114,7 +114,7 @@ function AircraftDetailPage({ aircraftId }: { aircraftId: string }) {
         Create Work Package
       </Button>
 
-      <AmroWorkPackageCreateWizard
+      <AmroWorkOrderCreateWizard
         open={wizardOpen}
         onOpenChange={setWizardOpen}
         onSuccess={handleSuccess}
@@ -132,13 +132,13 @@ function AircraftDetailPage({ aircraftId }: { aircraftId: string }) {
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/work-orders';
-import { useListWorkPackages } from '@/features/module-amro/components/work-orders/useWorkPackageState';
+import { AmroWorkOrderCreateWizard } from '@/features/module-amro/components/work-orders';
+import { useListWorkOrders } from '@/features/module-amro/components/work-orders/useWorkOrderState';
 import { toast } from 'sonner';
 
 function WorkOrdersListPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
-  const { refetch } = useListWorkPackages();
+  const { refetch } = useListWorkOrders();
 
   return (
     <>
@@ -152,7 +152,7 @@ function WorkOrdersListPage() {
 
       {/* Your work orders list */}
 
-      <AmroWorkPackageCreateWizard
+      <AmroWorkOrderCreateWizard
         open={wizardOpen}
         onOpenChange={setWizardOpen}
         onSuccess={() => {
@@ -180,7 +180,7 @@ type Props = {
   preselectedAircraftId?: string; // NEW
 };
 
-export function AmroWorkPackageCreateWizard({ 
+export function AmroWorkOrderCreateWizard({ 
   open, 
   onOpenChange, 
   onSuccess,
@@ -197,7 +197,7 @@ export function AmroWorkPackageCreateWizard({
 
 **Usage:**
 ```typescript
-<AmroWorkPackageCreateWizard
+<AmroWorkOrderCreateWizard
   open={wizardOpen}
   onOpenChange={setWizardOpen}
   onSuccess={handleSuccess}
@@ -213,12 +213,12 @@ export function AmroWorkPackageCreateWizard({
 
 **Remove:**
 ```typescript
-import { AddWorkPackageDialog } from './amro-settings-master-data/components/AddWorkPackageDialog';
+import { AddWorkOrderDialog } from './amro-settings-master-data/components/AddWorkOrderDialog';
 ```
 
 **Add:**
 ```typescript
-import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/work-orders';
+import { AmroWorkOrderCreateWizard } from '@/features/module-amro/components/work-orders';
 ```
 
 ---
@@ -228,21 +228,21 @@ import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/w
 **Remove These State Variables (No longer needed):**
 ```typescript
 // DELETE all these:
-const [aircraftWorkPackageActiveTab, setAircraftWorkPackageActiveTab] = useState(...);
-const [aircraftWorkPackageValues, setAircraftWorkPackageValues] = useState(...);
-const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState(...);
-const [selectedWorkPackageTemplateId, setSelectedWorkPackageTemplateId] = useState(...);
-const [aircraftWorkPackagePagedTasks, setAircraftWorkPackagePagedTasks] = useState(...);
-const [aircraftWorkPackageSelectedTaskIds, setAircraftWorkPackageSelectedTaskIds] = useState(...);
-const [aircraftWorkPackageTaskSort, setAircraftWorkPackageTaskSort] = useState(...);
-const [aircraftWorkPackageTaskPage, setAircraftWorkPackageTaskPage] = useState(...);
-const [aircraftWorkPackageTaskTotalPages, setAircraftWorkPackageTaskTotalPages] = useState(...);
-const [aircraftSelectedExistingWorkPackageId, setAircraftSelectedExistingWorkPackageId] = useState(...);
-const [aircraftExistingWorkPackages, setAircraftExistingWorkPackages] = useState(...);
-const [aircraftExistingWorkPackagesError, setAircraftExistingWorkPackagesError] = useState(...);
-const [aircraftExistingWorkPackagesLoading, setAircraftExistingWorkPackagesLoading] = useState(...);
+const [aircraftWorkOrderActiveTab, setAircraftWorkOrderActiveTab] = useState(...);
+const [aircraftWorkOrderValues, setAircraftWorkOrderValues] = useState(...);
+const [aircraftWorkOrderErrors, setAircraftWorkOrderErrors] = useState(...);
+const [selectedWorkOrderTemplateId, setSelectedWorkOrderTemplateId] = useState(...);
+const [aircraftWorkOrderPagedTasks, setAircraftWorkOrderPagedTasks] = useState(...);
+const [aircraftWorkOrderSelectedTaskIds, setAircraftWorkOrderSelectedTaskIds] = useState(...);
+const [aircraftWorkOrderTaskSort, setAircraftWorkOrderTaskSort] = useState(...);
+const [aircraftWorkOrderTaskPage, setAircraftWorkOrderTaskPage] = useState(...);
+const [aircraftWorkOrderTaskTotalPages, setAircraftWorkOrderTaskTotalPages] = useState(...);
+const [aircraftSelectedExistingWorkOrderId, setAircraftSelectedExistingWorkOrderId] = useState(...);
+const [aircraftExistingWorkOrders, setAircraftExistingWorkOrders] = useState(...);
+const [aircraftExistingWorkOrdersError, setAircraftExistingWorkOrdersError] = useState(...);
+const [aircraftExistingWorkOrdersLoading, setAircraftExistingWorkOrdersLoading] = useState(...);
 const [aircraftTaskGridFilteredRows, setAircraftTaskGridFilteredRows] = useState(...);
-const [aircraftWorkPackageSubmitting, setAircraftWorkPackageSubmitting] = useState(...);
+const [aircraftWorkOrderSubmitting, setAircraftWorkOrderSubmitting] = useState(...);
 const [aircraftTemplateAssociatedTasks, setAircraftTemplateAssociatedTasks] = useState(...);
 const [aircraftTemplateAssociatedTasksLoading, setAircraftTemplateAssociatedTasksLoading] = useState(...);
 const [aircraftTemplateAssociatedTasksError, setAircraftTemplateAssociatedTasksError] = useState(...);
@@ -250,7 +250,7 @@ const [aircraftTemplateAssociatedTasksError, setAircraftTemplateAssociatedTasksE
 
 **Keep:**
 ```typescript
-const [aircraftWorkPackageDialogOpen, setAircraftWorkPackageDialogOpen] = useState(false);
+const [aircraftWorkOrderDialogOpen, setAircraftWorkOrderDialogOpen] = useState(false);
 ```
 
 ---
@@ -260,13 +260,13 @@ const [aircraftWorkPackageDialogOpen, setAircraftWorkPackageDialogOpen] = useSta
 **Delete these functions:**
 ```typescript
 // DELETE:
-const handleOpenWorkPackageCreateDialog
-const setAircraftWorkPackageField
-const handleAircraftWorkPackageTemplateSelect
-const handleAircraftWorkPackageTaskSelection
-const handleApplyExistingWorkPackageSelection
-const handleAircraftWorkPackageSubmit
-const loadWorkPackageTemplateRegistry
+const handleOpenWorkOrderCreateDialog
+const setAircraftWorkOrderField
+const handleAircraftWorkOrderTemplateSelect
+const handleAircraftWorkOrderTaskSelection
+const handleApplyExistingWorkOrderSelection
+const handleAircraftWorkOrderSubmit
+const loadWorkOrderTemplateRegistry
 // And all related functions
 ```
 
@@ -276,41 +276,41 @@ const loadWorkPackageTemplateRegistry
 
 **Old (Line ~9244):**
 ```typescript
-<AddWorkPackageDialog
-  aircraftWorkPackageDialogOpen={aircraftWorkPackageDialogOpen}
-  setAircraftWorkPackageDialogOpen={setAircraftWorkPackageDialogOpen}
-  aircraftWorkPackageActiveTab={aircraftWorkPackageActiveTab}
-  setAircraftWorkPackageActiveTab={setAircraftWorkPackageActiveTab}
-  aircraftWorkPackageValues={aircraftWorkPackageValues}
-  aircraftWorkPackageErrors={aircraftWorkPackageErrors}
-  setAircraftWorkPackageField={setAircraftWorkPackageField}
-  selectedWorkPackageTemplateId={selectedWorkPackageTemplateId}
-  handleAircraftWorkPackageTemplateSelect={handleAircraftWorkPackageTemplateSelect}
-  workPackageTemplateRegistryLoading={workPackageTemplateRegistryLoading}
-  workPackageTemplateRegistry={workPackageTemplateRegistry}
-  workPackageTemplateRegistryError={workPackageTemplateRegistryError}
-  selectedWorkPackageTemplate={selectedWorkPackageTemplate}
-  aircraftWorkPackagePagedTasks={aircraftWorkPackagePagedTasks}
-  aircraftWorkPackageSelectedTaskIds={aircraftWorkPackageSelectedTaskIds}
-  handleAircraftWorkPackageTaskSelection={handleAircraftWorkPackageTaskSelection}
-  setAircraftWorkPackageSelectedTaskIds={setAircraftWorkPackageSelectedTaskIds}
-  aircraftWorkPackageTaskSort={aircraftWorkPackageTaskSort}
-  setAircraftWorkPackageTaskSort={setAircraftWorkPackageTaskSort}
-  setAircraftWorkPackageTaskSortDirection={setAircraftWorkPackageTaskSortDirection}
-  aircraftWorkPackageTaskPage={aircraftWorkPackageTaskPage}
-  setAircraftWorkPackageTaskPage={setAircraftWorkPackageTaskPage}
-  aircraftWorkPackageTaskTotalPages={aircraftWorkPackageTaskTotalPages}
-  loadWorkPackageTemplateRegistry={loadWorkPackageTemplateRegistry}
-  aircraftSelectedExistingWorkPackageId={aircraftSelectedExistingWorkPackageId}
-  setAircraftSelectedExistingWorkPackageId={setAircraftSelectedExistingWorkPackageId}
-  aircraftExistingWorkPackagesError={aircraftExistingWorkPackagesError}
-  aircraftExistingWorkPackagesLoading={aircraftExistingWorkPackagesLoading}
-  aircraftExistingWorkPackageList={aircraftExistingWorkPackageList}
-  handleApplyExistingWorkPackageSelection={handleApplyExistingWorkPackageSelection}
+<AddWorkOrderDialog
+  aircraftWorkOrderDialogOpen={aircraftWorkOrderDialogOpen}
+  setAircraftWorkOrderDialogOpen={setAircraftWorkOrderDialogOpen}
+  aircraftWorkOrderActiveTab={aircraftWorkOrderActiveTab}
+  setAircraftWorkOrderActiveTab={setAircraftWorkOrderActiveTab}
+  aircraftWorkOrderValues={aircraftWorkOrderValues}
+  aircraftWorkOrderErrors={aircraftWorkOrderErrors}
+  setAircraftWorkOrderField={setAircraftWorkOrderField}
+  selectedWorkOrderTemplateId={selectedWorkOrderTemplateId}
+  handleAircraftWorkOrderTemplateSelect={handleAircraftWorkOrderTemplateSelect}
+  workOrderTemplateRegistryLoading={workOrderTemplateRegistryLoading}
+  workOrderTemplateRegistry={workOrderTemplateRegistry}
+  workOrderTemplateRegistryError={workOrderTemplateRegistryError}
+  selectedWorkOrderTemplate={selectedWorkOrderTemplate}
+  aircraftWorkOrderPagedTasks={aircraftWorkOrderPagedTasks}
+  aircraftWorkOrderSelectedTaskIds={aircraftWorkOrderSelectedTaskIds}
+  handleAircraftWorkOrderTaskSelection={handleAircraftWorkOrderTaskSelection}
+  setAircraftWorkOrderSelectedTaskIds={setAircraftWorkOrderSelectedTaskIds}
+  aircraftWorkOrderTaskSort={aircraftWorkOrderTaskSort}
+  setAircraftWorkOrderTaskSort={setAircraftWorkOrderTaskSort}
+  setAircraftWorkOrderTaskSortDirection={setAircraftWorkOrderTaskSortDirection}
+  aircraftWorkOrderTaskPage={aircraftWorkOrderTaskPage}
+  setAircraftWorkOrderTaskPage={setAircraftWorkOrderTaskPage}
+  aircraftWorkOrderTaskTotalPages={aircraftWorkOrderTaskTotalPages}
+  loadWorkOrderTemplateRegistry={loadWorkOrderTemplateRegistry}
+  aircraftSelectedExistingWorkOrderId={aircraftSelectedExistingWorkOrderId}
+  setAircraftSelectedExistingWorkOrderId={setAircraftSelectedExistingWorkOrderId}
+  aircraftExistingWorkOrdersError={aircraftExistingWorkOrdersError}
+  aircraftExistingWorkOrdersLoading={aircraftExistingWorkOrdersLoading}
+  aircraftExistingWorkOrderList={aircraftExistingWorkOrderList}
+  handleApplyExistingWorkOrderSelection={handleApplyExistingWorkOrderSelection}
   aircraftTaskGridFilteredRows={aircraftTaskGridFilteredRows}
-  aircraftWorkPackageSubmitting={aircraftWorkPackageSubmitting}
-  handleAircraftWorkPackageSubmit={handleAircraftWorkPackageSubmit}
-  canCreateWorkPackageFromTemplate={canCreateWorkPackageFromTemplate}
+  aircraftWorkOrderSubmitting={aircraftWorkOrderSubmitting}
+  handleAircraftWorkOrderSubmit={handleAircraftWorkOrderSubmit}
+  canCreateWorkOrderFromTemplate={canCreateWorkOrderFromTemplate}
   associatedTemplateTasks={aircraftTemplateAssociatedTasks}
   associatedTemplateTasksLoading={aircraftTemplateAssociatedTasksLoading}
   associatedTemplateTasksError={aircraftTemplateAssociatedTasksError}
@@ -319,10 +319,10 @@ const loadWorkPackageTemplateRegistry
 
 **New:**
 ```typescript
-<AmroWorkPackageCreateWizard
-  open={aircraftWorkPackageDialogOpen}
+<AmroWorkOrderCreateWizard
+  open={aircraftWorkOrderDialogOpen}
   onOpenChange={(isOpen) => {
-    setAircraftWorkPackageDialogOpen(isOpen);
+    setAircraftWorkOrderDialogOpen(isOpen);
     if (!isOpen) {
       // Optional: Reset any parent state
       console.log('Wizard closed');
@@ -330,7 +330,7 @@ const loadWorkPackageTemplateRegistry
   }}
   onSuccess={() => {
     // Refresh your data
-    loadWorkPackageTemplateRegistry();
+    loadWorkOrderTemplateRegistry();
     toast.success('Work package created successfully');
   }}
 />
@@ -342,24 +342,24 @@ const loadWorkPackageTemplateRegistry
 
 **Old:**
 ```typescript
-const handleOpenWorkPackageCreateDialog = useCallback(() => {
+const handleOpenWorkOrderCreateDialog = useCallback(() => {
   // Reset all state
-  setAircraftWorkPackageActiveTab('selected-task');
-  setAircraftWorkPackageValues({...});
-  setAircraftWorkPackageErrors({});
-  setSelectedWorkPackageTemplateId('');
-  setAircraftWorkPackageSelectedTaskIds([]);
+  setAircraftWorkOrderActiveTab('selected-task');
+  setAircraftWorkOrderValues({...});
+  setAircraftWorkOrderErrors({});
+  setSelectedWorkOrderTemplateId('');
+  setAircraftWorkOrderSelectedTaskIds([]);
   // ... 20+ lines of state reset
   
-  setAircraftWorkPackageDialogOpen(true);
-  trackWorkPackageTemplateAdoption('dialog_opened', {...});
+  setAircraftWorkOrderDialogOpen(true);
+  trackWorkOrderTemplateAdoption('dialog_opened', {...});
 }, [/* 10+ dependencies */]);
 ```
 
 **New:**
 ```typescript
-const handleOpenWorkPackageCreateDialog = useCallback(() => {
-  setAircraftWorkPackageDialogOpen(true);
+const handleOpenWorkOrderCreateDialog = useCallback(() => {
+  setAircraftWorkOrderDialogOpen(true);
   // Wizard handles all internal state management
 }, []);
 ```
@@ -415,13 +415,13 @@ VITE_AMRO_WP_WIZARD_ENABLED=true
 const useNewWizard = process.env.VITE_AMRO_WP_WIZARD_ENABLED === 'true';
 
 {useNewWizard ? (
-  <AmroWorkPackageCreateWizard
-    open={aircraftWorkPackageDialogOpen}
-    onOpenChange={setAircraftWorkPackageDialogOpen}
+  <AmroWorkOrderCreateWizard
+    open={aircraftWorkOrderDialogOpen}
+    onOpenChange={setAircraftWorkOrderDialogOpen}
     onSuccess={handleSuccess}
   />
 ) : (
-  <AddWorkPackageDialog {/* old props */} />
+  <AddWorkOrderDialog {/* old props */} />
 )}
 ```
 
@@ -484,9 +484,9 @@ expect(onSuccessMock).toHaveBeenCalled();
 
 ## 🚀 Deployment Checklist
 
-- [ ] Import `AmroWorkPackageCreateWizard`
+- [ ] Import `AmroWorkOrderCreateWizard`
 - [ ] Add `wizardOpen` state
-- [ ] Replace `<AddWorkPackageDialog>` with `<AmroWorkPackageCreateWizard>`
+- [ ] Replace `<AddWorkOrderDialog>` with `<AmroWorkOrderCreateWizard>`
 - [ ] Simplify props to 3 props max
 - [ ] Remove old form state variables
 - [ ] Remove old handler functions
@@ -506,16 +506,16 @@ expect(onSuccessMock).toHaveBeenCalled();
 
 ### 1. Add Analytics Tracking
 ```typescript
-<AmroWorkPackageCreateWizard
+<AmroWorkOrderCreateWizard
   open={wizardOpen}
   onOpenChange={(isOpen) => {
     setWizardOpen(isOpen);
     if (isOpen) {
-      analytics.track('work_package_creation_started');
+      analytics.track('work_order_creation_started');
     }
   }}
   onSuccess={() => {
-    analytics.track('work_package_created');
+    analytics.track('work_order_created');
     refetch();
   }}
 />
@@ -524,7 +524,7 @@ expect(onSuccessMock).toHaveBeenCalled();
 ### 2. Add Error Boundary
 ```typescript
 <ErrorBoundary fallback={<div>Failed to load wizard</div>}>
-  <AmroWorkPackageCreateWizard
+  <AmroWorkOrderCreateWizard
     open={wizardOpen}
     onOpenChange={setWizardOpen}
     onSuccess={handleSuccess}
@@ -538,7 +538,7 @@ expect(onSuccessMock).toHaveBeenCalled();
 const searchParams = useSearchParams();
 const preselectedAircraft = searchParams.get('aircraft_id');
 
-<AmroWorkPackageCreateWizard
+<AmroWorkOrderCreateWizard
   open={wizardOpen}
   onOpenChange={setWizardOpen}
   onSuccess={handleSuccess}

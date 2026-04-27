@@ -27,7 +27,7 @@ const amroOperationalSchemaSuite = (await resolveSupabaseAvailability()) ? descr
  * This test validates the creation and structure of all AMRO tables:
  * - aircraft
  * - components
- * - work_packages
+ * - work_orders
  * - tasks
  * - staff_qualifications
  * - maintenance_events
@@ -71,9 +71,9 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       expect(Array.isArray(data)).toBe(true);
     });
 
-    it('should have work_packages table with correct columns', async () => {
+    it('should have work_orders table with correct columns', async () => {
       const { data, error } = await supabase
-        .from('work_packages')
+        .from('work_orders')
         .select('*')
         .limit(1);
 
@@ -163,11 +163,11 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
     it('should have AMRO 6.2 operational core alignment columns', async () => {
       const checks: Array<{ table: string; columns: string }> = [
         { table: 'aircraft', columns: 'tail_number,msn,operator_code,aircraft_model,engine_type,status,station_code' },
-        { table: 'work_packages', columns: 'work_package_number,maintenance_type,priority,status,planned_start,planned_end,estimated_labor_hours,estimated_downtime_minutes' },
+        { table: 'work_orders', columns: 'work_order_number,maintenance_type,priority,status,planned_start,planned_end,estimated_labor_hours,estimated_downtime_minutes' },
         { table: 'tasks', columns: 'sequence,procedure_reference,steps_json,qualifications_json,status,assigned_technician_id' },
         { table: 'parts_inventory', columns: 'part_number,serial_number,batch_number,condition_code,uom,quantity_on_hand,quantity_available,warehouse_location,expiry_date' },
         { table: 'compliance_obligations', columns: 'obligation_type,due_date,due_hours,due_cycles,regulator_code,status,aircraft_id' },
-        { table: 'compliance_records', columns: 'obligation_id,decision_status,approving_authority,approving_authority_profile_id,work_package_id,policy_snapshot_id' },
+        { table: 'compliance_records', columns: 'obligation_id,decision_status,approving_authority,approving_authority_profile_id,work_order_id,policy_snapshot_id' },
         { table: 'staff_qualifications', columns: 'technician_id,rating,scope,issuer_authority,valid_from,valid_to,can_certify_release' },
         { table: 'certification_actions', columns: 'action_status,rejection_reason,policy_reference,signer_id,signature_method,policy_snapshot_id' },
         { table: 'maintenance_events', columns: 'event_hash,previous_hash,signature,signature_method,task_id,created_at' },
@@ -176,7 +176,7 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
         { table: 'task_evidence', columns: 'task_id,evidence_type,uri,checksum,captured_at' },
         { table: 'policy_snapshots', columns: 'policy_type,version,policy_key,rules_json,effective_at,checksum' },
         { table: 'sync_conflicts', columns: 'entity_type,entity_id,conflict_class,resolution,detected_at' },
-        { table: 'regulator_dossiers', columns: 'work_package_id,regulator_code,dossier_ref,status,manifest_json' },
+        { table: 'regulator_dossiers', columns: 'work_order_id,regulator_code,dossier_ref,status,manifest_json' },
         { table: 'forecast_features', columns: 'asset_id,feature_vector,inference_time,feature_hash,model_version' },
         { table: 'forecast_decisions', columns: 'recommendation_id,accepted,outcome_metric,decided_at,policy_snapshot_id' },
       ];
@@ -232,10 +232,10 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       }
     });
 
-    it('should enforce tenant isolation on work_packages table', async () => {
-      // Test that work_packages respects tenant_id in RLS
+    it('should enforce tenant isolation on work_orders table', async () => {
+      // Test that work_orders respects tenant_id in RLS
       const { data, error } = await supabase
-        .from('work_packages')
+        .from('work_orders')
         .select('tenant_id')
         .limit(1);
 
@@ -261,10 +261,10 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       expect(Array.isArray(data)).toBe(true);
     });
 
-    it('should support work_packages referencing aircraft', async () => {
+    it('should support work_orders referencing aircraft', async () => {
       // Verify structure
       const { data, error } = await supabase
-        .from('work_packages')
+        .from('work_orders')
         .select('id, aircraft_id')
         .limit(1);
 
@@ -272,11 +272,11 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       expect(Array.isArray(data)).toBe(true);
     });
 
-    it('should support tasks referencing work_packages', async () => {
+    it('should support tasks referencing work_orders', async () => {
       // Verify structure
       const { data, error } = await supabase
         .from('tasks')
-        .select('id, work_package_id')
+        .select('id, work_order_id')
         .limit(1);
 
       expect(error).toBeNull();
@@ -291,7 +291,7 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       const tables = [
         'aircraft',
         'components',
-        'work_packages',
+        'work_orders',
         'tasks',
         'staff_qualifications',
         'maintenance_events',
@@ -316,7 +316,7 @@ amroOperationalSchemaSuite('AMRO Operational Schema', () => {
       const tables = [
         'aircraft',
         'components',
-        'work_packages',
+        'work_orders',
         'tasks',
         'staff_qualifications',
         'maintenance_events',

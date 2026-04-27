@@ -86,7 +86,7 @@ describe('/api/v2/amro/health', () => {
     expect((res.jsonBody as any)?.checks?.gaReadiness?.milestone).toBe('M10');
     expect((res.jsonBody as any)?.checks?.gaReadiness?.readyForGa).toBe(false);
     expect((res.jsonBody as any)?.checks?.performance?.slo_alerting?.api_gateway?.availability_target_percent).toBe(99.95);
-    expect((res.jsonBody as any)?.checks?.performance?.capacity_planning?.target_concurrent_work_packages_per_region).toBe(25000);
+    expect((res.jsonBody as any)?.checks?.performance?.capacity_planning?.target_concurrent_work_orders_per_region).toBe(25000);
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
   });
 
@@ -104,7 +104,7 @@ describe('/api/v2/amro/health', () => {
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.tenant_id).toBe('public');
     expect((res.jsonBody as any)?.serviceBoundaries?.scopedAccess?.franchise_id).toBeNull();
-    expect((res.jsonBody as any)?.serviceBoundaries?.capability).toBe('work-packages');
+    expect((res.jsonBody as any)?.serviceBoundaries?.capability).toBe('work-orders');
   });
 
   it('reports GA readiness when M10 evidence checks are satisfied', async () => {

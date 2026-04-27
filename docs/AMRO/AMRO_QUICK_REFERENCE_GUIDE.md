@@ -78,7 +78,7 @@ Core UI & APIs             Advanced UX & Mobile        Optimization & Polish    
 **Code Pattern:**
 ```typescript
 const query = supabase
-  .from('work_packages')
+  .from('work_orders')
   .select('*')
   .eq('tenant_id', currentTenant); // ← MANDATORY
 ```
@@ -176,10 +176,10 @@ aircraft (id, tenant_id, tail_number, aircraft_model, status, created_at, update
 components (id, tenant_id, aircraft_id, part_number, serial_number, ata_chapter, llp_*, status)
 
 -- Main Work Orders
-work_packages (id, tenant_id, aircraft_id, work_type, title, priority, status, estimated_*, created_at)
+work_orders (id, tenant_id, aircraft_id, work_type, title, priority, status, estimated_*, created_at)
 
 -- Individual Tasks within WP
-tasks (id, tenant_id, work_package_id, sequence, description, procedure_reference, steps, status)
+tasks (id, tenant_id, work_order_id, sequence, description, procedure_reference, steps, status)
 
 -- Staff Qualifications
 staff_qualifications (id, tenant_id, technician_id, rating, scope, issued_date, expiration_date, can_certify_release)
@@ -261,7 +261,7 @@ GET    /api/v2/amro/master-data/:entity/export?format=csv
 - skill_codes
 - regulator_profiles
 - shift_calendars
-- work_package_templates
+- work_order_templates
 
 ### Master Data Form Usage and Validation
 - Each entity has a dedicated create/update form with required field enforcement before submit.
@@ -390,14 +390,14 @@ amro.compliance.gate_passed    # Release gate cleared
 ```typescript
 // ✅ CORRECT: Tenant filter included
 const { data } = await supabase
-  .from('work_packages')
+  .from('work_orders')
   .select('*')
   .eq('tenant_id', currentTenant)
   .eq('id', wpId);
 
 // ❌ WRONG: Missing tenant filter
 const { data } = await supabase
-  .from('work_packages')
+  .from('work_orders')
   .select('*')
   .eq('id', wpId); // Could leak other tenant's data!
 ```
@@ -424,7 +424,7 @@ const [state, setState] = useState({});
 await auditLog.record({
   tenant_id: currentTenant,
   entity_id: wpId,
-  entity_type: 'work_package',
+  entity_type: 'work_order',
   action: 'status_changed',
   actor_id: currentUser.id,
   context: {
@@ -435,7 +435,7 @@ await auditLog.record({
 });
 
 // ❌ WRONG: No audit trail
-updateWorkPackage(wpId, { status: 'planning' });
+updateWorkOrder(wpId, { status: 'planning' });
 ```
 
 ### Pattern 4: Error Handling

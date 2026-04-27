@@ -17,11 +17,11 @@ import {
   createAmroIsolationScope,
 } from '../anti-corruption-adapter';
 import { resolveAmroV2EndpointRolloutState } from '../audit-ledger-cutover';
-import { enforceAmroSequentialMilestoneForWorkPackageInterface } from '../phase-plan-model';
+import { enforceAmroSequentialMilestoneForWorkOrderInterface } from '../phase-plan-model';
 
-type ReplanWorkPackageState = 'planning' | 'scheduled' | 'blocked';
+type ReplanWorkOrderState = 'planning' | 'scheduled' | 'blocked';
 
-const REPLANNABLE_STATES = new Set<ReplanWorkPackageState>(['planning', 'scheduled', 'blocked']);
+const REPLANNABLE_STATES = new Set<ReplanWorkOrderState>(['planning', 'scheduled', 'blocked']);
 const REPLAN_APPROVER_ROLES = new Set(['tenant_admin', 'planner']);
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
@@ -59,9 +59,9 @@ function assertActiveConstraintsAndTenantCalendar(
   if (!tenantCalendarId.startsWith(`${tenantId}:`)) throw new Error('simulation must include tenant-specific calendars');
 }
 
-function assertReplannableStates(affectedWorkPackages: Array<Record<string, unknown>>) {
-  const invalidPackage = affectedWorkPackages.find((workPackage) => {
-    const state = String(workPackage.current_state || '').trim().toLowerCase() as ReplanWorkPackageState;
+function assertReplannableStates(affectedWorkOrders: Array<Record<string, unknown>>) {
+  const invalidPackage = affectedWorkOrders.find((workOrder) => {
+    const state = String(workOrder.current_state || '').trim().toLowerCase() as ReplanWorkOrderState;
     return !REPLANNABLE_STATES.has(state);
   });
   if (invalidPackage) throw new Error('all affected packages must be in re-plannable states');
@@ -132,7 +132,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     });
 
     const interfaceName = String(req.query.interface || 'run-replan-simulation').trim().toLowerCase();
-    enforceAmroSequentialMilestoneForWorkPackageInterface(interfaceName);
+    enforceAmroSequentialMilestoneForWorkOrderInterface(interfaceName);
     const body = parseBody(req.body);
 
     if (interfaceName === 'run-replan-simulation') {
@@ -184,8 +184,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const selectedOptionId = assertNonEmpty(body.selected_option_id, 'selected_option_id');
       const approverId = assertNonEmpty(body.approver_id, 'approver_id');
       const reason = assertNonEmpty(body.reason, 'reason');
-      const affectedWorkPackages = parseObjectArray(body.affected_work_packages, 'affected_work_packages');
-      assertReplannableStates(affectedWorkPackages);
+      const affectedWorkOrders = parseObjectArray(body.affected_work_orders, 'affected_work_orders');
+      assertReplannableStates(affectedWorkOrders);
       return res.status(200).json({
         version: 'v2',
         interface: 'confirm-replan',
@@ -208,8 +208,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             applied_option_id: selectedOptionId,
             approved_by: approverId,
           },
-          affected_work_packages: affectedWorkPackages.map((workPackage) => ({
-            work_package_id: String(workPackage.work_package_id || ''),
+          affected_work_orders: affectedWorkOrders.map((workOrder) => ({
+            work_order_id: String(workOrder.work_order_id || ''),
             new_state: 'scheduled',
           })),
           latency_budget_ms: 500,

@@ -1,10 +1,10 @@
 // Work Order Management Components
 export { AmroWorkOrdersListPage } from './AmroWorkOrdersListPage';
-export { AmroWorkPackageDetailPage } from './AmroWorkPackageDetailPage';
+export { AmroWorkOrderDetailPage } from './AmroWorkOrderDetailPage';
 export { AmroEmergencyQuickAccessPanel } from './AmroEmergencyQuickAccessPanel';
 export { AmroNonScheduledTaskPanel } from './AmroNonScheduledTaskPanel';
 export { AmroComplianceDashboard } from './AmroComplianceDashboard';
-export { AmroWorkPackageCreateWizard } from './AmroWorkPackageCreateWizard';
+export { AmroWorkOrderCreateWizard } from './AmroWorkOrderCreateWizard';
 
 // Template Version Management Hooks
 export {
@@ -33,7 +33,7 @@ export {
 } from './useEmergencyWPState';
 
 export type {
-  EmergencyWorkPackage,
+  EmergencyWorkOrder,
   EmergencyWPListResponse,
   EmergencyType,
   UrgencyLevel,
@@ -73,14 +73,14 @@ export type {
 
 // State Management - Work Packages
 export {
-  useListWorkPackages,
-  useWorkPackage,
-  useCreateWorkPackage,
-  useUpdateWorkPackage,
-  useTransitionWorkPackage,
-  useDeleteWorkPackage,
-  useWorkPackageActions,
-} from './useWorkPackageState';
+  useListWorkOrders,
+  useWorkOrder,
+  useCreateWorkOrder,
+  useUpdateWorkOrder,
+  useTransitionWorkOrder,
+  useDeleteWorkOrder,
+  useWorkOrderActions,
+} from './useWorkOrderState';
 
 // Aircraft State
 export {
@@ -91,21 +91,21 @@ export {
 
 // Template Options
 export {
-  useWorkPackageTemplateOptions,
-} from './useWorkPackageTemplates';
+  useWorkOrderTemplateOptions,
+} from './useWorkOrderTemplates';
 
 export type {
-  WorkPackageTemplateOption,
-} from './useWorkPackageTemplates';
+  WorkOrderTemplateOption,
+} from './useWorkOrderTemplates';
 
 // Types - Work Packages
 export type {
-  WorkPackageListItem,
-  WorkPackageDetail,
-  WorkPackageTask,
-  WorkPackageMaterial,
+  WorkOrderListItem,
+  WorkOrderDetail,
+  WorkOrderTask,
+  WorkOrderMaterial,
   MaintenanceEvent,
-  WorkPackageStatus,
-  WorkPackagePriority,
+  WorkOrderStatus,
+  WorkOrderPriority,
   MaintenanceType,
-} from './useWorkPackageState';
+} from './useWorkOrderState';

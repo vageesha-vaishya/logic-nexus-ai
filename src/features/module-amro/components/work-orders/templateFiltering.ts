@@ -1,17 +1,17 @@
-import type { WorkPackageTemplateOption } from './useWorkPackageTemplates';
+import type { WorkOrderTemplateOption } from './useWorkOrderTemplates';
 
 export type AircraftTemplateFilterInput = {
   aircraftTenantId: string | null | undefined;
   aircraftModelId: string | null | undefined;
   aircraftModelName: string | null | undefined;
-  templates: Array<WorkPackageTemplateOption & { value: string; label: string }>;
+  templates: Array<WorkOrderTemplateOption & { value: string; label: string }>;
 };
 
 function token(value: unknown): string {
   return String(value || '').trim().toLowerCase();
 }
 
-export function filterTemplatesByAircraft(input: AircraftTemplateFilterInput): Array<WorkPackageTemplateOption & { value: string; label: string }> {
+export function filterTemplatesByAircraft(input: AircraftTemplateFilterInput): Array<WorkOrderTemplateOption & { value: string; label: string }> {
   const tenantToken = token(input.aircraftTenantId);
   const aircraftModelIdToken = token(input.aircraftModelId);
   const aircraftModelNameToken = token(input.aircraftModelName);

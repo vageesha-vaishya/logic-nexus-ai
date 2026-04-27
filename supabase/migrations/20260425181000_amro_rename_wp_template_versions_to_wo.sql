@@ -2,22 +2,22 @@
 -- DB-ARCH-APPROVAL: pending-amro-arch-board-approval
 --
 -- Purpose:
--- - Rename table public.amro_work_package_template_versions -> public.amro_work_order_template_versions
+-- - Rename table public.amro_work_order_template_versions -> public.amro_work_order_template_versions
 -- - Rename associated constraints/indexes/policies to work-order naming
--- - Repoint residual inbound FKs from amro_work_package_template_versions(id) to amro_work_order_template_versions(id)
+-- - Repoint residual inbound FKs from amro_work_order_template_versions(id) to amro_work_order_template_versions(id)
 
 BEGIN;
 
 DO $$
 DECLARE
-  v_old_table regclass := to_regclass('public.amro_work_package_template_versions');
+  v_old_table regclass := to_regclass('public.amro_work_order_template_versions');
   v_new_table regclass := to_regclass('public.amro_work_order_template_versions');
   rec record;
   v_new_name text;
   v_def text;
 BEGIN
   IF v_old_table IS NOT NULL AND v_new_table IS NULL THEN
-    EXECUTE 'ALTER TABLE public.amro_work_package_template_versions RENAME TO amro_work_order_template_versions';
+    EXECUTE 'ALTER TABLE public.amro_work_order_template_versions RENAME TO amro_work_order_template_versions';
   END IF;
 
   v_new_table := to_regclass('public.amro_work_order_template_versions');
@@ -33,7 +33,7 @@ BEGIN
     WHERE conrelid = v_new_table
   LOOP
     v_new_name := rec.conname;
-    v_new_name := replace(v_new_name, 'work_package_template_versions', 'work_order_template_versions');
+    v_new_name := replace(v_new_name, 'work_order_template_versions', 'work_order_template_versions');
     v_new_name := replace(v_new_name, 'template_versions_wp', 'template_versions_wo');
     v_new_name := replace(v_new_name, 'wp_template_versions', 'wo_template_versions');
 
@@ -50,7 +50,7 @@ BEGIN
       AND tablename = 'amro_work_order_template_versions'
   LOOP
     v_new_name := rec.indexname;
-    v_new_name := replace(v_new_name, 'work_package_template_versions', 'work_order_template_versions');
+    v_new_name := replace(v_new_name, 'work_order_template_versions', 'work_order_template_versions');
     v_new_name := replace(v_new_name, 'template_versions_wp', 'template_versions_wo');
     v_new_name := replace(v_new_name, 'wp_template_versions', 'wo_template_versions');
 
@@ -81,7 +81,7 @@ BEGIN
   END IF;
 
   -- Repoint residual inbound FKs from the old table id in edge/partial states.
-  v_old_table := to_regclass('public.amro_work_package_template_versions');
+  v_old_table := to_regclass('public.amro_work_order_template_versions');
   IF v_old_table IS NOT NULL THEN
     FOR rec IN
       SELECT
@@ -92,7 +92,7 @@ BEGIN
       WHERE c.contype = 'f'
         AND c.confrelid = v_old_table
     LOOP
-      v_new_name := replace(rec.conname, 'work_package_template_versions', 'work_order_template_versions');
+      v_new_name := replace(rec.conname, 'work_order_template_versions', 'work_order_template_versions');
       v_new_name := replace(v_new_name, 'template_versions_wp', 'template_versions_wo');
       v_new_name := replace(v_new_name, 'wp_template_versions', 'wo_template_versions');
       IF v_new_name = rec.conname THEN
@@ -100,8 +100,8 @@ BEGIN
       END IF;
 
       v_def := replace(
-        replace(rec.condef, 'REFERENCES public.amro_work_package_template_versions', 'REFERENCES public.amro_work_order_template_versions'),
-        'REFERENCES amro_work_package_template_versions',
+        replace(rec.condef, 'REFERENCES public.amro_work_order_template_versions', 'REFERENCES public.amro_work_order_template_versions'),
+        'REFERENCES amro_work_order_template_versions',
         'REFERENCES amro_work_order_template_versions'
       );
 

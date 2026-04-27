@@ -15,7 +15,7 @@ import { useDomain } from "@/contexts/DomainContext";
 import { toast } from "sonner";
 import { Activity, AlertCircle, Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 
-type WorkPackageStatus =
+type WorkOrderStatus =
   | "planning"
   | "approved"
   | "scheduled"
@@ -34,7 +34,7 @@ type TaskStatus =
   | "rework_required"
   | "cancelled";
 
-type WorkPackage = {
+type WorkOrder = {
   id: string;
   work_order_number: string;
   title: string;
@@ -42,7 +42,7 @@ type WorkPackage = {
   maintenance_type: string;
   work_type: string;
   priority: number | null;
-  status: WorkPackageStatus;
+  status: WorkOrderStatus;
   aircraft_id: string;
   assigned_to: string | null;
   planned_start_date: string | null;
@@ -98,7 +98,7 @@ type AuditLogRow = {
   created_at: string;
 };
 
-const WORK_PACKAGE_STATUS_LABELS: Record<WorkPackageStatus, string> = {
+const WORK_PACKAGE_STATUS_LABELS: Record<WorkOrderStatus, string> = {
   planning: "Planning",
   approved: "Approved",
   scheduled: "Scheduled",
@@ -175,21 +175,21 @@ export default function AmroChangesPreview() {
   const { scopedDb, context } = useCRM();
   const { isPlatformAdmin: isAuthenticatedPlatformAdmin, hasPermission, roles } = useAuth();
   const { availableDomains, isPlatformAdmin: isDomainPlatformAdmin, isLoading: loadingDomains } = useDomain();
-  const [workPackages, setWorkPackages] = useState<WorkPackage[]>([]);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>([]);
   const [aircraftById, setAircraftById] = useState<Record<string, AircraftRow>>({});
-  const [selectedWorkPackageId, setSelectedWorkPackageId] = useState<string | null>(null);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string | null>(null);
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [events, setEvents] = useState<MaintenanceEventRow[]>([]);
   const [auditRows, setAuditRows] = useState<AuditLogRow[]>([]);
   const [searchText, setSearchText] = useState("");
-  const [statusFilter, setStatusFilter] = useState<WorkPackageStatus | "all">("all");
+  const [statusFilter, setStatusFilter] = useState<WorkOrderStatus | "all">("all");
   const [loadingList, setLoadingList] = useState(true);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [savingTask, setSavingTask] = useState(false);
 
-  const selectedWorkPackage = useMemo(
-    () => workPackages.find((item) => item.id === selectedWorkPackageId) ?? null,
-    [workPackages, selectedWorkPackageId],
+  const selectedWorkOrder = useMemo(
+    () => workOrders.find((item) => item.id === selectedWorkOrderId) ?? null,
+    [workOrders, selectedWorkOrderId],
   );
   const hasAmroAccess = useMemo(
     () =>
@@ -202,7 +202,7 @@ export default function AmroChangesPreview() {
     [availableDomains, context.isPlatformAdmin, hasPermission, isAuthenticatedPlatformAdmin, isDomainPlatformAdmin, roles],
   );
 
-  const loadWorkPackages = useCallback(async () => {
+  const loadWorkOrders = useCallback(async () => {
     if (!hasAmroAccess) {
       setLoadingList(false);
       return;
@@ -211,7 +211,7 @@ export default function AmroChangesPreview() {
     const { data, error } = await scopedDb
       .from("work_orders")
       .select(
-        "id, work_package_number, work_order_number, title, description, maintenance_type, work_type, priority, status, aircraft_id, assigned_to, planned_start_date, planned_end_date, actual_start_date, actual_end_date, estimated_labor_hours, estimated_cost, actual_labor_hours, actual_cost, updated_at",
+        "id, work_order_number, work_order_number, title, description, maintenance_type, work_type, priority, status, aircraft_id, assigned_to, planned_start_date, planned_end_date, actual_start_date, actual_end_date, estimated_labor_hours, estimated_cost, actual_labor_hours, actual_cost, updated_at",
       )
       .order("updated_at", { ascending: false })
       .limit(200);
@@ -222,8 +222,8 @@ export default function AmroChangesPreview() {
       return;
     }
 
-    const rows = (data ?? []) as WorkPackage[];
-    setWorkPackages(rows);
+    const rows = (data ?? []) as WorkOrder[];
+    setWorkOrders(rows);
 
     const aircraftIds = Array.from(new Set(rows.map((item) => item.aircraft_id).filter(Boolean)));
     if (aircraftIds.length > 0) {
@@ -241,7 +241,7 @@ export default function AmroChangesPreview() {
       setAircraftById({});
     }
 
-    setSelectedWorkPackageId((current) => {
+    setSelectedWorkOrderId((current) => {
       if (current && rows.some((item) => item.id === current)) return current;
       return rows[0]?.id ?? null;
     });
@@ -249,8 +249,8 @@ export default function AmroChangesPreview() {
     setLoadingList(false);
   }, [hasAmroAccess, scopedDb]);
 
-  const loadWorkPackageDetail = useCallback(
-    async (workPackageId: string) => {
+  const loadWorkOrderDetail = useCallback(
+    async (workOrderId: string) => {
       setLoadingDetail(true);
       const [taskResponse, eventResponse, auditResponse] = await Promise.all([
         scopedDb
@@ -258,7 +258,7 @@ export default function AmroChangesPreview() {
           .select(
             "id, task_number, title, status, task_category, sequence_order, estimated_duration_hours, progress_percentage, assigned_to, updated_at",
           )
-          .eq("work_package_id", workPackageId)
+          .eq("work_order_id", workOrderId)
           .order("sequence_order", { ascending: true })
           .order("updated_at", { ascending: false }),
         scopedDb
@@ -266,7 +266,7 @@ export default function AmroChangesPreview() {
           .select(
             "id, event_type, title, description, event_timestamp, performed_by, task_id, data, regulatory_requirement, compliance_authority",
           )
-          .eq("work_package_id", workPackageId)
+          .eq("work_order_id", workOrderId)
           .order("event_timestamp", { ascending: false })
           .limit(80),
         scopedDb
@@ -295,7 +295,7 @@ export default function AmroChangesPreview() {
         setAuditRows([]);
       } else {
         const records = ((auditResponse.data ?? []) as AuditLogRow[]).filter((row) =>
-          JSON.stringify(row.details ?? {}).includes(workPackageId),
+          JSON.stringify(row.details ?? {}).includes(workOrderId),
         );
         setAuditRows(records);
       }
@@ -308,31 +308,31 @@ export default function AmroChangesPreview() {
     if (loadingDomains) return;
     if (!hasAmroAccess) {
       setLoadingList(false);
-      setWorkPackages([]);
-      setSelectedWorkPackageId(null);
+      setWorkOrders([]);
+      setSelectedWorkOrderId(null);
       return;
     }
-    loadWorkPackages();
-  }, [hasAmroAccess, loadWorkPackages, loadingDomains]);
+    loadWorkOrders();
+  }, [hasAmroAccess, loadWorkOrders, loadingDomains]);
 
   useEffect(() => {
-    if (!selectedWorkPackageId) {
+    if (!selectedWorkOrderId) {
       setTasks([]);
       setEvents([]);
       setAuditRows([]);
       return;
     }
-    loadWorkPackageDetail(selectedWorkPackageId);
-  }, [selectedWorkPackageId, loadWorkPackageDetail]);
+    loadWorkOrderDetail(selectedWorkOrderId);
+  }, [selectedWorkOrderId, loadWorkOrderDetail]);
 
-  const filteredWorkPackages = useMemo(() => {
+  const filteredWorkOrders = useMemo(() => {
     const query = searchText.trim().toLowerCase();
-    return workPackages.filter((item) => {
+    return workOrders.filter((item) => {
       if (statusFilter !== "all" && item.status !== statusFilter) return false;
       if (!query) return true;
       const aircraft = aircraftById[item.aircraft_id];
       const searchable = [
-        item.work_package_number || item.work_order_number,
+        item.work_order_number || item.work_order_number,
         item.title,
         item.maintenance_type,
         item.work_type,
@@ -345,7 +345,7 @@ export default function AmroChangesPreview() {
         .toLowerCase();
       return searchable.includes(query);
     });
-  }, [aircraftById, searchText, statusFilter, workPackages]);
+  }, [aircraftById, searchText, statusFilter, workOrders]);
 
   const taskBoardItems = useMemo<KanbanItem[]>(
     () =>
@@ -379,18 +379,18 @@ export default function AmroChangesPreview() {
       const { error } = await scopedDb.from("tasks").update({ status: nextStatus }).eq("id", activeId);
       if (error) {
         toast.error("Task status update failed");
-        await loadWorkPackageDetail(selectedWorkPackageId as string);
+        await loadWorkOrderDetail(selectedWorkOrderId as string);
         setSavingTask(false);
         return;
       }
 
-      if (selectedWorkPackageId && context.userId) {
+      if (selectedWorkOrderId && context.userId) {
         const eventPayload = {
           event_type: "task_status_changed",
           title: `Task ${currentTask.task_number} status updated`,
           description: `${TASK_STATUS_LABELS[currentTask.status]} → ${TASK_STATUS_LABELS[nextStatus]}`,
           performed_by: context.userId,
-          work_package_id: selectedWorkPackageId,
+          work_order_id: selectedWorkOrderId,
           task_id: activeId,
           data: {
             from_status: currentTask.status,
@@ -413,20 +413,20 @@ export default function AmroChangesPreview() {
       setSavingTask(false);
       toast.success("Task status updated");
     },
-    [context.userId, loadWorkPackageDetail, scopedDb, selectedWorkPackageId, tasks],
+    [context.userId, loadWorkOrderDetail, scopedDb, selectedWorkOrderId, tasks],
   );
 
-  const workPackageStats = useMemo(() => {
-    const openCount = workPackages.filter((item) => !["completed", "closed", "cancelled"].includes(item.status)).length;
-    const inProgressCount = workPackages.filter((item) => item.status === "in_progress").length;
-    const closedCount = workPackages.filter((item) => ["completed", "closed"].includes(item.status)).length;
+  const workOrderStats = useMemo(() => {
+    const openCount = workOrders.filter((item) => !["completed", "closed", "cancelled"].includes(item.status)).length;
+    const inProgressCount = workOrders.filter((item) => item.status === "in_progress").length;
+    const closedCount = workOrders.filter((item) => ["completed", "closed"].includes(item.status)).length;
     return {
-      total: workPackages.length,
+      total: workOrders.length,
       open: openCount,
       inProgress: inProgressCount,
       closed: closedCount,
     };
-  }, [workPackages]);
+  }, [workOrders]);
 
   const selectedTaskStats = useMemo(() => {
     if (tasks.length === 0) return { total: 0, completed: 0, blocked: 0 };
@@ -485,7 +485,7 @@ export default function AmroChangesPreview() {
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className="bg-[#714B67] text-white hover:bg-[#714B67]">Tenant Scope: {shortId(context.tenantId)}</Badge>
                 <Badge variant="outline">Franchise Scope: {shortId(context.franchiseId)}</Badge>
-                <Button variant="outline" onClick={loadWorkPackages} disabled={loadingList}>
+                <Button variant="outline" onClick={loadWorkOrders} disabled={loadingList}>
                   {loadingList ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
                   <span className="ml-2">Refresh</span>
                 </Button>
@@ -497,7 +497,7 @@ export default function AmroChangesPreview() {
                 onChange={(event) => setSearchText(event.target.value)}
                 placeholder="Search work order, title, aircraft..."
               />
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as WorkPackageStatus | "all")}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value as WorkOrderStatus | "all")}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter by status" />
                 </SelectTrigger>
@@ -511,7 +511,7 @@ export default function AmroChangesPreview() {
                 </SelectContent>
               </Select>
               <div className="flex items-center rounded-md border px-3 text-sm text-muted-foreground">
-                Selected Work Package: {selectedWorkPackage?.work_package_number || selectedWorkPackage?.work_order_number ?? "None"}
+                Selected Work Package: {selectedWorkOrder?.work_order_number || selectedWorkOrder?.work_order_number ?? "None"}
               </div>
             </div>
           </CardHeader>
@@ -522,7 +522,7 @@ export default function AmroChangesPreview() {
             <CardHeader>
               <CardTitle>Work Package List</CardTitle>
               <CardDescription>
-                {loadingList ? "Loading work packages..." : `${filteredWorkPackages.length} records`}
+                {loadingList ? "Loading work packages..." : `${filteredWorkOrders.length} records`}
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -536,18 +536,18 @@ export default function AmroChangesPreview() {
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {filteredWorkPackages.map((item) => {
+                    {filteredWorkOrders.map((item) => {
                       const aircraft = aircraftById[item.aircraft_id];
-                      const isSelected = item.id === selectedWorkPackageId;
+                      const isSelected = item.id === selectedWorkOrderId;
                       return (
                         <TableRow
                           key={item.id}
                           className={isSelected ? "bg-muted/50" : ""}
-                          onClick={() => setSelectedWorkPackageId(item.id)}
+                          onClick={() => setSelectedWorkOrderId(item.id)}
                         >
                           <TableCell>
                             <div className="space-y-1">
-                              <div className="font-medium">{item.work_package_number || item.work_order_number}</div>
+                              <div className="font-medium">{item.work_order_number || item.work_order_number}</div>
                               <div className="text-xs text-muted-foreground line-clamp-2">{item.title}</div>
                             </div>
                           </TableCell>
@@ -563,7 +563,7 @@ export default function AmroChangesPreview() {
                         </TableRow>
                       );
                     })}
-                    {!loadingList && filteredWorkPackages.length === 0 ? (
+                    {!loadingList && filteredWorkOrders.length === 0 ? (
                       <TableRow>
                         <TableCell colSpan={3} className="text-center text-muted-foreground">
                           No work packages match the current filter.
@@ -580,7 +580,7 @@ export default function AmroChangesPreview() {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center justify-between gap-3">
-                  <span>{selectedWorkPackage ? `${selectedWorkPackage.work_package_number || selectedWorkPackage.work_order_number} · ${selectedWorkPackage.title}` : "Work Package Detail"}</span>
+                  <span>{selectedWorkOrder ? `${selectedWorkOrder.work_order_number || selectedWorkOrder.work_order_number} · ${selectedWorkOrder.title}` : "Work Package Detail"}</span>
                   {savingTask ? <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /> : null}
                 </CardTitle>
                 <CardDescription>
@@ -588,7 +588,7 @@ export default function AmroChangesPreview() {
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {!selectedWorkPackage ? (
+                {!selectedWorkOrder ? (
                   <div className="rounded-md border border-dashed p-8 text-center text-muted-foreground">
                     Select a work package to open detail view.
                   </div>
@@ -597,39 +597,39 @@ export default function AmroChangesPreview() {
                     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-md border p-3">
                         <p className="text-xs text-muted-foreground">Maintenance Type</p>
-                        <p className="font-medium">{selectedWorkPackage.maintenance_type}</p>
+                        <p className="font-medium">{selectedWorkOrder.maintenance_type}</p>
                       </div>
                       <div className="rounded-md border p-3">
                         <p className="text-xs text-muted-foreground">Work Type</p>
-                        <p className="font-medium">{selectedWorkPackage.work_type}</p>
+                        <p className="font-medium">{selectedWorkOrder.work_type}</p>
                       </div>
                       <div className="rounded-md border p-3">
                         <p className="text-xs text-muted-foreground">Priority</p>
                         <p className="font-medium">
-                          {selectedWorkPackage.priority ? PRIORITY_LABELS[selectedWorkPackage.priority] ?? selectedWorkPackage.priority : "—"}
+                          {selectedWorkOrder.priority ? PRIORITY_LABELS[selectedWorkOrder.priority] ?? selectedWorkOrder.priority : "—"}
                         </p>
                       </div>
                       <div className="rounded-md border p-3">
                         <p className="text-xs text-muted-foreground">Status</p>
-                        <Badge className={STATUS_BADGE_TONE[selectedWorkPackage.status]}>
-                          {WORK_PACKAGE_STATUS_LABELS[selectedWorkPackage.status]}
+                        <Badge className={STATUS_BADGE_TONE[selectedWorkOrder.status]}>
+                          {WORK_PACKAGE_STATUS_LABELS[selectedWorkOrder.status]}
                         </Badge>
                       </div>
                       <div className="rounded-md border p-3">
                         <p className="text-xs text-muted-foreground">Planned Start</p>
-                        <p className="font-medium">{formatDateTime(selectedWorkPackage.planned_start_date)}</p>
+                        <p className="font-medium">{formatDateTime(selectedWorkOrder.planned_start_date)}</p>
                       </div>
                       <div className="rounded-md border p-3">
                         <p className="text-xs text-muted-foreground">Planned End</p>
-                        <p className="font-medium">{formatDateTime(selectedWorkPackage.planned_end_date)}</p>
+                        <p className="font-medium">{formatDateTime(selectedWorkOrder.planned_end_date)}</p>
                       </div>
                       <div className="rounded-md border p-3">
                         <p className="text-xs text-muted-foreground">Estimated Labor</p>
-                        <p className="font-medium">{formatHours(selectedWorkPackage.estimated_labor_hours)}</p>
+                        <p className="font-medium">{formatHours(selectedWorkOrder.estimated_labor_hours)}</p>
                       </div>
                       <div className="rounded-md border p-3">
                         <p className="text-xs text-muted-foreground">Estimated Cost</p>
-                        <p className="font-medium">{formatMoney(selectedWorkPackage.estimated_cost)}</p>
+                        <p className="font-medium">{formatMoney(selectedWorkOrder.estimated_cost)}</p>
                       </div>
                     </div>
 
@@ -659,7 +659,7 @@ export default function AmroChangesPreview() {
                               if (!task) return;
                               toast.info(`${task.task_number}: ${task.title}`);
                             }}
-                            scrollPersistenceKey={`amro-work-package-${selectedWorkPackage.id}`}
+                            scrollPersistenceKey={`amro-work-order-${selectedWorkOrder.id}`}
                             className="h-[460px]"
                           />
                         )}
@@ -740,25 +740,25 @@ export default function AmroChangesPreview() {
           <Card className="md:col-span-1">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Work Packages</p>
-              <p className="text-2xl font-semibold">{workPackageStats.total}</p>
+              <p className="text-2xl font-semibold">{workOrderStats.total}</p>
             </CardContent>
           </Card>
           <Card className="md:col-span-1">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Open</p>
-              <p className="text-2xl font-semibold">{workPackageStats.open}</p>
+              <p className="text-2xl font-semibold">{workOrderStats.open}</p>
             </CardContent>
           </Card>
           <Card className="md:col-span-1">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">In Progress</p>
-              <p className="text-2xl font-semibold">{workPackageStats.inProgress}</p>
+              <p className="text-2xl font-semibold">{workOrderStats.inProgress}</p>
             </CardContent>
           </Card>
           <Card className="md:col-span-1">
             <CardContent className="p-4">
               <p className="text-xs text-muted-foreground">Closed</p>
-              <p className="text-2xl font-semibold">{workPackageStats.closed}</p>
+              <p className="text-2xl font-semibold">{workOrderStats.closed}</p>
             </CardContent>
           </Card>
           <Card className="md:col-span-1">

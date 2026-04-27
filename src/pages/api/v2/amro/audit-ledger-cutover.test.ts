@@ -51,12 +51,12 @@ describe('audit ledger cutover resolver', () => {
     const denied = resolveAmroAuditLedgerCutoverState({
       tenantId: 'tenant-c',
       franchiseId: 'fr-1',
-      capability: 'work-packages',
+      capability: 'work-orders',
     });
     const allowed = resolveAmroAuditLedgerCutoverState({
       tenantId: 'tenant-b',
       franchiseId: 'fr-1',
-      capability: 'work-packages',
+      capability: 'work-orders',
     });
 
     expect(denied.enabled).toBe(false);
@@ -84,7 +84,7 @@ describe('audit ledger cutover resolver', () => {
     const deniedCapability = resolveAmroAuditLedgerCutoverState({
       tenantId: 'tenant-1',
       franchiseId: 'fr-allow',
-      capability: 'work-packages',
+      capability: 'work-orders',
     });
     const allowed = resolveAmroAuditLedgerCutoverState({
       tenantId: 'tenant-1',
@@ -159,17 +159,17 @@ describe('amro v2 endpoint rollout resolver', () => {
     process.env.AMRO_V2_ROLLOUT_ENABLED = 'true';
     process.env.AMRO_V2_CANARY_TENANTS = 'tenant-allow';
     process.env.AMRO_V2_CANARY_FRANCHISES = 'fr-allow';
-    process.env.AMRO_V2_CANARY_CAPABILITIES = 'work-packages';
+    process.env.AMRO_V2_CANARY_CAPABILITIES = 'work-orders';
 
     const deniedTenant = resolveAmroV2EndpointRolloutState({
       tenantId: 'tenant-deny',
       franchiseId: 'fr-allow',
-      capability: 'work-packages',
+      capability: 'work-orders',
     });
     const deniedFranchise = resolveAmroV2EndpointRolloutState({
       tenantId: 'tenant-allow',
       franchiseId: 'fr-deny',
-      capability: 'work-packages',
+      capability: 'work-orders',
     });
     const deniedCapability = resolveAmroV2EndpointRolloutState({
       tenantId: 'tenant-allow',
@@ -179,7 +179,7 @@ describe('amro v2 endpoint rollout resolver', () => {
     const allowed = resolveAmroV2EndpointRolloutState({
       tenantId: 'tenant-allow',
       franchiseId: 'fr-allow',
-      capability: 'work-packages',
+      capability: 'work-orders',
     });
 
     expect(deniedTenant.enabled).toBe(false);

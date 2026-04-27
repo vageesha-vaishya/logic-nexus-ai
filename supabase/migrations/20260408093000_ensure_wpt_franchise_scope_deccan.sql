@@ -1,7 +1,7 @@
--- Ensure work_package_templates.franchise_id exists and repair Deccan/Deccan Fly scope data.
+-- Ensure work_order_templates.franchise_id exists and repair Deccan/Deccan Fly scope data.
 -- This migration is schema-safe across environments with optional "code" columns.
 
-ALTER TABLE public.work_package_templates
+ALTER TABLE public.work_order_templates
   ADD COLUMN IF NOT EXISTS franchise_id uuid;
 
 DO $$
@@ -9,19 +9,19 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conname = 'work_package_templates_franchise_id_fkey'
-      AND conrelid = 'public.work_package_templates'::regclass
+    WHERE conname = 'work_order_templates_franchise_id_fkey'
+      AND conrelid = 'public.work_order_templates'::regclass
   ) THEN
-    ALTER TABLE public.work_package_templates
-      ADD CONSTRAINT work_package_templates_franchise_id_fkey
+    ALTER TABLE public.work_order_templates
+      ADD CONSTRAINT work_order_templates_franchise_id_fkey
       FOREIGN KEY (franchise_id)
       REFERENCES public.franchises(id)
       ON DELETE SET NULL;
   END IF;
 END $$;
 
-CREATE INDEX IF NOT EXISTS idx_work_package_templates_franchise_id
-  ON public.work_package_templates(franchise_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_templates_franchise_id
+  ON public.work_order_templates(franchise_id);
 
 DO $$
 DECLARE
@@ -51,7 +51,7 @@ BEGIN
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'work_package_template_task_templates'
+      AND table_name = 'work_order_template_task_templates'
       AND column_name = 'franchise_id'
   ) INTO v_has_rel_franchise_column;
 
@@ -76,7 +76,7 @@ BEGIN
   END IF;
 
   IF v_tenant_id IS NULL THEN
-    RAISE EXCEPTION 'Deccan tenant not found; cannot backfill work_package_templates.franchise_id';
+    RAISE EXCEPTION 'Deccan tenant not found; cannot backfill work_order_templates.franchise_id';
   END IF;
 
   -- Resolve/create Deccan Fly franchise.
@@ -107,14 +107,14 @@ BEGIN
   END IF;
 
   -- Backfill WPT rows in Deccan tenant where scope is missing.
-  UPDATE public.work_package_templates w
+  UPDATE public.work_order_templates w
   SET franchise_id = v_franchise_id
   WHERE w.tenant_id = v_tenant_id
     AND w.franchise_id IS NULL;
 
   -- Keep relation table in same scope where franchise_id column exists.
   IF v_has_rel_franchise_column THEN
-    UPDATE public.work_package_template_task_templates r
+    UPDATE public.work_order_template_task_templates r
     SET franchise_id = v_franchise_id
     WHERE r.tenant_id = v_tenant_id
       AND r.franchise_id IS NULL;

@@ -49,7 +49,7 @@ The codebase used **BOTH** terms interchangeably:
 
 **In Code:**
 ```typescript
-// ❌ INCORRECT - Found in AmroWorkPackageDetailPage.tsx
+// ❌ INCORRECT - Found in AmroWorkOrderDetailPage.tsx
 "Work Order Information"
 "Loading work order details..."
 "Failed to load work order"
@@ -74,7 +74,7 @@ The codebase used **BOTH** terms interchangeably:
 
 ### ✅ Changes Completed
 
-#### File 1: `AmroWorkPackageDetailPage.tsx`
+#### File 1: `AmroWorkOrderDetailPage.tsx`
 **10 occurrences updated:**
 
 | Line | Before | After |
@@ -126,7 +126,7 @@ The codebase used **BOTH** terms interchangeably:
 ```sql
 -- Kept for backward compatibility
 work_order_number VARCHAR(50)  -- Legacy field, documented as deprecated
-work_package_number VARCHAR(50) -- Primary field
+work_order_number VARCHAR(50) -- Primary field
 ```
 
 **Rationale:** 
@@ -137,21 +137,21 @@ work_package_number VARCHAR(50) -- Primary field
 
 ### API Endpoints
 ```
-/api/v2/amro/work-packages           ✅ Already correct
-/api/v2/amro/work-packages/:id       ✅ Already correct
+/api/v2/amro/work-orders           ✅ Already correct
+/api/v2/amro/work-orders/:id       ✅ Already correct
 ```
 
 ### Type Definitions
 ```typescript
-type WorkPackageStatus               ✅ Already correct
-type WorkPackageDetail               ✅ Already correct
-type WorkPackageListItem             ✅ Already correct
+type WorkOrderStatus               ✅ Already correct
+type WorkOrderDetail               ✅ Already correct
+type WorkOrderListItem             ✅ Already correct
 ```
 
 ### Variable Names
 ```typescript
-work_package_number                  ✅ Already correct
-workPackages (state variable)        ✅ Already correct
+work_order_number                  ✅ Already correct
+workOrders (state variable)        ✅ Already correct
 ```
 
 ---
@@ -347,7 +347,7 @@ Phase 5 (Q4 2027): Database migration (optional)
 ## 13. Files Changed Summary
 
 ### Modified Files (2)
-1. `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`
+1. `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`
    - 10 occurrences updated
    - All user-facing text
    - No logic changes
@@ -454,11 +454,11 @@ Phase 5 (Q4 2027): Database migration (optional)
 - ⚠️ "Create Work Order" (use "Create Work Package")
 
 ### Code References
-- ✅ Table: `work_packages`
-- ✅ Field: `work_package_number` (primary)
+- ✅ Table: `work_orders`
+- ✅ Field: `work_order_number` (primary)
 - ⚠️ Field: `work_order_number` (deprecated, keep for compatibility)
-- ✅ API: `/api/v2/amro/work-packages`
-- ✅ Types: `WorkPackageDetail`, `WorkPackageStatus`
+- ✅ API: `/api/v2/amro/work-orders`
+- ✅ Types: `WorkOrderDetail`, `WorkOrderStatus`
 
 ---
 

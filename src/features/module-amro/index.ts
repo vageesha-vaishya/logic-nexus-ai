@@ -12,7 +12,7 @@ export {
   AmroSchedulingPage,
   AmroTaskExecutionPage,
   AmroWorkspaceDocumentationPage,
-  AmroWorkPackagesPage,
+  AmroWorkOrdersPage,
 } from './pages/AmroHubVerticalPage';
 export { AmroPlanDirectivesBulletinPage } from './pages/AmroPlanDirectivesBulletinPage';
 export { AmroMpdManagementPage } from './pages/AmroMpdManagementPage';

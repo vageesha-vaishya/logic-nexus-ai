@@ -12,14 +12,14 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import type { WorkPackageTemplate, AircraftModelOption } from './AmroWorkPackageTemplatesPage';
+import type { WorkOrderTemplate, AircraftModelOption } from './AmroWorkOrderTemplatesPage';
 import { cloneTemplate } from './templateApi';
 import { useAuth } from '@/hooks/useAuth';
 
 interface TemplateCloneDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  template: WorkPackageTemplate;
+  template: WorkOrderTemplate;
   onSuccess: () => void;
   aircraftModels: AircraftModelOption[];
 }

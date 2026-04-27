@@ -627,14 +627,14 @@ export function extractSelectedTaskTemplateResolution(payload: Record<string, un
   };
 }
 
-async function logWorkPackageTemplateLinkSnapshot(params: {
+async function logWorkOrderTemplateLinkSnapshot(params: {
   supabase: ReturnType<typeof getSupabaseAdminClient>;
   correlationId: string;
   templateId: string;
   tenantId: string;
 }) {
   const { data, error } = await params.supabase
-    .from('work_package_template_task_templates')
+    .from('work_order_template_task_templates')
     .select('task_template_id', { count: 'exact' })
     .eq('tenant_id', params.tenantId)
     .eq('work_order_template_id', params.templateId);
@@ -662,7 +662,7 @@ function isFranchiseCompatible(
   return recordFranchiseId === requestFranchiseId;
 }
 
-async function resolveWorkPackageTemplateModelId(
+async function resolveWorkOrderTemplateModelId(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   tenantId: string,
   franchiseId: string | null,
@@ -706,13 +706,13 @@ async function resolveWorkPackageTemplateModelId(
   return asNullableString((resolved as Record<string, unknown>).id);
 }
 
-export async function syncWorkPackageTemplateTaskLinks(params: {
+export async function syncWorkOrderTemplateTaskLinks(params: {
   supabase: ReturnType<typeof getSupabaseAdminClient>;
   tenantId: string;
   franchiseId: string | null;
   userId: string;
   correlationId: string;
-  workPackageTemplateId: string;
+  workOrderTemplateId: string;
   taskTemplateIds: string[];
   taskReferenceTokens: string[];
   aircraftModelToken: string | null;
@@ -721,7 +721,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     correlationId: params.correlationId,
     tenantId: params.tenantId,
     franchiseId: params.franchiseId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     requestedTaskTemplateCount: params.taskTemplateIds.length,
     requestedTaskReferenceCount: params.taskReferenceTokens.length,
     aircraftModelToken: params.aircraftModelToken || null,
@@ -740,7 +740,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   ));
   logger.info('[AMRO Master Data API] work package template relationship sync started', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     selectedTaskTemplateCount: uniqueTaskTemplateIds.length,
     selectedTaskTemplateIds: uniqueTaskTemplateIds,
     selectedTaskReferenceCount: uniqueTaskReferenceTokens.length,
@@ -749,7 +749,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   });
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-02 normalized-identifiers', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     uniqueTaskTemplateCount: uniqueTaskTemplateIds.length,
     uniqueTaskReferenceCount: uniqueTaskReferenceTokens.length,
   });
@@ -769,7 +769,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (uniqueTaskTemplateIds.length > 0) {
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-03 querying-task-templates-by-id', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       queryIdCount: uniqueTaskTemplateIds.length,
     });
     const { data: byIdRows, error: byIdError } = await resolveScopedTaskTemplateQuery().in('id', uniqueTaskTemplateIds);
@@ -786,7 +786,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (uniqueTaskReferenceTokens.length > 0) {
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-04 querying-task-templates-by-reference', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       queryReferenceCount: uniqueTaskReferenceTokens.length,
     });
     const { data: byTaskIdRows, error: byTaskIdError } = await resolveScopedTaskTemplateQuery().in('tt_sequence', uniqueTaskReferenceTokens);
@@ -825,7 +825,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   const missingReferenceTokens = uniqueTaskReferenceTokens.filter((token) => !resolvedReferenceTokens.has(token));
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-05 resolution-summary', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     resolvedTaskTemplateCount: availableIds.size,
     missingTaskTemplateCount: missingIds.length,
     missingReferenceTokenCount: missingReferenceTokens.length,
@@ -834,7 +834,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     const missingTokens = [...missingIds, ...missingReferenceTokens];
     logger.warn('[AMRO Master Data API] task template validation failed for work package template', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       missingTaskTemplateIds: missingIds,
       missingTaskReferenceTokens: missingReferenceTokens,
     });
@@ -844,13 +844,13 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (resolvedTaskTemplateIds.length === 0) {
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-06 no-task-resolved-cleanup-start', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
     });
     let cleanupQuery = params.supabase
-      .from('work_package_template_task_templates')
+      .from('work_order_template_task_templates')
       .delete()
       .eq('tenant_id', params.tenantId)
-      .eq('work_order_template_id', params.workPackageTemplateId);
+      .eq('work_order_template_id', params.workOrderTemplateId);
     if (params.franchiseId) {
       cleanupQuery = cleanupQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
     }
@@ -860,16 +860,16 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     }
     logger.info('[AMRO Master Data API] no task templates resolved for work package template sync, existing links cleared', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
     });
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-07 no-task-resolved-cleanup-complete', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
     });
     return;
   }
 
-  let modelId = await resolveWorkPackageTemplateModelId(
+  let modelId = await resolveWorkOrderTemplateModelId(
     params.supabase,
     params.tenantId,
     params.franchiseId,
@@ -893,19 +893,19 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   }
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-08 model-resolved', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     resolvedModelId: modelId,
     resolvedTaskTemplateCount: resolvedTaskTemplateIds.length,
   });
 
   let deleteQuery = params.supabase
-    .from('work_package_template_task_templates')
+    .from('work_order_template_task_templates')
     .delete()
     .eq('tenant_id', params.tenantId)
-    .eq('work_order_template_id', params.workPackageTemplateId);
+    .eq('work_order_template_id', params.workOrderTemplateId);
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-09 deleting-existing-links', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     franchiseScoped: Boolean(params.franchiseId),
   });
   if (params.franchiseId) {
@@ -915,7 +915,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (deleteError) {
     logger.error('[AMRO WORK PACKAGE TEMPLATE SYNC] step-09-delete-failed', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       message: String(deleteError.message || ''),
     });
     throw new HttpError(deleteError.message, 400);
@@ -924,7 +924,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   const relationshipRows = resolvedTaskTemplateIds.map((taskTemplateId) => ({
     tenant_id: params.tenantId,
     franchise_id: params.franchiseId,
-    work_order_template_id: params.workPackageTemplateId,
+    work_order_template_id: params.workOrderTemplateId,
     model_id: modelId,
     task_template_id: taskTemplateId,
     created_by: params.userId,
@@ -932,11 +932,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   }));
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-10 inserting-links', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     insertRowCount: relationshipRows.length,
   });
   let relationInsertResult = await params.supabase
-    .from('work_package_template_task_templates')
+    .from('work_order_template_task_templates')
     .insert(relationshipRows);
   if (
     relationInsertResult.error &&
@@ -944,11 +944,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   ) {
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-11 retry-insert-without-audit-columns', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       message: String(relationInsertResult.error.message || ''),
     });
     relationInsertResult = await params.supabase
-      .from('work_package_template_task_templates')
+      .from('work_order_template_task_templates')
       .insert(relationshipRows.map((row) => {
         const { created_by, updated_by, ...rest } = row;
         return rest;
@@ -957,7 +957,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (relationInsertResult.error) {
     logger.error('[AMRO WORK PACKAGE TEMPLATE SYNC] step-12-insert-failed', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       message: String(relationInsertResult.error.message || ''),
     });
     throw new HttpError(relationInsertResult.error.message, 400);
@@ -965,14 +965,14 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
 
   logger.info('[AMRO Master Data API] linked work package template task templates', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     linkedTaskTemplateCount: resolvedTaskTemplateIds.length,
     linkedTaskTemplateIds: resolvedTaskTemplateIds,
     resolvedModelId: modelId,
   });
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-13 sync-completed', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     linkedTaskTemplateCount: resolvedTaskTemplateIds.length,
   });
 }
@@ -1605,18 +1605,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const validation = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, [payload]);
       assemblyModelIssues = validation.get(0) || [];
     }
-    const workPackageTemplateIssues: { field: string; message: string }[] = [];
+    const workOrderTemplateIssues: { field: string; message: string }[] = [];
     if (entity === 'work_order_templates') {
       const policySnapshotId = asNullableString(payload.policy_snapshot_id);
       const modelId = asNullableString(payload.assembly_models_id);
       if (policySnapshotId && !isUuid(policySnapshotId)) {
-        workPackageTemplateIssues.push({
+        workOrderTemplateIssues.push({
           field: 'policy_snapshot_id',
           message: 'Policy Snapshot ID must be a valid UUID.',
         });
       }
       if (modelId && !isUuid(modelId)) {
-        workPackageTemplateIssues.push({
+        workOrderTemplateIssues.push({
           field: 'assembly_models_id',
           message: 'Aircraft Model reference must be a valid UUID.',
         });
@@ -1626,7 +1626,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       ...manufacturerIssues,
       ...aircraftModelIssues,
       ...assemblyModelIssues,
-      ...workPackageTemplateIssues,
+      ...workOrderTemplateIssues,
       ...buildRequiredFieldIssues(entity, payload),
       ...validatePayload(entity, payload),
     ];
@@ -1721,9 +1721,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-02 calling-atomic-function', {
         correlationId: ctx.correlationId,
-        functionName: 'amro_create_work_package_template_atomic',
+        functionName: 'amro_create_work_order_template_atomic',
       });
-      const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_package_template_atomic', {
+      const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_order_template_atomic', {
         p_tenant_id: tenantId,
         p_franchise_id: franchiseId,
         p_user_id: auth.userId,
@@ -1739,7 +1739,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         if (/validation failed/i.test(message)) {
           throw new HttpError(message, 422);
         }
-        if (/amro_create_work_package_template_atomic/i.test(message) && /does not exist|undefined function/i.test(message)) {
+        if (/amro_create_work_order_template_atomic/i.test(message) && /does not exist|undefined function/i.test(message)) {
           logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-04 atomic-function-missing', {
             correlationId: ctx.correlationId,
             message,
@@ -1802,7 +1802,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       createdRelationships.forEach((relationship, index) => {
         logger.debug('[AMRO Master Data API] inserted work package template task relationship', {
           correlationId: ctx.correlationId,
-          workPackageTemplateId: createdTemplateId,
+          workOrderTemplateId: createdTemplateId,
           relationshipIndex: index,
           taskTemplateId: asNullableString(relationship.task_template_id),
           modelId: asNullableString(relationship.model_id),
@@ -1810,7 +1810,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       const requestedTaskCount = Array.isArray(createdRecord?.tasks_json) ? createdRecord?.tasks_json.length : 0;
       const { data: verificationRows, error: verificationError } = await supabase
-        .from('work_package_template_task_templates')
+        .from('work_order_template_task_templates')
         .select('task_template_id')
         .eq('tenant_id', tenantId)
         .eq('work_order_template_id', createdTemplateId);

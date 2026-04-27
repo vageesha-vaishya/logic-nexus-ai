@@ -97,7 +97,7 @@ export class AmroEventsProducer {
     tenantId: string,
     userId: string,
     eventType: AmroEventType,
-    workPackageData: Record<string, any>,
+    workOrderData: Record<string, any>,
   ): void {
     if (!this.producer) {
       logger.warn('AmroEventsProducer not initialized, skipping event publication');
@@ -121,8 +121,8 @@ export class AmroEventsProducer {
       timestamp: new Date().toISOString(),
       tenant_id: tenantId,
       user_id: userId,
-      idempotency_key: `${tenantId}-${workPackageData.id || workPackageData.work_package_id}-${randomUUID()}`,
-      data: workPackageData as any,
+      idempotency_key: `${tenantId}-${workOrderData.id || workOrderData.work_order_id}-${randomUUID()}`,
+      data: workOrderData as any,
     };
 
     // Fire-and-forget publish
@@ -130,7 +130,7 @@ export class AmroEventsProducer {
       logger.error('Failed to publish work order event', {
         eventType,
         tenantId,
-        workPackageId: workPackageData.id || workPackageData.work_package_id,
+        workOrderId: workOrderData.id || workOrderData.work_order_id,
         error: error instanceof Error ? error.message : String(error),
       });
     });

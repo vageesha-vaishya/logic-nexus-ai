@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-12  
 **Status:** Phase 3 (React Query Hooks) - COMPLETE  
-**Pattern:** Follows existing `useWorkPackageState.ts` conventions
+**Pattern:** Follows existing `useWorkOrderState.ts` conventions
 
 ---
 
@@ -89,7 +89,7 @@
 
 ```
 src/features/module-amro/components/work-orders/
-├── useWorkPackageState.ts              ✅ Existing (work packages)
+├── useWorkOrderState.ts              ✅ Existing (work packages)
 ├── useTemplateVersionState.ts          ✅ NEW (template versions)
 ├── useEmergencyWPState.ts              ✅ NEW (emergency WPs)
 ├── useNonScheduledTaskState.ts         ✅ NEW (non-scheduled tasks)
@@ -202,14 +202,14 @@ import {
 
 // List compliance records
 const { data } = useListComplianceRecords({
-  workPackageId: 'uuid',
+  workOrderId: 'uuid',
   complianceType: 'AD',
 });
 
 // Create compliance record
 const createCompliance = useCreateComplianceRecord();
 await createCompliance.mutateAsync({
-  work_package_id: 'uuid',
+  work_order_id: 'uuid',
   compliance_type: 'AD',
   compliance_reference: '2024-15-07',
   compliance_method: 'Inspected per AD requirements',
@@ -221,7 +221,7 @@ await createCompliance.mutateAsync({
 // Generate CRS
 const createCert = useCreateCertificate();
 await createCert.mutateAsync({
-  work_package_id: 'uuid',
+  work_order_id: 'uuid',
   certifying_staff_id: 'user_id',
   staff_license_number: 'B1-12345',
   staff_license_type: 'B1',
@@ -278,9 +278,9 @@ export type ComplianceType = 'AD' | 'SB' | 'inspection' | 'certification' | 'rou
 
 // Response interfaces
 export interface TemplateVersionListResponse { records: TemplateVersion[]; total: number; page: number; page_size: number; }
-export interface EmergencyWPListResponse { records: EmergencyWorkPackage[]; total: number; page: number; page_size: number; active_count: number; }
+export interface EmergencyWPListResponse { records: EmergencyWorkOrder[]; total: number; page: number; page_size: number; active_count: number; }
 export interface NonScheduledTaskListResponse { records: NonScheduledTask[]; total: number; page: number; page_size: number; }
-export interface ComplianceRecordListResponse { work_package_id: string; records: ComplianceRecord[]; total: number; }
+export interface ComplianceRecordListResponse { work_order_id: string; records: ComplianceRecord[]; total: number; }
 ```
 
 ---
@@ -353,6 +353,6 @@ Test complete workflows:
 
 **Implementation Date:** 2026-04-12  
 **Developer:** AMRO Development Team  
-**Pattern Reference:** `useWorkPackageState.ts`  
+**Pattern Reference:** `useWorkOrderState.ts`  
 **Status:** Ready for UI component development  
 **Next:** Build priority UI components following AMRO design system

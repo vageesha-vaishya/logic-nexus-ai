@@ -1,4 +1,4 @@
--- Repair drift: regenerate work_package_template_task_templates from work_package_templates.tasks_json
+-- Repair drift: regenerate work_order_template_task_templates from work_order_templates.tasks_json
 -- Usage:
 --   psql "$DATABASE_URL" -f scripts/sql/repair_amro_wpt_task_drift.sql
 --
@@ -35,7 +35,7 @@ BEGIN
   END IF;
 
   CREATE TEMP TABLE tmp_wpt_repair_queue (
-    work_package_template_id uuid PRIMARY KEY,
+    work_order_template_id uuid PRIMARY KEY,
     tenant_id uuid NOT NULL,
     franchise_id uuid NULL,
     created_by uuid NULL,
@@ -43,7 +43,7 @@ BEGIN
   ) ON COMMIT DROP;
 
   CREATE TEMP TABLE tmp_wpt_repair_result (
-    work_package_template_id uuid NOT NULL,
+    work_order_template_id uuid NOT NULL,
     tenant_id uuid NOT NULL,
     status text NOT NULL,
     detail text NULL,
@@ -53,7 +53,7 @@ BEGIN
 
   WITH template_tasks_json AS (
     SELECT
-      w.id AS work_package_template_id,
+      w.id AS work_order_template_id,
       w.tenant_id,
       w.franchise_id,
       w.created_by,
@@ -65,33 +65,33 @@ BEGIN
           AND entry ? 'task_template_id'
           AND (entry->>'task_template_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
       ) AS json_task_ids
-    FROM public.work_package_templates w
+    FROM public.work_order_templates w
     WHERE w.deleted_at IS NULL
   ),
   template_relation AS (
     SELECT
-      r.work_package_template_id,
+      r.work_order_template_id,
       ARRAY_AGG(DISTINCT r.task_template_id ORDER BY r.task_template_id) AS rel_task_ids
-    FROM public.work_package_template_task_templates r
-    GROUP BY r.work_package_template_id
+    FROM public.work_order_template_task_templates r
+    GROUP BY r.work_order_template_id
   ),
   drift AS (
     SELECT
-      j.work_package_template_id,
+      j.work_order_template_id,
       j.tenant_id,
       j.franchise_id,
       j.created_by,
       j.updated_by
     FROM template_tasks_json j
     LEFT JOIN template_relation r
-      ON r.work_package_template_id = j.work_package_template_id
+      ON r.work_order_template_id = j.work_order_template_id
     WHERE COALESCE(j.json_task_ids, ARRAY[]::uuid[]) IS DISTINCT FROM COALESCE(r.rel_task_ids, ARRAY[]::uuid[])
-    ORDER BY j.work_package_template_id
+    ORDER BY j.work_order_template_id
     LIMIT v_max_templates
   )
-  INSERT INTO tmp_wpt_repair_queue (work_package_template_id, tenant_id, franchise_id, created_by, updated_by)
+  INSERT INTO tmp_wpt_repair_queue (work_order_template_id, tenant_id, franchise_id, created_by, updated_by)
   SELECT
-    d.work_package_template_id,
+    d.work_order_template_id,
     d.tenant_id,
     d.franchise_id,
     d.created_by,
@@ -101,7 +101,7 @@ BEGIN
   FOR v_row IN
     SELECT q.*
     FROM tmp_wpt_repair_queue q
-    ORDER BY q.work_package_template_id
+    ORDER BY q.work_order_template_id
     LIMIT v_max_templates
   LOOP
     EXIT WHEN v_processed >= v_max_templates;
@@ -109,9 +109,9 @@ BEGIN
 
     SELECT ARRAY(
       SELECT DISTINCT (entry->>'task_template_id')::uuid
-      FROM public.work_package_templates w
+      FROM public.work_order_templates w
       CROSS JOIN LATERAL jsonb_array_elements(coalesce(w.tasks_json, '[]'::jsonb)) entry
-      WHERE w.id = v_row.work_package_template_id
+      WHERE w.id = v_row.work_order_template_id
         AND jsonb_typeof(entry) = 'object'
         AND entry ? 'task_template_id'
         AND (entry->>'task_template_id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
@@ -119,12 +119,12 @@ BEGIN
     INTO v_task_ids;
 
     IF COALESCE(array_length(v_task_ids, 1), 0) = 0 THEN
-      DELETE FROM public.work_package_template_task_templates r
-      WHERE r.work_package_template_id = v_row.work_package_template_id
+      DELETE FROM public.work_order_template_task_templates r
+      WHERE r.work_order_template_id = v_row.work_order_template_id
         AND r.tenant_id = v_row.tenant_id;
 
-      INSERT INTO tmp_wpt_repair_result (work_package_template_id, tenant_id, status, detail, inserted_count)
-      VALUES (v_row.work_package_template_id, v_row.tenant_id, 'repaired', 'No task ids in tasks_json; relation rows cleared', 0);
+      INSERT INTO tmp_wpt_repair_result (work_order_template_id, tenant_id, status, detail, inserted_count)
+      VALUES (v_row.work_order_template_id, v_row.tenant_id, 'repaired', 'No task ids in tasks_json; relation rows cleared', 0);
       v_repaired := v_repaired + 1;
       CONTINUE;
     END IF;
@@ -143,9 +143,9 @@ BEGIN
     INTO v_missing_task_ids;
 
     IF COALESCE(array_length(v_missing_task_ids, 1), 0) > 0 THEN
-      INSERT INTO tmp_wpt_repair_result (work_package_template_id, tenant_id, status, detail, inserted_count)
+      INSERT INTO tmp_wpt_repair_result (work_order_template_id, tenant_id, status, detail, inserted_count)
       VALUES (
-        v_row.work_package_template_id,
+        v_row.work_order_template_id,
         v_row.tenant_id,
         'skipped',
         format('Missing task_template ids: %s', array_to_string(v_missing_task_ids, ', ')),
@@ -164,9 +164,9 @@ BEGIN
     INTO v_model_ids;
 
     IF COALESCE(array_length(v_model_ids, 1), 0) <> 1 THEN
-      INSERT INTO tmp_wpt_repair_result (work_package_template_id, tenant_id, status, detail, inserted_count)
+      INSERT INTO tmp_wpt_repair_result (work_order_template_id, tenant_id, status, detail, inserted_count)
       VALUES (
-        v_row.work_package_template_id,
+        v_row.work_order_template_id,
         v_row.tenant_id,
         'skipped',
         'Unable to resolve a single model_id from selected task templates',
@@ -178,14 +178,14 @@ BEGIN
 
     v_model_id := v_model_ids[1];
 
-    DELETE FROM public.work_package_template_task_templates r
-    WHERE r.work_package_template_id = v_row.work_package_template_id
+    DELETE FROM public.work_order_template_task_templates r
+    WHERE r.work_order_template_id = v_row.work_order_template_id
       AND r.tenant_id = v_row.tenant_id;
 
-    INSERT INTO public.work_package_template_task_templates (
+    INSERT INTO public.work_order_template_task_templates (
       tenant_id,
       franchise_id,
-      work_package_template_id,
+      work_order_template_id,
       model_id,
       task_template_id,
       created_by,
@@ -194,25 +194,25 @@ BEGIN
     SELECT
       v_row.tenant_id,
       v_row.franchise_id,
-      v_row.work_package_template_id,
+      v_row.work_order_template_id,
       v_model_id,
       task_id,
       v_row.created_by,
       v_row.updated_by
     FROM unnest(v_task_ids) task_id
-    ON CONFLICT ON CONSTRAINT uq_work_package_template_task_templates_scope DO NOTHING;
+    ON CONFLICT ON CONSTRAINT uq_work_order_template_task_templates_scope DO NOTHING;
 
     GET DIAGNOSTICS v_inserted_count = ROW_COUNT;
 
-    UPDATE public.work_package_templates
+    UPDATE public.work_order_templates
     SET
       model_id = COALESCE(model_id, v_model_id),
       updated_at = now()
-    WHERE id = v_row.work_package_template_id
+    WHERE id = v_row.work_order_template_id
       AND tenant_id = v_row.tenant_id;
 
-    INSERT INTO tmp_wpt_repair_result (work_package_template_id, tenant_id, status, detail, inserted_count)
-    VALUES (v_row.work_package_template_id, v_row.tenant_id, 'repaired', 'Relations regenerated from tasks_json', v_inserted_count);
+    INSERT INTO tmp_wpt_repair_result (work_order_template_id, tenant_id, status, detail, inserted_count)
+    VALUES (v_row.work_order_template_id, v_row.tenant_id, 'repaired', 'Relations regenerated from tasks_json', v_inserted_count);
     v_repaired := v_repaired + 1;
 
     IF (v_processed % v_batch_size) = 0 THEN
@@ -237,6 +237,6 @@ ORDER BY status;
 SELECT *
 FROM tmp_wpt_repair_result
 WHERE status = 'skipped'
-ORDER BY repaired_at, work_package_template_id;
+ORDER BY repaired_at, work_order_template_id;
 
 COMMIT;

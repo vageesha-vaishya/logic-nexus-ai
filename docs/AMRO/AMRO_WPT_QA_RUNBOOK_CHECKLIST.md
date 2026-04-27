@@ -14,11 +14,11 @@
 - Confirm fallback behavior can be tested with flag OFF.
 
 ## Mandatory Storybook Sign-off Sequence
-1. Open `WorkPackageTemplates_ProductionParity`
-2. Open `WorkPackageTemplates_ProductionParity_ValidationError`
+1. Open `WorkOrderTemplates_ProductionParity`
+2. Open `WorkOrderTemplates_ProductionParity_ValidationError`
 3. Read and execute checklist from story docs (`State Switch Guide` + visual sign-off checklist)
 
-### Baseline Visual Sign-off (`WorkPackageTemplates_ProductionParity`)
+### Baseline Visual Sign-off (`WorkOrderTemplates_ProductionParity`)
 - Verify standardized fields:
   - `Template Code (Standard)`
   - `Template Name (Standard)`
@@ -31,7 +31,7 @@
   - `Selected Tasks`
   - `Scope Definition`
 
-### Validation Sign-off (`WorkPackageTemplates_ProductionParity_ValidationError`)
+### Validation Sign-off (`WorkOrderTemplates_ProductionParity_ValidationError`)
 - Verify summary title: `Validation Errors`
 - Verify messages:
   - `Template Code (Standard) is required.`
@@ -68,7 +68,7 @@
 
 ## Feature Flag ON/OFF Parity
 - ON (`true`): adapter-template path visible.
-- OFF (`false`): legacy `WorkPackageTemplateCreateSection` path visible.
+- OFF (`false`): legacy `WorkOrderTemplateCreateSection` path visible.
 - Confirm payload parity:
   - create/update request structure unchanged
   - no unexpected field omissions/additions

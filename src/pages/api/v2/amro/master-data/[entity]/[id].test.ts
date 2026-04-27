@@ -403,7 +403,7 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
         }
         return { update: updateMock };
       }
-      if (table === 'work_package_template_task_templates') {
+      if (table === 'work_order_template_task_templates') {
         return { select: linkSelectMock, delete: relationDeleteMock, insert: relationInsertMock };
       }
       if (table === 'task_templates') {
@@ -440,7 +440,7 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     expect(updatePayload.aircraft_model).toBe('A320neo');
     expect((res.jsonBody as any)?.output?.record?.assembly_models_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect((res.jsonBody as any)?.output?.record?.aircraft_model).toBe('A320neo');
-    expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
+    expect(fromMock).toHaveBeenCalledWith('work_order_template_task_templates');
     expect(linkEqTemplateMock).toHaveBeenCalledWith('work_order_template_id', 'wpt-1');
   });
 

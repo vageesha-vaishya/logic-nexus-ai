@@ -42,7 +42,7 @@ AMRO runs as a platform-integrated domain module:
 | Layer | Existing Platform Capability | AMRO Domain Extension | Current State |
 |---|---|---|---|
 | Presentation | Dashboard layout, shared UI primitives | AMRO workspace pages, mobile task execution UX | Partial |
-| API | REST/GraphQL gateway, auth middleware | `/api/v1/work-packages`, `/api/v1/tasks`, AMRO event endpoints | Active |
+| API | REST/GraphQL gateway, auth middleware | `/api/v1/work-orders`, `/api/v1/tasks`, AMRO event endpoints | Active |
 | Domain Services | Shared service framework | Work package orchestration, qualification checks, audit recording | Partial |
 | Data | PostgreSQL + Supabase, RLS model | AMRO operational tables + immutable `mro_audit` schema | Active |
 | Eventing | Kafka backbone | Work package and task lifecycle topics | Active |

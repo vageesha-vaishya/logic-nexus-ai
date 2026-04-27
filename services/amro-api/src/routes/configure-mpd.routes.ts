@@ -164,7 +164,7 @@ function mapTaskWithTemplateToConfiguredRecord(taskRow: JsonRecord, templateRow:
     id: String(taskRow.id || ''),
     task_id: String(taskRow.id || ''),
     task_template_id: normalizeString(taskRow.task_template_id),
-    work_package_id: normalizeString(taskRow.work_order_id ?? taskRow.work_package_id),
+    work_order_id: normalizeString(taskRow.work_order_id ?? taskRow.work_order_id),
     task_number: normalizeString(taskRow.task_number),
     task_title: normalizeString(taskRow.title),
     task_description: normalizeString(taskRow.description),
@@ -280,7 +280,7 @@ async function resolveLatestTasksByTemplate(params: {
   return Array.from(latestByTemplateId.values());
 }
 
-async function ensureConfigureWorkPackage(params: {
+async function ensureConfigureWorkOrder(params: {
   supabase: SupabaseClient;
   tenantId: string;
   franchiseId: string | null;
@@ -333,7 +333,7 @@ function mapTemplateToTaskInsert(params: {
   tenantId: string;
   franchiseId: string | null;
   userId: string;
-  workPackageId: string;
+  workOrderId: string;
   workOrderNumber: string;
   template: JsonRecord;
   sequence: number;
@@ -344,7 +344,7 @@ function mapTemplateToTaskInsert(params: {
   return {
     tenant_id: params.tenantId,
     franchise_id: params.franchiseId,
-    work_order_id: params.workPackageId,
+    work_order_id: params.workOrderId,
     task_template_id: taskTemplateId,
     task_number: `${params.workOrderNumber}-${String(fallbackSequence).padStart(3, '0')}`,
     title: String(params.template.code_form_no || params.template.description || `Template Task ${fallbackSequence}`),
@@ -711,22 +711,22 @@ router.post(
     }
 
     const templates = (Array.isArray(templateRows) ? templateRows : []) as JsonRecord[];
-    const workPackage = await ensureConfigureWorkPackage({
+    const workOrder = await ensureConfigureWorkOrder({
       supabase,
       tenantId,
       franchiseId,
       aircraftId,
       userId,
     });
-    const workPackageId = String(workPackage.id || '').trim();
-    const workOrderNumber = String(workPackage.work_order_number || '').trim() || `CFG-${Date.now()}`;
+    const workOrderId = String(workOrder.id || '').trim();
+    const workOrderNumber = String(workOrder.work_order_number || '').trim() || `CFG-${Date.now()}`;
 
     const inserts = templates.map((template, index) =>
       mapTemplateToTaskInsert({
         tenantId,
         franchiseId,
         userId,
-        workPackageId,
+        workOrderId,
         workOrderNumber,
         template,
         sequence: index + 1,
@@ -749,7 +749,7 @@ router.post(
       .from('tasks')
       .select('id,task_template_id')
       .eq('tenant_id', tenantId)
-      .or(`work_order_id.eq.${workPackageId},work_package_id.eq.${workPackageId}`)
+      .or(`work_order_id.eq.${workOrderId},work_order_id.eq.${workOrderId}`)
       .in('task_template_id', targetTemplateIds);
     if (createdError) {
       res.status(500).json({

@@ -51,7 +51,7 @@ This document tracks the implementation progress of the Work Package Templates E
 
 **In Progress**:
 - [ ] **Main Grid Component with Virtual Scrolling**
-  - Planned file: `src/features/module-amro/templates/components/WorkPackageTemplatesGrid.tsx`
+  - Planned file: `src/features/module-amro/templates/components/WorkOrderTemplatesGrid.tsx`
   - Integration with @tanstack/react-virtual
   - Server-side pagination support
   - Multi-column sorting UI
@@ -178,7 +178,7 @@ This document tracks the implementation progress of the Work Package Templates E
 ### Phase 1: Foundation (Remaining)
 
 1. **Main Grid Component**
-   - Path: `src/features/module-amro/templates/components/WorkPackageTemplatesGrid.tsx`
+   - Path: `src/features/module-amro/templates/components/WorkOrderTemplatesGrid.tsx`
    - Purpose: Core grid with virtual scrolling
    - Estimated Lines: 500+
 
@@ -260,7 +260,7 @@ This document tracks the implementation progress of the Work Package Templates E
 ### Unit Tests
 - [ ] `store/useTemplateGridStore.test.ts`
 - [ ] `components/GridToolbar.test.tsx`
-- [ ] `components/WorkPackageTemplatesGrid.test.tsx`
+- [ ] `components/WorkOrderTemplatesGrid.test.tsx`
 - [ ] `components/TemplateRow.test.tsx`
 - [ ] `components/GridPagination.test.tsx`
 - [ ] `components/InlineEditCell.test.tsx`

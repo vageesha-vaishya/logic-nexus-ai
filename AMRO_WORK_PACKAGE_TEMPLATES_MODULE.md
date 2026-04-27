@@ -24,7 +24,7 @@ Built a complete, enterprise-grade Work Package Templates module based on thorou
 ```
 src/features/module-amro/templates/
 ├── index.ts                          # Barrel exports
-├── AmroWorkPackageTemplatesPage.tsx  # Main page with list/table view
+├── AmroWorkOrderTemplatesPage.tsx  # Main page with list/table view
 ├── TemplateCreateEditDialog.tsx      # Create/edit form with all fields
 ├── TemplateVersionManager.tsx        # Version management with approval workflow
 ├── TemplateCloneDialog.tsx           # Clone/duplicate functionality
@@ -38,7 +38,7 @@ src/features/module-amro/templates/
 
 ### 1. Template Library (Main Page)
 
-**File:** `AmroWorkPackageTemplatesPage.tsx`
+**File:** `AmroWorkOrderTemplatesPage.tsx`
 
 **Features:**
 - ✅ **Enterprise table view** with sortable columns
@@ -192,7 +192,7 @@ Centralized API functions:
 
 ## Database Schema Used
 
-### work_package_templates Table
+### work_order_templates Table
 | Column | Used? | Notes |
 |--------|-------|-------|
 | `id` | ✅ | Primary key |
@@ -233,7 +233,7 @@ Centralized API functions:
 ## What Was NOT Modified
 
 As requested, the following existing files were **NOT modified**:
-- ❌ `src/features/module-amro/settings/pages/amro-settings-master-data/components/WorkPackageTemplateCreateSection.tsx`
+- ❌ `src/features/module-amro/settings/pages/amro-settings-master-data/components/WorkOrderTemplateCreateSection.tsx`
 - ❌ `src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx` (except navigation link update)
 - ❌ Any database migrations
 - ❌ Any existing API endpoints
@@ -246,9 +246,9 @@ The new module is **completely standalone** and uses the existing API endpoints.
 
 | Route | Component | Purpose |
 |-------|-----------|---------|
-| `/dashboard/amro/templates` | `AmroWorkPackageTemplatesPage` | Main template library |
-| `/dashboard/amro/settings/work-package-templates` | `AmroTemplateCatalog` | Legacy catalog (kept for compatibility) |
-| `/dashboard/amro/settings/work-package-templates/new` | `AmroWorkPackageTemplatesMasterData` | Legacy create (kept for compatibility) |
+| `/dashboard/amro/templates` | `AmroWorkOrderTemplatesPage` | Main template library |
+| `/dashboard/amro/settings/work-order-templates` | `AmroTemplateCatalog` | Legacy catalog (kept for compatibility) |
+| `/dashboard/amro/settings/work-order-templates/new` | `AmroWorkOrderTemplatesMasterData` | Legacy create (kept for compatibility) |
 
 ---
 

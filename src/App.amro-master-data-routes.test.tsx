@@ -126,8 +126,8 @@ vi.mock('./features/module-amro/settings/pages/AmroMasterDataEntityPages', () =>
   ModelMasterDataPage: () => <div data-testid="route-model">model</div>,
   RegulatorProfilesMasterDataPage: () => <div data-testid="route-regulator-profiles">regulator-profiles</div>,
   ShiftCalendarsMasterDataPage: () => <div data-testid="route-shift-calendars">shift-calendars</div>,
-  WorkPackagesMasterDataPage: () => <div data-testid="route-work-packages">work-packages</div>,
-  WorkPackageTemplatesMasterDataPage: () => <div data-testid="route-work-package-templates">work-package-templates</div>,
+  WorkOrdersMasterDataPage: () => <div data-testid="route-work-orders">work-orders</div>,
+  WorkOrderTemplatesMasterDataPage: () => <div data-testid="route-work-order-templates">work-order-templates</div>,
 }));
 
 describe('App AMRO master data route mapping', () => {
@@ -147,8 +147,8 @@ describe('App AMRO master data route mapping', () => {
     { path: '/dashboard/amro/settings/master-data/model', marker: 'route-model' },
     { path: '/dashboard/amro/settings/master-data/regulator-profiles', marker: 'route-regulator-profiles' },
     { path: '/dashboard/amro/settings/master-data/shift-calendars', marker: 'route-shift-calendars' },
-    { path: '/dashboard/amro/settings/master-data/work-packages', marker: 'route-work-packages' },
-    { path: '/dashboard/amro/settings/master-data/work-package-templates', marker: 'route-work-package-templates' },
+    { path: '/dashboard/amro/settings/master-data/work-orders', marker: 'route-work-orders' },
+    { path: '/dashboard/amro/settings/master-data/work-order-templates', marker: 'route-work-order-templates' },
   ])('resolves $path to the expected AMRO wrapper component', async ({ path, marker }) => {
     window.history.pushState({}, 'Route Test', path);
     render(<App />);

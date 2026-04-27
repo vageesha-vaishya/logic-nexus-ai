@@ -197,11 +197,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tasks_json: taskRows,
     };
     delete rpcPayload.task_templates;
-    const { data: rpcResult, error: rpcError } = await supabase.rpc('amro_update_work_package_template_atomic', {
+    const { data: rpcResult, error: rpcError } = await supabase.rpc('amro_update_work_order_template_atomic', {
       p_tenant_id: tenantId,
       p_franchise_id: franchiseId,
       p_user_id: auth.userId,
-      p_work_package_template_id: id,
+      p_work_order_template_id: id,
       p_payload: rpcPayload,
     });
     if (rpcError) {

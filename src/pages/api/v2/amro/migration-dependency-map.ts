@@ -4,7 +4,7 @@ import type { AmroCapability } from './anti-corruption-adapter';
 export type AmroMigrationDependencyStepId =
   | 'domain-access-governance'
   | 'schema-activation-rls-scoped-data-access'
-  | 'work-package-task-command-paths'
+  | 'work-order-task-command-paths'
   | 'compliance-gate-audit-ledger-cutover'
   | 'materials-predictive-integrations'
   | 'external-adapters-retry-dead-letter';
@@ -35,7 +35,7 @@ export const AMRO_MIGRATION_DEPENDENCY_ORDER: ReadonlyArray<{
     ],
   },
   {
-    id: 'work-package-task-command-paths',
+    id: 'work-order-task-command-paths',
     title: 'Work package/task command path extraction',
     checks: [
       'legacy maintenance-like flows map to AMRO command/event contracts',
@@ -97,8 +97,8 @@ export const AMRO_FLOW_COMMAND_EVENT_MAP: ReadonlyArray<{
 }> = [
   {
     legacyFlow: 'legacy_work_orders.create',
-    amroCommandPath: '/api/v2/amro/work-packages',
-    emittedEvent: 'amro.work_package.created.v1',
+    amroCommandPath: '/api/v2/amro/work-orders',
+    emittedEvent: 'amro.work_order.created.v1',
   },
   {
     legacyFlow: 'legacy_work_orders.tasks.complete',
@@ -118,9 +118,9 @@ export const AMRO_ANTI_CORRUPTION_ADAPTERS: ReadonlyArray<{
   amroContract: string;
 }> = [
   {
-    legacySurface: 'legacy_work_packages table',
+    legacySurface: 'legacy_work_orders table',
     adapterRole: 'row mapping, scope hardening, deterministic ID translation',
-    amroContract: '/api/v2/amro/work-packages',
+    amroContract: '/api/v2/amro/work-orders',
   },
   {
     legacySurface: 'legacy_tasks table',
@@ -159,7 +159,7 @@ export const AMRO_EXTERNAL_ADAPTERS: ReadonlyArray<{
     },
     deadLetter: {
       queue: 'amro.sap_pm.dlq',
-      replayCommandPath: '/api/v2/amro/work-packages',
+      replayCommandPath: '/api/v2/amro/work-orders',
     },
   },
   {

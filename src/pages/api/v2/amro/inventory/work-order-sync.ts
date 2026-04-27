@@ -128,7 +128,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     const body = parseBody(req.body);
-    const workPackageId = String(body.work_package_id || '').trim() || null;
+    const workOrderId = String(body.work_order_id || '').trim() || null;
     const taskId = String(body.task_id || '').trim() || null;
     const partNumber = parseRequiredText(body.part_number, 'part_number');
     const quantity = parsePositiveNumber(body.quantity, 'quantity');
@@ -173,7 +173,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           tenant_id: tenantId,
           franchise_id: franchiseId,
           inventory_id: inventoryId,
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           task_id: taskId,
           reserved_quantity: quantity,
           status: 'active',
@@ -190,7 +190,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         franchise_id: franchiseId,
         inventory_id: inventoryId,
         reservation_id: reservationRow?.id || null,
-        work_package_id: workPackageId,
+        work_order_id: workOrderId,
         task_id: taskId,
         action_type: 'reserve',
         quantity,
@@ -248,7 +248,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           from_location: inventoryRow.warehouse_location || null,
           to_location: body.to_location || null,
           reference_type: 'work_order_consume',
-          reference_id: workPackageId || null,
+          reference_id: workOrderId || null,
           moved_by: authUser.userId,
           notes: body.notes || 'Auto-consumption posted from work-order completion',
         });
@@ -267,7 +267,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         franchise_id: franchiseId,
         inventory_id: inventoryId,
         reservation_id: reservationId,
-        work_package_id: workPackageId,
+        work_order_id: workOrderId,
         task_id: taskId,
         action_type: 'consume',
         quantity,
@@ -331,7 +331,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       franchise_id: franchiseId,
       inventory_id: inventoryId,
       reservation_id: releaseReservationId,
-      work_package_id: workPackageId,
+      work_order_id: workOrderId,
       task_id: taskId,
       action_type: 'release',
       quantity: releaseQty,

@@ -1,18 +1,18 @@
 DO $migration$
 BEGIN
   EXECUTE $fn$
-    CREATE OR REPLACE FUNCTION public.amro_update_work_package_template_atomic(
+    CREATE OR REPLACE FUNCTION public.amro_update_work_order_template_atomic(
       p_tenant_id uuid,
       p_franchise_id uuid,
       p_user_id uuid,
-      p_work_package_template_id uuid,
+      p_work_order_template_id uuid,
       p_payload jsonb
     )
     RETURNS jsonb
     LANGUAGE plpgsql
     AS $body$
     DECLARE
-      v_record public.work_package_templates%ROWTYPE;
+      v_record public.work_order_templates%ROWTYPE;
       v_tasks_json jsonb := '[]'::jsonb;
       v_scope_json jsonb := '[]'::jsonb;
       v_task_ids_raw uuid[] := ARRAY[]::uuid[];
@@ -25,8 +25,8 @@ BEGIN
     BEGIN
       SELECT *
       INTO v_record
-      FROM public.work_package_templates
-      WHERE id = p_work_package_template_id
+      FROM public.work_order_templates
+      WHERE id = p_work_order_template_id
         AND tenant_id = p_tenant_id
         AND (p_franchise_id IS NULL OR franchise_id IS NULL OR franchise_id = p_franchise_id)
       LIMIT 1;
@@ -99,7 +99,7 @@ BEGIN
         END IF;
       END IF;
 
-      UPDATE public.work_package_templates
+      UPDATE public.work_order_templates
       SET
         template_code = COALESCE(NULLIF(p_payload->>'template_code', ''), template_code),
         version = COALESCE((p_payload->>'version')::integer, version),
@@ -117,13 +117,13 @@ BEGIN
         END,
         updated_by = p_user_id,
         updated_at = now()
-      WHERE id = p_work_package_template_id
+      WHERE id = p_work_order_template_id
       RETURNING *
       INTO v_record;
 
-      DELETE FROM public.work_package_template_task_templates
+      DELETE FROM public.work_order_template_task_templates
       WHERE tenant_id = p_tenant_id
-        AND work_package_template_id = p_work_package_template_id
+        AND work_order_template_id = p_work_order_template_id
         AND (p_franchise_id IS NULL OR franchise_id IS NULL OR franchise_id = p_franchise_id);
 
       IF array_length(v_task_ids, 1) IS NOT NULL THEN
@@ -137,10 +137,10 @@ BEGIN
           RAISE EXCEPTION 'Validation failed: selected task templates belong to different or missing assembly_models';
         END IF;
 
-        INSERT INTO public.work_package_template_task_templates (
+        INSERT INTO public.work_order_template_task_templates (
           tenant_id,
           franchise_id,
-          work_package_template_id,
+          work_order_template_id,
           model_id,
           task_template_id,
           created_by,
@@ -151,7 +151,7 @@ BEGIN
         SELECT
           p_tenant_id,
           p_franchise_id,
-          p_work_package_template_id,
+          p_work_order_template_id,
           v_model_id,
           task_id,
           p_user_id,
@@ -159,13 +159,13 @@ BEGIN
           v_record.created_at,
           now()
         FROM unnest(v_task_ids) AS task_id
-        ON CONFLICT ON CONSTRAINT uq_work_package_template_task_templates_scope DO NOTHING;
+        ON CONFLICT ON CONSTRAINT uq_work_order_template_task_templates_scope DO NOTHING;
       END IF;
 
       SELECT COALESCE(
         jsonb_agg(
           jsonb_build_object(
-            'work_package_template_id', r.work_package_template_id,
+            'work_order_template_id', r.work_order_template_id,
             'task_template_id', r.task_template_id,
             'tenant_id', r.tenant_id,
             'model_id', r.model_id,
@@ -176,9 +176,9 @@ BEGIN
         '[]'::jsonb
       )
       INTO v_relationships
-      FROM public.work_package_template_task_templates r
+      FROM public.work_order_template_task_templates r
       WHERE r.tenant_id = p_tenant_id
-        AND r.work_package_template_id = p_work_package_template_id;
+        AND r.work_order_template_id = p_work_order_template_id;
 
       v_response := jsonb_build_object(
         'record', to_jsonb(v_record),

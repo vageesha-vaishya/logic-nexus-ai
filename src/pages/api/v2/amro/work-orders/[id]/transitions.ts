@@ -12,10 +12,10 @@ import {
 } from '../../../../_utils/http';
 import { sendErrorResponse } from '../../../../_utils/errorHandler';
 import {
-  fetchWorkPackageDetail,
-  persistTransitionWorkPackage,
-  type WorkPackageStatus,
-} from '../../work-package-persistence-db';
+  fetchWorkOrderDetail,
+  persistTransitionWorkOrder,
+  type WorkOrderStatus,
+} from '../../work-order-persistence-db';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -38,7 +38,7 @@ function assertNonEmpty(value: unknown, fieldName: string): string {
 }
 
 // Valid state transitions
-const VALID_TRANSITIONS: Record<WorkPackageStatus, WorkPackageStatus[]> = {
+const VALID_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
   planning: ['approved', 'cancelled'],
   approved: ['scheduled', 'cancelled'],
   scheduled: ['in_progress', 'on_hold', 'cancelled'],
@@ -49,10 +49,10 @@ const VALID_TRANSITIONS: Record<WorkPackageStatus, WorkPackageStatus[]> = {
   cancelled: [],
 };
 
-const VALID_STATUSES = new Set(Object.keys(VALID_TRANSITIONS)) as Set<WorkPackageStatus>;
+const VALID_STATUSES = new Set(Object.keys(VALID_TRANSITIONS)) as Set<WorkOrderStatus>;
 
-function isValidStatus(v: string): v is WorkPackageStatus {
-  return VALID_STATUSES.has(v as WorkPackageStatus);
+function isValidStatus(v: string): v is WorkOrderStatus {
+  return VALID_STATUSES.has(v as WorkOrderStatus);
 }
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
@@ -93,13 +93,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     // Fetch current status
-    const detail = await fetchWorkPackageDetail({ id: wpId, tenantId });
+    const detail = await fetchWorkOrderDetail({ id: wpId, tenantId });
     if (!detail) {
       res.status(404).json({ error: 'Work order not found', version: 'v2', correlationId: ctx.correlationId });
       return;
     }
 
-    const currentStatus = detail.workPackage.status;
+    const currentStatus = detail.workOrder.status;
     const allowedTargets = VALID_TRANSITIONS[currentStatus];
 
     if (!allowedTargets.includes(targetStatus)) {
@@ -111,11 +111,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const complianceNotes = body.compliance_notes ? String(body.compliance_notes).trim() : undefined;
 
     // Execute transition
-    const updated = await persistTransitionWorkPackage({
+    const updated = await persistTransitionWorkOrder({
       id: wpId,
       tenantId,
       userId: authUser.userId,
-      targetStatus: targetStatus as WorkPackageStatus,
+      targetStatus: targetStatus as WorkOrderStatus,
       complianceNotes,
     });
 
@@ -125,7 +125,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       correlationId: ctx.correlationId,
       output: {
         id: updated.id,
-        work_order_number: updated.work_order_number || updated.work_package_number,
+        work_order_number: updated.work_order_number || updated.work_order_number,
         previous_status: currentStatus,
         new_status: updated.status,
         transitioned_at: updated.updated_at,

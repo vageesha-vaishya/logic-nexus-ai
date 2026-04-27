@@ -220,7 +220,7 @@ async function handleReserve(req: ApiRequest, res: ApiResponse, tenantId: string
   try {
     const {
       quantity,
-      work_package_id,
+      work_order_id,
       task_id,
       notes,
     } = req.body || {};
@@ -229,8 +229,8 @@ async function handleReserve(req: ApiRequest, res: ApiResponse, tenantId: string
       return sendError(res, 400, 'Invalid quantity', 'Quantity must be a positive number');
     }
 
-    if (!work_package_id && !task_id) {
-      return sendError(res, 400, 'Missing reference', 'work_package_id or task_id is required');
+    if (!work_order_id && !task_id) {
+      return sendError(res, 400, 'Missing reference', 'work_order_id or task_id is required');
     }
 
     const supabase = getSupabaseAdminClient();
@@ -262,7 +262,7 @@ async function handleReserve(req: ApiRequest, res: ApiResponse, tenantId: string
       .insert({
         tenant_id: tenantId,
         inventory_id: materialId,
-        work_package_id,
+        work_order_id,
         task_id,
         reserved_quantity: quantity,
         status: 'confirmed',
@@ -282,7 +282,7 @@ async function handleReserve(req: ApiRequest, res: ApiResponse, tenantId: string
       quantity,
       reservationId: reservation.id,
       userId,
-      work_package_id,
+      work_order_id,
     });
 
     return sendJson(res, 201, {
@@ -303,7 +303,7 @@ async function handlePurchaseOrder(req: ApiRequest, res: ApiResponse, tenantId: 
   try {
     const {
       materials,
-      work_package_id,
+      work_order_id,
       supplier_id,
       priority = 'standard',
       notes,
@@ -361,7 +361,7 @@ async function handlePurchaseOrder(req: ApiRequest, res: ApiResponse, tenantId: 
         status: 'draft',
         total_amount: subtotal,
         currency: 'USD',
-        work_package_id,
+        work_order_id,
         notes,
         created_by: userId,
         metadata: { priority },

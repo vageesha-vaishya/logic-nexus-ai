@@ -1,7 +1,7 @@
 /**
  * React Query Hooks for AMRO Emergency Work Packages
  * 
- * Follows the pattern established in useWorkPackageState.ts
+ * Follows the pattern established in useWorkOrderState.ts
  * Provides hooks for:
  * - Listing emergency work packages
  * - Creating emergency work packages
@@ -24,10 +24,10 @@ function useAuthHeaders(): HeadersInit | null {
 export type EmergencyType = 'aog' | 'unscheduled_removal' | 'flight_delay_risk' | 'safety_issue' | 'technical_fault';
 export type UrgencyLevel = 'immediate' | 'urgent' | 'priority' | 'routine';
 
-export interface EmergencyWorkPackage {
+export interface EmergencyWorkOrder {
   id: string;
   tenant_id: string;
-  work_package_id: string;
+  work_order_id: string;
   emergency_type: EmergencyType;
   urgency_level: UrgencyLevel;
   reason: string;
@@ -54,7 +54,7 @@ export interface EmergencyWorkPackage {
   // Joined data
   work_orders?: {
     id: string;
-    work_package_number: string;
+    work_order_number: string;
     title: string;
     status: string;
     priority: number;
@@ -63,7 +63,7 @@ export interface EmergencyWorkPackage {
 }
 
 export interface EmergencyWPListResponse {
-  records: EmergencyWorkPackage[];
+  records: EmergencyWorkOrder[];
   total: number;
   page: number;
   page_size: number;
@@ -101,7 +101,7 @@ async function fetchEmergencyWP(
     ...(params.status ? { status: params.status } : {}),
   });
 
-  const url = `/api/v2/amro/emergency/work-packages?${qs.toString()}`;
+  const url = `/api/v2/amro/emergency/work-orders?${qs.toString()}`;
   const response = await fetch(url, { method: 'GET', headers });
   if (!response.ok) throw new Error(`Failed to list emergency work packages: ${response.status}`);
   const json = await response.json();
@@ -171,15 +171,15 @@ interface CreateEmergencyWPInput {
 }
 
 async function mutateCreateEmergencyWP(input: CreateEmergencyWPInput, headers: HeadersInit): Promise<{
-  work_package_id: string;
-  work_package_number: string;
+  work_order_id: string;
+  work_order_number: string;
   emergency_wp_id: string;
   declared_at: string;
   auto_prioritized: boolean;
   priority: number;
   message: string;
 }> {
-  const response = await fetch('/api/v2/amro/emergency/work-packages', {
+  const response = await fetch('/api/v2/amro/emergency/work-orders', {
     method: 'POST',
     headers,
     body: JSON.stringify(input),
@@ -213,8 +213,8 @@ interface ResolveEmergencyWPInput {
   resolution_summary: string;
 }
 
-async function mutateResolveEmergencyWP(input: ResolveEmergencyWPInput, headers: HeadersInit): Promise<EmergencyWorkPackage> {
-  const response = await fetch(`/api/v2/amro/emergency/work-packages/${input.id}/resolve`, {
+async function mutateResolveEmergencyWP(input: ResolveEmergencyWPInput, headers: HeadersInit): Promise<EmergencyWorkOrder> {
+  const response = await fetch(`/api/v2/amro/emergency/work-orders/${input.id}/resolve`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ resolution_summary: input.resolution_summary }),

@@ -85,12 +85,12 @@ COMMENT ON COLUMN public.task_templates.threshold_hours IS
   'Threshold hours as interval (supports HH:MM:SS and duration-safe arithmetic).';
 
 -- ============================================================================
--- 2) tasks: rename work_package_id -> work_order_id, keep compatibility alias
+-- 2) tasks: rename work_order_id -> work_order_id, keep compatibility alias
 --    and convert estimated_duration_hours numeric -> interval.
 -- ============================================================================
 DO $$
 DECLARE
-  has_work_package boolean;
+  has_work_order boolean;
   has_work_order boolean;
   duration_type text;
 BEGIN
@@ -99,9 +99,9 @@ BEGIN
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'tasks'
-      AND column_name = 'work_package_id'
+      AND column_name = 'work_order_id'
   )
-  INTO has_work_package;
+  INTO has_work_order;
 
   SELECT EXISTS (
     SELECT 1
@@ -112,8 +112,8 @@ BEGIN
   )
   INTO has_work_order;
 
-  IF has_work_package AND NOT has_work_order THEN
-    EXECUTE 'ALTER TABLE public.tasks RENAME COLUMN work_package_id TO work_order_id';
+  IF has_work_order AND NOT has_work_order THEN
+    EXECUTE 'ALTER TABLE public.tasks RENAME COLUMN work_order_id TO work_order_id';
   END IF;
 
   IF NOT EXISTS (
@@ -121,12 +121,12 @@ BEGIN
     FROM information_schema.columns
     WHERE table_schema = 'public'
       AND table_name = 'tasks'
-      AND column_name = 'work_package_id'
+      AND column_name = 'work_order_id'
   ) THEN
-    EXECUTE 'ALTER TABLE public.tasks ADD COLUMN work_package_id uuid';
+    EXECUTE 'ALTER TABLE public.tasks ADD COLUMN work_order_id uuid';
   END IF;
 
-  EXECUTE 'UPDATE public.tasks SET work_package_id = work_order_id WHERE work_package_id IS NULL';
+  EXECUTE 'UPDATE public.tasks SET work_order_id = work_order_id WHERE work_order_id IS NULL';
 
   SELECT data_type
   INTO duration_type
@@ -160,7 +160,7 @@ BEGIN
 END $$;
 
 ALTER TABLE public.tasks
-  DROP CONSTRAINT IF EXISTS tasks_work_package_id_fkey;
+  DROP CONSTRAINT IF EXISTS tasks_work_order_id_fkey;
 ALTER TABLE public.tasks
   DROP CONSTRAINT IF EXISTS tasks_work_order_id_fkey;
 ALTER TABLE public.tasks
@@ -168,19 +168,19 @@ ALTER TABLE public.tasks
   FOREIGN KEY (work_order_id) REFERENCES public.work_orders(id) ON DELETE CASCADE;
 
 ALTER TABLE public.tasks
-  DROP CONSTRAINT IF EXISTS tasks_work_package_id_compat_fkey;
+  DROP CONSTRAINT IF EXISTS tasks_work_order_id_compat_fkey;
 ALTER TABLE public.tasks
-  ADD CONSTRAINT tasks_work_package_id_compat_fkey
-  FOREIGN KEY (work_package_id) REFERENCES public.work_orders(id) ON DELETE CASCADE;
+  ADD CONSTRAINT tasks_work_order_id_compat_fkey
+  FOREIGN KEY (work_order_id) REFERENCES public.work_orders(id) ON DELETE CASCADE;
 
 ALTER TABLE public.tasks
   DROP CONSTRAINT IF EXISTS ck_tasks_work_order_alias_consistency;
 ALTER TABLE public.tasks
   ADD CONSTRAINT ck_tasks_work_order_alias_consistency
   CHECK (
-    work_package_id IS NULL
+    work_order_id IS NULL
     OR work_order_id IS NULL
-    OR work_package_id = work_order_id
+    OR work_order_id = work_order_id
   );
 
 CREATE OR REPLACE FUNCTION public.sync_tasks_work_order_alias_columns()
@@ -188,27 +188,27 @@ RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
-  NEW.work_order_id := COALESCE(NEW.work_order_id, NEW.work_package_id);
-  NEW.work_package_id := COALESCE(NEW.work_package_id, NEW.work_order_id);
+  NEW.work_order_id := COALESCE(NEW.work_order_id, NEW.work_order_id);
+  NEW.work_order_id := COALESCE(NEW.work_order_id, NEW.work_order_id);
   RETURN NEW;
 END;
 $$;
 
 DROP TRIGGER IF EXISTS trg_sync_tasks_work_order_alias_columns ON public.tasks;
 CREATE TRIGGER trg_sync_tasks_work_order_alias_columns
-  BEFORE INSERT OR UPDATE OF work_order_id, work_package_id
+  BEFORE INSERT OR UPDATE OF work_order_id, work_order_id
   ON public.tasks
   FOR EACH ROW
   EXECUTE FUNCTION public.sync_tasks_work_order_alias_columns();
 
 CREATE INDEX IF NOT EXISTS idx_tasks_work_order_id
   ON public.tasks(work_order_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_work_package_id_compat
-  ON public.tasks(work_package_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_work_order_id_compat
+  ON public.tasks(work_order_id);
 
 COMMENT ON COLUMN public.tasks.work_order_id IS
-  'Canonical FK to public.work_orders(id). Replaces legacy work_package_id naming.';
-COMMENT ON COLUMN public.tasks.work_package_id IS
+  'Canonical FK to public.work_orders(id). Replaces legacy work_order_id naming.';
+COMMENT ON COLUMN public.tasks.work_order_id IS
   'Compatibility alias for work_order_id during phased cutover. Kept in sync by trigger.';
 COMMENT ON COLUMN public.tasks.estimated_duration_hours IS
   'Estimated task duration stored as interval for duration-safe arithmetic.';

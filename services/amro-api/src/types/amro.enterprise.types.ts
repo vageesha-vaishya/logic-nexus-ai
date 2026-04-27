@@ -489,7 +489,7 @@ export interface ComplianceReport {
 // WORK PACKAGE TEMPLATE - Enhanced with Enterprise Fields
 // ============================================================================
 
-export interface EnhancedWorkPackageTemplate {
+export interface EnhancedWorkOrderTemplate {
   // Existing fields (would be in base type)
   id: string;
   template_code: string;

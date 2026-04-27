@@ -11,9 +11,9 @@ import {
   ShiftCalendarsMasterDataPage,
   SkillCodesMasterDataPage,
   SuppliersMasterDataPage,
-  WorkPackagesMasterDataPage,
+  WorkOrdersMasterDataPage,
   WorkCentersMasterDataPage,
-  WorkPackageTemplatesMasterDataPage,
+  WorkOrderTemplatesMasterDataPage,
 } from './AmroMasterDataEntityPages';
 
 vi.mock('./AmroSettingsMasterDataPage', () => ({
@@ -42,8 +42,8 @@ describe('AmroMasterDataEntityPages', () => {
       { component: ManufacturersMasterDataPage, expected: 'manufacturers:master-data' },
       { component: RegulatorProfilesMasterDataPage, expected: 'regulator_profiles:master-data' },
       { component: ShiftCalendarsMasterDataPage, expected: 'shift_calendars:master-data' },
-      { component: WorkPackagesMasterDataPage, expected: 'work_package_templates:master-data' },
-      { component: WorkPackageTemplatesMasterDataPage, expected: 'work_package_templates:master-data' },
+      { component: WorkOrdersMasterDataPage, expected: 'work_order_templates:master-data' },
+      { component: WorkOrderTemplatesMasterDataPage, expected: 'work_order_templates:master-data' },
     ];
 
     matrix.forEach(({ component: Component, expected }) => {

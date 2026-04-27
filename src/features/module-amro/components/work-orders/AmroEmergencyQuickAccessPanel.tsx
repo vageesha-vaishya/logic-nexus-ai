@@ -30,7 +30,7 @@ import { AmroCrudDialogFooter } from '../parts/AmroCrudPrimitives';
 import {
   useListEmergencyWP,
   useCreateEmergencyWP,
-  type EmergencyWorkPackage,
+  type EmergencyWorkOrder,
   type EmergencyType,
   type UrgencyLevel,
 } from './useEmergencyWPState';

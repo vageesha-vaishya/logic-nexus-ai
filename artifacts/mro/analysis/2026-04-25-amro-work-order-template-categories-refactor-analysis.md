@@ -3,7 +3,7 @@
 ## Scope
 - Date: `2026-04-25`
 - Requested rename:
-  - `public.amro_work_package_template_categories` -> `public.amro_work_order_template_categories`
+  - `public.amro_work_order_template_categories` -> `public.amro_work_order_template_categories`
 - Environment note: development stage with dummy/sample data.
 
 ## Migration Delivered
@@ -28,19 +28,19 @@
 ## Exhaustive Impact Analysis Summary
 
 ### Runtime code paths (`src`, `services`, API routes, edge functions)
-- No direct runtime references found for `amro_work_package_template_categories`.
+- No direct runtime references found for `amro_work_order_template_categories`.
 - Refactor impact is schema/docs oriented in current repository state.
 
 ### Foreign key dependency check (`...template_categories.id`)
 - Repository-wide SQL/code scan found **no table columns/constraints** referencing:
-  - `public.amro_work_package_template_categories(id)`
+  - `public.amro_work_order_template_categories(id)`
   - `public.amro_work_order_template_categories(id)`
 - Added defensive migration to remediate live-environment residual FKs if present:
   - `supabase/migrations/20260425170000_amro_fix_template_category_fk_targets.sql`
 
 ### Database objects and SQL
 - Legacy name references are present in the historical creation migration:
-  - `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql`
+  - `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql`
 - Canonical forward refactor captured in:
   - `supabase/migrations/20260425162000_amro_rename_wp_template_categories_to_wo.sql`
 
@@ -59,7 +59,7 @@
    - `npx supabase db push --include-all`
 2. Validate table rename:
    - `select to_regclass('public.amro_work_order_template_categories');`
-   - `select to_regclass('public.amro_work_package_template_categories');` (expected null)
+   - `select to_regclass('public.amro_work_order_template_categories');` (expected null)
 3. Validate constraints/indexes/policies:
    - inspect `pg_constraint` for `uq_work_order_template_category_code` and any renamed PK/check constraints.
    - inspect `pg_indexes` for `idx_work_order_template_categories_tenant`, `idx_work_order_template_categories_type`.

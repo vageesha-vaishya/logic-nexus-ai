@@ -19,7 +19,7 @@ describe('generate-route-inventory', () => {
 
     expect(apiRoutes).toContain('/api/v1/platform-domains');
     expect(apiRoutes).toContain('/api/v2/amro/compliance-gates');
-    expect(apiRoutes).toContain('/api/v2/amro/work-packages');
+    expect(apiRoutes).toContain('/api/v2/amro/work-orders');
     expect(apiRoutes).toContain('/api/v2/amro/tasks');
     expect(apiRoutes).toContain('/api/v2/quotations/import');
     expect(apiRoutes.some((route) => route.includes('_utils'))).toBe(false);

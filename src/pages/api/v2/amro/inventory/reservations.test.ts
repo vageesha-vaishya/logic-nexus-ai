@@ -86,7 +86,7 @@ describe('/api/v2/amro/inventory/reservations', () => {
             {
               id: 'res-1',
               inventory_id: 'inv-1',
-              work_package_id: 'wp-1',
+              work_order_id: 'wp-1',
               task_id: null,
               reserved_quantity: 5,
               status: 'active',
@@ -121,7 +121,7 @@ describe('/api/v2/amro/inventory/reservations', () => {
       expect(body.output.items[0].reserved_quantity).toBe(5);
     });
 
-    it('filters by work_package_id', async () => {
+    it('filters by work_order_id', async () => {
       const mockSupabase = {
         from: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
@@ -133,14 +133,14 @@ describe('/api/v2/amro/inventory/reservations', () => {
 
       const req = {
         method: 'GET',
-        query: { work_package_id: 'wp-123' },
+        query: { work_order_id: 'wp-123' },
         headers: {},
       } as unknown as ApiRequest;
       const res = createResponse();
       await handler(req, res);
 
       expect(res.statusCode).toBe(200);
-      expect(mockSupabase.eq).toHaveBeenCalledWith('work_package_id', 'wp-123');
+      expect(mockSupabase.eq).toHaveBeenCalledWith('work_order_id', 'wp-123');
     });
   });
 
@@ -169,7 +169,7 @@ describe('/api/v2/amro/inventory/reservations', () => {
         query: {},
         headers: {},
         body: {
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           line_items: [{ inventory_id: 'inv-1', quantity: 5 }],
         },
       } as unknown as ApiRequest;
@@ -203,7 +203,7 @@ describe('/api/v2/amro/inventory/reservations', () => {
         query: {},
         headers: {},
         body: {
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           line_items: [{ inventory_id: 'inv-1', quantity: 10 }],
         },
       } as unknown as ApiRequest;

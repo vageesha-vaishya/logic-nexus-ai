@@ -26,7 +26,7 @@ BEGIN
       'component_repair',
       'maintenance_completion',
       'maintenance_sign_off',
-      'work_package_approval',
+      'work_order_approval',
       'task_assignment',
       'task_completion',
       'quality_inspection',
@@ -50,9 +50,9 @@ BEGIN
       'component_replaced',
       'component_repaired',
       'component_inspected',
-      'work_package_created',
-      'work_package_scheduled',
-      'work_package_completed',
+      'work_order_created',
+      'work_order_scheduled',
+      'work_order_completed',
       'maintenance_approved',
       'maintenance_signed_off',
       'quality_checked',
@@ -96,7 +96,7 @@ BEGIN
     CREATE DOMAIN public.audit_entity_type AS text CHECK (VALUE IN (
       'aircraft',
       'component',
-      'work_package',
+      'work_order',
       'task',
       'staff_qualification',
       'maintenance_event',
@@ -160,7 +160,7 @@ COMMENT ON COLUMN mro_audit.records.previous_hash IS 'Hash of the previous audit
 COMMENT ON COLUMN mro_audit.records.context IS 'JSONB object containing additional context for the audit record. Structure varies by record_type. Examples:
 - For aircraft_registration: {"aircraft_id": uuid, "registration": string, "manufacturer": string}
 - For component_installation: {"component_id": uuid, "aircraft_id": uuid, "hours_before": number}
-- For maintenance_completion: {"work_package_id": uuid, "labor_hours": number, "defects_found": number}';
+- For maintenance_completion: {"work_order_id": uuid, "labor_hours": number, "defects_found": number}';
 
 -- ============================================================================
 -- 2. AUDIT TRAILS TABLE - Immutable compliance trail events for replay

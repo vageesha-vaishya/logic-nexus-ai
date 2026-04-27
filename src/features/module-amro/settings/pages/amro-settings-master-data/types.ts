@@ -12,7 +12,7 @@ export type MasterEntity =
   | 'regulator_profiles'
   | 'shift_calendars'
   | 'work_order_templates'
-  | 'work_package_templates';
+  | 'work_order_templates';
 
 export type RecordRow = {
   id: string;
@@ -69,11 +69,11 @@ export type EntityFormField = {
 
 export type FormValues = Record<string, unknown>;
 export type FormSectionKey = 'basic' | 'configuration';
-export type WorkPackageTrigger = 'schedule_due' | 'defect' | 'campaign' | 'predictive_alert';
-export type WorkPackageCreateAction = 'save_draft' | 'create_schedule' | 'create_open';
+export type WorkOrderTrigger = 'schedule_due' | 'defect' | 'campaign' | 'predictive_alert';
+export type WorkOrderCreateAction = 'save_draft' | 'create_schedule' | 'create_open';
 
-export type AircraftWorkPackageFormValues = {
-  source: WorkPackageTrigger;
+export type AircraftWorkOrderFormValues = {
+  source: WorkOrderTrigger;
   maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: '' | 'planning' | 'scheduled' | 'in_progress' | 'blocked';
@@ -81,7 +81,7 @@ export type AircraftWorkPackageFormValues = {
   plannedStart: string;
   plannedEnd: string;
   station: string;
-  workPackageNumber: string;
+  workOrderNumber: string;
   topic: string;
   ttafHours: string;
   openingDate: string;
@@ -101,7 +101,7 @@ export type AircraftWorkPackageFormValues = {
   scopeItemsText: string;
 };
 
-export type AircraftWorkPackageSnapshot = {
+export type AircraftWorkOrderSnapshot = {
   open: number;
   inProgress: number;
   deferred: number;

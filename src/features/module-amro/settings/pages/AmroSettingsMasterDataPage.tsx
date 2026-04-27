@@ -109,12 +109,12 @@ import {
 } from './amro-settings-master-data/services';
 import {
   buildAircraftPresenceCollaborators,
-  buildAircraftWorkPackageSnapshot,
+  buildAircraftWorkOrderSnapshot,
   buildPayloadFromForm,
   createSeedRecords,
   createDefaultBulkText,
   createRowsRenderSignature,
-  getDefaultAircraftWorkPackageValues,
+  getDefaultAircraftWorkOrderValues,
   getInitialFormValues,
   getPayloadImportedCount,
   getPayloadRecords,
@@ -122,7 +122,7 @@ import {
   normalizeTemplateScopeItems,
   normalizeTemplateTaskRows,
   isBlank,
-  parseWorkPackageItems,
+  parseWorkOrderItems,
   pickFormValuesFromRow,
 } from './amro-settings-master-data/utils';
 import { FlightLogsFilters } from './amro-settings-master-data/components/FlightLogsFilters';
@@ -132,9 +132,9 @@ import { AircraftDataTableFrame } from './amro-settings-master-data/components/A
 import { AircraftListingControls } from './amro-settings-master-data/components/AircraftListingControls';
 import { AircraftCreateDialogSection } from './amro-settings-master-data/components/AircraftCreateDialogSection';
 import { AircraftTemplateDialog } from './amro-settings-master-data/components/AircraftTemplateDialog';
-import { AmroWorkPackageCreateWizard } from '../../components/work-orders/AmroWorkPackageCreateWizard';
-import { WorkPackageTemplateCreateSection } from './amro-settings-master-data/components/WorkPackageTemplateCreateSection';
-import { AmroWorkPackageTemplateAdapter } from '@/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter';
+import { AmroWorkOrderCreateWizard } from '../../components/work-orders/AmroWorkOrderCreateWizard';
+import { WorkOrderTemplateCreateSection } from './amro-settings-master-data/components/WorkOrderTemplateCreateSection';
+import { AmroWorkOrderTemplateAdapter } from '@/features/module-amro/components/templates/AmroWorkOrderTemplateAdapter';
 import {
   filterUnifiedModuleRows,
   type AircraftUnifiedFilterOption,
@@ -158,7 +158,7 @@ export type MasterEntity =
   | 'assembly_models'
   | 'regulator_profiles'
   | 'shift_calendars'
-  | 'work_package_templates';
+  | 'work_order_templates';
 
 export const ENTITY_LABEL: Record<MasterEntity, string> = {
   aircraft: 'Aircraft',
@@ -173,7 +173,7 @@ export const ENTITY_LABEL: Record<MasterEntity, string> = {
   assembly_models: 'Model',
   regulator_profiles: 'Regulator Profiles',
   shift_calendars: 'Shift Calendars',
-  work_package_templates: 'Work Package Templates',
+  work_order_templates: 'Work Package Templates',
 };
 
 type RecordRow = {
@@ -182,7 +182,7 @@ type RecordRow = {
 };
 
 type SortDirection = 'asc' | 'desc';
-type AircraftWorkPackageTab = 'new-wp' | 'existing-wp' | 'non-performed-tasks' | 'selected-task' | 'all-tasks';
+type AircraftWorkOrderTab = 'new-wp' | 'existing-wp' | 'non-performed-tasks' | 'selected-task' | 'all-tasks';
 
 type InlineEditingCell = {
   rowId: string;
@@ -273,7 +273,7 @@ const TEMPLATE_REGISTRY_TIMEOUT_MS = 12000;
 const ENGINE_USABILITY_STORAGE_KEY = 'amro.engine.usability.session.events.v1';
 const WORK_PACKAGE_CREATE_TIMEOUT_MS = 20000;
 
-const resolveWorkPackageApiErrorMessage = (error: unknown, fallbackMessage: string): string => {
+const resolveWorkOrderApiErrorMessage = (error: unknown, fallbackMessage: string): string => {
   const normalized = String((error as Error)?.message || '').trim();
   if ((error as Error)?.name === 'AbortError') {
     return 'Request timed out. Please check your connection and retry.';
@@ -305,14 +305,14 @@ const formatAirportLabel = (record: Record<string, unknown> | null, fallback: st
   return fallback;
 };
 
-const normalizeWorkPackageTaskStatus = (value: unknown): string => {
+const normalizeWorkOrderTaskStatus = (value: unknown): string => {
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) return 'pending';
   return normalized;
 };
 
 const isTaskNonPerformedStatus = (value: unknown): boolean => {
-  const normalized = normalizeWorkPackageTaskStatus(value);
+  const normalized = normalizeWorkOrderTaskStatus(value);
   return !(
     normalized.includes('completed')
     || normalized.includes('performed')
@@ -409,13 +409,13 @@ const extractTemplateRegistryRecords = (payload: Record<string, unknown>): Recor
   return getPayloadRecords(payload);
 };
 
-const normalizeWorkPackageRecordSummary = (record: Record<string, unknown>): AircraftWorkPackageRecordSummary | null => {
-  const id = String(record.id || record.work_package_id || '').trim();
+const normalizeWorkOrderRecordSummary = (record: Record<string, unknown>): AircraftWorkOrderRecordSummary | null => {
+  const id = String(record.id || record.work_order_id || '').trim();
   if (!id) {
     return null;
   }
-  const workPackageNumber = String(record.work_package_number || record.work_order_number || record.package_number || '').trim() || id;
-  const title = String(record.title || record.topic || workPackageNumber).trim() || workPackageNumber;
+  const workOrderNumber = String(record.work_order_number || record.work_order_number || record.package_number || '').trim() || id;
+  const title = String(record.title || record.topic || workOrderNumber).trim() || workOrderNumber;
   const status = String(record.status || record.lifecycle_stage || 'planning').trim() || 'planning';
   const maintenanceType = String(record.maintenance_type || record.type || 'line').trim() || 'line';
   const priority = String(record.priority || 'medium').trim() || 'medium';
@@ -445,15 +445,15 @@ const normalizeWorkPackageRecordSummary = (record: Record<string, unknown>): Air
     });
   }
   const normalizedTasks = taskRows
-    .map((task, index): AircraftWorkPackageTaskListItem => {
+    .map((task, index): AircraftWorkOrderTaskListItem => {
       const taskRecord = task as Record<string, unknown>;
       const taskNumber = String(taskRecord.task_number || taskRecord['taskNumber'] || `TASK-${index + 1}`).trim() || `TASK-${index + 1}`;
       const ataCode = String(taskRecord.ata_code || taskRecord['ataCode'] || '').trim();
       const serialNumber = String(taskRecord.serial_number || taskRecord['serialNumber'] || '').trim();
       const partNumber = String(taskRecord.part_number || taskRecord['partNumber'] || '').trim();
       const description = String(taskRecord.description || taskRecord['title'] || taskRecord['name'] || '').trim();
-      const taskStatus = normalizeWorkPackageTaskStatus(taskRecord.status || status);
-      const source: AircraftWorkPackageTaskListItem['source'] = String(taskRecord.id || '').startsWith('scope-') ? 'scope' : 'existing_wp';
+      const taskStatus = normalizeWorkOrderTaskStatus(taskRecord.status || status);
+      const source: AircraftWorkOrderTaskListItem['source'] = String(taskRecord.id || '').startsWith('scope-') ? 'scope' : 'existing_wp';
       return {
         id: `existing-${id}-${index + 1}-${taskNumber}`.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
         taskNumber,
@@ -464,14 +464,14 @@ const normalizeWorkPackageRecordSummary = (record: Record<string, unknown>): Air
         status: taskStatus,
         selectable: true,
         source,
-        parentWorkPackageId: id,
-        parentWorkPackageNumber: workPackageNumber,
+        parentWorkOrderId: id,
+        parentWorkOrderNumber: workOrderNumber,
       };
     })
     .filter((task) => Boolean(task.description) || Boolean(task.taskNumber));
   return {
     id,
-    workPackageNumber,
+    workOrderNumber,
     title,
     status,
     maintenanceType,
@@ -539,13 +539,13 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   assembly_models: ['id', 'model_code', 'name', 'manufacturer_id', 'assembly_type_id', 'is_active', 'updated_at'],
   regulator_profiles: ['id', 'regulator_code', 'regulator_name', 'jurisdiction', 'policy_version', 'effective_from', 'is_active', 'updated_at'],
   shift_calendars: ['id', 'station_code', 'shift_name', 'shift_start_time', 'shift_end_time', 'capacity', 'is_active', 'updated_at'],
-  work_package_templates: ['id', 'template_code', 'template_name', 'model_id', 'aircraft_model', 'maintenance_type', 'version', 'active', 'updated_at'],
+  work_order_templates: ['id', 'template_code', 'template_name', 'model_id', 'aircraft_model', 'maintenance_type', 'version', 'active', 'updated_at'],
 };
 
 const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
   aircraft: ['id', 'created_at', 'updated_at', 'tenant_id', 'franchise_id'],
   flight_logs: ['tenant_id', 'franchise_id', 'is_deleted', 'deleted_at', 'deleted_by', 'created_by', 'updated_by', 'metadata'],
-  work_package_templates: ['id', 'created_at', 'updated_at', 'tenant_id', 'franchise_id', 'scope_json'],
+  work_order_templates: ['id', 'created_at', 'updated_at', 'tenant_id', 'franchise_id', 'scope_json'],
 };
 
 const AIRCRAFT_EDITABLE_COLUMNS = new Set(['registration', 'tail_number', 'serial_number', 'aircraft_type', 'engine_type', 'aircraft_model', 'maintenance_program', 'status']);
@@ -599,11 +599,11 @@ type EntityFormField = {
 
 type FormValues = Record<string, unknown>;
 type FormSectionKey = 'basic' | 'configuration';
-type WorkPackageTrigger = 'schedule_due' | 'defect' | 'campaign' | 'predictive_alert';
-type WorkPackageCreateAction = 'save_draft' | 'create_schedule' | 'create_open';
+type WorkOrderTrigger = 'schedule_due' | 'defect' | 'campaign' | 'predictive_alert';
+type WorkOrderCreateAction = 'save_draft' | 'create_schedule' | 'create_open';
 
-type AircraftWorkPackageFormValues = {
-  source: WorkPackageTrigger;
+type AircraftWorkOrderFormValues = {
+  source: WorkOrderTrigger;
   maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
   priority: 'low' | 'medium' | 'high' | 'critical';
   status: '' | 'planning' | 'scheduled' | 'in_progress' | 'blocked';
@@ -611,7 +611,7 @@ type AircraftWorkPackageFormValues = {
   plannedStart: string;
   plannedEnd: string;
   station: string;
-  workPackageNumber: string;
+  workOrderNumber: string;
   topic: string;
   ttafHours: string;
   openingDate: string;
@@ -631,7 +631,7 @@ type AircraftWorkPackageFormValues = {
   scopeItemsText: string;
 };
 
-type AircraftWorkPackageSnapshot = {
+type AircraftWorkOrderSnapshot = {
   open: number;
   inProgress: number;
   deferred: number;
@@ -652,7 +652,7 @@ type AircraftPresenceCollaborator = {
   source: 'flight_logs' | 'fallback';
 };
 
-type WorkPackageTemplateRegistryItem = {
+type WorkOrderTemplateRegistryItem = {
   id: string;
   templateCode: string;
   templateName: string;
@@ -671,19 +671,19 @@ type WorkPackageTemplateRegistryItem = {
   }>;
 };
 
-type AircraftWorkPackageRecordSummary = {
+type AircraftWorkOrderRecordSummary = {
   id: string;
-  workPackageNumber: string;
+  workOrderNumber: string;
   title: string;
   status: string;
   maintenanceType: string;
   priority: string;
   station: string;
   updatedAt: string;
-  tasks: AircraftWorkPackageTaskListItem[];
+  tasks: AircraftWorkOrderTaskListItem[];
 };
 
-type AircraftWorkPackageTaskListItem = {
+type AircraftWorkOrderTaskListItem = {
   id: string;
   taskNumber: string;
   ataCode: string;
@@ -693,8 +693,8 @@ type AircraftWorkPackageTaskListItem = {
   status: string;
   selectable: boolean;
   source: 'template' | 'existing_wp' | 'scope' | 'selected';
-  parentWorkPackageId?: string;
-  parentWorkPackageNumber?: string;
+  parentWorkOrderId?: string;
+  parentWorkOrderNumber?: string;
 };
 
 type AircraftTemplateAssociatedTaskRow = {
@@ -711,9 +711,9 @@ type AircraftTemplateAssociatedTaskRow = {
 
 type AircraftDashboardKpis = {
   fleet_size: number;
-  open_work_packages: number;
+  open_work_orders: number;
   due_within_window: number;
-  overdue_work_packages: number;
+  overdue_work_orders: number;
   open_defects: number;
   total_flight_hours: number;
   total_cycles: number;
@@ -870,12 +870,12 @@ const AIRCRAFT_NAV_RAIL = [
   { label: 'Components', path: '/dashboard/amro/aircraft/components', view: 'grid' as const, icon: CheckSquare },
   { label: 'Documents', path: '/dashboard/amro/aircraft/documents', view: 'import_export' as const, icon: FileText },
   { label: 'AD/SB', path: '/dashboard/amro/aircraft/ad-sb', view: 'pipeline' as const, icon: FileCheck },
-  { label: 'Operations', path: '/dashboard/amro/aircraft/work-packages', view: 'card' as const, icon: CalendarDays },
+  { label: 'Operations', path: '/dashboard/amro/aircraft/work-orders', view: 'card' as const, icon: CalendarDays },
 ] as const;
 
-type AircraftSubModuleSegment = 'list' | 'templates' | 'engine' | 'components' | 'documents' | 'ad-sb' | 'work-packages';
+type AircraftSubModuleSegment = 'list' | 'templates' | 'engine' | 'components' | 'documents' | 'ad-sb' | 'work-orders';
 
-const AIRCRAFT_SUBMODULE_SEGMENTS: ReadonlyArray<AircraftSubModuleSegment> = ['list', 'templates', 'engine', 'components', 'documents', 'ad-sb', 'work-packages'];
+const AIRCRAFT_SUBMODULE_SEGMENTS: ReadonlyArray<AircraftSubModuleSegment> = ['list', 'templates', 'engine', 'components', 'documents', 'ad-sb', 'work-orders'];
 
 const AIRCRAFT_SUBMODULE_VIEW_MAP: Record<string, 'module' | AircraftLeadsTab> = {
   list: 'module',
@@ -884,14 +884,14 @@ const AIRCRAFT_SUBMODULE_VIEW_MAP: Record<string, 'module' | AircraftLeadsTab> =
   components: 'grid',
   documents: 'import_export',
   'ad-sb': 'pipeline',
-  'work-packages': 'card',
+  'work-orders': 'card',
 };
 
 const DEFAULT_AIRCRAFT_DASHBOARD_KPIS: AircraftDashboardKpis = {
   fleet_size: 0,
-  open_work_packages: 0,
+  open_work_orders: 0,
   due_within_window: 0,
-  overdue_work_packages: 0,
+  overdue_work_orders: 0,
   open_defects: 0,
   total_flight_hours: 0,
   total_cycles: 0,
@@ -1190,7 +1190,7 @@ const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'effective_to', label: 'Effective To', type: 'date' },
     { key: 'is_active', label: 'Active', type: 'boolean' },
   ],
-  work_package_templates: [
+  work_order_templates: [
     { key: 'template_code', label: 'Template Code', type: 'text', required: true },
     { key: 'template_name', label: 'Template Name', type: 'text', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'select' },
@@ -1218,7 +1218,7 @@ const ENTITY_ROUTE_SEGMENT: Record<MasterEntity, string> = {
   assembly_models: 'model',
   regulator_profiles: 'regulator-profiles',
   shift_calendars: 'shift-calendars',
-  work_package_templates: 'work-package-templates',
+  work_order_templates: 'work-order-templates',
 };
 const ROUTE_SEGMENT_ENTITY: Record<string, MasterEntity> = Object.entries(ENTITY_ROUTE_SEGMENT).reduce(
   (accumulator, [entityKey, routeSegment]) => {
@@ -1363,7 +1363,7 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     effective_to: '',
     is_active: true,
   },
-  work_package_templates: {
+  work_order_templates: {
     template_code: '',
     template_name: '',
     aircraft_model: '',
@@ -1394,8 +1394,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return '/dashboard/amro';
     }
     if (
-      entityOverride === 'work_package_templates'
-      && location.pathname.startsWith('/dashboard/amro/settings/work-package-templates')
+      entityOverride === 'work_order_templates'
+      && location.pathname.startsWith('/dashboard/amro/settings/work-order-templates')
     ) {
       return '/dashboard/amro/settings';
     }
@@ -1513,24 +1513,24 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftFranchiseOptionsLoading, setAircraftFranchiseOptionsLoading] = useState(false);
   const [aircraftFranchiseOptionsError, setAircraftFranchiseOptionsError] = useState('');
   const [ataParentOptions, setAtaParentOptions] = useState<SelectOption[]>([]);
-  const [aircraftWorkPackageDialogOpen, setAircraftWorkPackageDialogOpen] = useState(false);
-  const [aircraftWorkPackageValues, setAircraftWorkPackageValues] = useState<AircraftWorkPackageFormValues>(getDefaultAircraftWorkPackageValues());
-  const [aircraftWorkPackageErrors, setAircraftWorkPackageErrors] = useState<Record<string, string>>({});
-  const [aircraftWorkPackageSubmitting, setAircraftWorkPackageSubmitting] = useState(false);
-  const [aircraftWorkPackageActiveTab, setAircraftWorkPackageActiveTab] = useState<AircraftWorkPackageTab>('new-wp');
-  const [aircraftWorkPackageTaskSearch, setAircraftWorkPackageTaskSearch] = useState('');
-  const [aircraftWorkPackageTaskSort, setAircraftWorkPackageTaskSort] = useState<'taskNumber' | 'ataCode' | 'description'>('taskNumber');
-  const [aircraftWorkPackageTaskSortDirection, setAircraftWorkPackageTaskSortDirection] = useState<SortDirection>('asc');
-  const [aircraftWorkPackageTaskPage, setAircraftWorkPackageTaskPage] = useState(1);
-  const [aircraftWorkPackageSelectedTaskIds, setAircraftWorkPackageSelectedTaskIds] = useState<string[]>([]);
-  const [aircraftExistingWorkPackages, setAircraftExistingWorkPackages] = useState<AircraftWorkPackageRecordSummary[]>([]);
-  const [aircraftExistingWorkPackagesLoading, setAircraftExistingWorkPackagesLoading] = useState(false);
-  const [aircraftExistingWorkPackagesError, setAircraftExistingWorkPackagesError] = useState('');
-  const [aircraftSelectedExistingWorkPackageId, setAircraftSelectedExistingWorkPackageId] = useState('');
-  const [workPackageTemplateRegistry, setWorkPackageTemplateRegistry] = useState<WorkPackageTemplateRegistryItem[]>([]);
-  const [workPackageTemplateRegistryLoading, setWorkPackageTemplateRegistryLoading] = useState(false);
-  const [workPackageTemplateRegistryError, setWorkPackageTemplateRegistryError] = useState('');
-  const [selectedWorkPackageTemplateId, setSelectedWorkPackageTemplateId] = useState('');
+  const [aircraftWorkOrderDialogOpen, setAircraftWorkOrderDialogOpen] = useState(false);
+  const [aircraftWorkOrderValues, setAircraftWorkOrderValues] = useState<AircraftWorkOrderFormValues>(getDefaultAircraftWorkOrderValues());
+  const [aircraftWorkOrderErrors, setAircraftWorkOrderErrors] = useState<Record<string, string>>({});
+  const [aircraftWorkOrderSubmitting, setAircraftWorkOrderSubmitting] = useState(false);
+  const [aircraftWorkOrderActiveTab, setAircraftWorkOrderActiveTab] = useState<AircraftWorkOrderTab>('new-wp');
+  const [aircraftWorkOrderTaskSearch, setAircraftWorkOrderTaskSearch] = useState('');
+  const [aircraftWorkOrderTaskSort, setAircraftWorkOrderTaskSort] = useState<'taskNumber' | 'ataCode' | 'description'>('taskNumber');
+  const [aircraftWorkOrderTaskSortDirection, setAircraftWorkOrderTaskSortDirection] = useState<SortDirection>('asc');
+  const [aircraftWorkOrderTaskPage, setAircraftWorkOrderTaskPage] = useState(1);
+  const [aircraftWorkOrderSelectedTaskIds, setAircraftWorkOrderSelectedTaskIds] = useState<string[]>([]);
+  const [aircraftExistingWorkOrders, setAircraftExistingWorkOrders] = useState<AircraftWorkOrderRecordSummary[]>([]);
+  const [aircraftExistingWorkOrdersLoading, setAircraftExistingWorkOrdersLoading] = useState(false);
+  const [aircraftExistingWorkOrdersError, setAircraftExistingWorkOrdersError] = useState('');
+  const [aircraftSelectedExistingWorkOrderId, setAircraftSelectedExistingWorkOrderId] = useState('');
+  const [workOrderTemplateRegistry, setWorkOrderTemplateRegistry] = useState<WorkOrderTemplateRegistryItem[]>([]);
+  const [workOrderTemplateRegistryLoading, setWorkOrderTemplateRegistryLoading] = useState(false);
+  const [workOrderTemplateRegistryError, setWorkOrderTemplateRegistryError] = useState('');
+  const [selectedWorkOrderTemplateId, setSelectedWorkOrderTemplateId] = useState('');
   const [aircraftTemplateAssociatedTasks, setAircraftTemplateAssociatedTasks] = useState<AircraftTemplateAssociatedTaskRow[]>([]);
   const [aircraftTemplateAssociatedTasksLoading, setAircraftTemplateAssociatedTasksLoading] = useState(false);
   const [aircraftTemplateAssociatedTasksError, setAircraftTemplateAssociatedTasksError] = useState('');
@@ -1546,7 +1546,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [sortDirection, setSortDirection] = useState<SortDirection>((searchParams.get('sort_dir') as SortDirection) || 'desc');
   const [inlineEditingCell, setInlineEditingCell] = useState<InlineEditingCell>(null);
   const [inlineEditValue, setInlineEditValue] = useState('');
-  const [aircraftWorkPackageSnapshot, setAircraftWorkPackageSnapshot] = useState<AircraftWorkPackageSnapshot>({
+  const [aircraftWorkOrderSnapshot, setAircraftWorkOrderSnapshot] = useState<AircraftWorkOrderSnapshot>({
     open: 0,
     inProgress: 0,
     deferred: 0,
@@ -1603,10 +1603,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const selectionAnchorRef = useRef<string | null>(null);
   const aircraftSnapshotAuthToastShownRef = useRef(false);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
-  const workPackageTemplateStandardDefault = import.meta.env.MODE !== 'test';
-  const workPackageTemplateStandardEnabled = normalizeFeatureFlag(
+  const workOrderTemplateStandardDefault = import.meta.env.MODE !== 'test';
+  const workOrderTemplateStandardEnabled = normalizeFeatureFlag(
     import.meta.env.VITE_AMRO_WPT_STANDARD_TEMPLATE,
-    workPackageTemplateStandardDefault,
+    workOrderTemplateStandardDefault,
   );
   const aircraftFormDraftKey = useMemo(
     () => `amro:aircraft-form-draft:${modalMode}:${selectedId || 'new'}`,
@@ -1632,8 +1632,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftAmendmentNumber, setAircraftAmendmentNumber] = useState('');
   const [aircraftAmendmentDate, setAircraftAmendmentDate] = useState('');
   const [aircraftCounterRows, setAircraftCounterRows] = useState<AircraftCounterRow[]>(getDefaultAircraftCounterRows);
-  const canCreateWorkPackage = hasPermission('create_maintenance_request');
-  const canScheduleWorkPackage = hasPermission('edit_aircraft_records');
+  const canCreateWorkOrder = hasPermission('create_maintenance_request');
+  const canScheduleWorkOrder = hasPermission('edit_aircraft_records');
   const canExportAircraftOps = hasPermission('delete_flight_logs');
   const canEscalateAircraftOps = hasPermission('approve_work_orders');
   const canCreateAircraftRecords = hasPermission('edit_aircraft_records') || hasPermission('create_maintenance_request');
@@ -1685,7 +1685,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const showAircraftLeadWorkspace =
     entity === 'aircraft'
     && aircraftEnhancementEnabled
-    && ((!isAircraftSubModule && aircraftNavigationView !== 'module') || aircraftSubModuleSegment === 'work-packages');
+    && ((!isAircraftSubModule && aircraftNavigationView !== 'module') || aircraftSubModuleSegment === 'work-orders');
   const showAircraftTemplatesWorkspace = entity === 'aircraft' && aircraftEnhancementEnabled && isAircraftSubModule && aircraftSubModuleSegment === 'templates';
   const showAircraftMasterRecords = entity === 'aircraft'
     ? (!isAircraftSubModule || aircraftSubModuleSegment === 'list')
@@ -1744,7 +1744,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftLeadsActiveTab(view);
     setAircraftNavigationView(view);
   }, [aircraftSubModuleSegment, isAircraftSubModule]);
-  const trackWorkPackageTemplateAdoption = useCallback(
+  const trackWorkOrderTemplateAdoption = useCallback(
     (event: string, details: Record<string, unknown> = {}) => {
       const payload = {
         event,
@@ -1759,7 +1759,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         ...payload,
       });
       try {
-        const key = 'amro:work-package-template-adoption-metrics';
+        const key = 'amro:work-order-template-adoption-metrics';
         const previousRaw = localStorage.getItem(key);
         const previous = previousRaw ? JSON.parse(previousRaw) : [];
         const next = Array.isArray(previous) ? [...previous, payload].slice(-100) : [payload];
@@ -3058,7 +3058,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           }
         }
       }
-      if (entity === 'work_package_templates') {
+      if (entity === 'work_order_templates') {
         const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
         const selectedTaskTemplateIds = tasksJson
           .map((entry) => {
@@ -3067,7 +3067,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             return String(row.task_template_id || row.taskTemplateId || row.id || '').trim();
           })
           .filter((value): value is string => Boolean(value));
-        logger.info('[AMRO Master Data UI] creating work package template request work_package_templates', {
+        logger.info('[AMRO Master Data UI] creating work package template request work_order_templates', {
           entity,
           requestUrl: '/api/v2/amro/master-data/work_order_templates',
           templateCode: String(payload.template_code || ''),
@@ -3079,7 +3079,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           tasksJsonPreview: tasksJson.slice(0, 5),
         });
       }
-      const createEndpoint = entity === 'work_package_templates'
+      const createEndpoint = entity === 'work_order_templates'
         ? '/api/v2/amro/master-data/work_order_templates'
         : `/api/v2/amro/master-data/${entity}`;
       const response = await fetch(createEndpoint, {
@@ -3088,7 +3088,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         body: JSON.stringify(payload),
       });
       const responsePayload = await parseApiPayload(response);
-      if (entity === 'work_package_templates') {
+      if (entity === 'work_order_templates') {
         const responseOutput = (responsePayload.output && typeof responsePayload.output === 'object')
           ? (responsePayload.output as Record<string, unknown>)
           : null;
@@ -3208,7 +3208,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           }
         }
       }
-      if (entity === 'work_package_templates') {
+      if (entity === 'work_order_templates') {
         const tasksJson = Array.isArray(payload.tasks_json) ? payload.tasks_json : [];
         const selectedTaskTemplateIds = tasksJson
           .map((entry) => {
@@ -3220,7 +3220,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         logger.info('[AMRO Master Data UI] updating work package template request', {
           entity,
           requestUrl: `/api/v2/amro/master-data/work_order_templates/${selectedId}`,
-          workPackageTemplateId: String(selectedId || ''),
+          workOrderTemplateId: String(selectedId || ''),
           templateCode: String(payload.template_code || ''),
           templateName: String(payload.template_name || ''),
           maintenanceType: String(payload.maintenance_type || ''),
@@ -3230,7 +3230,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           tasksJsonPreview: tasksJson.slice(0, 5),
         });
       }
-      const updateEndpoint = entity === 'work_package_templates'
+      const updateEndpoint = entity === 'work_order_templates'
         ? `/api/v2/amro/master-data/work_order_templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const updateMethod = 'PATCH';
@@ -3240,7 +3240,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         body: JSON.stringify(payload),
       });
       const responsePayload = await parseApiPayload(response);
-      if (entity === 'work_package_templates') {
+      if (entity === 'work_order_templates') {
         const responseOutput = (responsePayload.output && typeof responsePayload.output === 'object')
           ? (responsePayload.output as Record<string, unknown>)
           : null;
@@ -3263,7 +3263,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
         const baseError = String(responsePayload.error || 'Update failed');
         const correlationId = String(responsePayload.correlationId || '').trim();
-        if (entity === 'work_package_templates' && /outside current scope/i.test(baseError)) {
+        if (entity === 'work_order_templates' && /outside current scope/i.test(baseError)) {
           await loadRecords();
           throw new Error(
             `WPT update target is not available in your current scope. Reloaded records; reselect the template and retry.${correlationId ? ` Correlation ID: ${correlationId}` : ''}`,
@@ -3303,7 +3303,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (!selectedId) return;
     try {
       const headers = await buildApiHeaders(scope);
-      const deleteEndpoint = entity === 'work_package_templates'
+      const deleteEndpoint = entity === 'work_order_templates'
         ? `/api/v2/amro/master-data/work_order_templates/${selectedId}`
         : `/api/v2/amro/master-data/${entity}/${selectedId}`;
       const response = await fetch(deleteEndpoint, {
@@ -3404,11 +3404,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     const mapped = keyOrder
       .map((key) => formFields.find((field) => field.key === key))
       .filter((field): field is EntityFormField => Boolean(field));
-    if (entity !== 'aircraft' || canScheduleWorkPackage) {
+    if (entity !== 'aircraft' || canScheduleWorkOrder) {
       return mapped;
     }
     return mapped.filter((field) => !['maintenance_program', 'configuration_code'].includes(field.key));
-  }, [canScheduleWorkPackage, entity, formFields]);
+  }, [canScheduleWorkOrder, entity, formFields]);
   const systemFields = useMemo(
     () =>
       tableColumns.filter(
@@ -3423,7 +3423,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (!selectedRow) {
       return 'None';
     }
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       return String(selectedRow.template_code || selectedRow.template_name || selectedRow.id || 'None');
     }
     if (entity === 'aircraft') {
@@ -3438,13 +3438,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     () => (entity === 'aircraft' ? (selectedRow || rows[0] || null) : null),
     [entity, rows, selectedRow],
   );
-  const selectedWorkPackageTemplate = useMemo(
-    () => workPackageTemplateRegistry.find((item) => item.id === selectedWorkPackageTemplateId) || null,
-    [selectedWorkPackageTemplateId, workPackageTemplateRegistry],
+  const selectedWorkOrderTemplate = useMemo(
+    () => workOrderTemplateRegistry.find((item) => item.id === selectedWorkOrderTemplateId) || null,
+    [selectedWorkOrderTemplateId, workOrderTemplateRegistry],
   );
-  const canCreateWorkPackageFromTemplate = useMemo(
-    () => canCreateWorkPackage && Boolean(selectedWorkPackageTemplateId),
-    [canCreateWorkPackage, selectedWorkPackageTemplateId],
+  const canCreateWorkOrderFromTemplate = useMemo(
+    () => canCreateWorkOrder && Boolean(selectedWorkOrderTemplateId),
+    [canCreateWorkOrder, selectedWorkOrderTemplateId],
   );
   const selectedFlightLogAircraft = useMemo(
     () =>
@@ -3524,7 +3524,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const toggleFormPanel = useCallback((panel: 'basic' | 'configuration' | 'system') => {
     setCollapsedFormPanels((previous) => ({ ...previous, [panel]: !previous[panel] }));
   }, []);
-  const hasRestrictedAircraftFields = entity === 'aircraft' && !canScheduleWorkPackage;
+  const hasRestrictedAircraftFields = entity === 'aircraft' && !canScheduleWorkOrder;
   const manufacturerMetaById = useMemo(() => new Map(manufacturerOptions.map((option) => [option.id, option])), [manufacturerOptions]);
   const manufacturerSelectOptions = useMemo<SelectOption[]>(() => {
     const options: SelectOption[] = [];
@@ -4984,13 +4984,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
   }, [aircraftFormDraftKey, entity, handleCreate, handleUpdate, modalMode]);
 
-  const loadAircraftWorkPackageSnapshot = useCallback(async () => {
+  const loadAircraftWorkOrderSnapshot = useCallback(async () => {
     if (!aircraftEnhancementEnabled || entity !== 'aircraft') {
       return;
     }
     const aircraftId = String(selectedAircraft?.id || '').trim();
     if (!aircraftId) {
-      setAircraftWorkPackageSnapshot({
+      setAircraftWorkOrderSnapshot({
         open: 0,
         inProgress: 0,
         deferred: 0,
@@ -5003,15 +5003,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     try {
       const headers = await buildApiHeaders(scope, {
         fallbackAccessToken: sessionAccessToken,
-        requestTag: 'aircraft-work-package-snapshot',
-        requestUrl: '/api/v2/amro/work-packages',
+        requestTag: 'aircraft-work-order-snapshot',
+        requestUrl: '/api/v2/amro/work-orders',
         requestMethod: 'GET',
       });
       const authorizationHeader = String(headers.get('Authorization') || '');
       if (!authorizationHeader) {
         logger.warn('Aircraft row click snapshot skipped: Authorization header missing', {
           component: 'AmroSettingsMasterDataPage',
-          requestPath: '/api/v2/amro/work-packages',
+          requestPath: '/api/v2/amro/work-orders',
           requestMethod: 'GET',
           aircraftId,
           selectedId: String(selectedId || ''),
@@ -5021,7 +5021,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           aircraftSnapshotAuthToastShownRef.current = true;
           toast.error('Your session has expired. Sign in again to load aircraft details.');
         }
-        setAircraftWorkPackageSnapshot({
+        setAircraftWorkOrderSnapshot({
           open: 0,
           inProgress: 0,
           deferred: 0,
@@ -5036,7 +5036,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         page: '1',
         page_size: '50',
       });
-      const response = await fetch(`/api/v2/amro/work-packages?${query.toString()}`, {
+      const response = await fetch(`/api/v2/amro/work-orders?${query.toString()}`, {
         method: 'GET',
         headers,
       });
@@ -5045,7 +5045,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         const responseError = String(payload.error || '');
         logger.warn('Aircraft row click snapshot request failed', {
           component: 'AmroSettingsMasterDataPage',
-          requestPath: '/api/v2/amro/work-packages',
+          requestPath: '/api/v2/amro/work-orders',
           requestMethod: 'GET',
           statusCode: response.status,
           aircraftId,
@@ -5059,7 +5059,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             toast.error('Authentication failed while loading aircraft details. Please sign in again.');
           }
         }
-        setAircraftWorkPackageSnapshot({
+        setAircraftWorkOrderSnapshot({
           open: 0,
           inProgress: 0,
           deferred: 0,
@@ -5070,17 +5070,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return;
       }
       aircraftSnapshotAuthToastShownRef.current = false;
-      setAircraftWorkPackageSnapshot(buildAircraftWorkPackageSnapshot(parseWorkPackageItems(payload)));
+      setAircraftWorkOrderSnapshot(buildAircraftWorkOrderSnapshot(parseWorkOrderItems(payload)));
     } catch (error) {
       logger.warn('Aircraft row click snapshot request error', {
         component: 'AmroSettingsMasterDataPage',
-        requestPath: '/api/v2/amro/work-packages',
+        requestPath: '/api/v2/amro/work-orders',
         requestMethod: 'GET',
         aircraftId,
         selectedId: String(selectedId || ''),
         message: String((error as Error).message || error),
       });
-      setAircraftWorkPackageSnapshot({
+      setAircraftWorkOrderSnapshot({
         open: 0,
         inProgress: 0,
         deferred: 0,
@@ -5168,7 +5168,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setAircraftEnginePerformanceHistory([]);
         setAircraftEngineReadModelError(String((engineReadError as Error).message || 'Engine read model unavailable'));
       }
-      trackWorkPackageTemplateAdoption('dashboard_loaded', {
+      trackWorkOrderTemplateAdoption('dashboard_loaded', {
         selectedAircraftId: aircraftId,
         cacheState: String(output?.metadata?.cache || 'unknown'),
       });
@@ -5179,7 +5179,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setAircraftEnginePerformanceHistory([]);
       setAircraftEngineReadModelError(message);
       setAircraftDashboardError(message);
-      trackWorkPackageTemplateAdoption('dashboard_load_failed', {
+      trackWorkOrderTemplateAdoption('dashboard_load_failed', {
         errorMessage: message,
         selectedAircraftId: aircraftId,
       });
@@ -5197,19 +5197,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     scope,
     selectedAircraft,
     sessionAccessToken,
-    trackWorkPackageTemplateAdoption,
+    trackWorkOrderTemplateAdoption,
   ]);
 
-  const loadWorkPackageTemplateRegistry = useCallback(async () => {
-    if (entity !== 'aircraft' || !canCreateWorkPackage) {
+  const loadWorkOrderTemplateRegistry = useCallback(async () => {
+    if (entity !== 'aircraft' || !canCreateWorkOrder) {
       return;
     }
-    setWorkPackageTemplateRegistryLoading(true);
-    setWorkPackageTemplateRegistryError('');
+    setWorkOrderTemplateRegistryLoading(true);
+    setWorkOrderTemplateRegistryError('');
     try {
       const headers = await buildApiHeaders(scope, {
         fallbackAccessToken: sessionAccessToken,
-        requestTag: 'aircraft-work-package-template-registry',
+        requestTag: 'aircraft-work-order-template-registry',
         requestUrl: '/api/v2/amro/master-data/work_order_templates',
         requestMethod: 'GET',
       });
@@ -5245,7 +5245,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             ...taskRow,
           }));
           const maintenanceTypeText = String(record.maintenance_type || '').trim().toLowerCase();
-          const maintenanceType = (['line', 'base', 'hangar', 'shop'].includes(maintenanceTypeText) ? maintenanceTypeText : 'line') as WorkPackageTemplateRegistryItem['maintenanceType'];
+          const maintenanceType = (['line', 'base', 'hangar', 'shop'].includes(maintenanceTypeText) ? maintenanceTypeText : 'line') as WorkOrderTemplateRegistryItem['maintenanceType'];
           return {
             id,
             templateCode: String(record.template_code || '').trim(),
@@ -5258,29 +5258,29 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             taskRows,
           };
         })
-        .filter((item): item is WorkPackageTemplateRegistryItem => Boolean(item) && item.active);
-      setWorkPackageTemplateRegistry(registry);
-      trackWorkPackageTemplateAdoption('registry_loaded', {
+        .filter((item): item is WorkOrderTemplateRegistryItem => Boolean(item) && item.active);
+      setWorkOrderTemplateRegistry(registry);
+      trackWorkOrderTemplateAdoption('registry_loaded', {
         activeTemplateCount: registry.length,
       });
-      setSelectedWorkPackageTemplateId((previous) => {
+      setSelectedWorkOrderTemplateId((previous) => {
         if (previous && registry.some((item) => item.id === previous)) {
           return previous;
         }
         return '';
       });
     } catch (error) {
-      const message = resolveWorkPackageApiErrorMessage(error, 'Failed to load template registry');
-      setWorkPackageTemplateRegistry([]);
-      setSelectedWorkPackageTemplateId('');
-      setWorkPackageTemplateRegistryError(message);
-      trackWorkPackageTemplateAdoption('registry_load_failed', {
+      const message = resolveWorkOrderApiErrorMessage(error, 'Failed to load template registry');
+      setWorkOrderTemplateRegistry([]);
+      setSelectedWorkOrderTemplateId('');
+      setWorkOrderTemplateRegistryError(message);
+      trackWorkOrderTemplateAdoption('registry_load_failed', {
         errorMessage: message,
       });
     } finally {
-      setWorkPackageTemplateRegistryLoading(false);
+      setWorkOrderTemplateRegistryLoading(false);
     }
-  }, [canCreateWorkPackage, entity, scope, sessionAccessToken, trackWorkPackageTemplateAdoption]);
+  }, [canCreateWorkOrder, entity, scope, sessionAccessToken, trackWorkOrderTemplateAdoption]);
 
   const loadAircraftTemplateAssociatedTasks = useCallback(async (templateId: string) => {
     const normalizedTemplateId = String(templateId || '').trim();
@@ -5299,7 +5299,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       };
       const queryRelationships = async (withFranchiseScope: boolean) => {
         let query = (scopedDb as any)
-          .from('work_package_template_task_templates')
+          .from('work_order_template_task_templates')
           .select('task_template_id')
           .eq('tenant_id', scope.tenantId)
           .eq('work_order_template_id', normalizedTemplateId);
@@ -5386,8 +5386,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         .map((taskTemplateId) => byId.get(taskTemplateId) || null)
         .filter((row): row is AircraftTemplateAssociatedTaskRow => Boolean(row));
       setAircraftTemplateAssociatedTasks(orderedRows);
-      setAircraftWorkPackageSelectedTaskIds(orderedRows.map((row) => row.id));
-      setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '' }));
+      setAircraftWorkOrderSelectedTaskIds(orderedRows.map((row) => row.id));
+      setAircraftWorkOrderErrors((previous) => ({ ...previous, selectedTaskDescription: '' }));
     } catch (error) {
       setAircraftTemplateAssociatedTasks([]);
       setAircraftTemplateAssociatedTasksError(String((error as Error).message || 'Failed to load associated task templates'));
@@ -5398,8 +5398,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
 
 
   useEffect(() => {
-    void loadAircraftWorkPackageSnapshot();
-  }, [loadAircraftWorkPackageSnapshot]);
+    void loadAircraftWorkOrderSnapshot();
+  }, [loadAircraftWorkOrderSnapshot]);
 
   useEffect(() => {
     void loadAircraftLeadDashboard();
@@ -5410,33 +5410,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return;
     }
     const stationHint = String(selectedAircraft?.station_code || '').trim();
-    setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
-    setAircraftWorkPackageErrors({});
+    setAircraftWorkOrderValues(getDefaultAircraftWorkOrderValues(stationHint));
+    setAircraftWorkOrderErrors({});
   }, [entity, selectedAircraft]);
 
   useEffect(() => {
-    if (entity !== 'aircraft' || !aircraftWorkPackageDialogOpen) {
+    if (entity !== 'aircraft' || !aircraftWorkOrderDialogOpen) {
       return;
     }
-    if (workPackageTemplateRegistry.length > 0) {
+    if (workOrderTemplateRegistry.length > 0) {
       return;
     }
-    void loadWorkPackageTemplateRegistry();
-  }, [aircraftWorkPackageDialogOpen, entity, loadWorkPackageTemplateRegistry, workPackageTemplateRegistry.length]);
+    void loadWorkOrderTemplateRegistry();
+  }, [aircraftWorkOrderDialogOpen, entity, loadWorkOrderTemplateRegistry, workOrderTemplateRegistry.length]);
 
-  const loadAircraftExistingWorkPackages = useCallback(async () => {
-    if (entity !== 'aircraft' || !aircraftWorkPackageDialogOpen || !selectedAircraft?.id) {
-      setAircraftExistingWorkPackages([]);
-      setAircraftSelectedExistingWorkPackageId('');
+  const loadAircraftExistingWorkOrders = useCallback(async () => {
+    if (entity !== 'aircraft' || !aircraftWorkOrderDialogOpen || !selectedAircraft?.id) {
+      setAircraftExistingWorkOrders([]);
+      setAircraftSelectedExistingWorkOrderId('');
       return;
     }
-    setAircraftExistingWorkPackagesLoading(true);
-    setAircraftExistingWorkPackagesError('');
+    setAircraftExistingWorkOrdersLoading(true);
+    setAircraftExistingWorkOrdersError('');
     try {
       const headers = await buildApiHeaders(scope, {
         fallbackAccessToken: sessionAccessToken,
-        requestTag: 'aircraft-work-package-dialog-existing-records',
-        requestUrl: '/api/v2/amro/work-packages',
+        requestTag: 'aircraft-work-order-dialog-existing-records',
+        requestUrl: '/api/v2/amro/work-orders',
         requestMethod: 'GET',
       });
       const query = new URLSearchParams({
@@ -5444,7 +5444,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         page: '1',
         page_size: '100',
       });
-      const response = await fetch(`/api/v2/amro/work-packages?${query.toString()}`, {
+      const response = await fetch(`/api/v2/amro/work-orders?${query.toString()}`, {
         method: 'GET',
         headers,
       });
@@ -5452,59 +5452,59 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (!response.ok) {
         throw new Error(String(payload.error || 'Failed to load existing work packages'));
       }
-      const normalizedRows = parseWorkPackageItems(payload)
-        .map(normalizeWorkPackageRecordSummary)
-        .filter((row): row is AircraftWorkPackageRecordSummary => Boolean(row));
-      setAircraftExistingWorkPackages(normalizedRows);
-      setAircraftSelectedExistingWorkPackageId((previous) => {
+      const normalizedRows = parseWorkOrderItems(payload)
+        .map(normalizeWorkOrderRecordSummary)
+        .filter((row): row is AircraftWorkOrderRecordSummary => Boolean(row));
+      setAircraftExistingWorkOrders(normalizedRows);
+      setAircraftSelectedExistingWorkOrderId((previous) => {
         if (previous && normalizedRows.some((item) => item.id === previous)) {
           return previous;
         }
         return normalizedRows[0]?.id || '';
       });
     } catch (error) {
-      setAircraftExistingWorkPackages([]);
-      setAircraftSelectedExistingWorkPackageId('');
-      setAircraftExistingWorkPackagesError(String((error as Error).message || 'Failed to load existing work packages'));
+      setAircraftExistingWorkOrders([]);
+      setAircraftSelectedExistingWorkOrderId('');
+      setAircraftExistingWorkOrdersError(String((error as Error).message || 'Failed to load existing work packages'));
     } finally {
-      setAircraftExistingWorkPackagesLoading(false);
+      setAircraftExistingWorkOrdersLoading(false);
     }
-  }, [aircraftWorkPackageDialogOpen, entity, scope, selectedAircraft, sessionAccessToken]);
+  }, [aircraftWorkOrderDialogOpen, entity, scope, selectedAircraft, sessionAccessToken]);
 
   useEffect(() => {
-    if (!aircraftWorkPackageDialogOpen) {
+    if (!aircraftWorkOrderDialogOpen) {
       return;
     }
-    if (!['existing-wp', 'non-performed-tasks', 'all-tasks'].includes(aircraftWorkPackageActiveTab)) {
+    if (!['existing-wp', 'non-performed-tasks', 'all-tasks'].includes(aircraftWorkOrderActiveTab)) {
       return;
     }
-    void loadAircraftExistingWorkPackages();
-  }, [aircraftWorkPackageActiveTab, aircraftWorkPackageDialogOpen, loadAircraftExistingWorkPackages]);
+    void loadAircraftExistingWorkOrders();
+  }, [aircraftWorkOrderActiveTab, aircraftWorkOrderDialogOpen, loadAircraftExistingWorkOrders]);
 
   useEffect(() => {
-    if (!aircraftWorkPackageDialogOpen) {
+    if (!aircraftWorkOrderDialogOpen) {
       return;
     }
-    if (aircraftWorkPackageActiveTab !== 'new-wp') {
+    if (aircraftWorkOrderActiveTab !== 'new-wp') {
       return;
     }
-    if (workPackageTemplateRegistryLoading) {
+    if (workOrderTemplateRegistryLoading) {
       return;
     }
-    if (workPackageTemplateRegistryError) {
+    if (workOrderTemplateRegistryError) {
       return;
     }
-    if (workPackageTemplateRegistry.length > 0) {
+    if (workOrderTemplateRegistry.length > 0) {
       return;
     }
-    void loadWorkPackageTemplateRegistry();
+    void loadWorkOrderTemplateRegistry();
   }, [
-    aircraftWorkPackageActiveTab,
-    aircraftWorkPackageDialogOpen,
-    loadWorkPackageTemplateRegistry,
-    workPackageTemplateRegistryError,
-    workPackageTemplateRegistry.length,
-    workPackageTemplateRegistryLoading,
+    aircraftWorkOrderActiveTab,
+    aircraftWorkOrderDialogOpen,
+    loadWorkOrderTemplateRegistry,
+    workOrderTemplateRegistryError,
+    workOrderTemplateRegistry.length,
+    workOrderTemplateRegistryLoading,
   ]);
 
   const handleAircraftContextNavigation = useCallback(
@@ -5536,40 +5536,40 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [location.search, navigate],
   );
 
-  const openAircraftWorkPackageDialog = useCallback(() => {
-    if (!canCreateWorkPackage) {
+  const openAircraftWorkOrderDialog = useCallback(() => {
+    if (!canCreateWorkOrder) {
       toast.error('You do not have permission to create work packages');
       return;
     }
     const stationHint = String(selectedAircraft?.station_code || '').trim();
-    setAircraftWorkPackageValues(getDefaultAircraftWorkPackageValues(stationHint));
-    setAircraftWorkPackageErrors({});
-    setAircraftWorkPackageActiveTab('new-wp');
-    setAircraftWorkPackageTaskSearch('');
-    setAircraftWorkPackageTaskSort('taskNumber');
-    setAircraftWorkPackageTaskSortDirection('asc');
-    setAircraftWorkPackageTaskPage(1);
-    setAircraftWorkPackageSelectedTaskIds([]);
-    setAircraftExistingWorkPackages([]);
-    setAircraftExistingWorkPackagesError('');
-    setAircraftSelectedExistingWorkPackageId('');
+    setAircraftWorkOrderValues(getDefaultAircraftWorkOrderValues(stationHint));
+    setAircraftWorkOrderErrors({});
+    setAircraftWorkOrderActiveTab('new-wp');
+    setAircraftWorkOrderTaskSearch('');
+    setAircraftWorkOrderTaskSort('taskNumber');
+    setAircraftWorkOrderTaskSortDirection('asc');
+    setAircraftWorkOrderTaskPage(1);
+    setAircraftWorkOrderSelectedTaskIds([]);
+    setAircraftExistingWorkOrders([]);
+    setAircraftExistingWorkOrdersError('');
+    setAircraftSelectedExistingWorkOrderId('');
     setAircraftTemplateAssociatedTasks([]);
     setAircraftTemplateAssociatedTasksLoading(false);
     setAircraftTemplateAssociatedTasksError('');
-    setSelectedWorkPackageTemplateId((previous) => previous || '');
-    setAircraftWorkPackageDialogOpen(true);
-    trackWorkPackageTemplateAdoption('dialog_opened', {
-      hasTemplateRegistry: workPackageTemplateRegistry.length > 0,
-      preselectedTemplateId: selectedWorkPackageTemplateId || workPackageTemplateRegistry[0]?.id || '',
+    setSelectedWorkOrderTemplateId((previous) => previous || '');
+    setAircraftWorkOrderDialogOpen(true);
+    trackWorkOrderTemplateAdoption('dialog_opened', {
+      hasTemplateRegistry: workOrderTemplateRegistry.length > 0,
+      preselectedTemplateId: selectedWorkOrderTemplateId || workOrderTemplateRegistry[0]?.id || '',
     });
-  }, [canCreateWorkPackage, selectedAircraft, selectedWorkPackageTemplateId, trackWorkPackageTemplateAdoption, workPackageTemplateRegistry]);
+  }, [canCreateWorkOrder, selectedAircraft, selectedWorkOrderTemplateId, trackWorkOrderTemplateAdoption, workOrderTemplateRegistry]);
 
-  const setAircraftWorkPackageField = useCallback((key: keyof AircraftWorkPackageFormValues, value: string) => {
-    setAircraftWorkPackageValues((previous) => {
+  const setAircraftWorkOrderField = useCallback((key: keyof AircraftWorkOrderFormValues, value: string) => {
+    setAircraftWorkOrderValues((previous) => {
       const nextValues = { ...previous, [key]: value };
       const normalizedValue = value.trim();
       let nextError = '';
-      if (['workPackageNumber', 'topic', 'openingDate', 'revisionNumber', 'status', 'validationState', 'transmissionDate', 'expectedReceptionDate', 'maintenanceReleaseDate', 'workReceptionDate', 'source'].includes(key)) {
+      if (['workOrderNumber', 'topic', 'openingDate', 'revisionNumber', 'status', 'validationState', 'transmissionDate', 'expectedReceptionDate', 'maintenanceReleaseDate', 'workReceptionDate', 'source'].includes(key)) {
         nextError = normalizedValue ? '' : `${String(key).replace(/([A-Z])/g, ' $1').replace(/^./, (char) => char.toUpperCase())} is required`;
       }
       if (['openingDate', 'revisionDate', 'transmissionDate', 'expectedReceptionDate', 'maintenanceReleaseDate', 'workReceptionDate', 'plannedStart', 'plannedEnd'].includes(key) && normalizedValue) {
@@ -5586,22 +5586,22 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (key === 'scopeItemsText' && normalizedValue) {
         nextError = '';
       }
-      setAircraftWorkPackageErrors((previousErrors) => ({ ...previousErrors, [key]: nextError }));
+      setAircraftWorkOrderErrors((previousErrors) => ({ ...previousErrors, [key]: nextError }));
       return nextValues;
     });
   }, []);
 
-  const handleAircraftWorkPackageTemplateSelect = useCallback(
+  const handleAircraftWorkOrderTemplateSelect = useCallback(
     (templateId: string) => {
-      setSelectedWorkPackageTemplateId(templateId);
+      setSelectedWorkOrderTemplateId(templateId);
       setAircraftTemplateAssociatedTasks([]);
       setAircraftTemplateAssociatedTasksError('');
-      const template = workPackageTemplateRegistry.find((item) => item.id === templateId);
+      const template = workOrderTemplateRegistry.find((item) => item.id === templateId);
       if (!template) {
-        setAircraftWorkPackageSelectedTaskIds([]);
+        setAircraftWorkOrderSelectedTaskIds([]);
         return;
       }
-      setAircraftWorkPackageValues((previous) => {
+      setAircraftWorkOrderValues((previous) => {
         const firstTask = template.taskRows[0];
         return {
           ...previous,
@@ -5614,48 +5614,48 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           selectedTaskDescription: firstTask?.description || previous.selectedTaskDescription,
         };
       });
-      setAircraftWorkPackageSelectedTaskIds(template.taskRows.length > 0 ? template.taskRows.map((task) => task.id) : []);
+      setAircraftWorkOrderSelectedTaskIds(template.taskRows.length > 0 ? template.taskRows.map((task) => task.id) : []);
       void loadAircraftTemplateAssociatedTasks(template.id);
-      setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '', scopeItemsText: '' }));
-      trackWorkPackageTemplateAdoption('template_selected', {
+      setAircraftWorkOrderErrors((previous) => ({ ...previous, selectedTaskDescription: '', scopeItemsText: '' }));
+      trackWorkOrderTemplateAdoption('template_selected', {
         templateId: template.id,
         templateCode: template.templateCode,
         taskCount: template.taskRows.length,
       });
     },
-    [loadAircraftTemplateAssociatedTasks, trackWorkPackageTemplateAdoption, workPackageTemplateRegistry],
+    [loadAircraftTemplateAssociatedTasks, trackWorkOrderTemplateAdoption, workOrderTemplateRegistry],
   );
 
   useEffect(() => {
-    if (!aircraftWorkPackageDialogOpen) {
+    if (!aircraftWorkOrderDialogOpen) {
       return;
     }
-    if (!selectedWorkPackageTemplateId) {
+    if (!selectedWorkOrderTemplateId) {
       return;
     }
-    if (aircraftWorkPackageSelectedTaskIds.length > 0) {
+    if (aircraftWorkOrderSelectedTaskIds.length > 0) {
       return;
     }
-    handleAircraftWorkPackageTemplateSelect(selectedWorkPackageTemplateId);
+    handleAircraftWorkOrderTemplateSelect(selectedWorkOrderTemplateId);
   }, [
-    aircraftWorkPackageDialogOpen,
-    aircraftWorkPackageSelectedTaskIds.length,
-    handleAircraftWorkPackageTemplateSelect,
-    selectedWorkPackageTemplateId,
+    aircraftWorkOrderDialogOpen,
+    aircraftWorkOrderSelectedTaskIds.length,
+    handleAircraftWorkOrderTemplateSelect,
+    selectedWorkOrderTemplateId,
   ]);
 
-  const handleAircraftWorkPackageSubmit = useCallback(
-    async (action: WorkPackageCreateAction) => {
-      if (!canCreateWorkPackage) {
+  const handleAircraftWorkOrderSubmit = useCallback(
+    async (action: WorkOrderCreateAction) => {
+      if (!canCreateWorkOrder) {
         toast.error('You do not have permission to create work packages');
-        trackWorkPackageTemplateAdoption('submit_denied_permission', {
+        trackWorkOrderTemplateAdoption('submit_denied_permission', {
           action,
         });
         return;
       }
-      if (action === 'create_schedule' && !canScheduleWorkPackage) {
+      if (action === 'create_schedule' && !canScheduleWorkOrder) {
         toast.error('You do not have permission to schedule work packages');
-        trackWorkPackageTemplateAdoption('submit_denied_schedule_permission', {
+        trackWorkOrderTemplateAdoption('submit_denied_schedule_permission', {
           action,
         });
         return;
@@ -5665,175 +5665,175 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return;
       }
       const errors: Record<string, string> = {};
-      if (!selectedWorkPackageTemplateId.trim()) {
+      if (!selectedWorkOrderTemplateId.trim()) {
         errors.templateRegistry = 'Select a template before creating a new work package';
       }
-      if (!aircraftWorkPackageValues.workPackageNumber.trim()) {
-        errors.workPackageNumber = 'Work package number is required';
+      if (!aircraftWorkOrderValues.workOrderNumber.trim()) {
+        errors.workOrderNumber = 'Work package number is required';
       }
-      if (!aircraftWorkPackageValues.topic.trim()) {
+      if (!aircraftWorkOrderValues.topic.trim()) {
         errors.topic = 'Topic is required';
       }
-      if (!aircraftWorkPackageValues.openingDate.trim()) {
+      if (!aircraftWorkOrderValues.openingDate.trim()) {
         errors.openingDate = 'Opening date is required';
       }
-      if (!aircraftWorkPackageValues.revisionNumber.trim()) {
+      if (!aircraftWorkOrderValues.revisionNumber.trim()) {
         errors.revisionNumber = 'Revision number is required';
       }
-      if (!aircraftWorkPackageValues.ttafHours.trim()) {
+      if (!aircraftWorkOrderValues.ttafHours.trim()) {
         errors.ttafHours = 'TTAF is required';
       }
-      if (!aircraftWorkPackageValues.status) {
+      if (!aircraftWorkOrderValues.status) {
         errors.status = 'Status is required';
       }
-      if (!aircraftWorkPackageValues.validationState) {
+      if (!aircraftWorkOrderValues.validationState) {
         errors.validationState = 'Validation is required';
       }
-      if (!aircraftWorkPackageValues.transmissionDate.trim()) {
+      if (!aircraftWorkOrderValues.transmissionDate.trim()) {
         errors.transmissionDate = 'Transmission date is required';
       }
-      if (!aircraftWorkPackageValues.expectedReceptionDate.trim()) {
+      if (!aircraftWorkOrderValues.expectedReceptionDate.trim()) {
         errors.expectedReceptionDate = 'Expected reception date is required';
       }
-      if (!aircraftWorkPackageValues.maintenanceReleaseDate.trim()) {
+      if (!aircraftWorkOrderValues.maintenanceReleaseDate.trim()) {
         errors.maintenanceReleaseDate = 'Maintenance release date is required';
       }
-      if (!aircraftWorkPackageValues.workReceptionDate.trim()) {
+      if (!aircraftWorkOrderValues.workReceptionDate.trim()) {
         errors.workReceptionDate = 'Work reception date is required';
       }
-      if (!['schedule_due', 'defect', 'campaign', 'predictive_alert'].includes(aircraftWorkPackageValues.source)) {
+      if (!['schedule_due', 'defect', 'campaign', 'predictive_alert'].includes(aircraftWorkOrderValues.source)) {
         errors.source = 'Trigger source is required';
       }
-      const scopeItems = aircraftWorkPackageValues.scopeItemsText
+      const scopeItems = aircraftWorkOrderValues.scopeItemsText
         .split('\n')
         .map((item) => item.trim())
         .filter(Boolean);
-      const templateScopeItems = selectedWorkPackageTemplate?.scopeItems || [];
+      const templateScopeItems = selectedWorkOrderTemplate?.scopeItems || [];
       if (scopeItems.length === 0 && templateScopeItems.length > 0) {
         scopeItems.push(...templateScopeItems);
       }
-      if (scopeItems.length === 0 && aircraftWorkPackageValues.selectedTaskDescription.trim()) {
-        scopeItems.push(aircraftWorkPackageValues.selectedTaskDescription.trim());
+      if (scopeItems.length === 0 && aircraftWorkOrderValues.selectedTaskDescription.trim()) {
+        scopeItems.push(aircraftWorkOrderValues.selectedTaskDescription.trim());
       }
-      if (scopeItems.length === 0 && aircraftWorkPackageValues.comments.trim()) {
-        scopeItems.push(aircraftWorkPackageValues.comments.trim());
+      if (scopeItems.length === 0 && aircraftWorkOrderValues.comments.trim()) {
+        scopeItems.push(aircraftWorkOrderValues.comments.trim());
       }
       if (scopeItems.length === 0) {
         errors.scopeItemsText = 'Add at least one scope item';
       }
-      const openingDateTime = Date.parse(aircraftWorkPackageValues.openingDate);
+      const openingDateTime = Date.parse(aircraftWorkOrderValues.openingDate);
       if (Number.isNaN(openingDateTime)) {
         errors.openingDate = 'Opening date must be a valid date';
       }
-      const revisionDateTime = Date.parse(aircraftWorkPackageValues.revisionDate);
-      if (aircraftWorkPackageValues.revisionDate.trim() && Number.isNaN(revisionDateTime)) {
+      const revisionDateTime = Date.parse(aircraftWorkOrderValues.revisionDate);
+      if (aircraftWorkOrderValues.revisionDate.trim() && Number.isNaN(revisionDateTime)) {
         errors.revisionDate = 'Revision date must be a valid date';
       }
-      const ttafValue = Number(aircraftWorkPackageValues.ttafHours);
+      const ttafValue = Number(aircraftWorkOrderValues.ttafHours);
       if (!Number.isFinite(ttafValue) || ttafValue < 0) {
         errors.ttafHours = 'TTAF must be a non-negative number';
       }
-      const transmissionDateTime = Date.parse(aircraftWorkPackageValues.transmissionDate);
+      const transmissionDateTime = Date.parse(aircraftWorkOrderValues.transmissionDate);
       if (Number.isNaN(transmissionDateTime)) {
         errors.transmissionDate = 'Transmission date must be a valid date';
       }
-      const maintenanceReleaseDateTime = Date.parse(aircraftWorkPackageValues.maintenanceReleaseDate);
+      const maintenanceReleaseDateTime = Date.parse(aircraftWorkOrderValues.maintenanceReleaseDate);
       if (Number.isNaN(maintenanceReleaseDateTime)) {
         errors.maintenanceReleaseDate = 'Maintenance release date must be a valid date';
       }
-      const expectedReceptionDateTime = Date.parse(aircraftWorkPackageValues.expectedReceptionDate);
+      const expectedReceptionDateTime = Date.parse(aircraftWorkOrderValues.expectedReceptionDate);
       if (Number.isNaN(expectedReceptionDateTime)) {
         errors.expectedReceptionDate = 'Expected reception date must be a valid date';
       }
-      const workReceptionDateTime = Date.parse(aircraftWorkPackageValues.workReceptionDate);
+      const workReceptionDateTime = Date.parse(aircraftWorkOrderValues.workReceptionDate);
       if (Number.isNaN(workReceptionDateTime)) {
         errors.workReceptionDate = 'Work reception date must be a valid date';
       }
-      if (aircraftWorkPackageSelectedTaskIds.length === 0) {
+      if (aircraftWorkOrderSelectedTaskIds.length === 0) {
         errors.selectedTaskDescription = 'Select at least one task';
       }
-      setAircraftWorkPackageErrors(errors);
+      setAircraftWorkOrderErrors(errors);
       if (Object.keys(errors).length > 0) {
         toast.error('Please resolve aircraft work package validation errors');
-        trackWorkPackageTemplateAdoption('submit_validation_failed', {
+        trackWorkOrderTemplateAdoption('submit_validation_failed', {
           action,
           errorCount: Object.keys(errors).length,
-          usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
+          usesTemplate: Boolean(selectedWorkOrderTemplate?.id),
         });
         return;
       }
 
-      const workPackagePayload = {
+      const workOrderPayload = {
         aircraft_id: String(selectedAircraft.id),
-        work_order_number: aircraftWorkPackageValues.workPackageNumber.trim(),
-        title: aircraftWorkPackageValues.topic.trim(),
-        opening_date: new Date(aircraftWorkPackageValues.openingDate).toISOString(),
-        revision_number: aircraftWorkPackageValues.revisionNumber.trim(),
-        revision_date: aircraftWorkPackageValues.revisionDate.trim()
-          ? new Date(aircraftWorkPackageValues.revisionDate).toISOString()
+        work_order_number: aircraftWorkOrderValues.workOrderNumber.trim(),
+        title: aircraftWorkOrderValues.topic.trim(),
+        opening_date: new Date(aircraftWorkOrderValues.openingDate).toISOString(),
+        revision_number: aircraftWorkOrderValues.revisionNumber.trim(),
+        revision_date: aircraftWorkOrderValues.revisionDate.trim()
+          ? new Date(aircraftWorkOrderValues.revisionDate).toISOString()
           : null,
-        transmission_date: new Date(aircraftWorkPackageValues.transmissionDate).toISOString(),
-        expected_reception_date: new Date(aircraftWorkPackageValues.expectedReceptionDate).toISOString(),
-        maintenance_release_date: new Date(aircraftWorkPackageValues.maintenanceReleaseDate).toISOString(),
-        work_reception_date: new Date(aircraftWorkPackageValues.workReceptionDate).toISOString(),
-        work_report_number: aircraftWorkPackageValues.workReportNumber.trim(),
-        comments: aircraftWorkPackageValues.comments.trim(),
-        ttaf_hours: Number(aircraftWorkPackageValues.ttafHours),
-        validation_state: aircraftWorkPackageValues.validationState,
+        transmission_date: new Date(aircraftWorkOrderValues.transmissionDate).toISOString(),
+        expected_reception_date: new Date(aircraftWorkOrderValues.expectedReceptionDate).toISOString(),
+        maintenance_release_date: new Date(aircraftWorkOrderValues.maintenanceReleaseDate).toISOString(),
+        work_reception_date: new Date(aircraftWorkOrderValues.workReceptionDate).toISOString(),
+        work_report_number: aircraftWorkOrderValues.workReportNumber.trim(),
+        comments: aircraftWorkOrderValues.comments.trim(),
+        ttaf_hours: Number(aircraftWorkOrderValues.ttafHours),
+        validation_state: aircraftWorkOrderValues.validationState,
         selected_task: {
-          task_number: aircraftWorkPackageValues.selectedTaskNumber.trim(),
-          ata_code: aircraftWorkPackageValues.selectedTaskAtaCode.trim(),
-          serial_number: aircraftWorkPackageValues.selectedTaskSerialNumber.trim(),
-          part_number: aircraftWorkPackageValues.selectedTaskPartNumber.trim(),
-          description: aircraftWorkPackageValues.selectedTaskDescription.trim() || scopeItems[0] || '',
+          task_number: aircraftWorkOrderValues.selectedTaskNumber.trim(),
+          ata_code: aircraftWorkOrderValues.selectedTaskAtaCode.trim(),
+          serial_number: aircraftWorkOrderValues.selectedTaskSerialNumber.trim(),
+          part_number: aircraftWorkOrderValues.selectedTaskPartNumber.trim(),
+          description: aircraftWorkOrderValues.selectedTaskDescription.trim() || scopeItems[0] || '',
         },
-        source: aircraftWorkPackageValues.source,
-        trigger_source: aircraftWorkPackageValues.source,
-        maintenance_type: aircraftWorkPackageValues.maintenanceType,
-        station: aircraftWorkPackageValues.station.trim(),
-        priority: aircraftWorkPackageValues.priority,
-        status: aircraftWorkPackageValues.status,
-        planned_window: `${new Date(aircraftWorkPackageValues.plannedStart).toISOString()}|${new Date(aircraftWorkPackageValues.plannedEnd).toISOString()}`,
+        source: aircraftWorkOrderValues.source,
+        trigger_source: aircraftWorkOrderValues.source,
+        maintenance_type: aircraftWorkOrderValues.maintenanceType,
+        station: aircraftWorkOrderValues.station.trim(),
+        priority: aircraftWorkOrderValues.priority,
+        status: aircraftWorkOrderValues.status,
+        planned_window: `${new Date(aircraftWorkOrderValues.plannedStart).toISOString()}|${new Date(aircraftWorkOrderValues.plannedEnd).toISOString()}`,
         scope_items: scopeItems,
-        selected_task_ids: aircraftWorkPackageSelectedTaskIds,
-        template_id: selectedWorkPackageTemplate?.id || undefined,
-        template_code: selectedWorkPackageTemplate?.templateCode || undefined,
+        selected_task_ids: aircraftWorkOrderSelectedTaskIds,
+        template_id: selectedWorkOrderTemplate?.id || undefined,
+        template_code: selectedWorkOrderTemplate?.templateCode || undefined,
         reference_id: String(selectedAircraft.id),
         trigger_reference_id: String(selectedAircraft.id),
         triggered_at: new Date().toISOString(),
       };
 
       if (action === 'save_draft') {
-        localStorage.setItem(`amro:aircraft-wp-draft:${selectedAircraft.id}`, JSON.stringify(workPackagePayload));
+        localStorage.setItem(`amro:aircraft-wp-draft:${selectedAircraft.id}`, JSON.stringify(workOrderPayload));
         toast.success('Aircraft work package draft saved');
-        trackWorkPackageTemplateAdoption('draft_saved', {
-          usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
-          selectedTaskCount: aircraftWorkPackageSelectedTaskIds.length,
+        trackWorkOrderTemplateAdoption('draft_saved', {
+          usesTemplate: Boolean(selectedWorkOrderTemplate?.id),
+          selectedTaskCount: aircraftWorkOrderSelectedTaskIds.length,
         });
-        setAircraftWorkPackageDialogOpen(false);
+        setAircraftWorkOrderDialogOpen(false);
         return;
       }
 
-      setAircraftWorkPackageSubmitting(true);
+      setAircraftWorkOrderSubmitting(true);
       const now = Date.now();
       const transactionId = `aircraft-wp-tx-${selectedAircraft.id}-${now}`;
       const requestIdempotencyKey = `aircraft-wp-create-${now}`;
-      let committedWorkPackageId = '';
+      let committedWorkOrderId = '';
       try {
         const headers = await buildApiHeaders(scope, {
           fallbackAccessToken: sessionAccessToken,
-          requestTag: 'aircraft-work-package-create',
-          requestUrl: '/api/v2/amro/work-packages?interface=create-work-package',
+          requestTag: 'aircraft-work-order-create',
+          requestUrl: '/api/v2/amro/work-orders?interface=create-work-order',
           requestMethod: 'POST',
         });
         const controller = new AbortController();
         const timeoutHandle = window.setTimeout(() => controller.abort(), WORK_PACKAGE_CREATE_TIMEOUT_MS);
-        const response = await fetch('/api/v2/amro/work-packages?interface=create-work-package', {
+        const response = await fetch('/api/v2/amro/work-orders?interface=create-work-order', {
           method: 'POST',
           headers,
           signal: controller.signal,
           body: JSON.stringify({
-            ...workPackagePayload,
+            ...workOrderPayload,
             idempotency_key: requestIdempotencyKey,
             decision_trace_id: `aircraft-wp-${selectedAircraft.id}-${now}`,
             transaction_id: transactionId,
@@ -5843,13 +5843,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             audit_trail: {
               action: action === 'create_schedule' ? 'create_and_schedule' : 'create',
               actor_scope: scope.userId || '',
-              trigger_tab: aircraftWorkPackageActiveTab,
+              trigger_tab: aircraftWorkOrderActiveTab,
               created_at: new Date(now).toISOString(),
             },
             version_info: {
-              revision_number: aircraftWorkPackageValues.revisionNumber.trim(),
-              revision_date: aircraftWorkPackageValues.revisionDate.trim()
-                ? new Date(aircraftWorkPackageValues.revisionDate).toISOString()
+              revision_number: aircraftWorkOrderValues.revisionNumber.trim(),
+              revision_date: aircraftWorkOrderValues.revisionDate.trim()
+                ? new Date(aircraftWorkOrderValues.revisionDate).toISOString()
                 : null,
             },
           }),
@@ -5857,7 +5857,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         window.clearTimeout(timeoutHandle);
         const payload = await parseApiPayload(response);
         const output = payload.output && typeof payload.output === 'object' ? (payload.output as Record<string, unknown>) : {};
-        committedWorkPackageId = String(output.work_package_id || output.id || '');
+        committedWorkOrderId = String(output.work_order_id || output.id || '');
         if (!response.ok) {
           const statusMessage = response.status >= 500
             ? 'Work package service is temporarily unavailable. Try again shortly.'
@@ -5865,39 +5865,39 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           throw new Error(statusMessage);
         }
         toast.success('Aircraft work package created');
-        trackWorkPackageTemplateAdoption('submit_succeeded', {
+        trackWorkOrderTemplateAdoption('submit_succeeded', {
           action,
-          usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
-          templateId: selectedWorkPackageTemplate?.id || '',
-          selectedTaskCount: aircraftWorkPackageSelectedTaskIds.length,
-          workPackageId: committedWorkPackageId,
+          usesTemplate: Boolean(selectedWorkOrderTemplate?.id),
+          templateId: selectedWorkOrderTemplate?.id || '',
+          selectedTaskCount: aircraftWorkOrderSelectedTaskIds.length,
+          workOrderId: committedWorkOrderId,
         });
-        setAircraftWorkPackageDialogOpen(false);
-        await loadAircraftWorkPackageSnapshot();
-        void loadAircraftExistingWorkPackages();
+        setAircraftWorkOrderDialogOpen(false);
+        await loadAircraftWorkOrderSnapshot();
+        void loadAircraftExistingWorkOrders();
         if (action === 'create_schedule') {
           const query = new URLSearchParams();
           query.set('aircraft_id', String(selectedAircraft.id));
-          if (committedWorkPackageId) query.set('work_package_id', committedWorkPackageId);
+          if (committedWorkOrderId) query.set('work_order_id', committedWorkOrderId);
           navigate(`/dashboard/amro/scheduling?${query.toString()}`);
           return;
         }
         if (action === 'create_open') {
           const query = new URLSearchParams();
           query.set('aircraft_id', String(selectedAircraft.id));
-          if (committedWorkPackageId) query.set('focus', committedWorkPackageId);
-          navigate(`/dashboard/amro/aircraft/work-packages?${query.toString()}`);
+          if (committedWorkOrderId) query.set('focus', committedWorkOrderId);
+          navigate(`/dashboard/amro/aircraft/work-orders?${query.toString()}`);
         }
       } catch (error) {
-        if (committedWorkPackageId) {
+        if (committedWorkOrderId) {
           try {
             const rollbackHeaders = await buildApiHeaders(scope, {
               fallbackAccessToken: sessionAccessToken,
-              requestTag: 'aircraft-work-package-rollback',
-              requestUrl: `/api/v2/amro/work-packages/${committedWorkPackageId}`,
+              requestTag: 'aircraft-work-order-rollback',
+              requestUrl: `/api/v2/amro/work-orders/${committedWorkOrderId}`,
               requestMethod: 'DELETE',
             });
-            await fetch(`/api/v2/amro/work-packages/${committedWorkPackageId}?rollback=1`, {
+            await fetch(`/api/v2/amro/work-orders/${committedWorkOrderId}?rollback=1`, {
               method: 'DELETE',
               headers: rollbackHeaders,
               body: JSON.stringify({
@@ -5906,33 +5906,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               }),
             });
           } catch (rollbackError) {
-            trackWorkPackageTemplateAdoption('rollback_failed', {
+            trackWorkOrderTemplateAdoption('rollback_failed', {
               action,
-              workPackageId: committedWorkPackageId,
+              workOrderId: committedWorkOrderId,
               errorMessage: String((rollbackError as Error).message || rollbackError),
             });
           }
         }
         localStorage.setItem(
           `amro:aircraft-wp-draft:${selectedAircraft.id}`,
-          JSON.stringify(workPackagePayload),
+          JSON.stringify(workOrderPayload),
         );
-        toast.error(resolveWorkPackageApiErrorMessage(error, 'Work package service degraded. Draft captured locally.'));
-        trackWorkPackageTemplateAdoption('submit_failed', {
+        toast.error(resolveWorkOrderApiErrorMessage(error, 'Work package service degraded. Draft captured locally.'));
+        trackWorkOrderTemplateAdoption('submit_failed', {
           action,
-          usesTemplate: Boolean(selectedWorkPackageTemplate?.id),
-          templateId: selectedWorkPackageTemplate?.id || '',
-          selectedTaskCount: aircraftWorkPackageSelectedTaskIds.length,
+          usesTemplate: Boolean(selectedWorkOrderTemplate?.id),
+          templateId: selectedWorkOrderTemplate?.id || '',
+          selectedTaskCount: aircraftWorkOrderSelectedTaskIds.length,
           errorMessage: String((error as Error).message || error),
         });
       } finally {
-        setAircraftWorkPackageSubmitting(false);
+        setAircraftWorkOrderSubmitting(false);
       }
     },
-    [aircraftWorkPackageActiveTab, aircraftWorkPackageSelectedTaskIds, aircraftWorkPackageValues, canCreateWorkPackage, canScheduleWorkPackage, loadAircraftExistingWorkPackages, loadAircraftWorkPackageSnapshot, navigate, scope, selectedAircraft, selectedWorkPackageTemplate, sessionAccessToken, trackWorkPackageTemplateAdoption],
+    [aircraftWorkOrderActiveTab, aircraftWorkOrderSelectedTaskIds, aircraftWorkOrderValues, canCreateWorkOrder, canScheduleWorkOrder, loadAircraftExistingWorkOrders, loadAircraftWorkOrderSnapshot, navigate, scope, selectedAircraft, selectedWorkOrderTemplate, sessionAccessToken, trackWorkOrderTemplateAdoption],
   );
 
-  const aircraftWorkPackageSelectedTasks = useMemo(() => {
+  const aircraftWorkOrderSelectedTasks = useMemo(() => {
     const templateRows = aircraftTemplateAssociatedTasks.length > 0
       ? aircraftTemplateAssociatedTasks.map((task) => ({
           id: task.id,
@@ -5942,21 +5942,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           partNumber: '',
           description: task.description,
         }))
-      : (selectedWorkPackageTemplate?.taskRows || []);
-    const scopeRows = aircraftWorkPackageValues.scopeItemsText
+      : (selectedWorkOrderTemplate?.taskRows || []);
+    const scopeRows = aircraftWorkOrderValues.scopeItemsText
       .split('\n')
       .map((item) => item.trim())
       .filter(Boolean)
       .map((description, index) => ({
         id: `scope-${index + 1}`,
-        taskNumber: aircraftWorkPackageValues.selectedTaskNumber || `TASK-${index + 1}`,
-        ataCode: aircraftWorkPackageValues.selectedTaskAtaCode || '05-20-TIME LIMITS/MAINTENANCE CHECKS',
-        serialNumber: aircraftWorkPackageValues.selectedTaskSerialNumber || '',
-        partNumber: aircraftWorkPackageValues.selectedTaskPartNumber || '',
+        taskNumber: aircraftWorkOrderValues.selectedTaskNumber || `TASK-${index + 1}`,
+        ataCode: aircraftWorkOrderValues.selectedTaskAtaCode || '05-20-TIME LIMITS/MAINTENANCE CHECKS',
+        serialNumber: aircraftWorkOrderValues.selectedTaskSerialNumber || '',
+        partNumber: aircraftWorkOrderValues.selectedTaskPartNumber || '',
         description,
       }));
 
-    const selectedRowDescription = aircraftWorkPackageValues.selectedTaskDescription.trim();
+    const selectedRowDescription = aircraftWorkOrderValues.selectedTaskDescription.trim();
     const merged = [...templateRows];
     const seenKeys = new Set(
       merged.map((item) => `${item.taskNumber}|${item.ataCode}|${item.serialNumber}|${item.partNumber}|${item.description}`.toLowerCase()),
@@ -5964,10 +5964,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (selectedRowDescription) {
       const selectedTaskRow = {
         id: 'selected-task',
-        taskNumber: aircraftWorkPackageValues.selectedTaskNumber || 'Choose One',
-        ataCode: aircraftWorkPackageValues.selectedTaskAtaCode || '05-20-TIME LIMITS/MAINTENANCE CHECKS',
-        serialNumber: aircraftWorkPackageValues.selectedTaskSerialNumber || '',
-        partNumber: aircraftWorkPackageValues.selectedTaskPartNumber || '',
+        taskNumber: aircraftWorkOrderValues.selectedTaskNumber || 'Choose One',
+        ataCode: aircraftWorkOrderValues.selectedTaskAtaCode || '05-20-TIME LIMITS/MAINTENANCE CHECKS',
+        serialNumber: aircraftWorkOrderValues.selectedTaskSerialNumber || '',
+        partNumber: aircraftWorkOrderValues.selectedTaskPartNumber || '',
         description: selectedRowDescription,
       };
       const key = `${selectedTaskRow.taskNumber}|${selectedTaskRow.ataCode}|${selectedTaskRow.serialNumber}|${selectedTaskRow.partNumber}|${selectedTaskRow.description}`.toLowerCase();
@@ -5984,70 +5984,70 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }
     });
     return merged;
-  }, [aircraftTemplateAssociatedTasks, aircraftWorkPackageValues, selectedWorkPackageTemplate]);
+  }, [aircraftTemplateAssociatedTasks, aircraftWorkOrderValues, selectedWorkOrderTemplate]);
 
-  const aircraftWorkPackageFilteredTasks = useMemo(() => {
-    const normalizedSearch = aircraftWorkPackageTaskSearch.trim().toLowerCase();
+  const aircraftWorkOrderFilteredTasks = useMemo(() => {
+    const normalizedSearch = aircraftWorkOrderTaskSearch.trim().toLowerCase();
     const next = normalizedSearch
-      ? aircraftWorkPackageSelectedTasks.filter((task) =>
+      ? aircraftWorkOrderSelectedTasks.filter((task) =>
           [task.taskNumber, task.ataCode, task.serialNumber, task.partNumber, task.description]
             .some((value) => value.toLowerCase().includes(normalizedSearch)),
         )
-      : aircraftWorkPackageSelectedTasks;
+      : aircraftWorkOrderSelectedTasks;
     const sorted = [...next].sort((left, right) => {
-      const leftValue = String(left[aircraftWorkPackageTaskSort] || '').toLowerCase();
-      const rightValue = String(right[aircraftWorkPackageTaskSort] || '').toLowerCase();
+      const leftValue = String(left[aircraftWorkOrderTaskSort] || '').toLowerCase();
+      const rightValue = String(right[aircraftWorkOrderTaskSort] || '').toLowerCase();
       if (leftValue === rightValue) {
         return left.id.localeCompare(right.id);
       }
-      return aircraftWorkPackageTaskSortDirection === 'asc'
+      return aircraftWorkOrderTaskSortDirection === 'asc'
         ? leftValue.localeCompare(rightValue)
         : rightValue.localeCompare(leftValue);
     });
     return sorted;
   }, [
-    aircraftWorkPackageSelectedTasks,
-    aircraftWorkPackageTaskSearch,
-    aircraftWorkPackageTaskSort,
-    aircraftWorkPackageTaskSortDirection,
+    aircraftWorkOrderSelectedTasks,
+    aircraftWorkOrderTaskSearch,
+    aircraftWorkOrderTaskSort,
+    aircraftWorkOrderTaskSortDirection,
   ]);
 
-  const aircraftWorkPackageTaskPageSize = 5;
-  const aircraftWorkPackageTaskTotalPages = Math.max(1, Math.ceil(aircraftWorkPackageFilteredTasks.length / aircraftWorkPackageTaskPageSize));
+  const aircraftWorkOrderTaskPageSize = 5;
+  const aircraftWorkOrderTaskTotalPages = Math.max(1, Math.ceil(aircraftWorkOrderFilteredTasks.length / aircraftWorkOrderTaskPageSize));
   useEffect(() => {
-    setAircraftWorkPackageTaskPage((previous) => Math.min(previous, aircraftWorkPackageTaskTotalPages));
-  }, [aircraftWorkPackageTaskTotalPages]);
-  const aircraftWorkPackagePagedTasks = useMemo(() => {
-    const normalizedPage = Math.min(Math.max(aircraftWorkPackageTaskPage, 1), aircraftWorkPackageTaskTotalPages);
-    const start = (normalizedPage - 1) * aircraftWorkPackageTaskPageSize;
-    return aircraftWorkPackageFilteredTasks.slice(start, start + aircraftWorkPackageTaskPageSize);
-  }, [aircraftWorkPackageFilteredTasks, aircraftWorkPackageTaskPage, aircraftWorkPackageTaskTotalPages]);
+    setAircraftWorkOrderTaskPage((previous) => Math.min(previous, aircraftWorkOrderTaskTotalPages));
+  }, [aircraftWorkOrderTaskTotalPages]);
+  const aircraftWorkOrderPagedTasks = useMemo(() => {
+    const normalizedPage = Math.min(Math.max(aircraftWorkOrderTaskPage, 1), aircraftWorkOrderTaskTotalPages);
+    const start = (normalizedPage - 1) * aircraftWorkOrderTaskPageSize;
+    return aircraftWorkOrderFilteredTasks.slice(start, start + aircraftWorkOrderTaskPageSize);
+  }, [aircraftWorkOrderFilteredTasks, aircraftWorkOrderTaskPage, aircraftWorkOrderTaskTotalPages]);
 
-  const aircraftExistingWorkPackageSelectedRecord = useMemo(
-    () => aircraftExistingWorkPackages.find((item) => item.id === aircraftSelectedExistingWorkPackageId) || null,
-    [aircraftExistingWorkPackages, aircraftSelectedExistingWorkPackageId],
+  const aircraftExistingWorkOrderSelectedRecord = useMemo(
+    () => aircraftExistingWorkOrders.find((item) => item.id === aircraftSelectedExistingWorkOrderId) || null,
+    [aircraftExistingWorkOrders, aircraftSelectedExistingWorkOrderId],
   );
 
-  const aircraftExistingWorkPackageList = useMemo(() => {
-    return [...aircraftExistingWorkPackages].sort((left, right) => {
+  const aircraftExistingWorkOrderList = useMemo(() => {
+    return [...aircraftExistingWorkOrders].sort((left, right) => {
       const leftTime = Date.parse(left.updatedAt || '') || 0;
       const rightTime = Date.parse(right.updatedAt || '') || 0;
       if (leftTime !== rightTime) {
         return rightTime - leftTime;
       }
-      return left.workPackageNumber.localeCompare(right.workPackageNumber);
+      return left.workOrderNumber.localeCompare(right.workOrderNumber);
     });
-  }, [aircraftExistingWorkPackages]);
+  }, [aircraftExistingWorkOrders]);
 
   const aircraftNonPerformedTasks = useMemo(() => {
-    const source = aircraftExistingWorkPackageSelectedRecord
-      ? aircraftExistingWorkPackageSelectedRecord.tasks
-      : aircraftExistingWorkPackages.flatMap((item) => item.tasks);
+    const source = aircraftExistingWorkOrderSelectedRecord
+      ? aircraftExistingWorkOrderSelectedRecord.tasks
+      : aircraftExistingWorkOrders.flatMap((item) => item.tasks);
     return source.filter((item) => isTaskNonPerformedStatus(item.status));
-  }, [aircraftExistingWorkPackageSelectedRecord, aircraftExistingWorkPackages]);
+  }, [aircraftExistingWorkOrderSelectedRecord, aircraftExistingWorkOrders]);
 
-  const aircraftAllWorkPackageTasks = useMemo(() => {
-    const merged = new Map<string, AircraftWorkPackageTaskListItem>();
+  const aircraftAllWorkOrderTasks = useMemo(() => {
+    const merged = new Map<string, AircraftWorkOrderTaskListItem>();
     const templateRows = aircraftTemplateAssociatedTasks.length > 0
       ? aircraftTemplateAssociatedTasks.map((task) => ({
           id: task.id,
@@ -6057,7 +6057,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           partNumber: '',
           description: task.description,
         }))
-      : (selectedWorkPackageTemplate?.taskRows || []);
+      : (selectedWorkOrderTemplate?.taskRows || []);
     templateRows.forEach((item, index) => {
       const id = item.id || `template-${index + 1}`;
       merged.set(id, {
@@ -6072,15 +6072,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         source: 'template',
       });
     });
-    aircraftExistingWorkPackages.forEach((workPackage) => {
-      workPackage.tasks.forEach((task) => {
-        const key = `${task.taskNumber}|${task.ataCode}|${task.serialNumber}|${task.partNumber}|${task.description}|${workPackage.id}`.toLowerCase();
+    aircraftExistingWorkOrders.forEach((workOrder) => {
+      workOrder.tasks.forEach((task) => {
+        const key = `${task.taskNumber}|${task.ataCode}|${task.serialNumber}|${task.partNumber}|${task.description}|${workOrder.id}`.toLowerCase();
         if (!merged.has(key)) {
           merged.set(key, task);
         }
       });
     });
-    aircraftWorkPackageSelectedTasks.forEach((item) => {
+    aircraftWorkOrderSelectedTasks.forEach((item) => {
       const id = `selected-${item.id}`;
       if (!merged.has(id)) {
         merged.set(id, {
@@ -6097,16 +6097,16 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }
     });
     return Array.from(merged.values());
-  }, [aircraftExistingWorkPackages, aircraftTemplateAssociatedTasks, aircraftWorkPackageSelectedTasks, selectedWorkPackageTemplate]);
+  }, [aircraftExistingWorkOrders, aircraftTemplateAssociatedTasks, aircraftWorkOrderSelectedTasks, selectedWorkOrderTemplate]);
 
-  const aircraftTaskGridRows = useMemo<AircraftWorkPackageTaskListItem[]>(() => {
-    if (aircraftWorkPackageActiveTab === 'non-performed-tasks') {
+  const aircraftTaskGridRows = useMemo<AircraftWorkOrderTaskListItem[]>(() => {
+    if (aircraftWorkOrderActiveTab === 'non-performed-tasks') {
       return aircraftNonPerformedTasks;
     }
-    if (aircraftWorkPackageActiveTab === 'all-tasks') {
-      return aircraftAllWorkPackageTasks;
+    if (aircraftWorkOrderActiveTab === 'all-tasks') {
+      return aircraftAllWorkOrderTasks;
     }
-    return aircraftWorkPackagePagedTasks.map((item) => ({
+    return aircraftWorkOrderPagedTasks.map((item) => ({
       id: item.id,
       taskNumber: item.taskNumber,
       ataCode: item.ataCode,
@@ -6116,17 +6116,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       status: 'pending',
       selectable: true,
       source: 'selected' as const,
-      parentWorkPackageNumber: undefined,
+      parentWorkOrderNumber: undefined,
     }));
   }, [
-    aircraftAllWorkPackageTasks,
+    aircraftAllWorkOrderTasks,
     aircraftNonPerformedTasks,
-    aircraftWorkPackageActiveTab,
-    aircraftWorkPackagePagedTasks,
+    aircraftWorkOrderActiveTab,
+    aircraftWorkOrderPagedTasks,
   ]);
 
   const aircraftTaskGridFilteredRows = useMemo(() => {
-    const normalizedSearch = aircraftWorkPackageTaskSearch.trim().toLowerCase();
+    const normalizedSearch = aircraftWorkOrderTaskSearch.trim().toLowerCase();
     const rows = normalizedSearch
       ? aircraftTaskGridRows.filter((item) =>
           [item.taskNumber, item.ataCode, item.serialNumber, item.partNumber, item.description, item.status]
@@ -6134,29 +6134,29 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         )
       : aircraftTaskGridRows;
     return [...rows].sort((left, right) => {
-      const leftValue = String(left[aircraftWorkPackageTaskSort] || '').toLowerCase();
-      const rightValue = String(right[aircraftWorkPackageTaskSort] || '').toLowerCase();
+      const leftValue = String(left[aircraftWorkOrderTaskSort] || '').toLowerCase();
+      const rightValue = String(right[aircraftWorkOrderTaskSort] || '').toLowerCase();
       if (leftValue === rightValue) {
         return left.id.localeCompare(right.id);
       }
-      return aircraftWorkPackageTaskSortDirection === 'asc'
+      return aircraftWorkOrderTaskSortDirection === 'asc'
         ? leftValue.localeCompare(rightValue)
         : rightValue.localeCompare(leftValue);
     });
-  }, [aircraftTaskGridRows, aircraftWorkPackageTaskSearch, aircraftWorkPackageTaskSort, aircraftWorkPackageTaskSortDirection]);
+  }, [aircraftTaskGridRows, aircraftWorkOrderTaskSearch, aircraftWorkOrderTaskSort, aircraftWorkOrderTaskSortDirection]);
 
-  const handleAircraftWorkPackageTaskSelection = useCallback((task: AircraftWorkPackageTaskListItem, checked: boolean) => {
+  const handleAircraftWorkOrderTaskSelection = useCallback((task: AircraftWorkOrderTaskListItem, checked: boolean) => {
     if (!task.selectable) {
       return;
     }
-    setAircraftWorkPackageSelectedTaskIds((previous) => {
+    setAircraftWorkOrderSelectedTaskIds((previous) => {
       if (checked) {
         return Array.from(new Set([...previous, task.id]));
       }
       return previous.filter((id) => id !== task.id);
     });
     if (checked) {
-      setAircraftWorkPackageValues((previous) => ({
+      setAircraftWorkOrderValues((previous) => ({
         ...previous,
         selectedTaskNumber: task.taskNumber || previous.selectedTaskNumber,
         selectedTaskAtaCode: task.ataCode || previous.selectedTaskAtaCode,
@@ -6165,33 +6165,33 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         selectedTaskDescription: task.description || previous.selectedTaskDescription,
       }));
     }
-    setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '' }));
+    setAircraftWorkOrderErrors((previous) => ({ ...previous, selectedTaskDescription: '' }));
   }, []);
 
-  const handleApplyExistingWorkPackageSelection = useCallback(() => {
-    const selectedRecord = aircraftExistingWorkPackages.find((item) => item.id === aircraftSelectedExistingWorkPackageId);
+  const handleApplyExistingWorkOrderSelection = useCallback(() => {
+    const selectedRecord = aircraftExistingWorkOrders.find((item) => item.id === aircraftSelectedExistingWorkOrderId);
     if (!selectedRecord) {
       toast.error('Select an existing work package first');
       return;
     }
-    setAircraftWorkPackageValues((previous) => {
+    setAircraftWorkOrderValues((previous) => {
       const normalizedStatus = String(selectedRecord.status || '').toLowerCase();
       const nextStatus = (
         ['', 'planning', 'scheduled', 'in_progress', 'blocked'].includes(normalizedStatus)
           ? normalizedStatus
           : previous.status
-      ) as AircraftWorkPackageFormValues['status'];
+      ) as AircraftWorkOrderFormValues['status'];
       const normalizedPriority = String(selectedRecord.priority || '').toLowerCase();
       const nextPriority = (
         ['low', 'medium', 'high', 'critical'].includes(normalizedPriority)
           ? normalizedPriority
           : previous.priority
-      ) as AircraftWorkPackageFormValues['priority'];
+      ) as AircraftWorkOrderFormValues['priority'];
       return {
         ...previous,
-        workPackageNumber: selectedRecord.workPackageNumber || previous.workPackageNumber,
+        workOrderNumber: selectedRecord.workOrderNumber || previous.workOrderNumber,
         topic: selectedRecord.title || previous.topic,
-        maintenanceType: (selectedRecord.maintenanceType || previous.maintenanceType) as AircraftWorkPackageFormValues['maintenanceType'],
+        maintenanceType: (selectedRecord.maintenanceType || previous.maintenanceType) as AircraftWorkOrderFormValues['maintenanceType'],
         station: selectedRecord.station || previous.station,
         status: nextStatus,
         priority: nextPriority,
@@ -6203,15 +6203,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         scopeItemsText: selectedRecord.tasks.map((task) => task.description).filter(Boolean).join('\n') || previous.scopeItemsText,
       };
     });
-    setAircraftWorkPackageSelectedTaskIds(selectedRecord.tasks.map((task) => task.id));
-    setAircraftWorkPackageErrors((previous) => ({ ...previous, selectedTaskDescription: '', scopeItemsText: '' }));
-    setAircraftWorkPackageActiveTab('selected-task');
+    setAircraftWorkOrderSelectedTaskIds(selectedRecord.tasks.map((task) => task.id));
+    setAircraftWorkOrderErrors((previous) => ({ ...previous, selectedTaskDescription: '', scopeItemsText: '' }));
+    setAircraftWorkOrderActiveTab('selected-task');
     toast.success('Existing work package loaded');
-  }, [aircraftExistingWorkPackages, aircraftSelectedExistingWorkPackageId]);
+  }, [aircraftExistingWorkOrders, aircraftSelectedExistingWorkOrderId]);
 
   useEffect(() => {
-    setAircraftWorkPackageTaskPage(1);
-  }, [aircraftWorkPackageActiveTab]);
+    setAircraftWorkOrderTaskPage(1);
+  }, [aircraftWorkOrderActiveTab]);
 
   const openFlightLogDialog = useCallback((rowId: string) => {
     const aircraftId = rowId.trim();
@@ -6277,7 +6277,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setFlightLogDialogOpen(false);
       await loadRecords();
       if (mode === 'add') {
-        await loadAircraftWorkPackageSnapshot();
+        await loadAircraftWorkOrderSnapshot();
       }
     } catch (error) {
       logger.error('Flight log save failed', {
@@ -6290,15 +6290,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setFlightLogSubmitting(false);
     }
-  }, [loadAircraftWorkPackageSnapshot, loadRecords, scope]);
+  }, [loadAircraftWorkOrderSnapshot, loadRecords, scope]);
 
   const aircraftDashboardKpis = useMemo<AircraftDashboardKpis>(() => {
     const source = aircraftDashboard?.kpis || {};
     return {
       fleet_size: Number(source.fleet_size || 0),
-      open_work_packages: Number(source.open_work_packages || 0),
+      open_work_orders: Number(source.open_work_orders || 0),
       due_within_window: Number(source.due_within_window || 0),
-      overdue_work_packages: Number(source.overdue_work_packages || 0),
+      overdue_work_orders: Number(source.overdue_work_orders || 0),
       open_defects: Number(source.open_defects || 0),
       total_flight_hours: Number(source.total_flight_hours || 0),
       total_cycles: Number(source.total_cycles || 0),
@@ -7433,14 +7433,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const aircraftStatusPaletteActions = useMemo<AircraftPaletteAction[]>(
     () => [
       {
-        id: 'create-work-package',
+        id: 'create-work-order',
         label: 'Create Work Package',
         icon: <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />,
         group: 'primary',
         variant: 'default',
         permission: 'create_maintenance_request',
         onAction: async () => {
-          openAircraftWorkPackageDialog();
+          openAircraftWorkOrderDialog();
         },
       },
       {
@@ -7470,11 +7470,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         group: 'contextual',
         permission: 'edit_aircraft_records',
         onAction: async () => {
-          handleAircraftContextNavigation('/dashboard/amro/aircraft/work-packages');
+          handleAircraftContextNavigation('/dashboard/amro/aircraft/work-orders');
         },
       },
     ],
-    [handleAircraftContextNavigation, openAircraftFlightLogsList, openAircraftWorkPackageDialog, openFlightLogDialog, selectedAircraft?.id],
+    [handleAircraftContextNavigation, openAircraftFlightLogsList, openAircraftWorkOrderDialog, openFlightLogDialog, selectedAircraft?.id],
   );
   const aircraftKpiPaletteActions = useMemo<AircraftPaletteAction[]>(
     () => [
@@ -7517,23 +7517,23 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (aircraftSubModuleSegment === 'components') return 'components';
     if (aircraftSubModuleSegment === 'documents') return 'documents';
     if (aircraftSubModuleSegment === 'ad-sb') return 'ad-sb';
-    if (aircraftSubModuleSegment === 'work-packages') return 'work-packages';
+    if (aircraftSubModuleSegment === 'work-orders') return 'work-orders';
     return 'list';
   }, [aircraftSubModuleSegment]);
   const canOpenAircraftSubModuleCreateAction = useMemo(() => {
     if (activeAircraftUnifiedModuleKey === 'templates') {
       return canManageAircraftTemplates;
     }
-    if (activeAircraftUnifiedModuleKey === 'work-packages') {
-      return canCreateWorkPackage;
+    if (activeAircraftUnifiedModuleKey === 'work-orders') {
+      return canCreateWorkOrder;
     }
     return canCreateAircraftRecords;
-  }, [activeAircraftUnifiedModuleKey, canCreateAircraftRecords, canCreateWorkPackage, canManageAircraftTemplates]);
+  }, [activeAircraftUnifiedModuleKey, canCreateAircraftRecords, canCreateWorkOrder, canManageAircraftTemplates]);
   const aircraftSubModuleCreateActionLabel = useMemo(() => {
     if (activeAircraftUnifiedModuleKey === 'templates') {
       return 'New Template';
     }
-    if (activeAircraftUnifiedModuleKey === 'work-packages') {
+    if (activeAircraftUnifiedModuleKey === 'work-orders') {
       return 'New Work Package';
     }
     return 'New Aircraft Record';
@@ -7542,22 +7542,22 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (activeAircraftUnifiedModuleKey === 'templates') {
       return aircraftTemplateDialogSubmitting;
     }
-    if (activeAircraftUnifiedModuleKey === 'work-packages') {
-      return aircraftWorkPackageSubmitting;
+    if (activeAircraftUnifiedModuleKey === 'work-orders') {
+      return aircraftWorkOrderSubmitting;
     }
     return busyAction === 'create';
-  }, [activeAircraftUnifiedModuleKey, aircraftTemplateDialogSubmitting, aircraftWorkPackageSubmitting, busyAction]);
+  }, [activeAircraftUnifiedModuleKey, aircraftTemplateDialogSubmitting, aircraftWorkOrderSubmitting, busyAction]);
   const handleAircraftSubModuleCreateAction = useCallback(() => {
     if (activeAircraftUnifiedModuleKey === 'templates') {
       openCreateAircraftTemplateDialog();
       return;
     }
-    if (activeAircraftUnifiedModuleKey === 'work-packages') {
-      openAircraftWorkPackageDialog();
+    if (activeAircraftUnifiedModuleKey === 'work-orders') {
+      openAircraftWorkOrderDialog();
       return;
     }
     handleOpenCreateModal();
-  }, [activeAircraftUnifiedModuleKey, handleOpenCreateModal, openAircraftWorkPackageDialog, openCreateAircraftTemplateDialog]);
+  }, [activeAircraftUnifiedModuleKey, handleOpenCreateModal, openAircraftWorkOrderDialog, openCreateAircraftTemplateDialog]);
   const aircraftUnifiedActiveSearch = activeAircraftUnifiedModuleKey === 'list' ? search : aircraftUnifiedSearch;
   const aircraftUnifiedActiveStatusFilter = activeAircraftUnifiedModuleKey === 'list' ? statusFilter : aircraftUnifiedStatusFilter;
   const handleAircraftUnifiedSearchChange = useCallback((value: string) => {
@@ -7693,7 +7693,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       deferredAircraftUnifiedSearch,
       aircraftUnifiedStatusFilter,
       (row) => [
-        String(row.work_package_number || ''),
+        String(row.work_order_number || ''),
         String(row.title || ''),
         String(row.status || ''),
       ],
@@ -7907,11 +7907,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (activeAircraftUnifiedModuleKey === 'components') {
       return { visible: filteredAircraftComponentLifecycleRows.length, total: aircraftComponentLifecycleRows.length };
     }
-    if (activeAircraftUnifiedModuleKey === 'work-packages') {
-      const total = aircraftWorkPackageSnapshot.open
-        + aircraftWorkPackageSnapshot.inProgress
-        + aircraftWorkPackageSnapshot.deferred
-        + aircraftWorkPackageSnapshot.completed;
+    if (activeAircraftUnifiedModuleKey === 'work-orders') {
+      const total = aircraftWorkOrderSnapshot.open
+        + aircraftWorkOrderSnapshot.inProgress
+        + aircraftWorkOrderSnapshot.deferred
+        + aircraftWorkOrderSnapshot.completed;
       return { visible: total, total };
     }
     return { visible: renderedRows.length, total: rows.length };
@@ -7922,10 +7922,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     aircraftDocumentRows.length,
     aircraftEngineMaintenanceRows.length,
     aircraftTemplateRows.length,
-    aircraftWorkPackageSnapshot.completed,
-    aircraftWorkPackageSnapshot.deferred,
-    aircraftWorkPackageSnapshot.inProgress,
-    aircraftWorkPackageSnapshot.open,
+    aircraftWorkOrderSnapshot.completed,
+    aircraftWorkOrderSnapshot.deferred,
+    aircraftWorkOrderSnapshot.inProgress,
+    aircraftWorkOrderSnapshot.open,
     filteredAircraftAdSbRows.length,
     filteredAircraftComponentLifecycleRows.length,
     filteredAircraftDocumentRows.length,
@@ -8055,12 +8055,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                 <div className="space-y-3 rounded-md border border-[hsl(var(--mdm-template-border))] p-4">
                   <h3 className="text-[14px] font-semibold text-[hsl(var(--mdm-template-heading))]">KPI Cards</h3>
                   <div className="grid grid-cols-2 gap-2 text-[12px]">
-                    <div className="rounded-md bg-muted/40 p-2">Open WP: <span className="font-semibold">{aircraftWorkPackageSnapshot.open}</span></div>
-                    <div className="rounded-md bg-muted/40 p-2">In Progress: <span className="font-semibold">{aircraftWorkPackageSnapshot.inProgress}</span></div>
-                    <div className="rounded-md bg-muted/40 p-2">Deferred: <span className="font-semibold">{aircraftWorkPackageSnapshot.deferred}</span></div>
-                    <div className="rounded-md bg-muted/40 p-2">Completed: <span className="font-semibold">{aircraftWorkPackageSnapshot.completed}</span></div>
-                    <div className="rounded-md bg-muted/40 p-2">RTS Blockers: <span className="font-semibold">{aircraftWorkPackageSnapshot.rtsBlockers}</span></div>
-                    <div className="rounded-md bg-muted/40 p-2">SLA Risk: <span className="font-semibold">{aircraftWorkPackageSnapshot.slaRisk}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Open WP: <span className="font-semibold">{aircraftWorkOrderSnapshot.open}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">In Progress: <span className="font-semibold">{aircraftWorkOrderSnapshot.inProgress}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Deferred: <span className="font-semibold">{aircraftWorkOrderSnapshot.deferred}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">Completed: <span className="font-semibold">{aircraftWorkOrderSnapshot.completed}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">RTS Blockers: <span className="font-semibold">{aircraftWorkOrderSnapshot.rtsBlockers}</span></div>
+                    <div className="rounded-md bg-muted/40 p-2">SLA Risk: <span className="font-semibold">{aircraftWorkOrderSnapshot.slaRisk}</span></div>
                   </div>
                   <AircraftActionPalette actions={aircraftKpiPaletteActions} hasPermission={hasPermission} compact buttonClassName="h-8" className="pt-1" />
                 </div>
@@ -8099,7 +8099,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                       <div className="grid gap-2 text-[12px]">
                         {aircraftDashboardMaintenanceRows.map((row, index) => (
                           <div key={`ops-maintenance-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] px-2 py-1">
-                            {String(row.work_package_number || row.title || 'Work package')} · {String(row.status || 'open')} · due {String(row.due_in_days ?? '-')}d
+                            {String(row.work_order_number || row.title || 'Work package')} · {String(row.status || 'open')} · due {String(row.due_in_days ?? '-')}d
                           </div>
                         ))}
                       </div>
@@ -8238,14 +8238,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                   className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-2 transition-all duration-200 hover:border-primary/40 hover:bg-background"
                                   onClick={() =>
                                     endEngineUsabilityTask('engine_maintenance_next_due', 'completed', {
-                                      work_package: String(row.work_package_number || row.title || ''),
+                                      work_order: String(row.work_order_number || row.title || ''),
                                       status: String(row.status || 'open'),
                                     })
                                   }
                                 >
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">
-                                      {String(row.work_package_number || row.title || `Engine work order ${index + 1}`)}
+                                      {String(row.work_order_number || row.title || `Engine work order ${index + 1}`)}
                                     </p>
                                     <Badge variant={mapStatusToBadgeVariant(String(row.status || 'open'))}>{String(row.status || 'open')}</Badge>
                                   </div>
@@ -8317,7 +8317,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                                 <div key={`engine-work-order-row-${index + 1}`} className="rounded-md border border-[hsl(var(--mdm-template-border))] bg-background/70 px-2.5 py-1.5">
                                   <div className="flex items-center justify-between gap-2">
                                     <p className="text-[11px] font-medium text-[hsl(var(--mdm-template-heading))]">
-                                      {String(row.work_package_number || row.title || `Work order ${index + 1}`)}
+                                      {String(row.work_order_number || row.title || `Work order ${index + 1}`)}
                                     </p>
                                     <Badge variant={mapStatusToBadgeVariant(String(row.status || 'open'))}>{String(row.status || 'open')}</Badge>
                                   </div>
@@ -8742,7 +8742,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     )}
                   </div>
                   <div className="flex flex-wrap gap-2 pt-1">
-                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/settings/work-package-templates')}>
+                    <Button size="sm" variant="outline" onClick={() => handleAircraftContextNavigation('/dashboard/amro/settings/work-order-templates')}>
                       Open Template Records
                     </Button>
                     <Button size="sm" variant="outline" onClick={handleExportAircraftOpsReport}>
@@ -9419,9 +9419,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   setAircraftAmendmentDate={setAircraftAmendmentDate}
                   aircraftAuditTimeline={aircraftAuditTimeline}
                 />
-              ) : entity === 'work_package_templates' ? (
-                workPackageTemplateStandardEnabled ? (
-                  <AmroWorkPackageTemplateAdapter
+              ) : entity === 'work_order_templates' ? (
+                workOrderTemplateStandardEnabled ? (
+                  <AmroWorkOrderTemplateAdapter
                     mode={modalMode}
                     loading={false}
                     formValues={formValues}
@@ -9435,7 +9435,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                     scope={scope}
                   />
                 ) : (
-                  <WorkPackageTemplateCreateSection
+                  <WorkOrderTemplateCreateSection
                     formValues={formValues}
                     formErrors={formErrors}
                     setFieldValue={setFieldValue}
@@ -9553,9 +9553,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             </div>
           </DialogContent>
         </Dialog>
-        <AmroWorkPackageCreateWizard
-          open={aircraftWorkPackageDialogOpen}
-          onOpenChange={setAircraftWorkPackageDialogOpen}
+        <AmroWorkOrderCreateWizard
+          open={aircraftWorkOrderDialogOpen}
+          onOpenChange={setAircraftWorkOrderDialogOpen}
           preselectedAircraftId={selectedAircraft?.id || ''}
           onSuccess={() => {
             // Work package created successfully - user will see toast from wizard

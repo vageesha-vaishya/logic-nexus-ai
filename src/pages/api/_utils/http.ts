@@ -331,7 +331,7 @@ function getMutationTargetSignature(req: ApiRequest): string {
     String(query.interface || '').trim(),
     String(query.id || '').trim(),
     String(body.task_id || '').trim(),
-    String(body.work_package_id || '').trim(),
+    String(body.work_order_id || '').trim(),
     String(body.action || '').trim(),
   ].filter(Boolean);
   return segments.join(':') || 'generic-mutation';

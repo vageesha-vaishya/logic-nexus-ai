@@ -1,6 +1,6 @@
 PASS tests/work-orders.service.test.ts
 PASS tests/amro-tracing.test.ts
-PASS tests/work-packages-stream.test.ts
+PASS tests/work-orders-stream.test.ts
 PASS tests/resilience.test.ts
   ● Console
 
@@ -151,7 +151,7 @@ PASS tests/work-orders-contract.test.ts
       [INFO] Request started {
         requestId: '49204d5d-40b4-4bd3-b38a-7432ab156338',
         method: 'POST',
-        path: '/api/v1/work-packages/wp-1/tasks',
+        path: '/api/v1/work-orders/wp-1/tasks',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -161,7 +161,7 @@ PASS tests/work-orders-contract.test.ts
       [INFO] Request finished {
         requestId: '49204d5d-40b4-4bd3-b38a-7432ab156338',
         method: 'POST',
-        path: '/work-packages/wp-1/tasks',
+        path: '/work-orders/wp-1/tasks',
         statusCode: 201,
         durationMs: 11
       }
@@ -172,7 +172,7 @@ PASS tests/work-orders-contract.test.ts
       [INFO] Request started {
         requestId: '44b7b09c-45e2-41ef-96f1-e67c1feb7d46',
         method: 'POST',
-        path: '/api/v1/work-packages/wp-1/tasks',
+        path: '/api/v1/work-orders/wp-1/tasks',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -182,7 +182,7 @@ PASS tests/work-orders-contract.test.ts
       [INFO] Request finished {
         requestId: '44b7b09c-45e2-41ef-96f1-e67c1feb7d46',
         method: 'POST',
-        path: '/work-packages/wp-1/tasks',
+        path: '/work-orders/wp-1/tasks',
         statusCode: 201,
         durationMs: 1
       }
@@ -193,7 +193,7 @@ PASS tests/work-orders-contract.test.ts
       [INFO] Request started {
         requestId: 'be88a4e4-7f0a-4089-8dec-57d525dd5700',
         method: 'GET',
-        path: '/api/v1/work-packages/wp-42/materials',
+        path: '/api/v1/work-orders/wp-42/materials',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -203,7 +203,7 @@ PASS tests/work-orders-contract.test.ts
       [INFO] Request finished {
         requestId: 'be88a4e4-7f0a-4089-8dec-57d525dd5700',
         method: 'GET',
-        path: '/work-packages/wp-42/materials',
+        path: '/work-orders/wp-42/materials',
         statusCode: 200,
         durationMs: 2
       }
@@ -511,7 +511,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: 'a6122bd5-5085-41ce-9ae5-433534b8bf4a',
         method: 'GET',
-        path: '/api/v1/work-packages',
+        path: '/api/v1/work-orders',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -521,7 +521,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: 'a6122bd5-5085-41ce-9ae5-433534b8bf4a',
         method: 'GET',
-        path: '/work-packages',
+        path: '/work-orders',
         statusCode: 401,
         durationMs: 1
       }
@@ -532,7 +532,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: '8f8eb593-b06a-4499-8e59-a86012545cb9',
         method: 'GET',
-        path: '/api/v1/work-packages',
+        path: '/api/v1/work-orders',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -542,7 +542,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: '8f8eb593-b06a-4499-8e59-a86012545cb9',
         method: 'GET',
-        path: '/work-packages',
+        path: '/work-orders',
         statusCode: 401,
         durationMs: 0
       }
@@ -553,7 +553,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: 'e2d018ad-9f8d-4925-a269-66a88298fed5',
         method: 'GET',
-        path: '/api/v1/work-packages',
+        path: '/api/v1/work-orders',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -563,7 +563,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: 'e2d018ad-9f8d-4925-a269-66a88298fed5',
         method: 'GET',
-        path: '/work-packages',
+        path: '/work-orders',
         statusCode: 401,
         durationMs: 1
       }
@@ -637,7 +637,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: 'e9108662-5e96-4bfc-a87b-b0893da48efb',
         method: 'GET',
-        path: '/api/v1/work-packages',
+        path: '/api/v1/work-orders',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -647,7 +647,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: 'e9108662-5e96-4bfc-a87b-b0893da48efb',
         method: 'GET',
-        path: '/work-packages',
+        path: '/work-orders',
         statusCode: 401,
         durationMs: 0
       }
@@ -658,7 +658,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: '0ee8a475-2fa2-48ab-9689-2916e63d2833',
         method: 'POST',
-        path: '/api/v1/work-packages',
+        path: '/api/v1/work-orders',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -668,7 +668,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: '0ee8a475-2fa2-48ab-9689-2916e63d2833',
         method: 'POST',
-        path: '/work-packages',
+        path: '/work-orders',
         statusCode: 401,
         durationMs: 0
       }
@@ -679,7 +679,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: '72d5a772-5285-4b52-a292-72f67d5dda45',
         method: 'GET',
-        path: '/api/v1/work-packages/wp-123',
+        path: '/api/v1/work-orders/wp-123',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -689,7 +689,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: '72d5a772-5285-4b52-a292-72f67d5dda45',
         method: 'GET',
-        path: '/work-packages/wp-123',
+        path: '/work-orders/wp-123',
         statusCode: 401,
         durationMs: 1
       }
@@ -700,7 +700,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: '23fa274e-20ac-4294-b5be-e4ea75881236',
         method: 'PATCH',
-        path: '/api/v1/work-packages/wp-123',
+        path: '/api/v1/work-orders/wp-123',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -710,7 +710,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: '23fa274e-20ac-4294-b5be-e4ea75881236',
         method: 'PATCH',
-        path: '/work-packages/wp-123',
+        path: '/work-orders/wp-123',
         statusCode: 401,
         durationMs: 0
       }
@@ -721,7 +721,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: '8d0ca756-0b44-47c9-8c82-d2dcf413be46',
         method: 'DELETE',
-        path: '/api/v1/work-packages/wp-123',
+        path: '/api/v1/work-orders/wp-123',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -731,7 +731,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: '8d0ca756-0b44-47c9-8c82-d2dcf413be46',
         method: 'DELETE',
-        path: '/work-packages/wp-123',
+        path: '/work-orders/wp-123',
         statusCode: 401,
         durationMs: 0
       }
@@ -742,7 +742,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: '72bcd0ba-8adf-473b-94df-5fffd6b94edb',
         method: 'GET',
-        path: '/api/v1/work-packages/wp-123/tasks',
+        path: '/api/v1/work-orders/wp-123/tasks',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -752,7 +752,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: '72bcd0ba-8adf-473b-94df-5fffd6b94edb',
         method: 'GET',
-        path: '/work-packages/wp-123/tasks',
+        path: '/work-orders/wp-123/tasks',
         statusCode: 401,
         durationMs: 0
       }
@@ -763,7 +763,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: 'f3430052-3c39-467c-98bb-f28c5d98beb5',
         method: 'POST',
-        path: '/api/v1/work-packages/wp-123/tasks',
+        path: '/api/v1/work-orders/wp-123/tasks',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -773,7 +773,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: 'f3430052-3c39-467c-98bb-f28c5d98beb5',
         method: 'POST',
-        path: '/work-packages/wp-123/tasks',
+        path: '/work-orders/wp-123/tasks',
         statusCode: 401,
         durationMs: 0
       }
@@ -847,7 +847,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request started {
         requestId: '2efaadfc-6ee3-425d-aaad-6505b0310102',
         method: 'GET',
-        path: '/api/v1/work-packages/wp-123/materials',
+        path: '/api/v1/work-orders/wp-123/materials',
         ip: '::ffff:127.0.0.1'
       }
 
@@ -857,7 +857,7 @@ PASS tests/work-orders.test.ts
       [INFO] Request finished {
         requestId: '2efaadfc-6ee3-425d-aaad-6505b0310102',
         method: 'GET',
-        path: '/work-packages/wp-123/materials',
+        path: '/work-orders/wp-123/materials',
         statusCode: 401,
         durationMs: 1
       }

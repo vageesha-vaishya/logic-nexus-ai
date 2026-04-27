@@ -18,7 +18,7 @@ describe('AircraftUnifiedLayout', () => {
         activeModuleKey="templates"
         navItems={[
           { key: 'templates', label: 'Templates', path: '/dashboard/amro/aircraft/templates', icon: FileText },
-          { key: 'work-packages', label: 'Maintenance Planning', path: '/dashboard/amro/aircraft/work-packages', icon: CalendarDays },
+          { key: 'work-orders', label: 'Maintenance Planning', path: '/dashboard/amro/aircraft/work-orders', icon: CalendarDays },
         ]}
         onNavigate={onNavigate}
         searchValue=""
@@ -46,7 +46,7 @@ describe('AircraftUnifiedLayout', () => {
     expect(screen.getByText('Unified templates layout')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Maintenance Planning' }));
-    expect(onNavigate).toHaveBeenCalledWith('/dashboard/amro/aircraft/work-packages');
+    expect(onNavigate).toHaveBeenCalledWith('/dashboard/amro/aircraft/work-orders');
 
     fireEvent.change(screen.getByLabelText('Unified module search'), { target: { value: 'A320' } });
     expect(onSearchChange).toHaveBeenCalledWith('A320');

@@ -287,7 +287,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'evaluate-compliance-gate' },
       body: {
-        context: { type: 'work_package', id: 'wp-qual-001' },
+        context: { type: 'work_order', id: 'wp-qual-001' },
         regulator_profile: 'EASA',
         required_obligations: [{ obligation_id: 'obl-1', fulfilled: true }],
         policy_version_snapshot: 'policy-v2026.03.21',
@@ -316,7 +316,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'pre-schedule-compliance-gate' },
       body: {
-        work_package_id: 'wp-pre-schedule-1',
+        work_order_id: 'wp-pre-schedule-1',
         aircraft_status: 'grounded',
         unresolved_mandatory_obligations: ['obl-100'],
       },
@@ -366,7 +366,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'register-exception-request' },
       body: {
-        work_package_id: 'wp-001',
+        work_order_id: 'wp-001',
         obligation_id: 'obl-100',
         justification: 'Manual review required due to deferred component replacement',
         requested_by: 'inspector-01',
@@ -390,7 +390,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'generate-compliance-dossier' },
       body: {
-        work_package_id: 'wp-002',
+        work_order_id: 'wp-002',
         profile: 'EASA',
         include_artifacts: ['release_certificate', 'task_cards', 'signature_log'],
       },
@@ -440,7 +440,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'evaluate-closure-quality-gate' },
       body: {
-        work_package_id: 'wp-closure-1',
+        work_order_id: 'wp-closure-1',
         open_findings: 1,
         unresolved_deferrals: 0,
         pending_signatures: 0,
@@ -465,7 +465,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'ingest-ad-sb-obligations' },
       body: {
-        work_package_id: 'wp-100',
+        work_order_id: 'wp-100',
         regulator_profile: 'CAAC',
         source_adapter: 'feed-v1',
         obligations: [
@@ -505,7 +505,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'register-exception-request' },
       body: {
-        work_package_id: 'tenant-2:wp-001',
+        work_order_id: 'tenant-2:wp-001',
         obligation_id: 'tenant-2:obl-100',
         justification: 'Manual review required due to deferred component replacement',
         requested_by: 'inspector-01',
@@ -530,7 +530,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'evaluate-mel-cdl-deferral' },
       body: {
-        work_package_id: 'wp-101',
+        work_order_id: 'wp-101',
         deferral_type: 'mel',
         item_reference: 'MEL-ATA27-001',
         deferral_category: 'B',
@@ -555,7 +555,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'load-compliance-gate-explainability' },
       body: {
-        context: { type: 'work_package', id: 'wp-102' },
+        context: { type: 'work_order', id: 'wp-102' },
         policy_version_snapshot: 'policy-v2026.03.22',
         required_obligations: [{ obligation_id: 'obl-1', fulfilled: true }],
       },
@@ -621,7 +621,7 @@ describe('/api/v2/amro/compliance-gates', () => {
       method: 'POST',
       query: { interface: 'post-release-audit-gate' },
       body: {
-        work_package_id: 'wp-missing-release',
+        work_order_id: 'wp-missing-release',
         release_decision_id: 'decision-1',
         evidence_link_hash: 'abc123',
       },

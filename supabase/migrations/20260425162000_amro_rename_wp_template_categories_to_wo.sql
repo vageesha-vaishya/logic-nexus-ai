@@ -2,21 +2,21 @@
 -- DB-ARCH-APPROVAL: pending-amro-arch-board-approval
 --
 -- Purpose:
--- - Rename table public.amro_work_package_template_categories -> public.amro_work_order_template_categories
+-- - Rename table public.amro_work_order_template_categories -> public.amro_work_order_template_categories
 -- - Rename associated constraints/indexes/policies to work-order naming conventions
 
 BEGIN;
 
 DO $$
 DECLARE
-  v_old_table regclass := to_regclass('public.amro_work_package_template_categories');
+  v_old_table regclass := to_regclass('public.amro_work_order_template_categories');
   v_new_table regclass := to_regclass('public.amro_work_order_template_categories');
   rec record;
   v_new_name text;
 BEGIN
   -- Rename table if still in legacy name.
   IF v_old_table IS NOT NULL AND v_new_table IS NULL THEN
-    EXECUTE 'ALTER TABLE public.amro_work_package_template_categories RENAME TO amro_work_order_template_categories';
+    EXECUTE 'ALTER TABLE public.amro_work_order_template_categories RENAME TO amro_work_order_template_categories';
   END IF;
 
   v_new_table := to_regclass('public.amro_work_order_template_categories');
@@ -31,7 +31,7 @@ BEGIN
     WHERE conrelid = v_new_table
   LOOP
     v_new_name := rec.conname;
-    v_new_name := replace(v_new_name, 'work_package_template_categories', 'work_order_template_categories');
+    v_new_name := replace(v_new_name, 'work_order_template_categories', 'work_order_template_categories');
     v_new_name := replace(v_new_name, 'template_category_code', 'work_order_template_category_code');
     v_new_name := replace(v_new_name, 'template_category', 'work_order_template_category');
 

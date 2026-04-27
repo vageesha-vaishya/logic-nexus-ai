@@ -3,7 +3,7 @@
  * 
  * DATABASE SCHEMA:
  * - Uses: amro_non_scheduled_tasks (existing)
- * - Uses: amro_emergency_work_packages (existing)
+ * - Uses: amro_emergency_work_orders (existing)
  * - Uses: work_orders (existing)
  * - Updates: non-scheduled task status to 'converted_to_wp'
  * - Creates: emergency work package linked to original task
@@ -165,10 +165,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     let emergencyWPId = null;
     if (['immediate', 'urgent'].includes(urgencyLevel)) {
       const { data: emergencyWP, error: emergencyError } = await supabase
-        .from('amro_emergency_work_packages')
+        .from('amro_emergency_work_orders')
         .insert({
           tenant_id: tenantId,
-          work_package_id: wp.id,
+          work_order_id: wp.id,
           emergency_type: task.priority === 'aog' ? 'aog' : 'technical_fault',
           urgency_level: urgencyLevel,
           reason: task.task_description,
@@ -214,8 +214,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       interface: 'convert-non-scheduled-task-to-wp',
       correlationId: ctx.correlationId,
       output: {
-        work_package_id: wp.id,
-        work_package_number: wp.work_order_number || wp.work_package_number,
+        work_order_id: wp.id,
+        work_order_number: wp.work_order_number || wp.work_order_number,
         emergency_wp_id: emergencyWPId,
         converted_from_task_id: task.id,
         conversion_timestamp: new Date().toISOString(),

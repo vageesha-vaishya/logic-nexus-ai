@@ -2,10 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   adaptLegacyComplianceGates,
   adaptLegacyTasks,
-  adaptLegacyWorkPackages,
+  adaptLegacyWorkOrders,
   adaptModuleComplianceGatesFromLegacy,
   adaptModuleTasksFromLegacy,
-  adaptModuleWorkPackagesFromLegacy,
+  adaptModuleWorkOrdersFromLegacy,
 } from './anti-corruption-adapter';
 
 describe('AMRO anti-corruption adapter', () => {
@@ -23,8 +23,8 @@ describe('AMRO anti-corruption adapter', () => {
       },
     ];
 
-    const legacyItems = adaptLegacyWorkPackages(rows);
-    const moduleItems = adaptModuleWorkPackagesFromLegacy(rows);
+    const legacyItems = adaptLegacyWorkOrders(rows);
+    const moduleItems = adaptModuleWorkOrdersFromLegacy(rows);
 
     expect(legacyItems[0].id).toBe('legacy-wp-001');
     expect(moduleItems[0].id).toBe('amro-wp-001');
@@ -37,7 +37,7 @@ describe('AMRO anti-corruption adapter', () => {
     const rows = [
       {
         legacy_id: 'legacy-task-002',
-        work_package_id: 'WP-001',
+        work_order_id: 'WP-001',
         task_code: 'T-002',
         legacy_title: 'Legacy Avionics Wiring Continuity Test',
         legacy_status: 'in_progress' as const,
@@ -63,7 +63,7 @@ describe('AMRO anti-corruption adapter', () => {
     const rows = [
       {
         legacy_gate_id: 'legacy-gate-003',
-        work_package_id: 'WP-002',
+        work_order_id: 'WP-002',
         task_code: 'T-003',
         decision: 'rejected' as const,
         decided_by: 'certifier-b',

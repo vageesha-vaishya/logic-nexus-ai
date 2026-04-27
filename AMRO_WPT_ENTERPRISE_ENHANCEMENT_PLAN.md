@@ -461,13 +461,13 @@ POST   /api/v2/amro/compliance/export-report      - Export regulatory report
 ### Enhanced Existing Endpoints
 
 ```
-POST /api/v2/amro/master-data/work_package_templates
+POST /api/v2/amro/master-data/work_order_templates
   - Accept enhanced materials_json, tooling_json, compliance_requirements_json
   - Validate material stock levels
   - Validate tooling availability
   - Check compliance deadlines
 
-PATCH /api/v2/amro/master-data/work_package_templates/:id
+PATCH /api/v2/amro/master-data/work_order_templates/:id
   - Update enhanced fields
   - Track changes in audit trail
   - Notify stakeholders on critical changes

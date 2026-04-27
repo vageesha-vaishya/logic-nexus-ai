@@ -3,7 +3,7 @@
 -- ============================================================================
 -- The Materials+, Tooling+, and Compliance+ data must exist on the physical
 -- work-order template table used by runtime APIs.
--- NOTE: work_package_templates may be an updatable compatibility VIEW, so
+-- NOTE: work_order_templates may be an updatable compatibility VIEW, so
 -- ALTER TABLE operations must target public.work_order_templates directly.
 -- ============================================================================
 
@@ -63,14 +63,14 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM pg_constraint
-        WHERE conname = 'chk_work_package_templates_materials_json_is_array'
+        WHERE conname = 'chk_work_order_templates_materials_json_is_array'
     ) AND NOT EXISTS (
         SELECT 1
         FROM pg_constraint
         WHERE conname = 'chk_work_order_templates_materials_json_is_array'
     ) THEN
         ALTER TABLE public.work_order_templates
-        RENAME CONSTRAINT chk_work_package_templates_materials_json_is_array
+        RENAME CONSTRAINT chk_work_order_templates_materials_json_is_array
         TO chk_work_order_templates_materials_json_is_array;
     END IF;
 
@@ -88,14 +88,14 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM pg_constraint
-        WHERE conname = 'chk_work_package_templates_tooling_json_is_array'
+        WHERE conname = 'chk_work_order_templates_tooling_json_is_array'
     ) AND NOT EXISTS (
         SELECT 1
         FROM pg_constraint
         WHERE conname = 'chk_work_order_templates_tooling_json_is_array'
     ) THEN
         ALTER TABLE public.work_order_templates
-        RENAME CONSTRAINT chk_work_package_templates_tooling_json_is_array
+        RENAME CONSTRAINT chk_work_order_templates_tooling_json_is_array
         TO chk_work_order_templates_tooling_json_is_array;
     END IF;
 
@@ -113,14 +113,14 @@ BEGIN
     IF EXISTS (
         SELECT 1
         FROM pg_constraint
-        WHERE conname = 'chk_work_package_templates_compliance_requirements_json_is_array'
+        WHERE conname = 'chk_work_order_templates_compliance_requirements_json_is_array'
     ) AND NOT EXISTS (
         SELECT 1
         FROM pg_constraint
         WHERE conname = 'chk_work_order_templates_compliance_requirements_json_is_array'
     ) THEN
         ALTER TABLE public.work_order_templates
-        RENAME CONSTRAINT chk_work_package_templates_compliance_requirements_json_is_array
+        RENAME CONSTRAINT chk_work_order_templates_compliance_requirements_json_is_array
         TO chk_work_order_templates_compliance_requirements_json_is_array;
     END IF;
 

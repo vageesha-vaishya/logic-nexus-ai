@@ -3,7 +3,7 @@ import { createHash } from 'node:crypto';
 
 export type AmroReconciliationQueueEntry = {
   idempotencyKey: string;
-  capability: 'work-packages' | 'tasks' | 'compliance-gates';
+  capability: 'work-orders' | 'tasks' | 'compliance-gates';
   correlationId: string;
   tenantId: string;
   franchiseId: string | null;
@@ -30,7 +30,7 @@ type QueueRuntime = {
 
 type AmroReconciliationQueueInput = Omit<AmroReconciliationQueueEntry, 'idempotencyKey' | 'createdAt' | 'historicalBackfill'>;
 type AmroFallbackDrainInput = Pick<AmroReconciliationQueueInput, 'capability' | 'tenantId' | 'franchiseId' | 'compatMode' | 'correlationId'>;
-type AmroDualWriteEntityType = 'work-package' | 'task' | 'compliance-gate';
+type AmroDualWriteEntityType = 'work-order' | 'task' | 'compliance-gate';
 type AmroDualWriteInput = {
   capability: AmroReconciliationQueueEntry['capability'];
   tenantId: string;
@@ -39,7 +39,7 @@ type AmroDualWriteInput = {
   correlationId: string;
   entityType: AmroDualWriteEntityType;
   entityId: string;
-  eventType: 'amro.work_package.created.v1' | 'amro.task.completed.v1' | 'amro.compliance.gate_decided.v1';
+  eventType: 'amro.work_order.created.v1' | 'amro.task.completed.v1' | 'amro.compliance.gate_decided.v1';
   action: 'upsert' | 'status-sync' | 'gate-sync';
 };
 

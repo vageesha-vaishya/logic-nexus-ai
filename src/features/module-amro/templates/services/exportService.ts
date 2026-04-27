@@ -12,7 +12,7 @@
 
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -20,7 +20,7 @@ export type ExportFormat = 'csv' | 'xlsx' | 'pdf';
 
 export interface ExportOptions {
   format: ExportFormat;
-  templates: WorkPackageTemplate[];
+  templates: WorkOrderTemplate[];
   columns?: string[]; // Columns to include (defaults to all)
   includeHeaders?: boolean; // Include header row (default: true)
   fileName?: string; // Custom file name
@@ -109,7 +109,7 @@ function formatDate(dateString: string): string {
 /**
  * Transform template to export row
  */
-function transformTemplate(template: WorkPackageTemplate, columns: string[]): Record<string, any> {
+function transformTemplate(template: WorkOrderTemplate, columns: string[]): Record<string, any> {
   const row: Record<string, any> = {};
 
   columns.forEach(column => {
@@ -197,7 +197,7 @@ function downloadFile(blob: Blob, fileName: string): void {
  * Export templates to CSV
  */
 export async function exportToCSV(
-  templates: WorkPackageTemplate[],
+  templates: WorkOrderTemplate[],
   columns: string[] = DEFAULT_COLUMNS,
   includeHeaders: boolean = true,
   fileName?: string
@@ -241,7 +241,7 @@ export async function exportToCSV(
  * Export templates to Excel
  */
 export async function exportToExcel(
-  templates: WorkPackageTemplate[],
+  templates: WorkOrderTemplate[],
   columns: string[] = DEFAULT_COLUMNS,
   includeHeaders: boolean = true,
   fileName?: string
@@ -304,7 +304,7 @@ export async function exportToExcel(
  * Note: PDF export is client-side and may be slow for large datasets (>1000 rows)
  */
 export async function exportToPDF(
-  templates: WorkPackageTemplate[],
+  templates: WorkOrderTemplate[],
   columns: string[] = DEFAULT_COLUMNS,
   includeHeaders: boolean = true,
   fileName?: string

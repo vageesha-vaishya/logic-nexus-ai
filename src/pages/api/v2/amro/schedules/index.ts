@@ -17,7 +17,7 @@ import {
   createAmroIsolationScope,
 } from '../anti-corruption-adapter';
 import { resolveAmroV2EndpointRolloutState } from '../audit-ledger-cutover';
-import { enforceAmroSequentialMilestoneForWorkPackageInterface } from '../phase-plan-model';
+import { enforceAmroSequentialMilestoneForWorkOrderInterface } from '../phase-plan-model';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -76,7 +76,7 @@ function buildScheduleUpdateEvent(params: {
   tenantId: string;
   franchiseId: string | null;
   scheduleId: string;
-  workPackageId: string;
+  workOrderId: string;
   eventType: 'schedule.slot.assigned' | 'schedule.update.acknowledged';
   actorId: string;
 }) {
@@ -86,7 +86,7 @@ function buildScheduleUpdateEvent(params: {
     event_type: params.eventType,
     topic: 'amro.schedule.updated.v1',
     schedule_id: params.scheduleId,
-    work_package_id: params.workPackageId,
+    work_order_id: params.workOrderId,
     actor_id: params.actorId,
     published_at: new Date().toISOString(),
   };
@@ -183,7 +183,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const rows = [
         {
           schedule_id: `${tenantId}-${franchiseId}-schedule-a`,
-          work_package_id: `${tenantId}-${franchiseId}-wp-100`,
+          work_order_id: `${tenantId}-${franchiseId}-wp-100`,
           station_code: `${tenantId}:station-a`,
           slot_start: new Date(Date.parse(plannedDate) + 60 * 60 * 1000).toISOString(),
           slot_end: new Date(Date.parse(plannedDate) + 3 * 60 * 60 * 1000).toISOString(),
@@ -193,7 +193,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         {
           schedule_id: `${tenantId}-${franchiseId}-schedule-b`,
-          work_package_id: `${tenantId}-${franchiseId}-wp-101`,
+          work_order_id: `${tenantId}-${franchiseId}-wp-101`,
           station_code: `${tenantId}:station-b`,
           slot_start: new Date(Date.parse(plannedDate) + 4 * 60 * 60 * 1000).toISOString(),
           slot_end: new Date(Date.parse(plannedDate) + 6 * 60 * 60 * 1000).toISOString(),
@@ -225,7 +225,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     const interfaceName = String(req.query.interface || 'assign-maintenance-slot').trim().toLowerCase();
-    enforceAmroSequentialMilestoneForWorkPackageInterface(interfaceName);
+    enforceAmroSequentialMilestoneForWorkOrderInterface(interfaceName);
     if (interfaceName !== 'assign-maintenance-slot' && interfaceName !== 'acknowledge-schedule-update') {
       return res.status(400).json({
         error: 'Unsupported interface. Use assign-maintenance-slot or acknowledge-schedule-update.',
@@ -237,7 +237,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const body = parseBody(req.body);
     if (interfaceName === 'assign-maintenance-slot') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
       const stationCode = assertNonEmpty(body.station_code, 'station_code');
       const window = parseScheduleWindow(body.slot_start, body.slot_end);
       const assignedTeam = parseObjectArray(body.assigned_team, 'assigned_team');
@@ -250,7 +250,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         tenantId,
         franchiseId,
         scheduleId,
-        workPackageId,
+        workOrderId,
         eventType: 'schedule.slot.assigned',
         actorId: String(auth.userId || ''),
       });
@@ -267,7 +267,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         serviceBoundaries,
         input: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           station_code: `${tenantId}:${stationCode}`,
           slot_start: window.slotStart,
           slot_end: window.slotEnd,
@@ -289,7 +289,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       throw new Error('mobile schedule acknowledgment requires operational role');
     }
     const scheduleId = assertNonEmpty(body.schedule_id, 'schedule_id');
-    const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+    const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
     const acknowledgedAt = parseIsoTimestamp(body.acknowledged_at || new Date().toISOString(), 'acknowledged_at');
     const deviceId = assertNonEmpty(body.device_id, 'device_id');
     const acknowledgmentNote = String(body.note || '').trim();
@@ -297,7 +297,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       tenantId,
       franchiseId,
       scheduleId,
-      workPackageId,
+      workOrderId,
       eventType: 'schedule.update.acknowledged',
       actorId: String(auth.userId || ''),
     });
@@ -315,7 +315,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       serviceBoundaries,
       input: {
         schedule_id: scheduleId,
-        work_package_id: workPackageId,
+        work_order_id: workOrderId,
         acknowledged_at: acknowledgedAt,
         device_id: deviceId,
         note: acknowledgmentNote || null,

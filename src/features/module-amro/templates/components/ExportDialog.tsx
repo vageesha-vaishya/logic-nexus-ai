@@ -27,14 +27,14 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { getExportColumns, exportTemplates, ExportFormat } from '../services/exportService';
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface ExportDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  templates: WorkPackageTemplate[];
+  templates: WorkOrderTemplate[];
   selectedIds?: Set<string>;
 }
 

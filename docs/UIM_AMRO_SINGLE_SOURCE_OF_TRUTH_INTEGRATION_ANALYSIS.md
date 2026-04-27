@@ -118,7 +118,7 @@ Recommended baseline:
 ### 🟧 Domain Extension Layer
 AMRO-specific migration notes:
 - preserve historical traceability by mapping AMRO movement records into canonical ledger metadata.
-- preserve execution references (`work_package_id`, `task_id`) as extension metadata bindings.
+- preserve execution references (`work_order_id`, `task_id`) as extension metadata bindings.
 
 ## 7. Validation Coverage
 ### 🟦 Generic Core Layer

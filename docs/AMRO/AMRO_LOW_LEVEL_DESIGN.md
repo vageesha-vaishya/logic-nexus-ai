@@ -38,9 +38,9 @@ This Low Level Design defines the executable technical blueprint for delivering 
 ### 1.3 Database Rename Addendum (2026-04-25)
 
 - Canonical AMRO template table name is `public.work_order_templates`.
-- Legacy name `public.work_package_templates` is retained as a compatibility view during transition.
+- Legacy name `public.work_order_templates` is retained as a compatibility view during transition.
 - API and service layers normalize legacy entity tokens to `work_order_templates`.
-- Rollback path restores physical table name to `work_package_templates` and removes compatibility view.
+- Rollback path restores physical table name to `work_order_templates` and removes compatibility view.
 
 ---
 
@@ -60,7 +60,7 @@ This Low Level Design defines the executable technical blueprint for delivering 
 | Component | Type | Primary Functions | Data Ownership |
 |---|---|---|---|
 | Maintenance Scheduling Service | Domain service | Slot planning, resource constraints, disruption re-planning | schedules, schedule_constraints |
-| Work Order Orchestration Service | Domain service | Work package lifecycle, transitions, closure gates | work_packages, tasks |
+| Work Order Orchestration Service | Domain service | Work package lifecycle, transitions, closure gates | work_orders, tasks |
 | Parts Inventory Service | Domain service | Stock allocation, reservations, rotable traceability | parts_inventory, stock_movements, reservations |
 | Compliance Control Service | Domain service | AD/SB controls, MEL/CDL checks, gate enforcement | compliance_records, compliance_obligations |
 | Certification Service | Domain service | Staff qualifications, certifying authority, release approval | staff_qualifications, certification_actions |
@@ -220,7 +220,7 @@ This section defines the engineering execution order, per-phase implementation s
 | Phase | Backend Build Scope | Frontend Build Scope | Data and Security Scope | Test Scope | Deliverables |
 |---|---|---|---|---|---|
 | P0 Foundation | Build v2 API skeletons, request/response envelope utilities, error model, auth middleware hooks | Build AMRO route shell, module navigation entry points, placeholder pages for Overview/Work Package/Scheduling | Create baseline tables and RLS policies with tenant_id and franchise_id; enforce AMRO domain assignment checks | Add unit tests for auth/access middleware and contract health endpoints | Running AMRO domain routes, secured API scaffold, passing CI baseline |
-| P1 Core Workflows | Implement work package lifecycle APIs (create/transition/clone), task step update APIs, parts reserve/shortage APIs | Implement SCR-AMRO-001/002/003/004/005/006/007 baseline views and forms | Implement schema for work_packages, tasks, reservations, stock movements with policy-safe transitions | Add integration tests for plan-to-execute flow and API validation rules | End-to-end flow: create WP -> schedule -> execute task -> reserve parts |
+| P1 Core Workflows | Implement work package lifecycle APIs (create/transition/clone), task step update APIs, parts reserve/shortage APIs | Implement SCR-AMRO-001/002/003/004/005/006/007 baseline views and forms | Implement schema for work_orders, tasks, reservations, stock movements with policy-safe transitions | Add integration tests for plan-to-execute flow and API validation rules | End-to-end flow: create WP -> schedule -> execute task -> reserve parts |
 | P2 Compliance and Mobility | Implement compliance gate, exception, dossier APIs; implement certification authority and decision APIs | Implement SCR-AMRO-008/009/010 and mobile execution behavior including offline queue UX | Add compliance_records, obligations, certification_actions, signed evidence references; enforce ABAC cert rules | Add replayable audit tests, signature integrity tests, offline sync conflict tests | Compliance and certification gate path fully executable with audit trail |
 | P3 Intelligence and Optimization | Implement risk scoring, intervention recommendation, feedback capture APIs; optimize heavy queries | Implement SCR-AMRO-011/012 analytics, forecast explainability, operator action feedback UI | Add forecast_outputs, asset_health_signals, model feedback policy configs | Add model contract tests, low-confidence flag tests, p95/p99 performance tests | Forecast loop operational: score -> recommend -> outcome feedback |
 | P4 Integration and Scale | Implement partner ingest/replay/callback hardening, adapter retries, dead-letter/replay orchestration | Implement integration monitor operational console hardening and admin controls | Add integration_jobs/mappings audit fields, retention rules, and replay governance controls | Add adapter contract tests, resilience tests, DR validation tests | Production-ready integrations with replay, observability, and DR evidence |
@@ -266,18 +266,18 @@ This section defines the engineering execution order, per-phase implementation s
 
 | Interface Group | Interface Query Value | Endpoint Route | Handler File | Primary Test File | Contract File to Update | Supporting Files |
 |---|---|---|---|---|---|---|
-| 15.2.2 Work Package Management | create-work-package | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
-| 15.2.2 Work Package Management | transition-work-package | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
-| 15.2.2 Work Package Management | clone-template | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.2 Work Package Management | create-work-order | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.2 Work Package Management | transition-work-order | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.2 Work Package Management | clone-template | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
 | 15.2.3 Task Execution and Evidence | update-task-step | /api/v2/amro/tasks | src/pages/api/v2/amro/tasks.ts | src/pages/api/v2/amro/tasks.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
 | 15.2.3 Task Execution and Evidence | upload-evidence | /api/v2/amro/tasks | src/pages/api/v2/amro/tasks.ts | src/pages/api/v2/amro/tasks.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
 | 15.2.3 Task Execution and Evidence | submit-signature | /api/v2/amro/tasks | src/pages/api/v2/amro/tasks.ts | src/pages/api/v2/amro/tasks.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
-| 15.2.4 Maintenance Scheduling | assign-maintenance-slot | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
-| 15.2.4 Maintenance Scheduling | run-replan-simulation | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
-| 15.2.4 Maintenance Scheduling | confirm-replan | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
-| 15.2.5 Parts and Materials | reserve-parts | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
-| 15.2.5 Parts and Materials | process-shortage-response | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
-| 15.2.5 Parts and Materials | sync-supplier-eta | /api/v2/amro/work-packages | src/pages/api/v2/amro/work-packages.ts | src/pages/api/v2/amro/work-packages.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.4 Maintenance Scheduling | assign-maintenance-slot | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.4 Maintenance Scheduling | run-replan-simulation | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.4 Maintenance Scheduling | confirm-replan | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.5 Parts and Materials | reserve-parts | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.5 Parts and Materials | process-shortage-response | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
+| 15.2.5 Parts and Materials | sync-supplier-eta | /api/v2/amro/work-orders | src/pages/api/v2/amro/work-orders.ts | src/pages/api/v2/amro/work-orders.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
 | 15.2.6 Compliance and Airworthiness | evaluate-compliance-gate | /api/v2/amro/compliance-gates | src/pages/api/v2/amro/compliance-gates.ts | src/pages/api/v2/amro/compliance-gates.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
 | 15.2.6 Compliance and Airworthiness | register-exception-request | /api/v2/amro/compliance-gates | src/pages/api/v2/amro/compliance-gates.ts | src/pages/api/v2/amro/compliance-gates.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
 | 15.2.6 Compliance and Airworthiness | generate-compliance-dossier | /api/v2/amro/compliance-gates | src/pages/api/v2/amro/compliance-gates.ts | src/pages/api/v2/amro/compliance-gates.test.ts | src/pages/api/v2/amro/contracts/openapi-3.1.yaml | src/pages/api/v2/amro/audit-ledger.ts; src/pages/api/v2/amro/anti-corruption-adapter.ts; src/features/module-amro/pages/AmroHubVerticalPage.tsx; src/pages/api/v2/amro/contracts/contract-endpoints.test.ts |
@@ -422,7 +422,7 @@ AMRO UI follows a unified module shell pattern:
 | Domain | Purpose | Core Tables |
 |---|---|---|
 | Asset Registry | Aircraft and serialized component master data | aircraft, components, component_positions |
-| Work Execution | Work package and task lifecycle | work_packages, tasks, maintenance_events |
+| Work Execution | Work package and task lifecycle | work_orders, tasks, maintenance_events |
 | Scheduling | Capacity and slot planning | schedules, schedule_constraints, shift_calendars |
 | Inventory | Parts stock, movements, supplier linkage | parts_inventory, stock_movements, reservations, suppliers |
 | Compliance | Regulatory obligations and closure evidence | compliance_obligations, compliance_records, regulator_profiles |
@@ -442,23 +442,23 @@ AMRO UI follows a unified module shell pattern:
 - Constraints: unique `(tenant_id, tail_number)`, check on status enum
 - Indexes: `(tenant_id, status)`, `(tenant_id, station_code)`, `(tenant_id, updated_at desc)`
 
-#### 6.2.2 work_packages (DB-AMRO-004)
+#### 6.2.2 work_orders (DB-AMRO-004)
 
 - Primary key: `id` UUID
 - Scope: `tenant_id`, `franchise_id`
 - FKs: `aircraft_id -> aircraft.id`
-- Core attributes: `work_package_number`, `maintenance_type`, `priority`, `status`, `planned_start`, `planned_end`, `estimated_labor_hours`, `estimated_downtime_minutes`
-- Constraints: unique `(tenant_id, work_package_number)`, valid status transitions through service layer
+- Core attributes: `work_order_number`, `maintenance_type`, `priority`, `status`, `planned_start`, `planned_end`, `estimated_labor_hours`, `estimated_downtime_minutes`
+- Constraints: unique `(tenant_id, work_order_number)`, valid status transitions through service layer
 - Indexes: `(tenant_id, status, planned_start)`, `(tenant_id, aircraft_id)`, partial index for active statuses
 
 #### 6.2.3 tasks (DB-AMRO-005)
 
 - Primary key: `id` UUID
 - Scope: `tenant_id`, `franchise_id`
-- FKs: `work_package_id`, `assigned_technician_id`
+- FKs: `work_order_id`, `assigned_technician_id`
 - Core attributes: `sequence`, `procedure_reference`, `steps_json`, `qualifications_json`, `status`
-- Constraints: unique `(work_package_id, sequence)`, step schema validation
-- Indexes: `(tenant_id, work_package_id, status)`, GIN on `steps_json`
+- Constraints: unique `(work_order_id, sequence)`, step schema validation
+- Indexes: `(tenant_id, work_order_id, status)`, GIN on `steps_json`
 
 #### 6.2.4 parts_inventory (DB-AMRO-007)
 
@@ -493,11 +493,11 @@ AMRO UI follows a unified module shell pattern:
 ### 6.3 Relationship Model
 
 ```text
-aircraft 1---n work_packages 1---n tasks 1---n maintenance_events
-work_packages 1---n reservations n---1 parts_inventory
-work_packages 1---n compliance_records n---1 compliance_obligations
+aircraft 1---n work_orders 1---n tasks 1---n maintenance_events
+work_orders 1---n reservations n---1 parts_inventory
+work_orders 1---n compliance_records n---1 compliance_obligations
 tasks n---1 staff_qualifications (via qualification requirements mapping)
-work_packages 1---n certification_actions
+work_orders 1---n certification_actions
 all operational entities 1---n mro_audit.records/trails
 ```
 
@@ -569,9 +569,9 @@ all operational entities 1---n mro_audit.records/trails
 
 | API ID | Endpoint | Module | Method |
 |---|---|---|---|
-| API-AMRO-001 | `/api/v2/amro/work-packages` | Work order | GET/POST |
-| API-AMRO-002 | `/api/v2/amro/work-packages/{id}` | Work order | GET/PATCH |
-| API-AMRO-003 | `/api/v2/amro/work-packages/{id}/transitions` | Work order | POST |
+| API-AMRO-001 | `/api/v2/amro/work-orders` | Work order | GET/POST |
+| API-AMRO-002 | `/api/v2/amro/work-orders/{id}` | Work order | GET/PATCH |
+| API-AMRO-003 | `/api/v2/amro/work-orders/{id}/transitions` | Work order | POST |
 | API-AMRO-004 | `/api/v2/amro/schedules` | Scheduling | GET/POST |
 | API-AMRO-005 | `/api/v2/amro/schedules/replan` | Scheduling | POST |
 | API-AMRO-006 | `/api/v2/amro/tasks` | Execution | GET/POST |
@@ -817,9 +817,9 @@ Scoring scale: 1 (limited) to 5 (leading maturity for aviation MRO use cases).
 
 | Interface | Input Contract | Output Contract | Validation Rules |
 |---|---|---|---|
-| Create work package | aircraft_id, maintenance_type, planned_window, station, priority, scope_items[] | work_package_id, status=planning, created_at, created_by | Tenant/franchise scope required; aircraft active; required fields non-null |
-| Transition work package | work_package_id, target_status, reason_code, actor_signature | updated_status, transition_id, gate_results[] | Transition must be allowed by policy matrix and role |
-| Clone template | template_id, aircraft_id, override_fields | new_work_package_id, inherited_tasks_count | Template version must be active and tenant-visible |
+| Create work package | aircraft_id, maintenance_type, planned_window, station, priority, scope_items[] | work_order_id, status=planning, created_at, created_by | Tenant/franchise scope required; aircraft active; required fields non-null |
+| Transition work package | work_order_id, target_status, reason_code, actor_signature | updated_status, transition_id, gate_results[] | Transition must be allowed by policy matrix and role |
+| Clone template | template_id, aircraft_id, override_fields | new_work_order_id, inherited_tasks_count | Template version must be active and tenant-visible |
 
 #### 15.2.3 Task Execution and Evidence
 
@@ -833,33 +833,33 @@ Scoring scale: 1 (limited) to 5 (leading maturity for aviation MRO use cases).
 
 | Interface | Input Contract | Output Contract | Validation Rules |
 |---|---|---|---|
-| Assign maintenance slot | work_package_id, station_code, slot_start, slot_end, assigned_team[] | schedule_id, assignment_status, conflict_flags[] | No overlap allowed; station capacity and qualification checks required |
+| Assign maintenance slot | work_order_id, station_code, slot_start, slot_end, assigned_team[] | schedule_id, assignment_status, conflict_flags[] | No overlap allowed; station capacity and qualification checks required |
 | Run replan simulation | disrupted_slots[], priority_rules, planning_horizon | replan_options[], impact_summary, recommended_option | Simulation must include active constraints and tenant-specific calendars |
-| Confirm replan | selected_option_id, approver_id, reason | updated_schedule, affected_work_packages[] | Approval role required; all affected packages must be in re-plannable states |
+| Confirm replan | selected_option_id, approver_id, reason | updated_schedule, affected_work_orders[] | Approval role required; all affected packages must be in re-plannable states |
 
 #### 15.2.5 Parts and Materials
 
 | Interface | Input Contract | Output Contract | Validation Rules |
 |---|---|---|---|
-| Reserve parts | work_package_id, demand_lines[{part_number, quantity, serial?}] | reservations[], reservation_status, shortages[] | Quantity must be positive; serialized parts must be unique per tenant |
+| Reserve parts | work_order_id, demand_lines[{part_number, quantity, serial?}] | reservations[], reservation_status, shortages[] | Quantity must be positive; serialized parts must be unique per tenant |
 | Process shortage response | shortage_id, action(backorder/substitute/escalate), supplier_ref | shortage_status, procurement_trigger_id | Substitute must pass approved compatibility mapping |
-| Sync supplier ETA | supplier_event_id, part_number, eta, quantity_confirmed | updated_eta, impacted_work_packages[] | Supplier source must be trusted adapter; ETA must be valid datetime |
+| Sync supplier ETA | supplier_event_id, part_number, eta, quantity_confirmed | updated_eta, impacted_work_orders[] | Supplier source must be trusted adapter; ETA must be valid datetime |
 
 #### 15.2.6 Compliance and Airworthiness
 
 | Interface | Input Contract | Output Contract | Validation Rules |
 |---|---|---|---|
-| Evaluate compliance gate | context(work_package/task), regulator_profile, required_obligations[] | decision(pass/fail), blockers[], rationale | Must include policy version snapshot and decision evidence |
-| Register exception request | work_package_id, obligation_id, justification, requested_by | exception_id, review_status, sla_due_at | Justification text mandatory; only allowed roles may request exception |
-| Generate compliance dossier | work_package_id, profile(FAA/EASA/CAAC), include_artifacts[] | dossier_id, dossier_status, artifact_manifest[] | All mandatory artifacts must be present before dossier finalization |
+| Evaluate compliance gate | context(work_order/task), regulator_profile, required_obligations[] | decision(pass/fail), blockers[], rationale | Must include policy version snapshot and decision evidence |
+| Register exception request | work_order_id, obligation_id, justification, requested_by | exception_id, review_status, sla_due_at | Justification text mandatory; only allowed roles may request exception |
+| Generate compliance dossier | work_order_id, profile(FAA/EASA/CAAC), include_artifacts[] | dossier_id, dossier_status, artifact_manifest[] | All mandatory artifacts must be present before dossier finalization |
 
 #### 15.2.7 Certification and Authority
 
 | Interface | Input Contract | Output Contract | Validation Rules |
 |---|---|---|---|
 | Validate certifying authority | actor_id, aircraft_scope, maintenance_scope, timestamp | valid/invalid, expiry_info, restriction_reason | Expired or out-of-scope authority always invalid |
-| Submit certification decision | work_package_id, decision(approve/reject/defer), signatures[] | certification_action_id, action_status, blockers[] | Approval requires all mandatory signatures and zero unresolved blockers |
-| Escalate blocked certification | work_package_id, block_reason, escalation_target | escalation_event_id, escalation_status | Escalation target must belong to valid authority chain |
+| Submit certification decision | work_order_id, decision(approve/reject/defer), signatures[] | certification_action_id, action_status, blockers[] | Approval requires all mandatory signatures and zero unresolved blockers |
+| Escalate blocked certification | work_order_id, block_reason, escalation_target | escalation_event_id, escalation_status | Escalation target must belong to valid authority chain |
 
 #### 15.2.8 Integration and Partner Hub
 
@@ -1043,7 +1043,7 @@ Task Completion Request
 
 ### 19.2 Representative Endpoint Contracts
 
-#### API-AMRO-001 GET `/api/v2/amro/work-packages`
+#### API-AMRO-001 GET `/api/v2/amro/work-orders`
 
 Request query:
 - `status[]`, `station`, `aircraft_id`, `due_before`, `page`, `page_size`, `sort`.
@@ -1056,13 +1056,13 @@ Errors:
 - `AMRO_FILTER_VALIDATION_FAILED` (422)
 - `AMRO_RATE_LIMITED` (429)
 
-#### API-AMRO-003 POST `/api/v2/amro/work-packages/{id}/transitions`
+#### API-AMRO-003 POST `/api/v2/amro/work-orders/{id}/transitions`
 
 Request body:
 - `target_status`, `reason_code`, `notes`, `signature`.
 
 Response body:
-- `work_package_id`, `from_status`, `to_status`, `gate_results[]`, `audit_event_id`.
+- `work_order_id`, `from_status`, `to_status`, `gate_results[]`, `audit_event_id`.
 
 Errors:
 - `AMRO_TRANSITION_NOT_ALLOWED` (409)
@@ -1110,11 +1110,11 @@ Errors:
 
 | Table | Purpose | Key Columns | Notes |
 |---|---|---|---|
-| work_package_templates | Reusable scope/task templates | tenant_id, template_code, version, active | Supports standardized planning |
+| work_order_templates | Reusable scope/task templates | tenant_id, template_code, version, active | Supports standardized planning |
 | task_evidence | Structured evidence metadata | task_id, evidence_type, uri, checksum, captured_at | Supports hash-based integrity checks |
 | policy_snapshots | Immutable policy version captures | policy_type, version, rules_json, effective_at | Enables audit replay fidelity |
 | sync_conflicts | Offline/online merge conflicts | entity_type, entity_id, conflict_class, resolution | Supports conflict cockpit |
-| regulator_dossiers | Release compliance packets | work_package_id, regulator_code, dossier_ref | Bundles evidence for audit/export |
+| regulator_dossiers | Release compliance packets | work_order_id, regulator_code, dossier_ref | Bundles evidence for audit/export |
 | forecast_features | Model feature snapshots | asset_id, feature_vector, inference_time | Supports explainable predictions |
 | forecast_decisions | Action outcomes from recommendations | recommendation_id, accepted, outcome_metric | Closes ML feedback loop |
 
@@ -1332,9 +1332,9 @@ This section is the single-point map from module to UI/UX, database, workflow, a
 
 | Module ID | Primary Tables | Key Fields Used by Module | Critical Constraints and Rules |
 |---|---|---|---|
-| MOD-AMRO-01 | work_packages, maintenance_events, forecast_outputs | status, planned_start, risk_score, created_at | Tenant/franchise scope enforced; KPI queries use indexed status/time fields |
-| MOD-AMRO-02 | work_packages, work_package_templates, tasks | work_package_number, maintenance_type, priority, status | Unique `(tenant_id, work_package_number)`; transition policy validation required |
-| MOD-AMRO-03 | tasks, task_evidence, maintenance_events, sync_conflicts | sequence, steps_json, checksum, signature metadata | Unique `(work_package_id, sequence)`; evidence checksum mandatory |
+| MOD-AMRO-01 | work_orders, maintenance_events, forecast_outputs | status, planned_start, risk_score, created_at | Tenant/franchise scope enforced; KPI queries use indexed status/time fields |
+| MOD-AMRO-02 | work_orders, work_order_templates, tasks | work_order_number, maintenance_type, priority, status | Unique `(tenant_id, work_order_number)`; transition policy validation required |
+| MOD-AMRO-03 | tasks, task_evidence, maintenance_events, sync_conflicts | sequence, steps_json, checksum, signature metadata | Unique `(work_order_id, sequence)`; evidence checksum mandatory |
 | MOD-AMRO-04 | schedules, schedule_constraints, shift_calendars | slot_start, slot_end, station_code, qualification requirements | Constraint solver must enforce capacity and certification availability |
 | MOD-AMRO-05 | parts_inventory, reservations, stock_movements, suppliers | part_number, serial_number, quantity_available, eta | Quantity consistency checks; serialized uniqueness per tenant |
 | MOD-AMRO-06 | compliance_obligations, compliance_records, regulator_profiles, policy_snapshots | obligation_type, due_date, decision_status, policy_version | Mandatory obligations must pass before release; policy snapshot immutability |
@@ -1347,12 +1347,12 @@ This section is the single-point map from module to UI/UX, database, workflow, a
 
 | Relationship Path | Purpose | Modules Consuming Path |
 |---|---|---|
-| aircraft -> work_packages -> tasks -> maintenance_events | End-to-end execution trace | MOD-AMRO-02, 03, 10 |
-| work_packages -> reservations -> parts_inventory | Material readiness and shortage control | MOD-AMRO-05 |
-| work_packages -> compliance_records -> compliance_obligations | Gate pass/fail rationale | MOD-AMRO-06 |
+| aircraft -> work_orders -> tasks -> maintenance_events | End-to-end execution trace | MOD-AMRO-02, 03, 10 |
+| work_orders -> reservations -> parts_inventory | Material readiness and shortage control | MOD-AMRO-05 |
+| work_orders -> compliance_records -> compliance_obligations | Gate pass/fail rationale | MOD-AMRO-06 |
 | tasks -> staff_qualifications -> certification_actions | Qualification and release validity | MOD-AMRO-07 |
 | integration_jobs -> webhook_outbox -> maintenance_events | External sync and internal state propagation | MOD-AMRO-08, 10 |
-| asset_health_signals -> forecast_outputs -> work_packages | Predictive recommendation to planned work creation | MOD-AMRO-09, 02 |
+| asset_health_signals -> forecast_outputs -> work_orders | Predictive recommendation to planned work creation | MOD-AMRO-09, 02 |
 
 ### 26.5 Workflow and Data-Flow Mapping by Module
 
@@ -1429,8 +1429,8 @@ External Systems
 
 | Module | Sub-Modules | UI/UX | DB Tables | Workflow | APIs | Implementation Sequence |
 |---|---|---|---|---|---|---|
-| Overview and KPI Intelligence | KPI Aggregation, Risk Heatmap, Forecast Panel | SCR-001, SCR-012 | work_packages, maintenance_events, forecast_outputs | 17.1, 18.1 | API-001, API-015 | S8 |
-| Work Package Management | CRUD, Transitions, Detail Context | SCR-002, SCR-003, SCR-004 | work_packages, work_package_templates, tasks | 17.1 | API-001, API-002, API-003 | S2 |
+| Overview and KPI Intelligence | KPI Aggregation, Risk Heatmap, Forecast Panel | SCR-001, SCR-012 | work_orders, maintenance_events, forecast_outputs | 17.1, 18.1 | API-001, API-015 | S8 |
+| Work Package Management | CRUD, Transitions, Detail Context | SCR-002, SCR-003, SCR-004 | work_orders, work_order_templates, tasks | 17.1 | API-001, API-002, API-003 | S2 |
 | Task Execution and Evidence | Step Engine, Evidence, Offline Queue | SCR-005 | tasks, task_evidence, maintenance_events, sync_conflicts | 17.2, 18.3 | API-006, API-007 | S4 |
 | Maintenance Scheduling | Planner, Solver, Replan | SCR-006 | schedules, schedule_constraints, shift_calendars | 17.1 | API-004, API-005 | S3 |
 | Parts and Materials | Availability, Reservation, Shortage | SCR-007 | parts_inventory, reservations, stock_movements, suppliers | 17.1, 18.2 | API-008, API-009 | S5 |
@@ -1524,12 +1524,12 @@ All database implementation and review activities must treat this section as nor
 |---|---|---:|---|---|
 | `public.aircraft` | Aircraft master registry and lifecycle status | 200-10,000 | `id` | RLS enabled; tenant-isolated; platform-admin override |
 | `public.components` | Serialized rotable/repairable component registry | 5,000-250,000 | `id` | RLS enabled; tenant-isolated; aircraft/work package linkage |
-| `public.work_packages` | Maintenance package planning/execution container | 1,000-60,000 | `id` | RLS enabled; tenant-isolated; role-gated transitions |
+| `public.work_orders` | Maintenance package planning/execution container | 1,000-60,000 | `id` | RLS enabled; tenant-isolated; role-gated transitions |
 | `public.tasks` | Unit execution tasks inside work packages | 10,000-1,000,000 | `id` | RLS enabled; tenant-isolated; execution evidence fields |
 | `public.staff_qualifications` | Certification and authority records | 200-50,000 | `id` | RLS enabled; tenant-isolated; certifier authority controls |
 | `public.maintenance_events` | Operational maintenance event stream | 50,000-5,000,000 | `id` | RLS enabled; tenant-isolated; performed-by user required |
 | `public.amro_work_order_materials` | Parts/material demand, reservation, and sourcing lines | 5,000-750,000 | `id` | RLS enabled; tenant-isolated; material lifecycle status controls |
-| `public.work_order_templates` | Reusable work-package scope and task templates | 500-250,000 | `id` | RLS enabled; tenant/franchise-scoped business key uniqueness |
+| `public.work_order_templates` | Reusable work-order scope and task templates | 500-250,000 | `id` | RLS enabled; tenant/franchise-scoped business key uniqueness |
 | `public.task_evidence` | Structured evidence metadata and integrity records | 100,000-30,000,000 | `(id, captured_at)` | RLS enabled; append-only trigger; monthly partitions |
 | `public.policy_snapshots` | Immutable policy version captures for decision replay | 5,000-1,000,000 | `id` | RLS enabled; append-only trigger; policy key uniqueness |
 | `public.sync_conflicts` | Offline/online merge conflict cockpit and resolutions | 1,000-2,000,000 | `id` | RLS enabled; active-conflict partial index |
@@ -1608,15 +1608,15 @@ All database implementation and review activities must treat this section as nor
 | `hours_since_new` | `decimal(15,2)` | Yes | `0` | — |
 | `cycles_since_new` | `integer` | Yes | `0` | — |
 | `location` | `text` | Yes | — | — |
-| `work_package_id` | `uuid` | Yes | — | FK (`components_work_package_id_fkey`) -> `public.work_packages(id)` ON DELETE SET NULL |
+| `work_order_id` | `uuid` | Yes | — | FK (`components_work_order_id_fkey`) -> `public.work_orders(id)` ON DELETE SET NULL |
 | `created_at` | `timestamptz` | No | `now()` | — |
 | `updated_at` | `timestamptz` | No | `now()` | — |
 | `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 
-- Indexes: `idx_components_tenant_id`, `idx_components_franchise_id`, `idx_components_aircraft_id`, `idx_components_part_number`, `idx_components_serial_number`, `idx_components_status`, `idx_components_work_package_id`
+- Indexes: `idx_components_tenant_id`, `idx_components_franchise_id`, `idx_components_aircraft_id`, `idx_components_part_number`, `idx_components_serial_number`, `idx_components_status`, `idx_components_work_order_id`
 
-#### 28.2.3 `public.work_packages`
+#### 28.2.3 `public.work_orders`
 
 - Namespace prefix: `public`
 - Purpose: Central maintenance planning and execution package object.
@@ -1644,7 +1644,7 @@ All database implementation and review activities must treat this section as nor
 | `estimated_cost` | `decimal(15,2)` | Yes | — | — |
 | `actual_labor_hours` | `decimal(10,2)` | Yes | — | — |
 | `actual_cost` | `decimal(15,2)` | Yes | — | — |
-| `status` | `work_package_status` | No | `'planning'::work_package_status` | Domain-constrained |
+| `status` | `work_order_status` | No | `'planning'::work_order_status` | Domain-constrained |
 | `assigned_to` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `supervisor_id` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `reference_documents` | `text[]` | Yes | `ARRAY[]::text[]` | — |
@@ -1655,7 +1655,7 @@ All database implementation and review activities must treat this section as nor
 | `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 
-- Indexes: `idx_work_packages_tenant_id`, `idx_work_packages_franchise_id`, `idx_work_packages_aircraft_id`, `idx_work_packages_work_order_number`, `idx_work_packages_status`, `idx_work_packages_assigned_to`, `idx_work_packages_maintenance_type`
+- Indexes: `idx_work_orders_tenant_id`, `idx_work_orders_franchise_id`, `idx_work_orders_aircraft_id`, `idx_work_orders_work_order_number`, `idx_work_orders_status`, `idx_work_orders_assigned_to`, `idx_work_orders_maintenance_type`
 
 #### 28.2.4 `public.tasks`
 
@@ -1669,8 +1669,8 @@ All database implementation and review activities must treat this section as nor
 | `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
 | `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
 | `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
-| `work_order_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
-| `work_package_id` | `uuid` | Yes | — | Compatibility alias FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `work_order_id` | `uuid` | No | — | FK -> `public.work_orders(id)` ON DELETE CASCADE |
+| `work_order_id` | `uuid` | Yes | — | Compatibility alias FK -> `public.work_orders(id)` ON DELETE CASCADE |
 | `task_number` | `text` | No | — | — |
 | `title` | `text` | No | — | — |
 | `description` | `text` | Yes | — | — |
@@ -1698,7 +1698,7 @@ All database implementation and review activities must treat this section as nor
 | `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `updated_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 
-- Indexes: `idx_tasks_tenant_id`, `idx_tasks_franchise_id`, `idx_tasks_work_order_id`, `idx_tasks_work_package_id_compat`, `idx_tasks_status`, `idx_tasks_assigned_to`, `idx_tasks_task_category`
+- Indexes: `idx_tasks_tenant_id`, `idx_tasks_franchise_id`, `idx_tasks_work_order_id`, `idx_tasks_work_order_id_compat`, `idx_tasks_status`, `idx_tasks_assigned_to`, `idx_tasks_task_category`
 
 #### 28.2.5 `public.staff_qualifications`
 
@@ -1754,7 +1754,7 @@ All database implementation and review activities must treat this section as nor
 | `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
 | `aircraft_id` | `uuid` | Yes | — | FK -> `public.aircraft(id)` ON DELETE SET NULL |
 | `component_id` | `uuid` | Yes | — | FK -> `public.components(id)` ON DELETE SET NULL |
-| `work_package_id` | `uuid` | Yes | — | FK -> `public.work_packages(id)` ON DELETE SET NULL |
+| `work_order_id` | `uuid` | Yes | — | FK -> `public.work_orders(id)` ON DELETE SET NULL |
 | `task_id` | `uuid` | Yes | — | FK -> `public.tasks(id)` ON DELETE SET NULL |
 | `event_type` | `text` | No | — | — |
 | `event_code` | `text` | Yes | — | — |
@@ -1773,7 +1773,7 @@ All database implementation and review activities must treat this section as nor
 | `event_timestamp` | `timestamptz` | No | `now()` | — |
 | `created_at` | `timestamptz` | No | `now()` | — |
 
-- Indexes: `idx_maintenance_events_tenant_id`, `idx_maintenance_events_franchise_id`, `idx_maintenance_events_aircraft_id`, `idx_maintenance_events_component_id`, `idx_maintenance_events_work_package_id`, `idx_maintenance_events_task_id`, `idx_maintenance_events_event_type`, `idx_maintenance_events_event_timestamp`, `idx_maintenance_events_performed_by`
+- Indexes: `idx_maintenance_events_tenant_id`, `idx_maintenance_events_franchise_id`, `idx_maintenance_events_aircraft_id`, `idx_maintenance_events_component_id`, `idx_maintenance_events_work_order_id`, `idx_maintenance_events_task_id`, `idx_maintenance_events_event_type`, `idx_maintenance_events_event_timestamp`, `idx_maintenance_events_performed_by`
 
 #### 28.2.7 `public.amro_work_order_materials`
 
@@ -1787,7 +1787,7 @@ All database implementation and review activities must treat this section as nor
 | `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
 | `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
 | `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
-| `work_order_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `work_order_id` | `uuid` | No | — | FK -> `public.work_orders(id)` ON DELETE CASCADE |
 | `part_number` | `text` | No | — | — |
 | `description` | `text` | No | — | — |
 | `manufacturer` | `text` | Yes | — | — |
@@ -1866,7 +1866,7 @@ All database implementation and review activities must treat this section as nor
 #### 28.2.10 `public.work_order_templates`
 
 - Namespace prefix: `public`
-- Purpose: Reusable planning templates for standardized work-package scope and task decomposition.
+- Purpose: Reusable planning templates for standardized work-order scope and task decomposition.
 - Estimated row count: 500-250,000 per active tenant per 12 months.
 - Primary key: `id`
 - Security considerations: Tenant/franchise isolation with RLS; template activation index supports live planning retrieval.
@@ -1893,7 +1893,7 @@ All database implementation and review activities must treat this section as nor
 - Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), template_code, version)` for active rows (`deleted_at IS NULL`)
 - Check constraints: `version > 0`, `jsonb_typeof(scope_json) = 'array'`, `jsonb_typeof(tasks_json) = 'array'`
 - Indexes: `idx_work_order_templates_tenant_active`, `uq_work_order_templates_tenant_franchise_code_version_active`
-- Compatibility: legacy `public.work_package_templates` is an updatable compatibility view mapped to `public.work_order_templates` for transition-safe callers.
+- Compatibility: legacy `public.work_order_templates` is an updatable compatibility view mapped to `public.work_order_templates` for transition-safe callers.
 
 #### 28.2.11 `public.task_evidence`
 
@@ -1986,14 +1986,14 @@ All database implementation and review activities must treat this section as nor
 - Purpose: Compliance dossier bundles for regulator submissions and export packets.
 - Estimated row count: 500-500,000 per active tenant per 12 months.
 - Primary key: `id`
-- Security considerations: Dossiers inherit tenant scope and work-package linkage; regulator reference uniqueness prevents duplicate packet IDs.
+- Security considerations: Dossiers inherit tenant scope and work-order linkage; regulator reference uniqueness prevents duplicate packet IDs.
 
 | Column | Type | Nullable | Default | Constraints |
 |---|---|---|---|---|
 | `id` | `uuid` | No | `gen_random_uuid()` | Primary key |
 | `tenant_id` | `uuid` | No | — | FK -> `public.tenants(id)` ON DELETE CASCADE |
 | `franchise_id` | `uuid` | Yes | — | FK -> `public.franchises(id)` ON DELETE SET NULL |
-| `work_package_id` | `uuid` | No | — | FK -> `public.work_packages(id)` ON DELETE CASCADE |
+| `work_order_id` | `uuid` | No | — | FK -> `public.work_orders(id)` ON DELETE CASCADE |
 | `regulator_code` | `text` | No | — | Regulator authority code |
 | `dossier_ref` | `text` | No | — | Dossier identifier |
 | `dossier_uri` | `text` | Yes | — | External URI |
@@ -2007,7 +2007,7 @@ All database implementation and review activities must treat this section as nor
 | `deleted_at` | `timestamptz` | Yes | — | Soft delete marker |
 
 - Unique constraints: `(tenant_id, COALESCE(franchise_id, zero_uuid), regulator_code, dossier_ref)`
-- Indexes: `idx_regulator_dossiers_tenant_work_package`, `uq_regulator_dossiers_tenant_franchise_regulator_ref`
+- Indexes: `idx_regulator_dossiers_tenant_work_order`, `uq_regulator_dossiers_tenant_franchise_regulator_ref`
 
 #### 28.2.15 `public.forecast_features`
 
@@ -2120,7 +2120,7 @@ All database implementation and review activities must treat this section as nor
 ### 28.3 Supporting Schema Components
 
 - Domains in `public` schema:
-  - `aircraft_status`, `component_status`, `maintenance_type`, `work_package_status`, `task_status`, `material_status`, `material_action`, `signature_method`
+  - `aircraft_status`, `component_status`, `maintenance_type`, `work_order_status`, `task_status`, `material_status`, `material_action`, `signature_method`
   - `audit_record_type`, `audit_event_type`, `audit_actor_role`, `audit_entity_type`
 - Audit immutability function:
   - `mro_audit.prevent_audit_updates()` blocks update/delete operations on `mro_audit.records` and `mro_audit.trails`
@@ -2138,7 +2138,7 @@ All database implementation and review activities must treat this section as nor
 ### 28.4 Seed Data Process (Master Data Entities)
 
 - Seed migrations:
-  - `20260324171000_amro_master_data_entity_seed_pack.sql` seeds `regulator_profiles`, `shift_calendars`, `work_package_templates` and links templates to `policy_snapshots`.
+  - `20260324171000_amro_master_data_entity_seed_pack.sql` seeds `regulator_profiles`, `shift_calendars`, `work_order_templates` and links templates to `policy_snapshots`.
   - `20260324170000_amro_master_data_entity_structure_repairs.sql` applies supporting integrity constraints and active-row unique indexes for these entities.
 - Tenant scope logic:
   - Seed execution targets AMRO-assigned tenants in `tenant_domain_assignments` joined to active `platform_domains(code='amro')`.
@@ -2362,24 +2362,24 @@ Implementation Notes:
 
 ```text
 Component Type: Table
-Component Name: public.work_packages_title
+Component Name: public.work_orders_title
 Purpose: Tenant/franchise-scoped catalog for approved Work Package titles and numbering suffix (`wp_title`) consumed by AMRO work order creation.
 Estimated Row Count: 20-500 per tenant
 Primary Key: id
 Foreign Keys:
-  - work_packages.work_package_title_id -> public.work_packages_title(id) ON DELETE SET NULL
+  - work_orders.work_order_title_id -> public.work_orders_title(id) ON DELETE SET NULL
 Unique Constraints:
-  - uq_work_packages_title_tenant_title (tenant_id, title)
+  - uq_work_orders_title_tenant_title (tenant_id, title)
 Check Constraints:
-  - ck_work_packages_title_wp_title_not_blank (length(trim(wp_title)) > 0)
+  - ck_work_orders_title_wp_title_not_blank (length(trim(wp_title)) > 0)
 Defaults:
   - id: gen_random_uuid()
   - created_at: now()
   - updated_at: now()
 Indexes:
-  - idx_work_packages_title_tenant_id(tenant_id)
-  - idx_work_packages_title_franchise_id(franchise_id)
-  - idx_work_packages_work_package_title_id(work_packages.work_package_title_id)
+  - idx_work_orders_title_tenant_id(tenant_id)
+  - idx_work_orders_title_franchise_id(franchise_id)
+  - idx_work_orders_work_order_title_id(work_orders.work_order_title_id)
 Columns:
   - id | uuid | nullable:no | default:gen_random_uuid()
   - tenant_id | uuid | nullable:no | default:-
@@ -2392,7 +2392,7 @@ Security Considerations:
   - Tenant-scoped lookup enforced by API context before create/number generation.
   - Franchise rows can be shared (`franchise_id IS NULL`) or franchise-restricted.
 Implementation Notes:
-  - Migration: 20260420131500_amro_work_package_titles_catalog.sql
+  - Migration: 20260420131500_amro_work_order_titles_catalog.sql
   - Seed data loaded for tenant `157b8d12-c115-446e-a4dc-d12077751fe2`.
 ```
 
@@ -2701,8 +2701,8 @@ Component Name: /api/v2/amro/work-orders (POST create-work-order)
 Purpose: Persist AMRO work orders from wizard payloads with title-catalog selection, template linkage, normalized planned dates, and deterministic work package numbering.
 Estimated Request Volume: 200-3000 create calls/day per tenant
 Field Contract:
-  - work_package_title_id | uuid | optional (preferred over free-text title)
-  - work_package_template_id | uuid | optional (links to work_packages.work_package_template_id)
+  - work_order_title_id | uuid | optional (preferred over free-text title)
+  - work_order_template_id | uuid | optional (links to work_orders.work_order_template_id)
   - planned_start_date | ISO/date string | optional (stored as timestamptz)
   - planned_end_date | ISO/date string | optional (stored as timestamptz)
 Output Contract:
@@ -2712,7 +2712,7 @@ Security Considerations:
   - Title lookup restricted to tenant (and franchise when applicable).
 Implementation Notes:
   - Handler: src/pages/api/v2/amro/work-orders/index.ts
-  - Persistence: src/pages/api/v2/amro/work-package-persistence-db.ts
+  - Persistence: src/pages/api/v2/amro/work-order-persistence-db.ts
 ```
 
 ```text
@@ -2979,7 +2979,7 @@ Dependencies:
   - public.aircraft
   - public.components
   - public.maintenance_schedule
-  - public.work_packages
+  - public.work_orders
   - public.flight_logs
   - public.asset_health_signals
   - public.engine_parameter_history
@@ -3024,7 +3024,7 @@ Validation:
 
 ```text
 Component Type: Module API
-Component Name: POST /api/v2/amro/work-packages?interface=trace-rotable-llp
+Component Name: POST /api/v2/amro/work-orders?interface=trace-rotable-llp
 Purpose: Apply rotable and LLP traceability controls on serialized AMRO material lines.
 Input Contract:
   - component_id | string | required
@@ -3053,10 +3053,10 @@ Performance Targets:
 
 ```text
 Component Type: Module API
-Component Name: POST /api/v2/amro/work-packages?interface=run-inventory-optimization
+Component Name: POST /api/v2/amro/work-orders?interface=run-inventory-optimization
 Purpose: Trigger inventory optimization model hooks using demand and forecast signals for a work package.
 Input Contract:
-  - work_package_id | string | required
+  - work_order_id | string | required
   - forecast_signal_ids | string[] | required
   - optimization_window | string | required
 Output Contract:
@@ -3066,7 +3066,7 @@ Output Contract:
 Authorization:
   - platform_admin or tenant role with dashboards.manage/reports.manage
 Data Dependencies:
-  - mro_core.work_packages
+  - mro_core.work_orders
   - mro_core.material_planning
   - mro_analytics.predictive_recommendations
 Failure Modes:
@@ -3079,24 +3079,24 @@ Performance Targets:
 
 ```text
 Component Type: Module API
-Component Name: POST /api/v2/amro/work-packages?interface=sync-supplier-asn-erp
+Component Name: POST /api/v2/amro/work-orders?interface=sync-supplier-asn-erp
 Purpose: Reconcile supplier ASN events with ERP procurement records and propagate impacts to work packages.
 Input Contract:
   - asn_event_id | string | required
   - procurement_source | enum(sap-pm,oracle-eam,maximo,ariba,coupa) | required
   - po_number | string | required
   - line_items | object[] | required
-  - impacted_work_packages | string[] | optional
+  - impacted_work_orders | string[] | optional
 Output Contract:
   - sync_status | string
   - procurement_sync_id | string
-  - impacted_work_packages | string[]
+  - impacted_work_orders | string[]
 Authorization:
   - platform_admin or tenant role with dashboards.manage/reports.manage
 Data Dependencies:
   - mro_integration.supplier_events
   - mro_integration.procurement_sync
-  - mro_core.work_packages
+  - mro_core.work_orders
 Failure Modes:
   - 400 untrusted procurement adapter or empty line items
   - 403 unauthorized AMRO domain access
@@ -3120,8 +3120,8 @@ Input Contract:
   - page | integer >= 1 | optional, default 1
   - page_size | integer 1..200 | optional, default 15
 Output Contract:
-  - executive_summary | object(active_work_packages, overdue_tasks, compliance_status_pct, forecast_accuracy_pct)
-  - work_package_overview | object[](work_package_id, title, status, planner_id, engineer_id, due_at, progress_pct)
+  - executive_summary | object(active_work_orders, overdue_tasks, compliance_status_pct, forecast_accuracy_pct)
+  - work_order_overview | object[](work_order_id, title, status, planner_id, engineer_id, due_at, progress_pct)
   - pagination | object(page, page_size, total_rows, total_pages)
   - materials_reservation_alerts | object[]
   - compliance_gate_status | object[]
@@ -3129,7 +3129,7 @@ Output Contract:
 Authorization:
   - authenticated AMRO domain tenant or franchise scope with active AMRO domain assignment
 Data Dependencies:
-  - work_package_master
+  - work_order_master
   - materials_inventory
   - compliance_gates
   - integration_logs
@@ -3147,7 +3147,7 @@ Component Type: Module API
 Component Name: GET /api/v2/amro/overview-kpi?interface=load-operational-trends
 Purpose: Load operational trend datasets required by module CRUD monitoring widgets for task execution, scheduling, certification, audit, and forecast.
 Input Contract:
-  - metric_key | enum(open_work_packages,schedule_adherence,aog_count,compliance_risk,parts_fill_rate) | required
+  - metric_key | enum(open_work_orders,schedule_adherence,aog_count,compliance_risk,parts_fill_rate) | required
   - window | enum(7d,30d,90d) | required
   - compare_window | string(<N>d) within policy max | required
   - station_ids | string[] | optional
@@ -3220,7 +3220,7 @@ Unique Constraints:
 Check Constraints:
   - persona in (management, planner, compliance_lead)
   - date_range_end >= date_range_start
-  - open_work_packages >= 0
+  - open_work_orders >= 0
   - in_progress_tasks >= 0
   - deferred_items >= 0
   - compliance_alerts >= 0
@@ -3230,7 +3230,7 @@ Defaults:
   - id: gen_random_uuid()
   - snapshot_at: now()
   - created_at: now()
-  - open_work_packages: 0
+  - open_work_orders: 0
   - in_progress_tasks: 0
   - deferred_items: 0
   - compliance_alerts: 0
@@ -3250,7 +3250,7 @@ Columns:
   - date_range_start | date | nullable:no | default:none
   - date_range_end | date | nullable:no | default:none
   - snapshot_at | timestamptz | nullable:no | default:now()
-  - open_work_packages | integer | nullable:no | default:0
+  - open_work_orders | integer | nullable:no | default:0
   - in_progress_tasks | integer | nullable:no | default:0
   - deferred_items | integer | nullable:no | default:0
   - compliance_alerts | integer | nullable:no | default:0
@@ -3332,7 +3332,7 @@ Primary Key: id
 Foreign Keys:
   - tenant_id -> public.tenants(id) ON DELETE CASCADE
   - franchise_id -> public.franchises(id) ON DELETE SET NULL
-  - work_package_id -> public.work_packages(id) ON DELETE SET NULL
+  - work_order_id -> public.work_orders(id) ON DELETE SET NULL
   - aircraft_id -> public.aircraft(id) ON DELETE SET NULL
 Unique Constraints:
   - uq_amro_operational_telemetry_scope_record_key(tenant_id, franchise_id, source_record_key)
@@ -3344,13 +3344,13 @@ Defaults:
   - created_at: now()
 Indexes:
   - idx_amro_operational_telemetry_scope_metric_time(tenant_id, metric_key, recorded_at DESC)
-  - idx_amro_operational_telemetry_work_package(work_package_id)
+  - idx_amro_operational_telemetry_work_order(work_order_id)
   - uq_amro_operational_telemetry_scope_record_key(tenant_id, franchise_id, source_record_key)
 Columns:
   - id | uuid | nullable:no | default:gen_random_uuid()
   - tenant_id | uuid | nullable:no | default:none
   - franchise_id | uuid | nullable:yes | default:none
-  - work_package_id | uuid | nullable:yes | default:none
+  - work_order_id | uuid | nullable:yes | default:none
   - aircraft_id | uuid | nullable:yes | default:none
   - source_record_key | text | nullable:no | default:none
   - telemetry_source | text | nullable:no | default:none
@@ -3379,7 +3379,7 @@ Foreign Keys:
   - tenant_id -> public.tenants(id) ON DELETE CASCADE
   - franchise_id -> public.franchises(id) ON DELETE SET NULL
   - obligation_id -> public.compliance_obligations(id) ON DELETE SET NULL
-  - work_package_id -> public.work_packages(id) ON DELETE SET NULL
+  - work_order_id -> public.work_orders(id) ON DELETE SET NULL
   - task_id -> public.tasks(id) ON DELETE SET NULL
   - maintenance_event_id -> public.maintenance_events(id) ON DELETE SET NULL
   - created_by -> auth.users(id) ON DELETE SET NULL
@@ -3405,7 +3405,7 @@ Columns:
   - tenant_id | uuid | nullable:no | default:none
   - franchise_id | uuid | nullable:yes | default:none
   - obligation_id | uuid | nullable:yes | default:none
-  - work_package_id | uuid | nullable:yes | default:none
+  - work_order_id | uuid | nullable:yes | default:none
   - task_id | uuid | nullable:yes | default:none
   - maintenance_event_id | uuid | nullable:yes | default:none
   - event_code | text | nullable:no | default:none
@@ -3485,14 +3485,14 @@ Security:
 Performance:
   - Expected p95 <= 1ms per attempted mutation
 Validation:
-  - src/pages/api/v2/amro/work-packages.test.ts
+  - src/pages/api/v2/amro/work-orders.test.ts
 ```
 
 ```text
 Component Type: Table
-Component Name: public.work_packages (version extension)
+Component Name: public.work_orders (version extension)
 Purpose: Add optimistic locking version control for concurrent work package transitions.
-Estimated Row Count: Existing `public.work_packages` volume; +1 integer column.
+Estimated Row Count: Existing `public.work_orders` volume; +1 integer column.
 Primary Key: id
 Foreign Keys:
   - unchanged from existing table contract
@@ -3503,7 +3503,7 @@ Check Constraints:
 Defaults:
   - version: 1
 Indexes:
-  - idx_work_packages_id_version(id, version)
+  - idx_work_orders_id_version(id, version)
 Columns:
   - version | integer | nullable:no | default:1
 Security Considerations:
@@ -3516,7 +3516,7 @@ Implementation Notes:
 
 ```text
 Component Type: SQL Function
-Component Name: amro_ops.amro_ops_create_work_package(...)
+Component Name: amro_ops.amro_ops_create_work_order(...)
 Purpose: Create a tenant/franchise-scoped AMRO work package with persistence-level validation for aircraft state, maintenance type, priority, and non-empty scope.
 Input Parameters:
   - p_tenant_id | text | required
@@ -3534,7 +3534,7 @@ Input Parameters:
   - p_creation_triggered_at | timestamptz | required
   - p_engineer_plan | jsonb | optional
 Output Contract:
-  - work_package_id | text
+  - work_order_id | text
   - status | text
   - version | integer
   - created_at | timestamptz
@@ -3542,7 +3542,7 @@ Output Contract:
   - updated_at | timestamptz
   - updated_by | text
 Dependencies:
-  - amro_ops.work_package
+  - amro_ops.work_order
 Validation Rules:
   - aircraft_id cannot contain inactive/retired markers
   - maintenance_type in (line, base, component, a-check, c-check)
@@ -3554,19 +3554,19 @@ Security:
 Performance:
   - Single-row insert path with indexed primary-key lookup return
 Implementation Notes:
-  - Migration: V2024.06.15.002__add_version_column_work_package.sql
-  - Used by: src/pages/api/v2/amro/work-package-persistence.ts
+  - Migration: V2024.06.15.002__add_version_column_work_order.sql
+  - Used by: src/pages/api/v2/amro/work-order-persistence.ts
 ```
 
 ```text
 Component Type: SQL Function
-Component Name: amro_ops.amro_ops_transition_work_package(...)
+Component Name: amro_ops.amro_ops_transition_work_order(...)
 Purpose: Transition work package status with optimistic locking, policy-matrix validation, role authorization, and in-transaction workflow audit logging.
 Input Parameters:
   - p_tenant_id | text | required
   - p_franchise_id | text | required
   - p_user_id | text | required
-  - p_work_package_id | text | required
+  - p_work_order_id | text | required
   - p_current_status | text | required
   - p_target_status | text | required
   - p_reason_code | text | required
@@ -3578,7 +3578,7 @@ Input Parameters:
   - p_input_payload | jsonb | optional
   - p_user_ctx | jsonb | optional
 Output Contract:
-  - work_package_id | text
+  - work_order_id | text
   - status | text
   - version | integer
   - created_at | timestamptz
@@ -3586,7 +3586,7 @@ Output Contract:
   - updated_at | timestamptz
   - updated_by | text
 Dependencies:
-  - amro_ops.work_package
+  - amro_ops.work_order
   - amro_audit.amro_workflow_tx_log
 Validation Rules:
   - Current and target statuses must be in the supported lifecycle set
@@ -3605,13 +3605,13 @@ Security:
 Performance:
   - Single-row update with direct-key predicate and append-only audit write
 Implementation Notes:
-  - Migration: V2024.06.15.002__add_version_column_work_package.sql
-  - Used by: src/pages/api/v2/amro/work-package-persistence.ts
+  - Migration: V2024.06.15.002__add_version_column_work_order.sql
+  - Used by: src/pages/api/v2/amro/work-order-persistence.ts
 ```
 
 ```text
 Component Type: SQL Function
-Component Name: amro_ops.amro_ops_clone_template_work_package(...)
+Component Name: amro_ops.amro_ops_clone_template_work_order(...)
 Purpose: Clone a template into a new tenant/franchise-scoped work package after persistence-level aircraft activity validation.
 Input Parameters:
   - p_tenant_id | text | required
@@ -3623,7 +3623,7 @@ Input Parameters:
   - p_aircraft_id | text | required
   - p_override_fields | jsonb | optional
 Output Contract:
-  - work_package_id | text
+  - work_order_id | text
   - status | text
   - version | integer
   - created_at | timestamptz
@@ -3632,7 +3632,7 @@ Output Contract:
   - updated_by | text
   - inherited_tasks_count | integer
 Dependencies:
-  - amro_ops.work_package
+  - amro_ops.work_order
 Validation Rules:
   - aircraft_id cannot contain inactive/retired markers
 Security:
@@ -3641,8 +3641,8 @@ Security:
 Performance:
   - Single-row insert path with deterministic inherited task count return
 Implementation Notes:
-  - Migration: V2024.06.15.002__add_version_column_work_package.sql
-  - Used by: src/pages/api/v2/amro/work-package-persistence.ts
+  - Migration: V2024.06.15.002__add_version_column_work_order.sql
+  - Used by: src/pages/api/v2/amro/work-order-persistence.ts
 ```
 
 ```text
@@ -3660,7 +3660,7 @@ Output Contract:
 Authorization:
   - authenticated AMRO domain tenant or franchise scope with dashboards.view permission
 Data Dependencies:
-  - public.work_packages
+  - public.work_orders
 Failure Modes:
   - 403 unauthorized AMRO domain access
   - 405 unsupported method
@@ -3769,8 +3769,8 @@ Primary Key: id
 Foreign Keys:
   - tenant_id -> public.tenants(id) ON DELETE CASCADE
   - franchise_id -> public.franchises(id) ON DELETE SET NULL
-  - work_order_id -> public.work_packages(id) ON DELETE CASCADE
-  - work_package_id -> public.work_packages(id) ON DELETE CASCADE (compatibility alias)
+  - work_order_id -> public.work_orders(id) ON DELETE CASCADE
+  - work_order_id -> public.work_orders(id) ON DELETE CASCADE (compatibility alias)
   - assigned_to -> auth.users(id) ON DELETE SET NULL
   - assigned_technician_id -> auth.users(id) ON DELETE SET NULL
   - qa_verified_by -> auth.users(id) ON DELETE SET NULL
@@ -3794,11 +3794,11 @@ Defaults:
 Indexes:
   - idx_tasks_assigned_technician_id(assigned_technician_id)
   - idx_tasks_work_order_id(work_order_id)
-  - idx_tasks_work_package_id_compat(work_package_id)
+  - idx_tasks_work_order_id_compat(work_order_id)
   - idx_tasks_sequence_active(work_order_id, sequence) WHERE deleted_at IS NULL AND sequence IS NOT NULL
 Columns:
   - work_order_id | uuid | nullable:no | default:none
-  - work_package_id | uuid | nullable:yes | default:null (compatibility alias kept in sync with work_order_id)
+  - work_order_id | uuid | nullable:yes | default:null (compatibility alias kept in sync with work_order_id)
   - estimated_duration_hours | interval | nullable:yes | default:null
   - sequence | integer | nullable:yes | default:null
   - sequence_order | integer | nullable:yes | default:null (deprecated alias)
@@ -3847,7 +3847,7 @@ Estimated Row Count: 500-1,000,000 per tenant
 Primary Key:
   - id
 Foreign Keys:
-  - work_order_id -> public.work_packages(id) ON DELETE CASCADE
+  - work_order_id -> public.work_orders(id) ON DELETE CASCADE
   - task_id -> public.tasks(id) ON DELETE SET NULL
   - resource_id -> public.amro_resource_pools(id) ON DELETE NO ACTION
 Unique Constraints:
@@ -3936,7 +3936,7 @@ Estimated Row Count: 500-1,000,000 per tenant
 Primary Key:
   - id
 Foreign Keys:
-  - work_order_id -> public.work_packages(id) ON DELETE CASCADE
+  - work_order_id -> public.work_orders(id) ON DELETE CASCADE
   - task_id -> public.tasks(id) ON DELETE SET NULL
   - directive_id -> public.amro_compliance_directives(id) ON DELETE SET NULL
   - certified_by -> auth.users(id) ON DELETE NO ACTION
@@ -4076,7 +4076,7 @@ Foreign Keys:
 Unique Constraints:
   - none
 Check Constraints:
-  - entity_type IN ('work_package','task','resource','compliance','certificate','template','directive')
+  - entity_type IN ('work_order','task','resource','compliance','certificate','template','directive')
   - action IN ('create','update','delete','approve','reject','activate','deactivate','assign','unassign','complete','defer')
 Defaults:
   - id: gen_random_uuid()

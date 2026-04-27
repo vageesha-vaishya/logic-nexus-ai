@@ -99,14 +99,14 @@ Dashboard → AMRO → Settings → Master Data → Aircraft
 const aircraftStatusPaletteActions = useMemo<AircraftPaletteAction[]>(
   () => [
     {
-      id: 'create-work-package',
+      id: 'create-work-order',
       label: 'Create Work Package',  // ← THIS BUTTON
       icon: <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />,
       group: 'primary',
       variant: 'default',
       permission: 'create_maintenance_request',
       onAction: async () => {
-        openAircraftWorkPackageDialog(); // ← OPENS DIALOG
+        openAircraftWorkOrderDialog(); // ← OPENS DIALOG
       },
     },
     // ... more actions
@@ -231,7 +231,7 @@ Dashboard → AMRO → Work Orders
 
 ### Current Behavior (Old Dialog)
 ```
-Opens: AircraftWorkPackageCreateDialog
+Opens: AircraftWorkOrderCreateDialog
 - 98.5vw width (entire screen)
 - 5 confusing tabs
 - 10-11px font (tiny)
@@ -241,7 +241,7 @@ Opens: AircraftWorkPackageCreateDialog
 
 ### New Behavior (After Integration)
 ```
-Opens: AmroWorkPackageCreateWizard
+Opens: AmroWorkOrderCreateWizard
 - max-w-4xl (reasonable size)
 - 4-step wizard
 - 14px+ font (readable)
@@ -257,21 +257,21 @@ Opens: AmroWorkPackageCreateWizard
 
 **Current Code (Line ~9244):**
 ```typescript
-<AddWorkPackageDialog
-  aircraftWorkPackageDialogOpen={aircraftWorkPackageDialogOpen}
-  setAircraftWorkPackageDialogOpen={setAircraftWorkPackageDialogOpen}
+<AddWorkOrderDialog
+  aircraftWorkOrderDialogOpen={aircraftWorkOrderDialogOpen}
+  setAircraftWorkOrderDialogOpen={setAircraftWorkOrderDialogOpen}
   // ... 30+ props
 />
 ```
 
 **Replace With:**
 ```typescript
-<AmroWorkPackageCreateWizard
-  open={aircraftWorkPackageDialogOpen}
-  onOpenChange={setAircraftWorkPackageDialogOpen}
+<AmroWorkOrderCreateWizard
+  open={aircraftWorkOrderDialogOpen}
+  onOpenChange={setAircraftWorkOrderDialogOpen}
   preselectedAircraftId={selectedAircraft?.id}
   onSuccess={() => {
-    loadWorkPackageTemplateRegistry();
+    loadWorkOrderTemplateRegistry();
     toast.success('Work package created successfully');
   }}
 />
@@ -289,10 +289,10 @@ To see the "Create Work Package" button, users need:
 
 **Check in Code:**
 ```typescript
-const canCreateWorkPackage = hasPermission('create_maintenance_request');
+const canCreateWorkOrder = hasPermission('create_maintenance_request');
 
 // Button only shows if:
-if (canCreateWorkPackage) {
+if (canCreateWorkOrder) {
   // Show button
 }
 ```
@@ -329,8 +329,8 @@ Look for this button among the aircraft actions:
 
 **Old Dialog Opens?**
 - The integration hasn't been completed yet
-- Currently shows `AircraftWorkPackageCreateDialog`
-- After integration, will show `AmroWorkPackageCreateWizard`
+- Currently shows `AircraftWorkOrderCreateDialog`
+- After integration, will show `AmroWorkOrderCreateWizard`
 
 **Need Access?**
 - Contact your AMRO administrator

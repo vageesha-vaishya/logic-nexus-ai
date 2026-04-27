@@ -22,23 +22,23 @@ import {
   Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface RowContextMenuProps {
-  template: WorkPackageTemplate | null;
+  template: WorkOrderTemplate | null;
   x: number;
   y: number;
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  onPreview: (template: WorkPackageTemplate) => void;
-  onEdit: (template: WorkPackageTemplate) => void;
-  onClone: (template: WorkPackageTemplate) => void;
-  onDelete: (template: WorkPackageTemplate) => void;
-  onManageVersions: (template: WorkPackageTemplate) => void;
-  onSetDefault?: (template: WorkPackageTemplate) => void;
-  onExport?: (template: WorkPackageTemplate) => void;
+  onPreview: (template: WorkOrderTemplate) => void;
+  onEdit: (template: WorkOrderTemplate) => void;
+  onClone: (template: WorkOrderTemplate) => void;
+  onDelete: (template: WorkOrderTemplate) => void;
+  onManageVersions: (template: WorkOrderTemplate) => void;
+  onSetDefault?: (template: WorkOrderTemplate) => void;
+  onExport?: (template: WorkOrderTemplate) => void;
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────

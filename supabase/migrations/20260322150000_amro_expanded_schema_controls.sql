@@ -1,7 +1,7 @@
 -- DB-VERIFICATION: amro-expanded-schema-controls-reviewed
 -- DB-ARCH-APPROVAL: amro-lld-20-expanded-schema-controls-approved
 
-CREATE TABLE IF NOT EXISTS public.work_package_templates (
+CREATE TABLE IF NOT EXISTS public.work_order_templates (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
@@ -20,10 +20,10 @@ CREATE TABLE IF NOT EXISTS public.work_package_templates (
   deleted_at timestamptz
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_work_package_templates_tenant_franchise_code_version
-  ON public.work_package_templates(tenant_id, COALESCE(franchise_id, '00000000-0000-0000-0000-000000000000'::uuid), template_code, version);
-CREATE INDEX IF NOT EXISTS idx_work_package_templates_tenant_active
-  ON public.work_package_templates(tenant_id, active)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_work_order_templates_tenant_franchise_code_version
+  ON public.work_order_templates(tenant_id, COALESCE(franchise_id, '00000000-0000-0000-0000-000000000000'::uuid), template_code, version);
+CREATE INDEX IF NOT EXISTS idx_work_order_templates_tenant_active
+  ON public.work_order_templates(tenant_id, active)
   WHERE deleted_at IS NULL AND active = true;
 
 CREATE TABLE IF NOT EXISTS public.policy_snapshots (
@@ -53,11 +53,11 @@ BEGIN
   IF NOT EXISTS (
     SELECT 1
     FROM pg_constraint
-    WHERE conname = 'fk_work_package_templates_policy_snapshot'
-      AND conrelid = 'public.work_package_templates'::regclass
+    WHERE conname = 'fk_work_order_templates_policy_snapshot'
+      AND conrelid = 'public.work_order_templates'::regclass
   ) THEN
-    ALTER TABLE public.work_package_templates
-      ADD CONSTRAINT fk_work_package_templates_policy_snapshot
+    ALTER TABLE public.work_order_templates
+      ADD CONSTRAINT fk_work_order_templates_policy_snapshot
       FOREIGN KEY (policy_snapshot_id) REFERENCES public.policy_snapshots(id) ON DELETE SET NULL
       DEFERRABLE INITIALLY DEFERRED;
   END IF;
@@ -95,7 +95,7 @@ CREATE TABLE IF NOT EXISTS public.regulator_dossiers (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
-  work_package_id uuid NOT NULL REFERENCES public.work_packages(id) ON DELETE CASCADE,
+  work_order_id uuid NOT NULL REFERENCES public.work_orders(id) ON DELETE CASCADE,
   regulator_code text NOT NULL,
   dossier_ref text NOT NULL,
   dossier_uri text,
@@ -111,8 +111,8 @@ CREATE TABLE IF NOT EXISTS public.regulator_dossiers (
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_regulator_dossiers_tenant_franchise_regulator_ref
   ON public.regulator_dossiers(tenant_id, COALESCE(franchise_id, '00000000-0000-0000-0000-000000000000'::uuid), regulator_code, dossier_ref);
-CREATE INDEX IF NOT EXISTS idx_regulator_dossiers_tenant_work_package
-  ON public.regulator_dossiers(tenant_id, work_package_id);
+CREATE INDEX IF NOT EXISTS idx_regulator_dossiers_tenant_work_order
+  ON public.regulator_dossiers(tenant_id, work_order_id);
 
 CREATE TABLE IF NOT EXISTS public.forecast_features (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -219,7 +219,7 @@ ALTER TABLE public.certification_actions
   );
 
 CREATE INDEX IF NOT EXISTS idx_tasks_active_statuses
-  ON public.tasks(tenant_id, work_package_id, planned_start_date)
+  ON public.tasks(tenant_id, work_order_id, planned_start_date)
   WHERE deleted_at IS NULL AND status IN ('pending', 'not_started', 'in_progress', 'on_hold');
 CREATE INDEX IF NOT EXISTS idx_compliance_obligations_active_statuses
   ON public.compliance_obligations(tenant_id, due_date)
@@ -253,7 +253,7 @@ DO $$
 DECLARE
   target_table text;
   target_tables text[] := ARRAY[
-    'work_package_templates',
+    'work_order_templates',
     'task_evidence',
     'policy_snapshots',
     'sync_conflicts',

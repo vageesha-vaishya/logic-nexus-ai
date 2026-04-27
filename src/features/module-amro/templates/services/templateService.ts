@@ -8,7 +8,7 @@
  * - Timeout handling
  */
 
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -27,7 +27,7 @@ export interface FetchTemplatesParams {
 }
 
 export interface FetchTemplatesResponse {
-  templates: WorkPackageTemplate[];
+  templates: WorkOrderTemplate[];
   total: number;
   page: number;
   pageSize: number;
@@ -50,7 +50,7 @@ const DEFAULT_TIMEOUT = 10000; // 10 seconds
 /**
  * Normalize template data from API response
  */
-function normalizeTemplate(r: any): WorkPackageTemplate {
+function normalizeTemplate(r: any): WorkOrderTemplate {
   return {
     id: String(r.id || ''),
     tenant_id: String(r.tenant_id || ''),
@@ -182,8 +182,8 @@ export async function fetchTemplates(
  */
 export async function createTemplate(
   accessToken: string,
-  templateData: Partial<WorkPackageTemplate>
-): Promise<WorkPackageTemplate> {
+  templateData: Partial<WorkOrderTemplate>
+): Promise<WorkOrderTemplate> {
   const url = `${API_BASE_URL}/master-data/work_order_templates`;
 
   try {
@@ -220,9 +220,9 @@ export async function createTemplate(
 export async function updateTemplate(
   accessToken: string,
   templateId: string,
-  templateData: Partial<WorkPackageTemplate>,
+  templateData: Partial<WorkOrderTemplate>,
   expectedUpdatedAt?: string
-): Promise<WorkPackageTemplate> {
+): Promise<WorkOrderTemplate> {
   const url = `${API_BASE_URL}/master-data/work_order_templates/${templateId}`;
 
   const headers: Record<string, string> = {
@@ -294,7 +294,7 @@ export async function cloneTemplate(
   templateId: string,
   newName: string,
   newCode: string
-): Promise<WorkPackageTemplate> {
+): Promise<WorkOrderTemplate> {
   const url = `${API_BASE_URL}/master-data/work_order_templates/${templateId}/clone`;
 
   try {
@@ -412,7 +412,7 @@ export async function fetchAircraftModels(
   const query = new URLSearchParams();
   if (tenantId) query.set('tenant_id', tenantId);
 
-  const url = `${API_BASE_URL}/work-package-templates/model-options?${query.toString()}`;
+  const url = `${API_BASE_URL}/work-order-templates/model-options?${query.toString()}`;
 
   try {
     const response = await fetchWithTimeout(url, {

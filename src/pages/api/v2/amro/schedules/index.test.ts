@@ -152,7 +152,7 @@ describe('/api/v2/amro/schedules', () => {
       query: { interface: 'assign-maintenance-slot' },
       headers: {},
       body: {
-        work_package_id: 'wp-120',
+        work_order_id: 'wp-120',
         station_code: 'station-a',
         slot_start: '2026-03-22T03:00:00.000Z',
         slot_end: '2026-03-22T05:00:00.000Z',
@@ -180,7 +180,7 @@ describe('/api/v2/amro/schedules', () => {
       query: { interface: 'assign-maintenance-slot' },
       headers: {},
       body: {
-        work_package_id: 'wp-121',
+        work_order_id: 'wp-121',
         station_code: 'station-a',
         slot_start: '2026-03-22T01:30:00.000Z',
         slot_end: '2026-03-22T03:00:00.000Z',
@@ -207,7 +207,7 @@ describe('/api/v2/amro/schedules', () => {
       query: { interface: 'assign-maintenance-slot' },
       headers: {},
       body: {
-        work_package_id: 'wp-122',
+        work_order_id: 'wp-122',
         station_code: 'station-a',
         slot_start: '2026-03-22T05:00:00.000Z',
         slot_end: '2026-03-22T06:00:00.000Z',
@@ -243,7 +243,7 @@ describe('/api/v2/amro/schedules', () => {
       headers: {},
       body: {
         schedule_id: 'tenant-1-fr-1-schedule-a',
-        work_package_id: 'wp-120',
+        work_order_id: 'wp-120',
         acknowledged_at: '2026-03-22T07:15:00.000Z',
         device_id: 'device-mobile-7',
       },
@@ -270,7 +270,7 @@ describe('/api/v2/amro/schedules', () => {
       headers: {},
       body: {
         schedule_id: 'tenant-1-fr-1-schedule-a',
-        work_package_id: 'wp-120',
+        work_order_id: 'wp-120',
         acknowledged_at: '2026-03-22T07:15:00.000Z',
         device_id: 'device-mobile-7',
       },
@@ -304,7 +304,7 @@ describe('/api/v2/amro/schedules', () => {
         query: { interface: 'assign-maintenance-slot' },
         headers: {},
         body: {
-          work_package_id: `wp-${index}`,
+          work_order_id: `wp-${index}`,
           station_code: 'station-a',
           slot_start: `2026-03-22T${String((index % 6) + 10).padStart(2, '0')}:00:00.000Z`,
           slot_end: `2026-03-22T${String((index % 6) + 11).padStart(2, '0')}:00:00.000Z`,

@@ -3,16 +3,16 @@
 ## Scope
 - Date: `2026-04-25`
 - Request: rename
-  - `public.amro_work_package_resource_assignments.work_package_id` -> `work_order_id`
-  - `public.amro_work_package_resource_assignments` -> `public.amro_work_order_resource_assignments`
+  - `public.amro_work_order_resource_assignments.work_order_id` -> `work_order_id`
+  - `public.amro_work_order_resource_assignments` -> `public.amro_work_order_resource_assignments`
 - Environment note: development phase with dummy/sample data.
 
 ## Migration Delivered
 - `supabase/migrations/20260425153000_amro_rename_wp_resource_assignments_to_wo.sql`
 
 ### Operations Performed
-1. Renames column `work_package_id` -> `work_order_id` when needed.
-2. Renames table `amro_work_package_resource_assignments` -> `amro_work_order_resource_assignments` when needed.
+1. Renames column `work_order_id` -> `work_order_id` when needed.
+2. Renames table `amro_work_order_resource_assignments` -> `amro_work_order_resource_assignments` when needed.
 3. Renames constraints on the table to work-order naming patterns.
 4. Renames indexes on the table to work-order naming patterns.
 5. Renames RLS policies:
@@ -28,15 +28,15 @@
 ## Impact Analysis Summary
 
 ### Direct table-name references
-- Runtime application/API code (`src`, `services`): no direct references found to `amro_work_package_resource_assignments`.
+- Runtime application/API code (`src`, `services`): no direct references found to `amro_work_order_resource_assignments`.
 - Historical schema migration reference remains in:
-  - `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql` (original creation migration).
+  - `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql` (original creation migration).
 - Refactor migration references:
   - `supabase/migrations/20260425153000_amro_rename_wp_resource_assignments_to_wo.sql`.
 
 ### Foreign key dependency check (`...resource_assignments.id`)
 - Repository-wide SQL/code scan found no explicit FK definitions targeting:
-  - `public.amro_work_package_resource_assignments(id)`
+  - `public.amro_work_order_resource_assignments(id)`
   - `public.amro_work_order_resource_assignments(id)`
 - Added defensive live-DB remediation migration:
   - `supabase/migrations/20260425171000_amro_fix_resource_assignment_fk_targets.sql`
@@ -52,7 +52,7 @@
 - Constraint names: normalized via dynamic catalog-driven rename.
 - Index names: normalized via `pg_indexes` rename loop.
 - RLS policies: explicit rename for the two known policy identifiers.
-- Foreign key relationship target remains `public.work_packages(id)` (column rename only; no relationship target change requested).
+- Foreign key relationship target remains `public.work_orders(id)` (column rename only; no relationship target change requested).
 
 ## Residual Legacy References (Intentional)
 - Original naming remains in older migration files as immutable historical record of prior schema state.
@@ -63,7 +63,7 @@
    - `npx supabase db push --include-all`
 2. Validate in SQL editor:
    - `select to_regclass('public.amro_work_order_resource_assignments');`
-   - `select to_regclass('public.amro_work_package_resource_assignments');` (should be null after successful rename)
+   - `select to_regclass('public.amro_work_order_resource_assignments');` (should be null after successful rename)
    - Inspect columns for `public.amro_work_order_resource_assignments` and confirm `work_order_id` exists.
 3. Verify policy/index names via:
    - `pg_policies` for `amro_platform_admin_access_wo_resource_assignments`, `amro_tenant_franchise_scope_wo_resource_assignments_read`

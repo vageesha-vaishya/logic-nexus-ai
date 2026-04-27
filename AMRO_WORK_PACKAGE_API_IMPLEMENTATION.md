@@ -2,7 +2,7 @@
 
 **Date:** 2026-04-12  
 **Status:** Phase 2 (API Layer) - COMPLETE  
-**Database Schema:** All required tables already exist in migration `20260412100000_amro_work_package_enhanced_schema.sql`
+**Database Schema:** All required tables already exist in migration `20260412100000_amro_work_order_enhanced_schema.sql`
 
 ---
 
@@ -12,17 +12,17 @@
 
 | File | Endpoint | Method | Purpose |
 |------|----------|--------|---------|
-| `work-package-template-versions/index.ts` | `/api/v2/amro/work-package-template-versions` | GET | List versions for a template |
-| `work-package-template-versions/index.ts` | `/api/v2/amro/work-package-template-versions` | POST | Create new version (draft) |
-| `work-package-template-versions/[id].ts` | `/api/v2/amro/work-package-template-versions/:id` | GET | Get version details |
-| `work-package-template-versions/[id].ts` | `/api/v2/amro/work-package-template-versions/:id` | PUT | Update version (draft only) |
-| `work-package-template-versions/[id].ts` | `/api/v2/amro/work-package-template-versions/:id` | DELETE | Delete version (draft only) |
-| `work-package-template-versions/[id]/submit.ts` | `/api/v2/amro/work-package-template-versions/:id/submit` | POST | Submit for review (draft → pending_review) |
-| `work-package-template-versions/[id]/approve.ts` | `/api/v2/amro/work-package-template-versions/:id/approve` | POST | Approve/reject (pending_review → approved/draft) |
+| `work-order-template-versions/index.ts` | `/api/v2/amro/work-order-template-versions` | GET | List versions for a template |
+| `work-order-template-versions/index.ts` | `/api/v2/amro/work-order-template-versions` | POST | Create new version (draft) |
+| `work-order-template-versions/[id].ts` | `/api/v2/amro/work-order-template-versions/:id` | GET | Get version details |
+| `work-order-template-versions/[id].ts` | `/api/v2/amro/work-order-template-versions/:id` | PUT | Update version (draft only) |
+| `work-order-template-versions/[id].ts` | `/api/v2/amro/work-order-template-versions/:id` | DELETE | Delete version (draft only) |
+| `work-order-template-versions/[id]/submit.ts` | `/api/v2/amro/work-order-template-versions/:id/submit` | POST | Submit for review (draft → pending_review) |
+| `work-order-template-versions/[id]/approve.ts` | `/api/v2/amro/work-order-template-versions/:id/approve` | POST | Approve/reject (pending_review → approved/draft) |
 
 **Database Tables Used:**
 - `amro_work_order_template_versions` (created 2026-04-12, renamed)
-- `work_package_templates` (created 2026-03-22)
+- `work_order_templates` (created 2026-03-22)
 
 **Key Features:**
 - ✅ Automatic version number incrementing
@@ -37,12 +37,12 @@
 
 | File | Endpoint | Method | Purpose |
 |------|----------|--------|---------|
-| `emergency/work-packages/index.ts` | `/api/v2/amro/emergency/work-packages` | GET | List emergency WPs |
-| `emergency/work-packages/index.ts` | `/api/v2/amro/emergency/work-packages` | POST | Create emergency WP |
+| `emergency/work-orders/index.ts` | `/api/v2/amro/emergency/work-orders` | GET | List emergency WPs |
+| `emergency/work-orders/index.ts` | `/api/v2/amro/emergency/work-orders` | POST | Create emergency WP |
 
 **Database Tables Used:**
-- `amro_emergency_work_packages` (created 2026-04-12)
-- `work_packages` (created 2026-03-22)
+- `amro_emergency_work_orders` (created 2026-04-12)
+- `work_orders` (created 2026-03-22)
 - `amro_non_scheduled_tasks` (created 2026-04-12) - optional conversion source
 
 **Key Features:**
@@ -66,8 +66,8 @@
 
 **Database Tables Used:**
 - `amro_non_scheduled_tasks` (created 2026-04-12)
-- `amro_emergency_work_packages` (created 2026-04-12)
-- `work_packages` (created 2026-03-22)
+- `amro_emergency_work_orders` (created 2026-04-12)
+- `work_orders` (created 2026-03-22)
 
 **Key Features:**
 - ✅ Task source tracking (pilot report, mechanic report, inspection finding, etc.)
@@ -83,15 +83,15 @@
 
 | File | Endpoint | Method | Purpose |
 |------|----------|--------|---------|
-| `work-packages/[id]/compliance-records.ts` | `/api/v2/amro/work-packages/:id/compliance-records` | GET | List compliance records |
-| `work-packages/[id]/compliance-records.ts` | `/api/v2/amro/work-packages/:id/compliance-records` | POST | Create compliance record |
-| `work-packages/[id]/certificates.ts` | `/api/v2/amro/work-packages/:id/certificates` | POST | Generate CRS |
+| `work-orders/[id]/compliance-records.ts` | `/api/v2/amro/work-orders/:id/compliance-records` | GET | List compliance records |
+| `work-orders/[id]/compliance-records.ts` | `/api/v2/amro/work-orders/:id/compliance-records` | POST | Create compliance record |
+| `work-orders/[id]/certificates.ts` | `/api/v2/amro/work-orders/:id/certificates` | POST | Generate CRS |
 
 **Database Tables Used:**
 - `amro_work_order_compliance_records` (created 2026-04-12, renamed)
 - `amro_compliance_directives` (created 2026-04-12)
 - `amro_certificates_release_service` (created 2026-04-12)
-- `work_packages` (created 2026-03-22)
+- `work_orders` (created 2026-03-22)
 
 **Key Features:**
 - ✅ AD/SB directive tracking
@@ -107,7 +107,7 @@
 
 ## 📊 Database Schema Reuse Analysis
 
-**CRITICAL FINDING:** All 14 tables required for the enhanced AMRO Work Package module **already exist** in the migration file `20260412100000_amro_work_package_enhanced_schema.sql`. 
+**CRITICAL FINDING:** All 14 tables required for the enhanced AMRO Work Package module **already exist** in the migration file `20260412100000_amro_work_order_enhanced_schema.sql`. 
 
 **No new tables were created.** All APIs reuse existing schema:
 
@@ -115,7 +115,7 @@
 |--------------|----------------|---------|
 | Template versioning | `amro_work_order_template_versions` | 2026-04-12 |
 | Template categories | `amro_work_order_template_categories` | 2026-04-12 |
-| Emergency WPs | `amro_emergency_work_packages` | 2026-04-12 |
+| Emergency WPs | `amro_emergency_work_orders` | 2026-04-12 |
 | Non-scheduled tasks | `amro_non_scheduled_tasks` | 2026-04-12 |
 | Compliance directives | `amro_compliance_directives` | 2026-04-12 |
 | WP compliance records | `amro_work_order_compliance_records` | 2026-04-12 |
@@ -171,20 +171,20 @@ All endpoints follow these patterns:
 
 ```
 src/pages/api/v2/amro/
-├── work-package-template-versions/
+├── work-order-template-versions/
 │   ├── index.ts                      ✅ GET, POST (list/create)
 │   └── [id]/
 │       ├── index.ts                  ✅ GET, PUT, DELETE (single resource)
 │       ├── submit.ts                 ✅ POST (draft → pending_review)
 │       └── approve.ts                ✅ POST (approve/reject workflow)
 ├── emergency/
-│   └── work-packages/
+│   └── work-orders/
 │       └── index.ts                  ✅ GET, POST (list/create emergency WPs)
 ├── non-scheduled-tasks/
 │   ├── index.ts                      ✅ GET, POST (list/create tasks)
 │   └── [id]/
 │       └── convert-to-wp.ts          ✅ POST (convert to emergency WP)
-└── work-packages/
+└── work-orders/
     └── [id]/
         ├── compliance-records.ts     ✅ GET, POST (compliance management)
         └── certificates.ts           ✅ POST (CRS generation)
@@ -205,7 +205,7 @@ src/pages/api/v2/amro/
    - `useEmergencyWP()` - Emergency work packages
    - `useNonScheduledTasks()` - Non-scheduled task registry
    - `useComplianceRecords()` - Compliance tracking
-   - Follow pattern in `src/features/module-amro/components/work-orders/useWorkPackageState.ts`
+   - Follow pattern in `src/features/module-amro/components/work-orders/useWorkOrderState.ts`
 
 3. **Build UI Components**
    - Template Version Manager
@@ -243,20 +243,20 @@ For each API endpoint:
 ### Test Files to Create
 ```
 src/pages/api/v2/amro/
-├── work-package-template-versions/
+├── work-order-template-versions/
 │   ├── index.test.ts
 │   └── [id]/
 │       ├── index.test.ts
 │       ├── submit.test.ts
 │       └── approve.test.ts
 ├── emergency/
-│   └── work-packages/
+│   └── work-orders/
 │       └── index.test.ts
 ├── non-scheduled-tasks/
 │   ├── index.test.ts
 │   └── [id]/
 │       └── convert-to-wp.test.ts
-└── work-packages/
+└── work-orders/
     └── [id]/
         ├── compliance-records.test.ts
         └── certificates.test.ts
@@ -268,7 +268,7 @@ src/pages/api/v2/amro/
 
 ### Create Template Version
 ```bash
-POST /api/v2/amro/work-package-template-versions
+POST /api/v2/amro/work-order-template-versions
 {
   "template_id": "uuid",
   "change_description": "Updated AD compliance requirements",
@@ -281,13 +281,13 @@ POST /api/v2/amro/work-package-template-versions
 
 ### Submit for Review
 ```bash
-POST /api/v2/amro/work-package-template-versions/:id/submit
+POST /api/v2/amro/work-order-template-versions/:id/submit
 {}
 ```
 
 ### Approve Version
 ```bash
-POST /api/v2/amro/work-package-template-versions/:id/approve
+POST /api/v2/amro/work-order-template-versions/:id/approve
 {
   "action": "approve",
   "set_active": true
@@ -296,7 +296,7 @@ POST /api/v2/amro/work-package-template-versions/:id/approve
 
 ### Create Emergency Work Package
 ```bash
-POST /api/v2/amro/emergency/work-packages
+POST /api/v2/amro/emergency/work-orders
 {
   "aircraft_id": "uuid",
   "emergency_type": "aog",
@@ -318,7 +318,7 @@ POST /api/v2/amro/non-scheduled-tasks/:id/convert-to-wp
 
 ### Create Compliance Record
 ```bash
-POST /api/v2/amro/work-packages/:id/compliance-records
+POST /api/v2/amro/work-orders/:id/compliance-records
 {
   "compliance_type": "AD",
   "compliance_reference": "2024-15-07",
@@ -334,7 +334,7 @@ POST /api/v2/amro/work-packages/:id/compliance-records
 
 ### Generate Certificate of Release to Service
 ```bash
-POST /api/v2/amro/work-packages/:id/certificates
+POST /api/v2/amro/work-orders/:id/certificates
 {
   "certifying_staff_id": "user_id",
   "staff_license_number": "B1-12345",
@@ -362,7 +362,7 @@ POST /api/v2/amro/work-packages/:id/certificates
 
 ## 📝 Notes for Developers
 
-1. **Database Migration First**: Before running APIs, ensure migration `20260412100000_amro_work_package_enhanced_schema.sql` is applied
+1. **Database Migration First**: Before running APIs, ensure migration `20260412100000_amro_work_order_enhanced_schema.sql` is applied
 2. **Environment Variables**: Ensure `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` are set
 3. **Permissions**: Update user permissions to include:
    - `templates.approve` - for template version approval

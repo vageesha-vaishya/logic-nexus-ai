@@ -411,7 +411,7 @@ function resolveEntity(rawEntity: unknown): MasterEntity {
   const normalizedEntity = asString(rawEntity)
     .toLowerCase()
     .replace(/[-\s]+/g, '_');
-  const entity = (normalizedEntity === 'work_package_templates' ? 'work_order_templates' : normalizedEntity) as MasterEntity;
+  const entity = (normalizedEntity === 'work_order_templates' ? 'work_order_templates' : normalizedEntity) as MasterEntity;
   if (!ENTITY_CONFIG[entity]) {
     throw new HttpError('Unsupported master data entity', 404);
   }
@@ -820,7 +820,7 @@ function normalizeShiftCalendar(payload: JsonRecord): JsonRecord {
   };
 }
 
-function normalizeWorkPackageTemplate(payload: JsonRecord): JsonRecord {
+function normalizeWorkOrderTemplate(payload: JsonRecord): JsonRecord {
   return {
     assembly_models_id: asString(payload.assembly_models_id),
     template_code: asString(payload.template_code),
@@ -864,7 +864,7 @@ function normalizePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord
   if (entity === 'task_categories') return normalizeTaskCategory(payload);
   if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
   if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
-  return normalizeWorkPackageTemplate(payload);
+  return normalizeWorkOrderTemplate(payload);
 }
 
 function sanitizeWritePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord {

@@ -1,7 +1,7 @@
 /**
  * React Query Hooks for AMRO Work Package Template Versions
  * 
- * Follows the pattern established in useWorkPackageState.ts
+ * Follows the pattern established in useWorkOrderState.ts
  * Provides hooks for:
  * - Listing template versions
  * - Creating new versions
@@ -101,7 +101,7 @@ async function fetchTemplateVersions(
     ...(params.status ? { status: params.status } : {}),
   });
 
-  const url = `/api/v2/amro/work-package-template-versions?${qs.toString()}`;
+  const url = `/api/v2/amro/work-order-template-versions?${qs.toString()}`;
   const response = await fetch(url, { method: 'GET', headers });
   if (!response.ok) throw new Error(`Failed to list template versions: ${response.status}`);
   const json = await response.json();
@@ -144,7 +144,7 @@ export function useListTemplateVersions(params: UseListTemplateVersionsParams) {
 // ── Get single template version ─────────────────────────────────────────────
 
 async function fetchTemplateVersion(id: string, headers: HeadersInit): Promise<TemplateVersion> {
-  const url = `/api/v2/amro/work-package-template-versions/${id}`;
+  const url = `/api/v2/amro/work-order-template-versions/${id}`;
   const response = await fetch(url, { method: 'GET', headers });
   if (!response.ok) throw new Error(`Failed to get template version: ${response.status}`);
   const json = await response.json();
@@ -181,7 +181,7 @@ interface CreateTemplateVersionInput {
 }
 
 async function mutateCreateTemplateVersion(input: CreateTemplateVersionInput, headers: HeadersInit): Promise<TemplateVersion> {
-  const response = await fetch('/api/v2/amro/work-package-template-versions', {
+  const response = await fetch('/api/v2/amro/work-order-template-versions', {
     method: 'POST',
     headers,
     body: JSON.stringify(input),
@@ -228,7 +228,7 @@ interface UpdateTemplateVersionInput {
 
 async function mutateUpdateTemplateVersion(input: UpdateTemplateVersionInput, headers: HeadersInit): Promise<TemplateVersion> {
   const { id, ...updateData } = input;
-  const response = await fetch(`/api/v2/amro/work-package-template-versions/${id}`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions/${id}`, {
     method: 'PUT',
     headers,
     body: JSON.stringify(updateData),
@@ -259,7 +259,7 @@ export function useUpdateTemplateVersion() {
 // ── Delete template version ─────────────────────────────────────────────────
 
 async function mutateDeleteTemplateVersion(id: string, headers: HeadersInit): Promise<void> {
-  const response = await fetch(`/api/v2/amro/work-package-template-versions/${id}`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions/${id}`, {
     method: 'DELETE',
     headers,
   });
@@ -286,7 +286,7 @@ export function useDeleteTemplateVersion() {
 // ── Submit for review ───────────────────────────────────────────────────────
 
 async function mutateSubmitForReview(id: string, headers: HeadersInit): Promise<TemplateVersion> {
-  const response = await fetch(`/api/v2/amro/work-package-template-versions/${id}/submit`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions/${id}/submit`, {
     method: 'POST',
     headers,
   });
@@ -324,7 +324,7 @@ interface ReviewTemplateVersionInput {
 
 async function mutateReviewTemplateVersion(input: ReviewTemplateVersionInput, headers: HeadersInit): Promise<TemplateVersion> {
   const { id, ...reviewData } = input;
-  const response = await fetch(`/api/v2/amro/work-package-template-versions/${id}/approve`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions/${id}/approve`, {
     method: 'POST',
     headers,
     body: JSON.stringify(reviewData),

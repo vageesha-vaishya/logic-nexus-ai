@@ -5,7 +5,7 @@
 - Status: `Draft for Stakeholder Approval`
 - Owner: `AMRO Product + Engineering`
 - Last Updated: `2026-04-06`
-- Scope: `work_package_templates` standard template rollout with parity protection
+- Scope: `work_order_templates` standard template rollout with parity protection
 
 ## Governance Structure
 - Program Sponsor: Product Director (AMRO)
@@ -40,7 +40,7 @@
 ### Deliverables
 - FE:
   - Complete Step-3 hybrid standardization of WPT core fields + task-row presentational wrappers.
-  - Storybook additions: `WorkPackageTaskRowsVariant`, `TaskRowValidationVariant`.
+  - Storybook additions: `WorkOrderTaskRowsVariant`, `TaskRowValidationVariant`.
 - BE:
   - Contract freeze for WPT payloads (create/update/delete).
   - Add telemetry tags for template path vs legacy path.

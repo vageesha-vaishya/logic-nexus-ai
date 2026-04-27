@@ -2,15 +2,15 @@
 -- DB-ARCH-APPROVAL: pending-amro-arch-board-approval
 --
 -- Purpose:
--- - Rename column public.amro_work_package_resource_assignments.work_package_id -> work_order_id
--- - Rename table public.amro_work_package_resource_assignments -> public.amro_work_order_resource_assignments
+-- - Rename column public.amro_work_order_resource_assignments.work_order_id -> work_order_id
+-- - Rename table public.amro_work_order_resource_assignments -> public.amro_work_order_resource_assignments
 -- - Rename associated constraints, indexes, and policies to work-order naming conventions
 
 BEGIN;
 
 DO $$
 DECLARE
-  v_old_table regclass := to_regclass('public.amro_work_package_resource_assignments');
+  v_old_table regclass := to_regclass('public.amro_work_order_resource_assignments');
   v_new_table regclass := to_regclass('public.amro_work_order_resource_assignments');
   v_has_old_column boolean := false;
   v_has_new_column boolean := false;
@@ -22,7 +22,7 @@ BEGIN
       SELECT 1
       FROM pg_attribute
       WHERE attrelid = v_old_table
-        AND attname = 'work_package_id'
+        AND attname = 'work_order_id'
         AND NOT attisdropped
     ) INTO v_has_old_column;
 
@@ -35,13 +35,13 @@ BEGIN
     ) INTO v_has_new_column;
 
     IF v_has_old_column AND NOT v_has_new_column THEN
-      EXECUTE 'ALTER TABLE public.amro_work_package_resource_assignments RENAME COLUMN work_package_id TO work_order_id';
+      EXECUTE 'ALTER TABLE public.amro_work_order_resource_assignments RENAME COLUMN work_order_id TO work_order_id';
     END IF;
   END IF;
 
   -- If old table exists and new table does not, rename table.
   IF v_old_table IS NOT NULL AND v_new_table IS NULL THEN
-    EXECUTE 'ALTER TABLE public.amro_work_package_resource_assignments RENAME TO amro_work_order_resource_assignments';
+    EXECUTE 'ALTER TABLE public.amro_work_order_resource_assignments RENAME TO amro_work_order_resource_assignments';
   END IF;
 
   v_new_table := to_regclass('public.amro_work_order_resource_assignments');
@@ -54,7 +54,7 @@ BEGIN
     SELECT 1
     FROM pg_attribute
     WHERE attrelid = v_new_table
-      AND attname = 'work_package_id'
+      AND attname = 'work_order_id'
       AND NOT attisdropped
   ) INTO v_has_old_column;
 
@@ -67,7 +67,7 @@ BEGIN
   ) INTO v_has_new_column;
 
   IF v_has_old_column AND NOT v_has_new_column THEN
-    EXECUTE 'ALTER TABLE public.amro_work_order_resource_assignments RENAME COLUMN work_package_id TO work_order_id';
+    EXECUTE 'ALTER TABLE public.amro_work_order_resource_assignments RENAME COLUMN work_order_id TO work_order_id';
   END IF;
 
   -- Rename constraints on the renamed table.
@@ -77,9 +77,9 @@ BEGIN
     WHERE conrelid = v_new_table
   LOOP
     v_new_name := rec.conname;
-    v_new_name := replace(v_new_name, 'work_package_resource_assignments', 'work_order_resource_assignments');
+    v_new_name := replace(v_new_name, 'work_order_resource_assignments', 'work_order_resource_assignments');
     v_new_name := replace(v_new_name, 'wp_resource_assignments', 'wo_resource_assignments');
-    v_new_name := replace(v_new_name, 'work_package_id', 'work_order_id');
+    v_new_name := replace(v_new_name, 'work_order_id', 'work_order_id');
 
     IF v_new_name <> rec.conname THEN
       EXECUTE format('ALTER TABLE public.amro_work_order_resource_assignments RENAME CONSTRAINT %I TO %I', rec.conname, v_new_name);
@@ -94,9 +94,9 @@ BEGIN
       AND tablename = 'amro_work_order_resource_assignments'
   LOOP
     v_new_name := rec.indexname;
-    v_new_name := replace(v_new_name, 'work_package_resource_assignments', 'work_order_resource_assignments');
+    v_new_name := replace(v_new_name, 'work_order_resource_assignments', 'work_order_resource_assignments');
     v_new_name := replace(v_new_name, 'wp_resource_assignments', 'wo_resource_assignments');
-    v_new_name := replace(v_new_name, 'work_package_id', 'work_order_id');
+    v_new_name := replace(v_new_name, 'work_order_id', 'work_order_id');
 
     IF v_new_name <> rec.indexname THEN
       EXECUTE format('ALTER INDEX public.%I RENAME TO %I', rec.indexname, v_new_name);

@@ -1,15 +1,15 @@
-# AMRO Schema Refactor Analysis: `work_package_materials` -> `amro_work_order_materials`
+# AMRO Schema Refactor Analysis: `work_order_materials` -> `amro_work_order_materials`
 
 ## Scope
 - Date: `2026-04-25`
 - Requested refactor:
-  - Column rename: `public.work_package_materials.work_package_id` -> `work_order_id`
-  - Table rename: `public.work_package_materials` -> `public.amro_work_order_materials`
-  - Repoint inbound FKs from `work_package_materials.id` to `amro_work_order_materials.id`
+  - Column rename: `public.work_order_materials.work_order_id` -> `work_order_id`
+  - Table rename: `public.work_order_materials` -> `public.amro_work_order_materials`
+  - Repoint inbound FKs from `work_order_materials.id` to `amro_work_order_materials.id`
 - Environment: development with dummy/sample data.
 
 ## Migration Delivered
-- `supabase/migrations/20260425173000_amro_rename_work_package_materials_to_work_order_materials.sql`
+- `supabase/migrations/20260425173000_amro_rename_work_order_materials_to_work_order_materials.sql`
 
 ### Migration capabilities
 1. Renames legacy column to `work_order_id`.
@@ -18,15 +18,15 @@
 4. Repoints inbound FK constraints from legacy target table to canonical target table in residual/partial states.
 5. Updates table comment for work-order terminology.
 
-## FK Dependency Analysis (`work_package_materials.id`)
+## FK Dependency Analysis (`work_order_materials.id`)
 - Repository-wide scans found no explicit FK DDL lines referencing:
-  - `public.work_package_materials(id)`
-  - `work_package_materials(id)`
+  - `public.work_order_materials(id)`
+  - `work_order_materials(id)`
 - Despite zero static hits, migration includes defensive inbound-FK repoint logic for live DB drift handling.
 
 ## Runtime/App Impact Updates
 - Updated runtime reads to canonical table/column:
-  - `src/pages/api/v2/amro/work-package-persistence-db.ts`
+  - `src/pages/api/v2/amro/work-order-persistence-db.ts`
 - Updated table fallback registries:
   - `src/pages/api/v2/amro/overview-kpi.ts`
   - `services/amro-api/src/app.ts`
@@ -46,8 +46,8 @@
 ## Verification Queries
 1. Existence checks:
    - `select to_regclass('public.amro_work_order_materials');`
-   - `select to_regclass('public.work_package_materials');` (expected null after migration)
+   - `select to_regclass('public.work_order_materials');` (expected null after migration)
 2. Column check:
-   - `select column_name from information_schema.columns where table_schema='public' and table_name='amro_work_order_materials' and column_name in ('work_order_id','work_package_id');`
+   - `select column_name from information_schema.columns where table_schema='public' and table_name='amro_work_order_materials' and column_name in ('work_order_id','work_order_id');`
 3. FK check:
-   - `select conrelid::regclass as table_name, conname, pg_get_constraintdef(oid) as definition from pg_constraint where contype='f' and (pg_get_constraintdef(oid) ilike '%work_package_materials%' or pg_get_constraintdef(oid) ilike '%amro_work_order_materials%');`
+   - `select conrelid::regclass as table_name, conname, pg_get_constraintdef(oid) as definition from pg_constraint where contype='f' and (pg_get_constraintdef(oid) ilike '%work_order_materials%' or pg_get_constraintdef(oid) ilike '%amro_work_order_materials%');`

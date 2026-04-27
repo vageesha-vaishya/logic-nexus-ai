@@ -76,7 +76,7 @@ export async function executeUimExternalMroPipelineAction(input: {
   part_number?: string;
   reservation_id?: string;
   maintenance_order_id?: string;
-  work_package_id?: string;
+  work_order_id?: string;
   task_id?: string;
   quantity?: number;
   records?: Array<Record<string, unknown>>;

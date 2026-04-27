@@ -43,7 +43,7 @@ function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unkno
   return res;
 }
 
-const mockWorkPackage = {
+const mockWorkOrder = {
   id: 'wp-1',
   tenant_id: 'tenant-1',
   franchise_id: 'fr-1',
@@ -148,7 +148,7 @@ describe('/api/v2/amro/work-orders/[id]/transitions', () => {
     });
 
     it('rejects invalid transition from current status', async () => {
-      const planningWp = { ...mockWorkPackage, status: 'planning' };
+      const planningWp = { ...mockWorkOrder, status: 'planning' };
       const chain: any = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),

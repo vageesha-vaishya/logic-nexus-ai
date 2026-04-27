@@ -248,13 +248,13 @@ Approval state transitions:
 | IBM Maximo Application Suite | AI-infused monitoring, condition-driven maintenance, risk-centric health insight and anomaly workflows | UX density can impact rapid decision cycles for frontline users | Adopt risk-ranked health cards, anomaly first-class widgets, and health trend drilldowns |
 | Oracle Fusion Cloud Maintenance | Smart Operations with maintenance plus supply chain plus finance context, real-time asset and backlog visibility | Requires careful role simplification to prevent operator cognitive overload | Adopt integrated backlog, cost, and service logistics visibility with role-scoped views |
 | Ramco Aviation 6.0 | Aviation-native control tower patterns, engine MRO readiness visibility, integrated planning-materials view, and AI-assisted execution insights | Advanced capabilities require disciplined governance to avoid over-automation in regulated flows | Adopt real-time readiness cockpit and planning-to-material coupling with controlled AI recommendation guards |
-| Swiss-AS AMOS | Integrated line maintenance visibility, work-package and ground-time orchestration, paperless/mobile-first execution continuity | Advanced predictive analytics often requires adjacent ecosystem services | Adopt one-stop planner experience with mobile-execution continuity and integrated turnaround prioritization |
+| Swiss-AS AMOS | Integrated line maintenance visibility, work-order and ground-time orchestration, paperless/mobile-first execution continuity | Advanced predictive analytics often requires adjacent ecosystem services | Adopt one-stop planner experience with mobile-execution continuity and integrated turnaround prioritization |
 
 ### 11.3 Best-Practice Synthesis for AMRO Overview
 
 - Dashboard architecture must separate critical operational insight from analytical deep-dives while preserving one-click drill-down.
 - KPI framework must support executive, planner, and frontline technician personas with shared metric definitions and persona-specific emphasis.
-- Predictive maintenance insight must combine confidence, risk score, recommendation reason, and affected work-package context in one surface.
+- Predictive maintenance insight must combine confidence, risk score, recommendation reason, and affected work-order context in one surface.
 - Navigation must preserve platform shell consistency while allowing AMRO route-level specialization.
 - Refresh model must use dual cadence (critical and standard) with visible freshness, degraded mode messaging, and retry behavior.
 - Integration state must be continuously visible with failed attempt, failure-rate, and recent-failure context.
@@ -317,7 +317,7 @@ Key gaps:
 | --- | --- | --- |
 | SAP MRO | Planning-centric maintenance package creation with strong materials/schedule context | Adopt guided package creation with planning defaults and station window suggestions from aircraft context |
 | IBM Maximo for Aviation | Risk-first monitoring and anomaly visibility with AI-assisted prioritization | Adopt aircraft health strip with risk score, confidence, anomaly reasons, and recommended actions |
-| Ramco Aviation Suite | Aviation-native execution and integrated maintenance lifecycle orchestration | Adopt tightly coupled aircraft-to-work-package workflow with minimal navigation hops and lifecycle state visibility |
+| Ramco Aviation Suite | Aviation-native execution and integrated maintenance lifecycle orchestration | Adopt tightly coupled aircraft-to-work-order workflow with minimal navigation hops and lifecycle state visibility |
 
 ### 12.4 Target UX Wireframes
 
@@ -407,7 +407,7 @@ Frontend surfaces:
 
 API and integration contracts:
 
-- Reuse existing `/api/v2/amro/work-packages` create-work-package interface for initial launch path.
+- Reuse existing `/api/v2/amro/work-orders` create-work-order interface for initial launch path.
 - Preserve existing `/api/v2/amro/master-data/aircraft` contracts; enhancement remains additive.
 - Include creation trigger metadata (`source`, `reference_id`, `triggered_at`) for traceability and analytics.
 
@@ -455,7 +455,7 @@ Data and security controls:
 
 | Platform | Best-in-Class Strengths | Observed Gaps vs Next-Gen Target | AMRO Adoption Decision |
 | --- | --- | --- | --- |
-| SAP MRO (A&D + SAP asset stack) | Strong service parts planning, maintenance-supply chain coupling, and maintenance strategy alignment with digital twin and ML-enabled asset management | Work package orchestration patterns are powerful but typically depend on broader SAP stack composition | Adopt parts-demand-to-work-package coupling, risk-based maintenance strategy templates, and planning board semantics |
+| SAP MRO (A&D + SAP asset stack) | Strong service parts planning, maintenance-supply chain coupling, and maintenance strategy alignment with digital twin and ML-enabled asset management | Work package orchestration patterns are powerful but typically depend on broader SAP stack composition | Adopt parts-demand-to-work-order coupling, risk-based maintenance strategy templates, and planning board semantics |
 | IBM Maximo (Aviation + MAS) | Mature work management, AI-driven predictive/risk prioritization, condition-based maintenance actions, rich CMMS/EAM workflow controls | Dense enterprise UX can slow frontline decisions if not role-curated | Adopt risk-first work package prioritization, health/risk scorecards, and predictive-to-work-order automation |
 | Oracle Aviation Maintenance pattern (Oracle Cloud Maintenance + OCI aviation MRO deployments) | Integrated maintenance, inventory, service logistics, and ERP finance context; strong cloud operations and integration posture | Requires careful domain tailoring for aviation-specific package and release workflows | Adopt maintenance + service logistics + cost context in package planning with cloud-native reliability controls |
 | Ramco Aviation 6.0 | Aviation-native end-to-end M&E/MRO depth, real-time scheduling visibility, integrated MRP and supply chain, AI-enhanced workflow automation, engine MRO specialization | Advanced capabilities vary by module maturity and tenant rollout profile | Adopt real-time planning control tower, dynamic material readiness checks, and AI-assisted execution recommendations |
@@ -537,14 +537,14 @@ Data and security controls:
 #### 13.5.2 API Integration Pattern
 
 - Command APIs (transactional):
-  - `POST /api/v2/amro/work-packages/intelligent-plan`
-  - `POST /api/v2/amro/work-packages/{id}/optimize-resources`
-  - `POST /api/v2/amro/work-packages/{id}/simulate`
-  - `POST /api/v2/amro/work-packages/{id}/publish`
+  - `POST /api/v2/amro/work-orders/intelligent-plan`
+  - `POST /api/v2/amro/work-orders/{id}/optimize-resources`
+  - `POST /api/v2/amro/work-orders/{id}/simulate`
+  - `POST /api/v2/amro/work-orders/{id}/publish`
 - Query APIs (analytics and state):
-  - `GET /api/v2/amro/work-packages/{id}/readiness`
-  - `GET /api/v2/amro/work-packages/{id}/compliance-gates`
-  - `GET /api/v2/amro/work-packages/optimization-board`
+  - `GET /api/v2/amro/work-orders/{id}/readiness`
+  - `GET /api/v2/amro/work-orders/{id}/compliance-gates`
+  - `GET /api/v2/amro/work-orders/optimization-board`
 - Contract rules:
   - include idempotency key for all mutation endpoints;
   - include `scope_context` payload (tenant, franchise, domain, role claims);
@@ -586,13 +586,13 @@ Data and security controls:
 
 | Entity | Purpose | Key Fields | Security/Isolation |
 | --- | --- | --- | --- |
-| `amro_work_package` | Master work package record | `id`, `tenant_id`, `franchise_id`, `aircraft_id`, `status`, `priority`, `planning_window_start`, `planning_window_end`, `source_profile`, `decision_trace_id` | RLS on tenant/franchise, write policy by role and domain |
-| `amro_work_package_task` | Task-level scope inside package | `id`, `work_package_id`, `task_card_ref`, `trigger_type`, `compliance_ref`, `estimated_hours`, `skill_profile`, `criticality` | Inherits package scope and immutable task lineage |
-| `amro_work_package_constraint` | Optimization constraints and penalties | `id`, `work_package_id`, `constraint_type`, `hard_soft_flag`, `weight`, `source`, `validity_window` | Protected updates, audited change control |
+| `amro_work_order` | Master work package record | `id`, `tenant_id`, `franchise_id`, `aircraft_id`, `status`, `priority`, `planning_window_start`, `planning_window_end`, `source_profile`, `decision_trace_id` | RLS on tenant/franchise, write policy by role and domain |
+| `amro_work_order_task` | Task-level scope inside package | `id`, `work_order_id`, `task_card_ref`, `trigger_type`, `compliance_ref`, `estimated_hours`, `skill_profile`, `criticality` | Inherits package scope and immutable task lineage |
+| `amro_work_order_constraint` | Optimization constraints and penalties | `id`, `work_order_id`, `constraint_type`, `hard_soft_flag`, `weight`, `source`, `validity_window` | Protected updates, audited change control |
 | `amro_resource_snapshot` | Time-bound resource availability graph | `id`, `station_id`, `resource_type`, `resource_ref`, `available_from`, `available_to`, `capability_tags` | Scope + station policy checks |
-| `amro_package_simulation_run` | What-if simulation archive | `id`, `work_package_id`, `scenario_name`, `input_hash`, `outcome_score`, `aog_risk_delta`, `cost_delta` | Signed result hash and replay metadata |
+| `amro_package_simulation_run` | What-if simulation archive | `id`, `work_order_id`, `scenario_name`, `input_hash`, `outcome_score`, `aog_risk_delta`, `cost_delta` | Signed result hash and replay metadata |
 | `amro_predictive_signal` | Normalized predictive recommendation input | `id`, `aircraft_id`, `failure_mode`, `risk_score`, `confidence_score`, `horizon_hours`, `recommended_action` | Source trust tier and integrity signature |
-| `amro_compliance_gate_result` | Authority gate outcomes per package | `id`, `work_package_id`, `authority_code`, `gate_code`, `result`, `block_reason`, `evaluated_at` | Immutable evidence retention |
+| `amro_compliance_gate_result` | Authority gate outcomes per package | `id`, `work_order_id`, `authority_code`, `gate_code`, `result`, `block_reason`, `evaluated_at` | Immutable evidence retention |
 | `amro_decision_explanation` | Explainability payload for AI/scheduler decisions | `id`, `decision_trace_id`, `model_version`, `top_factors`, `counterfactuals`, `human_override_reason` | Restricted read for regulated roles |
 
 ### 13.8 Security and Governance Requirements

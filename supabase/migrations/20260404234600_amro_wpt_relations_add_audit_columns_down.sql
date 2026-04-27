@@ -13,7 +13,7 @@ BEGIN
   $sql$;
 
   EXECUTE $sql$
-    ALTER TABLE public.work_package_template_task_templates
+    ALTER TABLE public.work_order_template_task_templates
       DROP COLUMN IF EXISTS deleted_at,
       DROP COLUMN IF EXISTS updated_by,
       DROP COLUMN IF EXISTS created_by

@@ -41,7 +41,7 @@ type PaginationMeta = {
 
 type DashboardOutput = {
   executive_summary: {
-    active_work_packages: number;
+    active_work_orders: number;
     overdue_tasks: number;
     compliance_status_pct: number;
     forecast_accuracy_pct: number;
@@ -50,8 +50,8 @@ type DashboardOutput = {
   risk_heatmap: { cells: RiskHeatmapCell[] };
   trend_lines: TrendSeries[];
   anomaly_flags: AnomalyFlag[];
-  work_package_overview: Array<{
-    work_package_id: string;
+  work_order_overview: Array<{
+    work_order_id: string;
     title: string;
     status: string;
     planner_id: string;
@@ -130,7 +130,7 @@ type TrendOutput = {
   };
   certification_decision_queue: Array<{
     certification_id: string;
-    work_package_id: string;
+    work_order_id: string;
     authority: string;
     status: string;
     submitted_at: string;
@@ -144,7 +144,7 @@ type TrendOutput = {
   }>;
   forecast_recommendation_hub: Array<{
     recommendation_id: string;
-    work_package_id: string;
+    work_order_id: string;
     recommendation: string;
     confidence_pct: number;
     risk_score: number;
@@ -251,13 +251,13 @@ function isSessionAuthError(error: unknown): boolean {
 function buildFallbackDashboard(request: DashboardRequest): DashboardOutput {
   return {
     executive_summary: {
-      active_work_packages: 0,
+      active_work_orders: 0,
       overdue_tasks: 0,
       compliance_status_pct: 0,
       forecast_accuracy_pct: 0,
     },
     kpi_cards: [
-      { key: 'open_work_packages', label: 'Open Work Packages', value: 0, trend: 'N/A' },
+      { key: 'open_work_orders', label: 'Open Work Packages', value: 0, trend: 'N/A' },
       { key: 'overdue_tasks', label: 'Overdue Tasks', value: 0, trend: 'N/A' },
       { key: 'compliance_risk', label: 'Compliance Risk', value: 0, trend: 'N/A' },
       { key: 'aog_count', label: 'AOG Count', value: 0, trend: 'N/A' },
@@ -265,7 +265,7 @@ function buildFallbackDashboard(request: DashboardRequest): DashboardOutput {
     risk_heatmap: { cells: [] },
     trend_lines: [],
     anomaly_flags: [],
-    work_package_overview: [],
+    work_order_overview: [],
     materials_reservation_alerts: [],
     compliance_gate_status: [],
     integration_monitor: {

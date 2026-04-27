@@ -63,7 +63,7 @@ interface MaterialLineItem {
 interface EnterpriseMaterialsEditorProps {
   materials: MaterialLineItem[];
   onChange: (materials: MaterialLineItem[]) => void;
-  workPackageTemplateId?: string;
+  workOrderTemplateId?: string;
   readOnly?: boolean;
 }
 

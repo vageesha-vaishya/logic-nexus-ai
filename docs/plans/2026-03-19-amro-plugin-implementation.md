@@ -62,10 +62,10 @@ describe('AMRO Schema Validation', () => {
     expect(columnNames).toContain('aircraft_model');
   });
 
-  it('should enforce RLS on work_packages table', async () => {
+  it('should enforce RLS on work_orders table', async () => {
     const { data: policies } = await supabase.from('pg_policies')
       .select('*')
-      .eq('tablename', 'work_packages');
+      .eq('tablename', 'work_orders');
 
     expect(policies?.length).toBeGreaterThan(0);
   });
@@ -126,7 +126,7 @@ CREATE INDEX idx_components_serial ON public.components(serial_number);
 CREATE INDEX idx_components_status ON public.components(status);
 
 -- Work Packages (Maintenance Orders)
-CREATE TABLE IF NOT EXISTS public.work_packages (
+CREATE TABLE IF NOT EXISTS public.work_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   aircraft_id UUID NOT NULL REFERENCES public.aircraft(id) ON DELETE CASCADE,
@@ -146,14 +146,14 @@ CREATE TABLE IF NOT EXISTS public.work_packages (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_work_packages_tenant_status ON public.work_packages(tenant_id, status);
-CREATE INDEX idx_work_packages_aircraft ON public.work_packages(aircraft_id);
+CREATE INDEX idx_work_orders_tenant_status ON public.work_orders(tenant_id, status);
+CREATE INDEX idx_work_orders_aircraft ON public.work_orders(aircraft_id);
 
 -- Tasks (Steps within Work Packages)
 CREATE TABLE IF NOT EXISTS public.tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  work_package_id UUID NOT NULL REFERENCES public.work_packages(id) ON DELETE CASCADE,
+  work_order_id UUID NOT NULL REFERENCES public.work_orders(id) ON DELETE CASCADE,
   sequence INT NOT NULL,
   task_type VARCHAR(50),
   description TEXT,
@@ -167,7 +167,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   updated_at TIMESTAMP NOT NULL DEFAULT NOW()
 );
 
-CREATE INDEX idx_tasks_work_package ON public.tasks(work_package_id);
+CREATE INDEX idx_tasks_work_order ON public.tasks(work_order_id);
 CREATE INDEX idx_tasks_technician ON public.tasks(assigned_technician_id);
 
 -- Staff Qualifications & Certifying Authority
@@ -212,7 +212,7 @@ CREATE INDEX idx_maintenance_events_created_at ON public.maintenance_events(crea
 CREATE TABLE IF NOT EXISTS public.amro_work_order_materials (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
-  work_package_id UUID NOT NULL REFERENCES public.work_packages(id) ON DELETE CASCADE,
+  work_order_id UUID NOT NULL REFERENCES public.work_orders(id) ON DELETE CASCADE,
   component_id UUID REFERENCES public.components(id),
   action VARCHAR(50) CHECK (action IN ('install', 'remove', 'inspect', 'repair')),
   required_quantity INT,
@@ -230,7 +230,7 @@ CREATE INDEX idx_work_order_materials_work_order ON public.amro_work_order_mater
 -- Enable RLS on all AMRO tables
 ALTER TABLE public.aircraft ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.components ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.work_packages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.work_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_qualifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.maintenance_events ENABLE ROW LEVEL SECURITY;
@@ -243,7 +243,7 @@ CREATE POLICY tenant_isolation_aircraft ON public.aircraft
 CREATE POLICY tenant_isolation_components ON public.components
   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
-CREATE POLICY tenant_isolation_work_packages ON public.work_packages
+CREATE POLICY tenant_isolation_work_orders ON public.work_orders
   USING (tenant_id = current_setting('app.current_tenant_id')::uuid);
 
 CREATE POLICY tenant_isolation_tasks ON public.tasks
@@ -310,9 +310,9 @@ describe('AMRO Audit Schema', () => {
       .from('mro_audit_records')
       .insert({
         tenant_id: 'test-tenant',
-        record_type: 'work_package_signed',
+        record_type: 'work_order_signed',
         related_entity_id: 'wp-id',
-        related_entity_type: 'work_package',
+        related_entity_type: 'work_order',
         actor_id: 'user-id',
         action: 'signed',
         context: {}
@@ -434,7 +434,7 @@ export interface Aircraft {
   updated_at: Date;
 }
 
-export interface WorkPackage {
+export interface WorkOrder {
   id: string;
   tenant_id: string;
   aircraft_id: string;
@@ -457,7 +457,7 @@ export interface WorkPackage {
 export interface Task {
   id: string;
   tenant_id: string;
-  work_package_id: string;
+  work_order_id: string;
   sequence: number;
   task_type?: string;
   description?: string;
@@ -478,18 +478,18 @@ export interface Task {
 // src/modules/amro/services/work-orders.service.ts
 import { Injectable } from '@nestjs/common';
 import { SupabaseService } from '@/services/supabase.service';
-import { WorkPackage } from '../types/amro.types';
+import { WorkOrder } from '../types/amro.types';
 
 @Injectable()
 export class WorkOrdersService {
   constructor(private supabase: SupabaseService) {}
 
-  async createWorkPackage(
+  async createWorkOrder(
     tenantId: string,
-    data: Partial<WorkPackage>,
-  ): Promise<WorkPackage> {
-    const { data: workPackage, error } = await this.supabase.client
-      .from('work_packages')
+    data: Partial<WorkOrder>,
+  ): Promise<WorkOrder> {
+    const { data: workOrder, error } = await this.supabase.client
+      .from('work_orders')
       .insert({
         tenant_id: tenantId,
         ...data,
@@ -498,24 +498,24 @@ export class WorkOrdersService {
       .single();
 
     if (error) throw error;
-    return workPackage as WorkPackage;
+    return workOrder as WorkOrder;
   }
 
-  async getWorkPackage(tenantId: string, id: string): Promise<WorkPackage> {
+  async getWorkOrder(tenantId: string, id: string): Promise<WorkOrder> {
     const { data, error } = await this.supabase.client
-      .from('work_packages')
+      .from('work_orders')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('id', id)
       .single();
 
     if (error) throw error;
-    return data as WorkPackage;
+    return data as WorkOrder;
   }
 
-  async listWorkPackages(tenantId: string, status?: string): Promise<WorkPackage[]> {
+  async listWorkOrders(tenantId: string, status?: string): Promise<WorkOrder[]> {
     let query = this.supabase.client
-      .from('work_packages')
+      .from('work_orders')
       .select('*')
       .eq('tenant_id', tenantId);
 
@@ -525,16 +525,16 @@ export class WorkOrdersService {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data as WorkPackage[];
+    return data as WorkOrder[];
   }
 
-  async updateWorkPackage(
+  async updateWorkOrder(
     tenantId: string,
     id: string,
-    updates: Partial<WorkPackage>,
-  ): Promise<WorkPackage> {
+    updates: Partial<WorkOrder>,
+  ): Promise<WorkOrder> {
     const { data, error } = await this.supabase.client
-      .from('work_packages')
+      .from('work_orders')
       .update(updates)
       .eq('tenant_id', tenantId)
       .eq('id', id)
@@ -542,7 +542,7 @@ export class WorkOrdersService {
       .single();
 
     if (error) throw error;
-    return data as WorkPackage;
+    return data as WorkOrder;
   }
 }
 ```
@@ -553,7 +553,7 @@ export class WorkOrdersService {
 // src/modules/amro/controllers/work-orders.controller.ts
 import { Controller, Get, Post, Patch, Body, Param, Query } from '@nestjs/common';
 import { WorkOrdersService } from '../services/work-orders.service';
-import { WorkPackage } from '../types/amro.types';
+import { WorkOrder } from '../types/amro.types';
 import { CurrentTenant } from '@/decorators/current-tenant.decorator';
 
 @Controller('/api/amro/v1/work-orders')
@@ -563,34 +563,34 @@ export class WorkOrdersController {
   @Post()
   async create(
     @CurrentTenant() tenantId: string,
-    @Body() data: Partial<WorkPackage>,
-  ): Promise<WorkPackage> {
-    return this.workOrdersService.createWorkPackage(tenantId, data);
+    @Body() data: Partial<WorkOrder>,
+  ): Promise<WorkOrder> {
+    return this.workOrdersService.createWorkOrder(tenantId, data);
   }
 
   @Get(':id')
   async getOne(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
-  ): Promise<WorkPackage> {
-    return this.workOrdersService.getWorkPackage(tenantId, id);
+  ): Promise<WorkOrder> {
+    return this.workOrdersService.getWorkOrder(tenantId, id);
   }
 
   @Get()
   async list(
     @CurrentTenant() tenantId: string,
     @Query('status') status?: string,
-  ): Promise<WorkPackage[]> {
-    return this.workOrdersService.listWorkPackages(tenantId, status);
+  ): Promise<WorkOrder[]> {
+    return this.workOrdersService.listWorkOrders(tenantId, status);
   }
 
   @Patch(':id')
   async update(
     @CurrentTenant() tenantId: string,
     @Param('id') id: string,
-    @Body() updates: Partial<WorkPackage>,
-  ): Promise<WorkPackage> {
-    return this.workOrdersService.updateWorkPackage(tenantId, id, updates);
+    @Body() updates: Partial<WorkOrder>,
+  ): Promise<WorkOrder> {
+    return this.workOrdersService.updateWorkOrder(tenantId, id, updates);
   }
 }
 ```
@@ -750,7 +750,7 @@ export class AmroEventsProducer {
 **Step 3: Integrate producer into work orders service**
 
 ```typescript
-// src/modules/amro/services/work-orders.service.ts (add to createWorkPackage)
+// src/modules/amro/services/work-orders.service.ts (add to createWorkOrder)
 import { AmroEventsProducer } from '../events/amro-events.producer';
 import { AmroEventType } from '../events/amro-events.types';
 import { v4 as uuidv4 } from 'uuid';
@@ -762,12 +762,12 @@ export class WorkOrdersService {
     private eventsProducer: AmroEventsProducer,
   ) {}
 
-  async createWorkPackage(
+  async createWorkOrder(
     tenantId: string,
-    data: Partial<WorkPackage>,
-  ): Promise<WorkPackage> {
-    const { data: workPackage, error } = await this.supabase.client
-      .from('work_packages')
+    data: Partial<WorkOrder>,
+  ): Promise<WorkOrder> {
+    const { data: workOrder, error } = await this.supabase.client
+      .from('work_orders')
       .insert({
         tenant_id: tenantId,
         ...data,
@@ -781,14 +781,14 @@ export class WorkOrdersService {
     await this.eventsProducer.publishWorkOrderEvent({
       event_type: AmroEventType.WorkOrderCreated,
       tenant_id: tenantId,
-      work_order_id: workPackage.id,
-      aircraft_id: workPackage.aircraft_id,
-      data: workPackage,
+      work_order_id: workOrder.id,
+      aircraft_id: workOrder.aircraft_id,
+      data: workOrder,
       timestamp: new Date(),
       idempotency_key: uuidv4(),
     });
 
-    return workPackage as WorkPackage;
+    return workOrder as WorkOrder;
   }
 }
 ```
@@ -815,7 +815,7 @@ describe('AMRO Events', () => {
   it('should publish WorkOrderCreated event when work package is created', async () => {
     const publishSpy = jest.spyOn(eventsProducer, 'publishWorkOrderEvent');
 
-    const workPackage = await workOrdersService.createWorkPackage(tenantId, {
+    const workOrder = await workOrdersService.createWorkOrder(tenantId, {
       aircraft_id: aircraftId,
       title: 'Test work order',
     });
@@ -823,7 +823,7 @@ describe('AMRO Events', () => {
     expect(publishSpy).toHaveBeenCalledWith(
       expect.objectContaining({
         event_type: AmroEventType.WorkOrderCreated,
-        work_order_id: workPackage.id,
+        work_order_id: workOrder.id,
       }),
     );
   });
@@ -898,13 +898,13 @@ export async function withSpan<T>(
 // src/modules/amro/services/work-orders.service.ts (add withSpan)
 import { withSpan } from '../instrumentation/amro-tracing';
 
-async createWorkPackage(
+async createWorkOrder(
   tenantId: string,
-  data: Partial<WorkPackage>,
-): Promise<WorkPackage> {
-  return withSpan('work_package.create', async () => {
-    const { data: workPackage, error } = await this.supabase.client
-      .from('work_packages')
+  data: Partial<WorkOrder>,
+): Promise<WorkOrder> {
+  return withSpan('work_order.create', async () => {
+    const { data: workOrder, error } = await this.supabase.client
+      .from('work_orders')
       .insert({ tenant_id: tenantId, ...data })
       .select()
       .single();
@@ -916,7 +916,7 @@ async createWorkPackage(
       // ... rest of event
     });
 
-    return workPackage as WorkPackage;
+    return workOrder as WorkOrder;
   }, { tenant_id: tenantId });
 }
 ```
@@ -954,10 +954,10 @@ describe('AMRO Tracing', () => {
     const spanRecorder = new SpanRecorder();
     // ... setup mocking
 
-    await workOrdersService.createWorkPackage(tenantId, data);
+    await workOrdersService.createWorkOrder(tenantId, data);
 
     expect(spanRecorder.spans).toContainEqual(
-      expect.objectContaining({ name: 'work_package.create' }),
+      expect.objectContaining({ name: 'work_order.create' }),
     );
   });
 });
@@ -1095,7 +1095,7 @@ export const useWorkOrderStore = create<WorkOrderStore>((set) => ({
 
       await OfflineCache.set({
         id,
-        entity_type: 'work_package',
+        entity_type: 'work_order',
         entity_id: workOrder.id,
         data: workOrder,
         local_timestamp: Date.now(),
@@ -1158,7 +1158,7 @@ describe('OfflineCache', () => {
   it('should cache and retrieve offline data', async () => {
     const entry: OfflineCacheEntry = {
       id: 'test-1',
-      entity_type: 'work_package',
+      entity_type: 'work_order',
       entity_id: 'wp-123',
       data: { title: 'Test' },
       local_timestamp: Date.now(),

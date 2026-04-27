@@ -11,7 +11,7 @@
 
 ### Issue 1: Hardcoded Template Options
 
-**File:** `AmroWorkPackageCreateWizard.tsx` (lines 432-438)
+**File:** `AmroWorkOrderCreateWizard.tsx` (lines 432-438)
 
 **Problem:** The template dropdown was using hardcoded placeholder values instead of real data from the API:
 
@@ -39,24 +39,24 @@
 
 ## What Was Fixed
 
-### 1. Created `useWorkPackageTemplates` Hook
+### 1. Created `useWorkOrderTemplates` Hook
 
-**File:** `src/features/module-amro/components/work-orders/useWorkPackageTemplates.ts`
+**File:** `src/features/module-amro/components/work-orders/useWorkOrderTemplates.ts`
 
 This new hook:
-- ✅ Fetches templates from `/api/v2/amro/work-package-templates/model-options`
+- ✅ Fetches templates from `/api/v2/amro/work-order-templates/model-options`
 - ✅ Filters for active/approved templates only
 - ✅ Formats options with name and version (e.g., "A-Check Template v2.1")
 - ✅ Includes loading and error states
 - ✅ Caches results for 5 minutes (templates don't change often)
 
 ```typescript
-export function useWorkPackageTemplateOptions(enabled = true) {
+export function useWorkOrderTemplateOptions(enabled = true) {
   const authHeaders = useAuthHeaders();
   
   const { data, isLoading, error } = useQuery({
-    queryKey: ['amro', 'work-package-templates'],
-    queryFn: () => fetchWorkPackageTemplates(authHeaders),
+    queryKey: ['amro', 'work-order-templates'],
+    queryFn: () => fetchWorkOrderTemplates(authHeaders),
     enabled: enabled && !!authHeaders,
     staleTime: 5 * 60 * 1000,
     retry: 2,
@@ -69,12 +69,12 @@ export function useWorkPackageTemplateOptions(enabled = true) {
 
 ### 2. Updated Wizard to Use Real Template Data
 
-**Changes in `AmroWorkPackageCreateWizard.tsx`:**
+**Changes in `AmroWorkOrderCreateWizard.tsx`:**
 
 ✅ **Added template hook:**
 ```typescript
 const { options: templateOptions, isLoading: templateLoading, error: templateError } 
-  = useWorkPackageTemplateOptions(open);
+  = useWorkOrderTemplateOptions(open);
 ```
 
 ✅ **Replaced hardcoded dropdown with dynamic data:**
@@ -161,8 +161,8 @@ if (formData.creationPath === 'scheduled' && !formData.templateVersionId) {
 
 ## Files Modified
 
-1. ✅ **Created:** `src/features/module-amro/components/work-orders/useWorkPackageTemplates.ts`
-2. ✅ **Updated:** `src/features/module-amro/components/work-orders/AmroWorkPackageCreateWizard.tsx`
+1. ✅ **Created:** `src/features/module-amro/components/work-orders/useWorkOrderTemplates.ts`
+2. ✅ **Updated:** `src/features/module-amro/components/work-orders/AmroWorkOrderCreateWizard.tsx`
 3. ✅ **Updated:** `src/features/module-amro/components/work-orders/index.ts` (exports)
 
 ---
@@ -174,9 +174,9 @@ if (formData.creationPath === 'scheduled' && !formData.templateVersionId) {
 ```
 User opens wizard
   ↓
-useWorkPackageTemplateOptions hook fires
+useWorkOrderTemplateOptions hook fires
   ↓
-GET /api/v2/amro/work-package-templates/model-options
+GET /api/v2/amro/work-order-templates/model-options
   ↓
 API returns list of approved templates
   ↓
@@ -245,7 +245,7 @@ Validation passes ✅
 
 | Endpoint | Purpose | Response Format |
 |----------|---------|----------------|
-| `GET /api/v2/amro/work-package-templates/model-options` | Fetch available templates | `{ data: [{ id, name, version, status }] }` |
+| `GET /api/v2/amro/work-order-templates/model-options` | Fetch available templates | `{ data: [{ id, name, version, status }] }` |
 | `GET /api/v2/amro/aircraft` | Fetch aircraft records | `{ data: { records: [{ id, registration, aircraft_model }] } }` |
 
 ---
@@ -257,7 +257,7 @@ If templates still don't appear:
 1. **Check if templates exist in database:**
    ```sql
    SELECT id, name, status, version_number 
-   FROM work_package_templates 
+   FROM work_order_templates 
    WHERE status IN ('active', 'approved');
    ```
 

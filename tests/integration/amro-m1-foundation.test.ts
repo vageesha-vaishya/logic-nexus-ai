@@ -21,18 +21,18 @@ describe('AMRO M1 foundation static validation', () => {
     expectContainsAll(schemaSql, [
       'CREATE TABLE IF NOT EXISTS public.aircraft',
       'CREATE TABLE IF NOT EXISTS public.components',
-      'CREATE TABLE IF NOT EXISTS public.work_packages',
+      'CREATE TABLE IF NOT EXISTS public.work_orders',
       'CREATE TABLE IF NOT EXISTS public.tasks',
       'CREATE TABLE IF NOT EXISTS public.staff_qualifications',
       'CREATE TABLE IF NOT EXISTS public.maintenance_events',
-      'CREATE TABLE IF NOT EXISTS public.work_package_materials',
+      'CREATE TABLE IF NOT EXISTS public.work_order_materials',
       'CREATE INDEX IF NOT EXISTS idx_aircraft_tenant_id ON public.aircraft(tenant_id)',
       'CREATE INDEX IF NOT EXISTS idx_components_tenant_id ON public.components(tenant_id)',
-      'CREATE INDEX IF NOT EXISTS idx_work_packages_tenant_id ON public.work_packages(tenant_id)',
+      'CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_id ON public.work_orders(tenant_id)',
       'CREATE INDEX IF NOT EXISTS idx_tasks_tenant_id ON public.tasks(tenant_id)',
       'CREATE INDEX IF NOT EXISTS idx_staff_qualifications_tenant_id ON public.staff_qualifications(tenant_id)',
       'CREATE INDEX IF NOT EXISTS idx_maintenance_events_tenant_id ON public.maintenance_events(tenant_id)',
-      'CREATE INDEX IF NOT EXISTS idx_work_package_materials_tenant_id ON public.work_package_materials(tenant_id)',
+      'CREATE INDEX IF NOT EXISTS idx_work_order_materials_tenant_id ON public.work_order_materials(tenant_id)',
     ]);
   });
 
@@ -40,11 +40,11 @@ describe('AMRO M1 foundation static validation', () => {
     expectContainsAll(schemaSql, [
       'ALTER TABLE public.aircraft ENABLE ROW LEVEL SECURITY;',
       'ALTER TABLE public.components ENABLE ROW LEVEL SECURITY;',
-      'ALTER TABLE public.work_packages ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.work_orders ENABLE ROW LEVEL SECURITY;',
       'ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;',
       'ALTER TABLE public.staff_qualifications ENABLE ROW LEVEL SECURITY;',
       'ALTER TABLE public.maintenance_events ENABLE ROW LEVEL SECURITY;',
-      'ALTER TABLE public.work_package_materials ENABLE ROW LEVEL SECURITY;',
+      'ALTER TABLE public.work_order_materials ENABLE ROW LEVEL SECURITY;',
     ]);
     expectContainsAll(auditSql, [
       'ALTER TABLE mro_audit.records ENABLE ROW LEVEL SECURITY;',

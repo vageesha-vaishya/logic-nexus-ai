@@ -98,7 +98,7 @@ src/pages/api/v2/amro/
 │   ├── index.ts              # List tasks (applicability-filtered)
 │   ├── [id]/index.ts         # Task definition detail
 │   └── [id]/applicability-check.ts  # Check if task applies to aircraft
-├── work-packages/
+├── work-orders/
 │   ├── index.ts              # Work package CRUD
 │   ├── [id]/execute.ts       # Begin execution
 │   ├── [id]/complete.ts      # Close work package
@@ -357,7 +357,7 @@ CREATE TABLE amro.aircraft_maintenance_tasks (
 );
 
 -- 6. Work Packages (container for multiple tasks)
-CREATE TABLE amro.work_packages (
+CREATE TABLE amro.work_orders (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id UUID NOT NULL,
   franchise_id UUID NOT NULL,
@@ -381,9 +381,9 @@ CREATE TABLE amro.work_packages (
 );
 
 -- 7. Work Package Tasks (line items)
-CREATE TABLE amro.work_package_tasks (
+CREATE TABLE amro.work_order_tasks (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  work_package_id UUID NOT NULL REFERENCES amro.work_packages(id) ON DELETE CASCADE,
+  work_order_id UUID NOT NULL REFERENCES amro.work_orders(id) ON DELETE CASCADE,
   aircraft_maintenance_task_id UUID NOT NULL REFERENCES amro.aircraft_maintenance_tasks(id),
   status VARCHAR(50) DEFAULT 'not_started',  -- not_started, in_progress, completed, rework_required
   assigned_to UUID REFERENCES public.auth.users(id),
@@ -441,14 +441,14 @@ npm run supabase:types:gen
 | Component Type | Existing Library | Reuse for AMRO | Example |
 |---|---|---|---|
 | **Buttons** | shadcn/ui Button | ✓ 100% | ActionButton, DeleteButton, SubmitButton |
-| **Forms** | React Hook Form + shadcn/ui | ✓ 100% | MaintenanceTaskForm, WorkPackageForm |
+| **Forms** | React Hook Form + shadcn/ui | ✓ 100% | MaintenanceTaskForm, WorkOrderForm |
 | **Tables** | TanStack React Table | ✓ 100% | AircraftListTable, TaskListTable (with applicability filter) |
 | **Selects** | shadcn/ui Select + Combobox | ✓ 100% | AircraftSelect, TaskSelect with search |
-| **Dialogs** | shadcn/ui Dialog | ✓ 100% | ConfirmStartWorkPackage, SignOffDialog |
+| **Dialogs** | shadcn/ui Dialog | ✓ 100% | ConfirmStartWorkOrder, SignOffDialog |
 | **Tabs** | shadcn/ui Tabs | ✓ 100% | MaintenanceTaskDetails (applicability, intervals, history) |
-| **Alerts** | shadcn/ui Alert + Sonner Toast | ✓ 100% | WorkPackageStatusAlert, ComplianceWarning |
+| **Alerts** | shadcn/ui Alert + Sonner Toast | ✓ 100% | WorkOrderStatusAlert, ComplianceWarning |
 | **Charts** | Recharts + TailwindCSS | ✓ New | MaintenanceMetricsDashboard, ComplianceTimeline |
-| **Date Pickers** | React Day Picker + shadcn/ui | ✓ 100% | WorkPackageDateRangeSelect |
+| **Date Pickers** | React Day Picker + shadcn/ui | ✓ 100% | WorkOrderDateRangeSelect |
 | **Modals** | shadcn/ui Dialog | ✓ 100% | MasterMpdImportModal, ApplicabilityRuleEditor |
 
 **Component File Organization:**
@@ -465,11 +465,11 @@ src/components/
 │   │   ├── MaintenanceTaskList.tsx         # List with applicability filter
 │   │   ├── TaskApplicabilityViewer.tsx     # JSON viewer for applicability rules
 │   │   └── TaskDetailsTabs.tsx             # Tabs: intervals, history, versions
-│   ├── work-packages/
-│   │   ├── WorkPackageForm.tsx             # React Hook Form + shadcn/ui
-│   │   ├── WorkPackageStatusBadge.tsx      # Status indicator (GREEN/YELLOW/RED)
-│   │   ├── WorkPackageExecutor.tsx         # Task list + sign-off flow
-│   │   └── WorkPackageSignOffDialog.tsx    # Digital signature modal
+│   ├── work-orders/
+│   │   ├── WorkOrderForm.tsx             # React Hook Form + shadcn/ui
+│   │   ├── WorkOrderStatusBadge.tsx      # Status indicator (GREEN/YELLOW/RED)
+│   │   ├── WorkOrderExecutor.tsx         # Task list + sign-off flow
+│   │   └── WorkOrderSignOffDialog.tsx    # Digital signature modal
 │   ├── compliance/
 │   │   ├── ComplianceDashboard.tsx         # Maintenance status + alerts
 │   │   ├── AuditReportExporter.tsx         # Generate FAA/EASA exports
@@ -634,19 +634,19 @@ export class AircraftMaintenanceService {
 }
 
 // 4. Work Package Service
-export class WorkPackageService {
-  async create(payload: CreateWorkPackagePayload) {
+export class WorkOrderService {
+  async create(payload: CreateWorkOrderPayload) {
     // Auto-select tasks for check type
     // Estimate man-hours from task definitions
     // Create work package + line items
   }
 
-  async executeTask(workPackageTaskId: string, payload: ExecutePayload) {
+  async executeTask(workOrderTaskId: string, payload: ExecutePayload) {
     // Update task status, man-hours actual
     // Validate skill/certification of assigned technician
   }
 
-  async signOff(workPackageId: string, signature: DigitalSignature) {
+  async signOff(workOrderId: string, signature: DigitalSignature) {
     // Validate all tasks completed
     // Record digital signature + timestamp
     // Transition work package to 'closed'
@@ -661,7 +661,7 @@ export class WorkPackageService {
 ```typescript
 // Every service method MUST validate scope before database operations
 
-async createWorkPackage(payload: CreateWorkPackagePayload): Promise<WorkPackage> {
+async createWorkOrder(payload: CreateWorkOrderPayload): Promise<WorkOrder> {
   // Defensive check: ensure aircraft belongs to accessible scope
   const aircraft = await ScopedDataAccess.withScope(
     supabase.from('aircraft').select('id, tenant_id, franchise_id'),
@@ -673,7 +673,7 @@ async createWorkPackage(payload: CreateWorkPackagePayload): Promise<WorkPackage>
   }
 
   // Proceed with creation
-  return supabase.from('work_packages').insert({
+  return supabase.from('work_orders').insert({
     ...payload,
     tenant_id: this.scope.tenantId,
     franchise_id: this.scope.franchiseId,  // Inherit from aircraft
@@ -708,9 +708,9 @@ export const amroKeys = {
   aircraftStatus: (id: string) => [...amroKeys.aircraft(), 'status', id],
 
   // Work Packages
-  workPackages: () => [...amroKeys.all(), 'work-packages'],
-  workPackageList: () => [...amroKeys.workPackages(), 'list'],
-  workPackageDetail: (id: string) => [...amroKeys.workPackages(), 'detail', id],
+  workOrders: () => [...amroKeys.all(), 'work-orders'],
+  workOrderList: () => [...amroKeys.workOrders(), 'list'],
+  workOrderDetail: (id: string) => [...amroKeys.workOrders(), 'detail', id],
 };
 
 // Cache configuration
@@ -853,11 +853,11 @@ POST /api/v2/amro/aircraft/:id/mpd-auto-populate    # Apply master MPD
 PUT  /api/v2/amro/aircraft/:id/flight-update        # Increment flight hours
 
 // Work Packages
-GET  /api/v2/amro/work-packages        # List for franchise
-POST /api/v2/amro/work-packages        # Create with auto-select tasks
-GET  /api/v2/amro/work-packages/:id    # Work package detail
-POST /api/v2/amro/work-packages/:id/execute  # Start execution
-POST /api/v2/amro/work-packages/:id/sign-off # Digital signature + close
+GET  /api/v2/amro/work-orders        # List for franchise
+POST /api/v2/amro/work-orders        # Create with auto-select tasks
+GET  /api/v2/amro/work-orders/:id    # Work package detail
+POST /api/v2/amro/work-orders/:id/execute  # Start execution
+POST /api/v2/amro/work-orders/:id/sign-off # Digital signature + close
 
 // Compliance
 GET  /api/v2/amro/compliance/audit-report     # Export FAA/EASA format
@@ -895,10 +895,10 @@ CREATE OR REPLACE FUNCTION apply_master_mpd_to_aircraft(
 ) RETURNS SETOF aircraft_maintenance_tasks;
 
 -- Function 4: Auto-populate work package tasks (check type → tasks)
-CREATE OR REPLACE FUNCTION auto_populate_work_package_tasks(
-  p_work_package_id UUID,
+CREATE OR REPLACE FUNCTION auto_populate_work_order_tasks(
+  p_work_order_id UUID,
   p_check_type VARCHAR
-) RETURNS SETOF work_package_tasks;
+) RETURNS SETOF work_order_tasks;
 ```
 
 **Implementation Effort:** ~8 person-days for testing + optimization
@@ -1052,7 +1052,7 @@ Output: Work package with task list + resource planning
 Steps:
 1. [NOT IMPLEMENTED] Validate aircraft maintenance status
 2. [NOT IMPLEMENTED] Fetch tasks for check type from maintenance_checks table
-3. [NOT IMPLEMENTED] Auto-populate work_package_tasks
+3. [NOT IMPLEMENTED] Auto-populate work_order_tasks
 4. [NOT IMPLEMENTED] Estimate man-hours + required skills
 5. [NOT IMPLEMENTED] Check technician skill certification
 6. [NOT IMPLEMENTED] Assign tasks to available technicians
@@ -1401,12 +1401,12 @@ import { useQuery, useMutation } from '@tanstack/react-query';
 // TailwindCSS utility classes + CSS variables
 
 // Example: Create AMRO work package form
-export function CreateWorkPackageForm() {
+export function CreateWorkOrderForm() {
   const { tenantId, franchiseId } = useCRM();
-  const form = useForm<CreateWorkPackagePayload>();
+  const form = useForm<CreateWorkOrderPayload>();
   const { mutate } = useMutation({
     mutationFn: (payload) =>
-      fetch(`/api/v2/amro/work-packages`, {
+      fetch(`/api/v2/amro/work-orders`, {
         method: 'POST',
         body: JSON.stringify(payload),
         headers: { 'x-tenant-id': tenantId }
@@ -1442,15 +1442,15 @@ export function CreateWorkPackageForm() {
 src/components/amro/
 ├── AircraftStatusWidget          # Reuse Card + Badge
 ├── MaintenanceTaskList           # Reuse Table + Filter
-├── WorkPackageForm               # Reuse Form + Select
-├── WorkPackageExecutor           # Reuse Dialog + Progress
+├── WorkOrderForm               # Reuse Form + Select
+├── WorkOrderExecutor           # Reuse Dialog + Progress
 └── ComplianceStatusBanner        # Reuse Alert
 
 // Phase 2: Advanced components
 ├── SchedulingCalendar            # New: Calendar component (Recharts)
 ├── GanttChart                    # New: Timeline visualization
 ├── TechnicianCapacityPlanner     # New: Capacity heatmap
-└── OfflineWorkPackageForm        # Extend with service worker
+└── OfflineWorkOrderForm        # Extend with service worker
 ```
 
 ### 5.3 Database Migration Strategy
@@ -1493,19 +1493,19 @@ git commit -m "feat(amro): add phase 1 schema with RLS policies"
 src/services/amro/__tests__/
 ├── AircraftMaintenanceService.test.ts
 ├── MaintenanceTaskService.test.ts
-└── WorkPackageService.test.ts
+└── WorkOrderService.test.ts
 
 // Integration tests (medium, 5 sec per file)
 src/tests/integration/amro/
 ├── aircraft-mpd-auto-populate.test.ts
 ├── applicability-check.test.ts
-└── work-package-execution.test.ts
+└── work-order-execution.test.ts
 
 // E2E tests (slow, 30 sec per flow)
 tests/e2e/amro/
 ├── amro-end-to-end.spec.ts  (Playwright)
 ├── aircraft-onboarding.spec.ts
-├── work-package-flow.spec.ts
+├── work-order-flow.spec.ts
 └── compliance-reporting.spec.ts
 
 // Performance tests
@@ -1811,9 +1811,9 @@ const AMRO_PERMISSIONS = {
   'amro.aircraft.create': false,       // Add aircraft (admin only)
   'amro.maintenance_tasks.view': true, // View master/fleet MPD
   'amro.maintenance_tasks.import': false,  // Import master MPD (admin only)
-  'amro.work_packages.create': true,   // Create work packages
-  'amro.work_packages.execute': true,  // Execute tasks (technician)
-  'amro.work_packages.sign_off': false,  // Complete with signature (lead tech only)
+  'amro.work_orders.create': true,   // Create work packages
+  'amro.work_orders.execute': true,  // Execute tasks (technician)
+  'amro.work_orders.sign_off': false,  // Complete with signature (lead tech only)
   'amro.compliance.view': true,        // View compliance dashboard
   'amro.compliance.export': false,     // Export reports (director only)
 };
@@ -1835,8 +1835,8 @@ INSERT INTO audit_logs (
 -- Example: Work package sign-off audit
 {
   "user_id": "tech-uuid",
-  "action": "work_package_signed_off",
-  "resource_type": "work_package",
+  "action": "work_order_signed_off",
+  "resource_type": "work_order",
   "resource_id": "wp-uuid",
   "tenant_id": "tenant-uuid",
   "franchise_id": "franchise-uuid",
@@ -1907,10 +1907,10 @@ GET  /api/v2/amro/maintenance-tasks/:id/applicability-check?aircraftId=...
   - Response: { applicable: boolean, reasons: [strings] }
   - Cache: 10 min
 
-POST /api/v2/amro/work-packages
+POST /api/v2/amro/work-orders
   - Body: { aircraftId, checkType, plannedStartDate, ... }
-  - Response: { workPackageId, taskCount, estimatedManHours, ... }
-  - Permission: amro.work_packages.create
+  - Response: { workOrderId, taskCount, estimatedManHours, ... }
+  - Permission: amro.work_orders.create
 
 ... (remaining endpoints specified in detail)
 ```
@@ -1923,8 +1923,8 @@ POST /api/v2/amro/work-packages
 Components:
 ├── AircraftStatusWidget.stories.tsx
 ├── MaintenanceTaskList.stories.tsx
-├── WorkPackageForm.stories.tsx
-├── WorkPackageExecutor.stories.tsx
+├── WorkOrderForm.stories.tsx
+├── WorkOrderExecutor.stories.tsx
 ├── ComplianceDashboard.stories.tsx
 └── DigitalSignaturePad.stories.tsx
 

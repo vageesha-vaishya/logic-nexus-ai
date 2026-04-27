@@ -16,13 +16,13 @@ function firstQueryValue(value: unknown): string {
 export default async function handler(req: ApiRequest, res: ApiResponse) {
   const baseBody = parseBody(req.body);
   const fromQuery = {
-    work_package_id: firstQueryValue(req.query.work_package_id),
+    work_order_id: firstQueryValue(req.query.work_order_id),
     planning_horizon_days: firstQueryValue(req.query.planning_horizon_days),
     scenario: firstQueryValue(req.query.scenario),
   };
   const normalizedBody = {
     ...baseBody,
-    work_package_id: baseBody.work_package_id || fromQuery.work_package_id || 'wp-default',
+    work_order_id: baseBody.work_order_id || fromQuery.work_order_id || 'wp-default',
     planning_horizon_days: Number(baseBody.planning_horizon_days || fromQuery.planning_horizon_days || 30),
     scenario: baseBody.scenario || fromQuery.scenario || 'base',
   };

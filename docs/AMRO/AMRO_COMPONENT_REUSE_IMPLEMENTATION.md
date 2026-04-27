@@ -64,10 +64,10 @@ export function QuoteForm() {
 
 **AMRO Reuse Pattern - No Changes Needed:**
 ```typescript
-// src/features/module-amro/components/WorkPackageActions.tsx
+// src/features/module-amro/components/WorkOrderActions.tsx
 import { Button } from '@/components/ui/button';
 
-export function WorkPackageActions({ workPackageId }) {
+export function WorkOrderActions({ workOrderId }) {
   return (
     <div className="flex gap-2">
       <Button variant="default" onClick={handleStart}>Start Work</Button>
@@ -148,7 +148,7 @@ export function QuotationForm() {
 
 **AMRO Reuse - Same Pattern:**
 ```typescript
-// src/features/module-amro/components/WorkPackageForm.tsx
+// src/features/module-amro/components/WorkOrderForm.tsx
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -156,15 +156,15 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
-const workPackageSchema = z.object({
+const workOrderSchema = z.object({
   aircraftId: z.string().min(1),
   checkType: z.enum(['A_CHECK', 'C_CHECK', 'ANNUAL']),
   plannedStartDate: z.date(),
 });
 
-export function WorkPackageForm() {
+export function WorkOrderForm() {
   const form = useForm({
-    resolver: zodResolver(workPackageSchema),
+    resolver: zodResolver(workOrderSchema),
     defaultValues: { aircraftId: '', checkType: 'A_CHECK', plannedStartDate: new Date() },
   });
 
@@ -343,7 +343,7 @@ export function DeleteQuotationDialog({ isOpen, onConfirm, onCancel }) {
 // Dialog for confirming work package sign-off
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
-export function ConfirmSignOffDialog({ isOpen, workPackageId, onConfirm, onCancel }) {
+export function ConfirmSignOffDialog({ isOpen, workOrderId, onConfirm, onCancel }) {
   return (
     <Dialog open={isOpen}>
       <DialogContent>
@@ -765,7 +765,7 @@ export function DigitalSignaturePad({
 
 **Usage:**
 ```typescript
-// In WorkPackageSignOffFlow
+// In WorkOrderSignOffFlow
 const [showSignature, setShowSignature] = useState(false);
 
 return (
@@ -776,7 +776,7 @@ return (
       title="Sign Off Work Package WP-2026-001"
       method="pin"  // or "touchpad"
       onSign={async (signature) => {
-        await WorkPackageService.signOff(workPackageId, signature);
+        await WorkOrderService.signOff(workOrderId, signature);
         setShowSignature(false);
       }}
       onCancel={() => setShowSignature(false)}
@@ -1002,18 +1002,18 @@ const localizer = dateFnsLocalizer({
 });
 
 interface SchedulingCalendarProps {
-  workPackages: WorkPackage[];
+  workOrders: WorkOrder[];
   onSelectDateRange?: (startDate: Date, endDate: Date) => void;
-  onSelectWorkPackage?: (workPackageId: string) => void;
+  onSelectWorkOrder?: (workOrderId: string) => void;
 }
 
 export function SchedulingCalendar({
-  workPackages,
+  workOrders,
   onSelectDateRange,
-  onSelectWorkPackage,
+  onSelectWorkOrder,
 }: SchedulingCalendarProps) {
   const [view, setView] = useState<View>('month');
-  const events = workPackages.map(wp => ({
+  const events = workOrders.map(wp => ({
     id: wp.id,
     title: `${wp.wpNumber} - ${wp.checkType}`,
     start: wp.plannedStartDate,
@@ -1030,7 +1030,7 @@ export function SchedulingCalendar({
       view={view}
       onView={setView}
       style={{ height: 600 }}
-      onSelectEvent={(event) => onSelectWorkPackage?.(event.id)}
+      onSelectEvent={(event) => onSelectWorkOrder?.(event.id)}
       onSelectSlot={(slotInfo) =>
         onSelectDateRange?.(slotInfo.start, slotInfo.end)
       }
@@ -1060,8 +1060,8 @@ interface GanttData {
   technician: string;
 }
 
-export function GanttChart({ workPackage }: { workPackage: WorkPackage }) {
-  const data: GanttData[] = workPackage.tasks.map(task => ({
+export function GanttChart({ workOrder }: { workOrder: WorkOrder }) {
+  const data: GanttData[] = workOrder.tasks.map(task => ({
     taskName: task.description,
     startDay: calculateDayOffset(task.startDate),
     duration: calculateDuration(task.completedDate, task.startDate),

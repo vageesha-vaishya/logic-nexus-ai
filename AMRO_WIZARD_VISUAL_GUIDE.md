@@ -9,7 +9,7 @@
                        │
                        ▼
 ┌─────────────────────────────────────────────────────────────┐
-│  AmroWorkPackageCreateWizard Opens                          │
+│  AmroWorkOrderCreateWizard Opens                          │
 │  ┌───────────────────────────────────────────────────────┐  │
 │  │  Step 1: Aircraft & Creation Path                     │  │
 │  │                                                       │  │

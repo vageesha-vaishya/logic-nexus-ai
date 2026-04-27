@@ -14,7 +14,7 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 
 ### Top 5 Recommendations (Immediate Impact)
 
-1. **P0 - Template Versioning Implementation**: The schema exists (`amro_work_order_template_versions`, renamed from `amro_work_package_template_versions`) but has zero API or UI. This is the single most critical gap.
+1. **P0 - Template Versioning Implementation**: The schema exists (`amro_work_order_template_versions`, renamed from `amro_work_order_template_versions`) but has zero API or UI. This is the single most critical gap.
 2. **P0 - Approval Workflow**: No draft/review/approve lifecycle exists. Templates go directly from creation to "active" with no governance.
 3. **P1 - Template Catalog/Browser UI**: Templates are only editable via a modal dialog. There is no browse/search/catalog view.
 4. **P1 - Material/BOM/Tooling Support**: Template content is limited to task IDs. No materials, tooling, or equipment requirements can be defined.
@@ -39,7 +39,7 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 
 #### Existing Tables
 
-**`work_package_templates`** (main table)
+**`work_order_templates`** (main table)
 
 | Column | Type | Notes |
 |--------|------|-------|
@@ -61,16 +61,16 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 | `created_at` | TIMESTAMPTZ | |
 | `updated_at` | TIMESTAMPTZ | |
 
-**Indexes:** `idx_work_package_templates_model_id`, plus unique constraints on tenant/template_code/version.
+**Indexes:** `idx_work_order_templates_model_id`, plus unique constraints on tenant/template_code/version.
 
-**`work_package_template_task_templates`** (relationship/junction table)
+**`work_order_template_task_templates`** (relationship/junction table)
 
 | Column | Type | Notes |
 |--------|------|-------|
 | `id` | UUID PK | |
 | `tenant_id` | UUID | |
 | `franchise_id` | UUID | Nullable |
-| `work_package_template_id` | UUID FK | |
+| `work_order_template_id` | UUID FK | |
 | `model_id` | UUID FK | References `assembly_models` |
 | `task_template_id` | UUID FK | References `task_templates` |
 | `created_by` | UUID | Audit |
@@ -79,7 +79,7 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 | `created_at` | TIMESTAMPTZ | |
 | `updated_at` | TIMESTAMPTZ | |
 
-**Unique Constraint:** `uq_work_package_template_task_templates_scope` on `(tenant_id, COALESCE(franchise_id), model_id, task_template_id)`
+**Unique Constraint:** `uq_work_order_template_task_templates_scope` on `(tenant_id, COALESCE(franchise_id), model_id, task_template_id)`
 
 **Row Level Security:** Both tables have RLS policies for platform admin and tenant/franchise scoping.
 
@@ -97,23 +97,23 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 
 #### API Endpoints (Express Routes)
 
-**File:** `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/services/amro-api/src/routes/work-package-template.routes.ts` (1281 lines)
+**File:** `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/services/amro-api/src/routes/work-order-template.routes.ts` (1281 lines)
 
 | Method | Path | Function | Status |
 |--------|------|----------|--------|
-| POST | `/work-package-templates` | Create template + relationships | Implemented |
-| GET | `/work-package-templates` | List all templates with tasks | Implemented |
-| GET | `/work-package-templates/:id` | Get single template with tasks | Implemented |
-| PUT | `/work-package-templates/:id` | Update template + reset relationships | Implemented |
-| DELETE | `/work-package-templates/:id` | Delete template (cascades) | Implemented |
-| POST | `/work-package-templates/:id/task-templates` | Add task-template relationships | Implemented |
-| GET | `/work-package-templates/model-options` | List aircraft models for dropdown | Implemented |
-| GET | `/work-package-templates/task-template-options` | List task templates by aircraft model | Implemented |
+| POST | `/work-order-templates` | Create template + relationships | Implemented |
+| GET | `/work-order-templates` | List all templates with tasks | Implemented |
+| GET | `/work-order-templates/:id` | Get single template with tasks | Implemented |
+| PUT | `/work-order-templates/:id` | Update template + reset relationships | Implemented |
+| DELETE | `/work-order-templates/:id` | Delete template (cascades) | Implemented |
+| POST | `/work-order-templates/:id/task-templates` | Add task-template relationships | Implemented |
+| GET | `/work-order-templates/model-options` | List aircraft models for dropdown | Implemented |
+| GET | `/work-order-templates/task-template-options` | List task templates by aircraft model | Implemented |
 
 **API Gateway (Next.js):**
-- `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/pages/api/v2/amro/work-package-templates.ts` - Thin proxy to master-data entity handler
-- `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/pages/api/v2/amro/work-package-templates/task-template-options.ts` - Dedicated handler
-- `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/pages/api/v2/amro/work-package-templates/model-options.ts` - Dedicated handler
+- `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/pages/api/v2/amro/work-order-templates.ts` - Thin proxy to master-data entity handler
+- `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/pages/api/v2/amro/work-order-templates/task-template-options.ts` - Dedicated handler
+- `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/pages/api/v2/amro/work-order-templates/model-options.ts` - Dedicated handler
 
 **Master Data Entity Handler:**
 - `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/pages/api/v2/amro/master-data/[entity].ts` (1842 lines)
@@ -132,12 +132,12 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 
 **Weaknesses:**
 - **No atomic transactions**: Template and relationship inserts are separate Supabase calls, not wrapped in a database transaction. The manual rollback is fragile.
-- **No RPC usage**: The atomic PostgreSQL function `amro_create_work_package_template_atomic` (migration `20260403143000`) is defined but never called from the routes. The routes use manual multi-step inserts instead.
+- **No RPC usage**: The atomic PostgreSQL function `amro_create_work_order_template_atomic` (migration `20260403143000`) is defined but never called from the routes. The routes use manual multi-step inserts instead.
 - **Dual code paths**: Express routes (`services/amro-api/`) and Next.js API routes (`src/pages/api/`) both handle WPT operations, with potential inconsistency.
 - **No version endpoints**: GET/POST/PUT for template versions do not exist despite schema being ready.
 - **No approval endpoints**: Submit/approve/reject endpoints do not exist.
 - **No category endpoints**: Template categories CRUD does not exist.
-- **Response format inconsistency**: Some endpoints return `{ data, count }`, others return `{ data, work_package_template_id, relationship_count }`, others return `{ data, added_task_template_ids }`.
+- **Response format inconsistency**: Some endpoints return `{ data, count }`, others return `{ data, work_order_template_id, relationship_count }`, others return `{ data, added_task_template_ids }`.
 
 ### 2.3 Frontend UI Components
 
@@ -145,14 +145,14 @@ The AMRO Work Package Templates module is a **functional but incomplete** templa
 
 | File | Component | Lines | Purpose |
 |------|-----------|-------|---------|
-| `WorkPackageTemplateCreateSection.tsx` | `WorkPackageTemplateCreateSection` | 1307 | Core template create/edit form with task table |
-| `AmroWorkPackageTemplateAdapter.tsx` | `AmroWorkPackageTemplateAdapter` | 858 | Adapter wrapping CreateSection for StandardFormTemplate |
+| `WorkOrderTemplateCreateSection.tsx` | `WorkOrderTemplateCreateSection` | 1307 | Core template create/edit form with task table |
+| `AmroWorkOrderTemplateAdapter.tsx` | `AmroWorkOrderTemplateAdapter` | 858 | Adapter wrapping CreateSection for StandardFormTemplate |
 | `AmroStandardFormTemplate.tsx` | `AmroStandardFormTemplate` | 311 | Generic form template shell |
-| `useWorkPackageTemplates.ts` | `useWorkPackageTemplateOptions` | 74 | React Query hook for template dropdown |
+| `useWorkOrderTemplates.ts` | `useWorkOrderTemplateOptions` | 74 | React Query hook for template dropdown |
 | `useTemplateVersionState.ts` | `useListTemplateVersions`, etc. | ~200 | React Query hooks for template versions (references endpoints that **do not exist**) |
-| `AmroWorkPackageTemplateAdapter.stories.tsx` | Storybook stories | ~300 | Visual regression testing |
-| `AmroWorkPackageTemplatesEnterprise.stories.tsx` | Enterprise story variants | 358 | Desktop, tablet, high-contrast, RTL, offline, approval workflow stories |
-| `WorkPackageTemplateCreateSection.test.tsx` | Unit tests | ~150 | Basic rendering and interaction tests |
+| `AmroWorkOrderTemplateAdapter.stories.tsx` | Storybook stories | ~300 | Visual regression testing |
+| `AmroWorkOrderTemplatesEnterprise.stories.tsx` | Enterprise story variants | 358 | Desktop, tablet, high-contrast, RTL, offline, approval workflow stories |
+| `WorkOrderTemplateCreateSection.test.tsx` | Unit tests | ~150 | Basic rendering and interaction tests |
 
 #### Form Structure
 
@@ -180,8 +180,8 @@ The template creation form has these sections:
 
 #### UI Architecture Issues
 
-- **1307-line monolithic component**: `WorkPackageTemplateCreateSection.tsx` is too large, handling data loading, filtering, sorting, selection, form state, tenant/franchise scoping, hydration, and rendering in a single file.
-- **Adapter pattern with dual rendering**: `AmroWorkPackageTemplateAdapter.tsx` (858 lines) wraps `WorkPackageTemplateCreateSection` to integrate with `AmroStandardFormTemplate`, creating two rendering paths that must be kept in sync.
+- **1307-line monolithic component**: `WorkOrderTemplateCreateSection.tsx` is too large, handling data loading, filtering, sorting, selection, form state, tenant/franchise scoping, hydration, and rendering in a single file.
+- **Adapter pattern with dual rendering**: `AmroWorkOrderTemplateAdapter.tsx` (858 lines) wraps `WorkOrderTemplateCreateSection` to integrate with `AmroStandardFormTemplate`, creating two rendering paths that must be kept in sync.
 - **Feature flag fragmentation**: `embeddedInStandardTemplate` and `hideCoreDetailsSection` props create conditional rendering paths that are hard to test.
 - **Raw `<select>` elements**: The aircraft model dropdown uses native `<select>` instead of the shadcn `Select` component used for maintenance type (line ~700+ of CreateSection).
 
@@ -189,9 +189,9 @@ The template creation form has these sections:
 
 #### Template Selection in Create Work Package Wizard
 
-**File:** `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/features/module-amro/components/work-orders/AmroWorkPackageCreateWizard.tsx`
+**File:** `/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/src/features/module-amro/components/work-orders/AmroWorkOrderCreateWizard.tsx`
 
-- Uses `useWorkPackageTemplateOptions()` hook to fetch templates
+- Uses `useWorkOrderTemplateOptions()` hook to fetch templates
 - Templates are displayed in a simple dropdown (Select component)
 - Only shows templates with status "active" or "approved"
 - **Gap**: No template preview - user selects blindly
@@ -202,7 +202,7 @@ The template creation form has these sections:
 
 - Templates store `tasks_json` as a JSON array of `{task_template_id}` objects
 - When creating a work package, tasks are NOT auto-populated from the template
-- The relationship table `work_package_template_task_templates` stores the definitive links
+- The relationship table `work_order_template_task_templates` stores the definitive links
 - **Drift risk**: `tasks_json` on the main table can diverge from the relationship table (evidenced by repair scripts at `scripts/sql/repair_amro_wpt_task_drift.sql`)
 
 #### Template Versioning Workflow
@@ -254,7 +254,7 @@ The template creation form has these sections:
 
 | Feature | Status | Gap Severity | Enterprise Standard |
 |---------|--------|-------------|---------------------|
-| Template-to-work-package mapping | Partial (shallow, manual) | P1 High | AMOS: Auto-population of all content |
+| Template-to-work-order mapping | Partial (shallow, manual) | P1 High | AMOS: Auto-population of all content |
 | Auto-population of tasks, materials, tooling | Not implemented | P0 Critical | All: One-click template application |
 | Scheduling integration (intervals, due dates) | Not implemented | P1 High | Ramco: Flight hour/cycle/calendar triggers |
 | Regulatory compliance mapping (FAA/EASA/CAAC) | Not implemented | P0 Critical | All: Compliance tracking per template |
@@ -267,7 +267,7 @@ The template creation form has these sections:
 
 ### 4.1 Current UI Components Analysis
 
-#### `WorkPackageTemplateCreateSection.tsx` (1307 lines)
+#### `WorkOrderTemplateCreateSection.tsx` (1307 lines)
 
 **Issues Found:**
 
@@ -303,7 +303,7 @@ The template creation form has these sections:
 
 7. **Redundant Data Entry** (Severity: High)
    - `model_id` (UUID) and `aircraft_model` (text) are both stored, causing confusion
-   - `tasks_json` and `work_package_template_task_templates` relationship table duplicate data
+   - `tasks_json` and `work_order_template_task_templates` relationship table duplicate data
    - Known drift issue requiring repair scripts
 
 8. **Keyboard Navigation** (Severity: Medium)
@@ -493,15 +493,15 @@ The template creation form has these sections:
 ### 7.1 Architecture Improvements
 
 **A. Eliminate Dual Code Paths**
-- **Issue:** Express routes (`services/amro-api/src/routes/work-package-template.routes.ts`) and Next.js routes (`src/pages/api/v2/amro/work-package-templates/`) both serve WPT requests with different implementations.
+- **Issue:** Express routes (`services/amro-api/src/routes/work-order-template.routes.ts`) and Next.js routes (`src/pages/api/v2/amro/work-order-templates/`) both serve WPT requests with different implementations.
 - **Recommendation:** Consolidate to a single API layer. Either fully migrate to the Express microservice or fully adopt Next.js API routes. The Express routes have better validation logic; the Next.js routes have better integration with the master-data entity handler.
 
 **B. Use Atomic Database Operations**
 - **Issue:** Template creation uses separate Supabase calls for the template row and relationship rows, with manual rollback logic.
-- **Recommendation:** Use the existing `amro_create_work_package_template_atomic` PostgreSQL function. It is already defined in migration `20260403143000` but never called. Similarly, create `amro_update_work_package_template_atomic` and `amro_delete_work_package_template_atomic` functions.
+- **Recommendation:** Use the existing `amro_create_work_order_template_atomic` PostgreSQL function. It is already defined in migration `20260403143000` but never called. Similarly, create `amro_update_work_order_template_atomic` and `amro_delete_work_order_template_atomic` functions.
 
 **C. Resolve `tasks_json` vs. Relationship Table Drift**
-- **Issue:** Two sources of truth for template-task relationships. The `tasks_json` column on `work_package_templates` and the `work_package_template_task_templates` junction table can diverge.
+- **Issue:** Two sources of truth for template-task relationships. The `tasks_json` column on `work_order_templates` and the `work_order_template_task_templates` junction table can diverge.
 - **Recommendation:** Make the junction table the single source of truth. Deprecate `tasks_json` by computing it from the relationship table via a database trigger or view. Run the existing repair script (`scripts/sql/repair_amro_wpt_task_drift.sql`) to fix existing drift.
 
 **D. Remove Redundant `aircraft_model` Column**
@@ -509,14 +509,14 @@ The template creation form has these sections:
 - **Recommendation:** Migrate all references to use `model_id` via foreign key join to `assembly_models`. Remove the `aircraft_model` column after data migration.
 
 **E. Standardize API Response Formats**
-- **Issue:** Different endpoints return different shapes (`{ data, count }`, `{ data, work_package_template_id, relationship_count }`, `{ data, added_task_template_ids }`).
+- **Issue:** Different endpoints return different shapes (`{ data, count }`, `{ data, work_order_template_id, relationship_count }`, `{ data, added_task_template_ids }`).
 - **Recommendation:** Adopt a consistent envelope: `{ data, meta: { count, templateId, relationshipCount } }`.
 
 ### 7.2 Testing Strategy
 
 **Current Test Coverage:**
-- Route tests: `services/amro-api/tests/work-package-template.routes.test.ts` (3 test suites, ~8 test cases)
-- Component tests: `WorkPackageTemplateCreateSection.test.tsx` (~3 test cases)
+- Route tests: `services/amro-api/tests/work-order-template.routes.test.ts` (3 test suites, ~8 test cases)
+- Component tests: `WorkOrderTemplateCreateSection.test.tsx` (~3 test cases)
 - Storybook stories: 10+ stories covering various states
 - **Missing:** Integration tests for full create-edit-delete workflow, E2E tests, API contract tests
 
@@ -544,14 +544,14 @@ The template creation form has these sections:
 
 | Debt Item | Location | Severity | Fix Effort |
 |-----------|----------|----------|------------|
-| Manual rollback instead of database transaction | `work-package-template.routes.ts` lines 286-306 | High | S |
+| Manual rollback instead of database transaction | `work-order-template.routes.ts` lines 286-306 | High | S |
 | Atomic RPC function defined but never called | Migration `20260403143000` | High | S |
-| `tasks_json` drift from relationship table | `work_package_templates.tasks_json` | High | S |
-| Dual `model_id` and `aircraft_model` columns | `work_package_templates` table | Medium | S |
+| `tasks_json` drift from relationship table | `work_order_templates.tasks_json` | High | S |
+| Dual `model_id` and `aircraft_model` columns | `work_order_templates` table | Medium | S |
 | Inconsistent API response formats | All WPT endpoints | Medium | S |
-| 1307-line monolithic component | `WorkPackageTemplateCreateSection.tsx` | Medium | M |
-| Dual rendering paths (adapter + direct) | `AmroWorkPackageTemplateAdapter.tsx` | Medium | M |
-| Native `<select>` mixed with shadcn `Select` | `WorkPackageTemplateCreateSection.tsx` ~line 700 | Low | S |
+| 1307-line monolithic component | `WorkOrderTemplateCreateSection.tsx` | Medium | M |
+| Dual rendering paths (adapter + direct) | `AmroWorkOrderTemplateAdapter.tsx` | Medium | M |
+| Native `<select>` mixed with shadcn `Select` | `WorkOrderTemplateCreateSection.tsx` ~line 700 | Low | S |
 | Feature flag conditionals create untestable paths | `embeddedInStandardTemplate` prop | Low | S |
 | React Query hooks reference non-existent endpoints | `useTemplateVersionState.ts` | High | M |
 
@@ -560,8 +560,8 @@ The template creation form has these sections:
 ## 8. Quick Wins (1-2 Days, High Impact)
 
 ### QW1: Fix Template Auto-Population in Create Wizard
-- **File:** `AmroWorkPackageCreateWizard.tsx`
-- **Change:** When a template is selected, fetch its tasks from `work_package_template_task_templates` and auto-populate the work package task list.
+- **File:** `AmroWorkOrderCreateWizard.tsx`
+- **Change:** When a template is selected, fetch its tasks from `work_order_template_task_templates` and auto-populate the work package task list.
 - **Impact:** Unlocks the primary value proposition of templates.
 - **Effort:** 1-2 days
 
@@ -572,13 +572,13 @@ The template creation form has these sections:
 - **Effort:** 1-2 days
 
 ### QW3: Improve Error Messages
-- **Files:** `WorkPackageTemplateCreateSection.tsx`, `work-package-template.routes.ts`
+- **Files:** `WorkOrderTemplateCreateSection.tsx`, `work-order-template.routes.ts`
 - **Change:** Replace generic "Failed to load" messages with actionable guidance. Add field-level validation messages.
 - **Impact:** Reduces support requests and user frustration.
 - **Effort:** 0.5 days
 
 ### QW4: Add Template Preview Dialog
-- **File:** New component + modify `WorkPackageTemplateCreateSection.tsx`
+- **File:** New component + modify `WorkOrderTemplateCreateSection.tsx`
 - **Change:** Add a "Preview" button that opens a read-only view of the template with all tasks, scope, and metadata.
 - **Impact:** Enables review before approval workflow.
 - **Effort:** 1 day
@@ -590,13 +590,13 @@ The template creation form has these sections:
 - **Effort:** 0.5 days (plus testing)
 
 ### QW6: Implement Template Version API Endpoints
-- **File:** New routes in `services/amro-api/src/routes/work-package-template.routes.ts`
+- **File:** New routes in `services/amro-api/src/routes/work-order-template.routes.ts`
 - **Change:** Implement GET/POST/PUT for `amro_work_order_template_versions` table. These are simple CRUD endpoints backed by an existing schema.
 - **Impact:** Enables all future versioning features.
 - **Effort:** 2 days
 
 ### QW7: Add Keyboard Shortcuts
-- **File:** `WorkPackageTemplateCreateSection.tsx`
+- **File:** `WorkOrderTemplateCreateSection.tsx`
 - **Change:** Add Ctrl+S for save, Ctrl+N for new template, Escape to close modal, Space to toggle task selection in table.
 - **Impact:** Significantly improves power user productivity.
 - **Effort:** 0.5 days
@@ -609,11 +609,11 @@ The template creation form has these sections:
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `services/amro-api/src/routes/work-package-template.routes.ts` | 1281 | Express API routes (CRUD, model-options, task-template-options) |
-| `services/amro-api/tests/work-package-template.routes.test.ts` | ~200 | Route unit tests |
-| `src/pages/api/v2/amro/work-package-templates.ts` | 10 | Next.js proxy to master-data handler |
-| `src/pages/api/v2/amro/work-package-templates/model-options.ts` | ~50 | Aircraft model options endpoint |
-| `src/pages/api/v2/amro/work-package-templates/task-template-options.ts` | ~140 | Task template options by model |
+| `services/amro-api/src/routes/work-order-template.routes.ts` | 1281 | Express API routes (CRUD, model-options, task-template-options) |
+| `services/amro-api/tests/work-order-template.routes.test.ts` | ~200 | Route unit tests |
+| `src/pages/api/v2/amro/work-order-templates.ts` | 10 | Next.js proxy to master-data handler |
+| `src/pages/api/v2/amro/work-order-templates/model-options.ts` | ~50 | Aircraft model options endpoint |
+| `src/pages/api/v2/amro/work-order-templates/task-template-options.ts` | ~140 | Task template options by model |
 | `src/pages/api/v2/amro/master-data/[entity].ts` | 1842 | Generic CRUD with WPT special handling |
 | `src/pages/api/v2/amro/master-data/shared.ts` | 1034 | Entity configuration including WPT |
 
@@ -621,26 +621,26 @@ The template creation form has these sections:
 
 | File | Lines | Purpose |
 |------|-------|---------|
-| `src/features/module-amro/settings/pages/amro-settings-master-data/components/WorkPackageTemplateCreateSection.tsx` | 1307 | Core template form with task table |
-| `src/features/module-amro/settings/pages/amro-settings-master-data/components/WorkPackageTemplateCreateSection.test.tsx` | ~150 | Component tests |
-| `src/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter.tsx` | 858 | Adapter for StandardFormTemplate |
-| `src/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter.stories.tsx` | ~300 | Storybook stories |
-| `src/features/module-amro/components/templates/AmroWorkPackageTemplatesEnterprise.stories.tsx` | 358 | Enterprise story variants |
+| `src/features/module-amro/settings/pages/amro-settings-master-data/components/WorkOrderTemplateCreateSection.tsx` | 1307 | Core template form with task table |
+| `src/features/module-amro/settings/pages/amro-settings-master-data/components/WorkOrderTemplateCreateSection.test.tsx` | ~150 | Component tests |
+| `src/features/module-amro/components/templates/AmroWorkOrderTemplateAdapter.tsx` | 858 | Adapter for StandardFormTemplate |
+| `src/features/module-amro/components/templates/AmroWorkOrderTemplateAdapter.stories.tsx` | ~300 | Storybook stories |
+| `src/features/module-amro/components/templates/AmroWorkOrderTemplatesEnterprise.stories.tsx` | 358 | Enterprise story variants |
 | `src/features/module-amro/components/templates/AmroStandardFormTemplate.tsx` | 311 | Generic form template shell |
-| `src/features/module-amro/components/work-orders/useWorkPackageTemplates.ts` | 74 | React Query hook for template dropdown |
+| `src/features/module-amro/components/work-orders/useWorkOrderTemplates.ts` | 74 | React Query hook for template dropdown |
 | `src/features/module-amro/components/work-orders/useTemplateVersionState.ts` | ~200 | React Query hooks (referencing non-existent endpoints) |
 
 ### Database
 
 | File | Purpose |
 |------|---------|
-| `supabase/migrations/20260331123000_amro_create_work_package_template_task_temlates.sql` | Junction table creation |
-| `supabase/migrations/20260401110000_amro_fix_work_package_template_task_templates.sql` | Junction table fix |
+| `supabase/migrations/20260331123000_amro_create_work_order_template_task_temlates.sql` | Junction table creation |
+| `supabase/migrations/20260401110000_amro_fix_work_order_template_task_templates.sql` | Junction table fix |
 | `supabase/migrations/20260403143000_amro_wpt_atomic_create.sql` | Atomic create function + idempotency table |
 | `supabase/migrations/20260403203000_amro_wpt_atomic_update.sql` | Atomic update function |
 | `supabase/migrations/20260404234500_amro_wpt_relations_add_audit_columns.sql` | Audit columns on junction table |
 | `supabase/migrations/20260405003000_amro_wpt_add_model_id.sql` | model_id FK on main table |
-| `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql` | Enterprise schema (versions, categories, compliance, etc.) |
+| `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql` | Enterprise schema (versions, categories, compliance, etc.) |
 | `scripts/sql/repair_amro_wpt_task_drift.sql` | Drift repair script |
 | `scripts/sql/validate_amro_wpt_task_drift.sql` | Drift validation script |
 
@@ -658,7 +658,7 @@ The template creation form has these sections:
 
 ## Appendix B: Database Column Reference
 
-### `work_package_templates` - Complete Column List
+### `work_order_templates` - Complete Column List
 
 ```
 id                  UUID            PRIMARY KEY
@@ -680,13 +680,13 @@ created_at          TIMESTAMPTZ     NOT NULL DEFAULT now()
 updated_at          TIMESTAMPTZ     NOT NULL DEFAULT now()
 ```
 
-### `work_package_template_task_templates` - Complete Column List
+### `work_order_template_task_templates` - Complete Column List
 
 ```
 id                          UUID            PRIMARY KEY
 tenant_id                   UUID            NOT NULL
 franchise_id                UUID            NULL
-work_package_template_id    UUID            NOT NULL, FK -> work_package_templates
+work_order_template_id    UUID            NOT NULL, FK -> work_order_templates
 model_id                    UUID            NOT NULL, FK -> assembly_models
 task_template_id            UUID            NOT NULL, FK -> task_templates
 created_by                  UUID            NULL (audit)

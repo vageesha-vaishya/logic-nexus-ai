@@ -1176,17 +1176,17 @@ Service decomposition:
 - `amro-audit-ledger-service` (append-only `mro_audit` writers and replay API).
 
 Data ownership:
-- Operational tables: `aircraft`, `components`, `work_packages`, `tasks`, `staff_qualifications`, `maintenance_events`, `amro_work_order_materials`.
+- Operational tables: `aircraft`, `components`, `work_orders`, `tasks`, `staff_qualifications`, `maintenance_events`, `amro_work_order_materials`.
 - Immutable schema: `mro_audit.records`, `mro_audit.trails`.
 - Mandatory isolation fields: `tenant_id`, `franchise_id`, `domain_id`, `version`.
 - Access rule: all AMRO data operations must use scoped access and enforce AMRO tenant assignment through `platform_domains` + `tenant_domain_assignments` with active subscription validation.
 
 ### 13.3 AMRO Integration and Coexistence Pattern
 Integration contracts:
-- REST/OpenAPI 3.1: `/api/v2/amro/work-packages`, `/api/v2/amro/tasks`, `/api/v2/amro/compliance-gates`.
-- GraphQL subgraph: `amroWorkPackages`, `amroTask(id)`, `amroComplianceStatus`.
+- REST/OpenAPI 3.1: `/api/v2/amro/work-orders`, `/api/v2/amro/tasks`, `/api/v2/amro/compliance-gates`.
+- GraphQL subgraph: `amroWorkOrders`, `amroTask(id)`, `amroComplianceStatus`.
 - gRPC: `amro.v1.WorkOrderService`, `amro.v1.ComplianceService`.
-- AsyncAPI events: `amro.work_package.created.v1`, `amro.task.completed.v1`, `amro.compliance.gate_decided.v1`, `amro.audit.recorded.v1`.
+- AsyncAPI events: `amro.work_order.created.v1`, `amro.task.completed.v1`, `amro.compliance.gate_decided.v1`, `amro.audit.recorded.v1`.
 
 Coexistence and migration safeguards:
 - Dual-read with deterministic comparison across legacy and AMRO query surfaces.

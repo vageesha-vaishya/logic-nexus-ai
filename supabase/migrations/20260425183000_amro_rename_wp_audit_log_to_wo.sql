@@ -2,22 +2,22 @@
 -- DB-ARCH-APPROVAL: pending-amro-arch-board-approval
 --
 -- Purpose:
--- - Rename table public.amro_work_package_audit_log -> public.amro_work_order_audit_log
+-- - Rename table public.amro_work_order_audit_log -> public.amro_work_order_audit_log
 -- - Rename associated constraints/indexes/policies to work-order naming
--- - Repoint residual inbound FKs from amro_work_package_audit_log(id) to amro_work_order_audit_log(id)
+-- - Repoint residual inbound FKs from amro_work_order_audit_log(id) to amro_work_order_audit_log(id)
 
 BEGIN;
 
 DO $$
 DECLARE
-  v_old_table regclass := to_regclass('public.amro_work_package_audit_log');
+  v_old_table regclass := to_regclass('public.amro_work_order_audit_log');
   v_new_table regclass := to_regclass('public.amro_work_order_audit_log');
   rec record;
   v_new_name text;
   v_def text;
 BEGIN
   IF v_old_table IS NOT NULL AND v_new_table IS NULL THEN
-    EXECUTE 'ALTER TABLE public.amro_work_package_audit_log RENAME TO amro_work_order_audit_log';
+    EXECUTE 'ALTER TABLE public.amro_work_order_audit_log RENAME TO amro_work_order_audit_log';
   END IF;
 
   v_new_table := to_regclass('public.amro_work_order_audit_log');
@@ -33,7 +33,7 @@ BEGIN
     WHERE conrelid = v_new_table
   LOOP
     v_new_name := rec.conname;
-    v_new_name := replace(v_new_name, 'work_package_audit_log', 'work_order_audit_log');
+    v_new_name := replace(v_new_name, 'work_order_audit_log', 'work_order_audit_log');
     v_new_name := replace(v_new_name, 'wp_audit_log', 'wo_audit_log');
 
     IF v_new_name <> rec.conname THEN
@@ -49,7 +49,7 @@ BEGIN
       AND tablename = 'amro_work_order_audit_log'
   LOOP
     v_new_name := rec.indexname;
-    v_new_name := replace(v_new_name, 'work_package_audit_log', 'work_order_audit_log');
+    v_new_name := replace(v_new_name, 'work_order_audit_log', 'work_order_audit_log');
     v_new_name := replace(v_new_name, 'wp_audit_log', 'wo_audit_log');
 
     IF v_new_name <> rec.indexname THEN
@@ -89,7 +89,7 @@ BEGIN
   END IF;
 
   -- Repoint residual inbound FKs from old table id in edge/partial states.
-  v_old_table := to_regclass('public.amro_work_package_audit_log');
+  v_old_table := to_regclass('public.amro_work_order_audit_log');
   IF v_old_table IS NOT NULL THEN
     FOR rec IN
       SELECT
@@ -100,15 +100,15 @@ BEGIN
       WHERE c.contype = 'f'
         AND c.confrelid = v_old_table
     LOOP
-      v_new_name := replace(rec.conname, 'work_package_audit_log', 'work_order_audit_log');
+      v_new_name := replace(rec.conname, 'work_order_audit_log', 'work_order_audit_log');
       v_new_name := replace(v_new_name, 'wp_audit_log', 'wo_audit_log');
       IF v_new_name = rec.conname THEN
         v_new_name := rec.conname || '_woal';
       END IF;
 
       v_def := replace(
-        replace(rec.condef, 'REFERENCES public.amro_work_package_audit_log', 'REFERENCES public.amro_work_order_audit_log'),
-        'REFERENCES amro_work_package_audit_log',
+        replace(rec.condef, 'REFERENCES public.amro_work_order_audit_log', 'REFERENCES public.amro_work_order_audit_log'),
+        'REFERENCES amro_work_order_audit_log',
         'REFERENCES amro_work_order_audit_log'
       );
 

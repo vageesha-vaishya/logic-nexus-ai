@@ -31,7 +31,7 @@ const SOURCE_ENTITY_COLUMNS = [
   'document_number',
   'transaction_number',
   'work_order_number',
-  'work_package_number',
+  'work_order_number',
 ];
 
 async function validateSourceReferenceEntity(

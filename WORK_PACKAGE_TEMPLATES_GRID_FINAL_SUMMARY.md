@@ -226,7 +226,7 @@ The **Work Package Templates Enterprise Grid** has been successfully implemented
 ```
 src/features/module-amro/templates/
 ├── components/ (12 components + 2 tests)
-│   ├── WorkPackageTemplatesGrid.tsx (400 lines)
+│   ├── WorkOrderTemplatesGrid.tsx (400 lines)
 │   ├── TemplateRow.tsx (300 lines)
 │   ├── TemplateCard.tsx (250 lines) + test
 │   ├── GridToolbar.tsx (350 lines)

@@ -13,7 +13,7 @@
     - Work package template section
     - Generic tabbed form section
 - **Aircraft work package create dialog**
-  - Component: [AircraftWorkPackageCreateDialog.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx)
+  - Component: [AircraftWorkOrderCreateDialog.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx)
   - Mounted in page near [AmroSettingsMasterDataPage.tsx#L9090](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L9090)
 - **Flight log create/update dialog**
   - Uses `FlightLogForm` in page near [AmroSettingsMasterDataPage.tsx#L9126](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L9126)

@@ -111,7 +111,7 @@ Items stored in form state (form.materials_json, form.tooling_json, etc.)
          ↓
 User clicks "Save Template"
          ↓
-All data saved to work_package_templates table
+All data saved to work_order_templates table
          ↓
 JSON fields contain full enterprise data
 ```

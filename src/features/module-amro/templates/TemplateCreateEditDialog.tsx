@@ -26,7 +26,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import type { WorkPackageTemplate, TaskTemplateOption, AircraftModelOption } from './AmroWorkPackageTemplatesPage';
+import type { WorkOrderTemplate, TaskTemplateOption, AircraftModelOption } from './AmroWorkOrderTemplatesPage';
 import { fetchTaskTemplates } from './templateApi';
 import { useAuth } from '@/hooks/useAuth';
 // Enterprise editors
@@ -39,7 +39,7 @@ import { EnterpriseComplianceEditor } from '../components/templates/EnterpriseCo
 interface TemplateCreateEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  template: WorkPackageTemplate | null; // null = create mode
+  template: WorkOrderTemplate | null; // null = create mode
   onSuccess: () => void;
   aircraftModels: AircraftModelOption[];
   tenantId?: string; // Pass tenant ID for API calls
@@ -666,7 +666,7 @@ export function TemplateCreateEditDialog({
             <EnterpriseMaterialsEditor
               materials={form.materials_json}
               onChange={(materials) => setField('materials_json', materials)}
-              workPackageTemplateId={template?.id}
+              workOrderTemplateId={template?.id}
               readOnly={false}
             />
           </TabsContent>

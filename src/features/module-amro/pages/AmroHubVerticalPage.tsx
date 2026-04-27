@@ -55,7 +55,7 @@ type PersonaRole = 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user
 type AmroWorkspaceModuleKey =
   | 'overview'
   | 'primary-users'
-  | 'work-packages'
+  | 'work-orders'
   | 'task-execution'
   | 'scheduling'
   | 'parts'
@@ -81,7 +81,7 @@ type AmroHubVerticalPageProps = {
 };
 
 export type AmroOverviewWorkspaceTelemetry = {
-  openWorkPackages?: number;
+  openWorkOrders?: number;
   aogCount?: number;
   complianceRiskCount?: number;
   deferredCount?: number;
@@ -113,7 +113,7 @@ type AmroOverviewWorkspaceControls = {
 const AMRO_MODULE_PAGE_LABEL: Record<AmroModuleKey, string> = {
   overview: 'Overview',
   'primary-users': 'Primary Users',
-  'work-packages': 'Work Packages',
+  'work-orders': 'Work Packages',
   'task-execution': 'Task Execution',
   scheduling: 'Scheduling',
   parts: 'Parts',
@@ -1042,7 +1042,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
       return {};
     }
     const getKpiValue = (key: string) => dashboard.kpi_cards.find((card) => card.key === key)?.value;
-    const openWorkPackages = dashboard.executive_summary.active_work_packages;
+    const openWorkOrders = dashboard.executive_summary.active_work_orders;
     const aogCount = getKpiValue('aog_count') ?? 0;
     const complianceRiskCount = getKpiValue('compliance_alerts') ?? dashboard.anomaly_flags.length;
     const deferredCount = dashboard.executive_summary.overdue_tasks;
@@ -1051,9 +1051,9 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
       : undefined;
     const pipelineStages = ['planning', 'scheduled', 'in_progress'] as const;
     const pipelineSummary = pipelineStages
-      .map((stage) => `${stage} ${dashboard.work_package_overview.filter((item) => item.status === stage).length}`)
+      .map((stage) => `${stage} ${dashboard.work_order_overview.filter((item) => item.status === stage).length}`)
       .join(' / ');
-    const blockedCount = dashboard.work_package_overview.filter((item) => item.status === 'blocked').length;
+    const blockedCount = dashboard.work_order_overview.filter((item) => item.status === 'blocked').length;
     const criticalHeatmapCount = dashboard.risk_heatmap.cells.filter((cell) => String(cell.severity || '').toLowerCase() === 'high').length;
     const warningHeatmapCount = dashboard.risk_heatmap.cells.filter((cell) => String(cell.severity || '').toLowerCase() === 'medium').length;
     const recommendations = trends?.forecast_recommendation_hub || [];
@@ -1066,7 +1066,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
     const dataFreshness = dashboard.freshness_warning || 'Within SLA window';
     const syncHealth = dashboard.integration_monitor.status === 'healthy' ? 'Healthy sync' : dashboard.integration_monitor.status;
     return {
-      openWorkPackages,
+      openWorkOrders,
       aogCount,
       complianceRiskCount,
       deferredCount,
@@ -1090,7 +1090,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
   const [overviewRegulatorProfile, setOverviewRegulatorProfile] = useState<'FAA' | 'EASA' | 'CAAC'>('FAA');
   const [overviewFleetFilter, setOverviewFleetFilter] = useState<string>('all');
   const [overviewStationFilter, setOverviewStationFilter] = useState<string>('all');
-  const [overviewWorkPackagePage, setOverviewWorkPackagePage] = useState<number>(1);
+  const [overviewWorkOrderPage, setOverviewWorkOrderPage] = useState<number>(1);
   const [overviewTrendsPage, setOverviewTrendsPage] = useState<number>(1);
   const isWorkspaceDocumentationRoute = moduleKey === 'workspace-documentation';
   const isOverviewDashboardRoute = moduleKey === 'overview';
@@ -1152,7 +1152,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
     if (!Number.isFinite(value)) return '0%';
     return `${Math.round(Number(value) * 10) / 10}%`;
   };
-  const buildOverviewDashboardRequest = (page: number = overviewWorkPackagePage) => ({
+  const buildOverviewDashboardRequest = (page: number = overviewWorkOrderPage) => ({
     dateRange: buildDateRangeWindow(overviewDateRange),
     regionIds: overviewRegionFilter !== 'all' ? [overviewRegionFilter.toUpperCase()] : undefined,
     stationIds: overviewStationFilter !== 'all' ? [overviewStationFilter] : undefined,
@@ -1171,7 +1171,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
     pageSize: OVERVIEW_TRENDS_PAGE_SIZE,
   });
   const applyScopeFilters = async () => {
-    setOverviewWorkPackagePage(1);
+    setOverviewWorkOrderPage(1);
     setOverviewTrendsPage(1);
     await Promise.all([
       loadDashboard(buildOverviewDashboardRequest(1)),
@@ -1277,8 +1277,8 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
     });
     return Array.from(bucket.entries()).map(([severity, score]) => ({ severity, score }));
   }, [dashboard?.risk_heatmap?.cells]);
-  const workPackageCurrentPage = dashboard?.pagination?.page || overviewWorkPackagePage;
-  const workPackageTotalPages = dashboard?.pagination?.total_pages || 1;
+  const workOrderCurrentPage = dashboard?.pagination?.page || overviewWorkOrderPage;
+  const workOrderTotalPages = dashboard?.pagination?.total_pages || 1;
   const trendsCurrentPage = trends?.pagination?.page || overviewTrendsPage;
   const trendsTotalRows = Math.max(
     trends?.pagination?.audit_timeline_total_rows || 0,
@@ -1286,9 +1286,9 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
   );
   const trendsPageSize = trends?.pagination?.page_size || OVERVIEW_TRENDS_PAGE_SIZE;
   const trendsTotalPages = Math.max(1, Math.ceil((trendsTotalRows || (trends?.audit_timeline?.length || 0)) / trendsPageSize));
-  const handleWorkPackagePageChange = async (nextPage: number) => {
+  const handleWorkOrderPageChange = async (nextPage: number) => {
     const safePage = Math.max(1, nextPage);
-    setOverviewWorkPackagePage(safePage);
+    setOverviewWorkOrderPage(safePage);
     await loadDashboard(buildOverviewDashboardRequest(safePage));
   };
   const handleTrendsPageChange = async (nextPage: number) => {
@@ -1455,7 +1455,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
                   <div className="rounded-md border p-3 xl:col-span-4" role="region" aria-label="Critical Signal Board">
                     <p className="font-semibold">{t('amro.overview.criticalSignalBoard', { defaultValue: 'Critical Signal Board' })}</p>
                     <p className="mt-2 text-muted-foreground">
-                      {t('amro.overview.activeWorkPackages', { defaultValue: 'Active Work Packages' })}: {dashboard?.executive_summary.active_work_packages ?? 0}
+                      {t('amro.overview.activeWorkOrders', { defaultValue: 'Active Work Packages' })}: {dashboard?.executive_summary.active_work_orders ?? 0}
                     </p>
                     <p className="mt-1 text-muted-foreground">
                       {t('amro.overview.overdueTasks', { defaultValue: 'Overdue Tasks' })}: {dashboard?.executive_summary.overdue_tasks ?? 0}
@@ -1508,7 +1508,7 @@ export default function AmroHubVerticalPage({ moduleKey }: AmroHubVerticalPagePr
             </Card>
           ) : (
             <>
-              {moduleKey === 'work-packages' ? (
+              {moduleKey === 'work-orders' ? (
                 <AmroWorkOrdersListPage />
               ) : isWorkspaceDocumentationRoute ? (
                 <AmroWorkspaceDocumentationReference phasePlanRows={phasePlanRows} phasePlanSource={phasePlanSource} />
@@ -1536,8 +1536,8 @@ export function AmroPrimaryUsersPage() {
   return <AmroHubVerticalPage moduleKey="primary-users" />;
 }
 
-export function AmroWorkPackagesPage() {
-  return <AmroHubVerticalPage moduleKey="work-packages" />;
+export function AmroWorkOrdersPage() {
+  return <AmroHubVerticalPage moduleKey="work-orders" />;
 }
 
 export function AmroTaskExecutionPage() {

@@ -68,8 +68,8 @@ interface AmroEventPayload {
   "idempotency_key": "tenant-123-wp-789-a1b2c3d4",
   "data": {
     "id": "wp-789",
-    "work_package_id": "wp-789",
-    "work_package_number": "WP-001",
+    "work_order_id": "wp-789",
+    "work_order_number": "WP-001",
     "aircraft_id": "ac-123",
     "title": "Line Maintenance",
     "description": "Regular scheduled maintenance",
@@ -95,7 +95,7 @@ interface AmroEventPayload {
     "id": "task-789",
     "task_id": "task-789",
     "task_number": "TASK-001",
-    "work_package_id": "wp-789",
+    "work_order_id": "wp-789",
     "title": "Inspect hydraulics",
     "description": "Visual inspection of all hydraulic lines",
     "status": "pending",
@@ -158,7 +158,7 @@ import { amroEventsProducer } from './events/amro-events.producer';
 import { AmroEventType } from './events/amro-events.types';
 
 // In work-orders.service.ts
-async createWorkPackage(tenantId: string, userId: string, request: CreateWorkPackageRequest) {
+async createWorkOrder(tenantId: string, userId: string, request: CreateWorkOrderRequest) {
   // ... create work package in database
 
   // Publish event (fire-and-forget)
@@ -167,16 +167,16 @@ async createWorkPackage(tenantId: string, userId: string, request: CreateWorkPac
     userId,
     AmroEventType.WORK_ORDER_CREATED,
     {
-      id: workPackage.id,
-      work_package_id: workPackage.id,
-      work_package_number: workPackage.work_package_number,
-      aircraft_id: workPackage.aircraft_id,
-      title: workPackage.title,
+      id: workOrder.id,
+      work_order_id: workOrder.id,
+      work_order_number: workOrder.work_order_number,
+      aircraft_id: workOrder.aircraft_id,
+      title: workOrder.title,
       // ... other fields
     }
   );
 
-  return workPackage;
+  return workOrder;
 }
 ```
 
@@ -192,7 +192,7 @@ amroEventsProducer.publishTaskEvent(
     id: task.id,
     task_id: task.id,
     task_number: task.task_number,
-    work_package_id: task.work_package_id,
+    work_order_id: task.work_order_id,
     title: task.title,
     // ... other fields
   }
@@ -257,7 +257,7 @@ Event publication errors are logged at ERROR level with context:
 [ERROR] Failed to publish work order event {
   eventType: 'amro.work_order.created',
   tenantId: 'tenant-123',
-  workPackageId: 'wp-789',
+  workOrderId: 'wp-789',
   error: 'Connection refused'
 }
 ```

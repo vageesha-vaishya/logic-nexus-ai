@@ -55,7 +55,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     applyCompatibilityResponseHeaders(res, compatDecision, ctx.correlationId);
 
     const serviceBoundaries = buildAmroServiceBoundaryEnvelope({
-      capability: 'work-packages',
+      capability: 'work-orders',
       scope: createAmroIsolationScope(tenantId, franchiseId),
       subscriptionStatus: 'public',
       validatedAt: new Date().toISOString(),

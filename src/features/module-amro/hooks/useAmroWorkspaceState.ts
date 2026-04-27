@@ -9,16 +9,16 @@ import type {
   AmroMaterialPlanningRecord,
   AmroPredictiveRecommendation,
   AmroQualification,
-  AmroWorkPackage,
-  AmroWorkPackageLifecycleStage,
+  AmroWorkOrder,
+  AmroWorkOrderLifecycleStage,
 } from '../workspace/amroWorkspaceModel';
 import {
   buildComplianceCoverage,
   buildMaterialsPlanningSummary,
   buildPredictiveMaintenanceSummary,
   canPerformAuthoritySignOff,
-  canTransitionWorkPackageLifecycle,
-  getNextWorkPackageLifecycleStage,
+  canTransitionWorkOrderLifecycle,
+  getNextWorkOrderLifecycleStage,
 } from '../workspace/amroWorkspaceModel';
 
 const initialAssets: AmroAssetRegistryRecord[] = [
@@ -60,21 +60,21 @@ const initialAssets: AmroAssetRegistryRecord[] = [
   },
 ];
 
-type ApiWorkPackage = {
+type ApiWorkOrder = {
   id: string;
   aircraft_id: string;
   work_order_number?: string;
-  work_package_number?: string;
+  work_order_number?: string;
   status: string;
   title: string;
   maintenance_type?: string;
 };
 
-type WorkPackageStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+type WorkOrderStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 
 type ApiTask = {
   id: string;
-  work_package_id: string;
+  work_order_id: string;
   title: string;
   status: string;
 };
@@ -104,7 +104,7 @@ type ApiComplianceSummary = {
 
 type ApiEvidence = {
   id: string;
-  entity_type: 'work_package' | 'task' | 'inspection' | 'release';
+  entity_type: 'work_order' | 'task' | 'inspection' | 'release';
   entity_id: string;
   hash: string;
   immutable: boolean;
@@ -131,7 +131,7 @@ type ComplianceRegulatorProfile = 'FAA' | 'EASA' | 'CAAC';
 
 type ApiScheduleRow = {
   schedule_id: string;
-  work_package_id: string;
+  work_order_id: string;
   station_code: string;
   slot_start: string;
   slot_end: string;
@@ -150,7 +150,7 @@ type ApiScheduleOptimizationRecommendation = {
   rationale: string;
 };
 
-type ApiWorkPackageReplanOption = {
+type ApiWorkOrderReplanOption = {
   option_id: string;
   title: string;
   impact_score: number;
@@ -160,7 +160,7 @@ type ApiEnvelope<T> = {
   data: T;
 };
 
-type V2WorkPackageItem = {
+type V2WorkOrderItem = {
   id: string;
   code?: string;
   status: string;
@@ -168,12 +168,12 @@ type V2WorkPackageItem = {
 
 type V2TaskItem = {
   id: string;
-  workPackageId: string;
+  workOrderId: string;
   title: string;
   status: string;
 };
 
-type V2SavedWorkPackageView = {
+type V2SavedWorkOrderView = {
   id: string;
   name: string;
   filters: {
@@ -182,7 +182,7 @@ type V2SavedWorkPackageView = {
   };
 };
 
-const DEFAULT_WORK_PACKAGE_SAVED_VIEW: V2SavedWorkPackageView = {
+const DEFAULT_WORK_PACKAGE_SAVED_VIEW: V2SavedWorkOrderView = {
   id: 'default-all',
   name: 'All Work Packages',
   filters: {
@@ -198,11 +198,11 @@ type V2SchedulesResponse = {
   error?: string;
 };
 
-type V2WorkPackagesResponse = {
+type V2WorkOrdersResponse = {
   data?: {
-    workPackages?: V2WorkPackageItem[];
+    workOrders?: V2WorkOrderItem[];
   };
-  savedViews?: V2SavedWorkPackageView[];
+  savedViews?: V2SavedWorkOrderView[];
   error?: string;
 };
 
@@ -221,7 +221,7 @@ type ComplianceExplainabilityState = {
 };
 
 type ComplianceAuditReplayState = {
-  capability: 'work-packages' | 'tasks' | 'compliance-gates';
+  capability: 'work-orders' | 'tasks' | 'compliance-gates';
   format: 'csv' | 'json';
   eventCount: number;
   events: Array<{ sequence: number; recordId: string; action: string; createdAt: string }>;
@@ -277,7 +277,7 @@ type CertificationTemplateState = {
   deferMaxDays: number;
 };
 
-type CreateWorkPackageOptions = {
+type CreateWorkOrderOptions = {
   aircraftId?: string;
   maintenanceType?: 'line' | 'base' | 'hangar' | 'shop';
   priority?: 'low' | 'medium' | 'high' | 'critical';
@@ -347,7 +347,7 @@ function getAmroApiBaseUrl(): string {
   return withoutLegacyProxyPrefix === '/' ? '' : withoutLegacyProxyPrefix;
 }
 
-function mapStatusToLifecycle(status: string): AmroWorkPackageLifecycleStage {
+function mapStatusToLifecycle(status: string): AmroWorkOrderLifecycleStage {
   const normalized = status.trim().toLowerCase();
   if (normalized === 'approved') return 'plan';
   if (normalized === 'planning') return 'create';
@@ -358,7 +358,7 @@ function mapStatusToLifecycle(status: string): AmroWorkPackageLifecycleStage {
   return 'create';
 }
 
-function mapLifecycleToStatus(stage: AmroWorkPackageLifecycleStage): string {
+function mapLifecycleToStatus(stage: AmroWorkOrderLifecycleStage): string {
   if (stage === 'create') return 'planning';
   if (stage === 'plan') return 'approved';
   if (stage === 'schedule') return 'scheduled';
@@ -367,16 +367,16 @@ function mapLifecycleToStatus(stage: AmroWorkPackageLifecycleStage): string {
   return 'closed';
 }
 
-function sanitizeSavedWorkPackageViews(views: unknown): V2SavedWorkPackageView[] {
+function sanitizeSavedWorkOrderViews(views: unknown): V2SavedWorkOrderView[] {
   if (!Array.isArray(views)) {
     return [DEFAULT_WORK_PACKAGE_SAVED_VIEW];
   }
-  const dedupe = new Map<string, V2SavedWorkPackageView>();
+  const dedupe = new Map<string, V2SavedWorkOrderView>();
   views.forEach((entry) => {
     if (!entry || typeof entry !== 'object') {
       return;
     }
-    const item = entry as Partial<V2SavedWorkPackageView>;
+    const item = entry as Partial<V2SavedWorkOrderView>;
     const id = String(item.id || '').trim();
     const name = String(item.name || '').trim();
     if (!id || !name) {
@@ -442,7 +442,7 @@ const initialRulePacks: AmroComplianceRulePack[] = [
 ];
 
 const initialEvidenceChain: AmroEvidenceRecord[] = [
-  { id: 'ev-1', entityType: 'work_package', entityId: 'wp-1', hash: 'sha256:8df2a39aaad9', immutable: true, createdAt: '2026-03-20T11:40:00.000Z' },
+  { id: 'ev-1', entityType: 'work_order', entityId: 'wp-1', hash: 'sha256:8df2a39aaad9', immutable: true, createdAt: '2026-03-20T11:40:00.000Z' },
   { id: 'ev-2', entityType: 'task', entityId: 'task-3', hash: 'sha256:9ab12cdaa8be', immutable: true, createdAt: '2026-03-20T12:30:00.000Z' },
   { id: 'ev-3', entityType: 'inspection', entityId: 'task-4', hash: 'sha256:5a72c3ef8a71', immutable: true, createdAt: '2026-03-20T12:55:00.000Z' },
 ];
@@ -525,23 +525,23 @@ export function useAmroWorkspaceState() {
   const [assets, setAssets] = useState<AmroAssetRegistryRecord[]>(initialAssets);
   const [assetsLoadedFromApi, setAssetsLoadedFromApi] = useState<boolean>(false);
   const [apiUnavailableUntil, setApiUnavailableUntil] = useState<number>(0);
-  const [hasV1WorkPackageConnectivity, setHasV1WorkPackageConnectivity] = useState<boolean>(false);
-  const [workPackages, setWorkPackages] = useState<AmroWorkPackage[]>([]);
-  const [selectedWorkPackageId, setSelectedWorkPackageId] = useState<string>('');
-  const [loadingWorkPackages, setLoadingWorkPackages] = useState<boolean>(false);
-  const [workPackagesError, setWorkPackagesError] = useState<string | null>(null);
-  const [workPackageStatusFilter, setWorkPackageStatusFilter] = useState<string>('all');
-  const [workPackageSearch, setWorkPackageSearch] = useState<string>('');
+  const [hasV1WorkOrderConnectivity, setHasV1WorkOrderConnectivity] = useState<boolean>(false);
+  const [workOrders, setWorkOrders] = useState<AmroWorkOrder[]>([]);
+  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string>('');
+  const [loadingWorkOrders, setLoadingWorkOrders] = useState<boolean>(false);
+  const [workOrdersError, setWorkOrdersError] = useState<string | null>(null);
+  const [workOrderStatusFilter, setWorkOrderStatusFilter] = useState<string>('all');
+  const [workOrderSearch, setWorkOrderSearch] = useState<string>('');
   const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id);
-  const [savedWorkPackageViews, setSavedWorkPackageViews] = useState<V2SavedWorkPackageView[]>([DEFAULT_WORK_PACKAGE_SAVED_VIEW]);
-  const [holdReleaseStatusByWorkPackage, setHoldReleaseStatusByWorkPackage] = useState<Record<string, WorkPackageStatus>>({});
-  const [softDeletedWorkPackageStatusById, setSoftDeletedWorkPackageStatusById] = useState<Record<string, WorkPackageStatus>>({});
+  const [savedWorkOrderViews, setSavedWorkOrderViews] = useState<V2SavedWorkOrderView[]>([DEFAULT_WORK_PACKAGE_SAVED_VIEW]);
+  const [holdReleaseStatusByWorkOrder, setHoldReleaseStatusByWorkOrder] = useState<Record<string, WorkOrderStatus>>({});
+  const [softDeletedWorkOrderStatusById, setSoftDeletedWorkOrderStatusById] = useState<Record<string, WorkOrderStatus>>({});
   const [holdAuditTrail, setHoldAuditTrail] = useState<Array<{
-    workPackageId: string;
+    workOrderId: string;
     packageNumber: string;
     action: 'hold' | 'release';
-    fromStatus: WorkPackageStatus;
-    toStatus: WorkPackageStatus;
+    fromStatus: WorkOrderStatus;
+    toStatus: WorkOrderStatus;
     actorRole: string;
     occurredAt: string;
   }>>([]);
@@ -555,7 +555,7 @@ export function useAmroWorkspaceState() {
   const [predictiveRecommendations, setPredictiveRecommendations] = useState<AmroPredictiveRecommendation[]>(initialPredictiveRecommendations);
   const [scheduleBoardRows, setScheduleBoardRows] = useState<ApiScheduleRow[]>([]);
   const [scheduleOptimizationRecommendations, setScheduleOptimizationRecommendations] = useState<ApiScheduleOptimizationRecommendation[]>([]);
-  const [workPackageReplanOptions, setWorkPackageReplanOptions] = useState<ApiWorkPackageReplanOption[]>([]);
+  const [workOrderReplanOptions, setWorkOrderReplanOptions] = useState<ApiWorkOrderReplanOption[]>([]);
   const [lastConfirmedReplanScheduleId, setLastConfirmedReplanScheduleId] = useState<string>('');
   const [lastInventoryOptimizationRunId, setLastInventoryOptimizationRunId] = useState<string>('');
   const [lastProcurementSyncId, setLastProcurementSyncId] = useState<string>('');
@@ -655,11 +655,11 @@ export function useAmroWorkspaceState() {
       return;
     }
     void setDomain('AMRO').catch(() => {
-      setWorkPackagesError('AMRO domain context required - switch to AMRO domain');
+      setWorkOrdersError('AMRO domain context required - switch to AMRO domain');
     });
   }, [isAwaitingAmroDomainActivation, setDomain]);
 
-  const mapWorkPackageRecord = useCallback((item: { id: string; packageNumber: string; status: string; assetId: string }) => ({
+  const mapWorkOrderRecord = useCallback((item: { id: string; packageNumber: string; status: string; assetId: string }) => ({
     id: item.id,
     packageNumber: item.packageNumber,
     lifecycleStage: mapStatusToLifecycle(item.status),
@@ -667,14 +667,14 @@ export function useAmroWorkspaceState() {
     tasks: [],
   }), []);
 
-  const fetchWorkPackages = useCallback(async () => {
+  const fetchWorkOrders = useCallback(async () => {
     if (!authHeaders) {
-      setWorkPackages([]);
-      setSelectedWorkPackageId('');
+      setWorkOrders([]);
+      setSelectedWorkOrderId('');
       return;
     }
     if (!hasAmroAccess) {
-      setWorkPackagesError(
+      setWorkOrdersError(
         isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
       );
       return;
@@ -682,69 +682,69 @@ export function useAmroWorkspaceState() {
     if (isApiTemporarilyUnavailable()) {
       return;
     }
-    setLoadingWorkPackages(true);
-    setWorkPackagesError(null);
+    setLoadingWorkOrders(true);
+    setWorkOrdersError(null);
     try {
-      let next: AmroWorkPackage[] = [];
+      let next: AmroWorkOrder[] = [];
       try {
-        const response = await fetch(`${apiBaseUrl}/api/v1/work-packages`, { headers: authHeaders });
-        const payload = await parseJsonSafe<ApiEnvelope<ApiWorkPackage[]> & { error?: string }>(response);
+        const response = await fetch(`${apiBaseUrl}/api/v1/work-orders`, { headers: authHeaders });
+        const payload = await parseJsonSafe<ApiEnvelope<ApiWorkOrder[]> & { error?: string }>(response);
         if (!response.ok || !Array.isArray(payload?.data)) {
           throw new Error(payload?.error || `Failed to load work packages (${response.status})`);
         }
-        setHasV1WorkPackageConnectivity(true);
-        next = payload.data.map((item) => mapWorkPackageRecord({
+        setHasV1WorkOrderConnectivity(true);
+        next = payload.data.map((item) => mapWorkOrderRecord({
           id: item.id,
-          packageNumber: item.work_package_number || item.work_order_number || item.id,
+          packageNumber: item.work_order_number || item.work_order_number || item.id,
           status: item.status,
           assetId: item.aircraft_id,
-        })) as AmroWorkPackage[];
+        })) as AmroWorkOrder[];
       } catch (error) {
-        setHasV1WorkPackageConnectivity(false);
+        setHasV1WorkOrderConnectivity(false);
         const query = new URLSearchParams();
-        if (workPackageStatusFilter !== 'all') {
-          query.set('status', workPackageStatusFilter);
+        if (workOrderStatusFilter !== 'all') {
+          query.set('status', workOrderStatusFilter);
         }
-        if (workPackageSearch.trim()) {
-          query.set('search', workPackageSearch.trim());
+        if (workOrderSearch.trim()) {
+          query.set('search', workOrderSearch.trim());
         }
         if (selectedSavedViewId && selectedSavedViewId !== 'default-all') {
           query.set('saved_view', selectedSavedViewId);
         }
         const endpoint = query.size
-          ? `${apiBaseUrl}/api/v2/amro/work-packages?${query.toString()}`
-          : `${apiBaseUrl}/api/v2/amro/work-packages`;
+          ? `${apiBaseUrl}/api/v2/amro/work-orders?${query.toString()}`
+          : `${apiBaseUrl}/api/v2/amro/work-orders`;
         const v2Response = await fetch(endpoint, { headers: authHeaders });
-        const v2Payload = await parseJsonSafe<V2WorkPackagesResponse>(v2Response);
-        const v2Items = v2Payload?.data?.workPackages;
+        const v2Payload = await parseJsonSafe<V2WorkOrdersResponse>(v2Response);
+        const v2Items = v2Payload?.data?.workOrders;
         if (!v2Response.ok || !Array.isArray(v2Items)) {
           throw new Error(v2Payload?.error || `Failed to load work packages (${v2Response.status})`);
         }
         if (Array.isArray(v2Payload?.savedViews) && v2Payload.savedViews.length > 0) {
-          setSavedWorkPackageViews(sanitizeSavedWorkPackageViews(v2Payload.savedViews));
+          setSavedWorkOrderViews(sanitizeSavedWorkOrderViews(v2Payload.savedViews));
         }
         next = v2Items.map((item) =>
-          mapWorkPackageRecord({
+          mapWorkOrderRecord({
             id: item.id,
             packageNumber: item.code || item.id,
             status: mapV2StatusToV1Status(item.status),
             assetId: '',
           }),
-        ) as AmroWorkPackage[];
+        ) as AmroWorkOrder[];
       }
-      if (hasV1WorkPackageConnectivity) {
-        const normalizedSearch = workPackageSearch.trim().toLowerCase();
+      if (hasV1WorkOrderConnectivity) {
+        const normalizedSearch = workOrderSearch.trim().toLowerCase();
         next = next.filter((item) => {
           const status = mapLifecycleToStatus(item.lifecycleStage);
-          const statusMatch = workPackageStatusFilter === 'all' ? true : status === workPackageStatusFilter;
+          const statusMatch = workOrderStatusFilter === 'all' ? true : status === workOrderStatusFilter;
           const searchMatch = !normalizedSearch
             ? true
             : item.packageNumber.toLowerCase().includes(normalizedSearch) || item.id.toLowerCase().includes(normalizedSearch);
           return statusMatch && searchMatch;
         });
       }
-      setWorkPackages(next);
-      setSelectedWorkPackageId((previous) => {
+      setWorkOrders(next);
+      setSelectedWorkOrderId((previous) => {
         if (previous && next.some((item) => item.id === previous)) {
           return previous;
         }
@@ -753,25 +753,25 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load work packages');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load work packages');
     } finally {
-      setLoadingWorkPackages(false);
+      setLoadingWorkOrders(false);
     }
   }, [
     apiBaseUrl,
     authHeaders,
-    hasV1WorkPackageConnectivity,
+    hasV1WorkOrderConnectivity,
     isApiTemporarilyUnavailable,
-    mapWorkPackageRecord,
+    mapWorkOrderRecord,
     markApiTemporarilyUnavailable,
     selectedSavedViewId,
     hasAmroAccess,
     amroAccessErrorMessage,
-    workPackageSearch,
-    workPackageStatusFilter,
+    workOrderSearch,
+    workOrderStatusFilter,
     isAwaitingAmroDomainActivation,
   ]);
 
@@ -780,7 +780,7 @@ export function useAmroWorkspaceState() {
       return;
     }
     if (!hasAmroAccess) {
-      setWorkPackagesError(
+      setWorkOrdersError(
         isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
       );
       return;
@@ -801,8 +801,8 @@ export function useAmroWorkspaceState() {
         fetch(`${apiBaseUrl}/api/v1/qualifications`, { headers: authHeaders }),
         fetch(`${apiBaseUrl}/api/v1/compliance/summary`, { headers: authHeaders }),
         fetch(`${apiBaseUrl}/api/v1/evidence`, { headers: authHeaders }),
-        selectedWorkPackageId
-          ? fetch(`${apiBaseUrl}/api/v1/work-packages/${selectedWorkPackageId}/materials`, { headers: authHeaders })
+        selectedWorkOrderId
+          ? fetch(`${apiBaseUrl}/api/v1/work-orders/${selectedWorkOrderId}/materials`, { headers: authHeaders })
           : Promise.resolve(new Response(JSON.stringify({ data: [] }), { status: 200 })),
         fetch(`${apiBaseUrl}/api/v1/forecast/recommendations`, { headers: authHeaders }),
       ]);
@@ -943,20 +943,20 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load AMRO module data');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load AMRO module data');
     }
-  }, [apiBaseUrl, amroAccessErrorMessage, authHeaders, hasAmroAccess, isApiTemporarilyUnavailable, isAwaitingAmroDomainActivation, markApiTemporarilyUnavailable, selectedWorkPackageId]);
+  }, [apiBaseUrl, amroAccessErrorMessage, authHeaders, hasAmroAccess, isApiTemporarilyUnavailable, isAwaitingAmroDomainActivation, markApiTemporarilyUnavailable, selectedWorkOrderId]);
 
-  const fetchTasksForWorkPackage = useCallback(
-    async (workPackageId: string) => {
-      if (!authHeaders || !workPackageId) {
+  const fetchTasksForWorkOrder = useCallback(
+    async (workOrderId: string) => {
+      if (!authHeaders || !workOrderId) {
         return;
       }
       if (!hasAmroAccess) {
-        setWorkPackagesError(
+        setWorkOrdersError(
           isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
         );
         return;
@@ -967,14 +967,14 @@ export function useAmroWorkspaceState() {
       try {
         let tasks: ApiTask[] = [];
         try {
-          const response = await fetch(`${apiBaseUrl}/api/v1/work-packages/${workPackageId}/tasks`, { headers: authHeaders });
+          const response = await fetch(`${apiBaseUrl}/api/v1/work-orders/${workOrderId}/tasks`, { headers: authHeaders });
           const payload = await parseJsonSafe<ApiEnvelope<ApiTask[]> & { error?: string }>(response);
           if (!response.ok || !Array.isArray(payload?.data)) {
             throw new Error(payload?.error || `Failed to load tasks (${response.status})`);
           }
           tasks = payload.data;
         } catch (error) {
-          const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/tasks?workPackageId=${encodeURIComponent(workPackageId)}`, { headers: authHeaders });
+          const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/tasks?workOrderId=${encodeURIComponent(workOrderId)}`, { headers: authHeaders });
           const v2Payload = await parseJsonSafe<{ data?: { tasks?: V2TaskItem[] }; error?: string }>(v2Response);
           const v2Tasks = v2Payload?.data?.tasks;
           if (!v2Response.ok || !Array.isArray(v2Tasks)) {
@@ -982,19 +982,19 @@ export function useAmroWorkspaceState() {
           }
           tasks = v2Tasks.map((task) => ({
             id: task.id,
-            work_package_id: task.workPackageId,
+            work_order_id: task.workOrderId,
             title: task.title,
             status: mapV2StatusToV1Status(task.status),
           }));
         }
-        setWorkPackages((previous) =>
+        setWorkOrders((previous) =>
           previous.map((item) =>
-            item.id === workPackageId
+            item.id === workOrderId
               ? {
                   ...item,
                   tasks: tasks.map((task) => ({
                     id: task.id,
-                    workPackageId: task.work_package_id,
+                    workOrderId: task.work_order_id,
                     title: task.title,
                     lifecycleStage: mapStatusToLifecycle(task.status),
                     assignedRole: 'planner',
@@ -1007,10 +1007,10 @@ export function useAmroWorkspaceState() {
       } catch (error) {
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
-          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
           return;
         }
-        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load tasks');
+        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load tasks');
       }
     },
     [apiBaseUrl, amroAccessErrorMessage, authHeaders, hasAmroAccess, isApiTemporarilyUnavailable, isAwaitingAmroDomainActivation, markApiTemporarilyUnavailable],
@@ -1022,7 +1022,7 @@ export function useAmroWorkspaceState() {
       return;
     }
     if (!hasAmroAccess) {
-      setWorkPackagesError(
+      setWorkOrdersError(
         isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
       );
       return;
@@ -1042,27 +1042,27 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load scheduling board');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load scheduling board');
     }
   }, [apiBaseUrl, amroAccessErrorMessage, authHeaders, hasAmroAccess, isApiTemporarilyUnavailable, isAwaitingAmroDomainActivation, markApiTemporarilyUnavailable]);
 
   useEffect(() => {
-    void fetchWorkPackages();
-  }, [fetchWorkPackages]);
+    void fetchWorkOrders();
+  }, [fetchWorkOrders]);
 
   useEffect(() => {
     void fetchModuleSurfaces();
   }, [fetchModuleSurfaces]);
 
   useEffect(() => {
-    if (!selectedWorkPackageId) {
+    if (!selectedWorkOrderId) {
       return;
     }
-    void fetchTasksForWorkPackage(selectedWorkPackageId);
-  }, [fetchTasksForWorkPackage, selectedWorkPackageId]);
+    void fetchTasksForWorkOrder(selectedWorkOrderId);
+  }, [fetchTasksForWorkOrder, selectedWorkOrderId]);
 
   useEffect(() => {
     void fetchScheduleBoard();
@@ -1077,28 +1077,28 @@ export function useAmroWorkspaceState() {
       setRealtimeConnected(false);
       return;
     }
-    if (!hasV1WorkPackageConnectivity) {
+    if (!hasV1WorkOrderConnectivity) {
       setRealtimeConnected(false);
       return;
     }
     if (isApiTemporarilyUnavailable()) {
       return;
     }
-    const streamUrl = `${apiBaseUrl}/api/v1/work-packages/stream?access_token=${encodeURIComponent(token)}`;
+    const streamUrl = `${apiBaseUrl}/api/v1/work-orders/stream?access_token=${encodeURIComponent(token)}`;
     const source = new EventSource(streamUrl);
     source.addEventListener('connected', () => {
       setRealtimeConnected(true);
     });
-    source.addEventListener('work-package-change', () => {
-      void fetchWorkPackages();
+    source.addEventListener('work-order-change', () => {
+      void fetchWorkOrders();
       void fetchModuleSurfaces();
-      if (selectedWorkPackageId) {
-        void fetchTasksForWorkPackage(selectedWorkPackageId);
+      if (selectedWorkOrderId) {
+        void fetchTasksForWorkOrder(selectedWorkOrderId);
       }
     });
     source.onerror = () => {
       setRealtimeConnected(false);
-      setHasV1WorkPackageConnectivity(false);
+      setHasV1WorkOrderConnectivity(false);
       markApiTemporarilyUnavailable();
       source.close();
     };
@@ -1109,26 +1109,26 @@ export function useAmroWorkspaceState() {
   }, [
     apiBaseUrl,
     fetchModuleSurfaces,
-    fetchTasksForWorkPackage,
-    fetchWorkPackages,
+    fetchTasksForWorkOrder,
+    fetchWorkOrders,
     isApiTemporarilyUnavailable,
     hasAmroAccess,
-    hasV1WorkPackageConnectivity,
+    hasV1WorkOrderConnectivity,
     markApiTemporarilyUnavailable,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
     token,
   ]);
 
   useEffect(() => {
-    if (!authHeaders || hasV1WorkPackageConnectivity) {
+    if (!authHeaders || hasV1WorkOrderConnectivity) {
       return;
     }
     const intervalId = setInterval(() => {
-      void fetchWorkPackages();
+      void fetchWorkOrders();
       void fetchModuleSurfaces();
       void fetchScheduleBoard();
-      if (selectedWorkPackageId) {
-        void fetchTasksForWorkPackage(selectedWorkPackageId);
+      if (selectedWorkOrderId) {
+        void fetchTasksForWorkOrder(selectedWorkOrderId);
       }
     }, 30000);
     return () => {
@@ -1137,16 +1137,16 @@ export function useAmroWorkspaceState() {
   }, [
     authHeaders,
     fetchModuleSurfaces,
-    fetchTasksForWorkPackage,
-    fetchWorkPackages,
+    fetchTasksForWorkOrder,
+    fetchWorkOrders,
     fetchScheduleBoard,
-    hasV1WorkPackageConnectivity,
-    selectedWorkPackageId,
+    hasV1WorkOrderConnectivity,
+    selectedWorkOrderId,
   ]);
 
-  const selectedWorkPackage = useMemo(
-    () => workPackages.find((item) => item.id === selectedWorkPackageId) ?? workPackages[0] ?? null,
-    [selectedWorkPackageId, workPackages],
+  const selectedWorkOrder = useMemo(
+    () => workOrders.find((item) => item.id === selectedWorkOrderId) ?? workOrders[0] ?? null,
+    [selectedWorkOrderId, workOrders],
   );
 
   const selectedQualification = useMemo(
@@ -1165,23 +1165,23 @@ export function useAmroWorkspaceState() {
     return 'viewer';
   }, [hasPermission, hasRole]);
 
-  const canCreateWorkPackage = useMemo(
+  const canCreateWorkOrder = useMemo(
     () => isAmroAuthorized || hasPermission('dashboards.manage') || hasPermission('reports.manage'),
     [hasPermission, isAmroAuthorized],
   );
 
-  const canDeleteWorkPackage = useMemo(
+  const canDeleteWorkOrder = useMemo(
     () => isAuthPlatformAdmin() || isDomainPlatformAdmin || hasRole('tenant_admin') || hasPermission('dashboards.manage'),
     [hasPermission, hasRole, isAuthPlatformAdmin, isDomainPlatformAdmin],
   );
 
   const canAdvanceLifecycle = useMemo(() => {
-    if (!isAmroAuthorized || !selectedWorkPackage) return false;
-    if (selectedWorkPackage.lifecycleStage === 'close') return false;
-    const nextStage = getNextWorkPackageLifecycleStage(selectedWorkPackage.lifecycleStage);
+    if (!isAmroAuthorized || !selectedWorkOrder) return false;
+    if (selectedWorkOrder.lifecycleStage === 'close') return false;
+    const nextStage = getNextWorkOrderLifecycleStage(selectedWorkOrder.lifecycleStage);
     const nextStatus = mapLifecycleToStatus(nextStage);
     return resolveRoleTransitionTargets(activeRole).includes(nextStatus);
-  }, [activeRole, isAmroAuthorized, selectedWorkPackage]);
+  }, [activeRole, isAmroAuthorized, selectedWorkOrder]);
 
   const canSignOff = useMemo(() => {
     if (!selectedQualification) return false;
@@ -1251,14 +1251,14 @@ export function useAmroWorkspaceState() {
   }, [apiBaseUrl, authHeaders]);
 
   const loadComplianceGateExplainability = useCallback(async () => {
-    if (!selectedWorkPackageId || isApiTemporarilyUnavailable()) return false;
+    if (!selectedWorkOrderId || isApiTemporarilyUnavailable()) return false;
     try {
       const payload = await callComplianceInterface('load-compliance-gate-explainability', {
-        context: { type: 'work_package', id: selectedWorkPackageId },
+        context: { type: 'work_order', id: selectedWorkOrderId },
         policy_version_snapshot: 'policy-v2026.03.22',
         required_obligations: [
-          { obligation_id: `${selectedWorkPackageId}-ad-1`, fulfilled: true },
-          { obligation_id: `${selectedWorkPackageId}-sb-1`, fulfilled: true },
+          { obligation_id: `${selectedWorkOrderId}-ad-1`, fulfilled: true },
+          { obligation_id: `${selectedWorkOrderId}-sb-1`, fulfilled: true },
         ],
       });
       const output = (payload?.output || {}) as Record<string, unknown>;
@@ -1277,17 +1277,17 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load compliance explainability');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load compliance explainability');
       return false;
     }
   }, [
     callComplianceInterface,
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
   ]);
 
   const loadAuditReplayTimeline = useCallback(async () => {
@@ -1306,7 +1306,7 @@ export function useAmroWorkspaceState() {
       const exportFilters = (output.export_filters || {}) as Record<string, unknown>;
       const events = Array.isArray(replayTimeline.events) ? replayTimeline.events : [];
       setComplianceAuditReplay({
-        capability: String(exportFilters.capability || 'compliance-gates') as 'work-packages' | 'tasks' | 'compliance-gates',
+        capability: String(exportFilters.capability || 'compliance-gates') as 'work-orders' | 'tasks' | 'compliance-gates',
         format: String(exportFilters.format || 'csv') as 'csv' | 'json',
         eventCount: Number(replayTimeline.event_count || events.length || 0),
         events: events.map((entry) => {
@@ -1323,10 +1323,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load audit replay timeline');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load audit replay timeline');
       return false;
     }
   }, [callComplianceInterface, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable]);
@@ -1357,10 +1357,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to detect compliance anomalies');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to detect compliance anomalies');
       return false;
     }
   }, [
@@ -1401,35 +1401,35 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load regulator profile pack');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load regulator profile pack');
       return false;
     }
   }, [callComplianceInterface, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, selectedRegulatorProfile]);
 
   const ingestAdSbObligations = useCallback(async () => {
-    if (!selectedWorkPackageId || isApiTemporarilyUnavailable()) return false;
+    if (!selectedWorkOrderId || isApiTemporarilyUnavailable()) return false;
     try {
       const payload = await callComplianceInterface('ingest-ad-sb-obligations', {
-        work_package_id: selectedWorkPackageId,
+        work_order_id: selectedWorkOrderId,
         regulator_profile: selectedRegulatorProfile,
         source_adapter: 'ad-sb-feed-v1',
         obligations: [
           {
-            obligation_id: `${selectedWorkPackageId}-ad-001`,
+            obligation_id: `${selectedWorkOrderId}-ad-001`,
             obligation_type: 'ad',
             reference_number: 'AD-2026-001',
             due_at: new Date(Date.now() + 86400000 * 10).toISOString(),
-            applicability: { aircraft_id: selectedWorkPackage?.assetId || 'asset-1' },
+            applicability: { aircraft_id: selectedWorkOrder?.assetId || 'asset-1' },
           },
           {
-            obligation_id: `${selectedWorkPackageId}-sb-001`,
+            obligation_id: `${selectedWorkOrderId}-sb-001`,
             obligation_type: 'sb',
             reference_number: 'SB-A320-27-1121',
             due_at: new Date(Date.now() + 86400000 * 14).toISOString(),
-            applicability: { aircraft_id: selectedWorkPackage?.assetId || 'asset-1' },
+            applicability: { aircraft_id: selectedWorkOrder?.assetId || 'asset-1' },
           },
         ],
       });
@@ -1444,10 +1444,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to ingest AD/SB obligations');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to ingest AD/SB obligations');
       return false;
     }
   }, [
@@ -1455,17 +1455,17 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     selectedRegulatorProfile,
-    selectedWorkPackage?.assetId,
-    selectedWorkPackageId,
+    selectedWorkOrder?.assetId,
+    selectedWorkOrderId,
   ]);
 
   const evaluateMelCdlDeferral = useCallback(async () => {
-    if (!selectedWorkPackageId || isApiTemporarilyUnavailable()) return false;
+    if (!selectedWorkOrderId || isApiTemporarilyUnavailable()) return false;
     try {
       const payload = await callComplianceInterface('evaluate-mel-cdl-deferral', {
-        work_package_id: selectedWorkPackageId,
+        work_order_id: selectedWorkOrderId,
         deferral_type: 'mel',
-        item_reference: `${selectedWorkPackageId}-mel-001`,
+        item_reference: `${selectedWorkOrderId}-mel-001`,
         deferral_category: 'B',
         dispatch_conditions: ['operational-limitation-logged', 'next-flight-crew-briefed'],
         expires_at: new Date(Date.now() + 3600000 * 36).toISOString(),
@@ -1480,17 +1480,17 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to evaluate MEL/CDL deferral');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to evaluate MEL/CDL deferral');
       return false;
     }
   }, [
     callComplianceInterface,
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
   ]);
 
   const validateCertifyingPrivilege = useCallback(async () => {
@@ -1499,7 +1499,7 @@ export function useAmroWorkspaceState() {
       const payload = await callCertificationInterface('validate-certifying-authority', {
         actor_id: selectedQualification.id,
         timestamp: new Date().toISOString(),
-        aircraft_scope: [selectedWorkPackage?.assetId || 'asset-1'],
+        aircraft_scope: [selectedWorkOrder?.assetId || 'asset-1'],
         maintenance_scope: ['line'],
         required_privileges: ['release_approval'],
         authority: {
@@ -1517,11 +1517,11 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       setCertifyingPrivilegeValidated(false);
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to validate certifying privilege');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to validate certifying privilege');
       return false;
     }
   }, [
@@ -1529,14 +1529,14 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     selectedQualification,
-    selectedWorkPackage?.assetId,
+    selectedWorkOrder?.assetId,
   ]);
 
   const submitCertificationDecision = useCallback(async (decision: CertificationDecisionOption) => {
-    if (!selectedWorkPackageId || !selectedQualification || isApiTemporarilyUnavailable()) return false;
+    if (!selectedWorkOrderId || !selectedQualification || isApiTemporarilyUnavailable()) return false;
     try {
       const payload = await callCertificationInterface('submit-certification-decision', {
-        work_package_id: selectedWorkPackageId,
+        work_order_id: selectedWorkOrderId,
         decision,
         unresolved_blockers: ['none'],
         defer_reason: decision === 'defer' ? 'Additional engineering review required' : undefined,
@@ -1560,10 +1560,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to submit certification decision');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to submit certification decision');
       return false;
     }
   }, [
@@ -1571,7 +1571,7 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     selectedQualification,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
   ]);
 
   const runExpiryWarningAndSuspension = useCallback(async () => {
@@ -1597,10 +1597,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to run expiry warning automation');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to run expiry warning automation');
       return false;
     }
   }, [callCertificationInterface, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, qualifications]);
@@ -1633,10 +1633,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load competency analytics');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load competency analytics');
       return false;
     }
   }, [callCertificationInterface, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, qualifications]);
@@ -1664,10 +1664,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load authority certification template');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load authority certification template');
       return false;
     }
   }, [
@@ -1677,7 +1677,7 @@ export function useAmroWorkspaceState() {
     selectedCertificationAuthorityProfile,
   ]);
 
-  const shouldUseLocalWorkPackageFallback = useCallback((errorMessage: string) => {
+  const shouldUseLocalWorkOrderFallback = useCallback((errorMessage: string) => {
     const normalized = errorMessage.toLowerCase();
     return normalized.includes('temporarily unavailable')
       || normalized.includes('endpoint is disabled')
@@ -1687,46 +1687,46 @@ export function useAmroWorkspaceState() {
   }, []);
 
   const applyLocalLifecycleTransition = useCallback(
-    (workPackageId: string, nextStage: AmroWorkPackageLifecycleStage) => {
-      setWorkPackages((current) => current.map((item) => (
-        item.id === workPackageId
+    (workOrderId: string, nextStage: AmroWorkOrderLifecycleStage) => {
+      setWorkOrders((current) => current.map((item) => (
+        item.id === workOrderId
           ? {
               ...item,
               lifecycleStage: nextStage,
             }
           : item
       )));
-      setSelectedWorkPackageId(workPackageId);
+      setSelectedWorkOrderId(workOrderId);
       return nextStage;
     },
     [],
   );
 
-  const createLocalWorkPackage = useCallback(
+  const createLocalWorkOrder = useCallback(
     (title: string) => {
       const now = Date.now();
-      const localWorkPackage: AmroWorkPackage = {
+      const localWorkOrder: AmroWorkOrder = {
         id: `local-wp-${now}`,
         packageNumber: `WP-LOCAL-${String(now).slice(-6)}`,
         lifecycleStage: 'create',
         assetId: assets[0]?.id || 'asset-local',
         tasks: [],
       };
-      setWorkPackages((current) => [localWorkPackage, ...current]);
-      setSelectedWorkPackageId(localWorkPackage.id);
+      setWorkOrders((current) => [localWorkOrder, ...current]);
+      setSelectedWorkOrderId(localWorkOrder.id);
       return true;
     },
     [assets],
   );
 
-  const appendLocalScheduleRow = useCallback((workPackageId: string) => {
+  const appendLocalScheduleRow = useCallback((workOrderId: string) => {
     const now = Date.now();
     const slotStart = new Date(now + 3600000).toISOString();
     const slotEnd = new Date(now + 7200000).toISOString();
     setScheduleBoardRows((current) => [
       {
         schedule_id: `local-schedule-${now}`,
-        work_package_id: workPackageId,
+        work_order_id: workOrderId,
         station_code: 'station-a',
         slot_start: slotStart,
         slot_end: slotEnd,
@@ -1734,28 +1734,28 @@ export function useAmroWorkspaceState() {
         capacity: 2,
         status: 'assigned',
       },
-      ...current.filter((item) => item.work_package_id !== workPackageId),
+      ...current.filter((item) => item.work_order_id !== workOrderId),
     ]);
     return true;
   }, []);
 
-  const advanceWorkPackageLifecycle = async (workPackageId?: string) => {
-    const targetWorkPackage = workPackageId
-      ? workPackages.find((item) => item.id === workPackageId) ?? null
-      : selectedWorkPackage;
-    if (!targetWorkPackage) return false;
-    const nextStage = getNextWorkPackageLifecycleStage(targetWorkPackage.lifecycleStage);
-    if (!canTransitionWorkPackageLifecycle(targetWorkPackage.lifecycleStage, nextStage)) return false;
+  const advanceWorkOrderLifecycle = async (workOrderId?: string) => {
+    const targetWorkOrder = workOrderId
+      ? workOrders.find((item) => item.id === workOrderId) ?? null
+      : selectedWorkOrder;
+    if (!targetWorkOrder) return false;
+    const nextStage = getNextWorkOrderLifecycleStage(targetWorkOrder.lifecycleStage);
+    if (!canTransitionWorkOrderLifecycle(targetWorkOrder.lifecycleStage, nextStage)) return false;
     if (!authHeaders) {
-      return applyLocalLifecycleTransition(targetWorkPackage.id, nextStage);
+      return applyLocalLifecycleTransition(targetWorkOrder.id, nextStage);
     }
     try {
       if (nextStage === 'close') {
-        const selectedTasks = targetWorkPackage.tasks || [];
+        const selectedTasks = targetWorkOrder.tasks || [];
         const completedTasks = selectedTasks.filter((task) => task.completed).length;
         const evidenceForPackage = evidenceChain.filter(
           (record) =>
-            (record.entityType === 'work_package' && record.entityId === targetWorkPackage.id)
+            (record.entityType === 'work_order' && record.entityId === targetWorkOrder.id)
             || (record.entityType === 'task' && selectedTasks.some((task) => task.id === record.entityId)),
         ).length;
         const signaturePending = canSignOff ? 0 : 1;
@@ -1765,7 +1765,7 @@ export function useAmroWorkspaceState() {
             method: 'POST',
             headers: authHeaders,
             body: JSON.stringify({
-              work_package_id: targetWorkPackage.id,
+              work_order_id: targetWorkOrder.id,
               open_findings: selectedTasks.length - completedTasks,
               unresolved_deferrals: 0,
               pending_signatures: signaturePending,
@@ -1779,7 +1779,7 @@ export function useAmroWorkspaceState() {
         }
       }
       try {
-        const response = await fetch(`${apiBaseUrl}/api/v1/work-packages/${targetWorkPackage.id}`, {
+        const response = await fetch(`${apiBaseUrl}/api/v1/work-orders/${targetWorkOrder.id}`, {
           method: 'PATCH',
           headers: authHeaders,
           body: JSON.stringify({
@@ -1791,17 +1791,17 @@ export function useAmroWorkspaceState() {
           throw new Error(payload?.error || `Failed to update work package (${response.status})`);
         }
       } catch (error) {
-        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=transition-work-package`, {
+        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=transition-work-order`, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({
-            work_package_id: targetWorkPackage.id,
-            current_status: mapLifecycleToStatus(targetWorkPackage.lifecycleStage),
+            work_order_id: targetWorkOrder.id,
+            current_status: mapLifecycleToStatus(targetWorkOrder.lifecycleStage),
             target_status: mapLifecycleToStatus(nextStage),
             reason_code: 'ui-transition',
             actor_signature: `ui-${Date.now()}`,
-            idempotency_key: `wp-transition-${targetWorkPackage.id}-${Date.now()}`,
-            decision_trace_id: `wp-transition-${targetWorkPackage.id}`,
+            idempotency_key: `wp-transition-${targetWorkOrder.id}-${Date.now()}`,
+            decision_trace_id: `wp-transition-${targetWorkOrder.id}`,
             scope_context: {
               domain_id: 'amro',
             },
@@ -1812,33 +1812,33 @@ export function useAmroWorkspaceState() {
           throw new Error(v2Payload?.error || `Failed to update work package (${v2Response.status})`);
         }
       }
-      await fetchWorkPackages();
-      await fetchTasksForWorkPackage(targetWorkPackage.id);
+      await fetchWorkOrders();
+      await fetchTasksForWorkOrder(targetWorkOrder.id);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to advance lifecycle';
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
       }
-      if (shouldUseLocalWorkPackageFallback(message)) {
-        setWorkPackagesError('Running in local fallback mode for lifecycle transition.');
-        return applyLocalLifecycleTransition(targetWorkPackage.id, nextStage);
+      if (shouldUseLocalWorkOrderFallback(message)) {
+        setWorkOrdersError('Running in local fallback mode for lifecycle transition.');
+        return applyLocalLifecycleTransition(targetWorkOrder.id, nextStage);
       }
-      setWorkPackagesError(message);
+      setWorkOrdersError(message);
       return false;
     }
     return true;
   };
 
-  const createWorkPackage = useCallback(
-    async (title: string, options?: CreateWorkPackageOptions) => {
-      if (!authHeaders) return createLocalWorkPackage(title);
+  const createWorkOrder = useCallback(
+    async (title: string, options?: CreateWorkOrderOptions) => {
+      if (!authHeaders) return createLocalWorkOrder(title);
       const cleanTitle = title.trim();
       if (!cleanTitle) return false;
       const configuredAircraftId = String(import.meta.env.VITE_AMRO_DEFAULT_AIRCRAFT_ID || '').trim();
       const seededAircraftId = String(assets[0]?.id || '').trim();
       const defaultAircraftId = configuredAircraftId || (assetsLoadedFromApi ? seededAircraftId : '');
       if (isApiTemporarilyUnavailable()) {
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       try {
@@ -1850,7 +1850,7 @@ export function useAmroWorkspaceState() {
         const defaultStation = String(options?.station || import.meta.env.VITE_AMRO_DEFAULT_STATION || 'station-a').trim() || 'station-a';
         const scopeItems = Array.isArray(options?.scopeItems) && options.scopeItems.length > 0 ? options.scopeItems : [cleanTitle];
         const taskPlan = Array.isArray(options?.taskPlan) && options.taskPlan.length > 0 ? options.taskPlan : scopeItems;
-        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=create-work-package`, {
+        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=create-work-order`, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({
@@ -1877,18 +1877,18 @@ export function useAmroWorkspaceState() {
         if (!v2Response.ok) {
           throw new Error(v2Payload?.error || `Failed to create work package (${v2Response.status})`);
         }
-        await fetchWorkPackages();
+        await fetchWorkOrders();
         return true;
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to create work package';
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
         }
-        if (shouldUseLocalWorkPackageFallback(message)) {
-          setWorkPackagesError('Running in local fallback mode for work package creation.');
-          return createLocalWorkPackage(cleanTitle);
+        if (shouldUseLocalWorkOrderFallback(message)) {
+          setWorkOrdersError('Running in local fallback mode for work package creation.');
+          return createLocalWorkOrder(cleanTitle);
         }
-        setWorkPackagesError(message);
+        setWorkOrdersError(message);
         return false;
       }
     },
@@ -1897,39 +1897,39 @@ export function useAmroWorkspaceState() {
       assets,
       assetsLoadedFromApi,
       authHeaders,
-      fetchWorkPackages,
+      fetchWorkOrders,
       isApiTemporarilyUnavailable,
       markApiTemporarilyUnavailable,
-      createLocalWorkPackage,
-      shouldUseLocalWorkPackageFallback,
+      createLocalWorkOrder,
+      shouldUseLocalWorkOrderFallback,
     ],
   );
 
-  const cloneWorkPackageFromTemplate = useCallback(async (workPackageId?: string) => {
-    const targetWorkPackage = workPackageId
-      ? workPackages.find((item) => item.id === workPackageId) ?? null
-      : selectedWorkPackage;
-    if (!targetWorkPackage) return false;
-    const cloneTitle = `${targetWorkPackage.packageNumber} Clone`;
+  const cloneWorkOrderFromTemplate = useCallback(async (workOrderId?: string) => {
+    const targetWorkOrder = workOrderId
+      ? workOrders.find((item) => item.id === workOrderId) ?? null
+      : selectedWorkOrder;
+    if (!targetWorkOrder) return false;
+    const cloneTitle = `${targetWorkOrder.packageNumber} Clone`;
     if (!authHeaders) {
-      return createLocalWorkPackage(cloneTitle);
+      return createLocalWorkOrder(cloneTitle);
     }
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
       const now = Date.now();
       const defaultAircraftId = String(import.meta.env.VITE_AMRO_DEFAULT_AIRCRAFT_ID || '').trim();
       const fallbackAircraftId = String(assets[0]?.id || '').trim();
-      const aircraftId = String(targetWorkPackage.assetId || defaultAircraftId || fallbackAircraftId || 'amro-fallback-aircraft').trim();
-      const normalizedTemplateToken = targetWorkPackage.packageNumber
+      const aircraftId = String(targetWorkOrder.assetId || defaultAircraftId || fallbackAircraftId || 'amro-fallback-aircraft').trim();
+      const normalizedTemplateToken = targetWorkOrder.packageNumber
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
-      const templateId = `tmpl-${normalizedTemplateToken || targetWorkPackage.id}`;
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=clone-template`, {
+      const templateId = `tmpl-${normalizedTemplateToken || targetWorkOrder.id}`;
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=clone-template`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -1937,8 +1937,8 @@ export function useAmroWorkspaceState() {
           aircraft_id: aircraftId,
           registry_version: 'latest',
           override_fields: {
-            source_work_package_id: targetWorkPackage.id,
-            source_package_number: targetWorkPackage.packageNumber,
+            source_work_order_id: targetWorkOrder.id,
+            source_package_number: targetWorkOrder.packageNumber,
             clone_reason: 'ui-clone-action',
             requested_at: new Date(now).toISOString(),
           },
@@ -1948,41 +1948,41 @@ export function useAmroWorkspaceState() {
       if (!response.ok) {
         throw new Error(payload?.error || `Failed to clone work package (${response.status})`);
       }
-      await fetchWorkPackages();
+      await fetchWorkOrders();
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to clone work package';
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
       }
-      if (shouldUseLocalWorkPackageFallback(message)) {
-        setWorkPackagesError('Running in local fallback mode for work package clone.');
-        return createLocalWorkPackage(cloneTitle);
+      if (shouldUseLocalWorkOrderFallback(message)) {
+        setWorkOrdersError('Running in local fallback mode for work package clone.');
+        return createLocalWorkOrder(cloneTitle);
       }
-      setWorkPackagesError(message);
+      setWorkOrdersError(message);
       return false;
     }
   }, [
     apiBaseUrl,
     assets,
     authHeaders,
-    createLocalWorkPackage,
-    fetchWorkPackages,
+    createLocalWorkOrder,
+    fetchWorkOrders,
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
-    selectedWorkPackage,
-    shouldUseLocalWorkPackageFallback,
-    workPackages,
+    selectedWorkOrder,
+    shouldUseLocalWorkOrderFallback,
+    workOrders,
   ]);
 
-  const assignSelectedWorkPackageToNextSlot = useCallback(async (workPackageId?: string) => {
-    const resolvedFallbackWorkPackageId = workPackages[0]?.id || `local-wp-${Date.now()}`;
-    const targetWorkPackageId = workPackageId || selectedWorkPackageId || resolvedFallbackWorkPackageId;
-    setSelectedWorkPackageId(targetWorkPackageId);
-    if (!authHeaders) return appendLocalScheduleRow(targetWorkPackageId);
+  const assignSelectedWorkOrderToNextSlot = useCallback(async (workOrderId?: string) => {
+    const resolvedFallbackWorkOrderId = workOrders[0]?.id || `local-wp-${Date.now()}`;
+    const targetWorkOrderId = workOrderId || selectedWorkOrderId || resolvedFallbackWorkOrderId;
+    setSelectedWorkOrderId(targetWorkOrderId);
+    if (!authHeaders) return appendLocalScheduleRow(targetWorkOrderId);
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('Running in local fallback mode for scheduling.');
-      return appendLocalScheduleRow(targetWorkPackageId);
+      setWorkOrdersError('Running in local fallback mode for scheduling.');
+      return appendLocalScheduleRow(targetWorkOrderId);
     }
     try {
       const now = Date.now();
@@ -1996,7 +1996,7 @@ export function useAmroWorkspaceState() {
       const slotStart = new Date(slotStartMs).toISOString();
       const slotEnd = new Date(slotEndMs).toISOString();
       const requestPayload = {
-        work_package_id: targetWorkPackageId,
+        work_order_id: targetWorkOrderId,
         station_code: 'station-a',
         slot_start: slotStart,
         slot_end: slotEnd,
@@ -2012,41 +2012,41 @@ export function useAmroWorkspaceState() {
       const schedulesPayload = await parseJsonSafe<{ error?: string }>(schedulesResponse);
       if (schedulesResponse.ok) {
         await fetchScheduleBoard();
-        setWorkPackagesError(null);
+        setWorkOrdersError(null);
         return true;
       }
       const schedulesError = schedulesPayload?.error || `Failed to assign maintenance slot (${schedulesResponse.status})`;
       if (!isNotFoundErrorMessage(schedulesError)) {
         throw new Error(schedulesError);
       }
-      const workPackageResponse = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=assign-maintenance-slot`, {
+      const workOrderResponse = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=assign-maintenance-slot`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify(requestPayload),
       });
-      const workPackagePayload = await parseJsonSafe<{ error?: string }>(workPackageResponse);
-      if (isMissingAircraftIdErrorMessage(workPackagePayload?.error || '')) {
-        setWorkPackagesError(null);
-        return appendLocalScheduleRow(targetWorkPackageId);
+      const workOrderPayload = await parseJsonSafe<{ error?: string }>(workOrderResponse);
+      if (isMissingAircraftIdErrorMessage(workOrderPayload?.error || '')) {
+        setWorkOrdersError(null);
+        return appendLocalScheduleRow(targetWorkOrderId);
       }
-      if (!workPackageResponse.ok) {
-        throw new Error(workPackagePayload?.error || `Failed to assign maintenance slot (${workPackageResponse.status})`);
+      if (!workOrderResponse.ok) {
+        throw new Error(workOrderPayload?.error || `Failed to assign maintenance slot (${workOrderResponse.status})`);
       }
-      setWorkPackagesError(null);
-      return appendLocalScheduleRow(targetWorkPackageId);
+      setWorkOrdersError(null);
+      return appendLocalScheduleRow(targetWorkOrderId);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to assign maintenance slot';
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
       }
-      if (isNotFoundErrorMessage(message) || isMissingAircraftIdErrorMessage(message) || shouldUseLocalWorkPackageFallback(message)) {
-        setWorkPackagesError(null);
-        return appendLocalScheduleRow(targetWorkPackageId);
+      if (isNotFoundErrorMessage(message) || isMissingAircraftIdErrorMessage(message) || shouldUseLocalWorkOrderFallback(message)) {
+        setWorkOrdersError(null);
+        return appendLocalScheduleRow(targetWorkOrderId);
       }
-      setWorkPackagesError(
+      setWorkOrdersError(
         `Scheduling API rejected request. Applied local fallback assignment. (${message})`,
       );
-      return appendLocalScheduleRow(targetWorkPackageId);
+      return appendLocalScheduleRow(targetWorkOrderId);
     }
   }, [
     apiBaseUrl,
@@ -2056,30 +2056,30 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     scheduleBoardRows,
-    selectedWorkPackageId,
-    shouldUseLocalWorkPackageFallback,
-    workPackages,
+    selectedWorkOrderId,
+    shouldUseLocalWorkOrderFallback,
+    workOrders,
   ]);
 
-  const updateWorkPackageStatusById = useCallback(
-    async (workPackageId: string, targetStatus: WorkPackageStatus) => {
-      const targetWorkPackage = workPackages.find((item) => item.id === workPackageId) ?? null;
-      if (!targetWorkPackage) return false;
+  const updateWorkOrderStatusById = useCallback(
+    async (workOrderId: string, targetStatus: WorkOrderStatus) => {
+      const targetWorkOrder = workOrders.find((item) => item.id === workOrderId) ?? null;
+      if (!targetWorkOrder) return false;
       if (!authHeaders) {
-        return Boolean(applyLocalLifecycleTransition(workPackageId, mapStatusToLifecycle(targetStatus)));
+        return Boolean(applyLocalLifecycleTransition(workOrderId, mapStatusToLifecycle(targetStatus)));
       }
-      const currentStatus = mapLifecycleToStatus(targetWorkPackage.lifecycleStage) as WorkPackageStatus;
+      const currentStatus = mapLifecycleToStatus(targetWorkOrder.lifecycleStage) as WorkOrderStatus;
       if (currentStatus === targetStatus) {
-        setWorkPackagesError(null);
+        setWorkOrdersError(null);
         return true;
       }
       if (isApiTemporarilyUnavailable()) {
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       try {
-        const idempotencyKey = `wp-status-${workPackageId}-${targetStatus}-${Date.now()}`;
-        const patchResponse = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages/${workPackageId}`, {
+        const idempotencyKey = `wp-status-${workOrderId}-${targetStatus}-${Date.now()}`;
+        const patchResponse = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders/${workOrderId}`, {
           method: 'PATCH',
           headers: {
             ...authHeaders,
@@ -2089,7 +2089,7 @@ export function useAmroWorkspaceState() {
             current_status: currentStatus,
             status: targetStatus,
             idempotency_key: idempotencyKey,
-            decision_trace_id: `wp-status-${workPackageId}-${targetStatus}`,
+            decision_trace_id: `wp-status-${workOrderId}-${targetStatus}`,
             scope_context: {
               domain_id: 'amro',
               role: activeRole,
@@ -2100,20 +2100,20 @@ export function useAmroWorkspaceState() {
         if (!patchResponse.ok) {
           throw new Error(patchPayload?.error || `Failed to update status (${patchResponse.status})`);
         }
-        await fetchWorkPackages();
-        setWorkPackagesError(null);
+        await fetchWorkOrders();
+        setWorkOrdersError(null);
         return true;
       } catch (error) {
         const message = error instanceof Error ? error.message : 'Failed to update work package status';
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
-          return Boolean(applyLocalLifecycleTransition(workPackageId, mapStatusToLifecycle(targetStatus)));
+          return Boolean(applyLocalLifecycleTransition(workOrderId, mapStatusToLifecycle(targetStatus)));
         }
-        if (shouldUseLocalWorkPackageFallback(message)) {
-          setWorkPackagesError('Running in local fallback mode for work package status update.');
-          return Boolean(applyLocalLifecycleTransition(workPackageId, mapStatusToLifecycle(targetStatus)));
+        if (shouldUseLocalWorkOrderFallback(message)) {
+          setWorkOrdersError('Running in local fallback mode for work package status update.');
+          return Boolean(applyLocalLifecycleTransition(workOrderId, mapStatusToLifecycle(targetStatus)));
         }
-        setWorkPackagesError(message);
+        setWorkOrdersError(message);
         return false;
       }
     },
@@ -2122,58 +2122,58 @@ export function useAmroWorkspaceState() {
       apiBaseUrl,
       applyLocalLifecycleTransition,
       authHeaders,
-      fetchWorkPackages,
+      fetchWorkOrders,
       isApiTemporarilyUnavailable,
       markApiTemporarilyUnavailable,
-      shouldUseLocalWorkPackageFallback,
-      workPackages,
+      shouldUseLocalWorkOrderFallback,
+      workOrders,
     ],
   );
 
-  const updateWorkPackageScheduling = useCallback(
-    async (workPackageId?: string) => {
-      const targetId = workPackageId || selectedWorkPackageId || workPackages[0]?.id || '';
+  const updateWorkOrderScheduling = useCallback(
+    async (workOrderId?: string) => {
+      const targetId = workOrderId || selectedWorkOrderId || workOrders[0]?.id || '';
       if (!targetId) return false;
-      const scheduled = await assignSelectedWorkPackageToNextSlot(targetId);
+      const scheduled = await assignSelectedWorkOrderToNextSlot(targetId);
       if (!scheduled) return false;
-      const statusUpdated = await updateWorkPackageStatusById(targetId, 'scheduled');
+      const statusUpdated = await updateWorkOrderStatusById(targetId, 'scheduled');
       if (!statusUpdated) return false;
       await fetchScheduleBoard();
       return true;
     },
-    [assignSelectedWorkPackageToNextSlot, fetchScheduleBoard, selectedWorkPackageId, updateWorkPackageStatusById, workPackages],
+    [assignSelectedWorkOrderToNextSlot, fetchScheduleBoard, selectedWorkOrderId, updateWorkOrderStatusById, workOrders],
   );
 
-  const toggleWorkPackageHold = useCallback(
-    async (workPackageId?: string) => {
-      const targetWorkPackage = workPackageId
-        ? workPackages.find((item) => item.id === workPackageId) ?? null
-        : selectedWorkPackage;
-      if (!targetWorkPackage) return false;
-      const workPackageStatus = mapLifecycleToStatus(targetWorkPackage.lifecycleStage) as WorkPackageStatus;
-      const releaseStatus = holdReleaseStatusByWorkPackage[targetWorkPackage.id] || 'scheduled';
-      const nextStatus = workPackageStatus === 'blocked' ? releaseStatus : 'blocked';
-      const ok = await updateWorkPackageStatusById(targetWorkPackage.id, nextStatus);
+  const toggleWorkOrderHold = useCallback(
+    async (workOrderId?: string) => {
+      const targetWorkOrder = workOrderId
+        ? workOrders.find((item) => item.id === workOrderId) ?? null
+        : selectedWorkOrder;
+      if (!targetWorkOrder) return false;
+      const workOrderStatus = mapLifecycleToStatus(targetWorkOrder.lifecycleStage) as WorkOrderStatus;
+      const releaseStatus = holdReleaseStatusByWorkOrder[targetWorkOrder.id] || 'scheduled';
+      const nextStatus = workOrderStatus === 'blocked' ? releaseStatus : 'blocked';
+      const ok = await updateWorkOrderStatusById(targetWorkOrder.id, nextStatus);
       if (!ok) return false;
-      if (workPackageStatus === 'blocked') {
-        setHoldReleaseStatusByWorkPackage((current) => {
+      if (workOrderStatus === 'blocked') {
+        setHoldReleaseStatusByWorkOrder((current) => {
           const next = { ...current };
-          delete next[targetWorkPackage.id];
+          delete next[targetWorkOrder.id];
           return next;
         });
       } else {
-        setHoldReleaseStatusByWorkPackage((current) => ({
+        setHoldReleaseStatusByWorkOrder((current) => ({
           ...current,
-          [targetWorkPackage.id]: workPackageStatus,
+          [targetWorkOrder.id]: workOrderStatus,
         }));
       }
       const occurredAt = new Date().toISOString();
       setHoldAuditTrail((current) => [
         {
-          workPackageId: targetWorkPackage.id,
-          packageNumber: targetWorkPackage.packageNumber,
-          action: workPackageStatus === 'blocked' ? 'release' : 'hold',
-          fromStatus: workPackageStatus,
+          workOrderId: targetWorkOrder.id,
+          packageNumber: targetWorkOrder.packageNumber,
+          action: workOrderStatus === 'blocked' ? 'release' : 'hold',
+          fromStatus: workOrderStatus,
           toStatus: nextStatus,
           actorRole: activeRole,
           occurredAt,
@@ -2181,12 +2181,12 @@ export function useAmroWorkspaceState() {
         ...current,
       ]);
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('amro:work-package-hold-audit', {
+        window.dispatchEvent(new CustomEvent('amro:work-order-hold-audit', {
           detail: {
-            workPackageId: targetWorkPackage.id,
-            packageNumber: targetWorkPackage.packageNumber,
-            action: workPackageStatus === 'blocked' ? 'release' : 'hold',
-            fromStatus: workPackageStatus,
+            workOrderId: targetWorkOrder.id,
+            packageNumber: targetWorkOrder.packageNumber,
+            action: workOrderStatus === 'blocked' ? 'release' : 'hold',
+            fromStatus: workOrderStatus,
             toStatus: nextStatus,
             actorRole: activeRole,
             occurredAt,
@@ -2197,62 +2197,62 @@ export function useAmroWorkspaceState() {
     },
     [
       activeRole,
-      holdReleaseStatusByWorkPackage,
-      selectedWorkPackage,
-      updateWorkPackageStatusById,
-      workPackages,
+      holdReleaseStatusByWorkOrder,
+      selectedWorkOrder,
+      updateWorkOrderStatusById,
+      workOrders,
     ],
   );
 
-  const softDeleteWorkPackage = useCallback(
-    async (workPackageId?: string) => {
-      const targetWorkPackage = workPackageId
-        ? workPackages.find((item) => item.id === workPackageId) ?? null
-        : selectedWorkPackage;
-      if (!targetWorkPackage) return false;
-      const previousStatus = mapLifecycleToStatus(targetWorkPackage.lifecycleStage) as WorkPackageStatus;
-      const ok = await updateWorkPackageStatusById(targetWorkPackage.id, 'cancelled');
+  const softDeleteWorkOrder = useCallback(
+    async (workOrderId?: string) => {
+      const targetWorkOrder = workOrderId
+        ? workOrders.find((item) => item.id === workOrderId) ?? null
+        : selectedWorkOrder;
+      if (!targetWorkOrder) return false;
+      const previousStatus = mapLifecycleToStatus(targetWorkOrder.lifecycleStage) as WorkOrderStatus;
+      const ok = await updateWorkOrderStatusById(targetWorkOrder.id, 'cancelled');
       if (!ok) return false;
-      setSoftDeletedWorkPackageStatusById((current) => ({
+      setSoftDeletedWorkOrderStatusById((current) => ({
         ...current,
-        [targetWorkPackage.id]: previousStatus,
+        [targetWorkOrder.id]: previousStatus,
       }));
       return true;
     },
-    [selectedWorkPackage, updateWorkPackageStatusById, workPackages],
+    [selectedWorkOrder, updateWorkOrderStatusById, workOrders],
   );
 
-  const restoreSoftDeletedWorkPackage = useCallback(
-    async (workPackageId: string) => {
-      const restoreStatus = softDeletedWorkPackageStatusById[workPackageId] || 'planning';
-      const ok = await updateWorkPackageStatusById(workPackageId, restoreStatus);
+  const restoreSoftDeletedWorkOrder = useCallback(
+    async (workOrderId: string) => {
+      const restoreStatus = softDeletedWorkOrderStatusById[workOrderId] || 'planning';
+      const ok = await updateWorkOrderStatusById(workOrderId, restoreStatus);
       if (!ok) return false;
-      setSoftDeletedWorkPackageStatusById((current) => {
+      setSoftDeletedWorkOrderStatusById((current) => {
         const next = { ...current };
-        delete next[workPackageId];
+        delete next[workOrderId];
         return next;
       });
       return true;
     },
-    [softDeletedWorkPackageStatusById, updateWorkPackageStatusById],
+    [softDeletedWorkOrderStatusById, updateWorkOrderStatusById],
   );
 
-  const openWorkPackageDetails = useCallback(
-    async (workPackageId: string) => {
-      setSelectedWorkPackageId(workPackageId);
+  const openWorkOrderDetails = useCallback(
+    async (workOrderId: string) => {
+      setSelectedWorkOrderId(workOrderId);
       if (!authHeaders) return true;
       if (isApiTemporarilyUnavailable()) {
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       try {
-        const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages/${workPackageId}`, {
+        const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders/${workOrderId}`, {
           method: 'GET',
           headers: authHeaders,
         });
         const payload = await parseJsonSafe<{
           data?: {
-            work_package?: {
+            work_order?: {
               id?: string;
               status?: string;
               aircraft_id?: string;
@@ -2264,9 +2264,9 @@ export function useAmroWorkspaceState() {
         if (!response.ok) {
           throw new Error(payload?.error || `Failed to load work package detail (${response.status})`);
         }
-        const detail = payload?.data?.work_package;
+        const detail = payload?.data?.work_order;
         if (detail?.id) {
-          setWorkPackages((current) => current.map((item) => (
+          setWorkOrders((current) => current.map((item) => (
             item.id === detail.id
               ? {
                   ...item,
@@ -2277,31 +2277,31 @@ export function useAmroWorkspaceState() {
               : item
           )));
         }
-        await fetchTasksForWorkPackage(workPackageId);
-        setWorkPackagesError(null);
+        await fetchTasksForWorkOrder(workOrderId);
+        setWorkOrdersError(null);
         return true;
       } catch (error) {
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
         }
-        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to open work package');
+        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to open work package');
         return false;
       }
     },
     [
       apiBaseUrl,
       authHeaders,
-      fetchTasksForWorkPackage,
+      fetchTasksForWorkOrder,
       isApiTemporarilyUnavailable,
       markApiTemporarilyUnavailable,
     ],
   );
 
   const acknowledgeScheduleUpdate = useCallback(
-    async (scheduleId: string, workPackageId: string) => {
+    async (scheduleId: string, workOrderId: string) => {
       if (!authHeaders) return false;
       if (isApiTemporarilyUnavailable()) {
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       try {
@@ -2310,7 +2310,7 @@ export function useAmroWorkspaceState() {
           headers: authHeaders,
           body: JSON.stringify({
             schedule_id: scheduleId,
-            work_package_id: workPackageId,
+            work_order_id: workOrderId,
             acknowledged_at: new Date().toISOString(),
             device_id: 'mobile-ui-emulator',
           }),
@@ -2323,10 +2323,10 @@ export function useAmroWorkspaceState() {
       } catch (error) {
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
-          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
           return false;
         }
-        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to acknowledge schedule');
+        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to acknowledge schedule');
         return false;
       }
     },
@@ -2336,7 +2336,7 @@ export function useAmroWorkspaceState() {
   const fetchScheduleOptimizationRecommendations = useCallback(async () => {
     if (!authHeaders) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
@@ -2364,32 +2364,32 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to load schedule optimization recommendations');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load schedule optimization recommendations');
       return false;
     }
   }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable]);
 
-  const runWorkPackageReplanSimulation = useCallback(async () => {
-    if (!authHeaders || !selectedWorkPackageId) return false;
+  const runWorkOrderReplanSimulation = useCallback(async () => {
+    if (!authHeaders || !selectedWorkOrderId) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
       const tenantScope = String(assets[0]?.tenantId || 'tenant-ops-01').trim() || 'tenant-ops-01';
       const disruptionStart = scheduleBoardRows[0]?.slot_start || new Date().toISOString();
       const disruptionEnd = scheduleBoardRows[0]?.slot_end || new Date(Date.now() + 3600000).toISOString();
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=run-replan-simulation`, {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=run-replan-simulation`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
           disrupted_slots: [
             {
-              slot_id: scheduleBoardRows[0]?.schedule_id || `${selectedWorkPackageId}-slot`,
-              work_package_id: selectedWorkPackageId,
+              slot_id: scheduleBoardRows[0]?.schedule_id || `${selectedWorkOrderId}-slot`,
+              work_order_id: selectedWorkOrderId,
               slot_start: disruptionStart,
               slot_end: disruptionEnd,
             },
@@ -2406,20 +2406,20 @@ export function useAmroWorkspaceState() {
           tenant_calendar_id: `${tenantScope}:maintenance-calendar`,
         }),
       });
-      const payload = await parseJsonSafe<{ output?: { replan_options?: ApiWorkPackageReplanOption[] }; error?: string }>(response);
+      const payload = await parseJsonSafe<{ output?: { replan_options?: ApiWorkOrderReplanOption[] }; error?: string }>(response);
       const options = payload?.output?.replan_options;
       if (!response.ok || !Array.isArray(options)) {
         throw new Error(payload?.error || `Failed to run replan simulation (${response.status})`);
       }
-      setWorkPackageReplanOptions(options);
+      setWorkOrderReplanOptions(options);
       return true;
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to run replan simulation');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to run replan simulation');
       return false;
     }
   }, [
@@ -2429,28 +2429,28 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     scheduleBoardRows,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
   ]);
 
-  const confirmWorkPackageReplan = useCallback(async () => {
-    if (!authHeaders || !selectedWorkPackageId || workPackageReplanOptions.length === 0) return false;
+  const confirmWorkOrderReplan = useCallback(async () => {
+    if (!authHeaders || !selectedWorkOrderId || workOrderReplanOptions.length === 0) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
-      const selectedOption = workPackageReplanOptions[0];
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=confirm-replan`, {
+      const selectedOption = workOrderReplanOptions[0];
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=confirm-replan`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
           selected_option_id: selectedOption.option_id,
           approver_id: activeRole,
           reason: 'ui-replan-approval',
-          affected_work_packages: [
+          affected_work_orders: [
             {
-              work_package_id: selectedWorkPackageId,
-              current_state: mapLifecycleToStatus(selectedWorkPackage?.lifecycleStage || 'create'),
+              work_order_id: selectedWorkOrderId,
+              current_state: mapLifecycleToStatus(selectedWorkOrder?.lifecycleStage || 'create'),
             },
           ],
         }),
@@ -2461,17 +2461,17 @@ export function useAmroWorkspaceState() {
       }
       const confirmedScheduleId = String(payload?.output?.updated_schedule?.schedule_id || '').trim();
       setLastConfirmedReplanScheduleId(confirmedScheduleId);
-      setWorkPackageReplanOptions([]);
+      setWorkOrderReplanOptions([]);
       await fetchScheduleBoard();
-      await fetchWorkPackages();
+      await fetchWorkOrders();
       return true;
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to confirm replan');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to confirm replan');
       return false;
     }
   }, [
@@ -2479,18 +2479,18 @@ export function useAmroWorkspaceState() {
     apiBaseUrl,
     authHeaders,
     fetchScheduleBoard,
-    fetchWorkPackages,
+    fetchWorkOrders,
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
-    selectedWorkPackage,
-    selectedWorkPackageId,
-    workPackageReplanOptions,
+    selectedWorkOrder,
+    selectedWorkOrderId,
+    workOrderReplanOptions,
   ]);
 
-  const reservePartsAllocationForSelectedWorkPackage = useCallback(async () => {
-    if (!authHeaders || !selectedWorkPackageId || materials.length === 0) return false;
+  const reservePartsAllocationForSelectedWorkOrder = useCallback(async () => {
+    if (!authHeaders || !selectedWorkOrderId || materials.length === 0) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
@@ -2499,11 +2499,11 @@ export function useAmroWorkspaceState() {
         quantity: index === 0 ? 1 : 2,
         serial: index === 0 ? `${material.id}-serial` : undefined,
       }));
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=reserve-parts`, {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=reserve-parts`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
-          work_package_id: selectedWorkPackageId,
+          work_order_id: selectedWorkOrderId,
           demand_lines: demandLines,
         }),
       });
@@ -2516,10 +2516,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to reserve parts');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to reserve parts');
       return false;
     }
   }, [
@@ -2529,19 +2529,19 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     materials,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
   ]);
 
   const processCriticalShortageResponse = useCallback(async () => {
     if (!authHeaders) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
       const shortageMaterial = materials.find((item) => item.reservationStatus === 'shortage') || materials[0];
       if (!shortageMaterial) return false;
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=process-shortage-response`, {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=process-shortage-response`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -2559,10 +2559,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to process shortage response');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to process shortage response');
       return false;
     }
   }, [apiBaseUrl, authHeaders, fetchModuleSurfaces, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials]);
@@ -2570,13 +2570,13 @@ export function useAmroWorkspaceState() {
   const applyRotableLlpTraceability = useCallback(async (materialId: string) => {
     if (!authHeaders) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
       const targetMaterial = materials.find((item) => item.id === materialId);
       if (!targetMaterial) return false;
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=trace-rotable-llp`, {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=trace-rotable-llp`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -2608,26 +2608,26 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to apply rotable/LLP traceability');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to apply rotable/LLP traceability');
       return false;
     }
   }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials]);
 
   const runInventoryOptimizationModel = useCallback(async () => {
-    if (!authHeaders || !selectedWorkPackageId) return false;
+    if (!authHeaders || !selectedWorkOrderId) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=run-inventory-optimization`, {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=run-inventory-optimization`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
-          work_package_id: selectedWorkPackageId,
+          work_order_id: selectedWorkOrderId,
           forecast_signal_ids: predictiveRecommendations.slice(0, 3).map((item) => item.id),
           optimization_window: 'P14D',
         }),
@@ -2641,10 +2641,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to run inventory optimization');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to run inventory optimization');
       return false;
     }
   }, [
@@ -2653,19 +2653,19 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     predictiveRecommendations,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
   ]);
 
-  const syncSupplierEtaForSelectedWorkPackage = useCallback(async () => {
-    if (!authHeaders || !selectedWorkPackageId) return false;
+  const syncSupplierEtaForSelectedWorkOrder = useCallback(async () => {
+    if (!authHeaders || !selectedWorkOrderId) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
       const targetMaterial = materials.find((item) => item.reservationStatus === 'shortage') || materials[0];
       if (!targetMaterial) return false;
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=sync-supplier-eta`, {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=sync-supplier-eta`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -2674,7 +2674,7 @@ export function useAmroWorkspaceState() {
           eta: new Date(Date.now() + 86400000).toISOString(),
           quantity_confirmed: targetMaterial.reservationStatus === 'shortage' ? 0 : 1,
           supplier_source: 'vendor_portal',
-          impacted_work_packages: [selectedWorkPackageId],
+          impacted_work_orders: [selectedWorkOrderId],
         }),
       });
       const payload = await parseJsonSafe<{ error?: string }>(response);
@@ -2686,10 +2686,10 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to sync supplier ETA');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to sync supplier ETA');
       return false;
     }
   }, [
@@ -2699,17 +2699,17 @@ export function useAmroWorkspaceState() {
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
     materials,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
   ]);
 
   const syncSupplierAsnAndErpProcurement = useCallback(async () => {
     if (!authHeaders) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=sync-supplier-asn-erp`, {
+      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=sync-supplier-asn-erp`, {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
@@ -2720,7 +2720,7 @@ export function useAmroWorkspaceState() {
             part_number: material.partNumber,
             qty: material.reservationStatus === 'shortage' ? 2 : 1,
           })),
-          impacted_work_packages: selectedWorkPackageId ? [selectedWorkPackageId] : [],
+          impacted_work_orders: selectedWorkOrderId ? [selectedWorkOrderId] : [],
         }),
       });
       const payload = await parseJsonSafe<{ output?: { procurement_sync_id?: string }; error?: string }>(response);
@@ -2732,42 +2732,42 @@ export function useAmroWorkspaceState() {
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to sync supplier ASN and ERP procurement');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to sync supplier ASN and ERP procurement');
       return false;
     }
-  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials, selectedWorkPackageId]);
+  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials, selectedWorkOrderId]);
 
-  const applySavedWorkPackageView = useCallback((viewId: string) => {
-    const selectedView = savedWorkPackageViews.find((item) => item.id === viewId)
-      || savedWorkPackageViews.find((item) => item.id === DEFAULT_WORK_PACKAGE_SAVED_VIEW.id)
-      || savedWorkPackageViews[0]
+  const applySavedWorkOrderView = useCallback((viewId: string) => {
+    const selectedView = savedWorkOrderViews.find((item) => item.id === viewId)
+      || savedWorkOrderViews.find((item) => item.id === DEFAULT_WORK_PACKAGE_SAVED_VIEW.id)
+      || savedWorkOrderViews[0]
       || DEFAULT_WORK_PACKAGE_SAVED_VIEW;
     setSelectedSavedViewId(selectedView.id);
-    setWorkPackageStatusFilter(selectedView.filters.status || 'all');
-    setWorkPackageSearch(selectedView.filters.search || '');
-  }, [savedWorkPackageViews]);
+    setWorkOrderStatusFilter(selectedView.filters.status || 'all');
+    setWorkOrderSearch(selectedView.filters.search || '');
+  }, [savedWorkOrderViews]);
 
-  const saveCurrentWorkPackageView = useCallback(
+  const saveCurrentWorkOrderView = useCallback(
     async (name: string) => {
       if (!authHeaders) return false;
       const cleanName = name.trim();
       if (!cleanName) return false;
       if (isApiTemporarilyUnavailable()) {
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       try {
-        const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages?interface=save-work-package-view`, {
+        const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=save-work-order-view`, {
           method: 'POST',
           headers: authHeaders,
           body: JSON.stringify({
             view_name: cleanName,
             filters: {
-              status: workPackageStatusFilter,
-              search: workPackageSearch,
+              status: workOrderStatusFilter,
+              search: workOrderSearch,
             },
           }),
         });
@@ -2777,17 +2777,17 @@ export function useAmroWorkspaceState() {
         }
         const savedViewId = String(payload?.output?.saved_view_id || '').trim();
         if (savedViewId) {
-          setSavedWorkPackageViews((previous) => {
+          setSavedWorkOrderViews((previous) => {
             const next = previous.filter((item) => item.id !== savedViewId);
             next.push({
               id: savedViewId,
               name: String(payload?.output?.view_name || cleanName),
               filters: {
-                status: String(payload?.output?.filters?.status || workPackageStatusFilter),
-                search: String(payload?.output?.filters?.search || workPackageSearch),
+                status: String(payload?.output?.filters?.status || workOrderStatusFilter),
+                search: String(payload?.output?.filters?.search || workOrderSearch),
               },
             });
-            return sanitizeSavedWorkPackageViews(next);
+            return sanitizeSavedWorkOrderViews(next);
           });
           setSelectedSavedViewId(savedViewId);
         }
@@ -2795,10 +2795,10 @@ export function useAmroWorkspaceState() {
       } catch (error) {
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
-          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
           return false;
         }
-        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to save work package view');
+        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to save work package view');
         return false;
       }
     },
@@ -2807,16 +2807,16 @@ export function useAmroWorkspaceState() {
       authHeaders,
       isApiTemporarilyUnavailable,
       markApiTemporarilyUnavailable,
-      workPackageSearch,
-      workPackageStatusFilter,
+      workOrderSearch,
+      workOrderStatusFilter,
     ],
   );
 
   const updateTaskExecutionStatus = useCallback(
     async (taskId: string, action: 'start' | 'complete' | 'block' | 'reopen') => {
-      if (!authHeaders || !selectedWorkPackageId) return false;
+      if (!authHeaders || !selectedWorkOrderId) return false;
       if (isApiTemporarilyUnavailable()) {
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       try {
@@ -2835,25 +2835,25 @@ export function useAmroWorkspaceState() {
         if (!response.ok) {
           throw new Error(payload?.error || `Failed to update task step (${response.status})`);
         }
-        await fetchTasksForWorkPackage(selectedWorkPackageId);
+        await fetchTasksForWorkOrder(selectedWorkOrderId);
         return true;
       } catch (error) {
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
-          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
           return false;
         }
-        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to update task step');
+        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to update task step');
         return false;
       }
     },
     [
       apiBaseUrl,
       authHeaders,
-      fetchTasksForWorkPackage,
+      fetchTasksForWorkOrder,
       isApiTemporarilyUnavailable,
       markApiTemporarilyUnavailable,
-      selectedWorkPackageId,
+      selectedWorkOrderId,
     ],
   );
 
@@ -2861,7 +2861,7 @@ export function useAmroWorkspaceState() {
     async (taskId: string) => {
       if (!authHeaders) return false;
       if (isApiTemporarilyUnavailable()) {
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       try {
@@ -2896,10 +2896,10 @@ export function useAmroWorkspaceState() {
       } catch (error) {
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
-          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
           return false;
         }
-        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to upload task evidence');
+        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to upload task evidence');
         return false;
       }
     },
@@ -2910,7 +2910,7 @@ export function useAmroWorkspaceState() {
     async (taskId: string) => {
       if (!authHeaders || !selectedQualification) return false;
       if (isApiTemporarilyUnavailable()) {
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
       try {
@@ -2932,25 +2932,25 @@ export function useAmroWorkspaceState() {
       } catch (error) {
         if (isNetworkConnectivityError(error)) {
           markApiTemporarilyUnavailable();
-          setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
           return false;
         }
-        setWorkPackagesError(error instanceof Error ? error.message : 'Failed to submit signature');
+        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to submit signature');
         return false;
       }
     },
     [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, selectedQualification],
   );
 
-  const deleteSelectedWorkPackage = useCallback(async () => {
-    if (!authHeaders || !selectedWorkPackageId) return false;
+  const deleteSelectedWorkOrder = useCallback(async () => {
+    if (!authHeaders || !selectedWorkOrderId) return false;
     if (isApiTemporarilyUnavailable()) {
-      setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
       return false;
     }
     try {
       try {
-        const response = await fetch(`${apiBaseUrl}/api/v1/work-packages/${selectedWorkPackageId}`, {
+        const response = await fetch(`${apiBaseUrl}/api/v1/work-orders/${selectedWorkOrderId}`, {
           method: 'DELETE',
           headers: authHeaders,
         });
@@ -2959,8 +2959,8 @@ export function useAmroWorkspaceState() {
           throw new Error(payload?.error || `Failed to delete work package (${response.status})`);
         }
       } catch (error) {
-        const deleteIdempotencyKey = `wp-delete-${selectedWorkPackageId}-${Date.now()}`;
-        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-packages/${selectedWorkPackageId}`, {
+        const deleteIdempotencyKey = `wp-delete-${selectedWorkOrderId}-${Date.now()}`;
+        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders/${selectedWorkOrderId}`, {
           method: 'DELETE',
           headers: {
             ...authHeaders,
@@ -2968,7 +2968,7 @@ export function useAmroWorkspaceState() {
           },
           body: JSON.stringify({
             idempotency_key: deleteIdempotencyKey,
-            decision_trace_id: `wp-delete-${selectedWorkPackageId}`,
+            decision_trace_id: `wp-delete-${selectedWorkOrderId}`,
             scope_context: {
               domain_id: 'amro',
             },
@@ -2979,32 +2979,32 @@ export function useAmroWorkspaceState() {
           throw new Error(v2Payload?.error || `Failed to delete work package (${v2Response.status})`);
         }
       }
-      await fetchWorkPackages();
+      await fetchWorkOrders();
       return true;
     } catch (error) {
       if (isNetworkConnectivityError(error)) {
         markApiTemporarilyUnavailable();
-        setWorkPackagesError('AMRO API is temporarily unavailable. Retrying shortly.');
+        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
         return false;
       }
-      setWorkPackagesError(error instanceof Error ? error.message : 'Failed to delete work package');
+      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to delete work package');
       return false;
     }
   }, [
     apiBaseUrl,
     authHeaders,
-    fetchWorkPackages,
+    fetchWorkOrders,
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
-    selectedWorkPackageId,
+    selectedWorkOrderId,
   ]);
 
   return {
     assets,
-    workPackages,
-    selectedWorkPackage,
-    selectedWorkPackageId,
-    setSelectedWorkPackageId,
+    workOrders,
+    selectedWorkOrder,
+    selectedWorkOrderId,
+    setSelectedWorkOrderId,
     requiredAuthority,
     setRequiredAuthority,
     qualifications,
@@ -3017,7 +3017,7 @@ export function useAmroWorkspaceState() {
     predictiveRecommendations,
     scheduleBoardRows,
     scheduleOptimizationRecommendations,
-    workPackageReplanOptions,
+    workOrderReplanOptions,
     lastConfirmedReplanScheduleId,
     lastInventoryOptimizationRunId,
     lastProcurementSyncId,
@@ -3042,48 +3042,48 @@ export function useAmroWorkspaceState() {
     isAmroAuthorized,
     canAdvanceLifecycle,
     canSignOff,
-    canCreateWorkPackage,
-    canDeleteWorkPackage,
+    canCreateWorkOrder,
+    canDeleteWorkOrder,
     activeRole,
     complianceCoverage,
     materialsSummary,
     predictiveSummary,
-    advanceWorkPackageLifecycle,
-    loadingWorkPackages,
-    workPackagesError,
+    advanceWorkOrderLifecycle,
+    loadingWorkOrders,
+    workOrdersError,
     realtimeConnected,
-    refreshWorkPackages: fetchWorkPackages,
-    workPackageStatusFilter,
-    setWorkPackageStatusFilter,
-    workPackageSearch,
-    setWorkPackageSearch,
+    refreshWorkOrders: fetchWorkOrders,
+    workOrderStatusFilter,
+    setWorkOrderStatusFilter,
+    workOrderSearch,
+    setWorkOrderSearch,
     selectedSavedViewId,
-    setSelectedSavedViewId: applySavedWorkPackageView,
-    savedWorkPackageViews,
-    saveCurrentWorkPackageView,
-    createWorkPackage,
-    cloneWorkPackageFromTemplate,
-    assignSelectedWorkPackageToNextSlot,
-    updateWorkPackageScheduling,
-    toggleWorkPackageHold,
+    setSelectedSavedViewId: applySavedWorkOrderView,
+    savedWorkOrderViews,
+    saveCurrentWorkOrderView,
+    createWorkOrder,
+    cloneWorkOrderFromTemplate,
+    assignSelectedWorkOrderToNextSlot,
+    updateWorkOrderScheduling,
+    toggleWorkOrderHold,
     holdAuditTrail,
-    openWorkPackageDetails,
-    softDeleteWorkPackage,
-    restoreSoftDeletedWorkPackage,
+    openWorkOrderDetails,
+    softDeleteWorkOrder,
+    restoreSoftDeletedWorkOrder,
     updateTaskExecutionStatus,
     uploadTaskEvidence,
     submitTaskSignature,
     acknowledgeScheduleUpdate,
     fetchScheduleOptimizationRecommendations,
-    runWorkPackageReplanSimulation,
-    confirmWorkPackageReplan,
-    reservePartsAllocationForSelectedWorkPackage,
+    runWorkOrderReplanSimulation,
+    confirmWorkOrderReplan,
+    reservePartsAllocationForSelectedWorkOrder,
     processCriticalShortageResponse,
     applyRotableLlpTraceability,
     runInventoryOptimizationModel,
-    syncSupplierEtaForSelectedWorkPackage,
+    syncSupplierEtaForSelectedWorkOrder,
     syncSupplierAsnAndErpProcurement,
-    deleteSelectedWorkPackage,
+    deleteSelectedWorkOrder,
     loadComplianceGateExplainability,
     loadAuditReplayTimeline,
     detectComplianceAnomalies,

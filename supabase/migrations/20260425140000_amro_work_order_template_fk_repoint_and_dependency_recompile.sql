@@ -3,8 +3,8 @@
 --
 -- Purpose:
 -- - Ensure all foreign keys that should target template master records reference public.work_order_templates(id).
--- - Recompile SQL functions that still reference public.work_package_templates to use the canonical table.
--- - Keep legacy compatibility view public.work_package_templates in place for transition-safe runtime behavior.
+-- - Recompile SQL functions that still reference public.work_order_templates to use the canonical table.
+-- - Keep legacy compatibility view public.work_order_templates in place for transition-safe runtime behavior.
 
 BEGIN;
 
@@ -16,10 +16,10 @@ BEGIN
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
-      AND c.relname = 'work_package_templates'
+      AND c.relname = 'work_order_templates'
       AND c.relkind IN ('r', 'p')
   ) AND to_regclass('public.work_order_templates') IS NULL THEN
-    ALTER TABLE public.work_package_templates RENAME TO work_order_templates;
+    ALTER TABLE public.work_order_templates RENAME TO work_order_templates;
   END IF;
 END
 $$;
@@ -28,8 +28,8 @@ $$;
 DO $$
 BEGIN
   IF to_regclass('public.work_order_templates') IS NOT NULL THEN
-    DROP VIEW IF EXISTS public.work_package_templates;
-    CREATE VIEW public.work_package_templates AS
+    DROP VIEW IF EXISTS public.work_order_templates;
+    CREATE VIEW public.work_order_templates AS
     SELECT *
     FROM public.work_order_templates;
   END IF;
@@ -50,14 +50,14 @@ BEGIN
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
-      AND c.relname = 'work_packages'
+      AND c.relname = 'work_orders'
       AND c.relkind IN ('r', 'p')
   ) AND EXISTS (
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'work_packages'
-      AND column_name = 'work_package_template_id'
+      AND table_name = 'work_orders'
+      AND column_name = 'work_order_template_id'
   ) THEN
     FOR rec IN
       SELECT c.conname
@@ -65,16 +65,16 @@ BEGIN
       JOIN pg_attribute a
         ON a.attrelid = c.conrelid
        AND a.attnum = ANY (c.conkey)
-      WHERE c.conrelid = 'public.work_packages'::regclass
+      WHERE c.conrelid = 'public.work_orders'::regclass
         AND c.contype = 'f'
-        AND a.attname = 'work_package_template_id'
+        AND a.attname = 'work_order_template_id'
     LOOP
-      EXECUTE format('ALTER TABLE public.work_packages DROP CONSTRAINT IF EXISTS %I', rec.conname);
+      EXECUTE format('ALTER TABLE public.work_orders DROP CONSTRAINT IF EXISTS %I', rec.conname);
     END LOOP;
 
-    ALTER TABLE public.work_packages
-      ADD CONSTRAINT fk_work_packages_work_order_template_id
-      FOREIGN KEY (work_package_template_id)
+    ALTER TABLE public.work_orders
+      ADD CONSTRAINT fk_work_orders_work_order_template_id
+      FOREIGN KEY (work_order_template_id)
       REFERENCES public.work_order_templates(id)
       ON DELETE SET NULL;
   END IF;
@@ -84,13 +84,13 @@ BEGIN
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
-      AND c.relname = 'amro_work_package_template_versions'
+      AND c.relname = 'amro_work_order_template_versions'
       AND c.relkind IN ('r', 'p')
   ) AND EXISTS (
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'amro_work_package_template_versions'
+      AND table_name = 'amro_work_order_template_versions'
       AND column_name = 'template_id'
   ) THEN
     FOR rec IN
@@ -99,14 +99,14 @@ BEGIN
       JOIN pg_attribute a
         ON a.attrelid = c.conrelid
        AND a.attnum = ANY (c.conkey)
-      WHERE c.conrelid = 'public.amro_work_package_template_versions'::regclass
+      WHERE c.conrelid = 'public.amro_work_order_template_versions'::regclass
         AND c.contype = 'f'
         AND a.attname = 'template_id'
     LOOP
-      EXECUTE format('ALTER TABLE public.amro_work_package_template_versions DROP CONSTRAINT IF EXISTS %I', rec.conname);
+      EXECUTE format('ALTER TABLE public.amro_work_order_template_versions DROP CONSTRAINT IF EXISTS %I', rec.conname);
     END LOOP;
 
-    ALTER TABLE public.amro_work_package_template_versions
+    ALTER TABLE public.amro_work_order_template_versions
       ADD CONSTRAINT fk_amro_wp_template_versions_work_order_template_id
       FOREIGN KEY (template_id)
       REFERENCES public.work_order_templates(id)
@@ -118,14 +118,14 @@ BEGIN
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
-      AND c.relname = 'work_package_template_task_templates'
+      AND c.relname = 'work_order_template_task_templates'
       AND c.relkind IN ('r', 'p')
   ) AND EXISTS (
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'work_package_template_task_templates'
-      AND column_name = 'work_package_template_id'
+      AND table_name = 'work_order_template_task_templates'
+      AND column_name = 'work_order_template_id'
   ) THEN
     FOR rec IN
       SELECT c.conname
@@ -133,16 +133,16 @@ BEGIN
       JOIN pg_attribute a
         ON a.attrelid = c.conrelid
        AND a.attnum = ANY (c.conkey)
-      WHERE c.conrelid = 'public.work_package_template_task_templates'::regclass
+      WHERE c.conrelid = 'public.work_order_template_task_templates'::regclass
         AND c.contype = 'f'
-        AND a.attname = 'work_package_template_id'
+        AND a.attname = 'work_order_template_id'
     LOOP
-      EXECUTE format('ALTER TABLE public.work_package_template_task_templates DROP CONSTRAINT IF EXISTS %I', rec.conname);
+      EXECUTE format('ALTER TABLE public.work_order_template_task_templates DROP CONSTRAINT IF EXISTS %I', rec.conname);
     END LOOP;
 
-    ALTER TABLE public.work_package_template_task_templates
+    ALTER TABLE public.work_order_template_task_templates
       ADD CONSTRAINT fk_wpt_task_templates_work_order_template_id
-      FOREIGN KEY (work_package_template_id)
+      FOREIGN KEY (work_order_template_id)
       REFERENCES public.work_order_templates(id)
       ON DELETE CASCADE;
   END IF;
@@ -152,14 +152,14 @@ BEGIN
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
-      AND c.relname = 'work_package_template_task_temlates'
+      AND c.relname = 'work_order_template_task_temlates'
       AND c.relkind IN ('r', 'p')
   ) AND EXISTS (
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'work_package_template_task_temlates'
-      AND column_name = 'work_package_template_id'
+      AND table_name = 'work_order_template_task_temlates'
+      AND column_name = 'work_order_template_id'
   ) THEN
     FOR rec IN
       SELECT c.conname
@@ -167,16 +167,16 @@ BEGIN
       JOIN pg_attribute a
         ON a.attrelid = c.conrelid
        AND a.attnum = ANY (c.conkey)
-      WHERE c.conrelid = 'public.work_package_template_task_temlates'::regclass
+      WHERE c.conrelid = 'public.work_order_template_task_temlates'::regclass
         AND c.contype = 'f'
-        AND a.attname = 'work_package_template_id'
+        AND a.attname = 'work_order_template_id'
     LOOP
-      EXECUTE format('ALTER TABLE public.work_package_template_task_temlates DROP CONSTRAINT IF EXISTS %I', rec.conname);
+      EXECUTE format('ALTER TABLE public.work_order_template_task_temlates DROP CONSTRAINT IF EXISTS %I', rec.conname);
     END LOOP;
 
-    ALTER TABLE public.work_package_template_task_temlates
+    ALTER TABLE public.work_order_template_task_temlates
       ADD CONSTRAINT fk_wpt_task_temlates_work_order_template_id
-      FOREIGN KEY (work_package_template_id)
+      FOREIGN KEY (work_order_template_id)
       REFERENCES public.work_order_templates(id)
       ON DELETE CASCADE;
   END IF;
@@ -186,14 +186,14 @@ BEGIN
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'amro_ops'
-      AND c.relname = 'work_package'
+      AND c.relname = 'work_order'
       AND c.relkind IN ('r', 'p')
   ) AND EXISTS (
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'amro_ops'
-      AND table_name = 'work_package'
-      AND column_name = 'work_package_template_id'
+      AND table_name = 'work_order'
+      AND column_name = 'work_order_template_id'
   ) THEN
     FOR rec IN
       SELECT c.conname
@@ -201,23 +201,23 @@ BEGIN
       JOIN pg_attribute a
         ON a.attrelid = c.conrelid
        AND a.attnum = ANY (c.conkey)
-      WHERE c.conrelid = 'amro_ops.work_package'::regclass
+      WHERE c.conrelid = 'amro_ops.work_order'::regclass
         AND c.contype = 'f'
-        AND a.attname = 'work_package_template_id'
+        AND a.attname = 'work_order_template_id'
     LOOP
-      EXECUTE format('ALTER TABLE amro_ops.work_package DROP CONSTRAINT IF EXISTS %I', rec.conname);
+      EXECUTE format('ALTER TABLE amro_ops.work_order DROP CONSTRAINT IF EXISTS %I', rec.conname);
     END LOOP;
 
-    ALTER TABLE amro_ops.work_package
+    ALTER TABLE amro_ops.work_order
       ADD CONSTRAINT fk_amro_ops_work_order_template_id
-      FOREIGN KEY (work_package_template_id)
+      FOREIGN KEY (work_order_template_id)
       REFERENCES public.work_order_templates(id)
       ON DELETE SET NULL;
   END IF;
 END
 $$;
 
--- Generic remediation: if any FK still points to a physical public.work_package_templates table,
+-- Generic remediation: if any FK still points to a physical public.work_order_templates table,
 -- rewrite the constraint definition to public.work_order_templates.
 DO $$
 DECLARE
@@ -230,7 +230,7 @@ BEGIN
     FROM pg_class c
     JOIN pg_namespace n ON n.oid = c.relnamespace
     WHERE n.nspname = 'public'
-      AND c.relname = 'work_package_templates'
+      AND c.relname = 'work_order_templates'
       AND c.relkind IN ('r', 'p')
   ) THEN
     FOR rec IN
@@ -244,16 +244,16 @@ BEGIN
       JOIN pg_namespace rel_ns ON rel_ns.oid = rel.relnamespace
       WHERE c.contype = 'f'
         AND rel_ns.nspname = 'public'
-        AND rel.relname = 'work_package_templates'
+        AND rel.relname = 'work_order_templates'
     LOOP
-      v_new_name := replace(rec.conname, 'work_package_templates', 'work_order_templates');
+      v_new_name := replace(rec.conname, 'work_order_templates', 'work_order_templates');
       IF v_new_name = rec.conname THEN
         v_new_name := rec.conname || '_wot';
       END IF;
 
       v_def := replace(
-        replace(rec.condef, 'REFERENCES public.work_package_templates', 'REFERENCES public.work_order_templates'),
-        'REFERENCES work_package_templates',
+        replace(rec.condef, 'REFERENCES public.work_order_templates', 'REFERENCES public.work_order_templates'),
+        'REFERENCES work_order_templates',
         'REFERENCES work_order_templates'
       );
 
@@ -281,12 +281,12 @@ BEGIN
     WHERE n.nspname IN ('public', 'amro_ops')
       AND p.prokind = 'f'
       AND l.lanname IN ('sql', 'plpgsql')
-      AND pg_get_functiondef(p.oid) ILIKE '%work_package_templates%'
+      AND pg_get_functiondef(p.oid) ILIKE '%work_order_templates%'
   LOOP
     v_function_sql := pg_get_functiondef(rec.oid);
-    v_function_sql := replace(v_function_sql, 'public.work_package_templates%ROWTYPE', 'public.work_order_templates%ROWTYPE');
-    v_function_sql := replace(v_function_sql, 'public.work_package_templates', 'public.work_order_templates');
-    v_function_sql := replace(v_function_sql, 'work_package_templates table is not available', 'work_order_templates table is not available');
+    v_function_sql := replace(v_function_sql, 'public.work_order_templates%ROWTYPE', 'public.work_order_templates%ROWTYPE');
+    v_function_sql := replace(v_function_sql, 'public.work_order_templates', 'public.work_order_templates');
+    v_function_sql := replace(v_function_sql, 'work_order_templates table is not available', 'work_order_templates table is not available');
 
     -- Safety gate: only execute rewritten CREATE OR REPLACE FUNCTION statements.
     IF v_function_sql ~* '^\s*CREATE\s+OR\s+REPLACE\s+FUNCTION\s+' THEN

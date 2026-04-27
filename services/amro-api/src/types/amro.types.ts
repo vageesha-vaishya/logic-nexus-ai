@@ -13,7 +13,7 @@ export type ComponentStatus = 'installed' | 'removed' | 'repair_queue' | 'under_
 export type MaintenanceType = 'line' | 'base' | 'component' | 'inspection' | 'overhaul' | 'repair' | 'upgrade' | 'modification';
 
 // Work Package Status
-export type WorkPackageStatus = 'planning' | 'approved' | 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'closed' | 'cancelled';
+export type WorkOrderStatus = 'planning' | 'approved' | 'scheduled' | 'in_progress' | 'on_hold' | 'completed' | 'closed' | 'cancelled';
 
 // Task Status
 export type TaskStatus = 'pending' | 'not_started' | 'in_progress' | 'on_hold' | 'completed' | 'rework_required' | 'cancelled';
@@ -55,20 +55,20 @@ export interface Aircraft {
   updated_by?: string;
 }
 
-export interface WorkPackage {
+export interface WorkOrder {
   id: string;
   tenant_id: string;
   franchise_id?: string;
   aircraft_id: string;
   work_order_number: string;
-  work_package_number?: string;
+  work_order_number?: string;
   work_order_template_id?: string;
   work_order_title_id?: string;
   title: string;
   description?: string;
   work_type?: string;
   maintenance_type: MaintenanceType;
-  status: WorkPackageStatus;
+  status: WorkOrderStatus;
   planned_start_date?: string;
   planned_end_date?: string;
   planned_completion_date?: string;
@@ -92,7 +92,7 @@ export interface Task {
   tenant_id: string;
   franchise_id?: string;
   work_order_id?: string;
-  work_package_id?: string;
+  work_order_id?: string;
   task_number: string;
   title: string;
   description?: string;
@@ -118,7 +118,7 @@ export interface Task {
 export interface Material {
   id: string;
   tenant_id: string;
-  work_package_id: string;
+  work_order_id: string;
   part_number: string;
   part_name: string;
   part_description?: string;
@@ -179,7 +179,7 @@ export interface AmroComplianceSummary {
 
 export interface AmroEvidenceSummary {
   id: string;
-  entity_type: 'work_package' | 'task' | 'inspection' | 'release';
+  entity_type: 'work_order' | 'task' | 'inspection' | 'release';
   entity_id: string;
   hash: string;
   immutable: boolean;
@@ -196,7 +196,7 @@ export interface AmroForecastRecommendation {
 
 // API Request/Response Types
 
-export interface CreateWorkPackageRequest {
+export interface CreateWorkOrderRequest {
   aircraft_id: string;
   title?: string;
   work_order_title_id?: string;
@@ -211,11 +211,11 @@ export interface CreateWorkPackageRequest {
   estimated_cost?: number;
 }
 
-export interface UpdateWorkPackageRequest {
+export interface UpdateWorkOrderRequest {
   title?: string;
   description?: string;
   work_type?: string;
-  status?: WorkPackageStatus;
+  status?: WorkOrderStatus;
   planned_start_date?: string;
   planned_end_date?: string;
   planned_completion_date?: string;
@@ -231,7 +231,7 @@ export interface UpdateWorkPackageRequest {
 
 export interface CreateTaskRequest {
   work_order_id?: string;
-  work_package_id?: string;
+  work_order_id?: string;
   title: string;
   description?: string;
   task_category?: string;

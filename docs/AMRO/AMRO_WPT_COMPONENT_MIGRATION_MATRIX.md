@@ -5,18 +5,18 @@
 - Status: `Implementation Reference`
 - Owner: `AMRO FE Lead`
 - Last Updated: `2026-04-06`
-- Scope: `WorkPackageTemplateCreateSection` migration into `AmroStandardFormTemplate` adapter path
+- Scope: `WorkOrderTemplateCreateSection` migration into `AmroStandardFormTemplate` adapter path
 
 ## Objective
 Provide a field-by-field and block-by-block migration map so FE can standardize WPT UI with no ambiguity while preserving existing handlers, payload shape, and API integrations.
 
 ## Source Components
-- Legacy source: `WorkPackageTemplateCreateSection`
-  - [WorkPackageTemplateCreateSection.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/WorkPackageTemplateCreateSection.tsx)
+- Legacy source: `WorkOrderTemplateCreateSection`
+  - [WorkOrderTemplateCreateSection.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/WorkOrderTemplateCreateSection.tsx)
 - Standard shell: `AmroStandardFormTemplate`
   - [AmroStandardFormTemplate.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/components/templates/AmroStandardFormTemplate.tsx)
-- Adapter path: `AmroWorkPackageTemplateAdapter`
-  - [AmroWorkPackageTemplateAdapter.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter.tsx)
+- Adapter path: `AmroWorkOrderTemplateAdapter`
+  - [AmroWorkOrderTemplateAdapter.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/components/templates/AmroWorkOrderTemplateAdapter.tsx)
 
 ## Migration Strategy
 - Keep legacy controller logic and all data handlers intact.
@@ -62,7 +62,7 @@ Provide a field-by-field and block-by-block migration map so FE can standardize 
 
 ## Dependencies and Sequencing
 - Must complete before Phase B:
-  - Storybook parity stories approved (`WorkPackageTemplates_ProductionParity*`)
+  - Storybook parity stories approved (`WorkOrderTemplates_ProductionParity*`)
   - CI play checks green for ready + validation states
   - Feature-flag ON/OFF parity tests passing
 - Phase B dependencies:
@@ -94,8 +94,8 @@ Provide a field-by-field and block-by-block migration map so FE can standardize 
   - modal create/update, row double-click, save/delete parity
   - feature flag ON/OFF fallback parity
 - Storybook CI gates:
-  - `WorkPackageTemplates_ProductionParity` play assertions
-  - `WorkPackageTemplates_ProductionParity_ValidationError` play assertions
+  - `WorkOrderTemplates_ProductionParity` play assertions
+  - `WorkOrderTemplates_ProductionParity_ValidationError` play assertions
 
 ## Rollback Procedure (Component Scope)
 - Trigger:
@@ -105,7 +105,7 @@ Provide a field-by-field and block-by-block migration map so FE can standardize 
 - Action:
   - set `VITE_AMRO_WPT_STANDARD_TEMPLATE=false`
   - restart runtime
-  - route all users to legacy `WorkPackageTemplateCreateSection` path
+  - route all users to legacy `WorkOrderTemplateCreateSection` path
 - Verification:
   - rerun ON/OFF parity sanity tests and confirm legacy restoration
 

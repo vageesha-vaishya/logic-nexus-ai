@@ -10,9 +10,9 @@
  * - NO NEW TABLES REQUIRED
  * 
  * ENDPOINTS:
- * - GET    /api/v2/amro/work-packages/[id]/compliance-records (list compliance records)
- * - POST   /api/v2/amro/work-packages/[id]/compliance-records (create compliance record)
- * - POST   /api/v2/amro/work-packages/[id]/certificates (generate CRS)
+ * - GET    /api/v2/amro/work-orders/[id]/compliance-records (list compliance records)
+ * - POST   /api/v2/amro/work-orders/[id]/compliance-records (create compliance record)
+ * - POST   /api/v2/amro/work-orders/[id]/certificates (generate CRS)
  * 
  * FEATURES:
  * - AD/SB directive tracking
@@ -55,7 +55,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
   if (handlePreflight(req, res)) return;
 
   const ctx = buildApiContext(req);
-  const workPackageId = String(req.query.id || '').trim();
+  const workOrderId = String(req.query.id || '').trim();
 
   try {
     if (req.method !== 'GET' && req.method !== 'POST') {
@@ -64,7 +64,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       return;
     }
 
-    if (!workPackageId) {
+    if (!workOrderId) {
       res.status(400).json({ error: 'Work Package ID is required', version: 'v2', correlationId: ctx.correlationId });
       return;
     }
@@ -86,7 +86,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const { error: wpError } = await supabase
       .from('work_orders')
       .select('id, aircraft_id')
-      .eq('id', workPackageId)
+      .eq('id', workOrderId)
       .eq('tenant_id', tenantId)
       .single();
 
@@ -117,7 +117,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           )
         `, { count: 'exact' })
         .eq('tenant_id', tenantId)
-        .eq('work_order_id', workPackageId)
+        .eq('work_order_id', workOrderId)
         .order('created_at', { ascending: false });
 
       if (complianceType && VALID_COMPLIANCE_TYPES.includes(complianceType)) {
@@ -133,7 +133,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       // Transition-safe fallback while environments converge on rename migration.
       if (error && /amro_work_order_compliance_records|work_order_id/i.test(String(error.message || ''))) {
         let legacyQuery = supabase
-          .from('amro_work_package_compliance_records')
+          .from('amro_work_order_compliance_records')
           .select(`
             *,
             directive:directive_id (
@@ -145,7 +145,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
             )
           `, { count: 'exact' })
           .eq('tenant_id', tenantId)
-          .eq('work_package_id', workPackageId)
+          .eq('work_order_id', workOrderId)
           .order('created_at', { ascending: false });
 
         if (complianceType && VALID_COMPLIANCE_TYPES.includes(complianceType)) {
@@ -170,7 +170,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         interface: 'list-compliance-records',
         correlationId: ctx.correlationId,
         output: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           records: records || [],
           total: count || 0,
         },
@@ -214,7 +214,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         .from('amro_work_order_compliance_records')
         .insert({
           tenant_id: tenantId,
-          work_order_id: workPackageId,
+          work_order_id: workOrderId,
           task_id: taskId,
           directive_id: directiveId,
           compliance_type: complianceType,
@@ -238,10 +238,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       if (createError && /amro_work_order_compliance_records|work_order_id/i.test(String(createError.message || ''))) {
         const legacyResult = await supabase
-          .from('amro_work_package_compliance_records')
+          .from('amro_work_order_compliance_records')
           .insert({
             tenant_id: tenantId,
-            work_package_id: workPackageId,
+            work_order_id: workOrderId,
             task_id: taskId,
             directive_id: directiveId,
             compliance_type: complianceType,

@@ -2,16 +2,16 @@
 -- DB-ARCH-APPROVAL: pending-amro-arch-board-approval
 --
 -- Purpose:
--- - Rename column public.amro_work_package_compliance_records.work_package_id -> work_order_id
--- - Rename table public.amro_work_package_compliance_records -> public.amro_work_order_compliance_records
+-- - Rename column public.amro_work_order_compliance_records.work_order_id -> work_order_id
+-- - Rename table public.amro_work_order_compliance_records -> public.amro_work_order_compliance_records
 -- - Rename associated constraints/indexes/policies to work-order naming
--- - Repoint residual inbound FKs from amro_work_package_compliance_records(id) to amro_work_order_compliance_records(id)
+-- - Repoint residual inbound FKs from amro_work_order_compliance_records(id) to amro_work_order_compliance_records(id)
 
 BEGIN;
 
 DO $$
 DECLARE
-  v_old_table regclass := to_regclass('public.amro_work_package_compliance_records');
+  v_old_table regclass := to_regclass('public.amro_work_order_compliance_records');
   v_new_table regclass := to_regclass('public.amro_work_order_compliance_records');
   v_has_old_column boolean := false;
   v_has_new_column boolean := false;
@@ -25,7 +25,7 @@ BEGIN
       SELECT 1
       FROM pg_attribute
       WHERE attrelid = v_old_table
-        AND attname = 'work_package_id'
+        AND attname = 'work_order_id'
         AND NOT attisdropped
     ) INTO v_has_old_column;
 
@@ -38,13 +38,13 @@ BEGIN
     ) INTO v_has_new_column;
 
     IF v_has_old_column AND NOT v_has_new_column THEN
-      EXECUTE 'ALTER TABLE public.amro_work_package_compliance_records RENAME COLUMN work_package_id TO work_order_id';
+      EXECUTE 'ALTER TABLE public.amro_work_order_compliance_records RENAME COLUMN work_order_id TO work_order_id';
     END IF;
   END IF;
 
   -- Rename table to canonical work-order naming.
   IF v_old_table IS NOT NULL AND v_new_table IS NULL THEN
-    EXECUTE 'ALTER TABLE public.amro_work_package_compliance_records RENAME TO amro_work_order_compliance_records';
+    EXECUTE 'ALTER TABLE public.amro_work_order_compliance_records RENAME TO amro_work_order_compliance_records';
   END IF;
 
   v_new_table := to_regclass('public.amro_work_order_compliance_records');
@@ -58,7 +58,7 @@ BEGIN
     SELECT 1
     FROM pg_attribute
     WHERE attrelid = v_new_table
-      AND attname = 'work_package_id'
+      AND attname = 'work_order_id'
       AND NOT attisdropped
   ) INTO v_has_old_column;
 
@@ -71,7 +71,7 @@ BEGIN
   ) INTO v_has_new_column;
 
   IF v_has_old_column AND NOT v_has_new_column THEN
-    EXECUTE 'ALTER TABLE public.amro_work_order_compliance_records RENAME COLUMN work_package_id TO work_order_id';
+    EXECUTE 'ALTER TABLE public.amro_work_order_compliance_records RENAME COLUMN work_order_id TO work_order_id';
   END IF;
 
   -- Rename constraints on new table.
@@ -81,10 +81,10 @@ BEGIN
     WHERE conrelid = v_new_table
   LOOP
     v_new_name := rec.conname;
-    v_new_name := replace(v_new_name, 'work_package_compliance_records', 'work_order_compliance_records');
+    v_new_name := replace(v_new_name, 'work_order_compliance_records', 'work_order_compliance_records');
     v_new_name := replace(v_new_name, 'wp_compliance_records', 'wo_compliance_records');
     v_new_name := replace(v_new_name, 'compliance_records_wp', 'compliance_records_wo');
-    v_new_name := replace(v_new_name, 'work_package_id', 'work_order_id');
+    v_new_name := replace(v_new_name, 'work_order_id', 'work_order_id');
 
     IF v_new_name <> rec.conname THEN
       EXECUTE format('ALTER TABLE public.amro_work_order_compliance_records RENAME CONSTRAINT %I TO %I', rec.conname, v_new_name);
@@ -99,10 +99,10 @@ BEGIN
       AND tablename = 'amro_work_order_compliance_records'
   LOOP
     v_new_name := rec.indexname;
-    v_new_name := replace(v_new_name, 'work_package_compliance_records', 'work_order_compliance_records');
+    v_new_name := replace(v_new_name, 'work_order_compliance_records', 'work_order_compliance_records');
     v_new_name := replace(v_new_name, 'wp_compliance_records', 'wo_compliance_records');
     v_new_name := replace(v_new_name, 'compliance_records_wp', 'compliance_records_wo');
-    v_new_name := replace(v_new_name, 'work_package_id', 'work_order_id');
+    v_new_name := replace(v_new_name, 'work_order_id', 'work_order_id');
 
     IF v_new_name <> rec.indexname THEN
       EXECUTE format('ALTER INDEX public.%I RENAME TO %I', rec.indexname, v_new_name);
@@ -131,7 +131,7 @@ BEGIN
   END IF;
 
   -- Repoint residual inbound FKs if an old physical table still exists in edge environments.
-  v_old_table := to_regclass('public.amro_work_package_compliance_records');
+  v_old_table := to_regclass('public.amro_work_order_compliance_records');
   IF v_old_table IS NOT NULL THEN
     FOR rec IN
       SELECT
@@ -142,7 +142,7 @@ BEGIN
       WHERE c.contype = 'f'
         AND c.confrelid = v_old_table
     LOOP
-      v_new_name := replace(rec.conname, 'work_package_compliance_records', 'work_order_compliance_records');
+      v_new_name := replace(rec.conname, 'work_order_compliance_records', 'work_order_compliance_records');
       v_new_name := replace(v_new_name, 'wp_compliance_records', 'wo_compliance_records');
       v_new_name := replace(v_new_name, 'compliance_records_wp', 'compliance_records_wo');
       IF v_new_name = rec.conname THEN
@@ -150,8 +150,8 @@ BEGIN
       END IF;
 
       v_def := replace(
-        replace(rec.condef, 'REFERENCES public.amro_work_package_compliance_records', 'REFERENCES public.amro_work_order_compliance_records'),
-        'REFERENCES amro_work_package_compliance_records',
+        replace(rec.condef, 'REFERENCES public.amro_work_order_compliance_records', 'REFERENCES public.amro_work_order_compliance_records'),
+        'REFERENCES amro_work_order_compliance_records',
         'REFERENCES amro_work_order_compliance_records'
       );
 

@@ -13,7 +13,7 @@ describe('/api/v2/amro/certifications/actions', () => {
     const req: ApiRequest = {
       method: 'POST',
       query: {},
-      body: { work_package_id: 'wp-1', decision: 'approve', signatures: [{ signer: 'qa' }] },
+      body: { work_order_id: 'wp-1', decision: 'approve', signatures: [{ signer: 'qa' }] },
       headers: {},
     };
     const res = {} as ApiResponse;

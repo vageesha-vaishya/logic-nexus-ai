@@ -210,7 +210,7 @@ describe('/api/v2/amro/certification', () => {
       method: 'POST',
       query: { interface: 'submit-certification-decision' },
       body: {
-        work_package_id: 'wp-100',
+        work_order_id: 'wp-100',
         decision: 'approve',
         unresolved_blockers: ['none'],
         compliance_gate: {
@@ -245,7 +245,7 @@ describe('/api/v2/amro/certification', () => {
       method: 'POST',
       query: { interface: 'submit-certification-decision' },
       body: {
-        work_package_id: 'wp-100',
+        work_order_id: 'wp-100',
         decision: 'approve',
         unresolved_blockers: ['none'],
         compliance_gate: {
@@ -277,7 +277,7 @@ describe('/api/v2/amro/certification', () => {
       method: 'POST',
       query: { interface: 'submit-certification-decision' },
       body: {
-        work_package_id: 'wp-100',
+        work_order_id: 'wp-100',
         decision: 'approve',
         unresolved_blockers: ['open-ad-2026-001'],
         compliance_gate: {
@@ -309,7 +309,7 @@ describe('/api/v2/amro/certification', () => {
       method: 'POST',
       query: { interface: 'escalate-blocked-certification' },
       body: {
-        work_package_id: 'wp-100',
+        work_order_id: 'wp-100',
         block_reason: 'unresolved_ad',
         escalation_target: 'chief-certifier',
         authority_chain: ['duty-manager', 'hangar-supervisor'],
@@ -430,7 +430,7 @@ describe('/api/v2/amro/certification', () => {
       method: 'POST',
       query: { interface: 'submit-certification-decision' },
       body: {
-        work_package_id: 'wp-100',
+        work_order_id: 'wp-100',
         decision: 'approve',
         unresolved_blockers: ['none'],
         signatures: [{ signer_id: 'cert-a', mandatory: true, signature: 'sig-a' }],

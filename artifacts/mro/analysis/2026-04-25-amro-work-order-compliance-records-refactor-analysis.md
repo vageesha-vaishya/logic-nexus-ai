@@ -1,11 +1,11 @@
-# AMRO Schema Refactor Analysis: `amro_work_package_compliance_records` -> `amro_work_order_compliance_records`
+# AMRO Schema Refactor Analysis: `amro_work_order_compliance_records` -> `amro_work_order_compliance_records`
 
 ## Scope
 - Date: `2026-04-25`
 - Requested refactor:
-  - Column rename: `public.amro_work_package_compliance_records.work_package_id` -> `work_order_id`
-  - Table rename: `public.amro_work_package_compliance_records` -> `public.amro_work_order_compliance_records`
-  - Repoint inbound FKs from `amro_work_package_compliance_records(id)` to `amro_work_order_compliance_records(id)`
+  - Column rename: `public.amro_work_order_compliance_records.work_order_id` -> `work_order_id`
+  - Table rename: `public.amro_work_order_compliance_records` -> `public.amro_work_order_compliance_records`
+  - Repoint inbound FKs from `amro_work_order_compliance_records(id)` to `amro_work_order_compliance_records(id)`
 - Environment: development with dummy/sample data.
 
 ## Migration Delivered
@@ -23,13 +23,13 @@
 
 ## FK Dependency Analysis (`...compliance_records.id`)
 - Repository-wide scan found no static FK DDL directly targeting:
-  - `public.amro_work_package_compliance_records(id)`
-  - `amro_work_package_compliance_records(id)`
+  - `public.amro_work_order_compliance_records(id)`
+  - `amro_work_order_compliance_records(id)`
 - Defensive runtime migration logic was still added to repoint inbound FKs in live DB drift scenarios.
 
 ## Runtime and API Impact Updates
 - Updated compliance API to use canonical table/column:
-  - `src/pages/api/v2/amro/work-packages/[id]/compliance-records.ts`
+  - `src/pages/api/v2/amro/work-orders/[id]/compliance-records.ts`
 - Added transition-safe fallback logic to legacy table/column while environments converge.
 
 ## Documentation Impact Updates
@@ -42,8 +42,8 @@
 ## Verification Queries
 1. Existence checks:
    - `select to_regclass('public.amro_work_order_compliance_records');`
-   - `select to_regclass('public.amro_work_package_compliance_records');` (expected null after migration)
+   - `select to_regclass('public.amro_work_order_compliance_records');` (expected null after migration)
 2. Column check:
-   - `select column_name from information_schema.columns where table_schema='public' and table_name='amro_work_order_compliance_records' and column_name in ('work_order_id','work_package_id');`
+   - `select column_name from information_schema.columns where table_schema='public' and table_name='amro_work_order_compliance_records' and column_name in ('work_order_id','work_order_id');`
 3. FK check:
-   - `select conrelid::regclass as table_name, conname, pg_get_constraintdef(oid) as definition from pg_constraint where contype='f' and (pg_get_constraintdef(oid) ilike '%amro_work_package_compliance_records%' or pg_get_constraintdef(oid) ilike '%amro_work_order_compliance_records%');`
+   - `select conrelid::regclass as table_name, conname, pg_get_constraintdef(oid) as definition from pg_constraint where contype='f' and (pg_get_constraintdef(oid) ilike '%amro_work_order_compliance_records%' or pg_get_constraintdef(oid) ilike '%amro_work_order_compliance_records%');`

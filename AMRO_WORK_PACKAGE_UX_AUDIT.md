@@ -1,7 +1,7 @@
 # AMRO Aircraft → Create Work Package UI/UX Audit & Enhancement Plan
 
 **Date:** 2026-04-12  
-**Component:** `AircraftWorkPackageCreateDialog.tsx` (905 lines)  
+**Component:** `AircraftWorkOrderCreateDialog.tsx` (905 lines)  
 **Location:** `src/features/module-amro/settings/pages/amro-settings-master-data/components/`
 
 ---
@@ -158,7 +158,7 @@
 
 ## 📁 Implementation Plan
 
-**New File:** `src/features/module-amro/components/work-orders/AmroWorkPackageCreateWizard.tsx`
+**New File:** `src/features/module-amro/components/work-orders/AmroWorkOrderCreateWizard.tsx`
 
 **Features:**
 - Follows AMRO design system (AmroModuleSurface, AmroStandardToolbar, etc.)
@@ -170,11 +170,11 @@
 - Mobile-responsive
 
 **Hooks Used:**
-- `useCreateWorkPackage` (existing)
+- `useCreateWorkOrder` (existing)
 - `useListTemplateVersions` (new)
 - `useCreateEmergencyWP` (new)
 - `useConvertNonScheduledTaskToWP` (new)
 
 ---
 
-**Next Step:** Build enhanced `AmroWorkPackageCreateWizard.tsx` component
+**Next Step:** Build enhanced `AmroWorkOrderCreateWizard.tsx` component

@@ -108,10 +108,10 @@ No new dependencies needed! 🎉
 
 ### Option A: Use in Existing Template Management Page
 
-Update `AmroWorkPackageTemplatesPage.tsx` to use the new enterprise editors:
+Update `AmroWorkOrderTemplatesPage.tsx` to use the new enterprise editors:
 
 ```typescript
-// In src/features/module-amro/templates/AmroWorkPackageTemplatesPage.tsx
+// In src/features/module-amro/templates/AmroWorkOrderTemplatesPage.tsx
 
 // Add imports at the top
 import { EnterpriseMaterialsEditor } from './EnterpriseMaterialsEditor';
@@ -123,7 +123,7 @@ import type { MaterialLineItem, ToolingLineItem } from '../../../services/amro-a
   <EnterpriseMaterialsEditor
     materials={template.materials_json as MaterialLineItem[]}
     onChange={(materials) => updateTemplate('materials_json', materials)}
-    workPackageTemplateId={template.id}
+    workOrderTemplateId={template.id}
     readOnly={viewMode}
   />
 </TabsContent>
@@ -132,7 +132,7 @@ import type { MaterialLineItem, ToolingLineItem } from '../../../services/amro-a
   <EnterpriseToolingEditor
     tools={template.tooling_json as ToolingLineItem[]}
     onChange={(tools) => updateTemplate('tooling_json', tools)}
-    workPackageTemplateId={template.id}
+    workOrderTemplateId={template.id}
     readOnly={viewMode}
   />
 </TabsContent>
@@ -170,14 +170,14 @@ function MyCustomMaterialSelector() {
 import { EnterpriseMaterialsEditor } from './templates/EnterpriseMaterialsEditor';
 import type { MaterialLineItem } from '../../../services/amro-api/src/types/amro.enterprise.types';
 
-function WorkPackageTemplateEditor({ templateId }) {
+function WorkOrderTemplateEditor({ templateId }) {
   const [materials, setMaterials] = useState<MaterialLineItem[]>([]);
 
   return (
     <EnterpriseMaterialsEditor
       materials={materials}
       onChange={setMaterials}
-      workPackageTemplateId={templateId}
+      workOrderTemplateId={templateId}
       readOnly={false}
     />
   );
@@ -190,14 +190,14 @@ function WorkPackageTemplateEditor({ templateId }) {
 import { EnterpriseToolingEditor } from './templates/EnterpriseToolingEditor';
 import type { ToolingLineItem } from '../../../services/amro-api/src/types/amro.enterprise.types';
 
-function WorkPackageToolingSection({ templateId }) {
+function WorkOrderToolingSection({ templateId }) {
   const [tools, setTools] = useState<ToolingLineItem[]>([]);
 
   return (
     <EnterpriseToolingEditor
       tools={tools}
       onChange={setTools}
-      workPackageTemplateId={templateId}
+      workOrderTemplateId={templateId}
       readOnly={false}
     />
   );
@@ -368,7 +368,7 @@ const reserveMaterial = async (materialId: string, quantity: number) => {
     },
     body: JSON.stringify({
       quantity,
-      work_package_template_id: 'template-123',
+      work_order_template_id: 'template-123',
       expected_issue_date: '2026-04-20',
     }),
   });
@@ -535,7 +535,7 @@ const reservation = await fetch(`/api/v2/amro/materials/${searchResults.results[
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
     quantity: 5,
-    work_package_template_id: 'test-template',
+    work_order_template_id: 'test-template',
   }),
 }).then(r => r.json());
 
@@ -636,14 +636,14 @@ The new tables integrate with your existing master data system:
 ### Use Case 1: Create Work Package with Materials
 
 ```typescript
-function CreateWorkPackageWithMaterials() {
+function CreateWorkOrderWithMaterials() {
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [materials, setMaterials] = useState([]);
   
   // Load template with enterprise materials
   const { data: template } = useQuery({
     queryKey: ['template', selectedTemplate],
-    queryFn: () => fetch(`/api/v2/amro/work-package-templates/${selectedTemplate}`)
+    queryFn: () => fetch(`/api/v2/amro/work-order-templates/${selectedTemplate}`)
       .then(r => r.json()),
   });
 
@@ -655,7 +655,7 @@ function CreateWorkPackageWithMaterials() {
       await reserveMutation.mutateAsync({
         materialId: material.id,
         quantity: material.quantity_required,
-        work_package_template_id: selectedTemplate,
+        work_order_template_id: selectedTemplate,
       });
     }
     

@@ -52,9 +52,9 @@ describe('amro audit ledger', () => {
     appendAmroAuditLedgerRecord({
       tenantId: 'tenant-1',
       franchiseId: 'fr-1',
-      capability: 'work-packages',
+      capability: 'work-orders',
       eventType: 'amro.audit.recorded.v1',
-      entityType: 'work-package',
+      entityType: 'work-order',
       entityId: 'decision:all',
       correlationId: 'corr-wp',
       action: 'module.read',

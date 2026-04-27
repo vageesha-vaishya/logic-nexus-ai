@@ -21,7 +21,7 @@ import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import type { WorkPackageTemplate } from './AmroWorkPackageTemplatesPage';
+import type { WorkOrderTemplate } from './AmroWorkOrderTemplatesPage';
 import {
   fetchTemplateVersions,
   createTemplateVersion,
@@ -36,7 +36,7 @@ import { useAuth } from '@/hooks/useAuth';
 interface TemplateVersionManagerProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  template: WorkPackageTemplate;
+  template: WorkOrderTemplate;
   onSuccess: () => void;
 }
 

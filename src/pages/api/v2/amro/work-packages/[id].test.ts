@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import handler from './[id]';
 import transitionHandler from './[id]/transitions';
-import collectionHandler from '../work-packages';
-import { persistCreateWorkPackage } from '../work-package-persistence';
+import collectionHandler from '../work-orders';
+import { persistCreateWorkOrder } from '../work-order-persistence';
 import type { ApiRequest, ApiResponse } from '../../../_utils/types';
 import {
   applyCors,
@@ -42,10 +42,10 @@ vi.mock('../../../_utils/compatibility-facade', () => ({
   resolveGatewayCompatibility: vi.fn(),
 }));
 
-vi.mock('../work-package-persistence', () => ({
-  persistCreateWorkPackage: vi.fn(),
-  persistTransitionWorkPackage: vi.fn(),
-  persistCloneTemplateWorkPackage: vi.fn(),
+vi.mock('../work-order-persistence', () => ({
+  persistCreateWorkOrder: vi.fn(),
+  persistTransitionWorkOrder: vi.fn(),
+  persistCloneTemplateWorkOrder: vi.fn(),
 }));
 
 function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unknown; headers: Record<string, unknown> } {
@@ -67,7 +67,7 @@ function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unkno
   return res;
 }
 
-describe('/api/v2/amro/work-packages/[id] + transitions', () => {
+describe('/api/v2/amro/work-orders/[id] + transitions', () => {
   const envBackup = { ...process.env };
 
   beforeEach(() => {
@@ -126,8 +126,8 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
       source: 'database',
       validatedAt: '2026-03-20T00:00:00.000Z',
     } as any);
-    vi.mocked(persistCreateWorkPackage).mockResolvedValue({
-      work_package_id: 'tenant-1-fr-1-wp-101',
+    vi.mocked(persistCreateWorkOrder).mockResolvedValue({
+      work_order_id: 'tenant-1-fr-1-wp-101',
       status: 'planning',
       version: 1,
       created_at: '2026-03-20T00:00:00.000Z',
@@ -149,8 +149,8 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
     expect(enforceAnyPermission).toHaveBeenCalledWith(['dashboards.view', 'reports.manage'], ['dashboards.view']);
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.interface).toBe('detail-work-package');
-    expect((res.jsonBody as any)?.data?.work_package?.id).toBe('wp-100');
+    expect((res.jsonBody as any)?.interface).toBe('detail-work-order');
+    expect((res.jsonBody as any)?.data?.work_order?.id).toBe('wp-100');
   });
 
   it('updates work package for API-AMRO-002 PATCH', async () => {
@@ -169,7 +169,7 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.interface).toBe('update-work-package');
+    expect((res.jsonBody as any)?.interface).toBe('update-work-order');
     expect((res.jsonBody as any)?.data?.to_status).toBe('scheduled');
   });
 
@@ -180,9 +180,9 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.interface).toBe('delete-work-package');
+    expect((res.jsonBody as any)?.interface).toBe('delete-work-order');
     expect((res.jsonBody as any)?.data?.deleted).toBe(true);
-    expect((res.jsonBody as any)?.data?.work_package_id).toBe('wp-delete-1');
+    expect((res.jsonBody as any)?.data?.work_order_id).toBe('wp-delete-1');
   });
 
   it('blocks invalid transition path in API-AMRO-003 endpoint', async () => {
@@ -246,9 +246,9 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     await transitionHandler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.interface).toBe('transition-work-package');
+    expect((res.jsonBody as any)?.interface).toBe('transition-work-order');
     expect((res.jsonBody as any)?.output?.to_status).toBe('scheduled');
-    expect((res.jsonBody as any)?.output?.work_package_id).toBe('wp-303');
+    expect((res.jsonBody as any)?.output?.work_order_id).toBe('wp-303');
     expect((res.jsonBody as any)?.output?.notes).toBe('ready to schedule');
     expect((res.jsonBody as any)?.api_guardrails?.p95_target_ms).toBe(500);
   });
@@ -256,7 +256,7 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
   it('passes create to transition flow for API-AMRO-001 and API-AMRO-003', async () => {
     const createReq: ApiRequest = {
       method: 'POST',
-      query: { interface: 'create-work-package' },
+      query: { interface: 'create-work-order' },
       body: {
         aircraft_id: 'ac-900',
         maintenance_type: 'line',
@@ -271,12 +271,12 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     await collectionHandler(createReq, createRes);
 
     expect(createRes.statusCode).toBe(200);
-    const createdWorkPackageId = String((createRes.jsonBody as any)?.output?.work_package_id || '');
-    expect(createdWorkPackageId).toContain('tenant-1-fr-1-wp-');
+    const createdWorkOrderId = String((createRes.jsonBody as any)?.output?.work_order_id || '');
+    expect(createdWorkOrderId).toContain('tenant-1-fr-1-wp-');
 
     const transitionReq: ApiRequest = {
       method: 'POST',
-      query: { id: createdWorkPackageId },
+      query: { id: createdWorkOrderId },
       headers: { 'idempotency-key': 'idem-transition-e2e' },
       body: {
         current_status: 'planning',
@@ -289,7 +289,7 @@ describe('/api/v2/amro/work-packages/[id] + transitions', () => {
     await transitionHandler(transitionReq, transitionRes);
 
     expect(transitionRes.statusCode).toBe(200);
-    expect((transitionRes.jsonBody as any)?.output?.work_package_id).toBe(createdWorkPackageId);
+    expect((transitionRes.jsonBody as any)?.output?.work_order_id).toBe(createdWorkOrderId);
     expect((transitionRes.jsonBody as any)?.output?.from_status).toBe('planning');
     expect((transitionRes.jsonBody as any)?.output?.to_status).toBe('scheduled');
   });

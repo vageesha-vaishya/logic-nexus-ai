@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { buildWorkPackageWizardSteps } from './workPackageWizardConfig';
+import { buildWorkOrderWizardSteps } from './workOrderWizardConfig';
 
-describe('workPackageWizardConfig template model validation', () => {
+describe('workOrderWizardConfig template model validation', () => {
   const getTemplateValidator = (aircraftOptions: any[], templateOptions: any[]) => {
-    const steps = buildWorkPackageWizardSteps({
+    const steps = buildWorkOrderWizardSteps({
       aircraftOptions,
       templateOptions,
       assignmentOptions: [],
@@ -48,8 +48,8 @@ describe('workPackageWizardConfig template model validation', () => {
   });
 });
 
-describe('workPackageWizardConfig schedule validation', () => {
-  const steps = buildWorkPackageWizardSteps({
+describe('workOrderWizardConfig schedule validation', () => {
+  const steps = buildWorkOrderWizardSteps({
     aircraftOptions: [{ value: 'ac-001', label: 'VT-ABC' }],
     templateOptions: [{ value: 'tpl-001', label: 'A-Check' }],
     assignmentOptions: [

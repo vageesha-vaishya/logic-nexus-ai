@@ -57,7 +57,7 @@ describe('/api/v2/amro/compliance/obligations', () => {
   });
 
   it('returns obligations on GET', async () => {
-    const req: ApiRequest = { method: 'GET', query: { work_package_id: 'wp-1' }, headers: {}, body: {} };
+    const req: ApiRequest = { method: 'GET', query: { work_order_id: 'wp-1' }, headers: {}, body: {} };
     const res = createResponse();
 
     await handler(req, res);

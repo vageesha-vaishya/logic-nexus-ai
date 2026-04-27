@@ -193,7 +193,7 @@ Ticket IDs are proposed and can be mirrored in Jira/Linear.
 ## 7) Integration Requirements
 - Work Orders:
   - reserve, consume, release, reverse APIs with idempotency keys
-  - linkage by `work_package_id`, `task_id`, `aircraft_id`, and execution user
+  - linkage by `work_order_id`, `task_id`, `aircraft_id`, and execution user
 - Procurement:
   - supplier, PO, ASN, receipt, and invoice feeds
   - discrepancy and backorder states

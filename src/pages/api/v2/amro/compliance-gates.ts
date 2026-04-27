@@ -72,7 +72,7 @@ function buildLegacyComplianceGateRows(tenantId: string, franchiseId: string | n
   return [
     {
       legacy_gate_id: 'legacy-gate-001',
-      work_package_id: 'WP-001',
+      work_order_id: 'WP-001',
       task_code: 'T-001',
       decision: 'pending',
       decided_by: null,
@@ -84,7 +84,7 @@ function buildLegacyComplianceGateRows(tenantId: string, franchiseId: string | n
     },
     {
       legacy_gate_id: 'legacy-gate-002',
-      work_package_id: 'WP-001',
+      work_order_id: 'WP-001',
       task_code: 'T-002',
       decision: 'approved',
       decided_by: 'certifier-a',
@@ -96,7 +96,7 @@ function buildLegacyComplianceGateRows(tenantId: string, franchiseId: string | n
     },
     {
       legacy_gate_id: 'legacy-gate-003',
-      work_package_id: 'WP-002',
+      work_order_id: 'WP-002',
       task_code: 'T-003',
       decision: 'rejected',
       decided_by: 'certifier-b',
@@ -119,7 +119,7 @@ const ALLOWED_EXCEPTION_REQUEST_ROLES = new Set(['tenant_admin', 'inspector', 'e
 const ALLOWED_OBLIGATION_TYPES = new Set(['ad', 'sb']);
 const ALLOWED_DEFERRAL_TYPES = new Set(['mel', 'cdl']);
 const ALLOWED_DEFERRAL_CATEGORIES = new Set(['A', 'B', 'C', 'D']);
-const ALLOWED_AUDIT_REPLAY_CAPABILITIES = new Set(['work-packages', 'tasks', 'compliance-gates']);
+const ALLOWED_AUDIT_REPLAY_CAPABILITIES = new Set(['work-orders', 'tasks', 'compliance-gates']);
 const ALLOWED_EXPORT_FORMATS = new Set(['csv', 'json']);
 const REGULATOR_COMPLIANCE_PROFILES = {
   faa: {
@@ -359,14 +359,14 @@ function buildRegulatorProfilePack(profile: 'faa' | 'easa' | 'caac') {
 }
 
 function buildReconciliation(legacyItems: ComplianceGateItem[], moduleItems: ComplianceGateItem[]) {
-  const legacyKeys = new Set(legacyItems.map((item) => `${item.workPackageId}:${item.taskCode}`));
-  const moduleKeys = new Set(moduleItems.map((item) => `${item.workPackageId}:${item.taskCode}`));
+  const legacyKeys = new Set(legacyItems.map((item) => `${item.workOrderId}:${item.taskCode}`));
+  const moduleKeys = new Set(moduleItems.map((item) => `${item.workOrderId}:${item.taskCode}`));
   const missingInModule = legacyItems
-    .filter((item) => !moduleKeys.has(`${item.workPackageId}:${item.taskCode}`))
-    .map((item) => `${item.workPackageId}:${item.taskCode}`);
+    .filter((item) => !moduleKeys.has(`${item.workOrderId}:${item.taskCode}`))
+    .map((item) => `${item.workOrderId}:${item.taskCode}`);
   const missingInLegacy = moduleItems
-    .filter((item) => !legacyKeys.has(`${item.workPackageId}:${item.taskCode}`))
-    .map((item) => `${item.workPackageId}:${item.taskCode}`);
+    .filter((item) => !legacyKeys.has(`${item.workOrderId}:${item.taskCode}`))
+    .map((item) => `${item.workOrderId}:${item.taskCode}`);
   return {
     legacyCount: legacyItems.length,
     moduleCount: moduleItems.length,
@@ -577,8 +577,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       assertOptionalScopeContext(body, tenantId, franchiseId);
       const context = parseBody(body.context);
       const contextType = assertNonEmpty(context.type, 'context.type').toLowerCase();
-      if (contextType !== 'work_package' && contextType !== 'task') {
-        throw new Error('context must be work_package or task');
+      if (contextType !== 'work_order' && contextType !== 'task') {
+        throw new Error('context must be work_order or task');
       }
       const contextId = assertNonEmpty(context.id, 'context.id');
       assertOptionalScopedIdentifier(contextId, tenantId, 'context.id');
@@ -693,8 +693,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const body = parseBody(req.body);
       assertScopeRequired(tenantId, franchiseId);
       assertOptionalScopeContext(body, tenantId, franchiseId);
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
-      assertOptionalScopedIdentifier(workPackageId, tenantId, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      assertOptionalScopedIdentifier(workOrderId, tenantId, 'work_order_id');
       const regulatorProfile = assertNonEmpty(body.regulator_profile, 'regulator_profile').toLowerCase();
       if (!ALLOWED_REGULATOR_PROFILES.has(regulatorProfile)) {
         throw new Error('regulator_profile is not supported');
@@ -728,7 +728,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         };
       });
       const output = {
-        ingestion_id: `${tenantId}-${workPackageId}-obligation-ingest-${Date.now()}`,
+        ingestion_id: `${tenantId}-${workOrderId}-obligation-ingest-${Date.now()}`,
         mapped_obligations: mappedObligations,
         mapping_summary: {
           total: mappedObligations.length,
@@ -743,7 +743,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           compatMode: compatDecision.compatMode,
           interfaceName,
-          entityId: workPackageId,
+          entityId: workOrderId,
           context: {
             mappedCount: output.mapping_summary.total,
             sourceAdapter,
@@ -766,7 +766,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         serviceBoundaries,
         input: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           regulator_profile: regulatorProfile,
           source_adapter: sourceAdapter,
         },
@@ -784,7 +784,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method === 'POST' && interfaceName === 'pre-schedule-compliance-gate') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
       const aircraftStatus = assertNonEmpty(body.aircraft_status, 'aircraft_status').toLowerCase();
       const unresolvedObligations = parseStringArray(body.unresolved_mandatory_obligations);
       const blockedStatus = new Set(['grounded', 'airworthiness_hold', 'maintenance_blocked']);
@@ -800,7 +800,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           compatMode: compatDecision.compatMode,
           interfaceName,
-          entityId: workPackageId,
+          entityId: workOrderId,
           context: {
             gate: 'pre-schedule',
             aircraftStatus,
@@ -825,7 +825,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         serviceBoundaries,
         input: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           aircraft_status: aircraftStatus,
           unresolved_mandatory_obligations: unresolvedObligations,
         },
@@ -912,7 +912,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method === 'POST' && interfaceName === 'evaluate-mel-cdl-deferral') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
       const deferralType = assertNonEmpty(body.deferral_type, 'deferral_type').toLowerCase();
       if (!ALLOWED_DEFERRAL_TYPES.has(deferralType)) {
         throw new Error('deferral_type must be mel or cdl');
@@ -942,7 +942,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         serviceBoundaries,
         input: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           deferral_type: deferralType,
           item_reference: itemReference,
           deferral_category: category,
@@ -968,8 +968,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const body = parseBody(req.body);
       const context = parseBody(body.context);
       const contextType = assertNonEmpty(context.type, 'context.type').toLowerCase();
-      if (contextType !== 'work_package' && contextType !== 'task') {
-        throw new Error('context must be work_package or task');
+      if (contextType !== 'work_order' && contextType !== 'task') {
+        throw new Error('context must be work_order or task');
       }
       const contextId = assertNonEmpty(context.id, 'context.id');
       const policyVersionSnapshot = assertNonEmpty(body.policy_version_snapshot, 'policy_version_snapshot');
@@ -1039,7 +1039,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const records = replayAmroAuditLedgerRecords({
         tenantId,
         franchiseId,
-        capability: capability as 'work-packages' | 'tasks' | 'compliance-gates',
+        capability: capability as 'work-orders' | 'tasks' | 'compliance-gates',
         limit,
       }).filter((record) => {
         if (!actionFilter) return true;
@@ -1184,7 +1184,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method === 'POST' && interfaceName === 'evaluate-closure-quality-gate') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
       const openFindings = parseInteger(body.open_findings, 'open_findings');
       const unresolvedDeferrals = parseInteger(body.unresolved_deferrals, 'unresolved_deferrals');
       const pendingSignatures = parseInteger(body.pending_signatures, 'pending_signatures');
@@ -1212,7 +1212,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           compatMode: compatDecision.compatMode,
           interfaceName,
-          entityId: workPackageId,
+          entityId: workOrderId,
           context: {
             gate: 'pre-closure',
             openFindings,
@@ -1238,7 +1238,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         serviceBoundaries,
         input: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           open_findings: openFindings,
           unresolved_deferrals: unresolvedDeferrals,
           pending_signatures: pendingSignatures,
@@ -1262,7 +1262,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     if (req.method === 'POST' && interfaceName === 'post-release-audit-gate') {
       enforceAnyPermission(auth.permissions || [], ['dashboards.manage', 'reports.manage']);
       const body = parseBody(req.body);
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
       const releaseDecisionId = assertNonEmpty(body.release_decision_id, 'release_decision_id');
       const evidenceLinkHash = assertNonEmpty(body.evidence_link_hash, 'evidence_link_hash');
       const records = replayAmroAuditLedgerRecords({
@@ -1271,7 +1271,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         limit: 200,
       });
       const releaseRecord = records.find((record) =>
-        record.capability === 'certification' && String(record.entityId) === workPackageId
+        record.capability === 'certification' && String(record.entityId) === workOrderId
       );
       const replayReady = records.length > 0
         && records.every((record, index) => index === 0 || record.previousHash === records[index - 1]?.chainHash);
@@ -1287,7 +1287,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           correlationId: ctx.correlationId,
           compatMode: compatDecision.compatMode,
           interfaceName,
-          entityId: workPackageId,
+          entityId: workOrderId,
           context: {
             gate: 'post-release',
             releaseDecisionId,
@@ -1312,7 +1312,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         serviceBoundaries,
         input: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           release_decision_id: releaseDecisionId,
           evidence_link_hash: evidenceLinkHash,
         },
@@ -1341,15 +1341,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const body = parseBody(req.body);
       assertScopeRequired(tenantId, franchiseId);
       assertOptionalScopeContext(body, tenantId, franchiseId);
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
-      assertOptionalScopedIdentifier(workPackageId, tenantId, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      assertOptionalScopedIdentifier(workOrderId, tenantId, 'work_order_id');
       const obligationId = assertNonEmpty(body.obligation_id, 'obligation_id');
       assertOptionalScopedIdentifier(obligationId, tenantId, 'obligation_id');
       const justification = assertNonEmpty(body.justification, 'justification');
       const requestedBy = assertNonEmpty(body.requested_by, 'requested_by');
       const slaDueAt = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();
       const output = {
-        exception_id: `${tenantId}-${workPackageId}-exception-${Date.now()}`,
+        exception_id: `${tenantId}-${workOrderId}-exception-${Date.now()}`,
         review_status: 'pending_review',
         sla_due_at: slaDueAt,
       };
@@ -1362,7 +1362,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           interfaceName,
           entityId: output.exception_id,
           context: {
-            workPackageId,
+            workOrderId,
             obligationId,
             requestedBy,
           },
@@ -1383,7 +1383,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         serviceBoundaries,
         input: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           obligation_id: obligationId,
           justification,
           requested_by: requestedBy,
@@ -1404,8 +1404,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const body = parseBody(req.body);
       assertScopeRequired(tenantId, franchiseId);
       assertOptionalScopeContext(body, tenantId, franchiseId);
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
-      assertOptionalScopedIdentifier(workPackageId, tenantId, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      assertOptionalScopedIdentifier(workOrderId, tenantId, 'work_order_id');
       const profile = assertNonEmpty(body.profile, 'profile').toLowerCase();
       if (!ALLOWED_REGULATOR_PROFILES.has(profile)) {
         throw new Error('profile must be FAA, EASA, or CAAC');
@@ -1417,7 +1417,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         throw new Error('All mandatory artifacts must be present before dossier finalization');
       }
       const output = {
-        dossier_id: `${tenantId}-${workPackageId}-dossier-${Date.now()}`,
+        dossier_id: `${tenantId}-${workOrderId}-dossier-${Date.now()}`,
         dossier_status: 'finalized',
         artifact_manifest: includeArtifacts.map((artifact) => ({
           artifact,
@@ -1433,7 +1433,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           interfaceName,
           entityId: output.dossier_id,
           context: {
-            workPackageId,
+            workOrderId,
             profile,
             artifactCount: includeArtifacts.length,
           },
@@ -1454,7 +1454,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         serviceBoundaries,
         input: {
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           profile,
           include_artifacts: includeArtifacts,
         },

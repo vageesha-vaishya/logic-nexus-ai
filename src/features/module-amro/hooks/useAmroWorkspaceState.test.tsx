@@ -67,15 +67,15 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
 
-      if (url.includes('/api/v1/work-packages/') && url.includes('/materials')) {
+      if (url.includes('/api/v1/work-orders/') && url.includes('/materials')) {
         return jsonResponse({ data: [] });
       }
-      if (url.includes('/api/v1/work-packages/') && url.includes('/tasks')) {
+      if (url.includes('/api/v1/work-orders/') && url.includes('/tasks')) {
         return jsonResponse({
-          data: [{ id: 'task-1', work_package_id: 'wp-1', title: 'Inspect', status: 'in_progress' }],
+          data: [{ id: 'task-1', work_order_id: 'wp-1', title: 'Inspect', status: 'in_progress' }],
         });
       }
-      if (url.includes('/api/v1/work-packages')) {
+      if (url.includes('/api/v1/work-orders')) {
         return jsonResponse({
           data: [{ id: 'wp-1', aircraft_id: 'ac-1', work_order_number: 'WP-1', status: 'planning', title: 'WP' }],
         });
@@ -86,7 +86,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
             schedules: [
               {
                 schedule_id: 'sch-1',
-                work_package_id: 'wp-1',
+                work_order_id: 'wp-1',
                 station_code: 'station-a',
                 slot_start: '2026-03-22T00:00:00.000Z',
                 slot_end: '2026-03-22T02:00:00.000Z',
@@ -139,7 +139,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     await waitFor(() => expect(MockEventSource.instances.length).toBe(1));
 
     const source = MockEventSource.instances[0];
-    expect(source.url).toContain('/api/v1/work-packages/stream?access_token=token-abc');
+    expect(source.url).toContain('/api/v1/work-orders/stream?access_token=token-abc');
 
     act(() => {
       source.emit('connected');
@@ -148,23 +148,23 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     await waitFor(() => expect(result.current.realtimeConnected).toBe(true));
   });
 
-  it('refreshes workspace datasets when work-package-change event is emitted', async () => {
+  it('refreshes workspace datasets when work-order-change event is emitted', async () => {
     const fetchMock = vi.mocked(fetch);
     renderHook(() => useAmroWorkspaceState());
 
     await waitFor(() => expect(MockEventSource.instances.length).toBe(1));
 
     const listCallsBefore = fetchMock.mock.calls.filter(
-      (call) => String(call[0]).includes('/api/v1/work-packages') && !String(call[0]).includes('/tasks') && !String(call[0]).includes('/materials'),
+      (call) => String(call[0]).includes('/api/v1/work-orders') && !String(call[0]).includes('/tasks') && !String(call[0]).includes('/materials'),
     ).length;
 
     act(() => {
-      MockEventSource.instances[0].emit('work-package-change');
+      MockEventSource.instances[0].emit('work-order-change');
     });
 
     await waitFor(() => {
       const listCallsAfter = fetchMock.mock.calls.filter(
-        (call) => String(call[0]).includes('/api/v1/work-packages') && !String(call[0]).includes('/tasks') && !String(call[0]).includes('/materials'),
+        (call) => String(call[0]).includes('/api/v1/work-orders') && !String(call[0]).includes('/tasks') && !String(call[0]).includes('/materials'),
       ).length;
       expect(listCallsAfter).toBeGreaterThan(listCallsBefore);
     });
@@ -226,7 +226,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
 
     const { result } = renderHook(() => useAmroWorkspaceState());
 
-    await waitFor(() => expect(result.current.workPackagesError).toBe('Access denied - AMRO domain assignment required'));
+    await waitFor(() => expect(result.current.workOrdersError).toBe('Access denied - AMRO domain assignment required'));
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
@@ -249,7 +249,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     const { result } = renderHook(() => useAmroWorkspaceState());
 
     await waitFor(() =>
-      expect(result.current.workPackagesError).toBe('Switching to AMRO domain context...'),
+      expect(result.current.workOrdersError).toBe('Switching to AMRO domain context...'),
     );
     expect(setDomain).toHaveBeenCalledWith('AMRO');
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/materials'))).toBe(false);
@@ -279,7 +279,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
 
     const { result } = renderHook(() => useAmroWorkspaceState());
 
-    await waitFor(() => expect(result.current.workPackagesError).toBe('Switching to AMRO domain context...'));
+    await waitFor(() => expect(result.current.workOrdersError).toBe('Switching to AMRO domain context...'));
     expect(setDomain).toHaveBeenCalledWith('AMRO');
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -305,7 +305,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
 
     const { result } = renderHook(() => useAmroWorkspaceState());
 
-    await waitFor(() => expect(result.current.workPackagesError).toBe('Resolving AMRO domain assignment...'));
+    await waitFor(() => expect(result.current.workOrdersError).toBe('Resolving AMRO domain assignment...'));
     expect(fetchMock).not.toHaveBeenCalled();
     expect(refreshDomains).not.toHaveBeenCalled();
   });
@@ -339,13 +339,13 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
   it('sanitizes saved views returned by v2 work package fallback', async () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
-      if (url.includes('/api/v1/work-packages') && !url.includes('/tasks') && !url.includes('/materials')) {
+      if (url.includes('/api/v1/work-orders') && !url.includes('/tasks') && !url.includes('/materials')) {
         throw new TypeError('Failed to fetch');
       }
-      if (url.includes('/api/v2/amro/work-packages')) {
+      if (url.includes('/api/v2/amro/work-orders')) {
         return jsonResponse({
           data: {
-            workPackages: [{ id: 'wp-v2-1', code: 'WP-V2-001', status: 'planning' }],
+            workOrders: [{ id: 'wp-v2-1', code: 'WP-V2-001', status: 'planning' }],
           },
           savedViews: [
             { id: '', name: 'Broken Empty Id', filters: { status: 'all', search: '' } },
@@ -372,7 +372,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
       if (url.includes('/api/v1/forecast/recommendations')) {
         return jsonResponse({ data: [] });
       }
-      if (url.includes('/api/v1/work-packages/') && url.includes('/materials')) {
+      if (url.includes('/api/v1/work-orders/') && url.includes('/materials')) {
         return jsonResponse({ data: [] });
       }
       return jsonResponse({ data: [] });
@@ -381,12 +381,12 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
 
     const { result } = renderHook(() => useAmroWorkspaceState());
 
-    await waitFor(() => expect(result.current.workPackages.length).toBe(1));
-    expect(result.current.workPackages[0]?.packageNumber).toBe('WP-V2-001');
-    expect(result.current.savedWorkPackageViews.some((view) => view.id === '')).toBe(false);
-    expect(result.current.savedWorkPackageViews.some((view) => view.name === '')).toBe(false);
-    expect(result.current.savedWorkPackageViews.some((view) => view.id === 'default-all')).toBe(true);
-    expect(result.current.savedWorkPackageViews.some((view) => view.id === 'valid-view')).toBe(true);
+    await waitFor(() => expect(result.current.workOrders.length).toBe(1));
+    expect(result.current.workOrders[0]?.packageNumber).toBe('WP-V2-001');
+    expect(result.current.savedWorkOrderViews.some((view) => view.id === '')).toBe(false);
+    expect(result.current.savedWorkOrderViews.some((view) => view.name === '')).toBe(false);
+    expect(result.current.savedWorkOrderViews.some((view) => view.id === 'default-all')).toBe(true);
+    expect(result.current.savedWorkOrderViews.some((view) => view.id === 'valid-view')).toBe(true);
     expect(result.current.selectedSavedViewId).toBe('default-all');
   });
 
@@ -439,15 +439,15 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
         });
       }
 
-      if (url.includes('/api/v1/work-packages/') && url.includes('/materials')) {
+      if (url.includes('/api/v1/work-orders/') && url.includes('/materials')) {
         return jsonResponse({ data: [] });
       }
-      if (url.includes('/api/v1/work-packages/') && url.includes('/tasks')) {
+      if (url.includes('/api/v1/work-orders/') && url.includes('/tasks')) {
         return jsonResponse({
-          data: [{ id: 'task-1', work_package_id: 'wp-1', title: 'Inspect', status: 'in_progress' }],
+          data: [{ id: 'task-1', work_order_id: 'wp-1', title: 'Inspect', status: 'in_progress' }],
         });
       }
-      if (url.includes('/api/v1/work-packages')) {
+      if (url.includes('/api/v1/work-orders')) {
         return jsonResponse({
           data: [{ id: 'wp-1', aircraft_id: 'ac-1', work_order_number: 'WP-1', status: 'planning', title: 'WP' }],
         });
@@ -498,7 +498,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
 
     const { result } = renderHook(() => useAmroWorkspaceState());
 
-    await waitFor(() => expect(result.current.selectedWorkPackageId).toBe('wp-1'));
+    await waitFor(() => expect(result.current.selectedWorkOrderId).toBe('wp-1'));
 
     await act(async () => {
       await result.current.validateCertifyingPrivilege();
@@ -519,24 +519,24 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
 
-      if (url.includes('/api/v2/amro/work-packages?interface=clone-template')) {
+      if (url.includes('/api/v2/amro/work-orders?interface=clone-template')) {
         return jsonResponse({
           output: {
-            new_work_package_id: 'wp-clone-1',
+            new_work_order_id: 'wp-clone-1',
             inherited_tasks_count: 2,
             version: '1',
           },
         });
       }
-      if (url.includes('/api/v2/amro/work-packages?interface=sync-supplier-eta')) {
+      if (url.includes('/api/v2/amro/work-orders?interface=sync-supplier-eta')) {
         return jsonResponse({
           output: {
             updated_eta: '2026-03-23T00:00:00.000Z',
-            impacted_work_packages: ['wp-1'],
+            impacted_work_orders: ['wp-1'],
           },
         });
       }
-      if (url.includes('/api/v2/amro/work-packages?interface=run-replan-simulation')) {
+      if (url.includes('/api/v2/amro/work-orders?interface=run-replan-simulation')) {
         return jsonResponse({
           output: {
             replan_options: [
@@ -549,7 +549,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
           },
         });
       }
-      if (url.includes('/api/v2/amro/work-packages?interface=confirm-replan')) {
+      if (url.includes('/api/v2/amro/work-orders?interface=confirm-replan')) {
         return jsonResponse({
           output: {
             updated_schedule: {
@@ -558,7 +558,7 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
           },
         });
       }
-      if (url.includes('/api/v1/work-packages/') && url.includes('/materials')) {
+      if (url.includes('/api/v1/work-orders/') && url.includes('/materials')) {
         return jsonResponse({
           data: [
             {
@@ -570,12 +570,12 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
           ],
         });
       }
-      if (url.includes('/api/v1/work-packages/') && url.includes('/tasks')) {
+      if (url.includes('/api/v1/work-orders/') && url.includes('/tasks')) {
         return jsonResponse({
-          data: [{ id: 'task-1', work_package_id: 'wp-1', title: 'Inspect', status: 'in_progress' }],
+          data: [{ id: 'task-1', work_order_id: 'wp-1', title: 'Inspect', status: 'in_progress' }],
         });
       }
-      if (url.includes('/api/v1/work-packages')) {
+      if (url.includes('/api/v1/work-orders')) {
         return jsonResponse({
           data: [{ id: 'wp-1', aircraft_id: 'ac-1', work_order_number: 'WP-1', status: 'planning', title: 'WP' }],
         });
@@ -617,29 +617,29 @@ describe('useAmroWorkspaceState realtime schedule connectivity', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     const { result } = renderHook(() => useAmroWorkspaceState());
-    await waitFor(() => expect(result.current.selectedWorkPackageId).toBe('wp-1'));
+    await waitFor(() => expect(result.current.selectedWorkOrderId).toBe('wp-1'));
 
     await act(async () => {
-      await result.current.cloneWorkPackageFromTemplate('wp-1');
-      await result.current.runWorkPackageReplanSimulation();
-      await result.current.syncSupplierEtaForSelectedWorkPackage();
+      await result.current.cloneWorkOrderFromTemplate('wp-1');
+      await result.current.runWorkOrderReplanSimulation();
+      await result.current.syncSupplierEtaForSelectedWorkOrder();
     });
-    await waitFor(() => expect(result.current.workPackageReplanOptions.length).toBeGreaterThan(0));
+    await waitFor(() => expect(result.current.workOrderReplanOptions.length).toBeGreaterThan(0));
     await act(async () => {
-      await result.current.confirmWorkPackageReplan();
+      await result.current.confirmWorkOrderReplan();
     });
 
     expect(fetchMock.mock.calls.some((call) =>
-      String(call[0]).includes('/api/v2/amro/work-packages?interface=clone-template'),
+      String(call[0]).includes('/api/v2/amro/work-orders?interface=clone-template'),
     )).toBe(true);
     expect(fetchMock.mock.calls.some((call) =>
-      String(call[0]).includes('/api/v2/amro/work-packages?interface=sync-supplier-eta'),
+      String(call[0]).includes('/api/v2/amro/work-orders?interface=sync-supplier-eta'),
     )).toBe(true);
     expect(fetchMock.mock.calls.some((call) =>
-      String(call[0]).includes('/api/v2/amro/work-packages?interface=run-replan-simulation'),
+      String(call[0]).includes('/api/v2/amro/work-orders?interface=run-replan-simulation'),
     )).toBe(true);
     expect(fetchMock.mock.calls.some((call) =>
-      String(call[0]).includes('/api/v2/amro/work-packages?interface=confirm-replan'),
+      String(call[0]).includes('/api/v2/amro/work-orders?interface=confirm-replan'),
     )).toBe(true);
   });
 });

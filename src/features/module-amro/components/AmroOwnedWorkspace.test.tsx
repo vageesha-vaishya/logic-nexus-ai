@@ -14,11 +14,11 @@ const mockWorksheet = {};
 const mockPdfSave = vi.fn();
 const mockXlsxWriteFile = vi.fn();
 const mockAutoTable = vi.fn();
-const mockOpenWorkPackageDetails = vi.fn().mockResolvedValue(true);
-const mockUpdateWorkPackageScheduling = vi.fn().mockResolvedValue(true);
-const mockToggleWorkPackageHold = vi.fn().mockResolvedValue(true);
-const mockSoftDeleteWorkPackage = vi.fn().mockResolvedValue(true);
-const mockRestoreSoftDeletedWorkPackage = vi.fn().mockResolvedValue(true);
+const mockOpenWorkOrderDetails = vi.fn().mockResolvedValue(true);
+const mockUpdateWorkOrderScheduling = vi.fn().mockResolvedValue(true);
+const mockToggleWorkOrderHold = vi.fn().mockResolvedValue(true);
+const mockSoftDeleteWorkOrder = vi.fn().mockResolvedValue(true);
+const mockRestoreSoftDeletedWorkOrder = vi.fn().mockResolvedValue(true);
 
 vi.mock('../hooks/useAmroWorkspaceState', () => ({
   useAmroWorkspaceState: () => mockUseAmroWorkspaceState(),
@@ -73,16 +73,16 @@ beforeEach(() => {
   mockPdfSave.mockReset();
   mockXlsxWriteFile.mockReset();
   mockAutoTable.mockReset();
-  mockOpenWorkPackageDetails.mockReset();
-  mockOpenWorkPackageDetails.mockResolvedValue(true);
-  mockUpdateWorkPackageScheduling.mockReset();
-  mockUpdateWorkPackageScheduling.mockResolvedValue(true);
-  mockToggleWorkPackageHold.mockReset();
-  mockToggleWorkPackageHold.mockResolvedValue(true);
-  mockSoftDeleteWorkPackage.mockReset();
-  mockSoftDeleteWorkPackage.mockResolvedValue(true);
-  mockRestoreSoftDeletedWorkPackage.mockReset();
-  mockRestoreSoftDeletedWorkPackage.mockResolvedValue(true);
+  mockOpenWorkOrderDetails.mockReset();
+  mockOpenWorkOrderDetails.mockResolvedValue(true);
+  mockUpdateWorkOrderScheduling.mockReset();
+  mockUpdateWorkOrderScheduling.mockResolvedValue(true);
+  mockToggleWorkOrderHold.mockReset();
+  mockToggleWorkOrderHold.mockResolvedValue(true);
+  mockSoftDeleteWorkOrder.mockReset();
+  mockSoftDeleteWorkOrder.mockResolvedValue(true);
+  mockRestoreSoftDeletedWorkOrder.mockReset();
+  mockRestoreSoftDeletedWorkOrder.mockResolvedValue(true);
   mockScopedDbFrom.mockImplementation((table: string) => {
     if (table === 'aircraft') {
       return buildQueryMock({
@@ -159,7 +159,7 @@ function createWorkspaceState(overrides: Record<string, unknown> = {}) {
     ],
     isAmroAuthorized: true,
     realtimeConnected: true,
-    workPackages: [
+    workOrders: [
       {
         id: 'wp-1',
         packageNumber: 'WP-1',
@@ -168,7 +168,7 @@ function createWorkspaceState(overrides: Record<string, unknown> = {}) {
         tasks: [
           {
             id: 'task-1',
-            workPackageId: 'wp-1',
+            workOrderId: 'wp-1',
             title: 'Inspect',
             lifecycleStage: 'execute',
             assignedRole: 'technician',
@@ -177,7 +177,7 @@ function createWorkspaceState(overrides: Record<string, unknown> = {}) {
         ],
       },
     ],
-    selectedWorkPackage: {
+    selectedWorkOrder: {
       id: 'wp-1',
       packageNumber: 'WP-1',
       lifecycleStage: 'plan',
@@ -185,7 +185,7 @@ function createWorkspaceState(overrides: Record<string, unknown> = {}) {
       tasks: [
         {
           id: 'task-1',
-          workPackageId: 'wp-1',
+          workOrderId: 'wp-1',
           title: 'Inspect',
           lifecycleStage: 'execute',
           assignedRole: 'technician',
@@ -193,44 +193,44 @@ function createWorkspaceState(overrides: Record<string, unknown> = {}) {
         },
       ],
     },
-    selectedWorkPackageId: 'wp-1',
-    setSelectedWorkPackageId: vi.fn(),
-    workPackagesError: null,
-    canCreateWorkPackage: true,
-    canDeleteWorkPackage: true,
+    selectedWorkOrderId: 'wp-1',
+    setSelectedWorkOrderId: vi.fn(),
+    workOrdersError: null,
+    canCreateWorkOrder: true,
+    canDeleteWorkOrder: true,
     canAdvanceLifecycle: true,
     activeRole: 'planner',
-    loadingWorkPackages: false,
-    refreshWorkPackages: vi.fn(),
-    createWorkPackage: vi.fn().mockResolvedValue(true),
-    deleteSelectedWorkPackage: vi.fn().mockResolvedValue(true),
-    openWorkPackageDetails: mockOpenWorkPackageDetails,
-    updateWorkPackageScheduling: mockUpdateWorkPackageScheduling,
-    toggleWorkPackageHold: mockToggleWorkPackageHold,
-    softDeleteWorkPackage: mockSoftDeleteWorkPackage,
-    restoreSoftDeletedWorkPackage: mockRestoreSoftDeletedWorkPackage,
+    loadingWorkOrders: false,
+    refreshWorkOrders: vi.fn(),
+    createWorkOrder: vi.fn().mockResolvedValue(true),
+    deleteSelectedWorkOrder: vi.fn().mockResolvedValue(true),
+    openWorkOrderDetails: mockOpenWorkOrderDetails,
+    updateWorkOrderScheduling: mockUpdateWorkOrderScheduling,
+    toggleWorkOrderHold: mockToggleWorkOrderHold,
+    softDeleteWorkOrder: mockSoftDeleteWorkOrder,
+    restoreSoftDeletedWorkOrder: mockRestoreSoftDeletedWorkOrder,
     holdAuditTrail: [],
-    advanceWorkPackageLifecycle: vi.fn(),
-    workPackageStatusFilter: 'all',
-    setWorkPackageStatusFilter: vi.fn(),
-    workPackageSearch: '',
-    setWorkPackageSearch: vi.fn(),
+    advanceWorkOrderLifecycle: vi.fn(),
+    workOrderStatusFilter: 'all',
+    setWorkOrderStatusFilter: vi.fn(),
+    workOrderSearch: '',
+    setWorkOrderSearch: vi.fn(),
     selectedSavedViewId: 'default-all',
     setSelectedSavedViewId: vi.fn(),
-    savedWorkPackageViews: [{ id: 'default-all', name: 'All Work Packages', filters: { status: 'all', search: '' } }],
-    saveCurrentWorkPackageView: vi.fn().mockResolvedValue(true),
-    cloneWorkPackageFromTemplate: vi.fn().mockResolvedValue(true),
+    savedWorkOrderViews: [{ id: 'default-all', name: 'All Work Packages', filters: { status: 'all', search: '' } }],
+    saveCurrentWorkOrderView: vi.fn().mockResolvedValue(true),
+    cloneWorkOrderFromTemplate: vi.fn().mockResolvedValue(true),
     updateTaskExecutionStatus: vi.fn().mockResolvedValue(true),
     uploadTaskEvidence: vi.fn().mockResolvedValue(true),
     submitTaskSignature: vi.fn().mockResolvedValue(true),
-    assignSelectedWorkPackageToNextSlot: vi.fn().mockResolvedValue(true),
+    assignSelectedWorkOrderToNextSlot: vi.fn().mockResolvedValue(true),
     fetchScheduleOptimizationRecommendations: vi.fn().mockResolvedValue(true),
-    runWorkPackageReplanSimulation: vi.fn().mockResolvedValue(true),
-    confirmWorkPackageReplan: vi.fn().mockResolvedValue(true),
+    runWorkOrderReplanSimulation: vi.fn().mockResolvedValue(true),
+    confirmWorkOrderReplan: vi.fn().mockResolvedValue(true),
     acknowledgeScheduleUpdate: vi.fn().mockResolvedValue(true),
     scheduleBoardRows: [],
     scheduleOptimizationRecommendations: [],
-    workPackageReplanOptions: [],
+    workOrderReplanOptions: [],
     lastConfirmedReplanScheduleId: '',
     complianceGateModalOpen: false,
     setComplianceGateModalOpen: vi.fn(),
@@ -274,11 +274,11 @@ function createWorkspaceState(overrides: Record<string, unknown> = {}) {
         traceabilityStatus: 'verified',
       },
     ],
-    reservePartsAllocationForSelectedWorkPackage: vi.fn().mockResolvedValue(true),
+    reservePartsAllocationForSelectedWorkOrder: vi.fn().mockResolvedValue(true),
     processCriticalShortageResponse: vi.fn().mockResolvedValue(true),
     applyRotableLlpTraceability: vi.fn().mockResolvedValue(true),
     runInventoryOptimizationModel: vi.fn().mockResolvedValue(true),
-    syncSupplierEtaForSelectedWorkPackage: vi.fn().mockResolvedValue(true),
+    syncSupplierEtaForSelectedWorkOrder: vi.fn().mockResolvedValue(true),
     syncSupplierAsnAndErpProcurement: vi.fn().mockResolvedValue(true),
     lastInventoryOptimizationRunId: '',
     lastProcurementSyncId: '',
@@ -333,7 +333,7 @@ describe('AmroOwnedWorkspace', () => {
       <AmroOwnedWorkspace
         moduleKey="overview"
         overviewTelemetry={{
-          openWorkPackages: 38,
+          openWorkOrders: 38,
           aogCount: 3,
         }}
       />,
@@ -393,10 +393,10 @@ describe('AmroOwnedWorkspace', () => {
   });
 
   it('requires rationale before closure and certification deferral actions', async () => {
-    const advanceWorkPackageLifecycle = vi.fn().mockResolvedValue(true);
+    const advanceWorkOrderLifecycle = vi.fn().mockResolvedValue(true);
     const submitCertificationDecision = vi.fn().mockResolvedValue(true);
     mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({
-      advanceWorkPackageLifecycle,
+      advanceWorkOrderLifecycle,
       submitCertificationDecision,
     }));
     render(<AmroOwnedWorkspace />);
@@ -405,7 +405,7 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getByText('Confirm Work Package Closure')).toBeTruthy();
     fireEvent.change(screen.getByLabelText('Closure rationale'), { target: { value: 'All checks passed and signed.' } });
     fireEvent.click(screen.getByRole('button', { name: 'Confirm closure with rationale' }));
-    expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(1);
+    expect(advanceWorkOrderLifecycle).toHaveBeenCalledTimes(1);
 
     fireEvent.click(screen.getByLabelText('Defer certification decision with rationale'));
     expect(screen.getByText('Confirm Certification Deferral')).toBeTruthy();
@@ -414,9 +414,9 @@ describe('AmroOwnedWorkspace', () => {
     expect(submitCertificationDecision).toHaveBeenCalledWith('defer');
   });
 
-  it('renders interactive work package surfaces on work-packages route', () => {
+  it('renders interactive work package surfaces on work-orders route', () => {
     mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
-    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+    render(<AmroOwnedWorkspace moduleKey="work-orders" />);
 
     expect(screen.getAllByText('Work Packages').length).toBeGreaterThan(0);
     expect(screen.queryByText('AMRO > Work Packages')).toBeNull();
@@ -426,9 +426,9 @@ describe('AmroOwnedWorkspace', () => {
   });
 
   it('validates and submits work package creation flow with aircraft-first gating', async () => {
-    const createWorkPackage = vi.fn().mockResolvedValue(true);
-    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({ createWorkPackage }));
-    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+    const createWorkOrder = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({ createWorkOrder }));
+    render(<AmroOwnedWorkspace moduleKey="work-orders" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add WP' }));
     expect(screen.getByLabelText('Package Number')).toBeTruthy();
@@ -436,7 +436,7 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getByLabelText('Planning Date')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     expect(screen.getAllByText('Aircraft is required before task selection.').length).toBeGreaterThan(0);
-    expect(createWorkPackage).toHaveBeenCalledTimes(0);
+    expect(createWorkOrder).toHaveBeenCalledTimes(0);
 
     fireEvent.click(await screen.findByRole('button', { name: /A320-200/ }));
     fireEvent.change(screen.getByLabelText('Package Number'), { target: { value: 'WP-A320-001' } });
@@ -454,7 +454,7 @@ describe('AmroOwnedWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Review' }));
     fireEvent.click(await screen.findByRole('button', { name: 'Submit' }));
     await waitFor(() => {
-      expect(createWorkPackage).toHaveBeenCalledWith('C-Check package for fleet A1', expect.objectContaining({
+      expect(createWorkOrder).toHaveBeenCalledWith('C-Check package for fleet A1', expect.objectContaining({
         aircraftId: 'ac-1',
         maintenanceType: 'line',
         priority: 'medium',
@@ -511,9 +511,9 @@ describe('AmroOwnedWorkspace', () => {
       }
       return buildQueryMock({ data: [], error: null });
     });
-    const createWorkPackage = vi.fn().mockResolvedValue(true);
-    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({ createWorkPackage }));
-    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+    const createWorkOrder = vi.fn().mockResolvedValue(true);
+    mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({ createWorkOrder }));
+    render(<AmroOwnedWorkspace moduleKey="work-orders" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Add WP' }));
     const aircraftOption = await screen.findByRole('button', { name: /A320-200/ });
@@ -527,9 +527,9 @@ describe('AmroOwnedWorkspace', () => {
     expect(screen.getByText('0 selected')).toBeTruthy();
   });
 
-  it('shows UX-AMRO-005 detail tabs and side panel headings on work-packages route', () => {
+  it('shows UX-AMRO-005 detail tabs and side panel headings on work-orders route', () => {
     mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState());
-    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+    render(<AmroOwnedWorkspace moduleKey="work-orders" />);
 
     expect(screen.getByText('Overview')).toBeTruthy();
     expect(screen.getByText('Tasks')).toBeTruthy();
@@ -544,11 +544,11 @@ describe('AmroOwnedWorkspace', () => {
   });
 
   it('runs integration monitor actions from integration module page', () => {
-    const refreshWorkPackages = vi.fn().mockResolvedValue(true);
+    const refreshWorkOrders = vi.fn().mockResolvedValue(true);
     const loadAuditReplayTimeline = vi.fn().mockResolvedValue(true);
     mockUseAmroWorkspaceState.mockReturnValue(
       createWorkspaceState({
-        refreshWorkPackages,
+        refreshWorkOrders,
         loadAuditReplayTimeline,
       }),
     );
@@ -557,21 +557,21 @@ describe('AmroOwnedWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Refresh Integration Status' }));
     fireEvent.click(screen.getByRole('button', { name: 'Open Replay Console' }));
 
-    expect(refreshWorkPackages).toHaveBeenCalledTimes(1);
+    expect(refreshWorkOrders).toHaveBeenCalledTimes(1);
     expect(loadAuditReplayTimeline).toHaveBeenCalledTimes(2);
   });
 
   it('wires shell and sticky action buttons to interactive handlers', async () => {
-    const setSelectedWorkPackageId = vi.fn();
-    const updateWorkPackageScheduling = vi.fn().mockResolvedValue(true);
-    const advanceWorkPackageLifecycle = vi.fn().mockResolvedValue(true);
-    const toggleWorkPackageHold = vi.fn().mockResolvedValue(true);
+    const setSelectedWorkOrderId = vi.fn();
+    const updateWorkOrderScheduling = vi.fn().mockResolvedValue(true);
+    const advanceWorkOrderLifecycle = vi.fn().mockResolvedValue(true);
+    const toggleWorkOrderHold = vi.fn().mockResolvedValue(true);
     mockUseAmroWorkspaceState.mockReturnValue(
       createWorkspaceState({
-        setSelectedWorkPackageId,
-        updateWorkPackageScheduling,
-        advanceWorkPackageLifecycle,
-        toggleWorkPackageHold,
+        setSelectedWorkOrderId,
+        updateWorkOrderScheduling,
+        advanceWorkOrderLifecycle,
+        toggleWorkOrderHold,
       }),
     );
     render(<AmroOwnedWorkspace />);
@@ -582,55 +582,55 @@ describe('AmroOwnedWorkspace', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Bulk Actions' }));
 
     await waitFor(() => {
-      expect(updateWorkPackageScheduling).toHaveBeenCalledTimes(1);
-      expect(toggleWorkPackageHold).toHaveBeenCalledTimes(1);
+      expect(updateWorkOrderScheduling).toHaveBeenCalledTimes(1);
+      expect(toggleWorkOrderHold).toHaveBeenCalledTimes(1);
     });
-    expect(setSelectedWorkPackageId).toHaveBeenCalledWith('wp-1');
-    expect(advanceWorkPackageLifecycle).toHaveBeenCalledTimes(1);
+    expect(setSelectedWorkOrderId).toHaveBeenCalledWith('wp-1');
+    expect(advanceWorkOrderLifecycle).toHaveBeenCalledTimes(1);
   });
 
   it('handles Open, Schedule, Hold, Clone, Export, Delete actions with feedback and recovery', async () => {
-    const cloneWorkPackageFromTemplate = vi.fn().mockResolvedValue(true);
-    const updateWorkPackageScheduling = vi.fn().mockResolvedValue(true);
-    const toggleWorkPackageHold = vi.fn().mockResolvedValue(true);
-    const openWorkPackageDetails = vi.fn().mockResolvedValue(true);
-    const softDeleteWorkPackage = vi.fn().mockResolvedValue(true);
-    const restoreSoftDeletedWorkPackage = vi.fn().mockResolvedValue(true);
+    const cloneWorkOrderFromTemplate = vi.fn().mockResolvedValue(true);
+    const updateWorkOrderScheduling = vi.fn().mockResolvedValue(true);
+    const toggleWorkOrderHold = vi.fn().mockResolvedValue(true);
+    const openWorkOrderDetails = vi.fn().mockResolvedValue(true);
+    const softDeleteWorkOrder = vi.fn().mockResolvedValue(true);
+    const restoreSoftDeletedWorkOrder = vi.fn().mockResolvedValue(true);
     const originalConfirm = window.confirm;
     window.confirm = vi.fn().mockReturnValue(true);
     mockUseAmroWorkspaceState.mockReturnValue(
       createWorkspaceState({
-        cloneWorkPackageFromTemplate,
-        updateWorkPackageScheduling,
-        toggleWorkPackageHold,
-        openWorkPackageDetails,
-        softDeleteWorkPackage,
-        restoreSoftDeletedWorkPackage,
+        cloneWorkOrderFromTemplate,
+        updateWorkOrderScheduling,
+        toggleWorkOrderHold,
+        openWorkOrderDetails,
+        softDeleteWorkOrder,
+        restoreSoftDeletedWorkOrder,
       }),
     );
-    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+    render(<AmroOwnedWorkspace moduleKey="work-orders" />);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open work package WP-1' }));
     await waitFor(() => {
-      expect(openWorkPackageDetails).toHaveBeenCalledWith('wp-1');
+      expect(openWorkOrderDetails).toHaveBeenCalledWith('wp-1');
     });
     fireEvent.click(screen.getByRole('button', { name: 'Schedule work package WP-1' }));
     await waitFor(() => {
-      expect(updateWorkPackageScheduling).toHaveBeenCalledWith('wp-1');
+      expect(updateWorkOrderScheduling).toHaveBeenCalledWith('wp-1');
     });
     fireEvent.click(screen.getByRole('button', { name: 'Hold work package WP-1' }));
     await waitFor(() => {
-      expect(toggleWorkPackageHold).toHaveBeenCalledWith('wp-1');
+      expect(toggleWorkOrderHold).toHaveBeenCalledWith('wp-1');
     });
     fireEvent.click(screen.getByRole('button', { name: 'Clone work package WP-1' }));
     await waitFor(() => {
-      expect(cloneWorkPackageFromTemplate).toHaveBeenCalledWith('wp-1');
+      expect(cloneWorkOrderFromTemplate).toHaveBeenCalledWith('wp-1');
     });
     fireEvent.click(screen.getByRole('button', { name: 'Export work package WP-1' }));
     fireEvent.click(screen.getByRole('button', { name: 'Delete work package WP-1' }));
 
     await waitFor(() => {
-      expect(softDeleteWorkPackage).toHaveBeenCalledWith('wp-1');
+      expect(softDeleteWorkOrder).toHaveBeenCalledWith('wp-1');
     });
 
     expect(mockXlsxWriteFile).toHaveBeenCalledWith(mockWorkbook, 'WP-1-export.xlsx');
@@ -643,7 +643,7 @@ describe('AmroOwnedWorkspace', () => {
     const toastOptions = deleteToastCall?.[1] as { action?: { onClick?: () => void } } | undefined;
     toastOptions?.action?.onClick?.();
     await waitFor(() => {
-      expect(restoreSoftDeletedWorkPackage).toHaveBeenCalledWith('wp-1');
+      expect(restoreSoftDeletedWorkOrder).toHaveBeenCalledWith('wp-1');
     });
     window.confirm = originalConfirm;
   });
@@ -656,7 +656,7 @@ describe('AmroOwnedWorkspace', () => {
       value: localStorageSetItem,
     });
     mockUseAmroWorkspaceState.mockReturnValue(createWorkspaceState({
-      workPackages: [
+      workOrders: [
         {
           id: 'wp-1',
           packageNumber: 'WP-1',
@@ -673,7 +673,7 @@ describe('AmroOwnedWorkspace', () => {
         },
       ],
     }));
-    render(<AmroOwnedWorkspace moduleKey="work-packages" />);
+    render(<AmroOwnedWorkspace moduleKey="work-orders" />);
 
     const sourceRow = screen.getByRole('button', { name: 'Drag handle for WP-1' }).closest('[draggable="true"]');
     const targetRow = screen.getByRole('button', { name: 'Drag handle for WP-2' }).closest('[draggable="true"]');
@@ -684,7 +684,7 @@ describe('AmroOwnedWorkspace', () => {
     fireEvent.drop(targetRow);
 
     await waitFor(() => {
-      expect(localStorageSetItem).toHaveBeenCalledWith('amro.workspace.work-package-order', expect.any(String));
+      expect(localStorageSetItem).toHaveBeenCalledWith('amro.workspace.work-order-order', expect.any(String));
     });
 
     Object.defineProperty(window.localStorage, 'setItem', {

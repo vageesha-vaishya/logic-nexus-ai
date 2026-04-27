@@ -25,15 +25,15 @@ This change renames `public.task_templates.task_template_id` to `public.task_tem
 Updated references where `task_templates.task_template_id` was used as the sequence column:
 
 - API query layer:
-  - `src/pages/api/v2/amro/work-package-templates/task-template-options.ts`
+  - `src/pages/api/v2/amro/work-order-templates/task-template-options.ts`
   - `src/pages/api/v2/amro/master-data/[entity].ts`
 - AMRO API service layer:
-  - `services/amro-api/src/routes/work-package-template.routes.ts`
+  - `services/amro-api/src/routes/work-order-template.routes.ts`
 - Tests:
-  - `src/pages/api/v2/amro/work-package-templates/task-template-options.test.ts`
-  - `services/amro-api/tests/work-package-template.routes.test.ts`
+  - `src/pages/api/v2/amro/work-order-templates/task-template-options.test.ts`
+  - `services/amro-api/tests/work-order-template.routes.test.ts`
 
-Reviewed and intentionally kept unchanged references that point to UUID foreign keys in `work_package_template_task_templates.task_template_id` and request payload keys `task_template_id`.
+Reviewed and intentionally kept unchanged references that point to UUID foreign keys in `work_order_template_task_templates.task_template_id` and request payload keys `task_template_id`.
 
 ## Deployment Checklist
 

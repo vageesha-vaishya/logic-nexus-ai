@@ -19,7 +19,7 @@
    - `accessToken`
    - `tenantId`
    - `franchiseId`
-   - `workPackageId`
+   - `workOrderId`
    - `taskId`
 4. Ensure `partNumber` and `scanCode` exist in seeded AMRO inventory.
 

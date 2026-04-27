@@ -25,7 +25,7 @@ describe('AMRO reconciliation queue', () => {
       tenantId: 'tenant-1',
       franchiseId: 'fr-1',
       compatMode: 'v2-shadow',
-      requestedFilters: { workPackageId: 'WP-001' },
+      requestedFilters: { workOrderId: 'WP-001' },
       reconciliation: {
         legacyCount: 1,
         moduleCount: 1,
@@ -57,7 +57,7 @@ describe('AMRO reconciliation queue', () => {
   it('returns disabled mode when queue is disabled by feature flag', async () => {
     process.env.AMRO_RECON_QUEUE_ENABLED = 'false';
     const result = await enqueueAmroReconciliationSnapshot({
-      capability: 'work-packages',
+      capability: 'work-orders',
       correlationId: 'corr-2',
       tenantId: 'tenant-1',
       franchiseId: null,
@@ -74,7 +74,7 @@ describe('AMRO reconciliation queue', () => {
 
     expect(result).toEqual({
       queued: false,
-      idempotencyKey: 'amro:work-packages:tenant-1:franchise-none:v2-shadow:corr-2',
+      idempotencyKey: 'amro:work-orders:tenant-1:franchise-none:v2-shadow:corr-2',
       queueMode: 'disabled',
     });
   });
@@ -87,7 +87,7 @@ describe('AMRO reconciliation queue', () => {
       tenantId: 'tenant-1',
       franchiseId: 'fr-1',
       compatMode: 'v2-shadow',
-      requestedFilters: { workPackageId: 'WP-001' },
+      requestedFilters: { workOrderId: 'WP-001' },
       reconciliation: {
         legacyCount: 2,
         moduleCount: 2,
@@ -182,7 +182,7 @@ describe('AMRO reconciliation queue', () => {
       tenantId: 'tenant-1',
       franchiseId: 'fr-1',
       compatMode: 'v2-shadow',
-      requestedFilters: { workPackageId: 'WP-001' },
+      requestedFilters: { workOrderId: 'WP-001' },
       reconciliation: {
         legacyCount: 2,
         moduleCount: 2,
@@ -205,7 +205,7 @@ describe('AMRO reconciliation queue', () => {
       tenantId: 'tenant-1',
       franchiseId: 'fr-1',
       compatMode: 'v2-shadow',
-      requestedFilters: { workPackageId: 'WP-001' },
+      requestedFilters: { workOrderId: 'WP-001' },
       reconciliation: {
         legacyCount: 2,
         moduleCount: 2,
@@ -225,7 +225,7 @@ describe('AMRO reconciliation queue', () => {
   it('returns disabled drain mode when queue feature is disabled', async () => {
     process.env.AMRO_RECON_QUEUE_ENABLED = 'false';
     const drained = await drainAmroReconciliationQueueForFallback({
-      capability: 'work-packages',
+      capability: 'work-orders',
       correlationId: 'corr-drain-disabled',
       tenantId: 'tenant-1',
       franchiseId: null,

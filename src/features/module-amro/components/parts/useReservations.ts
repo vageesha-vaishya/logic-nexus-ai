@@ -10,7 +10,7 @@ export interface ReservationItem {
   serial_number: string | null;
   description: string | null;
   warehouse_location: string | null;
-  work_package_id: string | null;
+  work_order_id: string | null;
   task_id: string | null;
   reserved_quantity: number;
   status: ReservationStatus;
@@ -38,7 +38,7 @@ interface ListReservationsOutput {
 
 interface ReservePartsOutput {
   tenant_id: string;
-  work_package_id: string | null;
+  work_order_id: string | null;
   task_id: string | null;
   total_requested: number;
   succeeded: number;
@@ -56,7 +56,7 @@ interface ReleaseReservationOutput {
 }
 
 interface UseListReservationsParams {
-  workPackageId?: string;
+  workOrderId?: string;
   inventoryId?: string;
   status?: ReservationStatus;
   limit?: number;
@@ -68,13 +68,13 @@ const RESERVATIONS_KEY = ['amro', 'inventory', 'reservations'] as const;
 // ── List reservations ───────────────────────────────────────────────────────
 
 async function fetchReservations(
-  workPackageId?: string,
+  workOrderId?: string,
   inventoryId?: string,
   status?: string,
   limit?: number,
 ): Promise<ListReservationsOutput> {
   const params = new URLSearchParams();
-  if (workPackageId) params.set('work_package_id', workPackageId);
+  if (workOrderId) params.set('work_order_id', workOrderId);
   if (inventoryId) params.set('inventory_id', inventoryId);
   if (status) params.set('status', status);
   if (limit) params.set('limit', String(limit));
@@ -87,10 +87,10 @@ async function fetchReservations(
 }
 
 export function useListReservations(params: UseListReservationsParams = {}) {
-  const { workPackageId, inventoryId, status, limit, enabled = true } = params;
+  const { workOrderId, inventoryId, status, limit, enabled = true } = params;
   return useQuery({
-    queryKey: [...RESERVATIONS_KEY, 'list', workPackageId || 'all', inventoryId || 'all', status || 'all', limit || 50] as const,
-    queryFn: () => fetchReservations(workPackageId, inventoryId, status, limit),
+    queryKey: [...RESERVATIONS_KEY, 'list', workOrderId || 'all', inventoryId || 'all', status || 'all', limit || 50] as const,
+    queryFn: () => fetchReservations(workOrderId, inventoryId, status, limit),
     enabled,
     staleTime: 15_000,
     retry: 2,
@@ -100,7 +100,7 @@ export function useListReservations(params: UseListReservationsParams = {}) {
 // ── Create reservation ──────────────────────────────────────────────────────
 
 interface CreateReservationInput {
-  workPackageId?: string;
+  workOrderId?: string;
   taskId?: string;
   expiresAt?: string;
   lineItems: Array<{ inventory_id: string; quantity: number; notes?: string }>;
@@ -111,7 +111,7 @@ async function mutateReservations(input: CreateReservationInput): Promise<Reserv
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      work_package_id: input.workPackageId,
+      work_order_id: input.workOrderId,
       task_id: input.taskId,
       expires_at: input.expiresAt,
       line_items: input.lineItems,

@@ -356,18 +356,18 @@ npm run test:smoke:production
 
 ```sql
 -- Check for data inconsistencies
-SELECT COUNT(*) FROM work_packages WHERE tenant_id IS NULL;
+SELECT COUNT(*) FROM work_orders WHERE tenant_id IS NULL;
 -- Expected: 0
 
 SELECT COUNT(*) FROM mro_audit.records WHERE created_at > NOW() - INTERVAL '1 hour';
 -- Expected: >0 (audit records being created)
 
 -- Check for orphaned references
-SELECT COUNT(*) FROM tasks WHERE work_package_id NOT IN (SELECT id FROM work_packages);
+SELECT COUNT(*) FROM tasks WHERE work_order_id NOT IN (SELECT id FROM work_orders);
 -- Expected: 0
 
 -- Verify RLS is enforced
-SELECT COUNT(DISTINCT tenant_id) FROM work_packages;
+SELECT COUNT(DISTINCT tenant_id) FROM work_orders;
 -- Expected: match number of tenants
 ```
 
@@ -708,9 +708,9 @@ pg_restore -h prod-db.aws.com -U admin \
 
 # 3. Run consistency checks
 psql -h prod-db.aws.com -U admin -d $TARGET_DB << EOF
-  SELECT COUNT(*) as work_packages FROM work_packages;
+  SELECT COUNT(*) as work_orders FROM work_orders;
   SELECT COUNT(*) as audit_records FROM mro_audit.records;
-  SELECT COUNT(DISTINCT tenant_id) as tenants FROM work_packages;
+  SELECT COUNT(DISTINCT tenant_id) as tenants FROM work_orders;
 EOF
 
 # 4. Switch application to restored database

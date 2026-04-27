@@ -25,8 +25,8 @@ function isV2Enabled(): boolean {
 function parseCapability(req: ApiRequest): AmroCapability {
   const value = Array.isArray(req.query.capability) ? req.query.capability[0] : req.query.capability;
   const normalized = String(value || '').trim().toLowerCase();
-  if (!normalized) return 'work-packages';
-  if (normalized === 'work-packages' || normalized === 'tasks' || normalized === 'compliance-gates') {
+  if (!normalized) return 'work-orders';
+  if (normalized === 'work-orders' || normalized === 'tasks' || normalized === 'compliance-gates') {
     return normalized;
   }
   throw new Error('Bad Request: Invalid capability filter');
