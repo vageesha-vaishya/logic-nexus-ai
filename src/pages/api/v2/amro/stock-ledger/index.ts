@@ -30,6 +30,7 @@ const SOURCE_ENTITY_COLUMNS = [
   'order_number',
   'document_number',
   'transaction_number',
+  'work_order_number',
   'work_package_number',
 ];
 

@@ -215,7 +215,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       correlationId: ctx.correlationId,
       output: {
         work_package_id: wp.id,
-        work_package_number: wp.work_package_number,
+        work_package_number: wp.work_order_number || wp.work_package_number,
         emergency_wp_id: emergencyWPId,
         converted_from_task_id: task.id,
         conversion_timestamp: new Date().toISOString(),

@@ -11,7 +11,7 @@ export interface PersistedWorkPackage {
   franchise_id: string | null;
   aircraft_id: string | null;
   work_order_number: string;
-  work_package_number: string;
+  work_package_number?: string;
   title: string;
   description: string | null;
   work_type: string | null;
@@ -539,14 +539,14 @@ async function getNextWorkOrderNumber(
   const likePattern = `WP-%-${params.year}-%`;
   const { data, error } = await supabase
     .from('work_orders')
-    .select('work_package_number')
+    .select('work_order_number')
     .eq('tenant_id', params.tenantId)
-    .ilike('work_package_number', likePattern);
+    .ilike('work_order_number', likePattern);
   if (error) {
     throw new Error(`Failed to generate work package sequence: ${error.message}`);
   }
   const maxSeq = (Array.isArray(data) ? data : []).reduce((max, row) => {
-    const current = parseWorkPackageNumberSequence(String((row as Record<string, unknown>).work_package_number || ''), params.year);
+    const current = parseWorkPackageNumberSequence(String((row as Record<string, unknown>).work_order_number || ''), params.year);
     return current > max ? current : max;
   }, 0);
   const nextSeq = String(maxSeq + 1).padStart(4, '0');
@@ -601,7 +601,7 @@ export async function persistCreateWorkPackage(params: {
       await client.query('BEGIN');
       const insertSql = `
         INSERT INTO public.work_orders (
-          tenant_id, franchise_id, aircraft_id, work_package_number, title, description,
+          tenant_id, franchise_id, aircraft_id, work_order_number, title, description,
           work_type, maintenance_type, priority, source, work_order_template_id, work_order_title_id,
           planned_start_date, planned_end_date, estimated_labor_hours, estimated_cost, status, assigned_to,
           supervisor_id, notes, reference_documents, external_reference, created_by, updated_by
@@ -650,7 +650,7 @@ export async function persistCreateWorkPackage(params: {
           franchiseId: params.franchiseId,
           userId: params.userId,
           workPackageId: String(createdWorkPackage.id),
-          workPackageNumber: String(createdWorkPackage.work_package_number || workOrderNumber),
+          workPackageNumber: String(createdWorkPackage.work_order_number || workOrderNumber),
           workPackageTemplateId: params.workPackageTemplateId,
         });
       }
@@ -658,7 +658,7 @@ export async function persistCreateWorkPackage(params: {
       await client.query('COMMIT');
       logger.info('amro-work-package-created-atomic', {
         id: String(createdWorkPackage.id),
-        workPackageNumber: String(createdWorkPackage.work_package_number || workOrderNumber),
+        workPackageNumber: String(createdWorkPackage.work_order_number || workOrderNumber),
         generatedTasksCount,
         tenantId: params.tenantId,
       });
@@ -686,7 +686,7 @@ export async function persistCreateWorkPackage(params: {
       tenant_id: params.tenantId,
       franchise_id: params.franchiseId,
       aircraft_id: params.aircraftId,
-      work_package_number: workOrderNumber,
+      work_order_number: workOrderNumber,
       title: titleRecord.title,
       description: params.description || null,
       work_type: params.workType || params.maintenanceType, // NOT NULL in DB; default to maintenance type
@@ -728,7 +728,7 @@ export async function persistCreateWorkPackage(params: {
         franchiseId: params.franchiseId,
         userId: params.userId,
         workPackageId: String(data.id),
-        workPackageNumber: String(data.work_package_number || workOrderNumber),
+        workPackageNumber: String(data.work_order_number || workOrderNumber),
         workPackageTemplateId: params.workPackageTemplateId,
       });
     } catch (taskCreationError) {
@@ -757,7 +757,7 @@ export async function persistCreateWorkPackage(params: {
 
   logger.info('amro-work-package-created', {
     id: data.id,
-    workOrderNumber: data.work_package_number,
+    workOrderNumber: data.work_order_number,
     generatedTasksCount,
     tenantId: params.tenantId,
   });
@@ -932,7 +932,7 @@ export async function fetchWorkPackageList(params: {
   }
   if (params.search) {
     query = query.or(
-      `title.ilike.%${params.search}%,work_package_number.ilike.%${params.search}%,notes.ilike.%${params.search}%`
+      `title.ilike.%${params.search}%,work_order_number.ilike.%${params.search}%,notes.ilike.%${params.search}%`
     );
   }
 
@@ -1049,9 +1049,8 @@ function mapRowToWorkPackage(row: Record<string, unknown>): PersistedWorkPackage
     tenant_id: String(row.tenant_id || ''),
     franchise_id: row.franchise_id ? String(row.franchise_id) : null,
     aircraft_id: row.aircraft_id ? String(row.aircraft_id) : null,
-    // work_package_number is the sole identifier; work_order_number column was dropped
-    work_order_number: String(row.work_package_number || ''),
-    work_package_number: String(row.work_package_number || ''),
+    work_order_number: String(row.work_order_number || ''),
+    work_package_number: String(row.work_order_number || row.work_package_number || ''),
     title: String(row.title || ''),
     description: row.description ? String(row.description) : null,
     work_type: row.work_type ? String(row.work_type) : null,

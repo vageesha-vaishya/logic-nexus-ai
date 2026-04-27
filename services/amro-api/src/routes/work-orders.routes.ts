@@ -344,8 +344,8 @@ router.post(
       interface: 'create-work-order',
       output: {
         id: workPackage.id,
-        work_order_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
-        work_package_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
+        work_order_number: workPackage.work_order_number || workPackage.work_package_number || workPackage.id,
+        work_package_number: workPackage.work_order_number || workPackage.work_package_number || workPackage.id,
         status: workPackage.status,
         generated_tasks_count: Number(workPackage.generated_tasks_count || 0),
       },
@@ -375,8 +375,8 @@ router.patch(
       interface: 'update-work-order',
       output: {
         id: workPackage.id,
-        work_order_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
-        work_package_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
+        work_order_number: workPackage.work_order_number || workPackage.work_package_number || workPackage.id,
+        work_package_number: workPackage.work_order_number || workPackage.work_package_number || workPackage.id,
         status: workPackage.status,
       },
     });
@@ -445,8 +445,8 @@ router.get(
     const workPackages = await workOrdersService.getWorkPackages(tenantId);
     const records = workPackages.map((row) => ({
       id: row.id,
-      work_order_number: row.work_package_number || row.work_order_number || row.id,
-      work_package_number: row.work_package_number || row.work_order_number || row.id,
+      work_order_number: row.work_order_number || row.work_package_number || row.id,
+      work_package_number: row.work_order_number || row.work_package_number || row.id,
       title: row.title,
       aircraft_id: row.aircraft_id,
       status: row.status,

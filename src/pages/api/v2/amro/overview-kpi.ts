@@ -913,8 +913,8 @@ function mapWorkPackageOverview(
     return plannerPass && engineerPass;
   });
   return filtered.slice(0, 15).map((row) => ({
-    work_package_id: getStringValue(row, ['id', 'work_package_id', 'code', 'work_package_number'], 'unknown-work-package'),
-    title: getStringValue(row, ['title', 'name', 'description', 'work_package_number'], 'Untitled work package'),
+    work_package_id: getStringValue(row, ['id', 'work_package_id', 'code', 'work_order_number', 'work_package_number'], 'unknown-work-package'),
+    title: getStringValue(row, ['title', 'name', 'description', 'work_order_number', 'work_package_number'], 'Untitled work package'),
     status: resolveStatus(row) || 'unknown',
     planner_id: getStringValue(row, ['planner_id', 'assigned_planner_id', 'assigned_to'], 'unassigned'),
     engineer_id: getStringValue(row, ['engineer_id', 'assigned_engineer_id', 'lead_engineer_id'], 'unassigned'),

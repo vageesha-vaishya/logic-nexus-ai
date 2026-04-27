@@ -564,7 +564,7 @@ function buildComponentsSnapshot(args: {
 
 function buildEngineOperationsModule(args: {
   engineSnapshot: JsonRecord;
-  maintenanceRows: Array<{ work_package_id: string; work_package_number: string; title: string; status: string; priority: string; due_in_days: number | null; compliance_state: string; due_at: string; aircraft_id: string }>;
+  maintenanceRows: Array<{ work_package_id: string; work_package_number: string; work_order_number?: string; title: string; status: string; priority: string; due_in_days: number | null; compliance_state: string; due_at: string; aircraft_id: string }>;
   aircraftStatusRows: Array<{
     aircraft_id: string;
     registration: string;
@@ -596,7 +596,7 @@ function buildEngineOperationsModule(args: {
   } = args;
   const engineKeywords = ['engine', 'borescope', 'tbo', 'llp', 'hot section', 'compressor', 'turbine'];
   const engineMaintenanceRows = maintenanceRows.filter((row) => {
-    const title = `${parseStringValue(row.title)} ${parseStringValue(row.work_package_number)}`.toLowerCase();
+    const title = `${parseStringValue(row.title)} ${parseStringValue(row.work_order_number || row.work_package_number)}`.toLowerCase();
     return engineKeywords.some((keyword) => title.includes(keyword));
   });
   const selectedMaintenanceRows = (engineMaintenanceRows.length > 0 ? engineMaintenanceRows : maintenanceRows).slice(0, 12);
@@ -1081,7 +1081,7 @@ async function loadWorkPackageRows(supabase: SupabaseClient, tenantId: string, f
     limit,
     stats,
     candidateTables: ['work_orders', 'work_package_master'],
-    columns: 'id,aircraft_id,work_package_number,title,status,priority,planned_start,planned_end,due_at,compliance_state,updated_at',
+    columns: 'id,aircraft_id,work_order_number,title,status,priority,planned_start,planned_end,due_at,compliance_state,updated_at',
   });
 }
 
@@ -1242,7 +1242,7 @@ function buildRoleScopedOutput(args: {
   return {
     aircraft_status: allData.aircraft_status,
     maintenance_schedule: (allData.maintenance_schedule as JsonRecord[]).map((item) => ({
-      work_package_number: item.work_package_number,
+      work_package_number: item.work_order_number || item.work_package_number,
       status: item.status,
       due_in_days: item.due_in_days,
       priority: item.priority,
@@ -1479,8 +1479,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         return {
           work_package_id: parseStringValue(row.id),
           aircraft_id: parseStringValue(row.aircraft_id),
-          work_package_number: parseStringValue(row.work_package_number || row.id),
-          title: parseStringValue(row.title || row.work_package_number || 'Maintenance package'),
+          work_package_number: parseStringValue(row.work_order_number || row.work_package_number || row.id),
+          title: parseStringValue(row.title || row.work_order_number || row.work_package_number || 'Maintenance package'),
           status: parseStringValue(row.status || 'open'),
           priority: parseStringValue(row.priority || 'medium'),
           planned_start: parseStringValue(row.planned_start),

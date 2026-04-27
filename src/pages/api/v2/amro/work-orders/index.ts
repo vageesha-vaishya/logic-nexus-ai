@@ -129,7 +129,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       const records = rows.map((wp) => ({
         id: wp.id,
-        work_order_number: wp.work_package_number,
+        work_order_number: wp.work_order_number || wp.work_package_number,
         title: wp.title,
         aircraft_id: wp.aircraft_id,
         aircraft_registration: null, // Would join aircraft table in production
@@ -223,7 +223,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           id: persisted.id,
-          work_order_number: persisted.work_package_number,
+          work_order_number: persisted.work_order_number || persisted.work_package_number,
           status: persisted.status,
           created_at: persisted.created_at,
           generated_tasks_count: Number(persisted.generated_tasks_count || 0),

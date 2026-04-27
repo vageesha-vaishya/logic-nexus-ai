@@ -90,7 +90,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           *,
           work_orders:work_package_id (
             id,
-            work_package_number,
+            work_order_number,
             title,
             status,
             priority,
@@ -241,7 +241,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           work_package_id: wp.id,
-          work_package_number: wp.work_package_number,
+          work_package_number: wp.work_order_number || wp.work_package_number,
           emergency_wp_id: emergencyWP.id,
           declared_at: emergencyWP.declared_at,
           auto_prioritized: emergencyWP.auto_prioritized,

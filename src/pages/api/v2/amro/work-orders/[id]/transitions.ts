@@ -125,7 +125,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       correlationId: ctx.correlationId,
       output: {
         id: updated.id,
-        work_order_number: updated.work_package_number,
+        work_order_number: updated.work_order_number || updated.work_package_number,
         previous_status: currentStatus,
         new_status: updated.status,
         transitioned_at: updated.updated_at,

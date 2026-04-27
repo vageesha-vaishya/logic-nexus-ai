@@ -695,8 +695,8 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
         ? forecastRecommendations.reduce((sum, item) => sum + item.confidence_pct, 0) / forecastRecommendations.length
         : 0;
       const workPackageOverview = filteredWorkPackages.slice(0, 15).map((row) => ({
-        work_package_id: getStringValue(row, ['id', 'work_package_id', 'code', 'work_package_number'], 'unknown-work-package'),
-        title: getStringValue(row, ['title', 'name', 'description', 'work_package_number'], 'Untitled work package'),
+        work_package_id: getStringValue(row, ['id', 'work_package_id', 'code', 'work_order_number', 'work_package_number'], 'unknown-work-package'),
+        title: getStringValue(row, ['title', 'name', 'description', 'work_order_number', 'work_package_number'], 'Untitled work package'),
         status: resolveStatus(row) || 'unknown',
         planner_id: getStringValue(row, ['planner_id', 'assigned_planner_id', 'assigned_to'], 'unassigned'),
         engineer_id: getStringValue(row, ['engineer_id', 'assigned_engineer_id', 'lead_engineer_id'], 'unassigned'),
@@ -1420,8 +1420,8 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
       return {
         work_package_id: getStringValue(row, ['id']),
         aircraft_id: getStringValue(row, ['aircraft_id']),
-        work_package_number: getStringValue(row, ['work_package_number', 'id']),
-        title: getStringValue(row, ['title', 'work_package_number'], 'Maintenance package'),
+        work_package_number: getStringValue(row, ['work_order_number', 'work_package_number', 'id']),
+        title: getStringValue(row, ['title', 'work_order_number', 'work_package_number'], 'Maintenance package'),
         status,
         priority: getStringValue(row, ['priority'], 'medium'),
         due_at: dueDate,
