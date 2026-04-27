@@ -21,7 +21,6 @@ function useAuthHeaders(): HeadersInit | null {
 export interface WorkOrderListItem {
   id: string;
   work_order_number: string;
-  work_order_number?: string;
   title: string;
   aircraft_id: string | null;
   aircraft_registration: string | null;
@@ -109,8 +108,7 @@ function normalizeWorkOrderListResponse(json: any): WorkOrderListResponse {
   return {
     records: recordsArray.map((item: any) => ({
       id: item.id || item.work_order_id || '',
-      work_order_number: item.work_order_number || item.work_order_number || item.package_number || item.code || item.id || '',
-      work_order_number: item.work_order_number || item.work_order_number || item.code || '',
+      work_order_number: item.work_order_number || item.package_number || item.code || item.id || '',
       title: item.title || 'Work Package',
       aircraft_id: item.aircraft_id || null,
       aircraft_registration: item.aircraft_registration || null,
@@ -172,26 +170,14 @@ async function fetchWorkOrders(
   });
 
   const queryString = qs.toString();
-  const fetchList = async (endpoint: '/api/v2/amro/work-orders' | '/api/v2/amro/work-orders') => {
+  const fetchList = async (endpoint: '/api/v2/amro/work-orders') => {
     const response = await fetch(`${endpoint}?${queryString}`, { method: 'GET', headers });
     if (!response.ok) throw new Error(`Failed to list work packages: ${response.status}`);
     const json = await response.json();
     return normalizeWorkOrderListResponse(json);
   };
 
-  let primaryError: Error | null = null;
-  try {
-    const primary = await fetchList('/api/v2/amro/work-orders');
-    if (primary.records.length > 0) return primary;
-  } catch (error) {
-    primaryError = error as Error;
-  }
-
-  try {
-    return await fetchList('/api/v2/amro/work-orders');
-  } catch (fallbackError) {
-    throw primaryError || fallbackError;
-  }
+  return fetchList('/api/v2/amro/work-orders');
 }
 
 export function useListWorkOrders(params: UseListWorkOrdersParams = {}) {
@@ -251,8 +237,7 @@ async function fetchWorkOrder(id: string, headers: HeadersInit): Promise<WorkOrd
     const item = dataBlock.work_order || dataBlock.record || dataBlock;
     return {
       id: item.id || id,
-      work_order_number: item.work_order_number || item.work_order_number || item.code || '',
-      work_order_number: item.work_order_number || item.work_order_number || item.code || '',
+      work_order_number: item.work_order_number || item.code || '',
       title: item.title || item.work_order_number || 'Work Package',
       aircraft_id: item.aircraft_id || null,
       aircraft_registration: item.aircraft_registration || item.aircraft || null,
@@ -281,18 +266,14 @@ async function fetchWorkOrder(id: string, headers: HeadersInit): Promise<WorkOrd
     };
   };
 
-  const fetchDetail = async (endpoint: '/api/v2/amro/work-orders' | '/api/v2/amro/work-orders') => {
+  const fetchDetail = async (endpoint: '/api/v2/amro/work-orders') => {
     const response = await fetch(`${endpoint}/${id}`, { method: 'GET', headers });
     if (!response.ok) throw new Error(`Failed to get work package: ${response.status}`);
     const json = await response.json();
     return mapDetail(json);
   };
 
-  try {
-    return await fetchDetail('/api/v2/amro/work-orders');
-  } catch {
-    return fetchDetail('/api/v2/amro/work-orders');
-  }
+  return fetchDetail('/api/v2/amro/work-orders');
 }
 
 export function useWorkOrder(id: string | null) {
@@ -331,7 +312,6 @@ interface CreateWorkOrderInput {
 async function mutateCreateWorkOrder(input: CreateWorkOrderInput, headers: HeadersInit): Promise<{
   id: string;
   work_order_number: string;
-  work_order_number?: string;
   status: WorkOrderStatus;
 }> {
   const response = await fetch('/api/v2/amro/work-orders', {
@@ -381,7 +361,6 @@ async function mutateUpdateWorkOrder(input: UpdateWorkOrderInput, headers: Heade
   id: string;
   status: WorkOrderStatus;
   work_order_number: string;
-  work_order_number?: string;
 }> {
   const response = await fetch(`/api/v2/amro/work-orders/${input.id}`, {
     method: 'PATCH',
