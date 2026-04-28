@@ -3166,6 +3166,45 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return accumulator;
     }, {});
   }, []);
+  const normalizeAircraftValidationErrors = useCallback((errors: Record<string, string>): Record<string, string> => {
+    const normalized = { ...errors };
+    if (normalized.tail_number && !normalized.registration) {
+      normalized.registration = normalized.tail_number;
+    }
+    return normalized;
+  }, []);
+  const focusFirstAircraftValidationField = useCallback((errors: Record<string, string>) => {
+    const orderedFields: Array<{ key: string; elementId: string }> = [
+      { key: 'registration', elementId: 'aircraft-registration' },
+      { key: 'tail_number', elementId: 'aircraft-registration' },
+      { key: 'tenant_id', elementId: 'aircraft-tenant-id' },
+      { key: 'franchise_id', elementId: 'aircraft-franchise-id' },
+      { key: 'serial_number', elementId: 'aircraft-serial' },
+      { key: 'aircraft_template', elementId: 'aircraft-template-select' },
+      { key: 'manufacturer_id', elementId: 'aircraft-manufacturer-readonly' },
+      { key: 'aircraft_model', elementId: 'aircraft-model-name-readonly' },
+      { key: 'aircraft_type', elementId: 'aircraft-type-readonly' },
+      { key: 'maintenance_program', elementId: 'aircraft-maintenance-program' },
+      { key: 'warranty_start_date', elementId: 'warranty-start-date' },
+      { key: 'warranty_end_date', elementId: 'warranty-end-date' },
+      { key: 'not_in_use_date', elementId: 'aircraft-not-in-use-date' },
+      { key: 'readonly_date', elementId: 'aircraft-readonly-date' },
+    ];
+    const firstErrorField = orderedFields.find((field) => String(errors[field.key] || '').trim().length > 0);
+    if (!firstErrorField) {
+      return;
+    }
+    window.requestAnimationFrame(() => {
+      const target = document.getElementById(firstErrorField.elementId) as HTMLElement | null;
+      if (!target) {
+        return;
+      }
+      target.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      if (typeof target.focus === 'function') {
+        target.focus();
+      }
+    });
+  }, []);
 
   const handleCreate = useCallback(async () => {
     try {
@@ -3213,8 +3252,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         payload.warranty_start_date = String(warrantyJson.warranty_start_date || '').trim() || null;
         payload.warranty_end_date = String(warrantyJson.warranty_end_date || '').trim() || null;
       }
-      setFormErrors(errors);
-      if (Object.keys(errors).length > 0) {
+      const normalizedErrors = entity === 'aircraft' ? normalizeAircraftValidationErrors(errors) : errors;
+      setFormErrors(normalizedErrors);
+      if (Object.keys(normalizedErrors).length > 0) {
+        if (entity === 'aircraft') {
+          focusFirstAircraftValidationField(normalizedErrors);
+        }
         toast.error('Please resolve form validation errors');
         return false;
       }
@@ -3353,7 +3396,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error(message);
       return false;
     }
-  }, [aircraftTemplateModel, entity, extractValidationErrors, formValues, getFormValuesForSubmit, isSystemSelectValue, loadRecords, resolveTemplateModelDetailsById, scope, systemTemplateModelOptions]);
+  }, [aircraftTemplateModel, entity, extractValidationErrors, focusFirstAircraftValidationField, formValues, getFormValuesForSubmit, isSystemSelectValue, loadRecords, normalizeAircraftValidationErrors, resolveTemplateModelDetailsById, scope, systemTemplateModelOptions]);
 
   const handleUpdate = useCallback(async () => {
     if (!selectedId) {
@@ -3391,8 +3434,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         payload.warranty_start_date = String(warrantyJson.warranty_start_date || '').trim() || null;
         payload.warranty_end_date = String(warrantyJson.warranty_end_date || '').trim() || null;
       }
-      setFormErrors(errors);
-      if (Object.keys(errors).length > 0) {
+      const normalizedErrors = entity === 'aircraft' ? normalizeAircraftValidationErrors(errors) : errors;
+      setFormErrors(normalizedErrors);
+      if (Object.keys(normalizedErrors).length > 0) {
+        if (entity === 'aircraft') {
+          focusFirstAircraftValidationField(normalizedErrors);
+        }
         toast.error('Please resolve form validation errors');
         return false;
       }
@@ -3539,7 +3586,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       toast.error(message);
       return false;
     }
-  }, [entity, extractValidationErrors, formValues, getFormValuesForSubmit, loadRecords, scope, selectedId]);
+  }, [aircraftTemplateModel, entity, extractValidationErrors, focusFirstAircraftValidationField, formValues, getFormValuesForSubmit, isSystemSelectValue, loadRecords, normalizeAircraftValidationErrors, resolveTemplateModelDetailsById, scope, selectedId]);
 
   const handleDelete = useCallback(async () => {
     if (!selectedId) {

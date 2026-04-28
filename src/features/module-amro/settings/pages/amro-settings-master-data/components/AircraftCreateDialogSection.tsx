@@ -162,6 +162,9 @@ export function AircraftCreateDialogSection({
   const sectionClassName = 'rounded border border-[#7aa4d6] bg-white p-3';
   const sectionTitleClassName = 'mb-2 border-b border-[#7aa4d6] pb-1 text-[13px] font-semibold text-slate-900';
   const controlClassName = 'h-8 rounded border border-[#7aa4d6] bg-white px-2 text-[12px] text-slate-800';
+  const validationMessages = Object.entries(formErrors)
+    .filter(([, message]) => String(message || '').trim().length > 0)
+    .map(([field, message]) => ({ field, message: String(message) }));
 
   return (
     <div className="space-y-3 bg-[#f4f7fb] p-3 text-[12px]">
@@ -190,6 +193,12 @@ export function AircraftCreateDialogSection({
           {collaborationIndicator.status} · {collaborationIndicator.activeEditors} active · Errors {aircraftValidationSummary.errorCount}
         </span>
       </div>
+      {validationMessages.length > 0 ? (
+        <div className="rounded border border-red-300 bg-red-50 px-3 py-2 text-[11px] text-red-700">
+          <p className="font-semibold">Please resolve the highlighted fields:</p>
+          <p>{validationMessages.map((entry) => entry.message).join(' | ')}</p>
+        </div>
+      ) : null}
 
       <div className="grid gap-3 lg:grid-cols-2">
         <div className="space-y-3">
@@ -208,7 +217,7 @@ export function AircraftCreateDialogSection({
                     setFieldValue('tail_number', value);
                   }
                 }}
-                className={cn(controlClassName, formErrors.registration && 'border-destructive')}
+                className={cn(controlClassName, (formErrors.registration || formErrors.tail_number) && 'border-destructive')}
               />
 
               <Label htmlFor="aircraft-franchise-id" className="font-semibold">* Franchise</Label>
@@ -302,11 +311,23 @@ export function AircraftCreateDialogSection({
               <button type="button" className="h-7 w-7 rounded-full border border-slate-500 text-sm font-bold">+</button>
 
               <Label htmlFor="aircraft-manufacturer-readonly" className="font-semibold">* Manufacturer</Label>
-              <Input id="aircraft-manufacturer-readonly" value={selectedTemplateManufacturerName || '-'} readOnly aria-readonly="true" className={cn(controlClassName, 'bg-slate-100')} />
+              <Input
+                id="aircraft-manufacturer-readonly"
+                value={selectedTemplateManufacturerName || '-'}
+                readOnly
+                aria-readonly="true"
+                className={cn(controlClassName, 'bg-slate-100', formErrors.manufacturer_id && 'border-destructive')}
+              />
               <span />
 
               <Label htmlFor="aircraft-model-name-readonly" className="font-semibold">* Model</Label>
-              <Input id="aircraft-model-name-readonly" value={selectedTemplateModelName || '-'} readOnly aria-readonly="true" className={cn(controlClassName, 'bg-slate-100')} />
+              <Input
+                id="aircraft-model-name-readonly"
+                value={selectedTemplateModelName || '-'}
+                readOnly
+                aria-readonly="true"
+                className={cn(controlClassName, 'bg-slate-100', formErrors.aircraft_model && 'border-destructive')}
+              />
               <span />
 
               <Label htmlFor="aircraft-type-readonly" className="font-semibold">* Category</Label>
