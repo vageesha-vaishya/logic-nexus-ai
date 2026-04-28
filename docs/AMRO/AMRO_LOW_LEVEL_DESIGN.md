@@ -2316,6 +2316,7 @@ Primary Key: id
 Foreign Keys:
   - (manufacturer_id, tenant_id) -> public.manufacturers(id, tenant_id) ON DELETE RESTRICT
   - (assembly_type_id, tenant_id) -> public.assembly_types(id, tenant_id) ON DELETE RESTRICT
+  - aircraft_category_id -> public.aircraft_categories(id) ON DELETE SET NULL
   - created_by -> auth.users(id) ON DELETE SET NULL
   - updated_by -> auth.users(id) ON DELETE SET NULL
 Unique Constraints:
@@ -2338,6 +2339,7 @@ Indexes:
   - idx_assembly_models_assembly_type_id(assembly_type_id)
   - idx_assembly_models_tenant_id(tenant_id)
   - idx_assembly_models_franchise_id(franchise_id)
+  - idx_assembly_models_aircraft_category_id(aircraft_category_id)
 Columns:
   - id | uuid | nullable:no | default:gen_random_uuid()
   - manufacturer_id | uuid | nullable:no | default:-
@@ -2354,10 +2356,12 @@ Columns:
   - updated_by | uuid | nullable:yes | default:null
   - tenant_id | uuid | nullable:no | default:'e42ec6fd-6b88-4721-befe-4443d9743120'::uuid
   - franchise_id | uuid | nullable:yes | default:null
+  - aircraft_category_id | uuid | nullable:yes | default:null
 Security Considerations:
   - RLS enabled; tenant isolation via user_roles; platform admin override policy.
 Implementation Notes:
   - Migration: 20260325000000_amro_multi_tenant_isolation.sql
+  - Migration: 20260426201000_add_assembly_models_aircraft_category_id_fk.sql
 ```
 
 ```text
