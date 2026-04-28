@@ -109,7 +109,7 @@ export function createSeedRecords(entity: MasterEntity): Record<string, unknown>
       },
     ];
   }
-  if (entity === 'work_order_templates' || entity === 'work_order_templates') {
+  if (entity === 'work_order_templates') {
     return [
       {
         template_code: 'TMP-A320-LINE-48H',
@@ -436,7 +436,7 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       next[field.key] = normalizeFormValue(field, row[field.key]);
     }
   });
-  if ((entity === 'work_order_templates' || entity === 'work_order_templates') && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
+  if (entity === 'work_order_templates' && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
     next.model_id = String(row.model_id ?? '').trim();
   }
   if (entity === 'parts_inventory' && !String(next.part_number ?? '').trim()) {
@@ -444,6 +444,37 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
     if (itemNumber) {
       next.part_number = itemNumber;
     }
+  }
+  if (entity === 'aircraft') {
+    const passthroughKeys = [
+      'tenant_id',
+      'franchise_id',
+      'aircraft_template',
+      'manufacturing_date',
+      'base_location',
+      'owner_name',
+      'line_number',
+      'variable_number',
+      'maintenance_revision_number',
+      'maintenance_revision_date',
+      'amendment_number',
+      'amendment_date',
+      'is_under_warranty',
+      'warranty_start_date',
+      'warranty_end_date',
+      'warranty_json',
+      'is_not_in_use',
+      'not_in_use_date',
+      'is_readonly',
+      'readonly_date',
+      'is_flight_log_under_utc',
+    ];
+    passthroughKeys.forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(row, key)) {
+        return;
+      }
+      next[key] = row[key];
+    });
   }
   return next;
 }
@@ -487,7 +518,7 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
   const payload: Record<string, unknown> = {};
   fields.forEach((field) => {
     const raw = values[field.key];
-    const isWorkOrderAircraftModelSatisfiedByModelId = (entity === 'work_order_templates' || entity === 'work_order_templates')
+    const isWorkOrderAircraftModelSatisfiedByModelId = entity === 'work_order_templates'
       && field.key === 'aircraft_model'
       && !isBlank(values.model_id);
     if (field.required && isBlank(raw) && field.type !== 'boolean' && !isWorkOrderAircraftModelSatisfiedByModelId) {
@@ -581,7 +612,7 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
         errors.serial_number = 'Serial Number must be at least 3 characters';
       }
     }
-    if (payload.aircraft_type && !AIRCRAFT_TYPE_OPTIONS.includes(String(payload.aircraft_type))) {
+    if (payload.aircraft_type && !String(payload.aircraft_type).trim()) {
       errors.aircraft_type = 'Aircraft Type is invalid';
     }
     if (payload.status && !AIRCRAFT_STATUS_OPTIONS.includes(String(payload.status) as (typeof AIRCRAFT_STATUS_OPTIONS)[number])) {
@@ -657,7 +688,7 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     });
   }
 
-  if (entity === 'work_order_templates' || entity === 'work_order_templates') {
+  if (entity === 'work_order_templates') {
     const modelId = String(values.model_id ?? '').trim();
     // model_id is required by database constraint ck_work_order_templates_model_id_required
     if (!modelId) {

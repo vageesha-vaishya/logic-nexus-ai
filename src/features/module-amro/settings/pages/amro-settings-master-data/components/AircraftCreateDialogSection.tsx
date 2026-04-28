@@ -13,12 +13,6 @@ type SelectOption = {
   disabled?: boolean;
 };
 
-type FieldDescriptor = {
-  key: string;
-  label: string;
-  type: string;
-};
-
 type AircraftTemplateModelOption = {
   id: string;
   name: string;
@@ -58,7 +52,6 @@ type AircraftCreateDialogSectionProps = {
   aircraftTemplateOptionsLoading: boolean;
   aircraftTenantOptionsError: string;
   aircraftFranchiseOptionsError: string;
-  isSystemSelectValue: (value: string) => boolean;
   setAircraftTemplateModel: (value: string) => void;
   setAircraftTenantValue: (value: string) => void;
   setAircraftFranchiseValue: (value: string) => void;
@@ -79,8 +72,6 @@ type AircraftCreateDialogSectionProps = {
   selectedTemplateModelName: string;
   selectedTemplateManufacturerName: string;
   selectedTemplateAircraftType: string;
-  setSelectFieldValue: (field: string, value: string) => void;
-  resolveSelectOptions: (field: FieldDescriptor) => SelectOption[];
   aircraftNoSerialNumber: boolean;
   handleAircraftNoSerialChange: (value: boolean) => void;
   aircraftManufacturingDate: string;
@@ -121,7 +112,6 @@ export function AircraftCreateDialogSection({
   aircraftTemplateOptionsLoading,
   aircraftTenantOptionsError,
   aircraftFranchiseOptionsError,
-  isSystemSelectValue,
   setAircraftTemplateModel,
   setAircraftTenantValue,
   setAircraftFranchiseValue,
@@ -141,8 +131,6 @@ export function AircraftCreateDialogSection({
   selectedTemplateModelName,
   selectedTemplateManufacturerName,
   selectedTemplateAircraftType,
-  setSelectFieldValue,
-  resolveSelectOptions,
   aircraftNoSerialNumber,
   handleAircraftNoSerialChange,
   aircraftManufacturingDate,
@@ -169,7 +157,6 @@ export function AircraftCreateDialogSection({
   setAircraftAmendmentDate,
   aircraftAuditTimeline,
 }: AircraftCreateDialogSectionProps) {
-  const aircraftTypeOptions = resolveSelectOptions({ key: 'aircraft_type', label: 'Aircraft Type', type: 'select' });
   const sectionClassName = 'rounded border border-[#7aa4d6] bg-white p-3';
   const sectionTitleClassName = 'mb-2 border-b border-[#7aa4d6] pb-1 text-[13px] font-semibold text-slate-900';
   const controlClassName = 'h-8 rounded border border-[#7aa4d6] bg-white px-2 text-[12px] text-slate-800';
@@ -313,27 +300,21 @@ export function AircraftCreateDialogSection({
               <button type="button" className="h-7 w-7 rounded-full border border-slate-500 text-sm font-bold">+</button>
 
               <Label htmlFor="aircraft-manufacturer-readonly" className="font-semibold">* Manufacturer</Label>
-              <Input id="aircraft-manufacturer-readonly" value={selectedTemplateManufacturerName || '-'} readOnly disabled className={cn(controlClassName, 'bg-slate-100')} />
+              <Input id="aircraft-manufacturer-readonly" value={selectedTemplateManufacturerName || '-'} readOnly aria-readonly="true" className={cn(controlClassName, 'bg-slate-100')} />
               <span />
 
               <Label htmlFor="aircraft-model-name-readonly" className="font-semibold">* Model</Label>
-              <Input id="aircraft-model-name-readonly" value={selectedTemplateModelName || '-'} readOnly disabled className={cn(controlClassName, 'bg-slate-100')} />
+              <Input id="aircraft-model-name-readonly" value={selectedTemplateModelName || '-'} readOnly aria-readonly="true" className={cn(controlClassName, 'bg-slate-100')} />
               <span />
 
-              <Label htmlFor="aircraft-type-select" className="font-semibold">* Category</Label>
-              <select
-                id="aircraft-type-select"
-                value={String(formValues.aircraft_type ?? '')}
-                onChange={(event) => setSelectFieldValue('aircraft_type', event.target.value)}
-                className={cn(controlClassName, formErrors.aircraft_type && 'border-destructive')}
-              >
-                <option value="">Select category...</option>
-                {aircraftTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value} disabled={Boolean(option.disabled) || isSystemSelectValue(option.value)}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+              <Label htmlFor="aircraft-type-readonly" className="font-semibold">* Category</Label>
+              <Input
+                id="aircraft-type-readonly"
+                value={selectedTemplateAircraftType || '-'}
+                readOnly
+                aria-readonly="true"
+                className={cn(controlClassName, 'bg-slate-100', formErrors.aircraft_type && 'border-destructive')}
+              />
               <span />
             </div>
             <div className="mt-2 space-y-1">

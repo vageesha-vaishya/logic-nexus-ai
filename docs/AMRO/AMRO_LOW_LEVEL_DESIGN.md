@@ -1569,6 +1569,7 @@ All database implementation and review activities must treat this section as nor
 | `operator_code` | `text` | Yes | — | — |
 | `base_location` | `text` | Yes | — | — |
 | `home_base` | `uuid` | Yes | — | FK -> `public.aircraft(id)` ON DELETE SET NULL |
+| `warranty_json` | `jsonb` | No | `'{}'::jsonb` | Cached warranty snapshot (`is_under_warranty`, `warranty_start_date`, `warranty_end_date`) |
 | `created_at` | `timestamptz` | No | `now()` | — |
 | `updated_at` | `timestamptz` | No | `now()` | — |
 | `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
