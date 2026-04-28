@@ -169,390 +169,343 @@ export function AircraftCreateDialogSection({
   setAircraftAmendmentDate,
   aircraftAuditTimeline,
 }: AircraftCreateDialogSectionProps) {
+  const aircraftTypeOptions = resolveSelectOptions({ key: 'aircraft_type', label: 'Aircraft Type', type: 'select' });
+  const sectionClassName = 'rounded border border-[#7aa4d6] bg-white p-3';
+  const sectionTitleClassName = 'mb-2 border-b border-[#7aa4d6] pb-1 text-[13px] font-semibold text-slate-900';
+  const controlClassName = 'h-8 rounded border border-[#7aa4d6] bg-white px-2 text-[12px] text-slate-800';
+
   return (
-    <div className="space-y-3 rounded-md bg-[#08a8bd] p-3 text-[12px]">
-      <div className="flex flex-wrap items-center justify-between gap-2 text-white">
-        <p className="font-semibold">
+    <div className="space-y-3 bg-[#f4f7fb] p-3 text-[12px]">
+      <div className="flex flex-wrap gap-1">
+        {['Aircraft Status', 'Assembly(s)', 'Maintenance Prog'].map((tabLabel, index) => (
+          <button
+            key={tabLabel}
+            type="button"
+            className={cn(
+              'rounded-sm border px-3 py-1 text-[12px] font-medium',
+              index === 0
+                ? 'border-[#5b7fb0] bg-gradient-to-b from-[#dce7f7] to-[#c8d9f2] text-[#1f3d68]'
+                : 'border-[#9fb8db] bg-gradient-to-b from-[#eef3fb] to-[#dde7f7] text-[#304f7a]',
+            )}
+          >
+            {tabLabel}
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center justify-between rounded border border-[#7aa4d6] bg-white px-3 py-2 text-[11px] text-slate-700">
+        <span className="font-semibold text-[#1f3d68]">
           Required Completion {aircraftRequiredProgress.completed}/{aircraftRequiredProgress.total} ({aircraftRequiredProgress.percent}%)
-        </p>
-        <div className="flex items-center gap-2 text-[11px]">
-          <Users className="h-3.5 w-3.5" />
-          <span>{collaborationIndicator.status} · {collaborationIndicator.activeEditors} active</span>
-          <span>Last sync {collaborationIndicator.lastSeen}</span>
-          <span>Errors {aircraftValidationSummary.errorCount}</span>
-        </div>
+        </span>
+        <span className="flex items-center gap-2">
+          <Users className="h-3.5 w-3.5 text-[#1f3d68]" />
+          {collaborationIndicator.status} · {collaborationIndicator.activeEditors} active · Errors {aircraftValidationSummary.errorCount}
+        </span>
       </div>
-      <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <section className="space-y-2 rounded bg-white p-3">
-          <p className="text-[11px] text-slate-600">Aircraft Template</p>
-          <Label htmlFor="aircraft-tenant-id" className="text-[12px] font-medium text-slate-800">Tenant</Label>
-          <select
-            id="aircraft-tenant-id"
-            value={aircraftTenantValue}
-            disabled={aircraftTenantOptionsLoading}
-            onChange={(event) => setAircraftTenantValue(event.target.value)}
-            className={cn(
-              'h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-              formErrors.tenant_id && 'border-destructive',
-            )}
-          >
-            {aircraftTenantSelectOptions.map((option) => (
-              <option key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {formErrors.tenant_id ? <p className="mdm-template-danger">{formErrors.tenant_id}</p> : aircraftTenantOptionsError ? <p className="text-[10px] text-red-600">{aircraftTenantOptionsError}</p> : null}
-          <Label htmlFor="aircraft-franchise-id" className="text-[12px] font-medium text-slate-800">Franchise</Label>
-          <select
-            id="aircraft-franchise-id"
-            value={aircraftFranchiseValue}
-            disabled={disableAircraftFranchiseSelection || aircraftFranchiseOptionsLoading}
-            onChange={(event) => setAircraftFranchiseValue(event.target.value)}
-            className={cn(
-              'h-8 w-full rounded-md border border-slate-300 bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-              formErrors.franchise_id && 'border-destructive',
-            )}
-          >
-            {aircraftFranchiseSelectOptions.map((option) => (
-              <option key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {formErrors.franchise_id ? <p className="mdm-template-danger">{formErrors.franchise_id}</p> : aircraftFranchiseOptionsError ? <p className="text-[10px] text-red-600">{aircraftFranchiseOptionsError}</p> : null}
-          <Label htmlFor="aircraft-template-select" className="text-[12px] font-medium text-slate-800">Aircraft Template</Label>
-          <select
-            id="aircraft-template-select"
-            value={aircraftTemplateModel}
-            disabled={aircraftTemplateOptionsLoading || disableAircraftModelSelection}
-            onChange={(event) => {
-              setAircraftTemplateModel(event.target.value);
-              void hydrateAircraftCountersFromTemplate(event.target.value);
-            }}
-            className={cn(
-              'h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2',
-              formErrors.aircraft_template && 'border-destructive',
-            )}
-          >
-            {aircraftTemplateSelectOptions.map((option) => (
-              <option key={option.value} value={option.value} disabled={option.disabled}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-          {formErrors.aircraft_template ? <p className="mdm-template-danger">{formErrors.aircraft_template}</p> : null}
-        </section>
-        <section className="rounded bg-white p-3">
-          <p className="mb-2 text-[11px] text-slate-600">Aircraft Model Details</p>
-          <div className="space-y-2 border border-slate-200 px-3 py-2 text-[12px]">
-            <div className="space-y-1">
-              <Label htmlFor="aircraft-model-name-readonly" className="text-[12px]">Model Name:</Label>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <div className="space-y-3">
+          <section className={sectionClassName}>
+            <h3 className={sectionTitleClassName}>Aircraft Registration Details</h3>
+            <div className="grid gap-2 sm:grid-cols-[120px_1fr] sm:items-center">
+              <Label htmlFor="aircraft-registration" className="font-semibold">* Reg No.</Label>
               <Input
-                id="aircraft-model-name-readonly"
-                value={selectedTemplateModelName || '-'}
-                readOnly
-                disabled
-                className="h-8 bg-slate-100 text-[12px] text-slate-800"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="aircraft-manufacturer-readonly" className="text-[12px]">Manufacturer:</Label>
-              <Input
-                id="aircraft-manufacturer-readonly"
-                value={selectedTemplateManufacturerName || '-'}
-                readOnly
-                disabled
-                className="h-8 bg-slate-100 text-[12px] text-slate-800"
-              />
-            </div>
-            <div className="space-y-1">
-              <Label htmlFor="aircraft-type-readonly" className="text-[12px]">Aircraft Type:</Label>
-              <Input
-                id="aircraft-type-readonly"
-                value={selectedTemplateAircraftType || '-'}
-                readOnly
-                disabled
-                className="h-8 bg-slate-100 text-[12px] text-slate-800"
-              />
-            </div>
-          </div>
-        </section>
-      </div>
-      <div className="grid gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
-        <section className="space-y-2 rounded bg-white p-3">
-          <p className="text-[11px] text-slate-600">Aircraft definition</p>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-registration" className="text-[12px]">Registration</Label>
-            <Input
-              id="aircraft-registration"
-              ref={firstFieldRef}
-              value={String(formValues.registration ?? '')}
-              onChange={(event) => {
-                const value = event.target.value.toUpperCase();
-                setFieldValue('registration', value);
-                if (!String(formValues.tail_number ?? '').trim()) {
-                  setFieldValue('tail_number', value);
-                }
-              }}
-              className={cn('h-8 text-[12px]', formErrors.registration && 'border-destructive')}
-            />
-            {formErrors.registration ? <p className="mdm-template-danger">{formErrors.registration}</p> : null}
-          </div>
-          <div className="flex items-center gap-2">
-            <Checkbox id="aircraft-no-serial" checked={aircraftNoSerialNumber} onCheckedChange={(value) => handleAircraftNoSerialChange(Boolean(value))} />
-            <Label htmlFor="aircraft-no-serial" className="text-[12px] font-normal">No Serial number</Label>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-serial" className="text-[12px]">Serial number</Label>
-            <Input
-              id="aircraft-serial"
-              value={String(formValues.serial_number ?? '')}
-              onChange={(event) => setFieldValue('serial_number', event.target.value.toUpperCase())}
-              disabled={aircraftNoSerialNumber}
-              className={cn('h-8 text-[12px]', formErrors.serial_number && 'border-destructive')}
-            />
-            {formErrors.serial_number ? <p className="mdm-template-danger">{formErrors.serial_number}</p> : null}
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-engine-type" className="text-[12px]">Engine Type</Label>
-            <Input
-              id="aircraft-engine-type"
-              value={String(formValues.engine_type ?? '')}
-              onChange={(event) => setAircraftAuxField('engine_type', event.target.value)}
-              className={cn('h-8 text-[12px]', formErrors.engine_type && 'border-destructive')}
-            />
-            {formErrors.engine_type ? <p className="mdm-template-danger">{formErrors.engine_type}</p> : null}
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-manufacturing-date" className="text-[12px]">Manufacturing Date</Label>
-            <div className="relative">
-              <Input
-                id="aircraft-manufacturing-date"
-                type="date"
-                value={aircraftManufacturingDate}
+                id="aircraft-registration"
+                ref={firstFieldRef}
+                value={String(formValues.registration ?? '')}
                 onChange={(event) => {
-                  setAircraftManufacturingDate(event.target.value);
-                  setAircraftAuxField('manufacturing_date', event.target.value);
+                  const value = event.target.value.toUpperCase();
+                  setFieldValue('registration', value);
+                  if (!String(formValues.tail_number ?? '').trim()) {
+                    setFieldValue('tail_number', value);
+                  }
                 }}
-                className="h-8 pr-8 text-[12px]"
+                className={cn(controlClassName, formErrors.registration && 'border-destructive')}
               />
-              <CalendarDays className="pointer-events-none absolute right-2 top-2 h-3.5 w-3.5 text-slate-400" />
+
+              <Label htmlFor="aircraft-type-select" className="font-semibold">* Category</Label>
+              <select
+                id="aircraft-type-select"
+                value={String(formValues.aircraft_type ?? '')}
+                onChange={(event) => setSelectFieldValue('aircraft_type', event.target.value)}
+                className={cn(controlClassName, formErrors.aircraft_type && 'border-destructive')}
+              >
+                <option value="">Select category...</option>
+                {aircraftTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={Boolean(option.disabled) || isSystemSelectValue(option.value)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <Label htmlFor="aircraft-franchise-id" className="font-semibold">* Franchise</Label>
+              <select
+                id="aircraft-franchise-id"
+                value={aircraftFranchiseValue}
+                disabled={disableAircraftFranchiseSelection || aircraftFranchiseOptionsLoading}
+                onChange={(event) => setAircraftFranchiseValue(event.target.value)}
+                className={cn(controlClassName, formErrors.franchise_id && 'border-destructive')}
+              >
+                {aircraftFranchiseSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <Label htmlFor="aircraft-owner-select" className="font-semibold">* Operator Owner</Label>
+              <select
+                id="aircraft-owner-select"
+                value={aircraftOwner}
+                disabled={aircraftListboxOptionsLoading}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setAircraftOwner(value);
+                  setAircraftAuxField('owner_name', value);
+                }}
+                className={controlClassName}
+              >
+                {aircraftOwnerSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <Label htmlFor="aircraft-tenant-id" className="font-semibold">Tenant</Label>
+              <select
+                id="aircraft-tenant-id"
+                value={aircraftTenantValue}
+                disabled={aircraftTenantOptionsLoading}
+                onChange={(event) => setAircraftTenantValue(event.target.value)}
+                className={cn(controlClassName, formErrors.tenant_id && 'border-destructive')}
+              >
+                {aircraftTenantSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={Boolean(option.disabled)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
             </div>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-base-select" className="text-[12px]">Base</Label>
-            <select
-              id="aircraft-base-select"
-              value={aircraftBase}
-              disabled={aircraftListboxOptionsLoading}
-              onChange={(event) => {
-                const value = event.target.value;
-                setAircraftBase(value);
-                setAircraftAuxField('base_location', value);
-              }}
-              className="h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
-              {aircraftBaseSelectOptions.map((option) => (
-                <option key={option.value} value={option.value} disabled={option.disabled}>
-                  {option.label}
-                </option>
+            {formErrors.tenant_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.tenant_id}</p> : aircraftTenantOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftTenantOptionsError}</p> : null}
+            {formErrors.franchise_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.franchise_id}</p> : aircraftFranchiseOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftFranchiseOptionsError}</p> : null}
+          </section>
+
+          <section className={sectionClassName}>
+            <h3 className={sectionTitleClassName}>Airframe Details</h3>
+            <div className="grid gap-2 sm:grid-cols-[160px_1fr_auto] sm:items-center">
+              <Label htmlFor="aircraft-template-select" className="font-semibold">* Aircraft Template</Label>
+              <select
+                id="aircraft-template-select"
+                value={aircraftTemplateModel}
+                disabled={aircraftTemplateOptionsLoading || disableAircraftModelSelection}
+                onChange={(event) => {
+                  setAircraftTemplateModel(event.target.value);
+                  void hydrateAircraftCountersFromTemplate(event.target.value);
+                }}
+                className={cn(controlClassName, formErrors.aircraft_template && 'border-destructive')}
+              >
+                {aircraftTemplateSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <button type="button" className="h-7 w-7 rounded-full border border-slate-500 text-sm font-bold">+</button>
+
+              <Label htmlFor="aircraft-manufacturer-readonly" className="font-semibold">* Manufacturer</Label>
+              <Input id="aircraft-manufacturer-readonly" value={selectedTemplateManufacturerName || '-'} readOnly disabled className={cn(controlClassName, 'bg-slate-100')} />
+              <span />
+
+              <Label htmlFor="aircraft-model-name-readonly" className="font-semibold">* Model</Label>
+              <Input id="aircraft-model-name-readonly" value={selectedTemplateModelName || '-'} readOnly disabled className={cn(controlClassName, 'bg-slate-100')} />
+              <span />
+
+              <Label htmlFor="aircraft-serial" className="font-semibold">* Serial No.</Label>
+              <Input
+                id="aircraft-serial"
+                value={String(formValues.serial_number ?? '')}
+                onChange={(event) => setFieldValue('serial_number', event.target.value.toUpperCase())}
+                disabled={aircraftNoSerialNumber}
+                className={cn(controlClassName, formErrors.serial_number && 'border-destructive')}
+              />
+              <div className="flex items-center gap-1 text-[11px]">
+                <Checkbox id="aircraft-no-serial" checked={aircraftNoSerialNumber} onCheckedChange={(value) => handleAircraftNoSerialChange(Boolean(value))} />
+                <Label htmlFor="aircraft-no-serial" className="font-normal">No Serial</Label>
+              </div>
+            </div>
+            <div className="mt-2 space-y-1">
+              <Label htmlFor="aircraft-maintenance-program" className="font-semibold">Maintenance Service Program/Provider</Label>
+              <Input
+                id="aircraft-maintenance-program"
+                value={String(formValues.maintenance_program ?? '')}
+                onChange={(event) => setFieldValue('maintenance_program', event.target.value)}
+                className={cn(controlClassName, formErrors.maintenance_program && 'border-destructive')}
+              />
+            </div>
+          </section>
+
+          <section className={sectionClassName}>
+            <h3 className={sectionTitleClassName}>Warranty Details</h3>
+            <div className="grid gap-2 sm:grid-cols-[160px_1fr] sm:items-center">
+              <Label htmlFor="warranty-enabled" className="font-semibold">Is Aircraft Under Warranty?</Label>
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="warranty-enabled"
+                  checked={Boolean(formValues.is_under_warranty)}
+                  onCheckedChange={(checked) => setAircraftAuxField('is_under_warranty', checked ? 'true' : 'false')}
+                />
+              </div>
+
+              <Label htmlFor="warranty-start-date" className="font-semibold">Warranty Start Date</Label>
+              <Input
+                id="warranty-start-date"
+                type="date"
+                value={String(formValues.warranty_start_date ?? '')}
+                onChange={(event) => setAircraftAuxField('warranty_start_date', event.target.value)}
+                className={controlClassName}
+              />
+
+              <Label htmlFor="warranty-end-date" className="font-semibold">Warranty End Date</Label>
+              <Input
+                id="warranty-end-date"
+                type="date"
+                value={String(formValues.warranty_end_date ?? '')}
+                onChange={(event) => setAircraftAuxField('warranty_end_date', event.target.value)}
+                className={controlClassName}
+              />
+            </div>
+          </section>
+        </div>
+
+        <div className="space-y-3">
+          <section className={sectionClassName}>
+            <h3 className={sectionTitleClassName}>Total Weight And Capacity</h3>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {[
+                ['empty_weight', 'Empty Wt.'],
+                ['all_up_weight', 'All Up Wt.'],
+                ['gross_payload', 'Gross PayLoad'],
+                ['taxi_weight', 'Taxi Wt.'],
+                ['takeoff_weight', 'Take Off Wt.'],
+                ['zero_fuel_weight', 'Zero Fuel Wt.'],
+                ['landing_weight', 'Landing Wt.'],
+                ['fuel_capacity', 'Fuel Cap.'],
+              ].map(([field, label]) => (
+                <div key={field} className="grid grid-cols-[120px_1fr] items-center gap-2">
+                  <Label htmlFor={`aircraft-${field}`}>{label}</Label>
+                  <Input
+                    id={`aircraft-${field}`}
+                    value={String(formValues[field] ?? '')}
+                    onChange={(event) => setAircraftAuxField(field, event.target.value)}
+                    className={controlClassName}
+                  />
+                </div>
               ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-owner-select" className="text-[12px]">Owner</Label>
-            <select
-              id="aircraft-owner-select"
-              value={aircraftOwner}
-              disabled={aircraftListboxOptionsLoading}
-              onChange={(event) => {
-                const value = event.target.value;
-                setAircraftOwner(value);
-                setAircraftAuxField('owner_name', value);
-              }}
-              className="h-8 w-full rounded-md border border-input bg-white px-2 text-[12px] text-slate-800 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
-            >
-              {aircraftOwnerSelectOptions.map((option) => (
-                <option key={option.value} value={option.value} disabled={option.disabled}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-line-number" className="text-[12px]">Line number</Label>
-            <Input
-              id="aircraft-line-number"
-              value={aircraftLineNumber}
-              onChange={(event) => {
-                setAircraftLineNumber(event.target.value);
-                setAircraftAuxField('line_number', event.target.value);
-              }}
-              className="h-8 text-[12px]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-variable-number" className="text-[12px]">Variable number</Label>
-            <Input
-              id="aircraft-variable-number"
-              value={aircraftVariableNumber}
-              onChange={(event) => {
-                setAircraftVariableNumber(event.target.value);
-                setAircraftAuxField('variable_number', event.target.value);
-              }}
-              className="h-8 text-[12px]"
-            />
-          </div>
-        </section>
-        <section className="rounded bg-white p-3">
-          <p className="mb-2 text-[11px] text-slate-600">Counters</p>
-          <div className="overflow-x-auto border border-slate-200">
-            <table className="w-full text-[12px]">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-slate-800">
-                  <th className="px-2 py-2 font-semibold">Name</th>
-                  <th className="px-2 py-2 font-semibold">Serial number</th>
-                  <th className="px-2 py-2 font-semibold">Model</th>
-                  <th className="px-2 py-2 font-semibold">Initial Value / Initial Date</th>
-                  <th className="px-2 py-2 font-semibold"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {aircraftCounterRows.map((row) => (
-                  <tr key={row.key} className="border-t border-slate-100 align-top">
-                    <td className="px-2 py-2 text-slate-700">{row.name}</td>
-                    <td className="px-2 py-2 text-slate-700">{row.serialNumber}</td>
-                    <td className="px-2 py-2 text-slate-700">{row.model}</td>
-                    <td className="px-2 py-1">
-                      <div className="grid gap-1 sm:grid-cols-[130px_150px]">
+            </div>
+          </section>
+
+          <section className={sectionClassName}>
+            <h3 className={sectionTitleClassName}>Times Since New Values of Aircraft (TSN)</h3>
+            <div className="mb-2 grid grid-cols-[120px_1fr] items-center gap-2">
+              <Label htmlFor="aircraft-manufacturing-date" className="font-semibold">* As On Date</Label>
+              <div className="relative">
+                <Input
+                  id="aircraft-manufacturing-date"
+                  type="date"
+                  value={aircraftManufacturingDate}
+                  onChange={(event) => {
+                    setAircraftManufacturingDate(event.target.value);
+                    setAircraftAuxField('manufacturing_date', event.target.value);
+                  }}
+                  className={cn(controlClassName, 'pr-8')}
+                />
+                <CalendarDays className="pointer-events-none absolute right-2 top-2 h-3.5 w-3.5 text-slate-400" />
+              </div>
+            </div>
+            <div className="overflow-x-auto border border-[#7aa4d6]">
+              <table className="w-full text-[12px]">
+                <thead className="bg-[#3b5f8f] text-white">
+                  <tr>
+                    <th className="px-2 py-1 text-left font-semibold">Periods</th>
+                    <th className="px-2 py-1 text-left font-semibold">Value</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {aircraftCounterRows.map((row) => (
+                    <tr key={row.key} className="border-t border-slate-200">
+                      <td className="px-2 py-1">{row.name}</td>
+                      <td className="px-2 py-1">
                         <Input
                           value={row.initialValue}
                           onChange={(event) => setAircraftCounterValue(row.key, 'initialValue', event.target.value)}
-                          className="h-8 text-[12px]"
+                          className={controlClassName}
                         />
-                        <div className="relative">
-                          <Input
-                            type="date"
-                            value={row.initialDate}
-                            onChange={(event) => setAircraftCounterValue(row.key, 'initialDate', event.target.value)}
-                            className="h-8 pr-8 text-[12px]"
-                          />
-                          <CalendarDays className="pointer-events-none absolute right-2 top-2 h-3.5 w-3.5 text-slate-400" />
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-2 py-2 text-slate-600">{row.unit}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </section>
+
+          <section className={sectionClassName}>
+            <h3 className={sectionTitleClassName}>Other Details</h3>
+            <div className="grid gap-2 sm:grid-cols-[220px_1fr] sm:items-center">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="aircraft-not-in-use"
+                  checked={Boolean(formValues.is_not_in_use)}
+                  onCheckedChange={(checked) => setAircraftAuxField('is_not_in_use', checked ? 'true' : 'false')}
+                />
+                <Label htmlFor="aircraft-not-in-use" className="font-normal">Aircraft not in use</Label>
+              </div>
+              <Input
+                id="aircraft-not-in-use-date"
+                type="date"
+                value={String(formValues.not_in_use_date ?? '')}
+                onChange={(event) => setAircraftAuxField('not_in_use_date', event.target.value)}
+                className={controlClassName}
+              />
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="aircraft-readonly-flag"
+                  checked={Boolean(formValues.is_readonly)}
+                  onCheckedChange={(checked) => setAircraftAuxField('is_readonly', checked ? 'true' : 'false')}
+                />
+                <Label htmlFor="aircraft-readonly-flag" className="font-normal">Mark this Aircraft as ReadOnly</Label>
+              </div>
+              <Input
+                id="aircraft-readonly-date"
+                type="date"
+                value={String(formValues.readonly_date ?? '')}
+                onChange={(event) => setAircraftAuxField('readonly_date', event.target.value)}
+                className={controlClassName}
+              />
+
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="aircraft-utc-flag"
+                  checked={Boolean(formValues.is_flight_log_under_utc)}
+                  onCheckedChange={(checked) => setAircraftAuxField('is_flight_log_under_utc', checked ? 'true' : 'false')}
+                />
+                <Label htmlFor="aircraft-utc-flag" className="font-normal">Is Flight Log Under UTC?</Label>
+              </div>
+              <div className="flex gap-2">
+                <button type="button" className="rounded border border-[#7aa4d6] bg-[#dbe8f9] px-3 py-1 font-medium text-[#1f3d68]">
+                  Attach Dent and Buckle Chart
+                </button>
+                <button type="button" className="rounded border border-slate-300 bg-slate-100 px-3 py-1 text-slate-500">
+                  Remove Attachment
+                </button>
+              </div>
+            </div>
+          </section>
+        </div>
       </div>
-      <section className="space-y-2 rounded bg-white p-3">
-        <p className="text-[11px] text-slate-600">Approved maintenance program</p>
-        <div className="space-y-1">
-          <Label htmlFor="aircraft-maintenance-program" className="text-[12px]">Maintenance Program</Label>
-          <Input
-            id="aircraft-maintenance-program"
-            value={String(formValues.maintenance_program ?? '')}
-            onChange={(event) => setFieldValue('maintenance_program', event.target.value)}
-            className={cn('h-8 text-[12px]', formErrors.maintenance_program && 'border-destructive')}
-          />
-          {formErrors.maintenance_program ? <p className="mdm-template-danger">{formErrors.maintenance_program}</p> : null}
-        </div>
-        <div className="grid gap-2 md:grid-cols-2">
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-maintenance-revision-number" className="text-[12px]">Revision number</Label>
-            <Input
-              id="aircraft-maintenance-revision-number"
-              value={aircraftMaintenanceRevisionNumber}
-              onChange={(event) => {
-                setAircraftMaintenanceRevisionNumber(event.target.value);
-                setAircraftAuxField('maintenance_revision_number', event.target.value);
-              }}
-              className="h-8 text-[12px]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-maintenance-amendment-number" className="text-[12px]">Amendment number</Label>
-            <Input
-              id="aircraft-maintenance-amendment-number"
-              value={aircraftAmendmentNumber}
-              onChange={(event) => {
-                setAircraftAmendmentNumber(event.target.value);
-                setAircraftAuxField('amendment_number', event.target.value);
-              }}
-              className="h-8 text-[12px]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-maintenance-revision-date" className="text-[12px]">Revision date</Label>
-            <Input
-              id="aircraft-maintenance-revision-date"
-              type="date"
-              value={aircraftMaintenanceRevisionDate}
-              onChange={(event) => {
-                setAircraftMaintenanceRevisionDate(event.target.value);
-                setAircraftAuxField('maintenance_revision_date', event.target.value);
-              }}
-              className="h-8 text-[12px]"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-maintenance-amendment-date" className="text-[12px]">Amendment date</Label>
-            <Input
-              id="aircraft-maintenance-amendment-date"
-              type="date"
-              value={aircraftAmendmentDate}
-              onChange={(event) => {
-                setAircraftAmendmentDate(event.target.value);
-                setAircraftAuxField('amendment_date', event.target.value);
-              }}
-              className="h-8 text-[12px]"
-            />
-          </div>
-        </div>
-      </section>
-      <section className="space-y-2 rounded bg-white p-3">
-        <p className="text-[11px] text-slate-600">Engine lifecycle records</p>
-        <div className="grid gap-2 lg:grid-cols-3">
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-engine-install-history" className="text-[12px]">Engine Install History (JSON Array)</Label>
-            <Textarea
-              id="aircraft-engine-install-history"
-              value={String(formValues.engine_install_history ?? '[]')}
-              onChange={(event) => setAircraftAuxField('engine_install_history', event.target.value)}
-              className={cn('min-h-[96px] text-[12px]', formErrors.engine_install_history && 'border-destructive')}
-            />
-            {formErrors.engine_install_history ? <p className="mdm-template-danger">{formErrors.engine_install_history}</p> : null}
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-thrust-rating-change-log" className="text-[12px]">Thrust Rating Change Log (JSON Array)</Label>
-            <Textarea
-              id="aircraft-thrust-rating-change-log"
-              value={String(formValues.thrust_rating_change_log ?? '[]')}
-              onChange={(event) => setAircraftAuxField('thrust_rating_change_log', event.target.value)}
-              className={cn('min-h-[96px] text-[12px]', formErrors.thrust_rating_change_log && 'border-destructive')}
-            />
-            {formErrors.thrust_rating_change_log ? <p className="mdm-template-danger">{formErrors.thrust_rating_change_log}</p> : null}
-          </div>
-          <div className="space-y-1">
-            <Label htmlFor="aircraft-on-wing-lifecycle-records" className="text-[12px]">On-Wing Lifecycle Records (JSON Array)</Label>
-            <Textarea
-              id="aircraft-on-wing-lifecycle-records"
-              value={String(formValues.on_wing_lifecycle_records ?? '[]')}
-              onChange={(event) => setAircraftAuxField('on_wing_lifecycle_records', event.target.value)}
-              className={cn('min-h-[96px] text-[12px]', formErrors.on_wing_lifecycle_records && 'border-destructive')}
-            />
-            {formErrors.on_wing_lifecycle_records ? <p className="mdm-template-danger">{formErrors.on_wing_lifecycle_records}</p> : null}
-          </div>
-        </div>
-      </section>
       <div className="grid gap-2 sm:grid-cols-3">
         {aircraftAuditTimeline.map((item) => (
-          <div key={item.label} className="rounded border border-white/40 bg-white/90 px-2 py-1 text-slate-700">
+          <div key={item.label} className="rounded border border-[#c5d7ef] bg-white px-2 py-1 text-slate-700">
             <p className="text-[10px]">{item.label}</p>
             <p className="text-[11px] font-medium">{item.value}</p>
           </div>

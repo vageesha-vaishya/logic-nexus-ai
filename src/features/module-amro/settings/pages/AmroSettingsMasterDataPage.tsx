@@ -1859,11 +1859,50 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, []);
 
   const fetchAircraftTempOptions = useCallback(async (headers: Headers): Promise<AircraftTempOption[]> => {
-    // Always use API for aircraft templates; direct scoped DB access can fail on
-    // environments where aircraft_template does not expose franchise_id.
+    const mapRecordsToOptions = (records: Array<Record<string, unknown>>): AircraftTempOption[] => {
+      const seen = new Set<string>();
+      return records
+        .map((record) => {
+          const id = String(record.id || '').trim();
+          const name = String(record.template_name || '').trim();
+          if (!id || !name) return null;
+          if (seen.has(id)) return null;
+          seen.add(id);
+          return {
+            id,
+            name,
+            tenantId: String(record.tenant_id || '').trim(),
+            franchiseId: String(record.franchise_id || '').trim(),
+            assemblyModelId: String(record.assembly_models || '').trim(),
+            maintenanceProgram: String(record.maintenance_program || '').trim(),
+            revisionNumber: String(record.revision_number || '').trim(),
+            amendmentNumber: String(record.amendment_number || '').trim(),
+          } satisfies AircraftTempOption;
+        })
+        .filter((option): option is AircraftTempOption => Boolean(option))
+        .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
+    };
+
+    // Primary source: direct table access from aircraft_template via scoped DB.
+    if (scopedDb) {
+      const { data, error } = await (scopedDb as any)
+        .from('aircraft_template')
+        .select('id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,is_active')
+        .order('template_name', { ascending: true })
+        .limit(500);
+
+      if (!error && Array.isArray(data)) {
+        const activeRows = (data as Record<string, unknown>[]).filter(
+          (record) => String(record.is_active ?? 'true').toLowerCase() !== 'false',
+        );
+        return mapRecordsToOptions(activeRows);
+      }
+    }
+
+    // Fallback path for environments where scoped direct read is not available.
     const query = new URLSearchParams({
       page: '1',
-      page_size: '200',
+      page_size: '500',
       sort_by: 'template_name',
       sort_dir: 'asc',
     });
@@ -1871,28 +1910,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     const payload = await parseApiPayload(response);
     if (!response.ok) throw new Error(String(payload.error || 'Failed to load aircraft templates'));
     const records = getPayloadRecords(payload);
-    const seen = new Set<string>();
-    return records
-      .map((record) => {
-        const id = String(record.id || '').trim();
-        const name = String(record.template_name || '').trim();
-        if (!id || !name) return null;
-        if (seen.has(id)) return null;
-        seen.add(id);
-        return {
-          id,
-          name,
-          tenantId: String(record.tenant_id || '').trim(),
-          franchiseId: String(record.franchise_id || '').trim(),
-          assemblyModelId: String(record.assembly_models || '').trim(),
-          maintenanceProgram: String(record.maintenance_program || '').trim(),
-          revisionNumber: String(record.revision_number || '').trim(),
-          amendmentNumber: String(record.amendment_number || '').trim(),
-        };
-      })
-      .filter((option): option is AircraftTempOption => Boolean(option))
-      .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
-  }, []);
+    return mapRecordsToOptions(records);
+  }, [scopedDb]);
 
   const fetchAircraftTemplateCounterRows = useCallback(
     async (templateId: string): Promise<AircraftCounterRow[]> => {
@@ -1991,6 +2010,40 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return { aircraftTypes, aircraftStatuses, aircraftOwners, aircraftBases };
     },
     [],
+  );
+
+  const fetchAircraftCategoryOptions = useCallback(
+    async (tenantId: string, franchiseId: string): Promise<string[]> => {
+      if (!scopedDb || !tenantId) {
+        return [];
+      }
+
+      let query = (scopedDb as any)
+        .from('aircraft_categories')
+        .select('tenant_id,franchise_id,code,name,is_active')
+        .eq('tenant_id', tenantId)
+        .order('name', { ascending: true })
+        .limit(500);
+
+      const { data, error } = await query;
+      if (error || !Array.isArray(data)) {
+        return [];
+      }
+
+      const normalizedFranchiseId = String(franchiseId || '').trim();
+      const filtered = (data as Record<string, unknown>[])
+        .filter((record) => String(record.is_active ?? 'true').toLowerCase() !== 'false')
+        .filter((record) => {
+          const recordFranchiseId = String(record.franchise_id || '').trim();
+          if (!normalizedFranchiseId) return true;
+          return !recordFranchiseId || recordFranchiseId === normalizedFranchiseId;
+        })
+        .map((record) => String(record.name || record.code || '').trim())
+        .filter(Boolean);
+
+      return Array.from(new Set(filtered));
+    },
+    [scopedDb],
   );
 
   const seedAircraftTemplatesIfNeeded = useCallback(async (headers: Headers): Promise<boolean> => {
@@ -2379,16 +2432,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
       }
       setSystemTemplateModelOptions(templateOptions);
-      const [aircraftCatalogResult, facilityBasesResult] = await Promise.allSettled([
+      const [aircraftCatalogResult, facilityBasesResult, aircraftCategoryResult] = await Promise.allSettled([
         fetchAircraftCreateCatalogOptions(headers),
         fetchAircraftBaseFacilityOptions(headers),
+        fetchAircraftCategoryOptions(effectiveTenantId, effectiveFranchiseId),
       ]);
+      const categoryOptions =
+        aircraftCategoryResult.status === 'fulfilled' && aircraftCategoryResult.value.length > 0
+          ? aircraftCategoryResult.value
+          : AIRCRAFT_TYPE_FALLBACK_OPTIONS;
       if (aircraftCatalogResult.status === 'fulfilled') {
-        setAircraftTypeOptions(AIRCRAFT_TYPE_FALLBACK_OPTIONS);
+        setAircraftTypeOptions(categoryOptions);
         setAircraftStatusOptions(aircraftCatalogResult.value.aircraftStatuses);
         setAircraftOwnerCatalogOptions(aircraftCatalogResult.value.aircraftOwners);
       } else {
-        setAircraftTypeOptions(AIRCRAFT_TYPE_FALLBACK_OPTIONS);
+        setAircraftTypeOptions(categoryOptions);
       }
       if (facilityBasesResult.status === 'fulfilled') {
         const catalogBases = aircraftCatalogResult.status === 'fulfilled' ? aircraftCatalogResult.value.aircraftBases : [];
@@ -2401,7 +2459,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setAircraftListboxOptionsLoading(false);
     }
-  }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftCreateCatalogOptions, fetchAircraftTempOptions, formValues.franchise_id, formValues.tenant_id, scope.franchiseId, scope.tenantId, scope.userId, seedAircraftTemplatesIfNeeded]);
+  }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftCategoryOptions, fetchAircraftCreateCatalogOptions, fetchAircraftTempOptions, formValues.franchise_id, formValues.tenant_id, scope.franchiseId, scope.tenantId, scope.userId, seedAircraftTemplatesIfNeeded]);
 
   const loadAircraftTemplatesWorkspace = useCallback(async () => {
     if (entity !== 'aircraft') {
