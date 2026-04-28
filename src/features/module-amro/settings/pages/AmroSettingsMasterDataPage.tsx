@@ -381,7 +381,9 @@ const buildAircraftWeightAndCapacityJson = (values: Record<string, unknown>): Re
   ] as const;
   return weightKeys.reduce<Record<string, unknown>>((accumulator, key) => {
     const rawValue = String(values[key] ?? '').trim();
+    const rawUnit = String(values[`${key}_unit`] ?? '').trim();
     accumulator[key] = rawValue;
+    accumulator[`${key}_unit`] = rawUnit;
     return accumulator;
   }, {});
 };
@@ -5203,13 +5205,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         aircraft_type: String(previous.aircraft_type ?? '').trim() || aircraftTypeSelectOptions[0]?.value || AIRCRAFT_TYPE_FALLBACK_OPTIONS[0],
         status: String(previous.status ?? '').trim() || aircraftStatusSelectOptions[0]?.value || AIRCRAFT_STATUS_OPTIONS[0],
         empty_weight: String((weightAndCapacityJson?.empty_weight ?? previous.empty_weight) ?? '').trim(),
+        empty_weight_unit: String((weightAndCapacityJson?.empty_weight_unit ?? previous.empty_weight_unit) ?? '').trim(),
         all_up_weight: String((weightAndCapacityJson?.all_up_weight ?? previous.all_up_weight) ?? '').trim(),
+        all_up_weight_unit: String((weightAndCapacityJson?.all_up_weight_unit ?? previous.all_up_weight_unit) ?? '').trim(),
         gross_payload: String((weightAndCapacityJson?.gross_payload ?? previous.gross_payload) ?? '').trim(),
+        gross_payload_unit: String((weightAndCapacityJson?.gross_payload_unit ?? previous.gross_payload_unit) ?? '').trim(),
         taxi_weight: String((weightAndCapacityJson?.taxi_weight ?? previous.taxi_weight) ?? '').trim(),
+        taxi_weight_unit: String((weightAndCapacityJson?.taxi_weight_unit ?? previous.taxi_weight_unit) ?? '').trim(),
         takeoff_weight: String((weightAndCapacityJson?.takeoff_weight ?? previous.takeoff_weight) ?? '').trim(),
+        takeoff_weight_unit: String((weightAndCapacityJson?.takeoff_weight_unit ?? previous.takeoff_weight_unit) ?? '').trim(),
         zero_fuel_weight: String((weightAndCapacityJson?.zero_fuel_weight ?? previous.zero_fuel_weight) ?? '').trim(),
+        zero_fuel_weight_unit: String((weightAndCapacityJson?.zero_fuel_weight_unit ?? previous.zero_fuel_weight_unit) ?? '').trim(),
         landing_weight: String((weightAndCapacityJson?.landing_weight ?? previous.landing_weight) ?? '').trim(),
+        landing_weight_unit: String((weightAndCapacityJson?.landing_weight_unit ?? previous.landing_weight_unit) ?? '').trim(),
         fuel_capacity: String((weightAndCapacityJson?.fuel_capacity ?? previous.fuel_capacity) ?? '').trim(),
+        fuel_capacity_unit: String((weightAndCapacityJson?.fuel_capacity_unit ?? previous.fuel_capacity_unit) ?? '').trim(),
         is_not_in_use: parseBooleanLike(otherDetailsJson?.is_not_in_use ?? previous.is_not_in_use),
         not_in_use_date: String((otherDetailsJson?.not_in_use_date ?? previous.not_in_use_date) ?? '').trim(),
         is_readonly: parseBooleanLike(otherDetailsJson?.is_readonly ?? previous.is_readonly),

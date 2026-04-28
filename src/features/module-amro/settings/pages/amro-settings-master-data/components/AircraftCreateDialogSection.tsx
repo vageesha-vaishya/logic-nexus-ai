@@ -39,6 +39,8 @@ type AircraftAuditTimelineItem = {
   value: string;
 };
 
+const AIRCRAFT_WEIGHT_UNIT_OPTIONS = ['KG', 'Pounds', 'Litre', 'Gallon (US)', 'Gallon (UK)', 'Quarters'];
+
 type AircraftCreateDialogSectionProps = {
   aircraftRequiredProgress: { completed: number; total: number; percent: number };
   collaborationIndicator: { status: string; activeEditors: number; lastSeen: string };
@@ -375,7 +377,7 @@ export function AircraftCreateDialogSection({
                 ['landing_weight', 'Landing Wt.'],
                 ['fuel_capacity', 'Fuel Cap.'],
               ].map(([field, label]) => (
-                <div key={field} className="grid grid-cols-[120px_1fr] items-center gap-2">
+                <div key={field} className="grid grid-cols-[120px_1fr_110px] items-center gap-2">
                   <Label htmlFor={`aircraft-${field}`}>{label}</Label>
                   <Input
                     id={`aircraft-${field}`}
@@ -383,6 +385,19 @@ export function AircraftCreateDialogSection({
                     onChange={(event) => setAircraftAuxField(field, event.target.value)}
                     className={controlClassName}
                   />
+                  <select
+                    id={`aircraft-${field}-unit`}
+                    value={String(formValues[`${field}_unit`] ?? '')}
+                    onChange={(event) => setAircraftAuxField(`${field}_unit`, event.target.value)}
+                    className={controlClassName}
+                  >
+                    <option value="">(SELECT)</option>
+                    {AIRCRAFT_WEIGHT_UNIT_OPTIONS.map((unitOption) => (
+                      <option key={`${field}-${unitOption}`} value={unitOption}>
+                        {unitOption}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               ))}
             </div>

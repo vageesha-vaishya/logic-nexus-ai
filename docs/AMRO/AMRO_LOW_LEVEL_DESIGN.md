@@ -1570,7 +1570,7 @@ All database implementation and review activities must treat this section as nor
 | `base_location` | `text` | Yes | — | — |
 | `home_base` | `uuid` | Yes | — | FK -> `public.aircraft(id)` ON DELETE SET NULL |
 | `warranty_json` | `jsonb` | No | `'{}'::jsonb` | Cached warranty snapshot (`is_under_warranty`, `warranty_start_date`, `warranty_end_date`) |
-| `aircraft_weight_and_capacity_json` | `jsonb` | No | `'{}'::jsonb` | Snapshot of Total Weight and Capacity fields (`empty_weight`, `all_up_weight`, `gross_payload`, `taxi_weight`, `takeoff_weight`, `zero_fuel_weight`, `landing_weight`, `fuel_capacity`) |
+| `aircraft_weight_and_capacity_json` | `jsonb` | No | `'{}'::jsonb` | Snapshot of Total Weight and Capacity fields with units (`empty_weight`, `empty_weight_unit`, `all_up_weight`, `all_up_weight_unit`, `gross_payload`, `gross_payload_unit`, `taxi_weight`, `taxi_weight_unit`, `takeoff_weight`, `takeoff_weight_unit`, `zero_fuel_weight`, `zero_fuel_weight_unit`, `landing_weight`, `landing_weight_unit`, `fuel_capacity`, `fuel_capacity_unit`) |
 | `aircraft_other_details_json` | `jsonb` | No | `'{}'::jsonb` | Snapshot of Other Details fields (`is_not_in_use`, `not_in_use_date`, `is_readonly`, `readonly_date`, `is_flight_log_under_utc`) |
 | `created_at` | `timestamptz` | No | `now()` | — |
 | `updated_at` | `timestamptz` | No | `now()` | — |
