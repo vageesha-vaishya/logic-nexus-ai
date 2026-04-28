@@ -525,28 +525,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         payload.assembly_models_id = asNullableString(payload.assembly_models_id);
       }
     }
-    let manufacturerIssues: { field: string; message: string }[] = [];
-    let aircraftModelIssues: { field: string; message: string }[] = [];
-    if (entity === 'aircraft' && (payload.manufacturer_id || payload.manufacturer || payload.manufacturer_code)) {
-      const resolved = await resolveAircraftManufacturerUpdate(supabase, payload);
-      payload = resolved.payload;
-      manufacturerIssues = resolved.issues;
-    }
     if (entity === 'aircraft') {
-      const existingManufacturerId = asNullableString((existingRecord as Record<string, unknown>).manufacturer_id);
-      const existingAircraftModel =
-        asNullableString((existingRecord as Record<string, unknown>).assembly_models) ||
-        asNullableString((existingRecord as Record<string, unknown>).aircraft_model) ||
-        asNullableString((existingRecord as Record<string, unknown>).model);
-      const effectiveManufacturerId = asNullableString(payload.manufacturer_id) || existingManufacturerId;
-      const effectiveAircraftModel = asNullableString(payload.assembly_models || payload.aircraft_model || payload.model) || existingAircraftModel;
-      aircraftModelIssues = await validateAircraftModelManufacturerReference(
-        supabase,
-        tenantId,
-        franchiseId,
-        effectiveManufacturerId,
-        effectiveAircraftModel,
-      );
+      delete payload.manufacturer_id;
+      delete payload.manufacturer;
+      delete payload.manufacturer_code;
+      delete payload.model;
+      delete payload.aircraft_model;
     }
     let assemblyModelIssues: { field: string; message: string }[] = [];
     if (entity === 'assembly_models') {
@@ -579,7 +563,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         });
       }
     }
-    const issues = [...manufacturerIssues, ...aircraftModelIssues, ...assemblyModelIssues, ...workOrderTemplateIssues, ...validatePayload(entity, payload)];
+    const issues = [...assemblyModelIssues, ...workOrderTemplateIssues, ...validatePayload(entity, payload)];
     if (validationOnly) {
       res.status(200).json({
         version: 'v2',
