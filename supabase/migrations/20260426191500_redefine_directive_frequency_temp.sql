@@ -25,7 +25,8 @@ CREATE TABLE public.directive_frequency_temp (
   calendar_unit public.calendar_unit NULL,
   threshold_rins integer NULL,
   threshold_hobbs integer NULL,
-  is_parsed_success boolean NULL
+  is_parsed_success boolean NULL,
+  CONSTRAINT directive_frequency_temp_pkey PRIMARY KEY (frequency_sequence)
 ) TABLESPACE pg_default;
 
 COMMENT ON TABLE public.directive_frequency_temp IS
