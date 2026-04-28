@@ -222,21 +222,6 @@ export function AircraftCreateDialogSection({
                 className={cn(controlClassName, formErrors.registration && 'border-destructive')}
               />
 
-              <Label htmlFor="aircraft-type-select" className="font-semibold">* Category</Label>
-              <select
-                id="aircraft-type-select"
-                value={String(formValues.aircraft_type ?? '')}
-                onChange={(event) => setSelectFieldValue('aircraft_type', event.target.value)}
-                className={cn(controlClassName, formErrors.aircraft_type && 'border-destructive')}
-              >
-                <option value="">Select category...</option>
-                {aircraftTypeOptions.map((option) => (
-                  <option key={option.value} value={option.value} disabled={Boolean(option.disabled) || isSystemSelectValue(option.value)}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
-
               <Label htmlFor="aircraft-franchise-id" className="font-semibold">* Franchise</Label>
               <select
                 id="aircraft-franchise-id"
@@ -285,6 +270,21 @@ export function AircraftCreateDialogSection({
                   </option>
                 ))}
               </select>
+
+              <Label htmlFor="aircraft-serial" className="font-semibold">* Serial No.</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="aircraft-serial"
+                  value={String(formValues.serial_number ?? '')}
+                  onChange={(event) => setFieldValue('serial_number', event.target.value.toUpperCase())}
+                  disabled={aircraftNoSerialNumber}
+                  className={cn(controlClassName, 'flex-1', formErrors.serial_number && 'border-destructive')}
+                />
+                <div className="flex items-center gap-1 text-[11px]">
+                  <Checkbox id="aircraft-no-serial" checked={aircraftNoSerialNumber} onCheckedChange={(value) => handleAircraftNoSerialChange(Boolean(value))} />
+                  <Label htmlFor="aircraft-no-serial" className="font-normal">No Serial</Label>
+                </div>
+              </div>
             </div>
             {formErrors.tenant_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.tenant_id}</p> : aircraftTenantOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftTenantOptionsError}</p> : null}
             {formErrors.franchise_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.franchise_id}</p> : aircraftFranchiseOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftFranchiseOptionsError}</p> : null}
@@ -320,18 +320,21 @@ export function AircraftCreateDialogSection({
               <Input id="aircraft-model-name-readonly" value={selectedTemplateModelName || '-'} readOnly disabled className={cn(controlClassName, 'bg-slate-100')} />
               <span />
 
-              <Label htmlFor="aircraft-serial" className="font-semibold">* Serial No.</Label>
-              <Input
-                id="aircraft-serial"
-                value={String(formValues.serial_number ?? '')}
-                onChange={(event) => setFieldValue('serial_number', event.target.value.toUpperCase())}
-                disabled={aircraftNoSerialNumber}
-                className={cn(controlClassName, formErrors.serial_number && 'border-destructive')}
-              />
-              <div className="flex items-center gap-1 text-[11px]">
-                <Checkbox id="aircraft-no-serial" checked={aircraftNoSerialNumber} onCheckedChange={(value) => handleAircraftNoSerialChange(Boolean(value))} />
-                <Label htmlFor="aircraft-no-serial" className="font-normal">No Serial</Label>
-              </div>
+              <Label htmlFor="aircraft-type-select" className="font-semibold">* Category</Label>
+              <select
+                id="aircraft-type-select"
+                value={String(formValues.aircraft_type ?? '')}
+                onChange={(event) => setSelectFieldValue('aircraft_type', event.target.value)}
+                className={cn(controlClassName, formErrors.aircraft_type && 'border-destructive')}
+              >
+                <option value="">Select category...</option>
+                {aircraftTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={Boolean(option.disabled) || isSystemSelectValue(option.value)}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+              <span />
             </div>
             <div className="mt-2 space-y-1">
               <Label htmlFor="aircraft-maintenance-program" className="font-semibold">Maintenance Service Program/Provider</Label>
