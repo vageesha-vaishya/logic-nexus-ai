@@ -1570,6 +1570,8 @@ All database implementation and review activities must treat this section as nor
 | `base_location` | `text` | Yes | — | — |
 | `home_base` | `uuid` | Yes | — | FK -> `public.aircraft(id)` ON DELETE SET NULL |
 | `warranty_json` | `jsonb` | No | `'{}'::jsonb` | Cached warranty snapshot (`is_under_warranty`, `warranty_start_date`, `warranty_end_date`) |
+| `aircraft_weight_and_capacity_json` | `jsonb` | No | `'{}'::jsonb` | Snapshot of Total Weight and Capacity fields (`empty_weight`, `all_up_weight`, `gross_payload`, `taxi_weight`, `takeoff_weight`, `zero_fuel_weight`, `landing_weight`, `fuel_capacity`) |
+| `aircraft_other_details_json` | `jsonb` | No | `'{}'::jsonb` | Snapshot of Other Details fields (`is_not_in_use`, `not_in_use_date`, `is_readonly`, `readonly_date`, `is_flight_log_under_utc`) |
 | `created_at` | `timestamptz` | No | `now()` | — |
 | `updated_at` | `timestamptz` | No | `now()` | — |
 | `created_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |

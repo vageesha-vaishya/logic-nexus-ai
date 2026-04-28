@@ -261,6 +261,14 @@ function parseJsonLikeValue(value: unknown): unknown {
   }
 }
 
+function parseJsonObjectInput(value: unknown): Record<string, unknown> | null {
+  const parsed = parseJsonLikeValue(value);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
+  return parsed as Record<string, unknown>;
+}
+
 function toRecordArray(value: unknown): Record<string, unknown>[] {
   const parsed = parseJsonLikeValue(value);
   if (Array.isArray(parsed)) {
@@ -463,6 +471,16 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       'warranty_start_date',
       'warranty_end_date',
       'warranty_json',
+      'aircraft_weight_and_capacity_json',
+      'aircraft_other_details_json',
+      'empty_weight',
+      'all_up_weight',
+      'gross_payload',
+      'taxi_weight',
+      'takeoff_weight',
+      'zero_fuel_weight',
+      'landing_weight',
+      'fuel_capacity',
       'is_not_in_use',
       'not_in_use_date',
       'is_readonly',
@@ -475,6 +493,35 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       }
       next[key] = row[key];
     });
+    const weightAndCapacityJson = parseJsonObjectInput(row.aircraft_weight_and_capacity_json);
+    if (weightAndCapacityJson) {
+      const weightKeys = [
+        'empty_weight',
+        'all_up_weight',
+        'gross_payload',
+        'taxi_weight',
+        'takeoff_weight',
+        'zero_fuel_weight',
+        'landing_weight',
+        'fuel_capacity',
+      ];
+      weightKeys.forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(weightAndCapacityJson, key)) {
+          return;
+        }
+        next[key] = weightAndCapacityJson[key];
+      });
+    }
+    const otherDetailsJson = parseJsonObjectInput(row.aircraft_other_details_json);
+    if (otherDetailsJson) {
+      const otherDetailsKeys = ['is_not_in_use', 'not_in_use_date', 'is_readonly', 'readonly_date', 'is_flight_log_under_utc'];
+      otherDetailsKeys.forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(otherDetailsJson, key)) {
+          return;
+        }
+        next[key] = otherDetailsJson[key];
+      });
+    }
   }
   return next;
 }

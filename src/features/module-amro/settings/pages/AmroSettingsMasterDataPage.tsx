@@ -348,6 +348,52 @@ const buildAircraftWarrantyJson = (values: Record<string, unknown>): Record<stri
   };
 };
 
+const parseJsonObjectLike = (value: unknown): Record<string, unknown> | null => {
+  if (!value) {
+    return null;
+  }
+  if (typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+    } catch {
+      return null;
+    }
+  }
+  return null;
+};
+
+const buildAircraftWeightAndCapacityJson = (values: Record<string, unknown>): Record<string, unknown> => {
+  const weightKeys = [
+    'empty_weight',
+    'all_up_weight',
+    'gross_payload',
+    'taxi_weight',
+    'takeoff_weight',
+    'zero_fuel_weight',
+    'landing_weight',
+    'fuel_capacity',
+  ] as const;
+  return weightKeys.reduce<Record<string, unknown>>((accumulator, key) => {
+    const rawValue = String(values[key] ?? '').trim();
+    accumulator[key] = rawValue;
+    return accumulator;
+  }, {});
+};
+
+const buildAircraftOtherDetailsJson = (values: Record<string, unknown>): Record<string, unknown> => ({
+  is_not_in_use: parseBooleanLike(values.is_not_in_use),
+  not_in_use_date: /^\d{4}-\d{2}-\d{2}$/.test(String(values.not_in_use_date ?? '').trim()) ? String(values.not_in_use_date ?? '').trim() : '',
+  is_readonly: parseBooleanLike(values.is_readonly),
+  readonly_date: /^\d{4}-\d{2}-\d{2}$/.test(String(values.readonly_date ?? '').trim()) ? String(values.readonly_date ?? '').trim() : '',
+  is_flight_log_under_utc: parseBooleanLike(values.is_flight_log_under_utc),
+});
+
 type AircraftTemplateFormValues = {
   template_name: string;
   aircraft_type: string;
@@ -3156,7 +3202,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           }
         }
         const warrantyJson = buildAircraftWarrantyJson(submitValues);
+        const weightAndCapacityJson = buildAircraftWeightAndCapacityJson(submitValues);
+        const otherDetailsJson = buildAircraftOtherDetailsJson(submitValues);
         payload.warranty_json = warrantyJson;
+        payload.aircraft_weight_and_capacity_json = weightAndCapacityJson;
+        payload.aircraft_other_details_json = otherDetailsJson;
         payload.is_under_warranty = Boolean(warrantyJson.is_under_warranty);
         payload.warranty_start_date = String(warrantyJson.warranty_start_date || '').trim() || null;
         payload.warranty_end_date = String(warrantyJson.warranty_end_date || '').trim() || null;
@@ -3330,7 +3380,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           }
         }
         const warrantyJson = buildAircraftWarrantyJson(submitValues);
+        const weightAndCapacityJson = buildAircraftWeightAndCapacityJson(submitValues);
+        const otherDetailsJson = buildAircraftOtherDetailsJson(submitValues);
         payload.warranty_json = warrantyJson;
+        payload.aircraft_weight_and_capacity_json = weightAndCapacityJson;
+        payload.aircraft_other_details_json = otherDetailsJson;
         payload.is_under_warranty = Boolean(warrantyJson.is_under_warranty);
         payload.warranty_start_date = String(warrantyJson.warranty_start_date || '').trim() || null;
         payload.warranty_end_date = String(warrantyJson.warranty_end_date || '').trim() || null;
@@ -5139,24 +5193,34 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftAmendmentDate(String(formValues.amendment_date ?? '').trim());
     setAircraftCounterRows(getDefaultAircraftCounterRows());
     setFormValues((previous) => {
+      const warrantyJson = parseJsonObjectLike(previous.warranty_json);
+      const weightAndCapacityJson = parseJsonObjectLike(previous.aircraft_weight_and_capacity_json);
+      const otherDetailsJson = parseJsonObjectLike(previous.aircraft_other_details_json);
       const fallbackTailNumber = String(previous.tail_number ?? '').trim() || String(previous.registration ?? '').trim() || String(previous.variable_number ?? '').trim();
       return {
         ...previous,
         tail_number: fallbackTailNumber ? fallbackTailNumber.toUpperCase() : previous.tail_number,
         aircraft_type: String(previous.aircraft_type ?? '').trim() || aircraftTypeSelectOptions[0]?.value || AIRCRAFT_TYPE_FALLBACK_OPTIONS[0],
         status: String(previous.status ?? '').trim() || aircraftStatusSelectOptions[0]?.value || AIRCRAFT_STATUS_OPTIONS[0],
-        is_under_warranty: parseBooleanLike(previous.warranty_json && typeof previous.warranty_json === 'object'
-          ? (previous.warranty_json as Record<string, unknown>).is_under_warranty
-          : previous.is_under_warranty),
+        empty_weight: String((weightAndCapacityJson?.empty_weight ?? previous.empty_weight) ?? '').trim(),
+        all_up_weight: String((weightAndCapacityJson?.all_up_weight ?? previous.all_up_weight) ?? '').trim(),
+        gross_payload: String((weightAndCapacityJson?.gross_payload ?? previous.gross_payload) ?? '').trim(),
+        taxi_weight: String((weightAndCapacityJson?.taxi_weight ?? previous.taxi_weight) ?? '').trim(),
+        takeoff_weight: String((weightAndCapacityJson?.takeoff_weight ?? previous.takeoff_weight) ?? '').trim(),
+        zero_fuel_weight: String((weightAndCapacityJson?.zero_fuel_weight ?? previous.zero_fuel_weight) ?? '').trim(),
+        landing_weight: String((weightAndCapacityJson?.landing_weight ?? previous.landing_weight) ?? '').trim(),
+        fuel_capacity: String((weightAndCapacityJson?.fuel_capacity ?? previous.fuel_capacity) ?? '').trim(),
+        is_not_in_use: parseBooleanLike(otherDetailsJson?.is_not_in_use ?? previous.is_not_in_use),
+        not_in_use_date: String((otherDetailsJson?.not_in_use_date ?? previous.not_in_use_date) ?? '').trim(),
+        is_readonly: parseBooleanLike(otherDetailsJson?.is_readonly ?? previous.is_readonly),
+        readonly_date: String((otherDetailsJson?.readonly_date ?? previous.readonly_date) ?? '').trim(),
+        is_flight_log_under_utc: parseBooleanLike(otherDetailsJson?.is_flight_log_under_utc ?? previous.is_flight_log_under_utc),
+        is_under_warranty: parseBooleanLike(warrantyJson?.is_under_warranty ?? previous.is_under_warranty),
         warranty_start_date: String(
-          (previous.warranty_json && typeof previous.warranty_json === 'object'
-            ? (previous.warranty_json as Record<string, unknown>).warranty_start_date
-            : previous.warranty_start_date) ?? '',
+          (warrantyJson?.warranty_start_date ?? previous.warranty_start_date) ?? '',
         ).trim(),
         warranty_end_date: String(
-          (previous.warranty_json && typeof previous.warranty_json === 'object'
-            ? (previous.warranty_json as Record<string, unknown>).warranty_end_date
-            : previous.warranty_end_date) ?? '',
+          (warrantyJson?.warranty_end_date ?? previous.warranty_end_date) ?? '',
         ).trim(),
       };
     });
