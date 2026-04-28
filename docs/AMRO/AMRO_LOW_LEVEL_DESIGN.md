@@ -2784,6 +2784,48 @@ Implementation Notes:
   - Handler: supabase/functions/parse-directive-frequency-temp/index.ts
 ```
 
+```text
+Component Type: Table
+Component Name: public.aircraft_categories
+Purpose: Tenant-scoped aircraft category master for AMRO aircraft classification and filtering.
+Estimated Row Count: 6-500 per tenant
+Primary Key:
+  - aircraft_categories_pkey (id)
+Foreign Keys:
+  - aircraft_categories_tenant_id_fkey: tenant_id -> public.tenants(id) ON DELETE CASCADE
+  - aircraft_categories_franchise_id_fkey: franchise_id -> public.franchises(id) ON DELETE SET NULL
+Unique Constraints:
+  - uq_aircraft_categories_tenant_code (tenant_id, code)
+Check Constraints:
+  - ck_aircraft_categories_code_non_empty
+  - ck_aircraft_categories_name_non_empty
+Defaults:
+  - id: gen_random_uuid()
+  - is_active: true
+  - created_at: now()
+  - updated_at: now()
+Indexes:
+  - idx_aircraft_categories_tenant_id(tenant_id)
+  - idx_aircraft_categories_franchise_id(franchise_id)
+  - idx_aircraft_categories_active(is_active)
+Columns:
+  - id | uuid | nullable:no | default:gen_random_uuid()
+  - tenant_id | uuid | nullable:no | default:null
+  - franchise_id | uuid | nullable:yes | default:null
+  - code | varchar(10) | nullable:no | default:null
+  - name | varchar(100) | nullable:no | default:null
+  - description | text | nullable:yes | default:null
+  - is_active | boolean | nullable:no | default:true
+  - created_at | timestamptz | nullable:no | default:now()
+  - updated_at | timestamptz | nullable:no | default:now()
+Security Considerations:
+  - RLS enabled with platform-admin full access and tenant-scoped access policy.
+  - No cross-tenant writes allowed through tenant-scoped policy checks.
+Implementation Notes:
+  - Migration: 20260426194000_create_aircraft_categories_if_absent.sql
+  - Seed scope: tenant_id 157b8d12-c115-446e-a4dc-d12077751fe2 only.
+```
+
 #### Template: SQL Function / Trigger Function
 
 ```text
