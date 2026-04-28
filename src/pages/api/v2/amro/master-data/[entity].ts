@@ -358,7 +358,7 @@ async function validateAircraftModelManufacturerReferences(
 
   const issues = new Map<number, { field: string; message: string }[]>();
   records.forEach((record, index) => {
-    const modelToken = asNullableString(record.aircraft_model || record.model);
+    const modelToken = asNullableString(record.assembly_models || record.aircraft_model || record.model);
     const manufacturerId = asNullableString(record.manufacturer_id);
     if (!modelToken || !manufacturerId) {
       return;
@@ -493,6 +493,15 @@ function resolveSortColumn(entity: string, requestedSortBy: string, listColumns:
     return 'created_at';
   }
   return columns[0];
+}
+
+function stripColumnFromRecord(record: Record<string, unknown>, column: string): Record<string, unknown> {
+  if (!Object.prototype.hasOwnProperty.call(record, column)) {
+    return record;
+  }
+  const next = { ...record };
+  delete next[column];
+  return next;
 }
 
 function matchesSearch(row: Record<string, unknown>, searchableColumns: string[], search: string): boolean {
@@ -1470,20 +1479,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new HttpError('bulk import supports up to 500 records per request', 400);
       }
       let resolvedRecords = records;
-      let manufacturerIssues = new Map<number, { field: string; message: string }[]>();
-      let aircraftModelIssues = new Map<number, { field: string; message: string }[]>();
       let assemblyModelIssues = new Map<number, { field: string; message: string }[]>();
-      if (entity === 'aircraft') {
-        const resolved = await resolveAircraftManufacturerReferences(supabase, records);
-        resolvedRecords = resolved.resolved;
-        manufacturerIssues = resolved.issues;
-        aircraftModelIssues = await validateAircraftModelManufacturerReferences(
-          supabase,
-          tenantId,
-          franchiseId,
-          resolvedRecords,
-        );
-      }
       if (entity === 'assembly_models') {
         assemblyModelIssues = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, records);
       }
@@ -1493,8 +1489,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const validationResults = prepared.map((record, index) => ({
         index,
         issues: [
-          ...(manufacturerIssues.get(index) || []),
-          ...(aircraftModelIssues.get(index) || []),
           ...(assemblyModelIssues.get(index) || []),
           ...buildRequiredFieldIssues(entity, record),
           ...validatePayload(entity, record),
@@ -1533,11 +1527,38 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         }
         return insertRow;
       });
-      const { data, error } = await supabase
-        .from(entityConfig.table)
-        .insert(insertRows)
-        .select(entityConfig.listColumns);
-      if (error) throw new HttpError(error.message, 400);
+      let bulkInsertRows = insertRows;
+      let bulkData: unknown[] | null = null;
+      let bulkErrorMessage = '';
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const selectClause = getSelectClause(entity, entityConfig.listColumns);
+        const { data, error } = await supabase
+          .from(entityConfig.table)
+          .insert(bulkInsertRows)
+          .select(selectClause);
+        if (!error) {
+          bulkData = Array.isArray(data) ? data : [];
+          bulkErrorMessage = '';
+          break;
+        }
+        bulkErrorMessage = String(error.message || '');
+        const missingColumn = extractMissingColumn(bulkErrorMessage);
+        if (!missingColumn) {
+          break;
+        }
+        const schemaAdjusted = markMissingColumn(
+          entity,
+          missingColumn,
+          entityConfig.listColumns,
+          entityConfig.searchableColumns,
+        );
+        const hadPayloadColumn = bulkInsertRows.some((row) => Object.prototype.hasOwnProperty.call(row, missingColumn));
+        if (!schemaAdjusted && !hadPayloadColumn) {
+          break;
+        }
+        bulkInsertRows = bulkInsertRows.map((row) => stripColumnFromRecord(row, missingColumn));
+      }
+      if (bulkErrorMessage) throw new HttpError(bulkErrorMessage, 400);
       if (entity === 'ata_codes') {
         ATA_TREE_CACHE.clear();
       }
@@ -1557,22 +1578,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         output: {
           entity,
           imported_count: insertRows.length,
-          records: data || [],
+          records: bulkData || [],
         },
       });
       return;
     }
 
     let resolvedBody = body;
-    let manufacturerIssues: { field: string; message: string }[] = [];
-    let aircraftModelIssues: { field: string; message: string }[] = [];
-    if (entity === 'aircraft') {
-      const resolved = await resolveAircraftManufacturerReferences(supabase, [body]);
-      resolvedBody = resolved.resolved[0] || body;
-      manufacturerIssues = resolved.issues.get(0) || [];
-      const validation = await validateAircraftModelManufacturerReferences(supabase, tenantId, franchiseId, [resolvedBody]);
-      aircraftModelIssues = validation.get(0) || [];
-    }
     const payload = sanitizeWritePayload(entity, resolvedBody, { requireCreateFields: entity !== 'aircraft' });
     if (entity === 'ata_codes') {
       payload.code = String(payload.code || '').trim().toUpperCase();
@@ -1623,8 +1635,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       }
     }
     const issues = [
-      ...manufacturerIssues,
-      ...aircraftModelIssues,
       ...assemblyModelIssues,
       ...workOrderTemplateIssues,
       ...buildRequiredFieldIssues(entity, payload),
@@ -1869,13 +1879,42 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       return;
     }
-    const { data, error } = await supabase
-      .from(entityConfig.table)
-      .insert(insertPayload)
-      .select(entityConfig.listColumns)
-      .maybeSingle();
-    if (error) {
-      throw new HttpError(error.message, 400);
+    let createPayload = insertPayload;
+    let createRecord: Record<string, unknown> | null = null;
+    let createErrorMessage = '';
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const selectClause = getSelectClause(entity, entityConfig.listColumns);
+      const { data, error } = await supabase
+        .from(entityConfig.table)
+        .insert(createPayload)
+        .select(selectClause)
+        .maybeSingle();
+      if (!error) {
+        createRecord = data && typeof data === 'object' && !Array.isArray(data)
+          ? (data as unknown as Record<string, unknown>)
+          : null;
+        createErrorMessage = '';
+        break;
+      }
+      createErrorMessage = String(error.message || '');
+      const missingColumn = extractMissingColumn(createErrorMessage);
+      if (!missingColumn) {
+        break;
+      }
+      const schemaAdjusted = markMissingColumn(
+        entity,
+        missingColumn,
+        entityConfig.listColumns,
+        entityConfig.searchableColumns,
+      );
+      const hadPayloadColumn = Object.prototype.hasOwnProperty.call(createPayload, missingColumn);
+      if (!schemaAdjusted && !hadPayloadColumn) {
+        break;
+      }
+      createPayload = stripColumnFromRecord(createPayload, missingColumn);
+    }
+    if (createErrorMessage) {
+      throw new HttpError(createErrorMessage, 400);
     }
     if (entity === 'ata_codes') {
       ATA_TREE_CACHE.clear();
@@ -1886,15 +1925,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       userId: auth.userId,
       entity,
       action: 'create',
-      entityId: String(((data as unknown as Record<string, unknown> | null)?.id) || ''),
-      afterData: data,
+      entityId: String((createRecord?.id) || ''),
+      afterData: createRecord,
     });
     res.status(201).json({
       version: 'v2',
       correlationId: ctx.correlationId,
       output: {
         entity,
-        record: data,
+        record: createRecord,
       },
     });
   } catch (error) {

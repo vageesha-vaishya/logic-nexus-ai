@@ -3231,15 +3231,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         }
         const templateDetails = resolveTemplateModelDetailsById(selectedTemplateId);
         if (templateDetails) {
-          if (templateDetails.assemblyModelName) {
-            payload.aircraft_model = templateDetails.assemblyModelName;
-          }
-          if (templateDetails.aircraftCategoryName) {
-            payload.aircraft_type = templateDetails.aircraftCategoryName;
-            delete errors.aircraft_type;
-          }
-          if (templateDetails.manufacturerId) {
-            payload.manufacturer_id = templateDetails.manufacturerId;
+          if (templateDetails.assemblyModelId) {
+            payload.assembly_models = templateDetails.assemblyModelId;
           }
         }
         const warrantyJson = buildAircraftWarrantyJson(submitValues);
@@ -3262,14 +3255,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return false;
       }
       const headers = await buildApiHeaders(scope);
-      if (entity === 'aircraft' && payload.manufacturer_id) {
-        const exists = await verifyReferenceExists(headers, 'manufacturers', String(payload.manufacturer_id), ['id', 'manufacturer_code', 'name']);
-        if (!exists) {
-          setFormErrors((previous) => ({ ...previous, manufacturer_id: 'Manufacturer was not found' }));
-          toast.error('Manufacturer reference is invalid');
-          return false;
-        }
-      }
       if (entity === 'parts_inventory' && payload.supplier_id) {
         const exists = await verifyReferenceExists(headers, 'suppliers', String(payload.supplier_id), ['id', 'supplier_code']);
         if (!exists) {
@@ -3412,15 +3397,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           payload.aircraft_template = selectedTemplateId;
           const templateDetails = resolveTemplateModelDetailsById(selectedTemplateId);
           if (templateDetails) {
-            if (templateDetails.assemblyModelName) {
-              payload.aircraft_model = templateDetails.assemblyModelName;
-            }
-            if (templateDetails.aircraftCategoryName) {
-              payload.aircraft_type = templateDetails.aircraftCategoryName;
-              delete errors.aircraft_type;
-            }
-            if (templateDetails.manufacturerId) {
-              payload.manufacturer_id = templateDetails.manufacturerId;
+            if (templateDetails.assemblyModelId) {
+              payload.assembly_models = templateDetails.assemblyModelId;
             }
           }
         }
@@ -3444,14 +3422,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return false;
       }
       const headers = await buildApiHeaders(scope);
-      if (entity === 'aircraft' && payload.manufacturer_id) {
-        const exists = await verifyReferenceExists(headers, 'manufacturers', String(payload.manufacturer_id), ['id', 'manufacturer_code', 'name']);
-        if (!exists) {
-          setFormErrors((previous) => ({ ...previous, manufacturer_id: 'Manufacturer was not found' }));
-          toast.error('Manufacturer reference is invalid');
-          return false;
-        }
-      }
       if (entity === 'parts_inventory' && payload.supplier_id) {
         const exists = await verifyReferenceExists(headers, 'suppliers', String(payload.supplier_id), ['id', 'supplier_code']);
         if (!exists) {

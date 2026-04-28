@@ -62,20 +62,17 @@ class HttpError extends Error {
 const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   aircraft: {
     table: 'aircraft',
-    searchableColumns: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'aircraft_model', 'msn'],
+    searchableColumns: ['tail_number', 'registration', 'serial_number', 'assembly_models', 'msn'],
     listColumns:
-      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,configuration_code,maintenance_program,status,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
-    requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model'],
+      'id,tenant_id,franchise_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+    requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
       'tail_number',
       'serial_number',
-      'aircraft_type',
-      'aircraft_model',
+      'assembly_models',
       'configuration_code',
       'maintenance_program',
-      'manufacturer',
-      'model',
       'msn',
       'line_number',
       'status',
@@ -622,18 +619,14 @@ function resolveSortColumn(entity: MasterEntity, requestedSortBy: string): strin
 function normalizeAircraft(payload: JsonRecord): JsonRecord {
   const tailNumber = asString(payload.tail_number || payload.registration);
   const serialNumber = asString(payload.serial_number || payload.msn);
-  const aircraftType = asString(payload.aircraft_type || payload.engine_type);
-  const aircraftModel = asString(payload.aircraft_model || payload.model);
+  const assemblyModel = asNullableString(payload.assembly_models || payload.assembly_model_id || payload.aircraft_model);
   return {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
     serial_number: serialNumber,
-    aircraft_type: aircraftType,
-    aircraft_model: aircraftModel,
+    assembly_models: assemblyModel,
     configuration_code: asNullableString(payload.configuration_code),
     maintenance_program: asNullableString(payload.maintenance_program),
-    manufacturer: asNullableString(payload.manufacturer),
-    model: asNullableString(payload.model),
     msn: asNullableString(payload.msn),
     line_number: asNullableString(payload.line_number),
     status: asString(payload.status) || 'active',

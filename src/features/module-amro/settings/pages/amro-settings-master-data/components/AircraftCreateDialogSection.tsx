@@ -283,6 +283,14 @@ export function AircraftCreateDialogSection({
                   <Label htmlFor="aircraft-no-serial" className="font-normal">No Serial</Label>
                 </div>
               </div>
+
+              <Label htmlFor="aircraft-tail-number" className="font-semibold">* Tail No.</Label>
+              <Input
+                id="aircraft-tail-number"
+                value={String(formValues.tail_number ?? '')}
+                onChange={(event) => setFieldValue('tail_number', event.target.value.toUpperCase())}
+                className={cn(controlClassName, formErrors.tail_number && 'border-destructive')}
+              />
             </div>
             {formErrors.tenant_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.tenant_id}</p> : aircraftTenantOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftTenantOptionsError}</p> : null}
             {formErrors.franchise_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.franchise_id}</p> : aircraftFranchiseOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftFranchiseOptionsError}</p> : null}

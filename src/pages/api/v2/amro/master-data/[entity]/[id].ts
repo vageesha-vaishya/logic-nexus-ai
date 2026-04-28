@@ -535,10 +535,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (entity === 'aircraft') {
       const existingManufacturerId = asNullableString((existingRecord as Record<string, unknown>).manufacturer_id);
       const existingAircraftModel =
+        asNullableString((existingRecord as Record<string, unknown>).assembly_models) ||
         asNullableString((existingRecord as Record<string, unknown>).aircraft_model) ||
         asNullableString((existingRecord as Record<string, unknown>).model);
       const effectiveManufacturerId = asNullableString(payload.manufacturer_id) || existingManufacturerId;
-      const effectiveAircraftModel = asNullableString(payload.aircraft_model || payload.model) || existingAircraftModel;
+      const effectiveAircraftModel = asNullableString(payload.assembly_models || payload.aircraft_model || payload.model) || existingAircraftModel;
       aircraftModelIssues = await validateAircraftModelManufacturerReference(
         supabase,
         tenantId,

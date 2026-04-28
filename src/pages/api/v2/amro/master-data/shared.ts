@@ -49,29 +49,22 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'tail_number',
       'registration',
       'serial_number',
-      'aircraft_type',
-      'aircraft_model',
+      'assembly_models',
       'msn',
-      'manufacturer',
-      'model',
       'owner_name',
       'base_location',
       'restrictions',
     ],
     listColumns:
-      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
-    requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'manufacturer_id'],
+      'id,tenant_id,franchise_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+    requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
       'tail_number',
       'serial_number',
-      'aircraft_type',
-      'aircraft_model',
+      'assembly_models',
       'configuration_code',
       'maintenance_program',
-      'manufacturer',
-      'manufacturer_id',
-      'model',
       'msn',
       'line_number',
       'status',
@@ -464,21 +457,16 @@ function normalizeAircraft(payload: Record<string, unknown>) {
   const serialNumber = requiresSyntheticSerial
     ? `NSN-${serialFallbackToken || 'UNSPECIFIED'}`
     : serialSource;
-  const aircraftType = asString(payload.aircraft_type || payload.engine_type);
-  const aircraftModel = asString(payload.aircraft_model || payload.model);
+  const assemblyModel = asNullableString(payload.assembly_models || payload.assembly_model_id || payload.aircraft_model);
   const normalizedStatusToken = asString(payload.status).toLowerCase();
   const normalizedStatus = AIRCRAFT_STATUS_ALIASES[normalizedStatusToken] || normalizedStatusToken || 'active';
   return {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
     serial_number: serialNumber,
-    aircraft_type: aircraftType,
-    aircraft_model: aircraftModel,
+    assembly_models: assemblyModel,
     configuration_code: asNullableString(payload.configuration_code),
     maintenance_program: asNullableString(payload.maintenance_program),
-    manufacturer: asNullableString(payload.manufacturer),
-    manufacturer_id: asNullableString(payload.manufacturer_id),
-    model: asString(payload.model || aircraftModel) || null,
     msn: asNullableString(payload.msn),
     line_number: asNullableString(payload.line_number),
     status: normalizedStatus,
@@ -961,13 +949,7 @@ export function sanitizeWritePayload(
       if ((field === 'serial_number' || field === 'msn') && (providedKeys.has('serial_number') || providedKeys.has('msn'))) {
         return true;
       }
-      if (field === 'aircraft_type' && (providedKeys.has('aircraft_type') || providedKeys.has('engine_type'))) {
-        return true;
-      }
-      if ((field === 'aircraft_model' || field === 'model') && (providedKeys.has('aircraft_model') || providedKeys.has('model'))) {
-        return true;
-      }
-      if ((field === 'manufacturer_id' || field === 'manufacturer') && (providedKeys.has('manufacturer_id') || providedKeys.has('manufacturer') || providedKeys.has('manufacturer_code'))) {
+      if (field === 'assembly_models' && (providedKeys.has('assembly_models') || providedKeys.has('assembly_model_id') || providedKeys.has('aircraft_model') || providedKeys.has('model'))){
         return true;
       }
     }
