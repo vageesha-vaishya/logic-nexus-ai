@@ -61,7 +61,6 @@ type AircraftCreateDialogSectionProps = {
   systemTemplateModelOptions: AircraftTemplateModelOption[];
   franchiseAssemblyModelOptions: AircraftTemplateModelOption[];
   setFieldValue: (field: string, value: unknown) => void;
-  hydrateAircraftCountersFromTemplate: (templateId: string) => Promise<void>;
   aircraftTemplateSelectOptions: SelectOption[];
   aircraftTenantSelectOptions: SelectOption[];
   aircraftFranchiseSelectOptions: SelectOption[];
@@ -121,7 +120,6 @@ export function AircraftCreateDialogSection({
   systemTemplateModelOptions,
   franchiseAssemblyModelOptions,
   setFieldValue,
-  hydrateAircraftCountersFromTemplate,
   aircraftTemplateSelectOptions,
   aircraftTenantSelectOptions,
   aircraftFranchiseSelectOptions,
@@ -305,8 +303,9 @@ export function AircraftCreateDialogSection({
                 value={aircraftTemplateModel}
                 disabled={aircraftTemplateOptionsLoading || disableAircraftModelSelection}
                 onChange={(event) => {
-                  setAircraftTemplateModel(event.target.value);
-                  void hydrateAircraftCountersFromTemplate(event.target.value);
+                  const selectedTemplateId = event.target.value;
+                  setAircraftTemplateModel(selectedTemplateId);
+                  setFieldValue('aircraft_template', selectedTemplateId);
                 }}
                 className={cn(controlClassName, formErrors.aircraft_template && 'border-destructive')}
               >
