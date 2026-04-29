@@ -56,7 +56,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'restrictions',
     ],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,warranty_json,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
@@ -73,6 +73,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'station_code',
       'base_location',
       'owner_name',
+      'warranty_json',
       'manufacturing_date',
       'defect_count',
       'first_limit_remaining',
@@ -463,6 +464,24 @@ function normalizeAircraft(payload: Record<string, unknown>) {
   const assemblyModel = asNullableString(payload.assembly_models || payload.assembly_model_id || payload.aircraft_model);
   const normalizedStatusToken = asString(payload.status).toLowerCase();
   const normalizedStatus = AIRCRAFT_STATUS_ALIASES[normalizedStatusToken] || normalizedStatusToken || 'active';
+  const hasWarrantyJson = Object.prototype.hasOwnProperty.call(payload, 'warranty_json');
+  const rawWarrantyJson = payload.warranty_json;
+  if (hasWarrantyJson && rawWarrantyJson !== null && rawWarrantyJson !== undefined && rawWarrantyJson !== '' && (typeof rawWarrantyJson !== 'object' || Array.isArray(rawWarrantyJson))) {
+    throw new HttpError('warranty_json must be an object', 400);
+  }
+  const warrantyJsonRecord = (asJsonObject(rawWarrantyJson) ?? {}) as Record<string, unknown>;
+  const normalizedWarranty = {
+    is_under_warranty: asBoolean(
+      warrantyJsonRecord.is_under_warranty ?? payload.is_under_warranty,
+      false,
+    ),
+    warranty_start_date: asDateString(
+      warrantyJsonRecord.warranty_start_date ?? payload.warranty_start_date,
+    ),
+    warranty_end_date: asDateString(
+      warrantyJsonRecord.warranty_end_date ?? payload.warranty_end_date,
+    ),
+  };
   return {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
@@ -487,6 +506,7 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     current_cycles: asNumber(payload.current_cycles) ?? 0,
     current_flight_hours_since_new: asNumber(payload.current_flight_hours_since_new) ?? 0,
     current_cycles_since_new: asNumber(payload.current_cycles_since_new) ?? 0,
+    warranty_json: normalizedWarranty,
     engine_install_history: asJsonArray(payload.engine_install_history),
     thrust_rating_change_log: asJsonArray(payload.thrust_rating_change_log),
     on_wing_lifecycle_records: asJsonArray(payload.on_wing_lifecycle_records),

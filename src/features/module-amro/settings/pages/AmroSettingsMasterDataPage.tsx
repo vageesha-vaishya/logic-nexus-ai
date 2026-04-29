@@ -3188,9 +3188,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         payload.warranty_json = warrantyJson;
         payload.aircraft_weight_and_capacity_json = weightAndCapacityJson;
         payload.aircraft_other_details_json = otherDetailsJson;
-        payload.is_under_warranty = Boolean(warrantyJson.is_under_warranty);
-        payload.warranty_start_date = String(warrantyJson.warranty_start_date || '').trim() || null;
-        payload.warranty_end_date = String(warrantyJson.warranty_end_date || '').trim() || null;
       }
       const normalizedErrors = entity === 'aircraft' ? normalizeAircraftValidationErrors(errors) : errors;
       setFormErrors(normalizedErrors);
@@ -3359,9 +3356,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         payload.warranty_json = warrantyJson;
         payload.aircraft_weight_and_capacity_json = weightAndCapacityJson;
         payload.aircraft_other_details_json = otherDetailsJson;
-        payload.is_under_warranty = Boolean(warrantyJson.is_under_warranty);
-        payload.warranty_start_date = String(warrantyJson.warranty_start_date || '').trim() || null;
-        payload.warranty_end_date = String(warrantyJson.warranty_end_date || '').trim() || null;
       }
       const normalizedErrors = entity === 'aircraft' ? normalizeAircraftValidationErrors(errors) : errors;
       setFormErrors(normalizedErrors);
@@ -5122,13 +5116,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         is_readonly: parseBooleanLike(otherDetailsJson?.is_readonly ?? previous.is_readonly),
         readonly_date: String((otherDetailsJson?.readonly_date ?? previous.readonly_date) ?? '').trim(),
         is_flight_log_under_utc: parseBooleanLike(otherDetailsJson?.is_flight_log_under_utc ?? previous.is_flight_log_under_utc),
-        is_under_warranty: parseBooleanLike(warrantyJson?.is_under_warranty ?? previous.is_under_warranty),
-        warranty_start_date: String(
-          (warrantyJson?.warranty_start_date ?? previous.warranty_start_date) ?? '',
-        ).trim(),
-        warranty_end_date: String(
-          (warrantyJson?.warranty_end_date ?? previous.warranty_end_date) ?? '',
-        ).trim(),
+        is_under_warranty: parseBooleanLike(warrantyJson?.is_under_warranty),
+        warranty_start_date: String(warrantyJson?.warranty_start_date ?? '').trim(),
+        warranty_end_date: String(warrantyJson?.warranty_end_date ?? '').trim(),
       };
     });
   }, [activeAircraftFranchiseId, activeAircraftTenantId, aircraftStatusSelectOptions, aircraftTemplateModel, aircraftTypeSelectOptions, entity, formValues.assembly_models, formValues.aircraft_template, formValues.manufacturing_date, formValues.base_location, formValues.owner_name, formValues.line_number, formValues.variable_number, formValues.maintenance_revision_number, formValues.maintenance_revision_date, formValues.amendment_number, formValues.amendment_date, formValues.registration, formValues.serial_number, formValues.aircraft_type, isSystemSelectValue, modalMode, modalOpen, selectedId, systemTemplateModelOptions, systemTemplateModelSelectOptions]);

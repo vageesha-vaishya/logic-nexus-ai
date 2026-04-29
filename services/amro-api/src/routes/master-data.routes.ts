@@ -64,7 +64,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'aircraft',
     searchableColumns: ['tail_number', 'registration', 'serial_number', 'assembly_models', 'msn'],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,owner_name,is_under_warranty,warranty_start_date,warranty_end_date,warranty_json,aircraft_weight_and_capacity_json,aircraft_other_details_json,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,owner_name,warranty_json,aircraft_weight_and_capacity_json,aircraft_other_details_json,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
@@ -90,9 +90,6 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'current_cycles',
       'current_flight_hours_since_new',
       'current_cycles_since_new',
-      'is_under_warranty',
-      'warranty_start_date',
-      'warranty_end_date',
       'warranty_json',
       'aircraft_weight_and_capacity_json',
       'aircraft_other_details_json',
@@ -411,6 +408,57 @@ function asDateString(value: unknown): string | null {
   return normalized;
 }
 
+type WarrantySnapshot = {
+  is_under_warranty: boolean;
+  warranty_start_date: string | null;
+  warranty_end_date: string | null;
+};
+
+function resolveWarrantySnapshot(payload: JsonRecord, options: { strictObject?: boolean } = {}): WarrantySnapshot {
+  const strictObject = options.strictObject ?? false;
+  const hasWarrantyJson = Object.prototype.hasOwnProperty.call(payload, 'warranty_json');
+  const rawWarrantyJson = payload.warranty_json;
+  let warrantySource: JsonRecord = {};
+
+  if (rawWarrantyJson === null || rawWarrantyJson === undefined || rawWarrantyJson === '') {
+    warrantySource = {};
+  } else if (typeof rawWarrantyJson === 'object' && !Array.isArray(rawWarrantyJson)) {
+    warrantySource = rawWarrantyJson as JsonRecord;
+  } else if (strictObject || hasWarrantyJson) {
+    throw new HttpError('warranty_json must be an object', 400);
+  }
+
+  return {
+    is_under_warranty: asBoolean(warrantySource.is_under_warranty ?? payload.is_under_warranty, false),
+    warranty_start_date: asDateString(warrantySource.warranty_start_date ?? payload.warranty_start_date),
+    warranty_end_date: asDateString(warrantySource.warranty_end_date ?? payload.warranty_end_date),
+  };
+}
+
+function enrichAircraftWarrantyFields(record: JsonRecord): JsonRecord {
+  let snapshot: WarrantySnapshot;
+  try {
+    snapshot = resolveWarrantySnapshot(record);
+  } catch {
+    logger.warn('[AMRO Master Data] malformed aircraft warranty_json in record payload', {
+      aircraftId: String(record.id || ''),
+      tenantId: String(record.tenant_id || ''),
+    });
+    snapshot = {
+      is_under_warranty: false,
+      warranty_start_date: null,
+      warranty_end_date: null,
+    };
+  }
+
+  return {
+    ...record,
+    is_under_warranty: snapshot.is_under_warranty,
+    warranty_start_date: snapshot.warranty_start_date,
+    warranty_end_date: snapshot.warranty_end_date,
+  };
+}
+
 function firstQueryValue(value: unknown): string {
   if (Array.isArray(value)) {
     return String(value[0] || '').trim();
@@ -634,8 +682,7 @@ function normalizeAircraft(payload: JsonRecord): JsonRecord {
   const tailNumber = asString(payload.tail_number || payload.registration);
   const serialNumber = asString(payload.serial_number || payload.msn);
   const assemblyModel = asNullableString(payload.assembly_models || payload.assembly_model_id || payload.aircraft_model);
-  const warrantyStartDate = asDateString(payload.warranty_start_date);
-  const warrantyEndDate = asDateString(payload.warranty_end_date);
+  const normalizedWarranty = resolveWarrantySnapshot(payload, { strictObject: true });
   return {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
@@ -660,10 +707,7 @@ function normalizeAircraft(payload: JsonRecord): JsonRecord {
     current_cycles: asNumber(payload.current_cycles) ?? 0,
     current_flight_hours_since_new: asNumber(payload.current_flight_hours_since_new) ?? 0,
     current_cycles_since_new: asNumber(payload.current_cycles_since_new) ?? 0,
-    is_under_warranty: asBoolean(payload.is_under_warranty, false),
-    warranty_start_date: warrantyStartDate ? asNullableString(warrantyStartDate) : null,
-    warranty_end_date: warrantyEndDate ? asNullableString(warrantyEndDate) : null,
-    warranty_json: asJsonObject(payload.warranty_json),
+    warranty_json: normalizedWarranty,
     aircraft_weight_and_capacity_json: asJsonObject(payload.aircraft_weight_and_capacity_json),
     aircraft_other_details_json: asJsonObject(payload.aircraft_other_details_json),
     engine_install_history: asJsonArray(payload.engine_install_history),
@@ -1258,7 +1302,11 @@ router.get(
       throw toHttpError(error);
     }
     const rawRows = Array.isArray(finalData) ? (finalData as unknown as JsonRecord[]) : [];
-    const enrichedRows = entity === 'flight_logs' ? enrichFlightLogRows(rawRows) : rawRows;
+    const enrichedRows = entity === 'flight_logs'
+      ? enrichFlightLogRows(rawRows)
+      : entity === 'aircraft'
+        ? rawRows.map((row) => enrichAircraftWarrantyFields(row))
+        : rawRows;
     const activeSearchableColumns = getActiveSearchableColumns(entity);
     const rows = franchiseId && search ? enrichedRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : enrichedRows;
 
@@ -1358,7 +1406,9 @@ router.post(
         output: {
           entity,
           imported_count: prepared.length,
-          records: data || [],
+          records: entity === 'aircraft'
+            ? (Array.isArray(data) ? data.map((row) => enrichAircraftWarrantyFields(row as unknown as JsonRecord)) : [])
+            : (data || []),
         },
       });
       return;
@@ -1417,7 +1467,10 @@ router.post(
     if (error) {
       throw new HttpError(error.message, 400);
     }
-    const createdRecord = (data || null) as JsonRecord | null;
+    const createdRecordBase = (data || null) as JsonRecord | null;
+    const createdRecord = createdRecordBase && entity === 'aircraft'
+      ? enrichAircraftWarrantyFields(createdRecordBase)
+      : createdRecordBase;
     await writeAuditRecord({
       tenantId: req.tenantId,
       franchiseId,
@@ -1480,7 +1533,8 @@ router.get(
     if (!data) {
       throw new HttpError('Record not found', 404);
     }
-    const record = data as unknown as JsonRecord;
+    const recordBase = data as unknown as JsonRecord;
+    const record = entity === 'aircraft' ? enrichAircraftWarrantyFields(recordBase) : recordBase;
     const recordFranchise = asString(record.franchise_id);
     if (franchiseId && recordFranchise && recordFranchise !== franchiseId) {
       throw new HttpError('Forbidden', 403);
@@ -1589,14 +1643,14 @@ router.patch(
       action: 'update',
       entityId: id,
       beforeData: existingRecord,
-      afterData: data,
+      afterData: entity === 'aircraft' && data ? enrichAircraftWarrantyFields(data as unknown as JsonRecord) : data,
     });
     res.status(200).json({
       version: 'v2',
       correlationId,
       output: {
         entity,
-        record: data || null,
+        record: entity === 'aircraft' && data ? enrichAircraftWarrantyFields(data as unknown as JsonRecord) : (data || null),
       },
     });
   }),
