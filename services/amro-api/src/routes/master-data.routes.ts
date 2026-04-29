@@ -64,12 +64,13 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'aircraft',
     searchableColumns: ['tail_number', 'registration', 'serial_number', 'assembly_models', 'msn'],
     listColumns:
-      'id,tenant_id,franchise_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
       'tail_number',
       'serial_number',
+      'aircraft_template_id',
       'assembly_models',
       'configuration_code',
       'maintenance_program',
@@ -624,6 +625,7 @@ function normalizeAircraft(payload: JsonRecord): JsonRecord {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
     serial_number: serialNumber,
+    aircraft_template_id: asNullableString(payload.aircraft_template_id || payload.aircraft_template),
     assembly_models: assemblyModel,
     configuration_code: asNullableString(payload.configuration_code),
     maintenance_program: asNullableString(payload.maintenance_program),

@@ -56,12 +56,13 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'restrictions',
     ],
     listColumns:
-      'id,tenant_id,franchise_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
       'tail_number',
       'serial_number',
+      'aircraft_template_id',
       'assembly_models',
       'configuration_code',
       'maintenance_program',
@@ -464,6 +465,7 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
     serial_number: serialNumber,
+    aircraft_template_id: asNullableString(payload.aircraft_template_id || payload.aircraft_template),
     assembly_models: assemblyModel,
     configuration_code: asNullableString(payload.configuration_code),
     maintenance_program: asNullableString(payload.maintenance_program),
@@ -947,6 +949,9 @@ export function sanitizeWritePayload(
         return true;
       }
       if ((field === 'serial_number' || field === 'msn') && (providedKeys.has('serial_number') || providedKeys.has('msn'))) {
+        return true;
+      }
+      if (field === 'aircraft_template_id' && (providedKeys.has('aircraft_template_id') || providedKeys.has('aircraft_template'))) {
         return true;
       }
       if (field === 'assembly_models' && (providedKeys.has('assembly_models') || providedKeys.has('assembly_model_id') || providedKeys.has('aircraft_model') || providedKeys.has('model'))){

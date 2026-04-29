@@ -457,7 +457,9 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
     const passthroughKeys = [
       'tenant_id',
       'franchise_id',
+      'aircraft_template_id',
       'aircraft_template',
+      'assembly_models',
       'manufacturing_date',
       'base_location',
       'owner_name',
@@ -501,6 +503,12 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       }
       next[key] = row[key];
     });
+    if (!String(next.aircraft_template ?? '').trim()) {
+      const templateId = String(row.aircraft_template_id ?? '').trim();
+      if (templateId) {
+        next.aircraft_template = templateId;
+      }
+    }
     const weightAndCapacityJson = parseJsonObjectInput(row.aircraft_weight_and_capacity_json);
     if (weightAndCapacityJson) {
       const weightKeys = [

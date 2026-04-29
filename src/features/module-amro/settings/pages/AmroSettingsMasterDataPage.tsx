@@ -3227,14 +3227,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         if (!selectedTemplateId || isSystemSelectValue(selectedTemplateId)) {
           errors.aircraft_template = 'Aircraft Template is required';
         } else {
-          payload.aircraft_template = selectedTemplateId;
+          payload.aircraft_template_id = selectedTemplateId;
+          delete payload.aircraft_template;
         }
-        const templateDetails = resolveTemplateModelDetailsById(selectedTemplateId);
+        const templateDetails = resolveTemplateModelDetailsById(selectedTemplateId)
+          || (await loadTemplateAssemblyModelDetails(selectedTemplateId));
         if (templateDetails) {
           if (templateDetails.assemblyModelId) {
             payload.assembly_models = templateDetails.assemblyModelId;
           }
         }
+        delete payload.aircraft_model;
+        delete payload.model;
         const warrantyJson = buildAircraftWarrantyJson(submitValues);
         const weightAndCapacityJson = buildAircraftWeightAndCapacityJson(submitValues);
         const otherDetailsJson = buildAircraftOtherDetailsJson(submitValues);
@@ -3394,14 +3398,18 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (entity === 'aircraft') {
         const selectedTemplateId = String(aircraftTemplateModel || submitValues.aircraft_template || '').trim();
         if (selectedTemplateId && !isSystemSelectValue(selectedTemplateId)) {
-          payload.aircraft_template = selectedTemplateId;
-          const templateDetails = resolveTemplateModelDetailsById(selectedTemplateId);
+          payload.aircraft_template_id = selectedTemplateId;
+          delete payload.aircraft_template;
+          const templateDetails = resolveTemplateModelDetailsById(selectedTemplateId)
+            || (await loadTemplateAssemblyModelDetails(selectedTemplateId));
           if (templateDetails) {
             if (templateDetails.assemblyModelId) {
               payload.assembly_models = templateDetails.assemblyModelId;
             }
           }
         }
+        delete payload.aircraft_model;
+        delete payload.model;
         const warrantyJson = buildAircraftWarrantyJson(submitValues);
         const weightAndCapacityJson = buildAircraftWeightAndCapacityJson(submitValues);
         const otherDetailsJson = buildAircraftOtherDetailsJson(submitValues);
@@ -5174,27 +5182,24 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       ? systemTemplateModelSelectOptions.find((option) => !option.disabled && !isSystemSelectValue(option.value))?.value || ''
       : '';
     
-    // Try to find matching template based on aircraft's aircraft_model and manufacturer_id
-    const aircraftModelValue = String(formValues.aircraft_model ?? '').trim();
-    const manufacturerIdValue = String(formValues.manufacturer_id ?? '').trim();
+    // Resolve selected template from aircraft_template link first, fallback to assembly model reference when needed.
+    const assemblyModelValue = String(formValues.assembly_models ?? '').trim();
     let matchedTemplateId = String(formValues.aircraft_template ?? '').trim();
-    
-    if (!matchedTemplateId && aircraftModelValue && manufacturerIdValue) {
-      // Find template whose assembly_models name/code matches the aircraft's model
+
+    if (!matchedTemplateId && assemblyModelValue) {
       const matchingTemplate = systemTemplateModelOptions.find((option) => {
-        // Match by name or model_code from the assembly model
-        return option.name === aircraftModelValue || option.assemblyModelId === aircraftModelValue;
+        return option.assemblyModelId === assemblyModelValue;
       });
       if (matchingTemplate) {
         matchedTemplateId = matchingTemplate.id;
       }
     }
-    
+
     const templateModelSource = canHydrateTemplate ? (matchedTemplateId || defaultTemplateModel) : '';
     const normalizedTemplateModel = String(templateModelSource).trim() || defaultTemplateModel;
     setAircraftTemplateModel(normalizedTemplateModel);
     if (!normalizedTemplateModel) {
-      setSelectedTemplateModelName(aircraftModelValue);
+      setSelectedTemplateModelName('');
       setSelectedTemplateAircraftType(String(formValues.aircraft_type ?? '').trim());
       setSelectedTemplateManufacturerName('');
     }
@@ -5251,7 +5256,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         ).trim(),
       };
     });
-  }, [activeAircraftFranchiseId, activeAircraftTenantId, aircraftStatusSelectOptions, aircraftTypeSelectOptions, entity, formValues.aircraft_model, formValues.aircraft_template, formValues.manufacturer_id, formValues.manufacturing_date, formValues.base_location, formValues.owner_name, formValues.line_number, formValues.variable_number, formValues.maintenance_revision_number, formValues.maintenance_revision_date, formValues.amendment_number, formValues.amendment_date, formValues.registration, formValues.serial_number, formValues.aircraft_type, isSystemSelectValue, modalMode, modalOpen, selectedId, systemTemplateModelOptions, systemTemplateModelSelectOptions]);
+  }, [activeAircraftFranchiseId, activeAircraftTenantId, aircraftStatusSelectOptions, aircraftTypeSelectOptions, entity, formValues.assembly_models, formValues.aircraft_template, formValues.manufacturing_date, formValues.base_location, formValues.owner_name, formValues.line_number, formValues.variable_number, formValues.maintenance_revision_number, formValues.maintenance_revision_date, formValues.amendment_number, formValues.amendment_date, formValues.registration, formValues.serial_number, formValues.aircraft_type, isSystemSelectValue, modalMode, modalOpen, selectedId, systemTemplateModelOptions, systemTemplateModelSelectOptions]);
 
   useEffect(() => {
     if (!modalOpen || entity !== 'aircraft') {
