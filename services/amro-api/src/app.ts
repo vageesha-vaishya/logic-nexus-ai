@@ -1840,7 +1840,7 @@ app.use((req: Request, res: Response) => {
 /**
  * Global Error Handler
  */
-app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   logger.error('Unhandled error', {
     requestId,
@@ -1853,6 +1853,9 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const statusCode = err.statusCode || 500;
   const code = err.code || 'INTERNAL_SERVER_ERROR';
   const message = err.message || 'An unexpected error occurred';
+  if (res.headersSent) {
+    return next(err);
+  }
 
   res.status(statusCode).json({
     error: message,

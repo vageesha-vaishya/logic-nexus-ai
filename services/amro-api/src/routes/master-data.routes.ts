@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { NextFunction, Router, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -64,7 +64,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'aircraft',
     searchableColumns: ['tail_number', 'registration', 'serial_number', 'assembly_models', 'msn'],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,owner_name,is_under_warranty,warranty_start_date,warranty_end_date,warranty_json,aircraft_weight_and_capacity_json,aircraft_other_details_json,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
@@ -77,14 +77,25 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'msn',
       'line_number',
       'status',
+      'owner_name',
       'operator_code',
       'station_code',
       'base_location',
       'engine_type',
+      'manufacturing_date',
+      'defect_count',
+      'first_limit_remaining',
+      'restrictions',
       'current_flight_hours',
       'current_cycles',
       'current_flight_hours_since_new',
       'current_cycles_since_new',
+      'is_under_warranty',
+      'warranty_start_date',
+      'warranty_end_date',
+      'warranty_json',
+      'aircraft_weight_and_capacity_json',
+      'aircraft_other_details_json',
       'engine_install_history',
       'thrust_rating_change_log',
       'on_wing_lifecycle_records',
@@ -621,6 +632,8 @@ function normalizeAircraft(payload: JsonRecord): JsonRecord {
   const tailNumber = asString(payload.tail_number || payload.registration);
   const serialNumber = asString(payload.serial_number || payload.msn);
   const assemblyModel = asNullableString(payload.assembly_models || payload.assembly_model_id || payload.aircraft_model);
+  const warrantyStartDate = asDateString(payload.warranty_start_date);
+  const warrantyEndDate = asDateString(payload.warranty_end_date);
   return {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
@@ -632,14 +645,25 @@ function normalizeAircraft(payload: JsonRecord): JsonRecord {
     msn: asNullableString(payload.msn),
     line_number: asNullableString(payload.line_number),
     status: asString(payload.status) || 'active',
+    owner_name: asNullableString(payload.owner_name),
     operator_code: asNullableString(payload.operator_code),
     station_code: asNullableString(payload.station_code),
     base_location: asNullableString(payload.base_location),
     engine_type: asNullableString(payload.engine_type),
+    manufacturing_date: asNullableString(asDateString(payload.manufacturing_date)),
+    defect_count: asNumber(payload.defect_count),
+    first_limit_remaining: asNumber(payload.first_limit_remaining),
+    restrictions: asNullableString(payload.restrictions),
     current_flight_hours: asNumber(payload.current_flight_hours) ?? 0,
     current_cycles: asNumber(payload.current_cycles) ?? 0,
     current_flight_hours_since_new: asNumber(payload.current_flight_hours_since_new) ?? 0,
     current_cycles_since_new: asNumber(payload.current_cycles_since_new) ?? 0,
+    is_under_warranty: asBoolean(payload.is_under_warranty, false),
+    warranty_start_date: warrantyStartDate ? asNullableString(warrantyStartDate) : null,
+    warranty_end_date: warrantyEndDate ? asNullableString(warrantyEndDate) : null,
+    warranty_json: asJsonObject(payload.warranty_json),
+    aircraft_weight_and_capacity_json: asJsonObject(payload.aircraft_weight_and_capacity_json),
+    aircraft_other_details_json: asJsonObject(payload.aircraft_other_details_json),
     engine_install_history: asJsonArray(payload.engine_install_history),
     thrust_rating_change_log: asJsonArray(payload.thrust_rating_change_log),
     on_wing_lifecycle_records: asJsonArray(payload.on_wing_lifecycle_records),
@@ -1275,9 +1299,12 @@ router.post(
     const entityConfig = ENTITY_CONFIG[entity];
     const body = req.body && typeof req.body === 'object' ? (req.body as JsonRecord) : {};
     const { isBulkImport, records } = parseBulkOperation(body);
-    const franchiseId = extractFranchiseId(req);
+    const requestFranchiseId = extractFranchiseId(req);
     const supabase = getSupabaseAdminClient();
-    const scopePayload = { tenant_id: req.tenantId, franchise_id: franchiseId };
+    const resolveFranchiseScope = (record: JsonRecord): string | null => {
+      if (requestFranchiseId) return requestFranchiseId;
+      return asNullableString(record.franchise_id);
+    };
    logger.info('[AMRO Master Data] POST Method received for entity002', {
       correlationId,
       entity: req.params.entity,
@@ -1291,11 +1318,12 @@ router.post(
       }
       const prepared = records.map((record) => ({
         ...sanitizeWritePayload(entity, record),
-        ...scopePayload,
+        tenant_id: req.tenantId,
+        franchise_id: resolveFranchiseScope(record),
         updated_by: req.userId,
       }));
       if (entity === 'assembly_models') {
-        const issues = await validateAssemblyModelReferences(supabase, req.tenantId, franchiseId, prepared);
+        const issues = await validateAssemblyModelReferences(supabase, req.tenantId, requestFranchiseId, prepared);
         if (issues.size > 0) {
           throw new HttpError('Invalid assembly model references', 422);
         }
@@ -1314,7 +1342,7 @@ router.post(
       }
       await writeAuditRecord({
         tenantId: req.tenantId,
-        franchiseId,
+        franchiseId: requestFranchiseId,
         userId: req.userId,
         entity,
         action: 'bulk_import',
@@ -1344,7 +1372,8 @@ router.post(
       logger.info('[WPT DEBUG] compliance_requirements_json value:', body.compliance_requirements_json);
     }
     
-    const hydratedBody = entity === 'aircraft' ? await hydrateAircraftPayload(supabase, req.tenantId, franchiseId, body) : body;
+    const hydratedBody = entity === 'aircraft' ? await hydrateAircraftPayload(supabase, req.tenantId, requestFranchiseId, body) : body;
+    const franchiseId = resolveFranchiseScope(hydratedBody);
     const payload = sanitizeWritePayload(entity, hydratedBody);
     
     // DEBUG: Log what passed through sanitization
@@ -1362,7 +1391,8 @@ router.post(
     }
     const insertPayload = {
       ...payload,
-      ...scopePayload,
+      tenant_id: req.tenantId,
+      franchise_id: franchiseId,
       created_by: req.userId,
       updated_by: req.userId,
     };
@@ -1651,7 +1681,7 @@ router.delete(
   }),
 );
 
-router.use((error: unknown, req: AuthRequest, res: { status: (code: number) => { json: (body: unknown) => void } }, _next: unknown) => {
+router.use((error: unknown, req: AuthRequest, res: Response, next: NextFunction) => {
   const correlationId = req.header('x-request-id') || crypto.randomUUID();
   const resolved = toHttpError(error);
   logger.error('[AMRO Master Data] request failed', {
@@ -1661,6 +1691,9 @@ router.use((error: unknown, req: AuthRequest, res: { status: (code: number) => {
     statusCode: resolved.statusCode,
     message: resolved.message,
   });
+  if (res.headersSent) {
+    return next(error);
+  }
   res.status(resolved.statusCode).json({
     error: resolved.message,
     version: 'v2',
