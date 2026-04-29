@@ -2042,12 +2042,21 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       if (['false', '0', 'no', 'off', 'inactive', 'f', 'n'].includes(token)) return false;
       return true;
     };
-    const mapRecordsToOptions = (records: Array<Record<string, unknown>>): AircraftTempOption[] => {
+    const isSelectableAircraftTemplateRecord = (record: Record<string, unknown>): boolean => {
+      const templateName = String(record.template_name || '').trim();
+      if (!templateName) {
+        return false;
+      }
+      return !/^(wp|wt)[\s_-]?\d+/i.test(templateName);
+    };
+    const mapRecordsToOptions = (records: Array<Record<string, unknown>>, mode: 'strict' | 'relaxed' = 'strict'): AircraftTempOption[] => {
       const seen = new Set<string>();
       let rejectedCount = 0;
       const options = records
         .filter((record) => {
-          const allowed = isAircraftTemplateRecordEligible(record);
+          const allowed = mode === 'strict'
+            ? isAircraftTemplateRecordEligible(record)
+            : isSelectableAircraftTemplateRecord(record);
           if (!allowed) {
             rejectedCount += 1;
           }
@@ -2103,9 +2112,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
 
       if (!error && Array.isArray(data)) {
         const activeRows = (data as Record<string, unknown>[]).filter((record) => isTruthyActive(record.is_active));
-        const mappedOptions = mapRecordsToOptions(activeRows);
-        if (mappedOptions.length > 0) {
-          return mappedOptions;
+        const strictMappedOptions = mapRecordsToOptions(activeRows, 'strict');
+        if (strictMappedOptions.length > 0) {
+          return strictMappedOptions;
+        }
+        const relaxedMappedOptions = mapRecordsToOptions(activeRows, 'relaxed');
+        if (relaxedMappedOptions.length > 0) {
+          logger.warn('Aircraft Template dropdown is using relaxed fallback eligibility due missing assembly model links', {
+            component: 'AmroSettingsMasterDataPage',
+            fallbackCount: relaxedMappedOptions.length,
+          });
+          return relaxedMappedOptions;
         }
       }
     }
