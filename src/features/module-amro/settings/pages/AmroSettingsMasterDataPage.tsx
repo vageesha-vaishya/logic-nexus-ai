@@ -101,6 +101,7 @@ import {
   deleteAircraftTemplate,
   filterAssemblyModelsByScope,
   filterManufacturersByTenant,
+  isAircraftTemplateRecordEligible,
   listAircraftTemplates,
   parseApiPayload,
   updateAircraftTemplate,
@@ -1760,7 +1761,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const manufacturerSeedAttemptedRef = useRef(false);
   const assemblyTypeSeedAttemptedRef = useRef(false);
   const assemblyModelSeedAttemptedRef = useRef(false);
-  const aircraftTemplateSeedAttemptedRef = useRef(false);
   const selectionAnchorRef = useRef<string | null>(null);
   const aircraftSnapshotAuthToastShownRef = useRef(false);
   const aircraftEnhancementEnabled = normalizeFeatureFlag(import.meta.env.VITE_AMRO_AIRCRAFT_FORM_ENHANCEMENTS, true);
@@ -2020,9 +2020,23 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, []);
 
   const fetchAircraftTempOptions = useCallback(async (headers: Headers): Promise<AircraftTempOption[]> => {
+    const isTruthyActive = (value: unknown): boolean => {
+      const token = String(value ?? '').trim().toLowerCase();
+      if (!token) return true;
+      if (['false', '0', 'no', 'off', 'inactive', 'f', 'n'].includes(token)) return false;
+      return true;
+    };
     const mapRecordsToOptions = (records: Array<Record<string, unknown>>): AircraftTempOption[] => {
       const seen = new Set<string>();
-      return records
+      let rejectedCount = 0;
+      const options = records
+        .filter((record) => {
+          const allowed = isAircraftTemplateRecordEligible(record);
+          if (!allowed) {
+            rejectedCount += 1;
+          }
+          return allowed;
+        })
         .map((record) => {
           const id = String(record.id || '').trim();
           const name = String(record.template_name || '').trim();
@@ -2043,21 +2057,40 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         })
         .filter((option): option is AircraftTempOption => Boolean(option))
         .sort((left, right) => left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: 'base' }));
+      if (rejectedCount > 0) {
+        logger.warn('Rejected non-aircraft template records while building Aircraft Template dropdown', {
+          component: 'AmroSettingsMasterDataPage',
+          rejectedCount,
+        });
+      }
+      return options;
     };
 
     // Primary source: direct table access from aircraft_template via scoped DB.
     if (scopedDb) {
-      const { data, error } = await (scopedDb as any)
+      let { data, error } = await (scopedDb as any)
         .from('aircraft_template')
         .select('id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,model_json,is_active')
         .order('template_name', { ascending: true })
         .limit(500);
 
+      // Backward-compat fallback for workspaces where is_active is not yet visible to the client schema.
+      if (error) {
+        const retry = await (scopedDb as any)
+          .from('aircraft_template')
+          .select('id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,model_json')
+          .order('template_name', { ascending: true })
+          .limit(500);
+        data = retry.data;
+        error = retry.error;
+      }
+
       if (!error && Array.isArray(data)) {
-        const activeRows = (data as Record<string, unknown>[]).filter(
-          (record) => String(record.is_active ?? 'true').toLowerCase() !== 'false',
-        );
-        return mapRecordsToOptions(activeRows);
+        const activeRows = (data as Record<string, unknown>[]).filter((record) => isTruthyActive(record.is_active));
+        const mappedOptions = mapRecordsToOptions(activeRows);
+        if (mappedOptions.length > 0) {
+          return mappedOptions;
+        }
       }
     }
 
@@ -2207,106 +2240,6 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     },
     [scopedDb],
   );
-
-  const seedAircraftTemplatesIfNeeded = useCallback(async (headers: Headers): Promise<boolean> => {
-    if (aircraftTemplateSeedAttemptedRef.current) {
-      return false;
-    }
-    const query = new URLSearchParams({
-      page: '1',
-      page_size: '200',
-      sort_by: 'template_name',
-      sort_dir: 'asc',
-    });
-    const response = await fetch(`/api/v2/amro/master-data/work_order_templates?${query.toString()}`, {
-      method: 'GET',
-      headers,
-    });
-    const payload = await parseApiPayload(response);
-    if (!response.ok) {
-      aircraftTemplateSeedAttemptedRef.current = true;
-      return false;
-    }
-    const records = getPayloadRecords(payload);
-    if (records.length === 0) {
-      aircraftTemplateSeedAttemptedRef.current = true;
-      return false;
-    }
-    const inferAircraftType = (templateName: string, maintenanceType: string): string => {
-      const text = `${templateName} ${maintenanceType}`.toLowerCase();
-      if (/(787|777|747|767|350|340|330|a3[3-9]|a380|wide)/.test(text)) {
-        return 'WideBody';
-      }
-      return 'NarrowBody';
-    };
-    const inferManufacturer = (templateName: string): string => {
-      const text = templateName.toLowerCase();
-      if (text.includes('airbus') || /\ba\d{3}/.test(text)) return 'Airbus';
-      if (text.includes('boeing') || /\bb\d{3}/.test(text)) return 'Boeing';
-      if (text.includes('embraer') || /\be\d{3}/.test(text)) return 'Embraer';
-      if (text.includes('atr')) return 'ATR';
-      return '';
-    };
-    const inferAircraftModel = (templateName: string): string => {
-      const match = templateName.match(/\b([ABE]\d{3}(?:-\d{1,3})?)\b/i);
-      return match?.[1]?.toUpperCase() || '';
-    };
-    const seen = new Set<string>();
-    const seedRecords = records
-      .map((record) => {
-        const templateName = String(record.template_name || '').trim();
-        if (!templateName) return null;
-        const dedupeKey = templateName.toLowerCase();
-        if (seen.has(dedupeKey)) return null;
-        seen.add(dedupeKey);
-        const maintenanceType = String(record.maintenance_type || '').trim();
-        const aircraftType = inferAircraftType(templateName, maintenanceType);
-        return {
-          template_name: templateName,
-          aircraft_type: aircraftType,
-          manufacturer: inferManufacturer(templateName),
-          aircraft_model: inferAircraftModel(templateName),
-          maintenance_program: String(record.template_code || '').trim(),
-          revision_number: String(record.version || '').trim(),
-          amendment_number: '',
-        };
-      })
-      .filter(
-        (
-          record,
-        ): record is {
-          template_name: string;
-          aircraft_type: string;
-          manufacturer: string;
-          aircraft_model: string;
-          maintenance_program: string;
-          revision_number: string;
-          amendment_number: string;
-        } => Boolean(record),
-      );
-    if (seedRecords.length === 0) {
-      aircraftTemplateSeedAttemptedRef.current = true;
-      return false;
-    }
-    const createResponse = await fetch('/api/v2/amro/master-data/aircraft_template', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify({
-        operation: 'bulk_import',
-        records: seedRecords,
-      }),
-    });
-    const createPayload = await parseApiPayload(createResponse);
-    aircraftTemplateSeedAttemptedRef.current = true;
-    if (!createResponse.ok) {
-      logger.warn('Aircraft template seed from work package templates failed', {
-        component: 'AmroSettingsMasterDataPage',
-        error: String(createPayload.error || 'Create aircraft_template bulk import failed'),
-      });
-      return false;
-    }
-    return true;
-  }, []);
 
   const fetchAircraftBaseFacilityOptions = useCallback(async (headers: Headers): Promise<string[]> => {
     const query = new URLSearchParams({
@@ -2586,13 +2519,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const effectiveTenantId = tenantOverride || String(formValues.tenant_id ?? scope.tenantId ?? '').trim();
       const effectiveFranchiseId = franchiseOverride || String(formValues.franchise_id ?? scope.franchiseId ?? '').trim();
       const headers = await buildApiHeaders({ tenantId: effectiveTenantId, franchiseId: effectiveFranchiseId, userId: scope.userId });
-      let templateOptions = await fetchAircraftTempOptions(headers);
-      if (templateOptions.length === 0) {
-        const seeded = await seedAircraftTemplatesIfNeeded(headers);
-        if (seeded) {
-          templateOptions = await fetchAircraftTempOptions(headers);
-        }
-      }
+      const templateOptions = await fetchAircraftTempOptions(headers);
       setSystemTemplateModelOptions(templateOptions);
       const [aircraftCatalogResult, facilityBasesResult, aircraftCategoryResult] = await Promise.allSettled([
         fetchAircraftCreateCatalogOptions(headers),
@@ -2621,7 +2548,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setAircraftListboxOptionsLoading(false);
     }
-  }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftCategoryOptions, fetchAircraftCreateCatalogOptions, fetchAircraftTempOptions, formValues.franchise_id, formValues.tenant_id, scope.franchiseId, scope.tenantId, scope.userId, seedAircraftTemplatesIfNeeded]);
+  }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftCategoryOptions, fetchAircraftCreateCatalogOptions, fetchAircraftTempOptions, formValues.franchise_id, formValues.tenant_id, scope.franchiseId, scope.tenantId, scope.userId]);
 
   const loadAircraftTemplatesWorkspace = useCallback(async () => {
     if (entity !== 'aircraft') {

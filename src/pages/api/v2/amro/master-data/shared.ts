@@ -310,7 +310,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
     table: 'aircraft_template',
     searchableColumns: ['template_name', 'maintenance_program'],
     listColumns:
-      'id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,created_at,updated_at',
+      'id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,model_json,is_active,created_at,updated_at',
     requiredCreateFields: ['template_name'],
     writeAllowedFields: [
       'template_name',
@@ -319,6 +319,8 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'maintenance_program',
       'revision_number',
       'amendment_number',
+      'model_json',
+      'is_active',
     ],
     defaultSortColumn: 'updated_at',
   },

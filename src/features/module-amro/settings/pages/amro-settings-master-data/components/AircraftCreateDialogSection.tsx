@@ -316,7 +316,7 @@ export function AircraftCreateDialogSection({
                   </option>
                 ))}
               </select>
-              <button type="button" className="h-7 w-7 rounded-full border border-slate-500 text-sm font-bold">+</button>
+              <span />
 
               <Label htmlFor="aircraft-manufacturer-readonly" className="font-semibold">* Manufacturer</Label>
               <Input
