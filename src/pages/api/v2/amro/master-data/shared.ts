@@ -676,6 +676,8 @@ function normalizeAircraftTemplate(payload: Record<string, unknown>) {
     maintenance_program: asNullableString(payload.maintenance_program),
     revision_number: asNullableString(payload.revision_number),
     amendment_number: asNullableString(payload.amendment_number),
+    model_json: asJsonArray(payload.model_json),
+    is_active: asBoolean(payload.is_active, true),
   };
 }
 

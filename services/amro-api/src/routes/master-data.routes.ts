@@ -106,7 +106,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'aircraft_template',
     searchableColumns: ['template_name', 'maintenance_program'],
     listColumns:
-      'id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,created_at,updated_at,created_by,updated_by',
+      'id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,model_json,is_active,created_at,updated_at,created_by,updated_by',
     requiredCreateFields: ['template_name'],
     writeAllowedFields: [
       'template_name',
@@ -115,6 +115,8 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'maintenance_program',
       'revision_number',
       'amendment_number',
+      'model_json',
+      'is_active',
     ],
     defaultSortColumn: 'template_name',
   },
@@ -865,6 +867,8 @@ function normalizeAircraftTemplate(payload: JsonRecord): JsonRecord {
     maintenance_program: asNullableString(payload.maintenance_program),
     revision_number: asNullableString(payload.revision_number),
     amendment_number: asNullableString(payload.amendment_number),
+    model_json: asJsonArray(payload.model_json),
+    is_active: asBoolean(payload.is_active, true),
   };
 }
 

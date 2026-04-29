@@ -269,11 +269,25 @@ const parseAircraftTemplateModelJson = (source: unknown): AircraftTemplateModelJ
     return null;
   }
   const record = parsed as Record<string, unknown>;
+  const normalizeKey = (key: string) => key.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalizedTextByKey = new Map<string, string>();
+  Object.entries(record).forEach(([key, value]) => {
+    const text = String(value ?? '').trim();
+    if (!text) return;
+    const normalizedKey = normalizeKey(key);
+    if (!normalizedTextByKey.has(normalizedKey)) {
+      normalizedTextByKey.set(normalizedKey, text);
+    }
+  });
   const readText = (keys: string[]): string => {
     for (const key of keys) {
-      const value = String(record[key] ?? '').trim();
-      if (value) {
-        return value;
+      const directValue = String(record[key] ?? '').trim();
+      if (directValue) {
+        return directValue;
+      }
+      const normalizedValue = normalizedTextByKey.get(normalizeKey(key));
+      if (normalizedValue) {
+        return normalizedValue;
       }
     }
     return '';
@@ -4213,7 +4227,25 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setFieldValue('aircraft_type', '');
         return;
       }
-      const details = resolveTemplateModelDetailsById(templateId);
+      let details: AircraftTemplateModelJsonDetails | null = null;
+      try {
+        const headers = await buildApiHeaders(scope);
+        const response = await fetch(`/api/v2/amro/master-data/aircraft_template/${templateId}`, { method: 'GET', headers });
+        const payload = await parseApiPayload(response);
+        if (response.ok) {
+          const output = payload.output as Record<string, unknown> | undefined;
+          const record =
+            (output?.record as Record<string, unknown> | undefined)
+            || (getPayloadRecords(payload)[0] as Record<string, unknown> | undefined)
+            || null;
+          details = parseAircraftTemplateRecordDetails(record);
+        }
+      } catch {
+        details = null;
+      }
+      if (!details) {
+        details = resolveTemplateModelDetailsById(templateId);
+      }
       if (!details) {
         setSelectedTemplateModelName('');
         setSelectedTemplateManufacturerName('');
@@ -4235,7 +4267,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setFieldValue('manufacturer_id', '');
       }
     },
-    [entity, resolveTemplateModelDetailsById, setFieldValue],
+    [entity, resolveTemplateModelDetailsById, scope, setFieldValue],
   );
 
   const resolveSelectOptions = useCallback(
@@ -5028,9 +5060,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       }
     }
 
-    const templateModelSource = canHydrateTemplate ? (matchedTemplateId || defaultTemplateModel) : '';
-    const normalizedTemplateModel = String(templateModelSource).trim() || defaultTemplateModel;
     const currentTemplateModel = String(aircraftTemplateModel || '').trim();
+    const templateModelSource = canHydrateTemplate ? (matchedTemplateId || currentTemplateModel || defaultTemplateModel) : '';
+    const normalizedTemplateModel = String(templateModelSource).trim() || defaultTemplateModel;
     const isManualTemplateSelectionLocked =
       modalMode === 'create'
       && aircraftTemplateManualSelectionRef.current
@@ -5041,7 +5073,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (shouldHydrateTemplateSelection) {
       setAircraftTemplateModel(normalizedTemplateModel);
     }
-    if (!normalizedTemplateModel) {
+    if (!normalizedTemplateModel && !currentTemplateModel) {
       setSelectedTemplateModelName('');
       setSelectedTemplateAircraftType('');
       setSelectedTemplateManufacturerName('');
@@ -5123,10 +5155,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (!modalOpen || entity !== 'aircraft') {
       return;
     }
-    void hydrateAircraftCountersFromTemplate(aircraftTemplateModel);
-    // Also load assembly model details when template is selected (works for both create and update modes)
+    // Template switch resolves details from aircraft_template data only.
     void loadTemplateAssemblyModelDetails(aircraftTemplateModel);
-  }, [aircraftTemplateModel, entity, hydrateAircraftCountersFromTemplate, loadTemplateAssemblyModelDetails, modalOpen]);
+  }, [aircraftTemplateModel, entity, loadTemplateAssemblyModelDetails, modalOpen]);
 
   const handleSubmitModal = useCallback(async () => {
     const ok = modalMode === 'create' ? await handleCreate() : await handleUpdate();
