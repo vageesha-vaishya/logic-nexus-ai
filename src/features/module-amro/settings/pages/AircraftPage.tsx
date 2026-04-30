@@ -61,14 +61,14 @@ const DEFAULT_FORM_DATA: AircraftFormData = {
   manufacturer: '',
   serial_number: '',
   year_manufactured: new Date().getFullYear(),
-  status: 'active',
+  status: 'pending',
   location: '',
   total_flight_hours: 0,
   total_cycles: 0,
   is_active: true,
 };
 
-const AIRCRAFT_STATUSES = ['active', 'maintenance', 'grounded', 'retired', 'stored'];
+const AIRCRAFT_STATUSES = ['pending', 'active', 'maintenance', 'grounded', 'retired', 'storage'];
 
 // ── API Functions ──────────────────────────────────────────────────────────────
 

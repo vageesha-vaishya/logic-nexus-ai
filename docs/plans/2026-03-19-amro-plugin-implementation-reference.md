@@ -68,7 +68,7 @@ Created operational database schema with 7 core tables, 46 optimized indexes, 14
 
 | Domain Type | Values | Purpose |
 |---|---|---|
-| aircraft_status | active, maintenance, grounded, retired, storage | Aircraft operational status |
+| aircraft_status | pending, active, maintenance, grounded, retired, storage | Aircraft operational status |
 | component_status | installed, removed, repair_queue, under_repair, awaiting_installation, condemned, obsolete | Part lifecycle state |
 | maintenance_type | line, base, component, inspection, overhaul, repair, upgrade, modification | Maintenance classification |
 | work_order_status | planning, approved, scheduled, in_progress, on_hold, completed, closed, cancelled | Work order status |

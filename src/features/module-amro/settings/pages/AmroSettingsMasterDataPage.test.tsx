@@ -2423,7 +2423,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     const aircraftStatuses = AMRO_MASTER_ENTITY_FORM_FIELDS.aircraft
       .find((field) => field.key === 'status')
       ?.options ?? [];
-    expect(aircraftStatuses).toEqual(['active', 'maintenance', 'grounded', 'retired', 'storage']);
+    expect(aircraftStatuses).toEqual(['pending', 'active', 'maintenance', 'grounded', 'retired', 'storage']);
     expect(AMRO_MASTER_ENTITY_FORM_FIELDS.aircraft.some((field) => field.key === 'engine_type')).toBe(true);
 
     const aircraftRetiredStatus = buildPayloadFromForm('aircraft', {

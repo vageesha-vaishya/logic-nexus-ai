@@ -1,8 +1,20 @@
 {
-  "generatedAt": "2026-04-25T11:17:51.249Z",
-  "strictMode": false,
-  "compliant": true,
+  "generatedAt": "2026-04-30T10:17:20.439Z",
+  "strictMode": true,
+  "compliant": false,
   "tableCount": 18,
   "documentedTableCount": 18,
-  "issues": []
+  "issues": [
+    "Missing table documentation for public.work_order_materials",
+    "Table documented but not present in AMRO schema migrations: public.amro_work_order_materials",
+    "Column default mismatch public.aircraft.status: schema='active' docs='pending'",
+    "Column documented but not present in schema: public.aircraft.warranty_json",
+    "Column documented but not present in schema: public.aircraft.aircraft_weight_and_capacity_json",
+    "Column documented but not present in schema: public.aircraft.aircraft_other_details_json",
+    "Column nullability mismatch public.tasks.work_order_id: schema=false docs=true",
+    "Column type mismatch public.tasks.estimated_duration_hours: schema=decimal(10,2) docs=interval",
+    "Column type mismatch public.tasks.status: schema=task_status docs=text",
+    "Column default mismatch public.tasks.status: schema='pending' docs='unconfigured'",
+    "Column documented but not present in schema: public.tasks.is_configured"
+  ]
 }

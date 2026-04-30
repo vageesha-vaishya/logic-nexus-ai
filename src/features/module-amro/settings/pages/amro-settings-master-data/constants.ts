@@ -107,7 +107,7 @@ export const MANUFACTURER_SEED_NAMES = [
 ];
 
 export const AIRCRAFT_TYPE_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
-export const AIRCRAFT_STATUS_OPTIONS = ['active', 'maintenance', 'grounded', 'retired', 'storage'] as const;
+export const AIRCRAFT_STATUS_OPTIONS = ['pending', 'active', 'maintenance', 'grounded', 'retired', 'storage'] as const;
 export const AIRCRAFT_FORM_SECTION_FIELD_KEYS: Record<FormSectionKey, string[]> = {
   basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'engine_type', 'manufacturer_id'],
   configuration: ['aircraft_model', 'configuration_code', 'maintenance_program', 'status'],
@@ -150,7 +150,7 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'engine_install_history', label: 'Engine Install History', type: 'json' },
     { key: 'thrust_rating_change_log', label: 'Thrust Rating Change Log', type: 'json' },
     { key: 'on_wing_lifecycle_records', label: 'On-Wing Lifecycle Records', type: 'json' },
-    { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'maintenance', 'grounded', 'retired', 'storage'] },
+    { key: 'status', label: 'Status', type: 'select', required: true, options: ['pending', 'active', 'maintenance', 'grounded', 'retired', 'storage'] },
   ],
   ata_codes: [
     { key: 'code', label: 'Code', type: 'text', required: true },
@@ -323,7 +323,7 @@ export const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     engine_install_history: '[]',
     thrust_rating_change_log: '[]',
     on_wing_lifecycle_records: '[]',
-    status: 'active',
+    status: 'pending',
   },
   ata_codes: { code: '', description: '', chapter_code: '', parent_id: '', parent_code_ref: '', level: 1, franchise_id: '', is_active: true },
   flight_logs: { aircraft_id: '', flight_date: new Date().toISOString().slice(0, 10), flight_number: '', departure_airport: '', arrival_airport: '', pilot_name: '', flight_hours: 0, block_hours: 0, flight_cycles: 0, crew_details: '', fuel_burn_kg: 0, oil_uplift_liters: 0, pirep_discrepancy: '', regulatory_authority: 'DGCA', metadata: '{}' },

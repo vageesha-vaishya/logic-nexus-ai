@@ -28,7 +28,7 @@ type EntityConfig = {
   defaultSortColumn: string;
 };
 
-const AIRCRAFT_ALLOWED_STATUSES = new Set(['active', 'maintenance', 'grounded', 'retired', 'storage']);
+const AIRCRAFT_ALLOWED_STATUSES = new Set(['pending', 'active', 'maintenance', 'grounded', 'retired', 'storage']);
 const AIRCRAFT_STATUS_ALIASES: Record<string, string> = {
   inactive: 'retired',
 };
@@ -463,7 +463,7 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     : serialSource;
   const assemblyModel = asNullableString(payload.assembly_models || payload.assembly_model_id || payload.aircraft_model);
   const normalizedStatusToken = asString(payload.status).toLowerCase();
-  const normalizedStatus = AIRCRAFT_STATUS_ALIASES[normalizedStatusToken] || normalizedStatusToken || 'active';
+  const normalizedStatus = AIRCRAFT_STATUS_ALIASES[normalizedStatusToken] || normalizedStatusToken || 'pending';
   const hasWarrantyJson = Object.prototype.hasOwnProperty.call(payload, 'warranty_json');
   const rawWarrantyJson = payload.warranty_json;
   if (hasWarrantyJson && rawWarrantyJson !== null && rawWarrantyJson !== undefined && rawWarrantyJson !== '' && (typeof rawWarrantyJson !== 'object' || Array.isArray(rawWarrantyJson))) {
@@ -769,7 +769,7 @@ export function validatePayload(entity: AmroMasterDataEntity, payload: Record<st
     if (statusRaw && !AIRCRAFT_ALLOWED_STATUSES.has(normalizedStatus)) {
       issues.push({
         field: 'status',
-        message: 'status must be one of active, maintenance, grounded, retired, or storage',
+        message: 'status must be one of pending, active, maintenance, grounded, retired, or storage',
       });
     }
     if (payload.defect_count !== undefined) {

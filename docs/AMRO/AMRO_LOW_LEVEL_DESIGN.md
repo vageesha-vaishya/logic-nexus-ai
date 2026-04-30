@@ -1565,7 +1565,7 @@ All database implementation and review activities must treat this section as nor
 | `current_flight_hours_since_new` | `decimal(15,2)` | Yes | `0` | — |
 | `current_cycles_since_new` | `integer` | Yes | `0` | — |
 | `owner_id` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
-| `status` | `aircraft_status` | No | `'active'::aircraft_status` | Domain-constrained |
+| `status` | `aircraft_status` | No | `'pending'::aircraft_status` | Domain-constrained (`pending`, `active`, `maintenance`, `grounded`, `retired`, `storage`) |
 | `operator_code` | `text` | Yes | — | — |
 | `base_location` | `text` | Yes | — | — |
 | `home_base` | `uuid` | Yes | — | FK -> `public.aircraft(id)` ON DELETE SET NULL |
