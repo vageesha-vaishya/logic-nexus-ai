@@ -3904,6 +3904,75 @@ Implementation Notes:
 ```
 
 ```text
+Component Type: SQL Function
+Component Name: public.generate_aircraft_tasks_from_templates(p_aircraft_id uuid, p_requested_by uuid, p_correlation_id text)
+Purpose: Atomically generate aircraft tasks from task templates for pending aircraft by assembly model, prevent duplicate template re-materialization, write system log audit, and transition aircraft status from pending to active on successful completion.
+Input Parameters:
+  - p_aircraft_id | uuid | required | target aircraft id
+  - p_requested_by | uuid | optional | actor id persisted in task/work-order audit fields and system log user_id
+  - p_correlation_id | text | optional | trace correlation id for system logging
+Output Contract:
+  - jsonb with keys:
+    - success | boolean
+    - tasks_created | integer
+    - tasks_skipped | integer
+    - task_templates_found | integer
+    - aircraft_id | uuid
+    - assembly_model_id | uuid
+    - work_order_id | uuid
+    - work_order_number | text
+    - aircraft_status | text
+    - error_code | text (when success=false)
+    - message | text (when success=false)
+Dependencies:
+  - public.aircraft
+  - public.task_templates
+  - public.work_orders
+  - public.tasks
+  - public.system_logs
+Security:
+  - SECURITY DEFINER
+  - search_path locked to public
+  - Intended invocation path: service-role/admin edge function
+  - SQL injection guarded by typed UUID parameters and no dynamic SQL text interpolation
+Performance:
+  - Single-transaction set-based insert with duplicate filtering by existing task_template_id per aircraft scope
+Validation:
+  - Rejects missing aircraft, non-pending aircraft status, missing assembly model, and no-template matches
+Implementation Notes:
+  - Migration: 20260429140000_amro_generate_aircraft_tasks_rpc.sql
+```
+
+```text
+Component Type: Module API
+Component Name: POST /functions/v1/generate-aircraft-tasks
+Purpose: Trigger serverless pending-aircraft task generation workflow for one aircraft id and return deterministic creation summary.
+Input Contract:
+  - aircraft_id | uuid | required body parameter
+Output Contract:
+  - success | boolean
+  - output.tasks_created | integer (success path)
+  - output.tasks_skipped | integer (success path)
+  - output.aircraft_status | text (success path, expected active)
+  - error_code | text (failure path)
+  - message | text (failure path)
+  - correlation_id | text
+Authorization:
+  - service role token OR admin user (platform_admin/super_admin/admin)
+Data Dependencies:
+  - RPC: public.generate_aircraft_tasks_from_templates
+Failure Modes:
+  - 400 invalid request payload or invalid UUID
+  - 404 aircraft not found / no templates for assembly model
+  - 409 aircraft not pending
+  - 500 RPC execution or database connectivity failure
+Performance Targets:
+  - synchronous completion for single-aircraft generation request (p95 <= 2s under nominal template volumes)
+Implementation Notes:
+  - Edge Function: supabase/functions/generate-aircraft-tasks/index.ts
+```
+
+```text
 Component Type: Table
 Component Name: public.amro_work_order_resource_assignments
 Purpose: Tenant-scoped resource allocation schedule for AMRO work orders and optional per-task assignment granularity.
