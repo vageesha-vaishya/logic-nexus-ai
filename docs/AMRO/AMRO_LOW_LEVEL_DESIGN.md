@@ -1689,8 +1689,7 @@ All database implementation and review activities must treat this section as nor
 | `planned_end_date` | `timestamptz` | Yes | — | — |
 | `actual_start_date` | `timestamptz` | Yes | — | — |
 | `actual_end_date` | `timestamptz` | Yes | — | — |
-| `status` | `text` | No | `'unconfigured'` | Check-constrained: `('unconfigured','pending','not_started','in_progress','on_hold','completed','deleted')` |
-| `is_configured` | `boolean` | No | `false` | Indicates configuration readiness (`false` before configuration) |
+| `status` | `text` | No | `'pending'` | Check-constrained: `('unconfigured','pending','not_started','in_progress','on_hold','completed','deleted')` |
 | `progress_percentage` | `integer` | Yes | `0` | Check: `progress_percentage >= 0 AND progress_percentage <= 100` |
 | `assigned_to` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
 | `qa_verified_by` | `uuid` | Yes | — | FK -> `auth.users(id)` ON DELETE SET NULL |
@@ -3845,8 +3844,7 @@ Check Constraints:
   - ck_tasks_status_allowed (status IN ('unconfigured','pending','not_started','in_progress','on_hold','completed','deleted'))
 Defaults:
   - id: gen_random_uuid()
-  - status: 'unconfigured'
-  - is_configured: false
+  - status: 'pending'
   - progress_percentage: 0
   - complexity_level: 3
   - checklist: '{}'::jsonb
@@ -3869,8 +3867,7 @@ Columns:
   - steps | jsonb | nullable:yes | default:null (deprecated alias)
   - qualifications_json | jsonb | nullable:yes | default:null
   - qualifications | jsonb | nullable:yes | default:null (deprecated alias)
-  - status | text | nullable:no | default:'unconfigured'
-  - is_configured | boolean | nullable:no | default:false
+  - status | text | nullable:no | default:'pending'
 Security Considerations:
   - Existing RLS on tasks remains in force; cleanup preserves compatibility while preventing cross-tenant leakage.
   - Canonical-vs-alias sync is enforced at DB layer to reduce divergence risk.
@@ -3878,6 +3875,7 @@ Implementation Notes:
   - Migration: 20260425123000_amro_task_due_extensions_and_tasks_cleanup.sql
   - Migration: 20260426123000_amro_task_templates_and_tasks_interval_work_order_alignment.sql
   - Migration: 20260429103000_amro_tasks_configuration_status_alignment.sql
+  - Migration: 20260430124500_drop_tasks_is_configured.sql
   - Backfill maps alias values into canonical columns and keeps both representations synchronized.
 ```
 
