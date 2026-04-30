@@ -2888,13 +2888,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [entity, formValues.tenant_id, loadManufacturerOptions, scope.tenantId]);
 
   useEffect(() => {
-    if ((entity === 'aircraft' || entity === 'assembly_models') && modalOpen) {
+    if ((entity === 'aircraft' || entity === 'assembly_models') && modalOpen && modalMode === 'create') {
       const tenantForLoad = entity === 'aircraft'
         ? String(formValues.tenant_id ?? scope.tenantId ?? '').trim()
         : String(scope.tenantId || '').trim();
       void loadManufacturerOptions(tenantForLoad);
     }
-  }, [entity, formValues.tenant_id, loadManufacturerOptions, modalOpen, scope.tenantId]);
+  }, [entity, formValues.tenant_id, loadManufacturerOptions, modalMode, modalOpen, scope.tenantId]);
 
   useEffect(() => {
     if (entity === 'assembly_models' || entity === 'aircraft') {
@@ -2903,10 +2903,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [entity, loadAssemblyTypeOptions]);
 
   useEffect(() => {
-    if ((entity === 'assembly_models' || entity === 'aircraft') && modalOpen) {
+    if ((entity === 'assembly_models' || entity === 'aircraft') && modalOpen && modalMode === 'create') {
       void loadAssemblyTypeOptions();
     }
-  }, [entity, loadAssemblyTypeOptions, modalOpen]);
+  }, [entity, loadAssemblyTypeOptions, modalMode, modalOpen]);
 
   useEffect(() => {
     if (entity === 'aircraft') {
@@ -2915,10 +2915,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [entity, loadAssemblyModelOptions]);
 
   useEffect(() => {
-    if (entity === 'aircraft' && modalOpen) {
+    if (entity === 'aircraft' && modalOpen && modalMode === 'create') {
       void loadAssemblyModelOptions();
     }
-  }, [entity, loadAssemblyModelOptions, modalOpen]);
+  }, [entity, loadAssemblyModelOptions, modalMode, modalOpen]);
 
   useEffect(() => {
     if (entity === 'aircraft') {
@@ -2927,10 +2927,10 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [entity, loadAircraftCreateListboxOptions]);
 
   useEffect(() => {
-    if (entity === 'aircraft' && modalOpen) {
+    if (entity === 'aircraft' && modalOpen && modalMode === 'create') {
       void loadAircraftCreateListboxOptions();
     }
-  }, [entity, loadAircraftCreateListboxOptions, modalOpen]);
+  }, [entity, loadAircraftCreateListboxOptions, modalMode, modalOpen]);
 
   useEffect(() => {
     if (isAircraftSubModule) {
@@ -3007,7 +3007,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [modalOpen]);
 
   useEffect(() => {
-    if (!modalOpen || entity !== 'aircraft') {
+    // Restore local draft only for create mode. Update mode must always show row data.
+    if (!modalOpen || entity !== 'aircraft' || modalMode !== 'create') {
       return;
     }
     const raw = localStorage.getItem(aircraftFormDraftKey);
@@ -3033,10 +3034,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } catch {
       localStorage.removeItem(aircraftFormDraftKey);
     }
-  }, [aircraftFormDraftKey, entity, modalOpen]);
+  }, [aircraftFormDraftKey, entity, modalMode, modalOpen]);
 
   useEffect(() => {
-    if (!modalOpen || entity !== 'aircraft') {
+    // Persist drafts only while creating new aircraft records.
+    if (!modalOpen || entity !== 'aircraft' || modalMode !== 'create') {
       return;
     }
     const timer = setTimeout(() => {
@@ -3053,7 +3055,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       setAircraftFormDraftStatus('saved');
     }, 550);
     return () => clearTimeout(timer);
-  }, [activeFormTab, aircraftFormDraftKey, entity, formValues, modalOpen]);
+  }, [activeFormTab, aircraftFormDraftKey, entity, formValues, modalMode, modalOpen]);
 
   useEffect(
     () => () => {
@@ -4901,8 +4903,41 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [entity, selectedRowIds, toggleRowSelection, toggleRowSelectionRange],
   );
 
+  const fetchMasterDataRowById = useCallback(
+    async (targetEntity: MasterEntity, rowId: string): Promise<RecordRow> => {
+      const normalizedRowId = String(rowId || '').trim();
+      if (!normalizedRowId) {
+        throw new Error('Record id is required');
+      }
+      const headers = await buildApiHeaders(scope);
+      const response = await fetch(`/api/v2/amro/master-data/${targetEntity}/${normalizedRowId}`, {
+        method: 'GET',
+        headers,
+      });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(String(payload.error || `Failed to load ${ENTITY_LABEL[targetEntity]} details`));
+      }
+      const output = payload.output && typeof payload.output === 'object'
+        ? (payload.output as Record<string, unknown>)
+        : null;
+      const outputRecord = output?.record && typeof output.record === 'object'
+        ? (output.record as Record<string, unknown>)
+        : null;
+      const resolvedRecord = outputRecord || getPayloadRecords(payload)[0];
+      if (!resolvedRecord || typeof resolvedRecord !== 'object') {
+        throw new Error(`${ENTITY_LABEL[targetEntity]} details were not returned by API`);
+      }
+      return {
+        ...resolvedRecord,
+        id: String((resolvedRecord as Record<string, unknown>).id || normalizedRowId).trim(),
+      };
+    },
+    [scope],
+  );
+
   const openUpdateModal = useCallback(
-    (row: RecordRow) => {
+    async (row: RecordRow) => {
       if (clickDelayTimerRef.current) {
         clearTimeout(clickDelayTimerRef.current);
       }
@@ -4911,8 +4946,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         if (!rowId) {
           throw new Error('Unable to open form for this record');
         }
+        const sourceRow = entity === 'aircraft'
+          ? await fetchMasterDataRowById(entity, rowId)
+          : row;
         setSelectedId(rowId);
-        setFormValues(pickFormValuesFromRow(entity, row));
+        setFormValues(pickFormValuesFromRow(entity, sourceRow));
         setFormErrors({});
         setModalMode('update');
         setActiveFormTab('basic');
@@ -4928,7 +4966,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         toast.error(message);
       }
     },
-    [entity],
+    [entity, fetchMasterDataRowById],
   );
 
   const handleRowDoubleClick = useCallback(
@@ -4941,7 +4979,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setFlightLogDetailOpen(true);
         return;
       }
-      openUpdateModal(row);
+      void openUpdateModal(row);
     },
     [entity, openUpdateModal],
   );
