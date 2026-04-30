@@ -132,6 +132,76 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect((res.jsonBody as any)?.output?.entity).toBe('aircraft');
   });
 
+  it('adds planning and directive capability counts for assembly models', async () => {
+    const modelsEqTenantMock = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: 'model-1',
+          model_code: 'A320-200',
+          name: 'A320-200',
+          manufacturer_id: 'man-1',
+          assembly_type_id: 'type-1',
+          is_active: true,
+        },
+      ],
+      count: 1,
+      error: null,
+    });
+    const modelsRangeMock = vi.fn().mockReturnValue({ eq: modelsEqTenantMock });
+    const modelsOrderMock = vi.fn().mockReturnValue({ range: modelsRangeMock });
+    const modelsSelectMock = vi.fn().mockReturnValue({ order: modelsOrderMock });
+
+    const taskTemplateEqModelMock = vi.fn().mockResolvedValue({
+      count: 3,
+      error: null,
+    });
+    const taskTemplateEqTenantMock = vi.fn().mockReturnValue({ eq: taskTemplateEqModelMock });
+    const taskTemplateSelectMock = vi.fn().mockReturnValue({ eq: taskTemplateEqTenantMock });
+
+    const directivesEqModelMock = vi.fn().mockResolvedValue({
+      count: 9,
+      error: null,
+    });
+    const directivesEqTenantMock = vi.fn().mockReturnValue({ eq: directivesEqModelMock });
+    const directivesSelectMock = vi.fn().mockReturnValue({ eq: directivesEqTenantMock });
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'assembly_models') {
+        return { select: modelsSelectMock };
+      }
+      if (table === 'task_templates') {
+        return { select: taskTemplateSelectMock };
+      }
+      if (table === 'directives') {
+        return { select: directivesSelectMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        entity: 'assembly_models',
+        page: '1',
+        page_size: '25',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    const record = (res.jsonBody as any)?.output?.records?.[0] || {};
+    expect(record.planning_capability).toBe(3);
+    expect(record.directive_capability).toBe(9);
+    expect(fromMock).toHaveBeenCalledWith('task_templates');
+    expect(fromMock).toHaveBeenCalledWith('directives');
+  });
+
   it('accepts hyphenated flight logs entity route segment', async () => {
     const eqTenantMock = vi.fn();
     const eqDeletedMock = vi.fn().mockResolvedValue({

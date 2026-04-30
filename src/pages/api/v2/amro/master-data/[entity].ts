@@ -480,6 +480,10 @@ function markMissingColumn(entity: string, rawColumnName: string, listColumns: s
 
 function resolveSortColumn(entity: string, requestedSortBy: string, listColumns: string): string {
   const columns = getActiveColumns(entity, listColumns);
+  if (entity === 'assembly_models' && (requestedSortBy === 'planning_capability' || requestedSortBy === 'directive_capability')) {
+    // Capability columns are computed at runtime, so keep DB ordering stable and sort in-memory later.
+    return columns.includes('updated_at') ? 'updated_at' : columns[0] || 'updated_at';
+  }
   if (!columns.length) {
     return requestedSortBy || 'updated_at';
   }
@@ -502,6 +506,164 @@ function stripColumnFromRecord(record: Record<string, unknown>, column: string):
   const next = { ...record };
   delete next[column];
   return next;
+}
+
+function isMissingColumnErrorMessage(errorMessage: string, column: string): boolean {
+  const normalizedMessage = errorMessage.toLowerCase();
+  const normalizedColumn = column.toLowerCase();
+  return normalizedMessage.includes(normalizedColumn) && normalizedMessage.includes('column');
+}
+
+type AggregateCountAttemptResult =
+  | { status: 'ok'; counts: Map<string, number> }
+  | { status: 'missing_model_column' }
+  | { status: 'missing_table' }
+  | { status: 'error'; message: string };
+
+async function queryAggregateCountsByModelColumn(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  table: 'task_templates' | 'directives';
+  modelColumn: string;
+  modelIds: string[];
+  tenantId: string;
+  franchiseId: string | null;
+}): Promise<AggregateCountAttemptResult> {
+  const counts = new Map<string, number>();
+  let applyFranchiseScope = Boolean(params.franchiseId);
+
+  for (const modelId of params.modelIds) {
+    const runCount = async (withFranchiseScope: boolean) => {
+      let query = params.supabase
+        .from(params.table)
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', params.tenantId)
+        .eq(params.modelColumn, modelId);
+      if (withFranchiseScope && params.franchiseId) {
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+      }
+      return query;
+    };
+
+    let { count, error } = await runCount(applyFranchiseScope);
+
+    if (error && applyFranchiseScope && isMissingColumnErrorMessage(String(error.message || ''), 'franchise_id')) {
+      applyFranchiseScope = false;
+      ({ count, error } = await runCount(false));
+    }
+
+    if (error) {
+      const message = String(error.message || '');
+      if (isMissingTableError(message)) {
+        return { status: 'missing_table' };
+      }
+      if (isMissingColumnErrorMessage(message, params.modelColumn)) {
+        return { status: 'missing_model_column' };
+      }
+      return { status: 'error', message };
+    }
+    counts.set(modelId, Number(count || 0));
+  }
+
+  return { status: 'ok', counts };
+}
+
+async function resolveAggregateCountsByModel(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  table: 'task_templates' | 'directives';
+  modelIds: string[];
+  tenantId: string;
+  franchiseId: string | null;
+  modelColumnCandidates: string[];
+  correlationId: string;
+}): Promise<Map<string, number>> {
+  if (params.modelIds.length === 0) {
+    return new Map<string, number>();
+  }
+
+  for (const modelColumn of params.modelColumnCandidates) {
+    const result = await queryAggregateCountsByModelColumn({
+      supabase: params.supabase,
+      table: params.table,
+      modelColumn,
+      modelIds: params.modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+    });
+
+    if (result.status === 'ok') {
+      return result.counts;
+    }
+    if (result.status === 'missing_model_column') {
+      continue;
+    }
+    if (result.status === 'missing_table') {
+      return new Map<string, number>();
+    }
+    logger.warn('[AMRO Master Data API] failed to resolve aggregate model counts', {
+      correlationId: params.correlationId,
+      table: params.table,
+      message: result.message,
+    });
+    return new Map<string, number>();
+  }
+
+  return new Map<string, number>();
+}
+
+async function enrichAssemblyModelRowsWithCapabilityCounts(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  rows: Record<string, unknown>[];
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+}): Promise<Record<string, unknown>[]> {
+  const modelIds = Array.from(
+    new Set(
+      params.rows
+        .map((row) => asNullableString(row.id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  if (modelIds.length === 0) {
+    return params.rows.map((row) => ({
+      ...row,
+      planning_capability: 0,
+      directive_capability: 0,
+    }));
+  }
+
+  const [planningCounts, directiveCounts] = await Promise.all([
+    resolveAggregateCountsByModel({
+      supabase: params.supabase,
+      table: 'task_templates',
+      modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+      modelColumnCandidates: ['assembly_models', 'model_id'],
+      correlationId: params.correlationId,
+    }),
+    resolveAggregateCountsByModel({
+      supabase: params.supabase,
+      table: 'directives',
+      modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+      modelColumnCandidates: ['assembly_models', 'assembly_model_id', 'model_id'],
+      correlationId: params.correlationId,
+    }),
+  ]);
+
+  return params.rows.map((row) => {
+    const modelId = asNullableString(row.id);
+    const planningCapability = modelId ? Number(planningCounts.get(modelId) || 0) : 0;
+    const directiveCapability = modelId ? Number(directiveCounts.get(modelId) || 0) : 0;
+    return {
+      ...row,
+      planning_capability: planningCapability,
+      directive_capability: directiveCapability,
+    };
+  });
 }
 
 function matchesSearch(row: Record<string, unknown>, searchableColumns: string[], search: string): boolean {
@@ -1429,13 +1591,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         }
       }
 
+      const baseRows = (finalData || []) as Record<string, unknown>[];
       const rawRows = entity === 'flight_logs'
         ? await enrichFlightLogRowsWithAirportData(
             supabase,
             tenantId,
-            await enrichFlightLogRowsWithAircraftData(supabase, tenantId, (finalData || []) as Record<string, unknown>[]),
+            await enrichFlightLogRowsWithAircraftData(supabase, tenantId, baseRows),
           )
-        : ((finalData || []) as Record<string, unknown>[]);
+        : entity === 'assembly_models'
+          ? await enrichAssemblyModelRowsWithCapabilityCounts({
+              supabase,
+              rows: baseRows,
+              tenantId,
+              franchiseId,
+              correlationId: ctx.correlationId,
+            })
+          : baseRows;
       const activeSearchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
       const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
       if (exportRequested) {

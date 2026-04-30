@@ -713,7 +713,7 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   work_centers: ['id', 'work_center_code', 'name', 'center_type', 'station_code', 'capacity_hours_per_day', 'is_active', 'updated_at'],
   skill_codes: ['id', 'skill_code', 'description', 'skill_family', 'license_authority', 'is_certification_required', 'is_active', 'updated_at'],
   manufacturers: ['id', 'manufacturer_code', 'name', 'country', 'is_active', 'updated_at'],
-  assembly_models: ['id', 'model_code', 'name', 'manufacturer_id', 'assembly_type_id', 'is_active', 'updated_at'],
+  assembly_models: ['id', 'model_code', 'name', 'planning_capability', 'directive_capability', 'manufacturer_id', 'assembly_type_id', 'is_active', 'updated_at'],
   regulator_profiles: ['id', 'regulator_code', 'regulator_name', 'jurisdiction', 'policy_version', 'effective_from', 'is_active', 'updated_at'],
   shift_calendars: ['id', 'station_code', 'shift_name', 'shift_start_time', 'shift_end_time', 'capacity', 'is_active', 'updated_at'],
   work_order_templates: ['id', 'template_code', 'template_name', 'model_id', 'aircraft_model', 'maintenance_type', 'version', 'active', 'updated_at'],
@@ -752,6 +752,8 @@ const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   block_hours: 'Block Hours',
   flight_cycles: 'Cycles',
   regulatory_authority: 'Regulatory Authority',
+  planning_capability: 'No of Planning Capability',
+  directive_capability: 'No of Directive Capability',
 };
 
 const isAbortLikeError = (error: unknown): boolean => {
@@ -4413,7 +4415,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setFieldValue,
   ]);
 
-  const supportsColumnHeaderFilters = entity === 'aircraft' || entity === 'flight_logs';
+  const supportsColumnHeaderFilters = entity === 'aircraft' || entity === 'flight_logs' || entity === 'assembly_models';
 
   const filteredRows = useMemo(() => {
     return rows.filter((row) => {
@@ -4519,7 +4521,22 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     visit(null, 0);
     return flattened;
   }, [entity, filteredRows, sortColumn]);
-  const renderedRows = entity === 'ata_codes' ? hierarchicalAtaRows : filteredRows;
+  const sortedRows = useMemo(() => {
+    if (entity !== 'assembly_models') {
+      return filteredRows;
+    }
+    if (sortColumn !== 'planning_capability' && sortColumn !== 'directive_capability') {
+      return filteredRows;
+    }
+    const sorted = [...filteredRows].sort((left, right) => {
+      const leftValue = Number(left[sortColumn] ?? 0);
+      const rightValue = Number(right[sortColumn] ?? 0);
+      if (leftValue === rightValue) return 0;
+      return sortDirection === 'asc' ? leftValue - rightValue : rightValue - leftValue;
+    });
+    return sorted;
+  }, [entity, filteredRows, sortColumn, sortDirection]);
+  const renderedRows = entity === 'ata_codes' ? hierarchicalAtaRows : sortedRows;
   useEffect(() => {
     if (entity !== 'ata_codes') {
       return;
