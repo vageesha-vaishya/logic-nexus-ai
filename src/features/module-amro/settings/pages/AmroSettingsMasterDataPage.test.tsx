@@ -762,6 +762,20 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
               }),
           };
         }
+        if (method === 'GET' && url.includes('/api/v2/amro/pilot-users')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    { user_id: 'pilot-1', display_name: 'Captain Rao', email: 'captain.rao@example.com' },
+                    { user_id: 'pilot-2', display_name: 'Captain Iyer', email: 'captain.iyer@example.com' },
+                  ],
+                },
+              }),
+          };
+        }
         if (method === 'GET') {
           if (url.includes('/api/v2/amro/work-orders')) {
             return {

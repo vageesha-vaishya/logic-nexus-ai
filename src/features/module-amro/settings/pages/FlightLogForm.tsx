@@ -125,9 +125,18 @@ export type FlightLogFormConfig = {
   aircraftReadOnly?: boolean;
 };
 
+export type FlightLogPilotOption = {
+  userId: string;
+  displayName: string;
+  email: string | null;
+};
+
 type FlightLogFormProps = {
   config: FlightLogFormConfig;
   initialValues?: Partial<FlightLogFormValues>;
+  pilotOptions?: FlightLogPilotOption[];
+  pilotOptionsLoading?: boolean;
+  pilotOptionsError?: string;
   onCancel: () => void;
   onSubmit: (input: FlightLogFormSubmitInput) => Promise<void>;
   submitting?: boolean;
@@ -355,7 +364,16 @@ export function buildFlightLogPayload(values: FlightLogFormValues, metadataSourc
   };
 }
 
-export function FlightLogForm({ config, initialValues, onCancel, onSubmit, submitting = false }: FlightLogFormProps) {
+export function FlightLogForm({
+  config,
+  initialValues,
+  pilotOptions = [],
+  pilotOptionsLoading = false,
+  pilotOptionsError = '',
+  onCancel,
+  onSubmit,
+  submitting = false,
+}: FlightLogFormProps) {
   const [values, setValues] = useState<FlightLogFormValues>(() => getDefaultFlightLogFormValues(initialValues));
   const [errors, setErrors] = useState<FlightLogFormErrors>({});
   const [submitError, setSubmitError] = useState('');
@@ -415,6 +433,15 @@ export function FlightLogForm({ config, initialValues, onCancel, onSubmit, submi
     ],
     [],
   );
+  const picOptions = useMemo(() => {
+    const fromPilots = pilotOptions
+      .map((option) => String(option.displayName || '').trim())
+      .filter((name) => Boolean(name));
+    if (values.picInCommand.trim() && !fromPilots.includes(values.picInCommand.trim())) {
+      return [values.picInCommand.trim(), ...fromPilots];
+    }
+    return fromPilots;
+  }, [pilotOptions, values.picInCommand]);
 
   const setFieldValue = useCallback((key: keyof FlightLogFormValues, value: string) => {
     setValues((previous) => {
@@ -563,13 +590,28 @@ export function FlightLogForm({ config, initialValues, onCancel, onSubmit, submi
             </div>
             <div className={sectionFieldClass}>
               <Label htmlFor={`${config.mode}-flight-log-pic`} className="mdm-template-label">PIC In Command</Label>
-              <Input
-                id={`${config.mode}-flight-log-pic`}
-                value={values.picInCommand}
-                onChange={(event) => setFieldValue('picInCommand', event.target.value)}
-                className="mdm-template-input"
-                placeholder="Captain / PIC"
-              />
+              <Select value={values.picInCommand} onValueChange={(value) => setFieldValue('picInCommand', value)}>
+                <SelectTrigger
+                  id={`${config.mode}-flight-log-pic`}
+                  className="mdm-template-input"
+                  aria-label="PIC In Command"
+                  disabled={pilotOptionsLoading}
+                >
+                  <SelectValue placeholder={pilotOptionsLoading ? 'Loading pilots...' : 'Select PIC in Command'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {picOptions.length === 0 ? (
+                    <SelectItem value="__no-pilot__" disabled>No pilot users available</SelectItem>
+                  ) : (
+                    picOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {pilotOptionsError ? <p className="mdm-template-danger">{pilotOptionsError}</p> : null}
             </div>
             <div className={sectionFieldClass}>
               <Label htmlFor={`${config.mode}-flight-log-co-pilot`} className="mdm-template-label">Co-Pilot</Label>

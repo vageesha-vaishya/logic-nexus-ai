@@ -26,6 +26,11 @@ import { executeWithResilience, getResilienceStatus } from './utils/resilience';
 
 const app: Express = express();
 type JsonRecord = Record<string, unknown>;
+type PilotLookupRow = {
+  user_id: string;
+  display_name: string;
+  email: string;
+};
 
 function resolveContractsDir(): string {
   const candidates = [
@@ -1789,6 +1794,116 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
       message: error instanceof Error ? error.message : 'Unknown error',
     });
     res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unexpected error',
+      statusCode: 500,
+      requestId,
+      version: 'v2',
+    });
+  }
+});
+
+app.get('/api/v2/amro/pilot-users', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = String(req.header('x-request-id') || crypto.randomUUID());
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+
+  if (!tenantId) {
+    return res.status(400).json({
+      error: 'Tenant context is required',
+      statusCode: 400,
+      requestId,
+      version: 'v2',
+    });
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { data: customRoleRows, error: customRoleError } = await supabase
+      .from('custom_roles')
+      .select('id, tenant_id, name, is_active')
+      .eq('tenant_id', tenantId)
+      .ilike('name', 'pilot');
+    if (customRoleError) {
+      throw new Error(customRoleError.message || 'Failed to load custom pilot roles');
+    }
+
+    const pilotRoleIds = (customRoleRows || [])
+      .filter((row) => String((row as Record<string, unknown>).tenant_id || '').trim() === tenantId)
+      .filter((row) => (row as Record<string, unknown>).is_active !== false)
+      .filter((row) => String((row as Record<string, unknown>).name || '').trim().toLowerCase() === 'pilot')
+      .map((row) => String((row as Record<string, unknown>).id || '').trim())
+      .filter(Boolean);
+
+    if (!pilotRoleIds.length) {
+      return res.status(200).json({
+        version: 'v2',
+        requestId,
+        output: { records: [] as PilotLookupRow[] },
+      });
+    }
+
+    const { data: assignmentRows, error: assignmentError } = await supabase
+      .from('user_custom_roles')
+      .select('user_id, role_id, tenant_id')
+      .eq('tenant_id', tenantId)
+      .in('role_id', pilotRoleIds);
+    if (assignmentError) {
+      throw new Error(assignmentError.message || 'Failed to load pilot role assignments');
+    }
+
+    const pilotUserIds = Array.from(
+      new Set(
+        (assignmentRows || [])
+          .filter((row) => String((row as Record<string, unknown>).tenant_id || '').trim() === tenantId)
+          .map((row) => String((row as Record<string, unknown>).user_id || '').trim())
+          .filter(Boolean),
+      ),
+    );
+    if (!pilotUserIds.length) {
+      return res.status(200).json({
+        version: 'v2',
+        requestId,
+        output: { records: [] as PilotLookupRow[] },
+      });
+    }
+
+    const { data: profileRows, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, email, is_active')
+      .in('id', pilotUserIds);
+    if (profileError) {
+      throw new Error(profileError.message || 'Failed to load pilot user profiles');
+    }
+
+    const pilotRecords: PilotLookupRow[] = (profileRows || [])
+      .filter((row) => (row as Record<string, unknown>).is_active !== false)
+      .map((row) => {
+        const record = row as Record<string, unknown>;
+        const firstName = String(record.first_name || '').trim();
+        const lastName = String(record.last_name || '').trim();
+        const email = String(record.email || '').trim();
+        return {
+          user_id: String(record.id || '').trim(),
+          display_name: `${firstName} ${lastName}`.trim() || email,
+          email,
+        };
+      })
+      .filter((row) => Boolean(row.user_id) && Boolean(row.display_name))
+      .sort((left, right) => left.display_name.localeCompare(right.display_name, undefined, { sensitivity: 'base' }));
+
+    return res.status(200).json({
+      version: 'v2',
+      requestId,
+      output: {
+        records: pilotRecords,
+      },
+    });
+  } catch (error) {
+    logger.error('pilot-users route error', {
+      requestId,
+      tenantId,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return res.status(500).json({
       error: error instanceof Error ? error.message : 'Unexpected error',
       statusCode: 500,
       requestId,

@@ -87,6 +87,7 @@ import {
 } from 'recharts';
 import {
   FlightLogForm,
+  type FlightLogPilotOption,
   buildFlightLogPayload,
   getDefaultFlightLogFormValues,
   type FlightLogFormConfig,
@@ -1717,6 +1718,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [flightLogSubmitting, setFlightLogSubmitting] = useState(false);
   const [flightLogMode, setFlightLogMode] = useState<FlightLogFormMode>('add');
   const [flightLogInitialValues, setFlightLogInitialValues] = useState<Partial<FlightLogFormValues>>(getDefaultFlightLogFormValues());
+  const [flightLogPilotOptions, setFlightLogPilotOptions] = useState<FlightLogPilotOption[]>([]);
+  const [flightLogPilotOptionsLoading, setFlightLogPilotOptionsLoading] = useState(false);
+  const [flightLogPilotOptionsError, setFlightLogPilotOptionsError] = useState('');
   const [flightLogDialogInstance, setFlightLogDialogInstance] = useState(0);
   const [flightLogDetailOpen, setFlightLogDetailOpen] = useState(false);
   const [flightLogDetailRow, setFlightLogDetailRow] = useState<RecordRow | null>(null);
@@ -6475,6 +6479,63 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setFlightLogDialogOpen(true);
   }, []);
 
+  const loadFlightLogPilotOptions = useCallback(async () => {
+    const tenantId = String(scope.tenantId || '').trim();
+    if (!tenantId) {
+      setFlightLogPilotOptions([]);
+      setFlightLogPilotOptionsError('Tenant scope is required to resolve pilot users');
+      return;
+    }
+    setFlightLogPilotOptionsLoading(true);
+    setFlightLogPilotOptionsError('');
+    try {
+      const headers = await buildApiHeaders(scope);
+      const response = await fetch('/api/v2/amro/pilot-users', {
+        method: 'GET',
+        headers,
+      });
+      const parsedPayload = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(String(parsedPayload.error || 'Failed to load pilot users'));
+      }
+      const records = getPayloadRecords(parsedPayload);
+      const normalizedOptions = records
+        .map((record) => {
+          const userId = String(record.user_id || record.id || '').trim();
+          const displayName = String(record.display_name || record.name || '').trim();
+          const email = String(record.email || '').trim();
+          if (!userId || !displayName) {
+            return null;
+          }
+          return {
+            userId,
+            displayName,
+            email: email || null,
+          } satisfies FlightLogPilotOption;
+        })
+        .filter((option): option is FlightLogPilotOption => Boolean(option));
+      setFlightLogPilotOptions(normalizedOptions);
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load pilot users');
+      logger.error('Flight log pilot lookup failed', {
+        component: 'AmroSettingsMasterDataPage',
+        error: error as Error,
+        tenantId: String(scope.tenantId || ''),
+      });
+      setFlightLogPilotOptions([]);
+      setFlightLogPilotOptionsError(message);
+    } finally {
+      setFlightLogPilotOptionsLoading(false);
+    }
+  }, [scope]);
+
+  useEffect(() => {
+    if (!flightLogDialogOpen) {
+      return;
+    }
+    void loadFlightLogPilotOptions();
+  }, [flightLogDialogOpen, loadFlightLogPilotOptions]);
+
   const handleFlightLogSubmit = useCallback(async ({ mode, payload, values }: FlightLogFormSubmitInput) => {
     const errors = validateFlightLogFormValues(values);
     if (Object.keys(errors).length > 0) {
@@ -9813,6 +9874,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               key={flightLogDialogInstance}
               config={flightLogDialogConfig}
               initialValues={flightLogInitialValues}
+              pilotOptions={flightLogPilotOptions}
+              pilotOptionsLoading={flightLogPilotOptionsLoading}
+              pilotOptionsError={flightLogPilotOptionsError}
               onCancel={() => setFlightLogDialogOpen(false)}
               onSubmit={handleFlightLogSubmit}
               submitting={flightLogSubmitting}
