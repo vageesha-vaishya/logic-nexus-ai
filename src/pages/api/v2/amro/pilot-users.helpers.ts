@@ -25,21 +25,30 @@ export type PilotOptionRow = {
   email: string;
 };
 
-export function getPilotRoleIds(customRoles: CustomRoleRow[], tenantId: string): string[] {
+export function getRoleIdsByName(customRoles: CustomRoleRow[], tenantId: string, roleName: string): string[] {
   const normalizedTenantId = String(tenantId || '').trim();
+  const normalizedRoleName = String(roleName || '').trim().toLowerCase();
   return customRoles
     .filter((row) => String(row.tenant_id || '').trim() === normalizedTenantId)
     .filter((row) => row.is_active !== false)
-    .filter((row) => String(row.name || '').trim().toLowerCase() === 'pilot')
+    .filter((row) => String(row.name || '').trim().toLowerCase() === normalizedRoleName)
     .map((row) => String(row.id || '').trim())
     .filter((id) => Boolean(id));
 }
 
-export function getPilotUserIds(assignments: UserCustomRoleRow[], pilotRoleIds: string[], tenantId: string): string[] {
-  if (!pilotRoleIds.length) {
+export function getPilotRoleIds(customRoles: CustomRoleRow[], tenantId: string): string[] {
+  return getRoleIdsByName(customRoles, tenantId, 'pilot');
+}
+
+export function getCoPilotRoleIds(customRoles: CustomRoleRow[], tenantId: string): string[] {
+  return getRoleIdsByName(customRoles, tenantId, 'co-pilot');
+}
+
+export function getUserIdsByRoleIds(assignments: UserCustomRoleRow[], roleIds: string[], tenantId: string): string[] {
+  if (!roleIds.length) {
     return [];
   }
-  const roleIdSet = new Set(pilotRoleIds.map((id) => String(id || '').trim()));
+  const roleIdSet = new Set(roleIds.map((id) => String(id || '').trim()));
   const normalizedTenantId = String(tenantId || '').trim();
   return Array.from(new Set(
     assignments
@@ -48,6 +57,14 @@ export function getPilotUserIds(assignments: UserCustomRoleRow[], pilotRoleIds: 
       .map((row) => String(row.user_id || '').trim())
       .filter((id) => Boolean(id)),
   ));
+}
+
+export function getPilotUserIds(assignments: UserCustomRoleRow[], pilotRoleIds: string[], tenantId: string): string[] {
+  return getUserIdsByRoleIds(assignments, pilotRoleIds, tenantId);
+}
+
+export function getCoPilotUserIds(assignments: UserCustomRoleRow[], coPilotRoleIds: string[], tenantId: string): string[] {
+  return getUserIdsByRoleIds(assignments, coPilotRoleIds, tenantId);
 }
 
 export function buildPilotOptions(profiles: ProfileRow[], pilotUserIds: string[]): PilotOptionRow[] {

@@ -13,7 +13,13 @@ import {
 import { sendErrorResponse } from '../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
 import { getSupabaseAdminClient } from '../../_utils/supabaseAdmin';
-import { buildPilotOptions, getPilotRoleIds, getPilotUserIds } from './pilot-users.helpers';
+import {
+  buildPilotOptions,
+  getCoPilotRoleIds,
+  getCoPilotUserIds,
+  getPilotRoleIds,
+  getPilotUserIds,
+} from './pilot-users.helpers';
 
 type CustomRoleLookupRow = {
   id: string;
@@ -78,19 +84,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const { data: roleRows, error: roleError } = await supabase
       .from('custom_roles')
       .select('id,tenant_id,name,is_active')
-      .eq('tenant_id', tenantId)
-      .ilike('name', 'pilot');
+      .eq('tenant_id', tenantId);
     if (roleError) {
-      throw new Error(roleError.message || 'Failed to load custom pilot roles');
+      throw new Error(roleError.message || 'Failed to load custom crew roles');
     }
 
     const pilotRoleIds = getPilotRoleIds((roleRows || []) as CustomRoleLookupRow[], tenantId);
-    if (!pilotRoleIds.length) {
+    const coPilotRoleIds = getCoPilotRoleIds((roleRows || []) as CustomRoleLookupRow[], tenantId);
+    const allTargetRoleIds = Array.from(new Set([...pilotRoleIds, ...coPilotRoleIds]));
+    if (!allTargetRoleIds.length) {
       return res.status(200).json({
         version: 'v2',
         correlationId: ctx.correlationId,
         output: {
           records: [],
+          co_pilot_records: [],
         },
       });
     }
@@ -99,18 +107,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       .from('user_custom_roles')
       .select('user_id,role_id,tenant_id')
       .eq('tenant_id', tenantId)
-      .in('role_id', pilotRoleIds);
+      .in('role_id', allTargetRoleIds);
     if (assignmentError) {
-      throw new Error(assignmentError.message || 'Failed to load pilot role assignments');
+      throw new Error(assignmentError.message || 'Failed to load crew role assignments');
     }
 
     const pilotUserIds = getPilotUserIds((assignmentRows || []) as UserCustomRoleLookupRow[], pilotRoleIds, tenantId);
-    if (!pilotUserIds.length) {
+    const coPilotUserIds = getCoPilotUserIds((assignmentRows || []) as UserCustomRoleLookupRow[], coPilotRoleIds, tenantId);
+    const allTargetUserIds = Array.from(new Set([...pilotUserIds, ...coPilotUserIds]));
+    if (!allTargetUserIds.length) {
       return res.status(200).json({
         version: 'v2',
         correlationId: ctx.correlationId,
         output: {
           records: [],
+          co_pilot_records: [],
         },
       });
     }
@@ -118,17 +129,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const { data: profileRows, error: profileError } = await supabase
       .from('profiles')
       .select('id,first_name,last_name,email,is_active')
-      .in('id', pilotUserIds);
+      .in('id', allTargetUserIds);
     if (profileError) {
-      throw new Error(profileError.message || 'Failed to load pilot user profiles');
+      throw new Error(profileError.message || 'Failed to load crew user profiles');
     }
 
     const records = buildPilotOptions((profileRows || []) as ProfileLookupRow[], pilotUserIds);
+    const coPilotRecords = buildPilotOptions((profileRows || []) as ProfileLookupRow[], coPilotUserIds);
     return res.status(200).json({
       version: 'v2',
       correlationId: ctx.correlationId,
       output: {
         records,
+        co_pilot_records: coPilotRecords,
       },
     });
   } catch (error) {

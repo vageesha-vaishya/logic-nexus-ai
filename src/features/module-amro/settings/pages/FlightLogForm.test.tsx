@@ -4,7 +4,7 @@ import { FlightLogForm, type FlightLogFormSubmitInput, getDefaultFlightLogFormVa
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 
 describe('FlightLogForm PIC in Command dropdown', () => {
-  it('renders pilot options and submits selected pilot as PIC', async () => {
+  it('renders pilot/co-pilot options and submits selected crew values', async () => {
     const onSubmit = vi.fn<(_input: FlightLogFormSubmitInput) => Promise<void>>().mockResolvedValue(undefined);
     render(
       <Dialog open>
@@ -29,6 +29,9 @@ describe('FlightLogForm PIC in Command dropdown', () => {
               { userId: 'pilot-1', displayName: 'Captain Rao', email: 'captain.rao@example.com' },
               { userId: 'pilot-2', displayName: 'Captain Iyer', email: 'captain.iyer@example.com' },
             ]}
+            coPilotOptions={[
+              { userId: 'co-pilot-1', displayName: 'First Officer Das', email: 'fo.das@example.com' },
+            ]}
             onCancel={() => undefined}
             onSubmit={onSubmit}
           />
@@ -38,6 +41,8 @@ describe('FlightLogForm PIC in Command dropdown', () => {
 
     fireEvent.click(screen.getByLabelText('PIC In Command'));
     fireEvent.click(await screen.findByText('Captain Rao'));
+    fireEvent.click(screen.getByLabelText('Co-Pilot'));
+    fireEvent.click(await screen.findByText('First Officer Das'));
     fireEvent.click(screen.getByRole('button', { name: /Save Flight Log/i }));
 
     await waitFor(() => {
@@ -46,6 +51,7 @@ describe('FlightLogForm PIC in Command dropdown', () => {
     const submitted = onSubmit.mock.calls[0][0];
     expect(submitted.payload.pic_in_command).toBe('Captain Rao');
     expect(submitted.payload.pilot_name).toBe('Captain Rao');
+    expect(submitted.payload.co_pilot).toBe('First Officer Das');
   });
 
   it('shows pilot lookup errors below the PIC dropdown', () => {
@@ -75,5 +81,33 @@ describe('FlightLogForm PIC in Command dropdown', () => {
     );
 
     expect(screen.getByText('Failed to load pilot users')).toBeInTheDocument();
+  });
+
+  it('shows co-pilot lookup errors below the Co-Pilot dropdown', () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <FlightLogForm
+            config={{
+              mode: 'add',
+              title: 'Add Flight Logs',
+              description: 'Test form',
+              submitLabel: 'Save Flight Log',
+              metadataSource: 'test.ui',
+            }}
+            initialValues={getDefaultFlightLogFormValues({
+              aircraftId: 'ac-1',
+              departureAirport: 'DEL',
+              arrivalAirport: 'CCU',
+            })}
+            coPilotOptions={[]}
+            coPilotOptionsError="Failed to load co-pilot users"
+            onCancel={() => undefined}
+            onSubmit={vi.fn().mockResolvedValue(undefined)}
+          />
+        </DialogContent>
+      </Dialog>,
+    );
+    expect(screen.getByText('Failed to load co-pilot users')).toBeInTheDocument();
   });
 });

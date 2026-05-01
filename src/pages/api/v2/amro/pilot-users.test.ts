@@ -69,7 +69,7 @@ function createResponse(): {
 }
 
 describe('pilot-users v2 API', () => {
-  let customRolesIlikeMock: ReturnType<typeof vi.fn>;
+  let customRolesEqMock: ReturnType<typeof vi.fn>;
   let userCustomRolesInMock: ReturnType<typeof vi.fn>;
   let profileInMock: ReturnType<typeof vi.fn>;
 
@@ -98,7 +98,7 @@ describe('pilot-users v2 API', () => {
       validatedAt: '2026-03-20T00:00:00.000Z',
     } as any);
 
-    customRolesIlikeMock = vi.fn().mockResolvedValue({
+    customRolesEqMock = vi.fn().mockResolvedValue({
       data: [
         { id: 'role-pilot-1', tenant_id: 'tenant-1', name: 'Pilot', is_active: true },
         { id: 'role-co-pilot-1', tenant_id: 'tenant-1', name: 'Co-pilot', is_active: true },
@@ -116,7 +116,7 @@ describe('pilot-users v2 API', () => {
     profileInMock = vi.fn().mockResolvedValue({
       data: [
         { id: 'u-1', first_name: 'Captain', last_name: 'Rao', email: 'captain.rao@example.com', is_active: true },
-        { id: 'u-2', first_name: 'Engineer', last_name: 'Sharma', email: 'eng@example.com', is_active: true },
+        { id: 'u-2', first_name: 'First', last_name: 'Officer', email: 'fo@example.com', is_active: true },
       ],
       error: null,
     });
@@ -125,9 +125,7 @@ describe('pilot-users v2 API', () => {
       if (table === 'custom_roles') {
         return {
           select: vi.fn().mockReturnValue({
-            eq: vi.fn().mockReturnValue({
-              ilike: customRolesIlikeMock,
-            }),
+            eq: customRolesEqMock,
           }),
         };
       }
@@ -174,6 +172,13 @@ describe('pilot-users v2 API', () => {
         email: 'captain.rao@example.com',
       },
     ]);
+    expect((res.jsonBody as any)?.output?.co_pilot_records).toEqual([
+      {
+        user_id: 'u-2',
+        display_name: 'First Officer',
+        email: 'fo@example.com',
+      },
+    ]);
     expect(applyCors).toHaveBeenCalled();
     expect(enforceHttps).toHaveBeenCalled();
     expect(enforceRateLimit).toHaveBeenCalled();
@@ -182,8 +187,8 @@ describe('pilot-users v2 API', () => {
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
   });
 
-  it('returns empty records when tenant has no active pilot custom role', async () => {
-    customRolesIlikeMock.mockResolvedValueOnce({
+  it('returns empty crew records when tenant has no active pilot or co-pilot custom roles', async () => {
+    customRolesEqMock.mockResolvedValueOnce({
       data: [{ id: 'role-engineer-1', tenant_id: 'tenant-1', name: 'Engineer', is_active: true }],
       error: null,
     });
@@ -199,12 +204,13 @@ describe('pilot-users v2 API', () => {
 
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.records).toEqual([]);
+    expect((res.jsonBody as any)?.output?.co_pilot_records).toEqual([]);
     expect(userCustomRolesInMock).not.toHaveBeenCalled();
     expect(profileInMock).not.toHaveBeenCalled();
   });
 
   it('routes downstream query failures through the shared error handler', async () => {
-    customRolesIlikeMock.mockResolvedValueOnce({
+    customRolesEqMock.mockResolvedValueOnce({
       data: null,
       error: { message: 'custom role lookup failed' },
     });

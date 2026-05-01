@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { buildPilotOptions, getPilotRoleIds, getPilotUserIds } from './pilot-users.helpers';
+import {
+  buildPilotOptions,
+  getCoPilotRoleIds,
+  getCoPilotUserIds,
+  getPilotRoleIds,
+  getPilotUserIds,
+} from './pilot-users.helpers';
 
 describe('pilot-users helpers', () => {
   it('extracts only active pilot custom roles within tenant scope', () => {
@@ -30,6 +36,28 @@ describe('pilot-users helpers', () => {
     );
 
     expect(userIds).toEqual(['user-1', 'user-4']);
+  });
+
+  it('extracts co-pilot role ids and co-pilot users within tenant scope only', () => {
+    const coPilotRoleIds = getCoPilotRoleIds(
+      [
+        { id: 'role-copilot-t1', tenant_id: 'tenant-1', name: 'Co-pilot', is_active: true },
+        { id: 'role-copilot-t1-inactive', tenant_id: 'tenant-1', name: 'Co-pilot', is_active: false },
+        { id: 'role-copilot-t2', tenant_id: 'tenant-2', name: 'Co-pilot', is_active: true },
+      ],
+      'tenant-1',
+    );
+    const coPilotUserIds = getCoPilotUserIds(
+      [
+        { user_id: 'user-a', role_id: 'role-copilot-t1', tenant_id: 'tenant-1' },
+        { user_id: 'user-b', role_id: 'role-copilot-t2', tenant_id: 'tenant-2' },
+        { user_id: 'user-c', role_id: 'role-copilot-t1', tenant_id: 'tenant-1' },
+      ],
+      coPilotRoleIds,
+      'tenant-1',
+    );
+    expect(coPilotRoleIds).toEqual(['role-copilot-t1']);
+    expect(coPilotUserIds).toEqual(['user-a', 'user-c']);
   });
 
   it('maps pilot profiles to display rows and excludes inactive/non-assigned users', () => {

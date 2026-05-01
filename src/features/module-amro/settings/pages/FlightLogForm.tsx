@@ -137,6 +137,9 @@ type FlightLogFormProps = {
   pilotOptions?: FlightLogPilotOption[];
   pilotOptionsLoading?: boolean;
   pilotOptionsError?: string;
+  coPilotOptions?: FlightLogPilotOption[];
+  coPilotOptionsLoading?: boolean;
+  coPilotOptionsError?: string;
   onCancel: () => void;
   onSubmit: (input: FlightLogFormSubmitInput) => Promise<void>;
   submitting?: boolean;
@@ -370,6 +373,9 @@ export function FlightLogForm({
   pilotOptions = [],
   pilotOptionsLoading = false,
   pilotOptionsError = '',
+  coPilotOptions = [],
+  coPilotOptionsLoading = false,
+  coPilotOptionsError = '',
   onCancel,
   onSubmit,
   submitting = false,
@@ -442,6 +448,15 @@ export function FlightLogForm({
     }
     return fromPilots;
   }, [pilotOptions, values.picInCommand]);
+  const coPilotSelectOptions = useMemo(() => {
+    const fromCoPilots = coPilotOptions
+      .map((option) => String(option.displayName || '').trim())
+      .filter((name) => Boolean(name));
+    if (values.coPilot.trim() && !fromCoPilots.includes(values.coPilot.trim())) {
+      return [values.coPilot.trim(), ...fromCoPilots];
+    }
+    return fromCoPilots;
+  }, [coPilotOptions, values.coPilot]);
 
   const setFieldValue = useCallback((key: keyof FlightLogFormValues, value: string) => {
     setValues((previous) => {
@@ -615,13 +630,28 @@ export function FlightLogForm({
             </div>
             <div className={sectionFieldClass}>
               <Label htmlFor={`${config.mode}-flight-log-co-pilot`} className="mdm-template-label">Co-Pilot</Label>
-              <Input
-                id={`${config.mode}-flight-log-co-pilot`}
-                value={values.coPilot}
-                onChange={(event) => setFieldValue('coPilot', event.target.value)}
-                className="mdm-template-input"
-                placeholder="First Officer"
-              />
+              <Select value={values.coPilot} onValueChange={(value) => setFieldValue('coPilot', value)}>
+                <SelectTrigger
+                  id={`${config.mode}-flight-log-co-pilot`}
+                  className="mdm-template-input"
+                  aria-label="Co-Pilot"
+                  disabled={coPilotOptionsLoading}
+                >
+                  <SelectValue placeholder={coPilotOptionsLoading ? 'Loading co-pilots...' : 'Select Co-Pilot'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {coPilotSelectOptions.length === 0 ? (
+                    <SelectItem value="__no-co-pilot__" disabled>No co-pilot users available</SelectItem>
+                  ) : (
+                    coPilotSelectOptions.map((option) => (
+                      <SelectItem key={option} value={option}>
+                        {option}
+                      </SelectItem>
+                    ))
+                  )}
+                </SelectContent>
+              </Select>
+              {coPilotOptionsError ? <p className="mdm-template-danger">{coPilotOptionsError}</p> : null}
             </div>
             <div className={sectionFieldClass}>
               <Label className="mdm-template-label">Classification</Label>

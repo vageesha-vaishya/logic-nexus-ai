@@ -1721,6 +1721,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [flightLogPilotOptions, setFlightLogPilotOptions] = useState<FlightLogPilotOption[]>([]);
   const [flightLogPilotOptionsLoading, setFlightLogPilotOptionsLoading] = useState(false);
   const [flightLogPilotOptionsError, setFlightLogPilotOptionsError] = useState('');
+  const [flightLogCoPilotOptions, setFlightLogCoPilotOptions] = useState<FlightLogPilotOption[]>([]);
+  const [flightLogCoPilotOptionsLoading, setFlightLogCoPilotOptionsLoading] = useState(false);
+  const [flightLogCoPilotOptionsError, setFlightLogCoPilotOptionsError] = useState('');
   const [flightLogDialogInstance, setFlightLogDialogInstance] = useState(0);
   const [flightLogDetailOpen, setFlightLogDetailOpen] = useState(false);
   const [flightLogDetailRow, setFlightLogDetailRow] = useState<RecordRow | null>(null);
@@ -6484,10 +6487,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (!tenantId) {
       setFlightLogPilotOptions([]);
       setFlightLogPilotOptionsError('Tenant scope is required to resolve pilot users');
+      setFlightLogCoPilotOptions([]);
+      setFlightLogCoPilotOptionsError('Tenant scope is required to resolve co-pilot users');
       return;
     }
     setFlightLogPilotOptionsLoading(true);
+    setFlightLogCoPilotOptionsLoading(true);
     setFlightLogPilotOptionsError('');
+    setFlightLogCoPilotOptionsError('');
     try {
       const headers = await buildApiHeaders(scope);
       const response = await fetch('/api/v2/amro/pilot-users', {
@@ -6499,6 +6506,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         throw new Error(String(parsedPayload.error || 'Failed to load pilot users'));
       }
       const records = getPayloadRecords(parsedPayload);
+      const parsedOutput = (parsedPayload && typeof parsedPayload === 'object'
+        ? (parsedPayload as Record<string, unknown>).output
+        : undefined) as Record<string, unknown> | undefined;
+      const coPilotRecords = Array.isArray(parsedOutput?.co_pilot_records)
+        ? (parsedOutput.co_pilot_records as Record<string, unknown>[])
+        : [];
       const normalizedOptions = records
         .map((record) => {
           const userId = String(record.user_id || record.id || '').trim();
@@ -6514,7 +6527,23 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           } satisfies FlightLogPilotOption;
         })
         .filter((option): option is FlightLogPilotOption => Boolean(option));
+      const normalizedCoPilotOptions = coPilotRecords
+        .map((record) => {
+          const userId = String(record.user_id || record.id || '').trim();
+          const displayName = String(record.display_name || record.name || '').trim();
+          const email = String(record.email || '').trim();
+          if (!userId || !displayName) {
+            return null;
+          }
+          return {
+            userId,
+            displayName,
+            email: email || null,
+          } satisfies FlightLogPilotOption;
+        })
+        .filter((option): option is FlightLogPilotOption => Boolean(option));
       setFlightLogPilotOptions(normalizedOptions);
+      setFlightLogCoPilotOptions(normalizedCoPilotOptions);
     } catch (error) {
       const message = String((error as Error).message || 'Failed to load pilot users');
       logger.error('Flight log pilot lookup failed', {
@@ -6524,8 +6553,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       });
       setFlightLogPilotOptions([]);
       setFlightLogPilotOptionsError(message);
+      setFlightLogCoPilotOptions([]);
+      setFlightLogCoPilotOptionsError(message.replace('pilot', 'co-pilot'));
     } finally {
       setFlightLogPilotOptionsLoading(false);
+      setFlightLogCoPilotOptionsLoading(false);
     }
   }, [scope]);
 
@@ -9877,6 +9909,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               pilotOptions={flightLogPilotOptions}
               pilotOptionsLoading={flightLogPilotOptionsLoading}
               pilotOptionsError={flightLogPilotOptionsError}
+              coPilotOptions={flightLogCoPilotOptions}
+              coPilotOptionsLoading={flightLogCoPilotOptionsLoading}
+              coPilotOptionsError={flightLogCoPilotOptionsError}
               onCancel={() => setFlightLogDialogOpen(false)}
               onSubmit={handleFlightLogSubmit}
               submitting={flightLogSubmitting}

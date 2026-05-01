@@ -772,6 +772,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                     { user_id: 'pilot-1', display_name: 'Captain Rao', email: 'captain.rao@example.com' },
                     { user_id: 'pilot-2', display_name: 'Captain Iyer', email: 'captain.iyer@example.com' },
                   ],
+                  co_pilot_records: [
+                    { user_id: 'co-pilot-1', display_name: 'First Officer Das', email: 'fo.das@example.com' },
+                  ],
                 },
               }),
           };

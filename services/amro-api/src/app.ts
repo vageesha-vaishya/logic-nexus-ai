@@ -1820,24 +1820,29 @@ app.get('/api/v2/amro/pilot-users', authMiddleware as any, async (req: AuthReque
     const { data: customRoleRows, error: customRoleError } = await supabase
       .from('custom_roles')
       .select('id, tenant_id, name, is_active')
-      .eq('tenant_id', tenantId)
-      .ilike('name', 'pilot');
+      .eq('tenant_id', tenantId);
     if (customRoleError) {
-      throw new Error(customRoleError.message || 'Failed to load custom pilot roles');
+      throw new Error(customRoleError.message || 'Failed to load custom crew roles');
     }
 
-    const pilotRoleIds = (customRoleRows || [])
+    const activeRoleRows = (customRoleRows || [])
       .filter((row) => String((row as Record<string, unknown>).tenant_id || '').trim() === tenantId)
-      .filter((row) => (row as Record<string, unknown>).is_active !== false)
+      .filter((row) => (row as Record<string, unknown>).is_active !== false);
+    const pilotRoleIds = activeRoleRows
       .filter((row) => String((row as Record<string, unknown>).name || '').trim().toLowerCase() === 'pilot')
       .map((row) => String((row as Record<string, unknown>).id || '').trim())
       .filter(Boolean);
+    const coPilotRoleIds = activeRoleRows
+      .filter((row) => String((row as Record<string, unknown>).name || '').trim().toLowerCase() === 'co-pilot')
+      .map((row) => String((row as Record<string, unknown>).id || '').trim())
+      .filter(Boolean);
+    const targetRoleIds = Array.from(new Set([...pilotRoleIds, ...coPilotRoleIds]));
 
-    if (!pilotRoleIds.length) {
+    if (!targetRoleIds.length) {
       return res.status(200).json({
         version: 'v2',
         requestId,
-        output: { records: [] as PilotLookupRow[] },
+        output: { records: [] as PilotLookupRow[], co_pilot_records: [] as PilotLookupRow[] },
       });
     }
 
@@ -1845,36 +1850,40 @@ app.get('/api/v2/amro/pilot-users', authMiddleware as any, async (req: AuthReque
       .from('user_custom_roles')
       .select('user_id, role_id, tenant_id')
       .eq('tenant_id', tenantId)
-      .in('role_id', pilotRoleIds);
+      .in('role_id', targetRoleIds);
     if (assignmentError) {
-      throw new Error(assignmentError.message || 'Failed to load pilot role assignments');
+      throw new Error(assignmentError.message || 'Failed to load crew role assignments');
     }
 
-    const pilotUserIds = Array.from(
+    const pickUserIdsByRole = (roleIds: string[]) => Array.from(
       new Set(
         (assignmentRows || [])
           .filter((row) => String((row as Record<string, unknown>).tenant_id || '').trim() === tenantId)
+          .filter((row) => roleIds.includes(String((row as Record<string, unknown>).role_id || '').trim()))
           .map((row) => String((row as Record<string, unknown>).user_id || '').trim())
           .filter(Boolean),
       ),
     );
-    if (!pilotUserIds.length) {
+    const pilotUserIds = pickUserIdsByRole(pilotRoleIds);
+    const coPilotUserIds = pickUserIdsByRole(coPilotRoleIds);
+    const targetUserIds = Array.from(new Set([...pilotUserIds, ...coPilotUserIds]));
+    if (!targetUserIds.length) {
       return res.status(200).json({
         version: 'v2',
         requestId,
-        output: { records: [] as PilotLookupRow[] },
+        output: { records: [] as PilotLookupRow[], co_pilot_records: [] as PilotLookupRow[] },
       });
     }
 
     const { data: profileRows, error: profileError } = await supabase
       .from('profiles')
       .select('id, first_name, last_name, email, is_active')
-      .in('id', pilotUserIds);
+      .in('id', targetUserIds);
     if (profileError) {
-      throw new Error(profileError.message || 'Failed to load pilot user profiles');
+      throw new Error(profileError.message || 'Failed to load crew user profiles');
     }
 
-    const pilotRecords: PilotLookupRow[] = (profileRows || [])
+    const allCrewRecords: PilotLookupRow[] = (profileRows || [])
       .filter((row) => (row as Record<string, unknown>).is_active !== false)
       .map((row) => {
         const record = row as Record<string, unknown>;
@@ -1889,12 +1898,17 @@ app.get('/api/v2/amro/pilot-users', authMiddleware as any, async (req: AuthReque
       })
       .filter((row) => Boolean(row.user_id) && Boolean(row.display_name))
       .sort((left, right) => left.display_name.localeCompare(right.display_name, undefined, { sensitivity: 'base' }));
+    const pilotRecordSet = new Set(pilotUserIds);
+    const coPilotRecordSet = new Set(coPilotUserIds);
+    const pilotRecords = allCrewRecords.filter((row) => pilotRecordSet.has(row.user_id));
+    const coPilotRecords = allCrewRecords.filter((row) => coPilotRecordSet.has(row.user_id));
 
     return res.status(200).json({
       version: 'v2',
       requestId,
       output: {
         records: pilotRecords,
+        co_pilot_records: coPilotRecords,
       },
     });
   } catch (error) {
