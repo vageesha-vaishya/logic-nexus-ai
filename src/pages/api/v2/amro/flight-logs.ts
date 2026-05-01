@@ -62,6 +62,38 @@ function parseCycleValue(value: unknown, fieldName: string): number {
   return parsed;
 }
 
+function parseOptionalNumericValue(value: unknown, fieldName: string): number | null {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  return parseNumericValue(value, fieldName);
+}
+
+function parseOptionalCycleValue(value: unknown, fieldName: string): number | null {
+  if (value === undefined || value === null || value === '') {
+    return null;
+  }
+  return parseCycleValue(value, fieldName);
+}
+
+function parseOptionalTimestamp(value: unknown, fieldName: string): string | null {
+  const normalized = parseOptionalString(value);
+  if (!normalized) return null;
+  const parsed = Date.parse(normalized);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${fieldName} must be a valid timestamp`);
+  }
+  return new Date(parsed).toISOString();
+}
+
+function parseOptionalArrayOfUnknown(value: unknown, fieldName: string): unknown[] {
+  if (value === undefined || value === null || value === '') return [];
+  if (!Array.isArray(value)) {
+    throw new Error(`${fieldName} must be an array`);
+  }
+  return value;
+}
+
 function parseMetadata(value: unknown): Record<string, unknown> {
   if (value === undefined || value === null || value === '') {
     return {};
@@ -163,11 +195,31 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const fuelBurnKg = parseNumericValue(body.fuel_burn_kg, 'fuel_burn_kg', 0);
     const oilUpliftLiters = parseNumericValue(body.oil_uplift_liters, 'oil_uplift_liters', 0);
     const pilotName = parseOptionalString(body.pilot_name);
+    const picInCommand = parseOptionalString(body.pic_in_command) || pilotName;
+    const coPilot = parseOptionalString(body.co_pilot);
+    const classificationId = parseOptionalString(body.classification_id);
+    const classificationName = parseOptionalString(body.classification_name);
+    const logSelectionNo = parseOptionalString(body.log_selection_no);
+    const logPageNo = parseOptionalString(body.log_page_no);
     const pirepDiscrepancy = parseOptionalString(body.pirep_discrepancy);
+    const remarks = parseOptionalString(body.remarks);
     const regulatoryAuthority = parseOptionalString(body.regulatory_authority);
+    const attachmentRefs = parseOptionalArrayOfUnknown(body.flight_log_attachment_refs, 'flight_log_attachment_refs');
+    const airframePeriods = parseOptionalArrayOfUnknown(body.airframe_periods, 'airframe_periods');
+    const enginePeriods = parseOptionalArrayOfUnknown(body.engine_periods, 'engine_periods');
+    const taxiOutTimeHours = parseOptionalNumericValue(body.taxi_out_time_hours, 'taxi_out_time_hours');
+    const airborneTimeHours = parseOptionalNumericValue(body.airborne_time_hours, 'airborne_time_hours');
+    const groundRunTimeHours = parseOptionalNumericValue(body.ground_run_time_hours, 'ground_run_time_hours');
+    const groundRunPercent = parseOptionalNumericValue(body.ground_run_percent, 'ground_run_percent');
+    const totalTimeHours = parseOptionalNumericValue(body.total_time_hours, 'total_time_hours');
+    const landings = parseOptionalCycleValue(body.landings, 'landings');
+    const timeOut = parseOptionalTimestamp(body.time_out, 'time_out');
+    const timeOff = parseOptionalTimestamp(body.time_off, 'time_off');
+    const timeOn = parseOptionalTimestamp(body.time_on, 'time_on');
+    const timeIn = parseOptionalTimestamp(body.time_in, 'time_in');
     const metadata = {
       ...parseMetadata(body.metadata),
-      ...(pilotName ? { pilot_name: pilotName } : {}),
+      ...(picInCommand ? { pilot_name: picInCommand } : {}),
     };
 
     if (departureAirport === arrivalAirport) {
@@ -220,14 +272,63 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     const flightLogId = data && typeof data === 'object' ? String((data as Record<string, unknown>).flight_log_id || '').trim() : '';
-    if (pilotName && flightLogId) {
+    const hasSupplementalFlightLogFields = Boolean(
+      picInCommand
+      || coPilot
+      || classificationId
+      || classificationName
+      || logSelectionNo
+      || logPageNo
+      || remarks
+      || timeOut
+      || timeOff
+      || timeOn
+      || timeIn
+      || attachmentRefs.length
+      || airframePeriods.length
+      || enginePeriods.length
+      || taxiOutTimeHours !== null
+      || airborneTimeHours !== null
+      || groundRunTimeHours !== null
+      || groundRunPercent !== null
+      || totalTimeHours !== null
+      || landings !== null,
+    );
+    if (flightLogId && (pilotName || hasSupplementalFlightLogFields)) {
+      const updatePayload: Record<string, unknown> = {
+        updated_by: userId,
+      };
+      if (picInCommand) {
+        updatePayload.pilot_name = picInCommand;
+        updatePayload.pic_in_command = picInCommand;
+      }
+      if (coPilot !== null) updatePayload.co_pilot = coPilot;
+      if (classificationId !== null) updatePayload.classification_id = classificationId;
+      if (classificationName !== null) updatePayload.classification_name = classificationName;
+      if (logSelectionNo !== null) updatePayload.log_selection_no = logSelectionNo;
+      if (logPageNo !== null) updatePayload.log_page_no = logPageNo;
+      if (remarks !== null) updatePayload.remarks = remarks;
+      if (timeOut !== null) updatePayload.time_out = timeOut;
+      if (timeOff !== null) updatePayload.time_off = timeOff;
+      if (timeOn !== null) updatePayload.time_on = timeOn;
+      if (timeIn !== null) updatePayload.time_in = timeIn;
+      if (taxiOutTimeHours !== null) updatePayload.taxi_out_time_hours = taxiOutTimeHours;
+      if (airborneTimeHours !== null) updatePayload.airborne_time_hours = airborneTimeHours;
+      if (groundRunTimeHours !== null) updatePayload.ground_run_time_hours = groundRunTimeHours;
+      if (groundRunPercent !== null) updatePayload.ground_run_percent = groundRunPercent;
+      if (totalTimeHours !== null) updatePayload.total_time_hours = totalTimeHours;
+      if (landings !== null) updatePayload.landings = landings;
+      if (attachmentRefs.length) updatePayload.flight_log_attachment_refs = attachmentRefs;
+      if (airframePeriods.length) updatePayload.airframe_periods = airframePeriods;
+      if (enginePeriods.length) updatePayload.engine_periods = enginePeriods;
+
       const { error: pilotUpdateError } = await supabase
         .from('flight_logs')
-        .update({ pilot_name: pilotName, updated_by: userId })
+        .update(updatePayload)
         .eq('id', flightLogId)
         .eq('tenant_id', tenantId);
       if (pilotUpdateError) {
-        throw new Error(pilotUpdateError.message || 'Failed to save pilot name');
+        throw new Error(pilotUpdateError.message || 'Failed to save supplemental flight log fields');
       }
     }
 
@@ -245,7 +346,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         flight_number: flightNumber,
         departure_airport: departureAirport,
         arrival_airport: arrivalAirport,
-        pilot_name: pilotName,
+        pilot_name: picInCommand,
+        co_pilot: coPilot,
+        classification_name: classificationName,
         flight_hours: flightHours,
         block_hours: blockHours,
         flight_cycles: flightCycles,
