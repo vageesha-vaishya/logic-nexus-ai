@@ -122,7 +122,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'flight_logs',
     searchableColumns: ['flight_number', 'departure_airport', 'arrival_airport', 'pilot_name', 'regulatory_authority'],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_id,flight_date,flight_number,departure_airport,arrival_airport,pilot_name,flight_hours,block_hours,flight_cycles,crew_details,fuel_burn_kg,oil_uplift_liters,pirep_discrepancy,regulatory_authority,is_deleted,deleted_at,deleted_by,metadata,created_at,updated_at,created_by,updated_by',
+      'id,tenant_id,franchise_id,aircraft_id,flight_date,flight_number,departure_airport,arrival_airport,pilot_name,flight_hours,block_hours,flight_cycles,landings,crew_details,fuel_burn_kg,oil_uplift_liters,pirep_discrepancy,regulatory_authority,is_deleted,deleted_at,deleted_by,metadata,created_at,updated_at,created_by,updated_by',
     requiredCreateFields: ['aircraft_id', 'flight_date', 'departure_airport', 'arrival_airport'],
     writeAllowedFields: [
       'aircraft_id',
@@ -134,6 +134,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'flight_hours',
       'block_hours',
       'flight_cycles',
+      'landings',
       'crew_details',
       'fuel_burn_kg',
       'oil_uplift_liters',
@@ -926,6 +927,7 @@ function normalizeFlightLog(payload: JsonRecord): JsonRecord {
     flight_hours: asNumber(payload.flight_hours) ?? 0,
     block_hours: asNumber(payload.block_hours) ?? 0,
     flight_cycles: asNumber(payload.flight_cycles) ?? 0,
+    landings: asNumber(payload.landings) ?? 0,
     crew_details: asNullableString(payload.crew_details),
     fuel_burn_kg: asNumber(payload.fuel_burn_kg) ?? 0,
     oil_uplift_liters: asNumber(payload.oil_uplift_liters) ?? 0,
@@ -933,6 +935,88 @@ function normalizeFlightLog(payload: JsonRecord): JsonRecord {
     regulatory_authority: asNullableString(payload.regulatory_authority),
     metadata: asJsonObject(payload.metadata),
   };
+}
+
+async function applyFlightLogAircraftCounters(params: {
+  supabase: SupabaseClient;
+  tenantId: string;
+  requestId: string;
+  aircraftId: string;
+  franchiseId: string | null;
+  updatedBy: string;
+  flightHoursDelta: number;
+  landingsDelta: number;
+}): Promise<void> {
+  const {
+    supabase,
+    tenantId,
+    requestId,
+    aircraftId,
+    franchiseId,
+    updatedBy,
+    flightHoursDelta,
+    landingsDelta,
+  } = params;
+  const normalizedHoursDelta = Math.max(flightHoursDelta, 0);
+  const normalizedLandingsDelta = Math.max(landingsDelta, 0);
+  const { data: existingAircraft, error: loadError } = await executeWithResilience(
+    {
+      dependency: 'supabase',
+      operation: 'master-data.flight_logs.aircraft_counters.load',
+      requestId,
+      tenantId,
+    },
+    async () => {
+      let queryBuilder = supabase
+        .from('aircraft')
+        .select('id,current_flight_hours,current_flight_hours_since_new,current_landings,current_landings_since_new')
+        .eq('id', aircraftId)
+        .eq('tenant_id', tenantId);
+      if (franchiseId) {
+        queryBuilder = queryBuilder.eq('franchise_id', franchiseId);
+      }
+      return await queryBuilder.limit(1).maybeSingle();
+    },
+  );
+  if (loadError) {
+    throw new HttpError(loadError.message, 400);
+  }
+  const aircraftRecord = (existingAircraft || null) as JsonRecord | null;
+  if (!aircraftRecord) {
+    throw new HttpError('Aircraft record was not found while applying flight-log usage counters', 404);
+  }
+  const nextCurrentFlightHours = (asNumber(aircraftRecord.current_flight_hours) ?? 0) + normalizedHoursDelta;
+  const nextCurrentFlightHoursSinceNew = (asNumber(aircraftRecord.current_flight_hours_since_new) ?? 0) + normalizedHoursDelta;
+  const nextCurrentLandings = (asNumber(aircraftRecord.current_landings) ?? 0) + normalizedLandingsDelta;
+  const nextCurrentLandingsSinceNew = (asNumber(aircraftRecord.current_landings_since_new) ?? 0) + normalizedLandingsDelta;
+  const { error: updateError } = await executeWithResilience(
+    {
+      dependency: 'supabase',
+      operation: 'master-data.flight_logs.aircraft_counters.update',
+      requestId,
+      tenantId,
+    },
+    async () => {
+      let queryBuilder = supabase
+        .from('aircraft')
+        .update({
+          current_flight_hours: nextCurrentFlightHours,
+          current_flight_hours_since_new: nextCurrentFlightHoursSinceNew,
+          current_landings: nextCurrentLandings,
+          current_landings_since_new: nextCurrentLandingsSinceNew,
+          updated_by: updatedBy,
+        })
+        .eq('id', aircraftId)
+        .eq('tenant_id', tenantId);
+      if (franchiseId) {
+        queryBuilder = queryBuilder.eq('franchise_id', franchiseId);
+      }
+      return await queryBuilder.select('id').limit(1).maybeSingle();
+    },
+  );
+  if (updateError) {
+    throw new HttpError(updateError.message, 400);
+  }
 }
 
 function normalizeSupplier(payload: JsonRecord): JsonRecord {
@@ -1627,7 +1711,7 @@ router.post(
         throw new HttpError('Invalid assembly model references', 422);
       }
     }
-    const insertPayload = {
+    const insertPayload: JsonRecord = {
       ...payload,
       tenant_id: req.tenantId,
       franchise_id: franchiseId,
@@ -1655,6 +1739,20 @@ router.post(
     const createdRecord = createdRecordBase && entity === 'aircraft'
       ? enrichAircraftWarrantyFields(createdRecordBase)
       : createdRecordBase;
+    if (entity === 'flight_logs') {
+      const flightHoursDelta = Math.max(asNumber(insertPayload.flight_hours) ?? 0, 0);
+      const landingsDelta = Math.max(asNumber(insertPayload.landings) ?? 0, 0);
+      await applyFlightLogAircraftCounters({
+        supabase,
+        tenantId: req.tenantId,
+        requestId: correlationId,
+        aircraftId: asString(insertPayload.aircraft_id),
+        franchiseId,
+        updatedBy: req.userId,
+        flightHoursDelta,
+        landingsDelta,
+      });
+    }
     await writeAuditRecord({
       tenantId: req.tenantId,
       franchiseId,

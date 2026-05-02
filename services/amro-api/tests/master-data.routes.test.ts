@@ -73,6 +73,24 @@ describe('master-data.routes', () => {
           error: null,
         };
       }
+      if (operation.endsWith('.aircraft_counters.load')) {
+        return {
+          data: {
+            id: 'aircraft-1',
+            current_flight_hours: 100,
+            current_flight_hours_since_new: 100,
+            current_landings: 30,
+            current_landings_since_new: 30,
+          },
+          error: null,
+        };
+      }
+      if (operation.endsWith('.aircraft_counters.update')) {
+        return {
+          data: { id: 'aircraft-1' },
+          error: null,
+        };
+      }
       if (operation.endsWith('.update.load') || operation.endsWith('.delete.load')) {
         return {
           data: { id: 'aircraft-1', tail_number: 'N101AA', tenant_id: 'tenant-1', franchise_id: null },
@@ -196,6 +214,33 @@ describe('master-data.routes', () => {
     );
   });
 
+  it('increments aircraft counters when creating flight logs', async () => {
+    const app = await createTestApp();
+    await request(app)
+      .post('/api/v2/amro/master-data/flight_logs')
+      .send({
+        aircraft_id: 'aircraft-1',
+        flight_date: '2026-05-02',
+        departure_airport: 'a1807454-4233-4c96-90af-d5f42f96df66',
+        arrival_airport: 'e5f20b57-ec4f-4a02-9f6e-19f3c0be3f48',
+        flight_hours: 2.5,
+        landings: 1,
+      })
+      .expect(201);
+    expect(mockExecuteWithResilience).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'master-data.flight_logs.create' }),
+      expect.any(Function),
+    );
+    expect(mockExecuteWithResilience).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'master-data.flight_logs.aircraft_counters.load' }),
+      expect.any(Function),
+    );
+    expect(mockExecuteWithResilience).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'master-data.flight_logs.aircraft_counters.update' }),
+      expect.any(Function),
+    );
+  });
+
   it('updates master data records', async () => {
     const app = await createTestApp();
     const response = await request(app)
@@ -241,7 +286,13 @@ describe('master-data.routes', () => {
       .post('/api/v2/amro/master-data/work_order_templates')
       .send({
         operation: 'bulk_import',
-        records: [{ template_code: 'TMP-1', template_name: 'Template 1', maintenance_type: 'line', version: 1 }],
+        records: [{
+          assembly_models_id: 'asm-1',
+          template_code: 'TMP-1',
+          template_name: 'Template 1',
+          maintenance_type: 'line',
+          version: 1,
+        }],
       })
       .expect(200);
     expect(response.body.output.entity).toBe('work_order_templates');
