@@ -86,6 +86,7 @@ import {
   YAxis,
 } from 'recharts';
 import {
+  type FlightLogAirportOption,
   FlightLogForm,
   type FlightLogPilotOption,
   buildFlightLogPayload,
@@ -1724,6 +1725,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [flightLogCoPilotOptions, setFlightLogCoPilotOptions] = useState<FlightLogPilotOption[]>([]);
   const [flightLogCoPilotOptionsLoading, setFlightLogCoPilotOptionsLoading] = useState(false);
   const [flightLogCoPilotOptionsError, setFlightLogCoPilotOptionsError] = useState('');
+  const [flightLogDepartureAirportOptions, setFlightLogDepartureAirportOptions] = useState<FlightLogAirportOption[]>([]);
+  const [flightLogDepartureAirportOptionsLoading, setFlightLogDepartureAirportOptionsLoading] = useState(false);
+  const [flightLogDepartureAirportOptionsError, setFlightLogDepartureAirportOptionsError] = useState('');
   const [flightLogDialogInstance, setFlightLogDialogInstance] = useState(0);
   const [flightLogDetailOpen, setFlightLogDetailOpen] = useState(false);
   const [flightLogDetailRow, setFlightLogDetailRow] = useState<RecordRow | null>(null);
@@ -6561,12 +6565,71 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
   }, [scope]);
 
+  const loadFlightLogDepartureAirports = useCallback(async () => {
+    const tenantId = String(scope.tenantId || '').trim();
+    if (!tenantId) {
+      setFlightLogDepartureAirportOptions([]);
+      setFlightLogDepartureAirportOptionsError('Tenant scope is required to resolve airports');
+      return;
+    }
+    setFlightLogDepartureAirportOptionsLoading(true);
+    setFlightLogDepartureAirportOptionsError('');
+    try {
+      const headers = await buildApiHeaders(scope);
+      const normalizeAirportOptions = (records: Record<string, unknown>[]) =>
+        records
+          .map((record) => {
+            const id = String(record.id || '').trim();
+            const name = String(record.name || '').trim();
+            const icaoCode = String(record.icao_code || '').trim().toUpperCase();
+            const iataCode = String(record.iata_code || '').trim().toUpperCase();
+            const code = icaoCode || iataCode;
+            if (!id || !code) {
+              return null;
+            }
+            return {
+              id,
+              name: name || code,
+              icaoCode: code,
+            } satisfies FlightLogAirportOption;
+          })
+          .filter((option): option is FlightLogAirportOption => Boolean(option));
+
+      const response = await fetch('/api/v2/amro/airports?limit=500', {
+        method: 'GET',
+        headers,
+      });
+      const parsedPayload = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(String(parsedPayload.error || 'Failed to load airports'));
+      }
+      const directRecords = getPayloadRecords(parsedPayload);
+      const normalizedOptions = normalizeAirportOptions(directRecords);
+
+      setFlightLogDepartureAirportOptions(
+        normalizedOptions.sort((left, right) => left.name.localeCompare(right.name, undefined, { sensitivity: 'base' })),
+      );
+    } catch (error) {
+      const message = String((error as Error).message || 'Failed to load airports');
+      logger.error('Flight log departure airport lookup failed', {
+        component: 'AmroSettingsMasterDataPage',
+        error: error as Error,
+        tenantId: String(scope.tenantId || ''),
+      });
+      setFlightLogDepartureAirportOptions([]);
+      setFlightLogDepartureAirportOptionsError(message);
+    } finally {
+      setFlightLogDepartureAirportOptionsLoading(false);
+    }
+  }, [scope]);
+
   useEffect(() => {
     if (!flightLogDialogOpen) {
       return;
     }
     void loadFlightLogPilotOptions();
-  }, [flightLogDialogOpen, loadFlightLogPilotOptions]);
+    void loadFlightLogDepartureAirports();
+  }, [flightLogDialogOpen, loadFlightLogDepartureAirports, loadFlightLogPilotOptions]);
 
   const handleFlightLogSubmit = useCallback(async ({ mode, payload, values }: FlightLogFormSubmitInput) => {
     const errors = validateFlightLogFormValues(values);
@@ -9912,6 +9975,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               coPilotOptions={flightLogCoPilotOptions}
               coPilotOptionsLoading={flightLogCoPilotOptionsLoading}
               coPilotOptionsError={flightLogCoPilotOptionsError}
+              departureAirportOptions={flightLogDepartureAirportOptions}
+              departureAirportOptionsLoading={flightLogDepartureAirportOptionsLoading}
+              departureAirportOptionsError={flightLogDepartureAirportOptionsError}
               onCancel={() => setFlightLogDialogOpen(false)}
               onSubmit={handleFlightLogSubmit}
               submitting={flightLogSubmitting}

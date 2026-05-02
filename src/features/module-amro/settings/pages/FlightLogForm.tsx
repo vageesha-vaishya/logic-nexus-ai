@@ -131,6 +131,12 @@ export type FlightLogPilotOption = {
   email: string | null;
 };
 
+export type FlightLogAirportOption = {
+  id: string;
+  name: string;
+  icaoCode: string;
+};
+
 type FlightLogFormProps = {
   config: FlightLogFormConfig;
   initialValues?: Partial<FlightLogFormValues>;
@@ -140,6 +146,9 @@ type FlightLogFormProps = {
   coPilotOptions?: FlightLogPilotOption[];
   coPilotOptionsLoading?: boolean;
   coPilotOptionsError?: string;
+  departureAirportOptions?: FlightLogAirportOption[];
+  departureAirportOptionsLoading?: boolean;
+  departureAirportOptionsError?: string;
   onCancel: () => void;
   onSubmit: (input: FlightLogFormSubmitInput) => Promise<void>;
   submitting?: boolean;
@@ -376,6 +385,9 @@ export function FlightLogForm({
   coPilotOptions = [],
   coPilotOptionsLoading = false,
   coPilotOptionsError = '',
+  departureAirportOptions = [],
+  departureAirportOptionsLoading = false,
+  departureAirportOptionsError = '',
   onCancel,
   onSubmit,
   submitting = false,
@@ -457,6 +469,21 @@ export function FlightLogForm({
     }
     return fromCoPilots;
   }, [coPilotOptions, values.coPilot]);
+  const departureSelectOptions = useMemo(() => {
+    const options = departureAirportOptions.map((option) => {
+      const icao = String(option.icaoCode || '').trim().toUpperCase();
+      const name = String(option.name || '').trim();
+      return {
+        value: icao,
+        label: name ? `${name} (${icao})` : icao,
+      };
+    }).filter((option) => Boolean(option.value));
+    const normalizedDeparture = values.departureAirport.trim().toUpperCase();
+    if (normalizedDeparture && !options.some((option) => option.value === normalizedDeparture)) {
+      return [{ value: normalizedDeparture, label: normalizedDeparture }, ...options];
+    }
+    return options;
+  }, [departureAirportOptions, values.departureAirport]);
 
   const setFieldValue = useCallback((key: keyof FlightLogFormValues, value: string) => {
     setValues((previous) => {
@@ -707,15 +734,33 @@ export function FlightLogForm({
               <div className="grid gap-3 md:grid-cols-2">
                 <div className={fullWidthSectionFieldClass}>
                   <Label htmlFor={`${config.mode}-flight-log-departure`} className="mdm-template-label">Place</Label>
-                  <Input
-                    id={`${config.mode}-flight-log-departure`}
-                    value={values.departureAirport}
-                    onChange={(event) => setFieldValue('departureAirport', event.target.value.toUpperCase())}
-                    className={cn('mdm-template-input', errors.departureAirport && 'border-destructive')}
-                    aria-invalid={Boolean(errors.departureAirport)}
-                    placeholder="DEL"
-                  />
+                  <Select
+                    value={values.departureAirport.trim().toUpperCase()}
+                    onValueChange={(value) => setFieldValue('departureAirport', value.toUpperCase())}
+                  >
+                    <SelectTrigger
+                      id={`${config.mode}-flight-log-departure`}
+                      className={cn('mdm-template-input', errors.departureAirport && 'border-destructive')}
+                      aria-invalid={Boolean(errors.departureAirport)}
+                      aria-label="Departure Place"
+                      disabled={departureAirportOptionsLoading}
+                    >
+                      <SelectValue placeholder={departureAirportOptionsLoading ? 'Loading airports...' : 'Select departure airport'} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {departureSelectOptions.length === 0 ? (
+                        <SelectItem value="__no-departure-airports__" disabled>No airports available</SelectItem>
+                      ) : (
+                        departureSelectOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
                   {errors.departureAirport ? <p className="mdm-template-danger">{errors.departureAirport}</p> : null}
+                  {departureAirportOptionsError ? <p className="mdm-template-danger">{departureAirportOptionsError}</p> : null}
                 </div>
                 <div className={sectionFieldClass}>
                   <Label htmlFor={`${config.mode}-flight-log-departure-date`} className="mdm-template-label">UTC Date</Label>

@@ -31,6 +31,12 @@ type PilotLookupRow = {
   display_name: string;
   email: string;
 };
+type AirportLookupRow = {
+  id: string;
+  name: string;
+  icao_code: string;
+  iata_code?: string | null;
+};
 
 function resolveContractsDir(): string {
   const candidates = [
@@ -1913,6 +1919,84 @@ app.get('/api/v2/amro/pilot-users', authMiddleware as any, async (req: AuthReque
     });
   } catch (error) {
     logger.error('pilot-users route error', {
+      requestId,
+      tenantId,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unexpected error',
+      statusCode: 500,
+      requestId,
+      version: 'v2',
+    });
+  }
+});
+
+app.get('/api/v2/amro/airports', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = String(req.header('x-request-id') || crypto.randomUUID());
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+  const franchiseId = String(req.header('x-franchise-id') || '').trim();
+  const requestedLimit = Number.parseInt(String(req.query.limit || '500'), 10);
+  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 500;
+
+  if (!tenantId) {
+    return res.status(400).json({
+      error: 'Tenant context is required',
+      statusCode: 400,
+      requestId,
+      version: 'v2',
+    });
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+    const normalizeAirportRows = (rows: Record<string, unknown>[]): AirportLookupRow[] =>
+      rows
+        .map((row) => ({
+          id: String(row.id || '').trim(),
+          name: String(row.name || '').trim(),
+          icao_code: String(row.icao_code || '').trim().toUpperCase(),
+          iata_code: String(row.iata_code || '').trim().toUpperCase() || null,
+        }))
+        .filter((row) => Boolean(row.id) && Boolean(row.icao_code));
+
+    let queryBuilder = supabase
+      .from('airports')
+      .select('id,name,icao_code,iata_code')
+      .eq('tenant_id', tenantId);
+    if (franchiseId) {
+      queryBuilder = queryBuilder.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+    const { data, error } = await queryBuilder.order('name', { ascending: true }).limit(limit);
+    if (error) {
+      throw new Error(error.message || 'Failed to load airports');
+    }
+    let records = normalizeAirportRows(((data || []) as Record<string, unknown>[]));
+
+    if (!records.length) {
+      logger.warn('No tenant-scoped airports found, falling back to shared airport catalog', {
+        requestId,
+        tenantId,
+      });
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('airports')
+        .select('id,name,icao_code,iata_code')
+        .is('franchise_id', null)
+        .order('name', { ascending: true })
+        .limit(limit);
+      if (fallbackError) {
+        throw new Error(fallbackError.message || 'Failed to load fallback airports');
+      }
+      records = normalizeAirportRows((fallbackData || []) as Record<string, unknown>[]);
+    }
+
+    return res.status(200).json({
+      version: 'v2',
+      requestId,
+      output: { records },
+    });
+  } catch (error) {
+    logger.error('airports route error', {
       requestId,
       tenantId,
       message: error instanceof Error ? error.message : 'Unknown error',
