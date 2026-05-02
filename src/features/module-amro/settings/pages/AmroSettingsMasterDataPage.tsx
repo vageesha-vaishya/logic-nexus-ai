@@ -255,6 +255,10 @@ const parseBooleanLike = (value: unknown): boolean => {
   return normalized === 'true' || normalized === '1' || normalized === 'yes' || normalized === 'y' || normalized === 'on';
 };
 
+const UUID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const isUuidLike = (value: string): boolean => UUID_PATTERN.test(value.trim());
+
 const parseAircraftTemplateModelJson = (source: unknown): AircraftTemplateModelJsonDetails | null => {
   let parsed: unknown = source;
   if (typeof parsed === 'string') {
@@ -6669,6 +6673,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     }
   }, [scope]);
 
+  const resolveFlightLogAirportId = useCallback((value: string): string => {
+    const trimmedValue = String(value || '').trim();
+    if (!trimmedValue) return '';
+    if (isUuidLike(trimmedValue)) return trimmedValue;
+    const upperValue = trimmedValue.toUpperCase();
+    const matchedOption = flightLogDepartureAirportOptions.find((option) => {
+      const optionId = String(option.id || '').trim();
+      const optionIcao = String(option.icaoCode || '').trim().toUpperCase();
+      return optionIcao === upperValue || optionId === trimmedValue;
+    });
+    return matchedOption ? String(matchedOption.id || '').trim() : '';
+  }, [flightLogDepartureAirportOptions]);
+
   const loadFlightLogDepartureAirports = useCallback(async () => {
     const tenantId = String(scope.tenantId || '').trim();
     if (!tenantId) {
@@ -6736,6 +6753,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   }, [flightLogDialogOpen, loadFlightLogDepartureAirports, loadFlightLogPilotOptions]);
 
   const handleFlightLogSubmit = useCallback(async ({ mode, payload, values }: FlightLogFormSubmitInput) => {
+    if (flightLogSubmitting) {
+      return;
+    }
     const errors = validateFlightLogFormValues(values);
     if (Object.keys(errors).length > 0) {
       toast.error('Please resolve flight log validation errors');
@@ -6745,42 +6765,32 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     try {
       const headers = await buildApiHeaders(scope);
       const normalizedPayload = buildFlightLogPayload(values, payload.metadata.source);
-      const endpoints = mode === 'add'
-        ? ['/api/v2/amro/flight-logs', '/api/v2/amro/master-data/flight_logs']
-        : ['/api/v2/amro/master-data/flight_logs'];
-      let saved = false;
-      let lastErrorMessage = 'Failed to save flight log';
-      for (let index = 0; index < endpoints.length; index += 1) {
-        const endpoint = endpoints[index];
-        const response = await fetch(endpoint, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify(normalizedPayload),
-        });
-        const parsedPayload = await parseApiPayload(response);
-        if (response.ok) {
-          saved = true;
-          break;
-        }
-        const apiMessage = String(parsedPayload.error || 'Failed to save flight log');
-        if (response.status === 404 && index < endpoints.length - 1) {
-          logger.warn('Primary flight log endpoint unavailable, retrying fallback endpoint', {
-            component: 'AmroSettingsMasterDataPage',
-            endpoint,
-            fallbackEndpoint: endpoints[index + 1],
-            aircraftId: String(normalizedPayload.aircraft_id || ''),
-          });
-          continue;
-        }
-        if (response.status === 404) {
-          lastErrorMessage = `Aircraft ${String(normalizedPayload.aircraft_id || '').trim() || 'record'} was not found or is outside your access scope`;
-          throw new Error(lastErrorMessage);
-        }
-        lastErrorMessage = apiMessage;
-        throw new Error(apiMessage);
+      const resolvedDepartureAirportId = resolveFlightLogAirportId(values.departureAirport);
+      const resolvedArrivalAirportId = resolveFlightLogAirportId(values.arrivalAirport);
+      if (!isUuidLike(normalizedPayload.aircraft_id)) {
+        throw new Error('Aircraft Id must be a valid UUID');
       }
-      if (!saved) {
-        throw new Error(lastErrorMessage);
+      if (!resolvedDepartureAirportId || !isUuidLike(resolvedDepartureAirportId)) {
+        throw new Error('Departure airport selection is invalid. Please re-select an airport.');
+      }
+      if (!resolvedArrivalAirportId || !isUuidLike(resolvedArrivalAirportId)) {
+        throw new Error('Arrival airport selection is invalid. Please re-select an airport.');
+      }
+      normalizedPayload.departure_airport = resolvedDepartureAirportId;
+      normalizedPayload.arrival_airport = resolvedArrivalAirportId;
+
+      const response = await fetch('/api/v2/amro/master-data/flight_logs', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(normalizedPayload),
+      });
+      const parsedPayload = await parseApiPayload(response);
+      if (!response.ok) {
+        const apiMessage = String(parsedPayload.error || 'Failed to save flight log');
+        if (response.status === 404) {
+          throw new Error(`Aircraft ${String(normalizedPayload.aircraft_id || '').trim() || 'record'} was not found or is outside your access scope`);
+        }
+        throw new Error(apiMessage);
       }
       toast.success(mode === 'add' ? 'Flight log recorded' : 'Flight Logs record created');
       setFlightLogDialogOpen(false);
@@ -6799,7 +6809,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     } finally {
       setFlightLogSubmitting(false);
     }
-  }, [loadAircraftWorkOrderSnapshot, loadRecords, scope]);
+  }, [flightLogSubmitting, loadAircraftWorkOrderSnapshot, loadRecords, resolveFlightLogAirportId, scope]);
 
   const aircraftDashboardKpis = useMemo<AircraftDashboardKpis>(() => {
     const source = aircraftDashboard?.kpis || {};
