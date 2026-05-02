@@ -5031,10 +5031,19 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setFlightLogInitialValues(defaults);
         setFlightLogAirframeSourceError('Airframe periods source data is unavailable for the selected aircraft.');
       } else {
-        const model = String(aircraftRow.assembly_models || aircraftRow.aircraft_model || aircraftRow.model || '').trim();
-        const serialNo = String(aircraftRow.serial_number || aircraftRow.msn || '').trim();
+        const assemblyModelToken = String(aircraftRow.assembly_models || '').trim();
+        const aircraftModelToken = String(aircraftRow.aircraft_model || aircraftRow.model || '').trim();
+        const modelReference = [...franchiseAssemblyModels, ...assemblyModelOptions].find((option) =>
+          option.id === assemblyModelToken
+          || option.id === aircraftModelToken
+          || option.modelValue === assemblyModelToken
+          || option.modelValue === aircraftModelToken
+          || option.name === aircraftModelToken,
+        );
+        const model = String(modelReference?.label || aircraftModelToken || assemblyModelToken).trim();
+        const serialNo = String(aircraftRow.serial_number || '').trim();
         const currentHours = Number(aircraftRow.current_flight_hours ?? aircraftRow.current_flight_hours_since_new ?? 0);
-        const currentLandings = Number(aircraftRow.current_cycles ?? 0);
+        const currentLandings = Number(aircraftRow.current_landings ?? 0);
         const safeHours = Number.isFinite(currentHours) ? String(currentHours) : '0';
         const safeLandings = Number.isFinite(currentLandings) ? String(currentLandings) : '0';
         const missingFields: string[] = [];
@@ -5080,7 +5089,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setActiveFormTab('basic');
     setModalOpen(true);
     setBusyAction(null);
-  }, [canCreateAircraftRecords, entity, flightAircraftFilter, rows]);
+  }, [assemblyModelOptions, canCreateAircraftRecords, entity, flightAircraftFilter, franchiseAssemblyModels, rows]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -6526,8 +6535,17 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         error: 'Airframe periods source data is unavailable for the selected aircraft.',
       };
     }
-    const model = String(aircraftRow.assembly_models || aircraftRow.aircraft_model || aircraftRow.model || '').trim();
-    const serialNo = String(aircraftRow.serial_number || aircraftRow.msn || '').trim();
+    const assemblyModelToken = String(aircraftRow.assembly_models || '').trim();
+    const aircraftModelToken = String(aircraftRow.aircraft_model || aircraftRow.model || '').trim();
+    const modelReference = [...franchiseAssemblyModels, ...assemblyModelOptions].find((option) =>
+      option.id === assemblyModelToken
+      || option.id === aircraftModelToken
+      || option.modelValue === assemblyModelToken
+      || option.modelValue === aircraftModelToken
+      || option.name === aircraftModelToken,
+    );
+    const model = String(modelReference?.label || aircraftModelToken || assemblyModelToken).trim();
+    const serialNo = String(aircraftRow.serial_number || '').trim();
     const currentHours = Number(aircraftRow.current_flight_hours ?? aircraftRow.current_flight_hours_since_new ?? 0);
     const currentLandings = Number(aircraftRow.current_cycles ?? 0);
     const safeHours = Number.isFinite(currentHours) ? String(currentHours) : '0';
@@ -6555,7 +6573,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         ? `Airframe periods source is missing required fields: ${missingFields.join(', ')}`
         : '',
     };
-  }, [rows]);
+  }, [assemblyModelOptions, franchiseAssemblyModels, rows]);
 
   const openFlightLogDialog = useCallback((rowId: string) => {
     const aircraftId = rowId.trim();

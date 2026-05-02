@@ -126,6 +126,21 @@ describe('master-data.routes', () => {
     expect(mockExecuteWithResilience).toHaveBeenCalled();
   });
 
+  it('always exposes aircraft usage counters in list response', async () => {
+    mockExecuteWithResilience.mockImplementationOnce(async () => ({
+      data: [{ id: 'aircraft-1', tail_number: 'N101AA', tenant_id: 'tenant-1', franchise_id: null, current_cycles: 12 }],
+      count: 1,
+      error: null,
+    }));
+    const app = await createTestApp();
+    const response = await request(app)
+      .get('/api/v2/amro/master-data/aircraft?page=1&page_size=25&sort_by=updated_at&sort_dir=desc')
+      .expect(200);
+    const first = response.body.output.records[0];
+    expect(first.current_flight_hours).toBe(0);
+    expect(first.current_landings).toBe(12);
+  });
+
   it('accepts hyphenated flight logs entity route', async () => {
     const app = await createTestApp();
     const response = await request(app)

@@ -64,7 +64,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'aircraft',
     searchableColumns: ['tail_number', 'registration', 'serial_number', 'assembly_models', 'msn'],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,owner_name,warranty_json,aircraft_weight_and_capacity_json,aircraft_other_details_json,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,owner_name,warranty_json,aircraft_weight_and_capacity_json,aircraft_other_details_json,current_flight_hours,current_cycles,current_landings,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
@@ -88,6 +88,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'restrictions',
       'current_flight_hours',
       'current_cycles',
+      'current_landings',
       'current_flight_hours_since_new',
       'current_cycles_since_new',
       'warranty_json',
@@ -451,8 +452,20 @@ function enrichAircraftWarrantyFields(record: JsonRecord): JsonRecord {
     };
   }
 
+  const resolveNumericOutput = (value: unknown, fallbackValue: unknown): number => {
+    const direct = Number(value);
+    if (Number.isFinite(direct)) return direct;
+    const fallback = Number(fallbackValue);
+    if (Number.isFinite(fallback)) return fallback;
+    return 0;
+  };
+  const currentFlightHours = resolveNumericOutput(record.current_flight_hours, record.current_flight_hours_since_new);
+  const currentLandings = resolveNumericOutput(record.current_landings, record.current_cycles);
+
   return {
     ...record,
+    current_flight_hours: currentFlightHours,
+    current_landings: currentLandings,
     is_under_warranty: snapshot.is_under_warranty,
     warranty_start_date: snapshot.warranty_start_date,
     warranty_end_date: snapshot.warranty_end_date,

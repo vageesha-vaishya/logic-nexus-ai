@@ -56,7 +56,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'restrictions',
     ],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,warranty_json,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,warranty_json,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_landings,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
@@ -81,6 +81,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'engine_type',
       'current_flight_hours',
       'current_cycles',
+      'current_landings',
       'current_flight_hours_since_new',
       'current_cycles_since_new',
       'engine_install_history',
