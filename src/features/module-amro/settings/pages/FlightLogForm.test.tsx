@@ -148,4 +148,89 @@ describe('FlightLogForm PIC in Command dropdown', () => {
     expect(screen.getByLabelText('Arrival Place')).toBeDisabled();
     expect(screen.getAllByText('Failed to load airports').length).toBeGreaterThan(0);
   });
+
+  it('auto-populates airframe periods and recalculates final values from entered deltas', () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <FlightLogForm
+            config={{
+              mode: 'add',
+              title: 'Add Flight Logs',
+              description: 'Test form',
+              submitLabel: 'Save Flight Log',
+              metadataSource: 'test.ui',
+            }}
+            initialValues={getDefaultFlightLogFormValues({
+              aircraftId: 'ac-1',
+              departureAirport: 'VIDP',
+              arrivalAirport: 'VECC',
+              airframePeriods: [{
+                model: 'A320',
+                serialNo: 'MSN-1001',
+                hours: '0',
+                finalHours: '1250',
+                landings: '0',
+                finalLandings: '950',
+                baselineHours: '1250',
+                baselineLandings: '950',
+              }],
+            })}
+            onCancel={() => undefined}
+            onSubmit={vi.fn().mockResolvedValue(undefined)}
+          />
+        </DialogContent>
+      </Dialog>,
+    );
+
+    expect(screen.getByDisplayValue('A320')).toBeInTheDocument();
+    expect(screen.getByDisplayValue('MSN-1001')).toBeInTheDocument();
+    const firstRow = document.querySelector('tbody tr');
+    expect(firstRow).toBeTruthy();
+    const rowInputs = firstRow!.querySelectorAll('input');
+    const hoursInput = rowInputs[2] as HTMLInputElement;
+    const finalHoursInput = rowInputs[3] as HTMLInputElement;
+    const landingsInput = rowInputs[4] as HTMLInputElement;
+    const finalLandingsInput = rowInputs[5] as HTMLInputElement;
+    expect(finalHoursInput).toHaveAttribute('readonly');
+    expect(finalLandingsInput).toHaveAttribute('readonly');
+
+    fireEvent.change(hoursInput, { target: { value: '2.5' } });
+    fireEvent.change(landingsInput, { target: { value: '3' } });
+    expect(finalHoursInput.value).toBe('1252.5');
+    expect(finalLandingsInput.value).toBe('953');
+
+    fireEvent.change(hoursInput, { target: { value: '' } });
+    fireEvent.change(landingsInput, { target: { value: '' } });
+    expect(finalHoursInput.value).toBe('1250');
+    expect(finalLandingsInput.value).toBe('950');
+  });
+
+  it('shows airframe source error when airframe period data is unavailable', () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <FlightLogForm
+            config={{
+              mode: 'add',
+              title: 'Add Flight Logs',
+              description: 'Test form',
+              submitLabel: 'Save Flight Log',
+              metadataSource: 'test.ui',
+            }}
+            initialValues={getDefaultFlightLogFormValues({
+              aircraftId: 'ac-1',
+              departureAirport: 'VIDP',
+              arrivalAirport: 'VECC',
+            })}
+            airframePeriodsSourceError="Airframe periods source data is unavailable for the selected aircraft."
+            onCancel={() => undefined}
+            onSubmit={vi.fn().mockResolvedValue(undefined)}
+          />
+        </DialogContent>
+      </Dialog>,
+    );
+
+    expect(screen.getByText('Airframe periods source data is unavailable for the selected aircraft.')).toBeInTheDocument();
+  });
 });

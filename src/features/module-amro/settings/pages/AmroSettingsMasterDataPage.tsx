@@ -1728,6 +1728,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [flightLogDepartureAirportOptions, setFlightLogDepartureAirportOptions] = useState<FlightLogAirportOption[]>([]);
   const [flightLogDepartureAirportOptionsLoading, setFlightLogDepartureAirportOptionsLoading] = useState(false);
   const [flightLogDepartureAirportOptionsError, setFlightLogDepartureAirportOptionsError] = useState('');
+  const [flightLogAirframeSourceError, setFlightLogAirframeSourceError] = useState('');
   const [flightLogDialogInstance, setFlightLogDialogInstance] = useState(0);
   const [flightLogDetailOpen, setFlightLogDetailOpen] = useState(false);
   const [flightLogDetailRow, setFlightLogDetailRow] = useState<RecordRow | null>(null);
@@ -5021,7 +5022,43 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     if (entity === 'flight_logs') {
       const aircraftIdHint = flightAircraftFilter.trim();
       setFlightLogMode('new');
-      setFlightLogInitialValues(getDefaultFlightLogFormValues({ aircraftId: aircraftIdHint }));
+      const defaults = getDefaultFlightLogFormValues({ aircraftId: aircraftIdHint });
+      const aircraftRow = rows.find((row) => String(row.id || '').trim() === aircraftIdHint);
+      if (!aircraftIdHint) {
+        setFlightLogInitialValues(defaults);
+        setFlightLogAirframeSourceError('');
+      } else if (!aircraftRow) {
+        setFlightLogInitialValues(defaults);
+        setFlightLogAirframeSourceError('Airframe periods source data is unavailable for the selected aircraft.');
+      } else {
+        const model = String(aircraftRow.assembly_models || aircraftRow.aircraft_model || aircraftRow.model || '').trim();
+        const serialNo = String(aircraftRow.serial_number || aircraftRow.msn || '').trim();
+        const currentHours = Number(aircraftRow.current_flight_hours ?? aircraftRow.current_flight_hours_since_new ?? 0);
+        const currentLandings = Number(aircraftRow.current_cycles ?? 0);
+        const safeHours = Number.isFinite(currentHours) ? String(currentHours) : '0';
+        const safeLandings = Number.isFinite(currentLandings) ? String(currentLandings) : '0';
+        const missingFields: string[] = [];
+        if (!model) missingFields.push('Model');
+        if (!serialNo) missingFields.push('Serial Number');
+        if (!Number.isFinite(currentHours)) missingFields.push('Current Hours');
+        if (!Number.isFinite(currentLandings)) missingFields.push('Current Landings');
+        setFlightLogInitialValues({
+          ...defaults,
+          airframePeriods: [{
+            model,
+            serialNo,
+            hours: '0',
+            finalHours: safeHours,
+            landings: '0',
+            finalLandings: safeLandings,
+            baselineHours: safeHours,
+            baselineLandings: safeLandings,
+          }],
+        });
+        setFlightLogAirframeSourceError(
+          missingFields.length ? `Airframe periods source is missing required fields: ${missingFields.join(', ')}` : '',
+        );
+      }
       setFlightLogSubmitting(false);
       setFlightLogDialogInstance((previous) => previous + 1);
       setFlightLogDialogOpen(true);
@@ -5043,7 +5080,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setActiveFormTab('basic');
     setModalOpen(true);
     setBusyAction(null);
-  }, [canCreateAircraftRecords, entity, flightAircraftFilter]);
+  }, [canCreateAircraftRecords, entity, flightAircraftFilter, rows]);
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
@@ -6473,6 +6510,53 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftWorkOrderTaskPage(1);
   }, [aircraftWorkOrderActiveTab]);
 
+  const buildFlightLogInitialValuesFromAircraft = useCallback((aircraftId: string): {
+    values: Partial<FlightLogFormValues>;
+    error: string;
+  } => {
+    const trimmedAircraftId = aircraftId.trim();
+    const defaults = getDefaultFlightLogFormValues({ aircraftId: trimmedAircraftId });
+    if (!trimmedAircraftId) {
+      return { values: defaults, error: '' };
+    }
+    const aircraftRow = rows.find((row) => String(row.id || '').trim() === trimmedAircraftId);
+    if (!aircraftRow) {
+      return {
+        values: defaults,
+        error: 'Airframe periods source data is unavailable for the selected aircraft.',
+      };
+    }
+    const model = String(aircraftRow.assembly_models || aircraftRow.aircraft_model || aircraftRow.model || '').trim();
+    const serialNo = String(aircraftRow.serial_number || aircraftRow.msn || '').trim();
+    const currentHours = Number(aircraftRow.current_flight_hours ?? aircraftRow.current_flight_hours_since_new ?? 0);
+    const currentLandings = Number(aircraftRow.current_cycles ?? 0);
+    const safeHours = Number.isFinite(currentHours) ? String(currentHours) : '0';
+    const safeLandings = Number.isFinite(currentLandings) ? String(currentLandings) : '0';
+    const missingFields: string[] = [];
+    if (!model) missingFields.push('Model');
+    if (!serialNo) missingFields.push('Serial Number');
+    if (!Number.isFinite(currentHours)) missingFields.push('Current Hours');
+    if (!Number.isFinite(currentLandings)) missingFields.push('Current Landings');
+    return {
+      values: {
+        ...defaults,
+        airframePeriods: [{
+          model,
+          serialNo,
+          hours: '0',
+          finalHours: safeHours,
+          landings: '0',
+          finalLandings: safeLandings,
+          baselineHours: safeHours,
+          baselineLandings: safeLandings,
+        }],
+      },
+      error: missingFields.length
+        ? `Airframe periods source is missing required fields: ${missingFields.join(', ')}`
+        : '',
+    };
+  }, [rows]);
+
   const openFlightLogDialog = useCallback((rowId: string) => {
     const aircraftId = rowId.trim();
     if (!aircraftId) {
@@ -6480,11 +6564,13 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return;
     }
     setFlightLogMode('add');
-    setFlightLogInitialValues(getDefaultFlightLogFormValues({ aircraftId }));
+    const seeded = buildFlightLogInitialValuesFromAircraft(aircraftId);
+    setFlightLogInitialValues(seeded.values);
+    setFlightLogAirframeSourceError(seeded.error);
     setFlightLogSubmitting(false);
     setFlightLogDialogInstance((previous) => previous + 1);
     setFlightLogDialogOpen(true);
-  }, []);
+  }, [buildFlightLogInitialValuesFromAircraft]);
 
   const loadFlightLogPilotOptions = useCallback(async () => {
     const tenantId = String(scope.tenantId || '').trim();
@@ -9978,6 +10064,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
               departureAirportOptions={flightLogDepartureAirportOptions}
               departureAirportOptionsLoading={flightLogDepartureAirportOptionsLoading}
               departureAirportOptionsError={flightLogDepartureAirportOptionsError}
+              airframePeriodsSourceError={flightLogAirframeSourceError}
               onCancel={() => setFlightLogDialogOpen(false)}
               onSubmit={handleFlightLogSubmit}
               submitting={flightLogSubmitting}

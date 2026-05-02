@@ -17,6 +17,8 @@ type AirframePeriodRow = {
   finalHours: string;
   landings: string;
   finalLandings: string;
+  baselineHours: string;
+  baselineLandings: string;
 };
 
 type EnginePeriodRow = {
@@ -149,10 +151,61 @@ type FlightLogFormProps = {
   departureAirportOptions?: FlightLogAirportOption[];
   departureAirportOptionsLoading?: boolean;
   departureAirportOptionsError?: string;
+  airframePeriodsSourceError?: string;
   onCancel: () => void;
   onSubmit: (input: FlightLogFormSubmitInput) => Promise<void>;
   submitting?: boolean;
 };
+
+function toFiniteNumber(value: string): number | null {
+  if (!value.trim()) return null;
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return null;
+  return parsed;
+}
+
+function formatCalculatedValue(value: number): string {
+  if (Number.isInteger(value)) return String(value);
+  return String(Number(value.toFixed(2)));
+}
+
+function normalizeAirframePeriodRows(rows: AirframePeriodRow[]): AirframePeriodRow[] {
+  if (!rows.length) {
+    return [{
+      model: '',
+      serialNo: '',
+      hours: '',
+      finalHours: '',
+      landings: '',
+      finalLandings: '',
+      baselineHours: '0',
+      baselineLandings: '0',
+    }];
+  }
+  return rows.map((row) => {
+    const baselineHours = row.baselineHours?.trim() || row.finalHours?.trim() || '0';
+    const baselineLandings = row.baselineLandings?.trim() || row.finalLandings?.trim() || '0';
+    return {
+      ...row,
+      baselineHours,
+      baselineLandings,
+    };
+  });
+}
+
+function recalculateAirframeRow(row: AirframePeriodRow, key: keyof AirframePeriodRow, value: string): AirframePeriodRow {
+  const next = { ...row, [key]: value } as AirframePeriodRow;
+  if (key !== 'hours' && key !== 'landings') {
+    return next;
+  }
+  const baselineHours = toFiniteNumber(next.baselineHours) ?? 0;
+  const baselineLandings = toFiniteNumber(next.baselineLandings) ?? 0;
+  const enteredHours = toFiniteNumber(next.hours) ?? 0;
+  const enteredLandings = toFiniteNumber(next.landings) ?? 0;
+  next.finalHours = formatCalculatedValue(baselineHours + enteredHours);
+  next.finalLandings = formatCalculatedValue(baselineLandings + enteredLandings);
+  return next;
+}
 
 export function getDefaultFlightLogFormValues(overrides: Partial<FlightLogFormValues> = {}): FlightLogFormValues {
   const today = new Date().toISOString().slice(0, 10);
@@ -163,6 +216,8 @@ export function getDefaultFlightLogFormValues(overrides: Partial<FlightLogFormVa
     finalHours: '',
     landings: '',
     finalLandings: '',
+    baselineHours: '0',
+    baselineLandings: '0',
   };
   const emptyEngineRow: EnginePeriodRow = {
     model: '',
@@ -388,11 +443,18 @@ export function FlightLogForm({
   departureAirportOptions = [],
   departureAirportOptionsLoading = false,
   departureAirportOptionsError = '',
+  airframePeriodsSourceError = '',
   onCancel,
   onSubmit,
   submitting = false,
 }: FlightLogFormProps) {
-  const [values, setValues] = useState<FlightLogFormValues>(() => getDefaultFlightLogFormValues(initialValues));
+  const [values, setValues] = useState<FlightLogFormValues>(() => {
+    const seeded = getDefaultFlightLogFormValues(initialValues);
+    return {
+      ...seeded,
+      airframePeriods: normalizeAirframePeriodRows(seeded.airframePeriods),
+    };
+  });
   const [errors, setErrors] = useState<FlightLogFormErrors>({});
   const [submitError, setSubmitError] = useState('');
   const classificationOptions = useMemo(
@@ -513,7 +575,7 @@ export function FlightLogForm({
   const setAirframeRowValue = useCallback((rowIndex: number, key: keyof AirframePeriodRow, value: string) => {
     setValues((previous) => {
       const nextRows = [...previous.airframePeriods];
-      nextRows[rowIndex] = { ...nextRows[rowIndex], [key]: value };
+      nextRows[rowIndex] = recalculateAirframeRow(nextRows[rowIndex], key, value);
       return { ...previous, airframePeriods: nextRows };
     });
     setSubmitError('');
@@ -533,7 +595,7 @@ export function FlightLogForm({
       ...previous,
       airframePeriods: [
         ...previous.airframePeriods,
-        { model: '', serialNo: '', hours: '', finalHours: '', landings: '', finalLandings: '' },
+        { model: '', serialNo: '', hours: '', finalHours: '', landings: '', finalLandings: '', baselineHours: '0', baselineLandings: '0' },
       ],
     }));
   }, []);
@@ -580,6 +642,7 @@ export function FlightLogForm({
       </DialogHeader>
       <div className="space-y-4 px-6 pb-6 pt-4">
         {submitError ? <p className="mdm-template-danger">{submitError}</p> : null}
+        {airframePeriodsSourceError ? <p className="mdm-template-danger">{airframePeriodsSourceError}</p> : null}
         <section className={sectionClass}>
           <h3 className={sectionHeadingClass}>Log Details</h3>
           <div className="mdm-template-form-grid">
@@ -1007,9 +1070,9 @@ export function FlightLogForm({
                     <td className="px-2 py-2"><Input value={row.model} className="mdm-template-input" onChange={(event) => setAirframeRowValue(index, 'model', event.target.value)} /></td>
                     <td className="px-2 py-2"><Input value={row.serialNo} className="mdm-template-input" onChange={(event) => setAirframeRowValue(index, 'serialNo', event.target.value)} /></td>
                     <td className="px-2 py-2"><Input value={row.hours} type="number" min="0" step="0.01" className="mdm-template-input" onChange={(event) => setAirframeRowValue(index, 'hours', event.target.value)} /></td>
-                    <td className="px-2 py-2"><Input value={row.finalHours} type="number" min="0" step="0.01" className="mdm-template-input" onChange={(event) => setAirframeRowValue(index, 'finalHours', event.target.value)} /></td>
+                    <td className="px-2 py-2"><Input value={row.finalHours} type="number" min="0" step="0.01" className="mdm-template-readonly" readOnly aria-label={`Airframe Final Hours ${index + 1}`} /></td>
                     <td className="px-2 py-2"><Input value={row.landings} type="number" min="0" step="1" className="mdm-template-input" onChange={(event) => setAirframeRowValue(index, 'landings', event.target.value)} /></td>
-                    <td className="px-2 py-2"><Input value={row.finalLandings} type="number" min="0" step="1" className="mdm-template-input" onChange={(event) => setAirframeRowValue(index, 'finalLandings', event.target.value)} /></td>
+                    <td className="px-2 py-2"><Input value={row.finalLandings} type="number" min="0" step="1" className="mdm-template-readonly" readOnly aria-label={`Airframe Final Landings ${index + 1}`} /></td>
                   </tr>
                 ))}
               </tbody>
