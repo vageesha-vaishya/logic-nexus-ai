@@ -211,9 +211,7 @@ export function AircraftCreateDialogSection({
                 onChange={(event) => {
                   const value = event.target.value.toUpperCase();
                   setFieldValue('registration', value);
-                  if (!String(formValues.tail_number ?? '').trim()) {
-                    setFieldValue('tail_number', value);
-                  }
+                  setFieldValue('tail_number', value);
                 }}
                 className={cn(controlClassName, (formErrors.registration || formErrors.tail_number) && 'border-destructive')}
               />
@@ -285,9 +283,11 @@ export function AircraftCreateDialogSection({
               <Label htmlFor="aircraft-tail-number" className="font-semibold">* Tail No.</Label>
               <Input
                 id="aircraft-tail-number"
-                value={String(formValues.tail_number ?? '')}
-                onChange={(event) => setFieldValue('tail_number', event.target.value.toUpperCase())}
-                className={cn(controlClassName, formErrors.tail_number && 'border-destructive')}
+                value={String(formValues.registration ?? '')}
+                readOnly
+                aria-readonly="true"
+                tabIndex={-1}
+                className={cn(controlClassName, 'bg-slate-100', formErrors.tail_number && 'border-destructive')}
               />
             </div>
             {formErrors.tenant_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.tenant_id}</p> : aircraftTenantOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftTenantOptionsError}</p> : null}
