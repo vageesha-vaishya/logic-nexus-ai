@@ -86,6 +86,11 @@ type AircraftCreateDialogSectionProps = {
   aircraftOwner: string;
   setAircraftOwner: (value: string) => void;
   aircraftOwnerSelectOptions: SelectOption[];
+  aircraftBaseLocationId: string;
+  setAircraftBaseLocationId: (value: string) => void;
+  aircraftBaseLocationSelectOptions: SelectOption[];
+  aircraftBaseLocationOptionsLoading: boolean;
+  aircraftBaseLocationOptionsError: string;
   aircraftLineNumber: string;
   setAircraftLineNumber: (value: string) => void;
   aircraftVariableNumber: string;
@@ -147,6 +152,11 @@ export function AircraftCreateDialogSection({
   aircraftOwner,
   setAircraftOwner,
   aircraftOwnerSelectOptions,
+  aircraftBaseLocationId,
+  setAircraftBaseLocationId,
+  aircraftBaseLocationSelectOptions,
+  aircraftBaseLocationOptionsLoading,
+  aircraftBaseLocationOptionsError,
   aircraftLineNumber,
   setAircraftLineNumber,
   aircraftVariableNumber,
@@ -275,6 +285,25 @@ export function AircraftCreateDialogSection({
                 ))}
               </select>
 
+              <Label htmlFor="aircraft-base-location-select" className="font-semibold">Base Location</Label>
+              <select
+                id="aircraft-base-location-select"
+                value={aircraftBaseLocationId}
+                disabled={aircraftBaseLocationOptionsLoading}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setAircraftBaseLocationId(value);
+                  setAircraftAuxField('aircraft_base_location_id', value);
+                }}
+                className={cn(controlClassName, formErrors.aircraft_base_location_id && 'border-destructive')}
+              >
+                {aircraftBaseLocationSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
               <Label htmlFor="aircraft-tenant-id" className="font-semibold">Tenant</Label>
               <select
                 id="aircraft-tenant-id"
@@ -317,6 +346,7 @@ export function AircraftCreateDialogSection({
             </div>
             {formErrors.tenant_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.tenant_id}</p> : aircraftTenantOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftTenantOptionsError}</p> : null}
             {formErrors.franchise_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.franchise_id}</p> : aircraftFranchiseOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftFranchiseOptionsError}</p> : null}
+            {formErrors.aircraft_base_location_id ? <p className="mt-1 text-[10px] text-red-600">{formErrors.aircraft_base_location_id}</p> : aircraftBaseLocationOptionsError ? <p className="mt-1 text-[10px] text-red-600">{aircraftBaseLocationOptionsError}</p> : null}
           </section>
 
           <section className={sectionClassName}>

@@ -723,9 +723,10 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
       payload.owner_name = ownerNameRaw;
     }
 
-    const aircraftOwnershipUuidFields: Array<{ key: 'aircraft_operators_id' | 'aircraft_owners_id'; label: string }> = [
+    const aircraftOwnershipUuidFields: Array<{ key: 'aircraft_operators_id' | 'aircraft_owners_id' | 'aircraft_base_location_id'; label: string }> = [
       { key: 'aircraft_operators_id', label: 'Operator Owner' },
       { key: 'aircraft_owners_id', label: 'Aircraft Owner' },
+      { key: 'aircraft_base_location_id', label: 'Base Location' },
     ];
     aircraftOwnershipUuidFields.forEach(({ key, label }) => {
       const rawValue = String(values[key] ?? '').trim();

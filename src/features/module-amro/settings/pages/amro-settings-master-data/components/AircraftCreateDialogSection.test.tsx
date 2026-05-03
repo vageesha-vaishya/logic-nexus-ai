@@ -37,7 +37,7 @@ describe('AircraftCreateDialogSection', () => {
     ],
     disableAircraftFranchiseSelection: true,
     disableAircraftModelSelection: true,
-    formValues: { registration: '', serial_number: '', aircraft_operators_id: '', aircraft_owners_id: '' },
+    formValues: { registration: '', serial_number: '', aircraft_operators_id: '', aircraft_owners_id: '', aircraft_base_location_id: '' },
     formErrors: {},
     firstFieldRef: { current: null },
     selectedTemplateModelName: '',
@@ -62,6 +62,14 @@ describe('AircraftCreateDialogSection', () => {
       { value: '', label: 'Nothing selected' },
       { value: '257b8d12-c115-446e-a4dc-d12077751fe2', label: 'Global Ops Air (GLOBAL_OPS_AIR)' },
     ],
+    aircraftBaseLocationId: '',
+    setAircraftBaseLocationId: vi.fn(),
+    aircraftBaseLocationSelectOptions: [
+      { value: '', label: 'Nothing selected' },
+      { value: '357b8d12-c115-446e-a4dc-d12077751fe2', label: 'Kempegowda Intl (BLR / VOBL)' },
+    ],
+    aircraftBaseLocationOptionsLoading: false,
+    aircraftBaseLocationOptionsError: '',
     aircraftLineNumber: '',
     setAircraftLineNumber: vi.fn(),
     aircraftVariableNumber: '',
@@ -83,6 +91,7 @@ describe('AircraftCreateDialogSection', () => {
     render(<AircraftCreateDialogSection {...createProps()} />);
     expect(screen.getByLabelText('Operator Owner')).toBeInTheDocument();
     expect(screen.getByLabelText('Aircraft Owner')).toBeInTheDocument();
+    expect(screen.getByLabelText('Base Location')).toBeInTheDocument();
     expect(screen.queryByText('* Operator Owner')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Tenant')).toBeInTheDocument();
     expect(screen.getByLabelText(/Franchise/)).toBeInTheDocument();
@@ -111,10 +120,13 @@ describe('AircraftCreateDialogSection', () => {
 
     await user.selectOptions(screen.getByLabelText('Operator Owner'), '157b8d12-c115-446e-a4dc-d12077751fe2');
     await user.selectOptions(screen.getByLabelText('Aircraft Owner'), '257b8d12-c115-446e-a4dc-d12077751fe2');
+    await user.selectOptions(screen.getByLabelText('Base Location'), '357b8d12-c115-446e-a4dc-d12077751fe2');
 
     expect(props.setAircraftOperatorOwner).toHaveBeenCalledWith('157b8d12-c115-446e-a4dc-d12077751fe2');
     expect(props.setAircraftAuxField).toHaveBeenCalledWith('aircraft_operators_id', '157b8d12-c115-446e-a4dc-d12077751fe2');
     expect(props.setAircraftOwner).toHaveBeenCalledWith('257b8d12-c115-446e-a4dc-d12077751fe2');
     expect(props.setAircraftAuxField).toHaveBeenCalledWith('aircraft_owners_id', '257b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(props.setAircraftBaseLocationId).toHaveBeenCalledWith('357b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(props.setAircraftAuxField).toHaveBeenCalledWith('aircraft_base_location_id', '357b8d12-c115-446e-a4dc-d12077751fe2');
   });
 });

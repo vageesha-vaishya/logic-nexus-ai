@@ -213,6 +213,7 @@ describe('master-data.routes', () => {
         status: 'active',
         aircraft_operators_id: '157b8d12-c115-446e-a4dc-d12077751fe2',
         aircraft_owners_id: '257b8d12-c115-446e-a4dc-d12077751fe2',
+        aircraft_base_location_id: '357b8d12-c115-446e-a4dc-d12077751fe2',
       })
       .expect(201);
     expect(response.body.output.entity).toBe('aircraft');
@@ -226,6 +227,7 @@ describe('master-data.routes', () => {
       expect.objectContaining({
         aircraft_operators_id: '157b8d12-c115-446e-a4dc-d12077751fe2',
         aircraft_owners_id: '257b8d12-c115-446e-a4dc-d12077751fe2',
+        aircraft_base_location_id: '357b8d12-c115-446e-a4dc-d12077751fe2',
       }),
     );
   });

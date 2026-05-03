@@ -690,6 +690,7 @@ const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
     'serial_number',
     'aircraft_operators_id',
     'aircraft_owners_id',
+    'aircraft_base_location_id',
     'owner_name',
     'base_location',
     'defect_count',
@@ -741,6 +742,7 @@ const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   serial_number: 'Serial Number',
   aircraft_operators_id: 'Operator Owner',
   aircraft_owners_id: 'Aircraft Owner',
+  aircraft_base_location_id: 'Base Location',
   owner_name: 'Owner',
   base_location: 'Base',
   defect_count: 'Defect',
@@ -1426,6 +1428,9 @@ const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     engine_type: '',
     aircraft_model: '',
     manufacturer_id: '',
+    aircraft_operators_id: '',
+    aircraft_owners_id: '',
+    aircraft_base_location_id: '',
     configuration_code: '',
     maintenance_program: '',
     engine_install_history: '[]',
@@ -1695,6 +1700,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftBaseCatalogOptions, setAircraftBaseCatalogOptions] = useState<string[]>([]);
   const [aircraftOperatorCatalogOptions, setAircraftOperatorCatalogOptions] = useState<SelectOption[]>([]);
   const [aircraftOwnerCatalogOptions, setAircraftOwnerCatalogOptions] = useState<SelectOption[]>([]);
+  const [aircraftBaseLocationCatalogOptions, setAircraftBaseLocationCatalogOptions] = useState<SelectOption[]>([]);
+  const [aircraftBaseLocationOptionsError, setAircraftBaseLocationOptionsError] = useState('');
   const [aircraftListboxOptionsLoading, setAircraftListboxOptionsLoading] = useState(false);
   const [aircraftTenantOptions, setAircraftTenantOptions] = useState<SelectOption[]>([]);
   const [aircraftTenantOptionsLoading, setAircraftTenantOptionsLoading] = useState(false);
@@ -1826,6 +1833,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
   const [aircraftBase, setAircraftBase] = useState(AIRCRAFT_UNSELECTED_OPTION);
   const [aircraftOperatorOwnerId, setAircraftOperatorOwnerId] = useState('');
   const [aircraftOwnerId, setAircraftOwnerId] = useState('');
+  const [aircraftBaseLocationId, setAircraftBaseLocationId] = useState('');
   const [aircraftLineNumber, setAircraftLineNumber] = useState('');
   const [aircraftVariableNumber, setAircraftVariableNumber] = useState('');
   const [aircraftMaintenanceRevisionNumber, setAircraftMaintenanceRevisionNumber] = useState('');
@@ -2362,6 +2370,38 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     [],
   );
 
+  const fetchAircraftBaseLocationCatalogOptions = useCallback(
+    async (headers: Headers): Promise<SelectOption[]> => {
+      const response = await fetch('/api/v2/amro/airports?limit=500', { method: 'GET', headers });
+      const payload = await parseApiPayload(response);
+      if (!response.ok) {
+        throw new Error(String(payload.error || 'Failed to load base locations'));
+      }
+      const records = getPayloadRecords(payload);
+      const seen = new Set<string>();
+      return records
+        .map((record) => {
+          const id = String(record.id || '').trim();
+          if (!isUuidLike(id)) return null;
+          const name = String(record.name || '').trim();
+          const icaoCode = String(record.icao_code || '').trim().toUpperCase();
+          const iataCode = String(record.iata_code || '').trim().toUpperCase();
+          const code = iataCode || icaoCode;
+          const label = name
+            ? code
+              ? `${name} (${code})`
+              : name
+            : code || id;
+          const dedupeKey = id.toLowerCase();
+          if (seen.has(dedupeKey)) return null;
+          seen.add(dedupeKey);
+          return { value: id, label } satisfies SelectOption;
+        })
+        .filter((option): option is SelectOption => Boolean(option));
+    },
+    [],
+  );
+
   const fetchAircraftBaseFacilityOptions = useCallback(async (headers: Headers): Promise<string[]> => {
     const query = new URLSearchParams({
       page: '1',
@@ -2642,12 +2682,14 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const headers = await buildApiHeaders({ tenantId: effectiveTenantId, franchiseId: effectiveFranchiseId, userId: scope.userId });
       const templateOptions = await fetchAircraftTempOptions(headers);
       setSystemTemplateModelOptions(templateOptions);
-      const [aircraftCatalogResult, facilityBasesResult, aircraftCategoryResult, aircraftOperatorOptionsResult, aircraftOwnerOptionsResult] = await Promise.allSettled([
+      setAircraftBaseLocationOptionsError('');
+      const [aircraftCatalogResult, facilityBasesResult, aircraftCategoryResult, aircraftOperatorOptionsResult, aircraftOwnerOptionsResult, aircraftAirportOptionsResult] = await Promise.allSettled([
         fetchAircraftCreateCatalogOptions(headers),
         fetchAircraftBaseFacilityOptions(headers),
         fetchAircraftCategoryOptions(effectiveTenantId, effectiveFranchiseId),
         fetchAircraftOperatorCatalogOptions(headers),
         fetchAircraftOwnerCatalogOptions(headers),
+        fetchAircraftBaseLocationCatalogOptions(headers),
       ]);
       const categoryOptions =
         aircraftCategoryResult.status === 'fulfilled' && aircraftCategoryResult.value.length > 0
@@ -2677,12 +2719,23 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         setAircraftOwnerCatalogOptions([]);
         toast.error(String((aircraftOwnerOptionsResult.reason as Error)?.message || 'Failed to load aircraft owners'));
       }
+      if (aircraftAirportOptionsResult.status === 'fulfilled') {
+        setAircraftBaseLocationCatalogOptions(aircraftAirportOptionsResult.value);
+        setAircraftBaseLocationOptionsError('');
+      } else {
+        setAircraftBaseLocationCatalogOptions([]);
+        const message = String((aircraftAirportOptionsResult.reason as Error)?.message || 'Failed to load base locations');
+        setAircraftBaseLocationOptionsError(message);
+        toast.error(message);
+      }
     } catch (error) {
       toast.error(String((error as Error).message || 'Failed to load aircraft listbox options'));
+      setAircraftBaseLocationCatalogOptions([]);
+      setAircraftBaseLocationOptionsError(String((error as Error).message || 'Failed to load base locations'));
     } finally {
       setAircraftListboxOptionsLoading(false);
     }
-  }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftCategoryOptions, fetchAircraftCreateCatalogOptions, fetchAircraftOperatorCatalogOptions, fetchAircraftOwnerCatalogOptions, fetchAircraftTempOptions, formValues.franchise_id, formValues.tenant_id, scope.franchiseId, scope.tenantId, scope.userId]);
+  }, [entity, fetchAircraftBaseFacilityOptions, fetchAircraftBaseLocationCatalogOptions, fetchAircraftCategoryOptions, fetchAircraftCreateCatalogOptions, fetchAircraftOperatorCatalogOptions, fetchAircraftOwnerCatalogOptions, fetchAircraftTempOptions, formValues.franchise_id, formValues.tenant_id, scope.franchiseId, scope.tenantId, scope.userId]);
 
   const loadAircraftTemplatesWorkspace = useCallback(async () => {
     if (entity !== 'aircraft') {
@@ -3196,6 +3249,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       const normalizedBase = String(values.base_location ?? aircraftBase ?? '').trim();
       const normalizedOperatorOwnerId = String(values.aircraft_operators_id ?? aircraftOperatorOwnerId ?? '').trim();
       const normalizedAircraftOwnerId = String(values.aircraft_owners_id ?? aircraftOwnerId ?? '').trim();
+      const normalizedAircraftBaseLocationId = String(values.aircraft_base_location_id ?? aircraftBaseLocationId ?? '').trim();
       return {
         ...values,
         line_number: String(values.line_number ?? aircraftLineNumber ?? '').trim(),
@@ -3203,11 +3257,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         base_location: normalizedBase === AIRCRAFT_UNSELECTED_OPTION ? '' : normalizedBase,
         aircraft_operators_id: normalizedOperatorOwnerId,
         aircraft_owners_id: normalizedAircraftOwnerId,
+        aircraft_base_location_id: normalizedAircraftBaseLocationId,
         current_flight_hours: String(values.current_flight_hours ?? flightHoursValue).trim(),
         current_cycles: String(values.current_cycles ?? landingValue).trim(),
       };
     },
-    [aircraftBase, aircraftCounterRows, aircraftLineNumber, aircraftManufacturingDate, aircraftOperatorOwnerId, aircraftOwnerId, entity],
+    [aircraftBase, aircraftBaseLocationId, aircraftCounterRows, aircraftLineNumber, aircraftManufacturingDate, aircraftOperatorOwnerId, aircraftOwnerId, entity],
   );
   const extractValidationErrors = useCallback((responsePayload: Record<string, unknown>): Record<string, string> => {
     const output = responsePayload.output;
@@ -4081,6 +4136,25 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     addOption(formValues.aircraft_owners_id, 'Selected owner');
     return options;
   }, [aircraftOwnerCatalogOptions, formValues.aircraft_owners_id]);
+  const aircraftBaseLocationSelectOptions = useMemo<SelectOption[]>(() => {
+    const options: SelectOption[] = [{ value: '', label: AIRCRAFT_UNSELECTED_OPTION }];
+    const seen = new Set<string>();
+    const addOption = (rawValue: unknown, fallbackLabel?: string) => {
+      const value = String(rawValue ?? '').trim();
+      if (!value || !isUuidLike(value)) return;
+      const key = value.toLowerCase();
+      if (seen.has(key)) return;
+      seen.add(key);
+      const matched = aircraftBaseLocationCatalogOptions.find((option) => option.value.toLowerCase() === key);
+      options.push({ value, label: matched?.label || fallbackLabel || value });
+    };
+    aircraftBaseLocationCatalogOptions.forEach((option) => addOption(option.value, option.label));
+    addOption(formValues.aircraft_base_location_id, 'Selected base location');
+    if (aircraftBaseLocationOptionsError && options.length === 1) {
+      options.push({ value: '__airport_load_error__', label: 'Unable to load airports', disabled: true });
+    }
+    return options;
+  }, [aircraftBaseLocationCatalogOptions, aircraftBaseLocationOptionsError, formValues.aircraft_base_location_id]);
 
   const setFieldValue = useCallback((fieldKey: string, value: unknown) => {
     setFormValues((previous) => ({ ...previous, [fieldKey]: value }));
@@ -5313,6 +5387,8 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setAircraftOperatorOwnerId(isUuidLike(operatorOwnerIdSource) ? operatorOwnerIdSource : '');
     const aircraftOwnerIdSource = String(formValues.aircraft_owners_id ?? '').trim();
     setAircraftOwnerId(isUuidLike(aircraftOwnerIdSource) ? aircraftOwnerIdSource : '');
+    const aircraftBaseLocationIdSource = String(formValues.aircraft_base_location_id ?? '').trim();
+    setAircraftBaseLocationId(isUuidLike(aircraftBaseLocationIdSource) ? aircraftBaseLocationIdSource : '');
     setAircraftLineNumber(String(formValues.line_number ?? '').trim());
     setAircraftVariableNumber(String(formValues.variable_number ?? registration).trim());
     setAircraftMaintenanceRevisionNumber(String(formValues.maintenance_revision_number ?? '').trim());
@@ -5356,7 +5432,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         warranty_end_date: String(warrantyJson?.warranty_end_date ?? '').trim(),
       };
     });
-  }, [activeAircraftFranchiseId, activeAircraftTenantId, aircraftStatusSelectOptions, aircraftTemplateModel, aircraftTypeSelectOptions, entity, formValues.assembly_models, formValues.aircraft_template, formValues.aircraft_operators_id, formValues.aircraft_owners_id, formValues.manufacturing_date, formValues.base_location, formValues.line_number, formValues.variable_number, formValues.maintenance_revision_number, formValues.maintenance_revision_date, formValues.amendment_number, formValues.amendment_date, formValues.registration, formValues.serial_number, formValues.aircraft_type, isSystemSelectValue, modalMode, modalOpen, selectedId, systemTemplateModelOptions, systemTemplateModelSelectOptions]);
+  }, [activeAircraftFranchiseId, activeAircraftTenantId, aircraftStatusSelectOptions, aircraftTemplateModel, aircraftTypeSelectOptions, entity, formValues.assembly_models, formValues.aircraft_template, formValues.aircraft_operators_id, formValues.aircraft_owners_id, formValues.aircraft_base_location_id, formValues.manufacturing_date, formValues.base_location, formValues.line_number, formValues.variable_number, formValues.maintenance_revision_number, formValues.maintenance_revision_date, formValues.amendment_number, formValues.amendment_date, formValues.registration, formValues.serial_number, formValues.aircraft_type, isSystemSelectValue, modalMode, modalOpen, selectedId, systemTemplateModelOptions, systemTemplateModelSelectOptions]);
 
   useEffect(() => {
     if (!modalOpen || entity !== 'aircraft') {
@@ -10024,6 +10100,11 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
                   aircraftOwner={aircraftOwnerId}
                   setAircraftOwner={setAircraftOwnerId}
                   aircraftOwnerSelectOptions={aircraftOwnerSelectOptions}
+                  aircraftBaseLocationId={aircraftBaseLocationId}
+                  setAircraftBaseLocationId={setAircraftBaseLocationId}
+                  aircraftBaseLocationSelectOptions={aircraftBaseLocationSelectOptions}
+                  aircraftBaseLocationOptionsLoading={aircraftListboxOptionsLoading}
+                  aircraftBaseLocationOptionsError={aircraftBaseLocationOptionsError}
                   aircraftLineNumber={aircraftLineNumber}
                   setAircraftLineNumber={setAircraftLineNumber}
                   aircraftVariableNumber={aircraftVariableNumber}
