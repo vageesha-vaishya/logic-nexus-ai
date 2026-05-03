@@ -2475,6 +2475,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       manufacturing_date: '2026-03-11',
       base_location: 'DXB',
       owner_name: 'Owned',
+      aircraft_operators_id: '157b8d12-c115-446e-a4dc-d12077751fe2',
+      aircraft_owners_id: '257b8d12-c115-446e-a4dc-d12077751fe2',
       current_flight_hours: '2401.7',
       current_cycles: '901',
     });
@@ -2485,6 +2487,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(aircraftOperationalFields.payload.engine_type).toBe('CFM56-5B');
     expect(aircraftOperationalFields.payload.base_location).toBe('DXB');
     expect(aircraftOperationalFields.payload.owner_name).toBe('Owned');
+    expect(aircraftOperationalFields.payload.aircraft_operators_id).toBe('157b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(aircraftOperationalFields.payload.aircraft_owners_id).toBe('257b8d12-c115-446e-a4dc-d12077751fe2');
     expect(aircraftOperationalFields.payload.current_flight_hours).toBe(2401.7);
     expect(aircraftOperationalFields.payload.current_cycles).toBe(901);
 
@@ -2497,9 +2501,26 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       status: 'active',
       base_location: 'Nothing selected',
       owner_name: 'Nothing selected',
+      aircraft_operators_id: '',
+      aircraft_owners_id: '',
     });
     expect(aircraftOptionalPlaceholders.payload.base_location).toBeUndefined();
     expect(aircraftOptionalPlaceholders.payload.owner_name).toBeUndefined();
+    expect(aircraftOptionalPlaceholders.payload.aircraft_operators_id).toBeUndefined();
+    expect(aircraftOptionalPlaceholders.payload.aircraft_owners_id).toBeUndefined();
+
+    const aircraftInvalidOwners = buildPayloadFromForm('aircraft', {
+      tail_number: 'N909AE',
+      serial_number: 'SN-913',
+      aircraft_type: 'NarrowBody',
+      manufacturer_id: 'manu-1',
+      aircraft_model: 'A320-200',
+      status: 'active',
+      aircraft_operators_id: 'invalid-operator-id',
+      aircraft_owners_id: 'invalid-owner-id',
+    });
+    expect(aircraftInvalidOwners.errors.aircraft_operators_id).toBe('Operator Owner must be a valid UUID');
+    expect(aircraftInvalidOwners.errors.aircraft_owners_id).toBe('Aircraft Owner must be a valid UUID');
 
     const supplierMalformed = buildPayloadFromForm('suppliers', {
       supplier_code: 'SUP-1',

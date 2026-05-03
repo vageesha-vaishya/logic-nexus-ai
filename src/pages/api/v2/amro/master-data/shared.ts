@@ -4,6 +4,8 @@ import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
 
 export type AmroMasterDataEntity =
   | 'aircraft'
+  | 'aircraft_operators'
+  | 'aircraft_owners'
   | 'aircraft_template'
   | 'ata_codes'
   | 'flight_logs'
@@ -51,12 +53,14 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'serial_number',
       'assembly_models',
       'msn',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
       'owner_name',
       'base_location',
       'restrictions',
     ],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,warranty_json,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_landings,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,aircraft_operators_id,aircraft_owners_id,owner_name,warranty_json,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_landings,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
@@ -72,6 +76,8 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'operator_code',
       'station_code',
       'base_location',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
       'owner_name',
       'warranty_json',
       'manufacturing_date',
@@ -89,6 +95,42 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'on_wing_lifecycle_records',
     ],
     defaultSortColumn: 'updated_at',
+  },
+  aircraft_operators: {
+    table: 'aircraft_operators',
+    searchableColumns: ['operator_code', 'operator_name', 'operator_type', 'contact_person', 'contact_email', 'phone_number'],
+    listColumns:
+      'id,tenant_id,franchise_id,operator_code,operator_name,operator_type,contact_person,contact_email,phone_number,address,is_active,created_at,updated_at',
+    requiredCreateFields: ['operator_code', 'operator_name'],
+    writeAllowedFields: [
+      'operator_code',
+      'operator_name',
+      'operator_type',
+      'contact_person',
+      'contact_email',
+      'phone_number',
+      'address',
+      'is_active',
+    ],
+    defaultSortColumn: 'operator_name',
+  },
+  aircraft_owners: {
+    table: 'aircraft_owners',
+    searchableColumns: ['owner_code', 'owner_name', 'owner_type', 'contact_person', 'contact_email', 'phone_number'],
+    listColumns:
+      'id,tenant_id,franchise_id,owner_code,owner_name,owner_type,contact_person,contact_email,phone_number,address,is_active,created_at,updated_at',
+    requiredCreateFields: ['owner_code', 'owner_name'],
+    writeAllowedFields: [
+      'owner_code',
+      'owner_name',
+      'owner_type',
+      'contact_person',
+      'contact_email',
+      'phone_number',
+      'address',
+      'is_active',
+    ],
+    defaultSortColumn: 'owner_name',
   },
   flight_logs: {
     table: 'flight_logs',

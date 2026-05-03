@@ -22,6 +22,8 @@ type AirportRecord = {
 
 type MasterEntity =
   | 'aircraft'
+  | 'aircraft_operators'
+  | 'aircraft_owners'
   | 'aircraft_template'
   | 'flight_logs'
   | 'parts_inventory'
@@ -62,9 +64,19 @@ class HttpError extends Error {
 const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   aircraft: {
     table: 'aircraft',
-    searchableColumns: ['tail_number', 'registration', 'serial_number', 'assembly_models', 'msn'],
+    searchableColumns: [
+      'tail_number',
+      'registration',
+      'serial_number',
+      'assembly_models',
+      'msn',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
+      'owner_name',
+      'base_location',
+    ],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,owner_name,warranty_json,aircraft_weight_and_capacity_json,aircraft_other_details_json,current_flight_hours,current_cycles,current_landings,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,operator_code,station_code,base_location,aircraft_operators_id,aircraft_owners_id,owner_name,warranty_json,aircraft_weight_and_capacity_json,aircraft_other_details_json,current_flight_hours,current_cycles,current_landings,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
     requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
@@ -78,6 +90,8 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'line_number',
       'status',
       'owner_name',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
       'operator_code',
       'station_code',
       'base_location',
@@ -99,6 +113,42 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'on_wing_lifecycle_records',
     ],
     defaultSortColumn: 'updated_at',
+  },
+  aircraft_operators: {
+    table: 'aircraft_operators',
+    searchableColumns: ['operator_code', 'operator_name', 'operator_type', 'contact_person', 'contact_email', 'phone_number'],
+    listColumns:
+      'id,tenant_id,franchise_id,operator_code,operator_name,operator_type,contact_person,contact_email,phone_number,address,is_active,created_at,updated_at',
+    requiredCreateFields: ['operator_code', 'operator_name'],
+    writeAllowedFields: [
+      'operator_code',
+      'operator_name',
+      'operator_type',
+      'contact_person',
+      'contact_email',
+      'phone_number',
+      'address',
+      'is_active',
+    ],
+    defaultSortColumn: 'operator_name',
+  },
+  aircraft_owners: {
+    table: 'aircraft_owners',
+    searchableColumns: ['owner_code', 'owner_name', 'owner_type', 'contact_person', 'contact_email', 'phone_number'],
+    listColumns:
+      'id,tenant_id,franchise_id,owner_code,owner_name,owner_type,contact_person,contact_email,phone_number,address,is_active,created_at,updated_at',
+    requiredCreateFields: ['owner_code', 'owner_name'],
+    writeAllowedFields: [
+      'owner_code',
+      'owner_name',
+      'owner_type',
+      'contact_person',
+      'contact_email',
+      'phone_number',
+      'address',
+      'is_active',
+    ],
+    defaultSortColumn: 'owner_name',
   },
   aircraft_template: {
     table: 'aircraft_template',

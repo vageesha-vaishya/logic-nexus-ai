@@ -80,6 +80,9 @@ type AircraftCreateDialogSectionProps = {
   aircraftBase: string;
   setAircraftBase: (value: string) => void;
   aircraftBaseSelectOptions: SelectOption[];
+  aircraftOperatorOwner: string;
+  setAircraftOperatorOwner: (value: string) => void;
+  aircraftOperatorOwnerSelectOptions: SelectOption[];
   aircraftOwner: string;
   setAircraftOwner: (value: string) => void;
   aircraftOwnerSelectOptions: SelectOption[];
@@ -138,6 +141,9 @@ export function AircraftCreateDialogSection({
   aircraftBase,
   setAircraftBase,
   aircraftBaseSelectOptions,
+  aircraftOperatorOwner,
+  setAircraftOperatorOwner,
+  aircraftOperatorOwnerSelectOptions,
   aircraftOwner,
   setAircraftOwner,
   aircraftOwnerSelectOptions,
@@ -231,7 +237,26 @@ export function AircraftCreateDialogSection({
                 ))}
               </select>
 
-              <Label htmlFor="aircraft-owner-select" className="font-semibold">* Operator Owner</Label>
+              <Label htmlFor="aircraft-operator-owner-select" className="font-semibold">Operator Owner</Label>
+              <select
+                id="aircraft-operator-owner-select"
+                value={aircraftOperatorOwner}
+                disabled={aircraftListboxOptionsLoading}
+                onChange={(event) => {
+                  const value = event.target.value;
+                  setAircraftOperatorOwner(value);
+                  setAircraftAuxField('aircraft_operators_id', value);
+                }}
+                className={controlClassName}
+              >
+                {aircraftOperatorOwnerSelectOptions.map((option) => (
+                  <option key={option.value} value={option.value} disabled={option.disabled}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+
+              <Label htmlFor="aircraft-owner-select" className="font-semibold">Aircraft Owner</Label>
               <select
                 id="aircraft-owner-select"
                 value={aircraftOwner}
@@ -239,7 +264,7 @@ export function AircraftCreateDialogSection({
                 onChange={(event) => {
                   const value = event.target.value;
                   setAircraftOwner(value);
-                  setAircraftAuxField('owner_name', value);
+                  setAircraftAuxField('aircraft_owners_id', value);
                 }}
                 className={controlClassName}
               >

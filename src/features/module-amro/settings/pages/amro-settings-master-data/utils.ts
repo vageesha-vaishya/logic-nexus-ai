@@ -18,6 +18,8 @@ import {
   MANUFACTURER_SEED_NAMES,
 } from './constants';
 
+const UUID_V4_LIKE_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
 export function getPayloadRecords(payload: Record<string, unknown>): RecordRow[] {
   const output = payload.output;
   if (!output || typeof output !== 'object') {
@@ -462,6 +464,8 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       'assembly_models',
       'manufacturing_date',
       'base_location',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
       'owner_name',
       'line_number',
       'variable_number',
@@ -718,6 +722,22 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     if (ownerNameRaw && ownerNameRaw !== AIRCRAFT_OWNER_OPTIONS[0]) {
       payload.owner_name = ownerNameRaw;
     }
+
+    const aircraftOwnershipUuidFields: Array<{ key: 'aircraft_operators_id' | 'aircraft_owners_id'; label: string }> = [
+      { key: 'aircraft_operators_id', label: 'Operator Owner' },
+      { key: 'aircraft_owners_id', label: 'Aircraft Owner' },
+    ];
+    aircraftOwnershipUuidFields.forEach(({ key, label }) => {
+      const rawValue = String(values[key] ?? '').trim();
+      if (!rawValue || rawValue === AIRCRAFT_OWNER_OPTIONS[0]) {
+        return;
+      }
+      if (!UUID_V4_LIKE_PATTERN.test(rawValue)) {
+        errors[key] = `${label} must be a valid UUID`;
+        return;
+      }
+      payload[key] = rawValue;
+    });
 
     const aircraftOptionalNumberFields = [
       'defect_count',
