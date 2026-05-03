@@ -195,6 +195,13 @@ describe('master-data.routes', () => {
   });
 
   it('creates master data records', async () => {
+    mockExecuteWithResilience.mockImplementationOnce(async (_context: unknown, operation: () => Promise<unknown>) => {
+      await operation();
+      return {
+        data: { id: 'aircraft-2', tail_number: 'N202AA' },
+        error: null,
+      };
+    });
     const app = await createTestApp();
     const response = await request(app)
       .post('/api/v2/amro/master-data/aircraft')
@@ -204,6 +211,8 @@ describe('master-data.routes', () => {
         aircraft_type: 'A320',
         aircraft_model: 'A320-200',
         status: 'active',
+        aircraft_operators_id: '157b8d12-c115-446e-a4dc-d12077751fe2',
+        aircraft_owners_id: '257b8d12-c115-446e-a4dc-d12077751fe2',
       })
       .expect(201);
     expect(response.body.output.entity).toBe('aircraft');
@@ -211,6 +220,13 @@ describe('master-data.routes', () => {
     expect(mockExecuteWithResilience).toHaveBeenCalledWith(
       expect.objectContaining({ operation: 'master-data.aircraft.create' }),
       expect.any(Function),
+    );
+    expect(lastFromTable).toBe('aircraft');
+    expect(lastQueryBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aircraft_operators_id: '157b8d12-c115-446e-a4dc-d12077751fe2',
+        aircraft_owners_id: '257b8d12-c115-446e-a4dc-d12077751fe2',
+      }),
     );
   });
 

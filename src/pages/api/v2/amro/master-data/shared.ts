@@ -540,6 +540,8 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     station_code: asNullableString(payload.station_code),
     base_location: asNullableString(payload.base_location),
     owner_name: asNullableString(payload.owner_name),
+    aircraft_operators_id: asNullableString(payload.aircraft_operators_id),
+    aircraft_owners_id: asNullableString(payload.aircraft_owners_id),
     manufacturing_date: asNullableString(payload.manufacturing_date),
     defect_count: asNumber(payload.defect_count) ?? 0,
     first_limit_remaining: asNumber(payload.first_limit_remaining),

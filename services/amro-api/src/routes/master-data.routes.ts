@@ -922,6 +922,8 @@ function normalizeAircraft(payload: JsonRecord): JsonRecord {
     line_number: asNullableString(payload.line_number),
     status: asString(payload.status) || 'active',
     owner_name: asNullableString(payload.owner_name),
+    aircraft_operators_id: asNullableString(payload.aircraft_operators_id),
+    aircraft_owners_id: asNullableString(payload.aircraft_owners_id),
     operator_code: asNullableString(payload.operator_code),
     station_code: asNullableString(payload.station_code),
     base_location: asNullableString(payload.base_location),
