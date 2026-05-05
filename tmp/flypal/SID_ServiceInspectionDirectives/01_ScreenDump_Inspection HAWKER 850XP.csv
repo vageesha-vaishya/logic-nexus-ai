@@ -1,0 +1,113 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,Aeromobile Liscense,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,"CAR Section-8, Series ""O"" Part-2 Para 7.2.9",HMU or GMU Flight.,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,FDR Readout,CH*,,,0:00,P/N:980-4710-003 S/L:872
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,BJETS/CAMO/VT-BTB/017 dated 23 June. 2014,Wing DHS fatners Head Corrosion Removal & Reprotection Treatment,CP1,,,0:00,SRM 57-10-13-201
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,12,,Every 200 Hours Lubrication Inspection-Area G,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,12,,1600 Hours Lubrication,LS*,,,0:00,AFMS Part 7
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,12,,2 Year Lubrication,LS*,,,0:00,AFMS part-7
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Every 400 Hours Detailed walk-around Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Pressure test Pitot/ Static/ Stall vent System,OP*,,,0:00,OOP-340006
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,ECTM Downloading,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"PATS APU GTCP36-150W Visual inspection of exhaust, loose or frayed wires.",OP*,,,0:00,OOP-490001
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Wing Inspection between rib 14 & 16.,OP*,,,0:00,OOP-570029
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Engine starter Generator Inspection,OP*,,,0:00,OOP-240001(LH)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Panel GG and Terminal Block M visual inspection,OP*,,,0:00,OOPI-240028 (Part of 400 Hours inspection schedule)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Inspection of Water separator system,OP*,,,0:00,OOP-210006 & 210007
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Operational test of pitot system isolation valves,OP*,,,0:00,OOP-340007
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"PATS APU GTCP36-150W Magnetic drain plug Insp., Lub oil drain, Oil filter replacement",OP*,,,0:00,OOP-490003
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Lubrication of area M1/M2 as per AFMS part-7 at 1200-2400 Hours Lubrication,OP*,,,0:00,OOP-760004
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Engine starter Generator Inspection,OP*,,,0:00,OOP-240001(RH)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,Microbiological test,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Pitot -Static drain,OP*,,,0:00,OOP-340002
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Every 30 Days 115 V AC Inverter system,ROU1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Wing bottom skin centerline joint strap.,ROU*,,,0:00,SI-570018 (Initial at 24000Hrs then after 9600Hrs)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Every 3500 Hours Emergency Lighting System,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,24Mts Inspection 'F' Check,ROU*,,,0:00,RI-050630
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,horizontal stabilizer,ROU*,,,0:00,SI-550013 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Skin Exterior under the dorsal intake, forward of frame 19.",ROU*,,,0:00,SI-530001 (Initial at 8 years then after 4 years.)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Pylon engine main mounting attachment fittings.,ROU*,,,0:00,SI-530013
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Horizontal stabilizer top skin ""T"" fitting and joinbt strap at the center line of the stabilizer",ROU*,,,0:00,SI-550014 (Initial at 15000 Lds then between 15-18 years & Repeat at every 8 years along task no-550013)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Flaps & flap vanes,ROU*,,,0:00,SI-570016 (Initial at 4800Hrs/8years then after 2400Hrs/4years.)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,No.1 & 2 Computer RVSM Air data Test as per AMM 34-10-19,ROU*,,,0:00,"FAR PART-43, Appendix-E as per FAR part-91.411"
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Connecting rods, aileron trim and servo tabs.",ROU*,,,0:00,SI-570014
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Front pressure bulk head,ROU*,,,0:00,SI-510002 (Initial at 5000L then after 1000L)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Main entry Door.,ROU*,,,0:00,SI-520008 (Initial at 12 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Elevator Trim tabs, connecting Rod lubrication or replacement.",ROU*,,,0:00,SI-550002
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Center fuselage structure below the floor, nose landing gear bay to frame 13 and frame 16 - 19.",ROU*,,,0:00,SI-510005 (Initial at 15 years then after 8 years.)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,31,,Under water locator Beacon (DK120) Battery (FDR-ARFPR-01026) S/N: SC37500,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,NSOP Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Connecting Rods, rudder trim tab & anti servo tab lubricate or replace rod end bearing",ROU*,,,0:00,SI-550005
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Every 800 Hours Lavatory Water System,ROU*,,,0:00,Frequency modified as per approved AMP Issue 01 Rev 0
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Wing front spar, forward face",ROU*,,,0:00,SI-570010
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Fuselage to lap joints,ROU*,,,0:00,SI-530009 (Initial at 27000L then after 4500L)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Flight compartment skin and window structure above windshield.,ROU*,,,0:00,SI-510003 (Initial at 12 years then after 4 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Upper surface of the wing bottom skin at the attachment to centerline joint adjacent to Rib 0,ROU*,,,0:00,SI-570019 (Initial at 24000Hrs then after 9600Hrs)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Engine beam,ROU*,,,0:00,SI-530016
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,10,AMM Ch 10-10-00,2 & 4 Weekly Flight Ready Storage.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,800Hrs Inspection 'B' Check,ROU*,,,0:00,RI-050110
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Wing bottom skins and stringers between the front and rear spars, Rib0 to Rib 1 and between rear spar RIB 1 to Rib 4",ROU*,,,0:00,SI-570007 (Initial at 8 years then after 4 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Every 200 Hours 115 V AC INVERTER SYSTEM,ROU*,,,0:00,Frequency has been modified as per approved AMP Issue 01 Rev 0
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Rear spar, rear face between rib 1 LH and rib 1 RH",ROU*,,,0:00,SI-570022
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Fuselage Skin adjacet to cabin window cutout.,ROU*,,,0:00,SI-530018 (Initial at 4800Hrs then after 2400Hrs.)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Main landing gear fairing strut,ROU*,,,0:00,SI-320028 (Initially at 8 years then after 4 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,RTA-858 Antenna Inspection & Lubrication,ROU*,,,0:00,Align with area F1 inspection of Inspection-G(AMM 34-40-25)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,NAV-4000 VHF Navigation Reciever-VOR Equipment Test,ROU*,,,0:00,Included in 30 days inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Rudder hinge brackets and attachments.,ROU*,,,0:00,SI-550007
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Inspection of rear pressure bulk head (Frame-19),ROU*,,,0:00,SI-530011
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Elevators,ROU*,,,0:00,SI-550003 (Initial at 8 years then after 4 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,Compass Swing Check,ROU*,,,0:00,OOP-340012
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Ventral Fuel tank and attachment,ROU*,,,0:00,SI-530004 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Vertical stabilizer root attachment to fuselage,ROU*,,,0:00,SI-530015
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,CVR Readout,ROU*,,,0:00,CAR Req.
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Center Fuselage Structure below the Floor, Frame 8 to 17.",ROU*,,,0:00,SI-510007 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,PATS APU GTCP36-150W Detail inspection of APU support structure,ROU*,,,0:00,SI-530020
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Vertical stabilizer,ROU*,,,0:00,SI-550010 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Horizontal to vertical stabilizer attachment.,ROU*,,,0:00,SI-550011 (Initial at 16 years then after 8 years.)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Wing bottom skin at attachment to rib 1 LH & RH,ROU*,,,0:00,SI-570024 (Initial at 12000Hrs then after 7200Hrs)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Elevator -Inspect mass balance wt., Spigot for corrosion.",ROU*,,,0:00,SI-550015
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Wing to fuselage Attachment links, bracket and bolts",ROU*,,,0:00,SI-530007 (Initial at 12 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Ailerons Inspection,ROU*,,,0:00,SI-570013
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,3200Hrs Inspection 'D' Check,ROU*,,,0:00,RI-050370
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,49,,Starter/Gen APU Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,ELT Annual Inspection,ROU*,,,0:00,ARTEX CMM
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,12Mts Inspection 'E' Check,ROU*,,,0:00,RI-050500
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Wing bottom skin at attachment to the rear spar, between Rib1 LH & Rib 1 RH",ROU*,,,0:00,SI-570025
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Rear Engine Mount fittings,ROU*,,,0:00,SI-530014
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Wing internal structure forward of center spar including the front and center spar from Ribs 1 to, and between and including the front and rear spars from Rib 4 to wing tip",ROU*,,,0:00,SI-570027
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Airbreaks Inspection,ROU*,,,0:00,SI-570012 (Initial at 4800Hrs/8years then after 2400Hrs/4years.)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Wing bottom skin at attachment to front spar between ribs 1 and 7,ROU*,,,0:00,SI-570017 (Initial at 24000Hrs then after 4800Hrs)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Nose landing gear bay side walls.,ROU*,,,0:00,SI-510001
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Horizontal stabilizer,ROU*,,,0:00,SI-550009
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,A R C,ROU*,,,0:00,Annual Review Certificate
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Every 1500 Hours / 6 Months Tia Microwave Oven Inspection,ROU*,,,0:00,Check
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Structure below escape hatc, frame 13 to 14.",ROU*,,,0:00,SI-510006 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Entry door Surround.,ROU*,,,0:00,SI-510009 (Initial at 8 years then after 4 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,12,,400Hrs Lubrication,ROU*,,,0:00,MI(AFMS PART-7)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Center fuselage structure above the floor.,ROU*,,,0:00,SI-510010 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,48Mts Inspection 'G' Check,ROU*,,,0:00,RI-050760
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,24,,Every 300 Hours Starter/Generator Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Wing rear spar, rear face",ROU*,,,0:00,SI-570011 (Initial at 4800Hrs/8years then after 2400Hrs/4years.)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Every 24,000 Flying Hours and then Every 12000 Flying Hours Wing Bottom Skin Centerline Butt Strap and Center Section Beams (24Positions) Inspection",ROU*,,,0:00,Initial
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Ailerons Inspection,ROU*,,,0:00,SI-570015 (Initial at 4800Hrs/8years then after 2400Hrs/4years.)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Main landing gear and sidestay attachment fittings.,ROU*,,,0:00,SI-570008 (Initial at 8 years then after 4 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Escape Hatch,ROU*,,,0:00,SI-520009 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,"Center Fuselage Structure below the Floor, Frame 13 to 16.",ROU*,,,0:00,SI-510008 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,10,AMM Ch 10-10-00.,2 Weekly Flight Ready Storage,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Remove TKS panels & inspect wing leading edges.,ROU*,,,0:00,SI-570026
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,400Hrs Detailed walk Around Inspection,ROU*,,,0:00,MI-050771
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,12,,200Hrs Lubrication,ROU*,,,0:00,MI(AFMS Part-7)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Rudder & Tab- Remove & detail Inspection,ROU*,,,0:00,SI-550004
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Wing bottom skin center line butt strap and center section beam (24 position).,ROU*,,,0:00,SI-570020 (Initial at 24000Hrs then after 12000Hrs)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Horizontal stabilizer,ROU*,,,0:00,SI-550012 (Initaial at 24 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,PATS APU GTC36-150W. Exhaust and inlet doubler frames and stringers.,ROU*,,,0:00,SI-530025
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Upper canopy rail at intersection with the canopy posts,ROU*,,,0:00,SI-510004
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Elevators & Tabs- Remove & detail inspect.,ROU*,,,0:00,SI-550001
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Front face of rear presure bulkhead (Frame 19),ROU*,,,0:00,SI-530012
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Fuselage skin under wing to fuselage fairing,ROU*,,,0:00,SI-530002 (Initially at 08 years then every 04 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,PATS APU GTCP36-150W Detail inspection of APU support structure,ROU*,,,0:00,SI-530019
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Rudder,ROU*,,,0:00,SI-550006 (Initial at 8 years then after 4 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Wing bottom skin(LH & RH) adjacent to flap outboard hinge at rib 8,ROU*,,,0:00,SI-570009 (Initial at 4800Hrs then after 1200Hrs)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,1600Hrs Inspection 'C' Check,ROU*,,,0:00,RI-050240
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,5,,Fuselage skin covered by the ventral fuel tank or baggage pannier / EBU,ROU*,,,0:00,SI-530003 (Initial at 15 years then after 8 years)
+157b8d12-c115-446e-a4dc-d12077751fe2,ef002da4-261e-411e-8142-679a1828aff8,,101,,Aeromobile License Renewal,SP*,,,0:00,

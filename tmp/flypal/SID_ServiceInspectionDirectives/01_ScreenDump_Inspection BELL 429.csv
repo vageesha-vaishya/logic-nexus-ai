@@ -1,0 +1,124 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,CVR System Check,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,FDR System Check,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,21,Form No: BELL 429/28,Every 200 Hrs Inspection of Aircom Air Conditioning system,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/05,100 FH / 90 Days Corrosion Inspection,CP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,,200 hours,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,Form No: BELL 429/03,1 Month Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,Form No: BELL 429/22,6 Month Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,,800 hours /12 months,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,Form No: BELL 429/10,Every 600 hours /12 months Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,,400 Hours/12 Months Lube Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,,400 hours /6 months,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,,600 hours,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,Form No: BELL 429/14,Every 200 hours /12 months Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,Form No: BELL 429/15,Every 400 hours Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,12,Form No: BELL 429/12,800 Hours Lubrication Inspection.,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,34,,CVR/FDR/ULB Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Every 100hrs Inspection,OP*,,,0:00,ASB 429-16-29 Rev A
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,34,Form No: BELL 429/45,Every 12 Month CVR/FDR Functional Check,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,6 month inspection,OP*,,,0:00,"complied with ASB429-15-21RA, TC AD CF-2016-11"
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,Amm 05-00-00,EVERY 100 HRS/12 MONTHS PERIODIC INSPECTION,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,34,,CVR/FDR System Annual Check,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,34,Form No: BELL 429/45,ULB Battery & ULB - Annual Inspection,OP*,,,0:00,1.ULB Battery (Functional Check ) 2.ULB ( Operational Check )
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/43,50 Hrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,DMC-429-A-12-00-00-09A-234A-A,800 hours Lubrication Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,Form No: BELL 429/63,Portable Fire Extinguisher Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,FDR Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/15,Every 400 Hrs Inlet Barrier Filter Inspection,ROU*,,,0:00,Part of 400 H Routine Inspection Form No: BELL 429/15
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/32,2-years inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,15000 Hours or 15 Years Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,,Every 3000 Hrs Inspection of Rotor Brake Assembly,ROU*,,,0:00,Caliper- OH & Disc -Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,Form No: BELL 429/54,WEIGHING OF AIRCRAFT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,6000-hours inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/14,200-hours/12-months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Every 1600Hrs /2 year Schedule Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Every 50Hrs/1 month schedule Inspection,ROU*,,,0:00,BHT-429-MM-1 Rev-25 Para 5-15
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,,Every 6000 Hrs Inspection of Rotor Brake Assembly,ROU*,,,0:00,Caliper-OH & Disc-Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,50 hours inspection,ROU*,,,0:00,"Bell 429/01, Rev. 01"
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,DMC-429-A-05-40-00-32A-281A-A,1600 Flight Cycle Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/42,Every 1600 Hrs / 24 Month Inspection of Wire Strike protection system,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Standby Altimeter,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,400-hours/12-months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/13,12-months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,100 hours inspection,ROU*,,,0:00,"Bell 429/02, Rev. 0"
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,5000 RIN Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/66,8-years inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/53,Every 1000 Hrs Inspection of Rotor Brake Assembly,ROU*,,,0:00,Caliper & Disc- Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Fuel MBT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/25,Every 800 Hours /12 Months Inspection of Wire Strike protection system,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,"10,000-hour inspection",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Range & Performance Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,800 Hour Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Pitot Static Leak check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/24,Annual Inspection of Crew & Passenger floor proctector,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,,Aircomm Air Conditioner,ROU*,,,0:00,Part of 12 M Inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,,Inlet Barrier Filter,ROU*,,,0:00,Part of 400 H/12 M Inspection Schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,C of A,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,FIRST AID KIT CERTIFICATION,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/88,Every 24 Month Inspection of Crew Door Assist Handle,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,"CAR Section 5, Series F, Part I Para 6.2 (c) & ASC No 08 of 2013",CVR/FDR Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/17,800-hours/12-months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Airworthiness Review Certificate,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,AAC 13 of 2017,ALTIMETER Every 2 year static pressure system test and inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,34,Form No: BELL 429/51,Every 2 Years CVR/FDR Functional Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/34,4-years inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/67,10-years inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Compass Swing,ROU*,,,0:00,"Bell 429/06, Rev. 0"
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Insurance,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,5000 Hours Component Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/57,Every Monthly Engine Performance Recovery Wash & external wash.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,5000-hour inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/33,3-years inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,,Every 12000 Hrs Inspection of Rotor Brake Assembly,ROU*,,,0:00,Disc-OH & Scrap Brake Caliper
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/16,600-hours/12-months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Every 10 Year Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Performance Recovery Wash,ROU*,,,0:00,"Note : Occasionally salt laden (Ref. 71-00-00,POWER PLANT -LEANING)"
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,12 Years Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/15,Every 400 Hrs Inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,,Wire Strike Protection system SR02791NY(PM965-067D),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,IL-GEN-19-144,3 Months Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,600-hours inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/89,Every 2000 Hrs Inspection of Rotor Brake Assembly,ROU*,,,0:00,Caliper & Disc - Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/14,200-hours inspection.,ROU*,,,0:00,Frequency modified as per AMP Issue 01 Rev 03.
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,CVR Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Lead Acid Battery CT,ROU*,,,0:00,Initially at 12 Mnths then every 6 Months CT
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,CVR ULB Functional check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Every 1000 Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,Form No: BELL 429/59,CVR/FDR 06 Year Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,AAC 3 & 4 of 2019,CVR/FDR Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Aeromobile license,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,DMC-429-A-05-40-00-28A-281A-A,1 Month Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,PM-965-067 Table-01,Every 1600 Hrs / 24 Mt Inspection of Wire Strike Protection System,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,Portable Fire Extinguisher Monthly Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,Form No: RN/009,ELT - ANNUAL INSPECTION,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Every 100 Hrs/12 month Schedule Inspection.,ROU*,,,0:00,BHT-429-MM-1 Rev-25 para 5-15
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/46,800 Hours Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,30,,FDR Functional Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,CAMO Contract Valadity,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,100-hours/12-months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,30,,FDR Sensor recalibration,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,,Every 9000 Hrs Inspection of Rotor Brake Assembly,ROU*,,,0:00,Caliper-OH & Disc-Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,23,,ULB & ULB Battery,ROU*,,,0:00,1.Replace Every Six Years
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/42,Every 800 Hrs / 24 Month Inspection of Wire Strike protection system,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,28,,Fuel Filler Area Protector Kit - Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,ELT Battery replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,"Portable Fire Extinguisher , HST",ROU*,,,0:00,HST
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,,Every 4000 Hrs Inspection of Rotor Brake Assembly,ROU*,,,0:00,Caliper-OH & Disc- Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/35,5-years inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/52,6-years Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/23,Annual Inspection of Door Opener,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Every 10000 Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,8000-hours inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,,TRANSPONDER CHECK,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,99,Form No: BELL 429/25,Every 100 Hrs Inspection of Wire Strike proctection system,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,85,PM-965-067 Table-01,Every 800 Hrs /12 Mt Inspection of Wire Strike Protection System,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,Every 5000Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,3000-hour inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,ULB Beacon Cleaning and testing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,101,Form No: BELL 429/68,Monthly ELT Operational check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,21,Form No: BELL 429/82,Annual Inspection of Aircom Air Conditioning system,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,,1000 Hours Component Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,Form No: BELL 429/31,800-hours/24-months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,DMC-429-A-05-50-00-00A-283A-A,Every 400 Hrs torque check of the two nuts that attach the shear bearing to the lead/lag damper,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,cfff3995-1167-4020-b67e-a07bfa0a4a13,,5,DMC-429-A-05-50-00- 00A-283A-A,Every 400 Hrs Torque / Friction check of tail boom attachment to the aft fuselage,SP*,,,0:00,"Added newly in flypal (During G1 audit pointed out,it was not monitored in flypal. (Dated 04.02.2021)"

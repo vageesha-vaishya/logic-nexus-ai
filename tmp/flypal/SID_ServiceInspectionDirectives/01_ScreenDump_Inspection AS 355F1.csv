@@ -1,0 +1,78 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,"Servo Control, Tail",CH*,,,0:00,Check the safetying of tail servo control rod eye end- fitting.
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,Range and Performance,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,53,,Rear Frame,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,Oil Filter-Filter Element,79,,Oil Filter-Filter Element-Check,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,12,,500 Hrs Lub Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,12,,600 Hrs/2 Yrs Lub Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,12,,100 Hours Lub Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,12,,100Hrs / 3Months Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,12,,1200 Hrs/4 Yrs Lub Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,12,,150 Hour/3 Months Lub Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,12,,2 Years Lub Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,12,,1 Month Lub Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,AD01,64,EASA AD 2009-0039,Tail Rotor - Tail Rotor Blades Skin - Inspection/Repair,OP1,,,0:00,No later than 31 March 2009. TRB P/N 355A12-0050-00/-01/-02/-03/-04/-05 with s/n listed in ASB No. 05.00.38 R3.
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,5400Hrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,50 Hrs/6 Months OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,498,5,"part- C, No.18",200Hrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,497,5,"Part- C, No. 17",110Hrs OOP Inspection,OP*,,,0:00,"Rev No. 0,Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,502,5,"Part -C, No.22",500Hrs / 3Months OOP Inspection,OP*,,,0:00,"Rev No. 0,Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,511,5,"part -C, No.31",2500Hrs/6Yrs OOP Inspection,OP*,,,0:00,"Rev No.0, Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,600 Hrs/3 Months OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,2400 Hrs/6 Years OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,3000 Hrs/6 Yrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,488,5,"Part-C, No.8",25Hrs OOP Inspection,OP*,,,0:00,"Rev No. 0,Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,100 Hrs/6 Months OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,Every 150 Hours/1 Year OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,508,5,"Part-C, No. 28",1500hrs/6Years OOP Inspection,OP*,,,0:00,"Rev No. 0, Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,509,5,"Part- C, No. 29",2000Hrs/6Yrs OOP Inspection,OP*,,,0:00,"Rev No. 0, Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,507,5,"Part-C, No.27",1200Hrs / 4Years OOP Inspection,OP*,,,0:00,"Rev No. 0, Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,505,5,"Part-C, No.25",550Hrs OOP Inspection,OP*,,,0:00,"Rev No. 0,Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,494,5,"Part-C, No.14",100hrs / 1Year OOP Inspection,OP*,,,0:00,"Rev No.0,Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,25,,Replace All Seat Belts and Harnesses,OP*,,,0:00,(P/N: 3491109-12-070/3491107-12-070)
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,5000Hrs/6 Years,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,510,5,"Part-C,No. 30",2500Hrs / 4Years OOP Inspection,OP*,,,0:00,"Rev No. 0,Dt 18/Mar/2008"
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,1800 Hrs/6 Years OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,Every 150 Hrs/6 Months OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,1200 Hrs/2 Years OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,A.R.C.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,ELT Battery Replacement - 406Mhz,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,Carryout Engine Oil Change. (RH),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,180 Days Radio Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,Altimeter Bench Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,26,,Fire Extinguisher Bottle HST (RH),ROU*,,,0:00,Weight of fire bottle was 1.88kgs CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,500 Hours/2 Years (T or A) Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,492,5,"Part-C, No. 12",100Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,Weighing of aircraft,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,C of A,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,484,5,"Part -C, No. 4",7 days Corrosion Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,Aeromobile license renewal,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,506,5,"Part-C,No . 26",1000hrs/4yrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,First Aid Kit Certification,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,513,5,"Part-C, No. 33",12Years Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,485,5,"Part -C, No.5",3 Months Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,ELT Battery replacement,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,Annual Compass Swing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,487,5,"Part-C, No.7",6 Months Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,487,5,"Part-C,No.7",Squib test and engine fire extinguisher weighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,Fuel MBT,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,499,5,"Part -C, No.19",300Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,DR Compass Swing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,Aeromobile License Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,487,101,"Part -C, No.7",Cockpit fire extinguisher reweighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,180Days Radio Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,520,5,"Part G, No. 1",300hrs/6m Corrosion Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,1200 Hrs/4 Yrs Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,496,5,"Part -C,No.16",100Hrs / 6Months Corrosion Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,641,101,,Annual Radio Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,5000 Hours/12 Years (C) inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,ELT Annual Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,490,5,"Part -C, No.10",50Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,5,,Phase A - Every 150 Flight Hours(S),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,521,5,"Part G, No.2",300hrs/12m Corrosion Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,486,5,"Part -C, No.6",1 Month Corrosion Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,First Aid Kit(1 Year),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,504,5,"Part-C, No. 24",500Hrs / 2Years Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,Transponder System Check,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,ELT Self Test (By Pilot),SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b70740bb-e394-490e-8fd4-271cf6dd2d90,,101,,Insurance Renewal,SP*,,,0:00,

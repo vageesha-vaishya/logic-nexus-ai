@@ -1,0 +1,74 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,99,,Annual Inspection of Aircomm Air Conditioning System,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,99,,Inspection of Aircomm Air Conditioning System,CH*,,,0:00,Form No:206L4/62
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,342,12,,200Hrs/12months Lubrication Schedule,LS*,,,0:00,Form No:206L4/34
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Engine oil filter Element,LS*,,,0:00,Replaced in concurrent with engine oil change
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,344,12,,300Hrs/12Months Lubrication Schedule,LS*,,,0:00,Form No:206L4/36
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,339,12,,50Hrs/12Months Lubrication Schedule,LS*,,,0:00,Form No:206L4/31
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,343,12,,300 Hrs Lubrication Schedule,LS*,,,0:00,Form No:206L4/35
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Hydraulic Filter Servicing,LS*,,,0:00,Form No:206L4/35
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,340,12,,100Hrs/12Months Lubrication Schedule,LS*,,,0:00,Form No:206L4/32
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,12,,600 Hrs/12 Months Lubrication Schedule,LS*,,,0:00,Form No:206L4/37
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,1200 Hours Inspection,OP*,,,0:00,Form No:206L4/14
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,313,5,"Part- C, No.4",Every 12 Months Inspection,OP*,,,0:00,Form No:206L4/15
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,24 Months Inspection,OP*,,,0:00,Form no:206L4/17
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Every 600 Hours/12 Months Inspection,OP*,,,0:00,Form No:206L4/19
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,1315,5,,100Hrs Out of Phase Inspection,OP*,,,0:00,"Rev No:0, Form no. Bell206L4/30/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,325,5,,12 Months Component Operation Inspection,OP*,,,0:00,Form No:206L4/16
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,326,5,"Part- D, No. 8",24 months Component inspection - Out of Phase Inspection,OP*,,,0:00,"Rev No:0, Form no. Bell206L4/17/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Every 110 Hours Inspection,OP*,,,0:00,Form No:206L4/53
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,322,5,,1500 Hours Component Operation Inspection,OP*,,,0:00,Form No:206L4/21
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,324,5,,3000 Hours Component Operation Inspection,OP*,,,0:00,Form No:206L4/23
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Every 300 Hrs or 12 Months,OP*,,,0:00,Form No:206L4/18
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,321,5,"Part- D, No.4",1200 Hrs/24 Months component operation - Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,2250Hrs/60Mths Inspection - Transmision Assy,OP*,,,0:00,"Rev No:06, Form no. Bell 206L4/22"
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Every 60 month OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,320,5,,1200 Hours Component Operation Inspection,OP*,,,0:00,Form No:206L4/20
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Battery CT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,FTD antenna coupler,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,ELT Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Fuel MBT ( 1 Year),ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,600 Hrs / 12 Month .A/C Battery (Over Temperature Sensor Check),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,ELT battery replacement,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,C of A,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,314,5,,100 Flight hours/12 Mt Periodic Inspection,ROU*,,,0:00,Form No:206L4/09
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Compass Swing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Insurance,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,PC filter flamed fitting & PC scroll fitting,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,24 Months (Transponder System Check),ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Pitot static system leak test,ROU*,,,0:00,CAR Requitement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Aeromobile Licence,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,C of A Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Annual Radio Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,ASI Calibration,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,ELT 3 months Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,300 Hrs/12 Months Engine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,150 Hrs/12 Months Engine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Range and performance certificate,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,26,,MONTHLY CABIN FIRE EXTINGUISHER,ROU*,,,0:00,Form No:206L4/55
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,ELT Battery Replacement 406Mhz,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,34,,FTD On VHF Com. Tranceiver,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Fuel MBT,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Aircraft Weighing,ROU*,,,0:00,CAR Requirement & Reference: Form No:206L4/01
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,316,5,,300 Hrs Routine Inspection,ROU*,,,0:00,Form No:206L4/11
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Fire Extinguisher Reweighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Fire extinguisher weighing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Inspect PC tube bat comp scroll & PC,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,ARC,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,346,5,,100Hrs / 90 Days corrosion control inspection,ROU*,,,0:00,Form No:206L4/24
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,318,5,"Part- C, No.9",1200Hrs Routine Inspection,ROU*,,,0:00,"Rev No:0, Form no. Bell206L4/14/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Annual Compass Swing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,First aid kit re-certification,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,180Days Radio inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,34,,FTD of HF receiver,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Aermobile License Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,FAR 91.411,ALTIMETER Every 2 year static pressure system test and inspection.,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Cabin Hand Fire Extinguisher (Weighing),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,,Tail Boom Inspection(Comp. Opr. Insp)(-OOP),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,34,,FTD of HF control,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,Range and performance check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,63,After installation of transmission assembly.,100 Hours inspection,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,5,"AMM 5-00-00, Para 5-48.",Carry out Torque check of Engine mount in 100 Hours after Installation.,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,63,,100 Hours inspection,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,ELT Self Test,SP*,,,0:00,Form No:RN/020
+157b8d12-c115-446e-a4dc-d12077751fe2,976352b9-ee52-4d36-88d5-64b2c49e5f4a,,101,,CAMO Contract Validity,SP*,,,0:00,
