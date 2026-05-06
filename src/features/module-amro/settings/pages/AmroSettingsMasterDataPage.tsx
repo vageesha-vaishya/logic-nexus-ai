@@ -5053,6 +5053,29 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setInlineEditingCell(null);
     setInlineEditValue('');
   }, []);
+  const resolveAircraftBaseLocationLabel = useCallback(
+    (rawValue: unknown) => {
+      const value = String(rawValue ?? '').trim();
+      if (!value) {
+        return '';
+      }
+      if (!isUuidLike(value)) {
+        return value;
+      }
+      const normalizedValue = value.toLowerCase();
+      const matched = aircraftBaseLocationCatalogOptions.find((option) => option.value.toLowerCase() === normalizedValue);
+      const matchedLabel = String(matched?.label || '').trim();
+      if (!matchedLabel) {
+        return value;
+      }
+      const codeMatch = matchedLabel.match(/\(([^)]+)\)\s*$/);
+      if (codeMatch?.[1]) {
+        return codeMatch[1].trim().toUpperCase();
+      }
+      return matchedLabel;
+    },
+    [aircraftBaseLocationCatalogOptions],
+  );
   const resolveTableCellValue = useCallback(
     (row: RecordRow, column: string) => {
       if (entity === 'assembly_models') {
@@ -5076,9 +5099,12 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           return resolveFlightLogAirportLabel(row, 'arrival_airport_label', 'arrival_airport_ref', 'arrival_airport');
         }
       }
+      if (entity === 'aircraft' && (column === 'base_location' || column === 'aircraft_base_location_id')) {
+        return resolveAircraftBaseLocationLabel(row[column]);
+      }
       return String(row[column] ?? '');
     },
-    [assemblyTypeLabelById, entity, manufacturerLabelById],
+    [assemblyTypeLabelById, entity, manufacturerLabelById, resolveAircraftBaseLocationLabel],
   );
 
   const handleRowSingleClick = useCallback(
