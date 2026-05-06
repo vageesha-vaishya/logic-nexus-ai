@@ -44,7 +44,7 @@ const DIRECTIVE_CARDS: DirectiveCardConfig[] = [
     title: 'Configure ADs/SBs',
     description: 'Configure settings and processing parameters for Airworthiness Directives and Service Bulletins.',
     ctaLabel: 'Open Configure ADs/SBs',
-    href: '/dashboard/amro/compliance',
+    href: '/dashboard/amro/plan-directives-bulletin/configure_directives',
     icon: Settings2,
     variant: 'outline',
   },

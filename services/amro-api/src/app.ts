@@ -17,6 +17,7 @@ import itemMasterRoutes from './routes/item-master.routes';
 import mpdRoutes from './routes/mpd.routes';
 import directivesRoutes from './routes/directives.routes';
 import configureMpdRoutes from './routes/configure-mpd.routes';
+import configureDirectivesRoutes from './routes/configure-directives.routes';
 import stockLedgerRoutes from './routes/stock-ledger.routes';
 import enterpriseRoutes from './routes/enterprise.routes';
 import { ErrorResponse } from './types/amro.types';
@@ -2029,6 +2030,7 @@ app.use('/api/v2', itemMasterRoutes);
 app.use('/api/v2', mpdRoutes);
 app.use('/api/v2', directivesRoutes);
 app.use('/api/v2', configureMpdRoutes);
+app.use('/api/v2', configureDirectivesRoutes);
 app.use('/api/v2', stockLedgerRoutes);
 
 // Mount enterprise routes

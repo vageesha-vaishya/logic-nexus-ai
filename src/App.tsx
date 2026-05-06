@@ -185,6 +185,7 @@ const AmroOverview = lazy(() => import("./features/module-amro").then((module) =
 const AmroPlanDirectivesBulletin = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroPlanDirectivesBulletinPage })));
 const AmroMpdManagement = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroMpdManagementPage })));
 const AmroConfigureMpdManagement = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroConfigureMpdPage })));
+const AmroConfigureDirectivesManagement = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroConfigureDirectivesPage })));
 const AmroDirectivesManagement = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroDirectivesManagementPage })));
 const AmroWorkOrders = lazy(() => import("./features/module-amro").then((module) => ({ default: module.AmroWorkOrdersPage })));
 const AmroWorkOrderDetail = lazy(() => import("./features/module-amro/components/work-orders").then((module) => ({ default: module.AmroWorkOrderDetailPage })));
@@ -890,6 +891,7 @@ const App = () => (
             <Route path="/dashboard/amro/plan-directives-bulletin" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroPlanDirectivesBulletin /></ProtectedRoute>} />
             <Route path="/dashboard/amro/plan-directives-bulletin/mpd" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroMpdManagement /></ProtectedRoute>} />
             <Route path="/dashboard/amro/plan-directives-bulletin/configure_mpd" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroConfigureMpdManagement /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/plan-directives-bulletin/configure_directives" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroConfigureDirectivesManagement /></ProtectedRoute>} />
             <Route path="/dashboard/amro/plan-directives-bulletin/directives" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroDirectivesManagement /></ProtectedRoute>} />
             <Route path="/dashboard/amro/aircraft/work-orders" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkOrders /></ProtectedRoute>} />
             <Route path="/dashboard/amro/work-orders" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkOrders /></ProtectedRoute>} />

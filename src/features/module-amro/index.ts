@@ -18,3 +18,4 @@ export { AmroPlanDirectivesBulletinPage } from './pages/AmroPlanDirectivesBullet
 export { AmroMpdManagementPage } from './pages/AmroMpdManagementPage';
 export { AmroDirectivesManagementPage } from './pages/AmroDirectivesManagementPage';
 export { AmroConfigureMpdPage } from './pages/AmroConfigureMpdPage';
+export { AmroConfigureDirectivesPage } from './pages/AmroConfigureDirectivesPage';
