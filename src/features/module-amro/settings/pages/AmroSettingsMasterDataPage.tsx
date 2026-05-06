@@ -744,7 +744,7 @@ const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   aircraft_owners_id: 'Aircraft Owner',
   aircraft_base_location_id: 'Base Location',
   owner_name: 'Owner',
-  base_location: 'Base',
+  base_location: 'Model Name',
   defect_count: 'Defect',
   current_flight_hours: 'TTAF',
   current_cycles: 'Landing',
@@ -4623,6 +4623,71 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
             return resolveFlightLogAirportLabel(row, 'arrival_airport_label', 'arrival_airport_ref', 'arrival_airport').toLowerCase().includes(value);
           }
         }
+        if (entity === 'aircraft' && column === 'aircraft_base_location_id') {
+          const extractCodeToken = (input: unknown): string => {
+            const token = String(input ?? '').trim();
+            if (!token) return '';
+            const bracketMatch = token.match(/\(([^)]+)\)\s*$/);
+            if (bracketMatch?.[1]) return bracketMatch[1].trim();
+            if (/^[A-Za-z]{3,4}$/.test(token)) return token;
+            return '';
+          };
+          const rawColumnValue = String(row[column] ?? '').trim();
+          const rawBaseLocation = String(row.base_location ?? '').trim();
+          const explicitLabel = String(row.aircraft_base_location_label ?? row.base_location_label ?? '').trim();
+          const matchedOption = rawColumnValue
+            ? aircraftBaseLocationCatalogOptions.find((option) => String(option.value || '').trim().toLowerCase() === rawColumnValue.toLowerCase())
+            : null;
+          const matchedOptionLabel = String(matchedOption?.label ?? '').trim();
+          const searchTokens = [
+            rawColumnValue,
+            rawBaseLocation,
+            explicitLabel,
+            matchedOptionLabel,
+            extractCodeToken(rawColumnValue),
+            extractCodeToken(rawBaseLocation),
+            extractCodeToken(explicitLabel),
+            extractCodeToken(matchedOptionLabel),
+          ].filter(Boolean);
+          const searchable = searchTokens.join(' ').toLowerCase();
+          return searchable.includes(value);
+        }
+        if (entity === 'aircraft' && column === 'base_location') {
+          const candidateTokens = [
+            String(row.assembly_models ?? '').trim(),
+            String(row.aircraft_model ?? row.model ?? '').trim(),
+            String(row.base_location ?? '').trim(),
+            String(row.base ?? '').trim(),
+          ].filter(Boolean);
+          const catalog = [...activeAircraftModelSourceOptions, ...assemblyModelOptions, ...franchiseAssemblyModels];
+          const modelName = candidateTokens.reduce<string>((resolved, candidate) => {
+            if (resolved) return resolved;
+            const normalizedCandidate = candidate.toLowerCase();
+            const matched = catalog.find((option) => {
+              const optionId = String(option.id ?? '').trim().toLowerCase();
+              const optionModel = String(option.modelValue ?? '').trim().toLowerCase();
+              const optionName = String(option.name ?? '').trim().toLowerCase();
+              const optionLabel = String(option.label ?? '').trim().toLowerCase();
+              return normalizedCandidate === optionId
+                || normalizedCandidate === optionModel
+                || normalizedCandidate === optionName
+                || normalizedCandidate === optionLabel;
+            });
+            if (!matched) return '';
+            return String(matched.name || matched.label || matched.modelValue || candidate).trim();
+          }, '');
+          const rawBaseLocation = String(row.base_location ?? '').trim();
+          const assemblyModelToken = String(row.assembly_models ?? '').trim();
+          const aircraftModelToken = String(row.aircraft_model ?? row.model ?? '').trim();
+          const searchTokens = [
+            modelName,
+            rawBaseLocation,
+            assemblyModelToken,
+            aircraftModelToken,
+          ].filter(Boolean);
+          const searchable = searchTokens.join(' ').toLowerCase();
+          return searchable.includes(value);
+        }
         if (!(column in row)) return true;
         return String(row[column] ?? '').toLowerCase().includes(value);
       });
@@ -4667,6 +4732,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
       return true;
     });
   }, [
+    aircraftBaseLocationCatalogOptions,
     columnFilters,
     entity,
     facilityStationFilter,
@@ -4676,6 +4742,9 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     flightNumberFilter,
     flightPilotFilter,
     flightRegistrationFilter,
+    activeAircraftModelSourceOptions,
+    assemblyModelOptions,
+    franchiseAssemblyModels,
     rows,
     supplierTypeFilter,
     workCenterTypeFilter,
@@ -5053,28 +5122,108 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
     setInlineEditingCell(null);
     setInlineEditValue('');
   }, []);
+  const extractAirportCode = useCallback((labelOrCode: unknown): string => {
+    const token = String(labelOrCode ?? '').trim();
+    if (!token) return '';
+    const bracketMatch = token.match(/\(([^)]+)\)\s*$/);
+    if (bracketMatch?.[1]) {
+      return bracketMatch[1].trim().toUpperCase();
+    }
+    if (/^[A-Za-z]{3,4}$/.test(token)) {
+      return token.toUpperCase();
+    }
+    return '';
+  }, []);
   const resolveAircraftBaseLocationLabel = useCallback(
-    (rawValue: unknown) => {
+    (row: RecordRow, rawValue: unknown) => {
       const value = String(rawValue ?? '').trim();
+      const explicitLabel = String(row.aircraft_base_location_label ?? row.base_location_label ?? '').trim();
+      const explicitCode = extractAirportCode(explicitLabel);
+      if (explicitCode) {
+        return explicitCode;
+      }
+      if (explicitLabel) {
+        const matchedByName = aircraftBaseLocationCatalogOptions.find((option) =>
+          String(option.label || '').trim().toLowerCase().startsWith(`${explicitLabel.toLowerCase()} (`),
+        );
+        const matchedCode = extractAirportCode(matchedByName?.label);
+        if (matchedCode) {
+          return matchedCode;
+        }
+      }
+      const joinedAirport = extractJoinedRecord(
+        row.aircraft_base_location_ref ?? row.base_location_ref ?? row.airport_ref,
+      );
+      const joinedLabel = formatAirportLabel(joinedAirport, '');
+      const joinedCode = extractAirportCode(joinedLabel);
+      if (joinedCode) {
+        return joinedCode;
+      }
+      if (joinedLabel) {
+        const matchedByJoinedName = aircraftBaseLocationCatalogOptions.find((option) =>
+          String(option.label || '').trim().toLowerCase().startsWith(`${joinedLabel.toLowerCase()} (`),
+        );
+        const matchedCode = extractAirportCode(matchedByJoinedName?.label);
+        if (matchedCode) {
+          return matchedCode;
+        }
+      }
       if (!value) {
         return '';
       }
       if (!isUuidLike(value)) {
-        return value;
+        return extractAirportCode(value) || value;
       }
       const normalizedValue = value.toLowerCase();
       const matched = aircraftBaseLocationCatalogOptions.find((option) => option.value.toLowerCase() === normalizedValue);
-      const matchedLabel = String(matched?.label || '').trim();
-      if (!matchedLabel) {
-        return value;
+      if (matched?.label) {
+        return extractAirportCode(matched.label) || String(matched.label).trim();
       }
-      const codeMatch = matchedLabel.match(/\(([^)]+)\)\s*$/);
-      if (codeMatch?.[1]) {
-        return codeMatch[1].trim().toUpperCase();
+      const baseLocationFallback = String(row.base_location ?? '').trim();
+      if (baseLocationFallback && !isUuidLike(baseLocationFallback)) {
+        return extractAirportCode(baseLocationFallback) || baseLocationFallback;
       }
-      return matchedLabel;
+      return value;
     },
-    [aircraftBaseLocationCatalogOptions],
+    [aircraftBaseLocationCatalogOptions, extractAirportCode],
+  );
+  const resolveAircraftAssemblyModelLabel = useCallback(
+    (row: RecordRow) => {
+      const directCandidates = [
+        String(row.assembly_models ?? '').trim(),
+        String(row.aircraft_model ?? row.model ?? '').trim(),
+      ].filter(Boolean);
+      const uuidFallbackCandidates = [
+        String(row.base_location ?? '').trim(),
+        String(row.base ?? '').trim(),
+      ].filter((candidate) => Boolean(candidate) && isUuidLike(candidate));
+      const candidates = [...directCandidates, ...uuidFallbackCandidates];
+      if (candidates.length === 0) {
+        return '';
+      }
+
+      const catalog = [...activeAircraftModelSourceOptions, ...assemblyModelOptions, ...franchiseAssemblyModels];
+      for (const candidate of candidates) {
+        const normalizedCandidate = candidate.toLowerCase();
+        const matched = catalog.find((option) => {
+          const optionId = String(option.id ?? '').trim().toLowerCase();
+          const optionModel = String(option.modelValue ?? '').trim().toLowerCase();
+          const optionName = String(option.name ?? '').trim().toLowerCase();
+          const optionLabel = String(option.label ?? '').trim().toLowerCase();
+          return normalizedCandidate === optionId
+            || normalizedCandidate === optionModel
+            || normalizedCandidate === optionName
+            || normalizedCandidate === optionLabel;
+        });
+        if (matched) {
+          return String(matched.name || matched.label || matched.modelValue || candidate).trim();
+        }
+      }
+
+      const nonUuidCandidate = candidates.find((token) => !isUuidLike(token));
+      return String(nonUuidCandidate || candidates[0] || '').trim();
+    },
+    [activeAircraftModelSourceOptions, assemblyModelOptions, franchiseAssemblyModels],
   );
   const resolveTableCellValue = useCallback(
     (row: RecordRow, column: string) => {
@@ -5099,12 +5248,15 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
           return resolveFlightLogAirportLabel(row, 'arrival_airport_label', 'arrival_airport_ref', 'arrival_airport');
         }
       }
-      if (entity === 'aircraft' && (column === 'base_location' || column === 'aircraft_base_location_id')) {
-        return resolveAircraftBaseLocationLabel(row[column]);
+      if (entity === 'aircraft' && column === 'base_location') {
+        return resolveAircraftAssemblyModelLabel(row);
+      }
+      if (entity === 'aircraft' && column === 'aircraft_base_location_id') {
+        return resolveAircraftBaseLocationLabel(row, row[column]);
       }
       return String(row[column] ?? '');
     },
-    [assemblyTypeLabelById, entity, manufacturerLabelById, resolveAircraftBaseLocationLabel],
+    [assemblyTypeLabelById, entity, manufacturerLabelById, resolveAircraftAssemblyModelLabel, resolveAircraftBaseLocationLabel],
   );
 
   const handleRowSingleClick = useCallback(
