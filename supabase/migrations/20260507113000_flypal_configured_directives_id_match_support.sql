@@ -78,7 +78,7 @@ AS $$
     SELECT
       c.id AS cfg_id,
       count(d.id) AS match_count,
-      min(d.id) AS matched_directive_id
+      (array_agg(d.id ORDER BY d.id))[1] AS matched_directive_id
     FROM candidate_rows c
     LEFT JOIN public.directives d
       ON d.tenant_id IS NOT DISTINCT FROM c.tenant_id
