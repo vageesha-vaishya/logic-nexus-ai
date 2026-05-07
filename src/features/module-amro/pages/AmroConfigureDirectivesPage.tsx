@@ -61,7 +61,7 @@ export function AmroConfigureDirectivesPage() {
     toDate: '',
   });
 
-  const listEnabled = Boolean(advancedFilters.assemblyType && advancedFilters.model);
+  const listEnabled = Boolean(advancedFilters.assemblyType && advancedFilters.model && advancedFilters.aircraftId);
   const { assemblyTypeOptionsQuery, assemblyModelOptionsQuery, ataCodeOptionsQuery, directiveTypeOptionsQuery } = useConfigureDirectivesOptions(true);
   const aircraftOptionsQuery = useConfigureDirectivesAircraftOptions(advancedFilters.model || undefined, Boolean(advancedFilters.model));
 
@@ -176,7 +176,7 @@ export function AmroConfigureDirectivesPage() {
 
   useEffect(() => {
     if (!listEnabled) {
-      setErrorMessage('Select Assembly Type and Model to load directives records');
+      setErrorMessage('Select Assembly Type, Model, and Aircraft to load Configure Directives records');
       return;
     }
     const activeError = activeTab === 'non-configured' ? nonConfiguredQuery.error : configuredQuery.error;
@@ -418,7 +418,6 @@ export function AmroConfigureDirectivesPage() {
   }, [configuredRecords]);
 
   const statusOptions = activeTab === 'configured' ? taskStatuses : [];
-  const activeRecordsCount = activeTab === 'non-configured' ? nonConfiguredRecords.length : configuredRecords.length;
   const selectedAircraftLabel = aircraftOptions.find((item) => item.id === advancedFilters.aircraftId)?.label || advancedFilters.aircraftId;
 
   return (
@@ -513,68 +512,71 @@ export function AmroConfigureDirectivesPage() {
                   ))}
                 </select>
               </div>
-              {activeTab === 'non-configured' && aircraftOptions.length > 0 ? (
-                <div className="space-y-1 md:col-span-2">
-                  <Label>Aircraft</Label>
-                  <select
-                    className="h-10 w-full rounded-md border bg-background px-2"
-                    value={advancedFilters.aircraftId}
-                    onChange={(event) => setAdvancedFilters((current) => ({ ...current, aircraftId: event.target.value }))}
-                    disabled={!aircraftOptions.length}
-                  >
-                    <option value="">(Select to configure)</option>
-                    {aircraftOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                  </select>
-                </div>
-              ) : null}
-              {activeTab === 'configured' ? (
-                <>
-                  <div className="space-y-1 md:col-span-1">
-                    <Label>Aircraft</Label>
-                    <select
-                      className="h-10 w-full rounded-md border bg-background px-2"
-                      value={advancedFilters.aircraftId}
-                      onChange={(event) => setAdvancedFilters((current) => ({ ...current, aircraftId: event.target.value }))}
-                      disabled={!aircraftOptions.length}
-                    >
-                      <option value="">(Select)</option>
-                      {aircraftOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
-                    </select>
-                  </div>
-                  <div className="space-y-1 md:col-span-1">
-                    <Label>Status</Label>
-                    <select
-                      className="h-10 w-full rounded-md border bg-background px-2"
-                      value={advancedFilters.status}
-                      onChange={(event) => setAdvancedFilters((current) => ({ ...current, status: event.target.value }))}
-                    >
-                      <option value="all">(All)</option>
-                      {statusOptions.map((status) => (
-                        <option key={status} value={status}>
-                          {status}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              ) : null}
+              <div className="space-y-1 md:col-span-2">
+                <Label>Aircraft</Label>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-2"
+                  value={advancedFilters.aircraftId}
+                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, aircraftId: event.target.value }))}
+                  disabled={!aircraftOptions.length}
+                >
+                  <option value="">(Select)</option>
+                  {aircraftOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1 md:col-span-1">
+                <Label>Search</Label>
+                <Input
+                  value={advancedFilters.search}
+                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, search: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-1 md:col-span-1">
+                <Label>Status</Label>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-2"
+                  value={advancedFilters.status}
+                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, status: event.target.value }))}
+                >
+                  <option value="all">(All)</option>
+                  {statusOptions.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-1 md:col-span-1">
+                <Label>From</Label>
+                <Input
+                  type="date"
+                  value={advancedFilters.fromDate}
+                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, fromDate: event.target.value }))}
+                />
+              </div>
+              <div className="space-y-1 md:col-span-1">
+                <Label>To</Label>
+                <Input
+                  type="date"
+                  value={advancedFilters.toDate}
+                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, toDate: event.target.value }))}
+                />
+              </div>
             </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 px-3 py-1.5 text-xs">
-            <span className="font-medium">Total Directives Records: {nonConfiguredCount}</span>
+            <span className="font-medium">Aircraft: {selectedAircraftLabel || 'Not selected'}</span>
             <span className="text-muted-foreground">|</span>
-            <span className="font-medium text-amber-700">Mandatory: {mandatoryCount}</span>
+            <span className="font-medium text-amber-700">Non-Configured: {nonConfiguredCount}</span>
+            <span className="text-muted-foreground">|</span>
+            <span className="font-medium text-emerald-700">Configured: {configuredCount}</span>
+            <span className="text-muted-foreground">|</span>
+            <span className="font-medium">Mandatory: {mandatoryCount}</span>
             <span className="text-muted-foreground">|</span>
             <span className="font-medium">Interval-driven: {intervalDrivenCount}</span>
             <span className="text-muted-foreground">|</span>
             <span className="font-medium">Optional: {optionalCount}</span>
-            {advancedFilters.aircraftId ? (
-              <>
-                <span className="text-muted-foreground">|</span>
-                <span className="font-medium text-emerald-700">Configured: {configuredCount}</span>
-              </>
-            ) : null}
           </div>
 
           <AmroCrudMessageBanner message={errorMessage} tone="error" />
