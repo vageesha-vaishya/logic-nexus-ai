@@ -134,6 +134,14 @@ export function AmroConfigureDirectivesPage() {
     }
   }, [advancedFilters.assemblyType, advancedFilters.model, modelOptions]);
 
+  useEffect(() => {
+    if (!advancedFilters.model || !aircraftOptions.length || advancedFilters.aircraftId) return;
+    const firstAircraft = aircraftOptions.find((aircraft) => aircraft.id);
+    if (firstAircraft) {
+      setAdvancedFilters((current) => ({ ...current, aircraftId: firstAircraft.id }));
+    }
+  }, [advancedFilters.aircraftId, advancedFilters.model, aircraftOptions]);
+
   const nonConfiguredRecords = useMemo<NonConfiguredGridRow[]>(() => {
     const source = nonConfiguredQuery.data?.records || [];
     return source
@@ -483,6 +491,18 @@ export function AmroConfigureDirectivesPage() {
                 />
               </div>
               <div className="space-y-1 md:col-span-2">
+                <Label>Aircraft</Label>
+                <select
+                  className="h-10 w-full rounded-md border bg-background px-2"
+                  value={advancedFilters.aircraftId}
+                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, aircraftId: event.target.value }))}
+                  disabled={!aircraftOptions.length}
+                >
+                  <option value="">(Select)</option>
+                  {aircraftOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1 md:col-span-2">
                 <Label>Directive Type</Label>
                 <select
                   className="h-10 w-full rounded-md border bg-background px-2"
@@ -510,18 +530,6 @@ export function AmroConfigureDirectivesPage() {
                       {option.label}
                     </option>
                   ))}
-                </select>
-              </div>
-              <div className="space-y-1 md:col-span-2">
-                <Label>Aircraft</Label>
-                <select
-                  className="h-10 w-full rounded-md border bg-background px-2"
-                  value={advancedFilters.aircraftId}
-                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, aircraftId: event.target.value }))}
-                  disabled={!aircraftOptions.length}
-                >
-                  <option value="">(Select)</option>
-                  {aircraftOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
               </div>
               <div className="space-y-1 md:col-span-1">
