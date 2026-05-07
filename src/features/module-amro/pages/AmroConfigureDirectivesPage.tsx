@@ -483,14 +483,6 @@ export function AmroConfigureDirectivesPage() {
                 </select>
               </div>
               <div className="space-y-1 md:col-span-2">
-                <Label>Directive No.</Label>
-                <Input
-                  value={advancedFilters.directiveNo}
-                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, directiveNo: event.target.value }))}
-                  placeholder="Filter by directive no."
-                />
-              </div>
-              <div className="space-y-1 md:col-span-2">
                 <Label>Aircraft</Label>
                 <select
                   className="h-10 w-full rounded-md border bg-background px-2"
@@ -501,6 +493,14 @@ export function AmroConfigureDirectivesPage() {
                   <option value="">(Select)</option>
                   {aircraftOptions.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
+              </div>
+              <div className="space-y-1 md:col-span-2">
+                <Label>Directive No.</Label>
+                <Input
+                  value={advancedFilters.directiveNo}
+                  onChange={(event) => setAdvancedFilters((current) => ({ ...current, directiveNo: event.target.value }))}
+                  placeholder="Filter by directive no."
+                />
               </div>
               <div className="space-y-1 md:col-span-2">
                 <Label>Directive Type</Label>
