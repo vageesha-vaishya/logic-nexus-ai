@@ -15,7 +15,14 @@ interface ParsedFrequency {
   is_frequency_parsed_success?: boolean;
 }
 
+interface ParsedEffectiveFrom {
+  effective_from_2_actual_end_hours: string | null;
+  effective_from_2_actual_end_date: string | null;
+}
+
 const TOKEN_PATTERN = /(\d+(?::\d{1,2})?|\d+(?:\.\d+)?)\s*(Ho|RI|Dy|Mt|Yr|L|C|H)\b/gi;
+const EFFECTIVE_FROM_HOURS_PATTERN = /^(\d+(?::\d{1,2})?|\d+(?:\.\d+)?)\s*H$/i;
+const EFFECTIVE_FROM_DATE_PATTERN = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/;
 const DEFAULT_BATCH_SIZE = 500;
 const MAX_FAILURES_IN_RESPONSE = 200;
 
@@ -53,6 +60,100 @@ function normalizeCalendarUnit(unit: string): CalendarUnit | null {
   if (value === "mt") return "Mt";
   if (value === "yr") return "Yr";
   return null;
+}
+
+function parseDdMmmYyyyToIso(value: string): string | null {
+  const m = value.match(EFFECTIVE_FROM_DATE_PATTERN);
+  if (!m) return null;
+
+  const day = Number(m[1]);
+  const monRaw = (m[2] ?? "").toLowerCase();
+  const year = Number(m[3]);
+  if (!Number.isFinite(day) || !Number.isFinite(year) || day < 1 || day > 31) return null;
+
+  const monthMap: Record<string, number> = {
+    jan: 1,
+    feb: 2,
+    mar: 3,
+    apr: 4,
+    may: 5,
+    jun: 6,
+    jul: 7,
+    aug: 8,
+    sep: 9,
+    oct: 10,
+    nov: 11,
+    dec: 12,
+  };
+
+  const month = monthMap[monRaw];
+  if (!month) return null;
+
+  const dt = new Date(Date.UTC(year, month - 1, day));
+  if (
+    dt.getUTCFullYear() !== year ||
+    dt.getUTCMonth() !== month - 1 ||
+    dt.getUTCDate() !== day
+  ) {
+    return null;
+  }
+
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function parseEffectiveFrom(raw: string): {
+  hasInput: boolean;
+  parsed: ParsedEffectiveFrom;
+  errors: string[];
+} {
+  const normalized = raw.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) {
+    return {
+      hasInput: false,
+      parsed: {
+        effective_from_2_actual_end_hours: null,
+        effective_from_2_actual_end_date: null,
+      },
+      errors: [],
+    };
+  }
+
+  const lines = normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const parsed: ParsedEffectiveFrom = {
+    effective_from_2_actual_end_hours: null,
+    effective_from_2_actual_end_date: null,
+  };
+  const errors: string[] = [];
+
+  for (const line of lines) {
+    const hoursMatch = line.match(EFFECTIVE_FROM_HOURS_PATTERN);
+    if (hoursMatch?.[1]) {
+      const intervalText = toIntervalText(hoursMatch[1]);
+      if (!intervalText) {
+        errors.push(`Invalid effective_from hours value: ${hoursMatch[1]}`);
+      } else {
+        parsed.effective_from_2_actual_end_hours = intervalText;
+      }
+      continue;
+    }
+
+    const isoDate = parseDdMmmYyyyToIso(line);
+    if (isoDate) {
+      parsed.effective_from_2_actual_end_date = isoDate;
+      continue;
+    }
+
+    errors.push(`Invalid effective_from value: ${line}`);
+  }
+
+  return {
+    hasInput: true,
+    parsed,
+    errors,
+  };
 }
 
 function parseFrequency(raw: string): { parsed: ParsedFrequency; errors: string[] } {
@@ -186,9 +287,92 @@ serveWithLogger(async (req, logger, supabase) => {
       for (const row of rows) {
         const sequence = Number(row.frequency_sequence);
         try {
+          const effectiveFromRaw = String((row as Record<string, unknown>).effective_from ?? "").trim();
+          const {
+            hasInput: hasEffectiveFromInput,
+            parsed: parsedEffectiveFrom,
+            errors: effectiveFromErrors,
+          } = parseEffectiveFrom(effectiveFromRaw);
+          const hasEffectiveFromTargetData = Boolean(
+            (row as Record<string, unknown>).effective_from_2_actual_end_hours ||
+            (row as Record<string, unknown>).effective_from_2_actual_end_date,
+          );
+
           if (row.is_frequency_parsed_success === true) {
-            skippedCount += 1;
+            if (!hasEffectiveFromInput || hasEffectiveFromTargetData) {
+              skippedCount += 1;
+              continue;
+            }
+
+            if (effectiveFromErrors.length > 0) {
+              failedCount += 1;
+              if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+                failures.push({
+                  frequency_sequence: sequence,
+                  reason: effectiveFromErrors.join("; "),
+                });
+              }
+              continue;
+            }
+
+            const { error: effectiveUpdateError } = await supabase
+              .schema("flypal")
+              .from("flypal_configured_directives")
+              .update({
+                effective_from_2_actual_end_hours: parsedEffectiveFrom.effective_from_2_actual_end_hours,
+                effective_from_2_actual_end_date: parsedEffectiveFrom.effective_from_2_actual_end_date,
+              })
+              .eq("frequency_sequence", sequence);
+
+            if (effectiveUpdateError) {
+              failedCount += 1;
+              if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+                failures.push({
+                  frequency_sequence: sequence,
+                  reason: effectiveUpdateError.message,
+                });
+              }
+              continue;
+            }
+
+            parsedCount += 1;
             continue;
+          }
+
+          if (effectiveFromErrors.length > 0) {
+            const markError = await setParsedStatus(supabase, sequence, false);
+            failedCount += 1;
+            const reason = markError
+              ? `${effectiveFromErrors.join("; ")} | status update failed: ${markError}`
+              : effectiveFromErrors.join("; ");
+            if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+              failures.push({
+                frequency_sequence: sequence,
+                reason,
+              });
+            }
+            continue;
+          }
+
+          if (hasEffectiveFromInput && !hasEffectiveFromTargetData) {
+            const { error: effectiveUpdateError } = await supabase
+              .schema("flypal")
+              .from("flypal_configured_directives")
+              .update({
+                effective_from_2_actual_end_hours: parsedEffectiveFrom.effective_from_2_actual_end_hours,
+                effective_from_2_actual_end_date: parsedEffectiveFrom.effective_from_2_actual_end_date,
+              })
+              .eq("frequency_sequence", sequence);
+            if (effectiveUpdateError) {
+              failedCount += 1;
+              if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+                failures.push({
+                  frequency_sequence: sequence,
+                  reason: effectiveUpdateError.message,
+                });
+              }
+              continue;
+            }
           }
 
           const sourceText = String((row as Record<string, unknown>).frequency ?? (row as Record<string, unknown>).frequecny ?? "").trim();
@@ -219,10 +403,19 @@ serveWithLogger(async (req, logger, supabase) => {
             continue;
           }
 
+          const updatePayload: Record<string, unknown> = {
+            ...parsed,
+            is_frequency_parsed_success: true,
+          };
+          if (hasEffectiveFromInput) {
+            updatePayload.effective_from_2_actual_end_hours = parsedEffectiveFrom.effective_from_2_actual_end_hours;
+            updatePayload.effective_from_2_actual_end_date = parsedEffectiveFrom.effective_from_2_actual_end_date;
+          }
+
           const { error: updateError } = await supabase
             .schema("flypal")
             .from("flypal_configured_directives")
-            .update({ ...parsed, is_frequency_parsed_success: true })
+            .update(updatePayload)
             .eq("frequency_sequence", sequence);
 
           if (updateError) {
