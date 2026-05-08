@@ -393,6 +393,7 @@ serveWithLogger(async (req, logger, supabase) => {
             }
 
             if (effectiveFromErrors.length > 0) {
+              await setParsedStatus(supabase, sequence, false);
               failedCount += 1;
               if (failures.length < MAX_FAILURES_IN_RESPONSE) {
                 failures.push({
@@ -403,6 +404,7 @@ serveWithLogger(async (req, logger, supabase) => {
               continue;
             }
             if (currentErrors.length > 0) {
+              await setParsedStatus(supabase, sequence, false);
               failedCount += 1;
               if (failures.length < MAX_FAILURES_IN_RESPONSE) {
                 failures.push({
@@ -434,6 +436,7 @@ serveWithLogger(async (req, logger, supabase) => {
               .eq("frequency_sequence", sequence);
 
             if (effectiveUpdateError) {
+              await setParsedStatus(supabase, sequence, false);
               failedCount += 1;
               if (failures.length < MAX_FAILURES_IN_RESPONSE) {
                 failures.push({
@@ -511,14 +514,14 @@ serveWithLogger(async (req, logger, supabase) => {
 
           const sourceText = String((row as Record<string, unknown>).frequency ?? (row as Record<string, unknown>).frequecny ?? "").trim();
           if (!sourceText) {
-            const markError = await setParsedStatus(supabase, sequence, false);
+            const markError = await setParsedStatus(supabase, sequence, true);
             if (markError) {
               failedCount += 1;
               if (failures.length < MAX_FAILURES_IN_RESPONSE) {
                 failures.push({ frequency_sequence: sequence, reason: `Failed to mark parse status: ${markError}` });
               }
             } else {
-              skippedCount += 1;
+              parsedCount += 1;
             }
             continue;
           }
