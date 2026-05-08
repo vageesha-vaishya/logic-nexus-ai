@@ -243,7 +243,7 @@ export class WorkOrdersService {
     if (task.required_qualification) {
       return task.required_qualification;
     }
-    const rating = task.qualifications?.rating;
+    const rating = task.qualifications_json?.rating;
     return typeof rating === 'string' ? rating : undefined;
   }
 
@@ -932,7 +932,7 @@ export class WorkOrdersService {
         if (!workOrderId) {
           throw new Error('work_order_id is required');
         }
-        const taskQualifications = request.qualifications
+        const taskQualifications = request.qualifications_json
           ?? (request.required_qualification ? { rating: request.required_qualification } : undefined);
 
         const { data, error } = await this.supabase
@@ -948,7 +948,7 @@ export class WorkOrdersService {
             sequence_order: sequenceOrder,
             planned_start_date: request.planned_start_date,
             planned_end_date: plannedEndDate,
-            qualifications: taskQualifications,
+            qualifications_json: taskQualifications,
             created_by: userId,
             updated_by: userId,
           })
@@ -1024,9 +1024,9 @@ export class WorkOrdersService {
     if (request.actual_end_date !== undefined || request.actual_completion_date !== undefined) {
       updateData.actual_end_date = request.actual_end_date ?? request.actual_completion_date;
     }
-    if (request.assigned_to !== undefined) updateData.assigned_to = request.assigned_to;
-    if (request.qualifications !== undefined || request.required_qualification !== undefined) {
-      updateData.qualifications = request.qualifications
+    if (request.assigned_technician_id !== undefined) updateData.assigned_technician_id = request.assigned_technician_id;
+    if (request.qualifications_json !== undefined || request.required_qualification !== undefined) {
+      updateData.qualifications_json = request.qualifications_json
         ?? (request.required_qualification ? { rating: request.required_qualification } : null);
     }
 
@@ -1058,7 +1058,7 @@ export class WorkOrdersService {
         description: task.description,
         status: task.status,
         sequence_number: this.getTaskSequence(task),
-        assigned_to: task.assigned_to,
+        assigned_technician_id: task.assigned_technician_id,
         required_qualification: this.getTaskRequiredQualification(task),
       },
     );
@@ -1077,7 +1077,7 @@ export class WorkOrdersService {
           title: task.title,
           description: task.description,
           status: task.status,
-          assigned_to: task.assigned_to,
+          assigned_technician_id: task.assigned_technician_id,
           started_at: new Date().toISOString(),
         },
       );
@@ -1097,7 +1097,7 @@ export class WorkOrdersService {
           title: task.title,
           description: task.description,
           status: task.status,
-          assigned_to: task.assigned_to,
+          assigned_technician_id: task.assigned_technician_id,
           completed_at: new Date().toISOString(),
         },
       );

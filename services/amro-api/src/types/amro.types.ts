@@ -106,8 +106,8 @@ export interface Task {
   actual_start_date?: string;
   actual_end_date?: string;
   actual_completion_date?: string;
-  assigned_to?: string;
-  qualifications?: Record<string, unknown> | null;
+  assigned_technician_id?: string;
+  qualifications_json?: Record<string, unknown> | null;
   required_qualification?: string;
   created_at: string;
   updated_at: string;
@@ -240,7 +240,7 @@ export interface CreateTaskRequest {
   planned_start_date?: string;
   planned_end_date?: string;
   planned_completion_date?: string;
-  qualifications?: Record<string, unknown>;
+  qualifications_json?: Record<string, unknown>;
   required_qualification?: string;
 }
 
@@ -257,8 +257,8 @@ export interface UpdateTaskRequest {
   actual_start_date?: string;
   actual_end_date?: string;
   actual_completion_date?: string;
-  assigned_to?: string;
-  qualifications?: Record<string, unknown> | null;
+  assigned_technician_id?: string;
+  qualifications_json?: Record<string, unknown> | null;
   required_qualification?: string;
 }
 

@@ -169,7 +169,7 @@ function mapTaskWithDirectiveToConfiguredRecord(taskRow: JsonRecord, directiveRo
     task_category: normalizeString(taskRow.task_category),
     task_status: normalizeString(taskRow.status),
     task_sequence_order: normalizeInteger(taskRow.sequence_order),
-    task_assigned_to: normalizeString(taskRow.assigned_to),
+    task_assigned_to: normalizeString(taskRow.assigned_technician_id),
     task_planned_start_date: normalizeString(taskRow.planned_start_date),
     task_planned_end_date: normalizeString(taskRow.planned_end_date),
     task_actual_start_date: normalizeString(taskRow.actual_start_date),
@@ -254,7 +254,7 @@ async function resolveLatestTasksByDirective(params: {
 }): Promise<JsonRecord[]> {
   let query = params.supabase
     .from('tasks')
-    .select('id,tenant_id,franchise_id,directive_id,work_order_id,task_number,title,description,task_category,status,sequence_order,assigned_to,planned_start_date,planned_end_date,actual_start_date,actual_end_date,created_at,updated_at,work_orders!inner(aircraft_id)')
+    .select('id,tenant_id,franchise_id,directive_id,work_order_id,task_number,title,description,task_category,status,sequence_order,assigned_technician_id,planned_start_date,planned_end_date,actual_start_date,actual_end_date,created_at,updated_at,work_orders!inner(aircraft_id)')
     .eq('tenant_id', params.tenantId)
     .eq('work_orders.aircraft_id', params.aircraftId)
     .not('directive_id', 'is', null)
@@ -897,8 +897,8 @@ router.patch(
     if (payload.task_category !== undefined || payload.task_category_code !== undefined) {
       patch.task_category = normalizeString(payload.task_category ?? payload.task_category_code);
     }
-    if (payload.task_assigned_to !== undefined || payload.assigned_to !== undefined) {
-      patch.assigned_to = normalizeString(payload.task_assigned_to ?? payload.assigned_to);
+    if (payload.task_assigned_to !== undefined || payload.assigned_technician_id !== undefined) {
+      patch.assigned_technician_id = normalizeString(payload.task_assigned_to ?? payload.assigned_technician_id);
     }
     patch.updated_by = String(req.userId);
     patch.updated_at = new Date().toISOString();

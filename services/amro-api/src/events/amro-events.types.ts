@@ -67,7 +67,7 @@ export interface AmroTaskEvent extends AmroEventPayload {
     work_order_id: string;
     title: string;
     status?: string;
-    assigned_to?: string;
+    assigned_technician_id?: string;
     [key: string]: any;
   };
 }
