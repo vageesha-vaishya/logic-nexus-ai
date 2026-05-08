@@ -20,9 +20,16 @@ interface ParsedEffectiveFrom {
   effective_from_2_actual_end_date: string | null;
 }
 
+interface ParsedCurrent {
+  current_2_aircraft_current_flight_hours: string | null;
+  current_2_aircraft_current_landings: number | null;
+  current_2_aircraft_current_reading_date: string | null;
+}
+
 const TOKEN_PATTERN = /(\d+(?::\d{1,2})?|\d+(?:\.\d+)?)\s*(Ho|RI|Dy|Mt|Yr|L|C|H)\b/gi;
 const EFFECTIVE_FROM_HOURS_PATTERN = /^(\d+(?::\d{1,2})?|\d+(?:\.\d+)?)\s*H$/i;
 const EFFECTIVE_FROM_DATE_PATTERN = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/;
+const CURRENT_LANDINGS_PATTERN = /^(\d+(?:\.\d+)?)\s*L$/i;
 const DEFAULT_BATCH_SIZE = 500;
 const MAX_FAILURES_IN_RESPONSE = 200;
 
@@ -147,6 +154,74 @@ function parseEffectiveFrom(raw: string): {
     }
 
     errors.push(`Invalid effective_from value: ${line}`);
+  }
+
+  return {
+    hasInput: true,
+    parsed,
+    errors,
+  };
+}
+
+function parseCurrent(raw: string): {
+  hasInput: boolean;
+  parsed: ParsedCurrent;
+  errors: string[];
+} {
+  const normalized = raw.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) {
+    return {
+      hasInput: false,
+      parsed: {
+        current_2_aircraft_current_flight_hours: null,
+        current_2_aircraft_current_landings: null,
+        current_2_aircraft_current_reading_date: null,
+      },
+      errors: [],
+    };
+  }
+
+  const tokens = normalized
+    .split(/[,\n]/)
+    .map((token) => token.trim())
+    .filter(Boolean);
+  const parsed: ParsedCurrent = {
+    current_2_aircraft_current_flight_hours: null,
+    current_2_aircraft_current_landings: null,
+    current_2_aircraft_current_reading_date: null,
+  };
+  const errors: string[] = [];
+
+  for (const token of tokens) {
+    const hoursMatch = token.match(EFFECTIVE_FROM_HOURS_PATTERN);
+    if (hoursMatch?.[1]) {
+      const intervalText = toIntervalText(hoursMatch[1]);
+      if (!intervalText) {
+        errors.push(`Invalid current hours value: ${hoursMatch[1]}`);
+      } else {
+        parsed.current_2_aircraft_current_flight_hours = intervalText;
+      }
+      continue;
+    }
+
+    const landingsMatch = token.match(CURRENT_LANDINGS_PATTERN);
+    if (landingsMatch?.[1]) {
+      const landings = toRoundedInt(landingsMatch[1]);
+      if (landings === null) {
+        errors.push(`Invalid current landings value: ${landingsMatch[1]}`);
+      } else {
+        parsed.current_2_aircraft_current_landings = landings;
+      }
+      continue;
+    }
+
+    const isoDate = parseDdMmmYyyyToIso(token);
+    if (isoDate) {
+      parsed.current_2_aircraft_current_reading_date = isoDate;
+      continue;
+    }
+
+    errors.push(`Invalid current value: ${token}`);
   }
 
   return {
@@ -297,9 +372,22 @@ serveWithLogger(async (req, logger, supabase) => {
             (row as Record<string, unknown>).effective_from_2_actual_end_hours ||
             (row as Record<string, unknown>).effective_from_2_actual_end_date,
           );
+          const currentRaw = String((row as Record<string, unknown>).current ?? "").trim();
+          const {
+            hasInput: hasCurrentInput,
+            parsed: parsedCurrent,
+            errors: currentErrors,
+          } = parseCurrent(currentRaw);
+          const hasCurrentTargetData = Boolean(
+            (row as Record<string, unknown>).current_2_aircraft_current_flight_hours ||
+            (row as Record<string, unknown>).current_2_aircraft_current_landings ||
+            (row as Record<string, unknown>).current_2_aircraft_current_reading_date,
+          );
 
           if (row.is_frequency_parsed_success === true) {
-            if (!hasEffectiveFromInput || hasEffectiveFromTargetData) {
+            const shouldProcessEffectiveFrom = hasEffectiveFromInput && !hasEffectiveFromTargetData;
+            const shouldProcessCurrent = hasCurrentInput && !hasCurrentTargetData;
+            if (!shouldProcessEffectiveFrom && !shouldProcessCurrent) {
               skippedCount += 1;
               continue;
             }
@@ -314,13 +402,34 @@ serveWithLogger(async (req, logger, supabase) => {
               }
               continue;
             }
+            if (currentErrors.length > 0) {
+              failedCount += 1;
+              if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+                failures.push({
+                  frequency_sequence: sequence,
+                  reason: currentErrors.join("; "),
+                });
+              }
+              continue;
+            }
 
             const { error: effectiveUpdateError } = await supabase
               .schema("flypal")
               .from("flypal_configured_directives")
               .update({
-                effective_from_2_actual_end_hours: parsedEffectiveFrom.effective_from_2_actual_end_hours,
-                effective_from_2_actual_end_date: parsedEffectiveFrom.effective_from_2_actual_end_date,
+                ...(shouldProcessEffectiveFrom
+                  ? {
+                    effective_from_2_actual_end_hours: parsedEffectiveFrom.effective_from_2_actual_end_hours,
+                    effective_from_2_actual_end_date: parsedEffectiveFrom.effective_from_2_actual_end_date,
+                  }
+                  : {}),
+                ...(shouldProcessCurrent
+                  ? {
+                    current_2_aircraft_current_flight_hours: parsedCurrent.current_2_aircraft_current_flight_hours,
+                    current_2_aircraft_current_landings: parsedCurrent.current_2_aircraft_current_landings,
+                    current_2_aircraft_current_reading_date: parsedCurrent.current_2_aircraft_current_reading_date,
+                  }
+                  : {}),
               })
               .eq("frequency_sequence", sequence);
 
@@ -353,14 +462,39 @@ serveWithLogger(async (req, logger, supabase) => {
             }
             continue;
           }
+          if (currentErrors.length > 0) {
+            const markError = await setParsedStatus(supabase, sequence, false);
+            failedCount += 1;
+            const reason = markError
+              ? `${currentErrors.join("; ")} | status update failed: ${markError}`
+              : currentErrors.join("; ");
+            if (failures.length < MAX_FAILURES_IN_RESPONSE) {
+              failures.push({
+                frequency_sequence: sequence,
+                reason,
+              });
+            }
+            continue;
+          }
 
-          if (hasEffectiveFromInput && !hasEffectiveFromTargetData) {
+          if ((hasEffectiveFromInput && !hasEffectiveFromTargetData) || (hasCurrentInput && !hasCurrentTargetData)) {
             const { error: effectiveUpdateError } = await supabase
               .schema("flypal")
               .from("flypal_configured_directives")
               .update({
-                effective_from_2_actual_end_hours: parsedEffectiveFrom.effective_from_2_actual_end_hours,
-                effective_from_2_actual_end_date: parsedEffectiveFrom.effective_from_2_actual_end_date,
+                ...(hasEffectiveFromInput && !hasEffectiveFromTargetData
+                  ? {
+                    effective_from_2_actual_end_hours: parsedEffectiveFrom.effective_from_2_actual_end_hours,
+                    effective_from_2_actual_end_date: parsedEffectiveFrom.effective_from_2_actual_end_date,
+                  }
+                  : {}),
+                ...(hasCurrentInput && !hasCurrentTargetData
+                  ? {
+                    current_2_aircraft_current_flight_hours: parsedCurrent.current_2_aircraft_current_flight_hours,
+                    current_2_aircraft_current_landings: parsedCurrent.current_2_aircraft_current_landings,
+                    current_2_aircraft_current_reading_date: parsedCurrent.current_2_aircraft_current_reading_date,
+                  }
+                  : {}),
               })
               .eq("frequency_sequence", sequence);
             if (effectiveUpdateError) {
@@ -410,6 +544,11 @@ serveWithLogger(async (req, logger, supabase) => {
           if (hasEffectiveFromInput) {
             updatePayload.effective_from_2_actual_end_hours = parsedEffectiveFrom.effective_from_2_actual_end_hours;
             updatePayload.effective_from_2_actual_end_date = parsedEffectiveFrom.effective_from_2_actual_end_date;
+          }
+          if (hasCurrentInput) {
+            updatePayload.current_2_aircraft_current_flight_hours = parsedCurrent.current_2_aircraft_current_flight_hours;
+            updatePayload.current_2_aircraft_current_landings = parsedCurrent.current_2_aircraft_current_landings;
+            updatePayload.current_2_aircraft_current_reading_date = parsedCurrent.current_2_aircraft_current_reading_date;
           }
 
           const { error: updateError } = await supabase
