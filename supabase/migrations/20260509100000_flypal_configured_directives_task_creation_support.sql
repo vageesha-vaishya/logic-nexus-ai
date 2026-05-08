@@ -18,19 +18,34 @@ BEGIN
 END $$;
 
 -- Dedicated flag for task creation outcome (separate from id_match outcome)
+-- Default false so all existing rows are considered pending
 ALTER TABLE flypal.flypal_configured_directives
-  ADD COLUMN IF NOT EXISTS is_task_created_success boolean NULL;
+  ADD COLUMN IF NOT EXISTS is_task_created_success boolean NOT NULL DEFAULT false;
+
+-- Backfill: rows that already have a created_task_id are considered succeeded
+UPDATE flypal.flypal_configured_directives
+SET is_task_created_success = true
+WHERE created_task_id IS NOT NULL
+  AND is_task_created_success = false;
+
+-- Dedicated failure reason column for task creation (separate from generic failure_reason)
+ALTER TABLE flypal.flypal_configured_directives
+  ADD COLUMN IF NOT EXISTS task_created_failure_reason text NULL;
 
 COMMENT ON COLUMN flypal.flypal_configured_directives.is_task_created_success IS
-  'Set to true when flypal_configured_directives_create_tasks edge function
-   successfully creates a public.tasks row for this directive. NULL = not yet
-   attempted. false = attempted and failed (see failure_reason).';
+  'true = task created successfully. false (default) = not yet created or failed.
+   Never process rows where this is true.';
 
--- Index to efficiently fetch rows pending task creation
+COMMENT ON COLUMN flypal.flypal_configured_directives.task_created_failure_reason IS
+  'Populated with the error reason when flypal_configured_directives_create_tasks
+   fails to create a task for this row. Null on success.';
+
+-- Index to efficiently fetch rows pending task creation:
+--   directive matched (is_row_processed_success=true) + task not yet created
 CREATE INDEX IF NOT EXISTS idx_flypal_cfg_dir_pending_task_creation
   ON flypal.flypal_configured_directives (tenant_id, frequency_sequence)
-  WHERE is_frequency_parsed_success = true
-    AND directive_id IS NOT NULL
-    AND created_task_id IS NULL;
+  WHERE directive_id IS NOT NULL
+    AND is_row_processed_success = true
+    AND is_task_created_success = false;
 
 COMMIT;
