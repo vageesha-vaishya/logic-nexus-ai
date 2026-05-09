@@ -26,8 +26,8 @@ import { requireServiceRoleOrAdmin } from "../_shared/auth.ts";
 //
 // PROCESSING FILTER:
 //   directive_id IS NOT NULL
-//   AND is_row_processed_success = TRUE     ← directive id was matched successfully
-//   AND is_task_created_success  = FALSE    ← task not yet created (default false)
+//   AND is_row_processed_success = TRUE                        ← directive id was matched successfully
+//   AND (is_task_created_success = FALSE OR IS NULL)           ← task not yet created or never attempted
 //
 // ON SUCCESS: is_task_created_success = true, created_task_id = <uuid>, processed_on = now()
 // ON FAILURE: is_task_created_success = false (unchanged), task_created_failure_reason = <message>
@@ -135,7 +135,7 @@ serveWithLogger(async (req, logger, supabase) => {
         )
         .not("directive_id", "is", null)
         .eq("is_row_processed_success", true)
-        .eq("is_task_created_success", false)
+        .or("is_task_created_success.is.null,is_task_created_success.eq.false")
         .order("frequency_sequence", { ascending: true })
         .range(offset, offset + batchSize - 1);
 
