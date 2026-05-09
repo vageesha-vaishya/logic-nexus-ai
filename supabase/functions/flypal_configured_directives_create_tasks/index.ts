@@ -6,35 +6,41 @@ import { requireServiceRoleOrAdmin } from "../_shared/auth.ts";
 // COLUMN MAPPING: flypal.flypal_configured_directives → public.tasks
 // ═══════════════════════════════════════════════════════════════════════════════
 //
-// Source (flypal_configured_directives)       Target (public.tasks)            Notes
-// ─────────────────────────────────────────── ───────────────────────────────  ──────────────────────────────────────────────
-// tenant_id                                   tenant_id                        Direct
-// franchise_id                                franchise_id                     Direct
-// directive_id                                directive_id                     Direct FK → public.directives
-// "TSK-" + registration + " " + directive_no  task_number                      e.g. "TSK-VT-ABC AMP-AD-001"
-// directive_no + " — " + registration         title                            Required NOT NULL
-// notes                                       notes                            Direct
-// (fixed) "directives"                        task_category                    Always "directives"
-// "AMA-" + ata_code + "-00-00"               procedure_reference               e.g. "AMA-05-10-00-00"
-// effective_from_2_actual_end_date            actual_end_date                  Cast date → timestamptz (midnight UTC)
-// effective_from_2_actual_end_date            planned_start_date               = actual_end_date − (estimated_man_hours/8) − 1 day
-//   └─ estimated_man_hours from public.directives via directive_id FK
-// directives.estimated_man_hours              estimated_duration_hours         Fetched from public.directives in batch
-// null                                        checklist                        Always null
-// null                                        work_order_id                    Nullable — no work order at import time
-// (fixed) "pending"                           status                           Default
+// Source (flypal_configured_directives)                  Target (public.tasks)        Notes
+// ──────────────────────────────────────────────────     ────────────────────────     ───────────────────────────────────────────────────────────────
+// tenant_id                                              tenant_id                    Direct
+// franchise_id                                           franchise_id                 Direct
+// directive_id                                           directive_id                 Direct FK → public.directives
+// "TSK-" + registration + " " + directive_no             task_number                  e.g. "TSK-VT-ABC AMP-AD-001"
+// directive_no + " — " + registration                    title                        Required NOT NULL
+// notes                                                  notes                        Direct
+// (fixed) "directives"                                   task_category                Always "directives"
+// "AMA-" + ata_code + "-00-00"                           procedure_reference          e.g. "AMA-05-10-00-00"
+// effective_from_2_actual_end_date                       actual_end_date              Cast date → timestamptz (midnight UTC)
+// effective_from_2_actual_end_date − (man_hrs/8) − 1d   planned_start_date           estimated_man_hours from public.directives
+// directives.estimated_man_hours                         estimated_duration_hours     Batch-fetched from public.directives
+// aircraft lookup (tenant_id+franchise_id+registration   aircraft_id                  Resolved per-row; REQUIRED — fails if not found
+//   +serial_number) → public.aircraft.id
+// ata_codes lookup (tenant_id + ata_code)                ata_code_id                  Resolved per-row; REQUIRED — fails if not found
+//   → public.ata_codes.id where ata_codes.code = ata_code
+// null                                                   checklist                    Always null
+// null                                                   work_order_id                Nullable — no work order at import time
+// (fixed) "pending"                                      status                       Default
 //
 // PROCESSING FILTER:
 //   directive_id IS NOT NULL
-//   AND is_row_processed_success = TRUE                        ← directive id was matched successfully
-//   AND (is_task_created_success = FALSE OR IS NULL)           ← task not yet created or never attempted
+//   AND is_row_processed_success = TRUE                  ← directive id matched successfully (id_match step)
+//   AND (is_task_created_success = FALSE OR IS NULL)     ← task not yet created or never attempted
 //
-// ON SUCCESS: is_task_created_success = true, created_task_id = <uuid>, processed_on = now()
-// ON FAILURE: is_task_created_success = false (unchanged), task_created_failure_reason = <message>
+// ON SUCCESS: is_task_created_success=true, created_task_id=<uuid>, processed_on=now(), task_created_failure_reason=null
+// ON FAILURE: is_task_created_success=false, task_created_failure_reason=<message>, processed_on=now()
+//             Processing continues to the next record regardless of per-row failure.
 // ═══════════════════════════════════════════════════════════════════════════════
 
 const DEFAULT_BATCH_SIZE = 200;
 const MAX_FAILURES_IN_RESPONSE = 200;
+
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface SourceRow {
   id: string;
@@ -44,6 +50,7 @@ interface SourceRow {
   directive_id: string | null;
   directive_no: string | null;
   registration: string | null;
+  serial_number: string | null;
   notes: string | null;
   ata_code: string | null;
   effective_from_2_actual_end_date: string | null;
@@ -54,14 +61,31 @@ interface DirectiveRow {
   estimated_man_hours: number | null;
 }
 
-function buildTaskNumber(registration: string | null, directiveNo: string | null): string {
+interface AircraftRow {
+  id: string;
+}
+
+interface AtaCodeRow {
+  id: string;
+}
+
+// ─── Pure helper functions (independently testable) ───────────────────────────
+
+export function buildTaskNumber(
+  registration: string | null,
+  directiveNo: string | null,
+): string {
   const reg = String(registration || "").trim();
   const dn = String(directiveNo || "").trim();
   const parts = [reg, dn].filter(Boolean).join(" ");
   return parts ? `TSK-${parts}` : `TSK-UNKNOWN`;
 }
 
-function buildTitle(directiveNo: string | null, registration: string | null, seq: number): string {
+export function buildTitle(
+  directiveNo: string | null,
+  registration: string | null,
+  seq: number,
+): string {
   const parts = [
     String(directiveNo || "").trim(),
     String(registration || "").trim(),
@@ -69,19 +93,19 @@ function buildTitle(directiveNo: string | null, registration: string | null, seq
   return parts.length > 0 ? parts.join(" — ") : `Directive task (seq ${seq})`;
 }
 
-function buildProcedureReference(ataCode: string | null): string | null {
+export function buildProcedureReference(ataCode: string | null): string | null {
   const ata = String(ataCode || "").trim();
   return ata ? `AMA-${ata}-00-00` : null;
 }
 
-function calcPlannedStartDate(
+export function calcPlannedStartDate(
   effectiveFromDate: string | null,
   estimatedManHours: number | null,
 ): string | null {
   if (!effectiveFromDate) return null;
   const d = new Date(effectiveFromDate);
   if (isNaN(d.getTime())) return null;
-  // working days back = estimated_man_hours / 8h per day, plus 1 buffer day
+  // Days to subtract = ceil(man_hours / 8h per working day) + 1 buffer day
   const workingDays = estimatedManHours != null && estimatedManHours > 0
     ? estimatedManHours / 8
     : 0;
@@ -89,6 +113,68 @@ function calcPlannedStartDate(
   d.setUTCDate(d.getUTCDate() - totalDaysBack);
   return d.toISOString();
 }
+
+// ─── Lookup helpers ───────────────────────────────────────────────────────────
+
+/**
+ * Resolve aircraft.id from tenant_id + franchise_id + registration + serial_number.
+ * Returns null if no match; throws if the DB query itself errors.
+ */
+export async function resolveAircraftId(
+  supabase: any,
+  tenantId: string,
+  franchiseId: string | null,
+  registration: string | null,
+  serialNumber: string | null,
+): Promise<string | null> {
+  if (!registration && !serialNumber) return null;
+
+  let query = supabase
+    .from("aircraft")
+    .select("id")
+    .eq("tenant_id", tenantId);
+
+  // franchise_id: match explicitly when present, otherwise allow any
+  if (franchiseId) {
+    query = query.eq("franchise_id", franchiseId);
+  }
+  if (registration) {
+    query = query.eq("registration", registration.trim());
+  }
+  if (serialNumber) {
+    query = query.eq("serial_number", serialNumber.trim());
+  }
+
+  const { data, error } = await query.limit(1).maybeSingle();
+  if (error) throw new Error(`aircraft lookup failed: ${error.message}`);
+  return (data as AircraftRow | null)?.id ?? null;
+}
+
+/**
+ * Resolve ata_codes.id from tenant_id + ata_code string.
+ * Matches ata_codes.code = ata_code (case-insensitive trim).
+ * Returns null if no match; throws if the DB query itself errors.
+ */
+export async function resolveAtaCodeId(
+  supabase: any,
+  tenantId: string,
+  ataCode: string | null,
+): Promise<string | null> {
+  if (!ataCode) return null;
+
+  const { data, error } = await supabase
+    .from("ata_codes")
+    .select("id")
+    .eq("tenant_id", tenantId)
+    .eq("code", ataCode.trim())
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw new Error(`ata_codes lookup failed: ${error.message}`);
+  return (data as AtaCodeRow | null)?.id ?? null;
+}
+
+// ─── Main handler ─────────────────────────────────────────────────────────────
 
 serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
@@ -111,7 +197,6 @@ serveWithLogger(async (req, logger, supabase) => {
       ? Math.min(Math.floor(batchSizeRaw), 2000)
       : DEFAULT_BATCH_SIZE;
 
-    // Optional: restrict to a single tenant
     const tenantFilter = requestUrl.searchParams.get("tenant_id")?.trim() || null;
 
     let totalRows = 0;
@@ -122,16 +207,13 @@ serveWithLogger(async (req, logger, supabase) => {
 
     while (true) {
       // ── Fetch next batch ──────────────────────────────────────────────────
-      // Eligible rows:
-      //   • directive_id IS NOT NULL  (id match was done)
-      //   • is_row_processed_success = TRUE  (id match succeeded)
-      //   • is_task_created_success = FALSE  (task not yet created — default false)
       let query = supabase
         .schema("flypal")
         .from("flypal_configured_directives")
         .select(
           "id,frequency_sequence,tenant_id,franchise_id,directive_id," +
-          "directive_no,registration,notes,ata_code,effective_from_2_actual_end_date",
+          "directive_no,registration,serial_number,notes,ata_code," +
+          "effective_from_2_actual_end_date",
         )
         .not("directive_id", "is", null)
         .eq("is_row_processed_success", true)
@@ -149,7 +231,7 @@ serveWithLogger(async (req, logger, supabase) => {
 
       totalRows += rows.length;
 
-      // ── Batch-fetch estimated_man_hours from public.directives ────────────
+      // ── Batch-fetch directive estimated_man_hours ─────────────────────────
       const directiveIds = [
         ...new Set(
           (rows as unknown as SourceRow[])
@@ -180,7 +262,7 @@ serveWithLogger(async (req, logger, supabase) => {
         const seq = Number(rawRow.frequency_sequence);
 
         try {
-          // ── Guard: required fields ─────────────────────────────────────
+          // ── Guard: required context fields ────────────────────────────────
           if (!rawRow.tenant_id) {
             throw new Error("tenant_id is null — cannot create task without tenant context");
           }
@@ -190,10 +272,40 @@ serveWithLogger(async (req, logger, supabase) => {
             );
           }
 
-          // ── Resolve directive data ─────────────────────────────────────
+          // ── Resolve aircraft_id (REQUIRED) ────────────────────────────────
+          const aircraftId = await resolveAircraftId(
+            supabase,
+            rawRow.tenant_id,
+            rawRow.franchise_id,
+            rawRow.registration,
+            rawRow.serial_number,
+          );
+          if (!aircraftId) {
+            throw new Error(
+              `No matching aircraft found for tenant_id=${rawRow.tenant_id}, ` +
+              `franchise_id=${rawRow.franchise_id ?? "null"}, ` +
+              `registration=${rawRow.registration ?? "null"}, ` +
+              `serial_number=${rawRow.serial_number ?? "null"}`,
+            );
+          }
+
+          // ── Resolve ata_code_id (REQUIRED) ───────────────────────────────
+          const ataCodeId = await resolveAtaCodeId(
+            supabase,
+            rawRow.tenant_id,
+            rawRow.ata_code,
+          );
+          if (!ataCodeId) {
+            throw new Error(
+              `No matching ata_code found for tenant_id=${rawRow.tenant_id}, ` +
+              `ata_code=${rawRow.ata_code ?? "null"}`,
+            );
+          }
+
+          // ── Resolve directive data ────────────────────────────────────────
           const estimatedManHours = directiveMap.get(rawRow.directive_id) ?? null;
 
-          // ── Dates ──────────────────────────────────────────────────────
+          // ── Dates ─────────────────────────────────────────────────────────
           const actualEndDate = rawRow.effective_from_2_actual_end_date
             ? new Date(rawRow.effective_from_2_actual_end_date).toISOString()
             : null;
@@ -203,12 +315,14 @@ serveWithLogger(async (req, logger, supabase) => {
             estimatedManHours,
           );
 
-          // ── Task payload ───────────────────────────────────────────────
+          // ── Build task payload ────────────────────────────────────────────
           const taskPayload: Record<string, unknown> = {
             tenant_id: rawRow.tenant_id,
             franchise_id: rawRow.franchise_id ?? null,
             work_order_id: null,
             directive_id: rawRow.directive_id,
+            aircraft_id: aircraftId,
+            ata_code_id: ataCodeId,
             task_number: buildTaskNumber(rawRow.registration, rawRow.directive_no),
             title: buildTitle(rawRow.directive_no, rawRow.registration, seq),
             notes: String(rawRow.notes || "").trim() || null,
@@ -224,7 +338,7 @@ serveWithLogger(async (req, logger, supabase) => {
             updated_at: new Date().toISOString(),
           };
 
-          // ── Insert task ────────────────────────────────────────────────
+          // ── Insert task ───────────────────────────────────────────────────
           const { data: inserted, error: insertError } = await supabase
             .from("tasks")
             .insert(taskPayload)
@@ -240,7 +354,7 @@ serveWithLogger(async (req, logger, supabase) => {
             throw new Error("Task inserted but no id returned");
           }
 
-          // ── Mark source row as succeeded ───────────────────────────────
+          // ── Mark source row as succeeded ──────────────────────────────────
           const { error: updateError } = await supabase
             .schema("flypal")
             .from("flypal_configured_directives")
@@ -253,18 +367,14 @@ serveWithLogger(async (req, logger, supabase) => {
             .eq("id", rowId);
 
           if (updateError) {
-            // Task was created — log but don't count as failure
             await logger.warn("Task created but source-row update failed", {
-              rowId,
-              seq,
-              createdTaskId,
-              error: updateError.message,
+              rowId, seq, createdTaskId, error: updateError.message,
             });
           }
 
           createdCount += 1;
         } catch (rowErr: unknown) {
-          // ── Mark source row as failed — continue to next record ────────
+          // ── Per-row failure: write reason and continue ────────────────────
           const reason = rowErr instanceof Error ? rowErr.message : String(rowErr);
 
           await supabase
@@ -281,7 +391,6 @@ serveWithLogger(async (req, logger, supabase) => {
           if (failures.length < MAX_FAILURES_IN_RESPONSE) {
             failures.push({ id: rowId, frequency_sequence: seq, reason });
           }
-          // continue — next record is processed regardless
         }
       }
 
