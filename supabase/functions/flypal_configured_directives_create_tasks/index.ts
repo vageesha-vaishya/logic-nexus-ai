@@ -271,7 +271,7 @@ serveWithLogger(async (req, logger, supabase) => {
             .schema("flypal")
             .from("flypal_configured_directives")
             .update({
-              // is_task_created_success stays false (its default)
+              is_task_created_success: false,
               task_created_failure_reason: reason.slice(0, 1000),
               processed_on: new Date().toISOString(),
             })
