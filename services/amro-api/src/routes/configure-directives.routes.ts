@@ -252,30 +252,60 @@ async function resolveLatestTasksByDirective(params: {
   franchiseId: string | null;
   aircraftId: string;
 }): Promise<JsonRecord[]> {
-  let query = params.supabase
+  let directAircraftQuery = params.supabase
+    .from('tasks')
+    .select('id,tenant_id,franchise_id,directive_id,work_order_id,task_number,title,description,task_category,status,sequence_order,assigned_technician_id,planned_start_date,planned_end_date,actual_start_date,actual_end_date,created_at,updated_at')
+    .eq('tenant_id', params.tenantId)
+    .eq('aircraft_id', params.aircraftId)
+    .not('directive_id', 'is', null)
+    .order('updated_at', { ascending: false, nullsFirst: false })
+    .order('created_at', { ascending: false, nullsFirst: false });
+  if (params.franchiseId) {
+    directAircraftQuery = directAircraftQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+  }
+  const { data: directAircraftData, error: directAircraftError } = await directAircraftQuery.limit(5000);
+  if (directAircraftError) {
+    throw new Error(`Failed to load configured directive tasks from tasks.aircraft_id: ${directAircraftError.message}`);
+  }
+
+  let legacyWorkOrderQuery = params.supabase
     .from('tasks')
     .select('id,tenant_id,franchise_id,directive_id,work_order_id,task_number,title,description,task_category,status,sequence_order,assigned_technician_id,planned_start_date,planned_end_date,actual_start_date,actual_end_date,created_at,updated_at,work_orders!inner(aircraft_id)')
     .eq('tenant_id', params.tenantId)
+    .is('aircraft_id', null)
     .eq('work_orders.aircraft_id', params.aircraftId)
     .not('directive_id', 'is', null)
     .order('updated_at', { ascending: false, nullsFirst: false })
     .order('created_at', { ascending: false, nullsFirst: false });
   if (params.franchiseId) {
-    query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+    legacyWorkOrderQuery = legacyWorkOrderQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
   }
-  const { data, error } = await query.limit(5000);
-  if (error) {
-    throw new Error(`Failed to load configured directive tasks: ${error.message}`);
+  const { data: legacyWorkOrderData, error: legacyWorkOrderError } = await legacyWorkOrderQuery.limit(5000);
+  if (legacyWorkOrderError) {
+    throw new Error(`Failed to load configured directive tasks from work_orders join: ${legacyWorkOrderError.message}`);
   }
 
-  const latestByDirectiveId = new Map<string, JsonRecord>();
-  for (const row of Array.isArray(data) ? data : []) {
+  const byTaskId = new Map<string, JsonRecord>();
+  for (const row of Array.isArray(directAircraftData) ? directAircraftData : []) {
     const task = row as JsonRecord;
-    const directiveId = String(task.directive_id || '').trim();
-    if (!directiveId || latestByDirectiveId.has(directiveId)) continue;
-    latestByDirectiveId.set(directiveId, task);
+    const taskId = String(task.id || '').trim();
+    if (!taskId || byTaskId.has(taskId)) continue;
+    byTaskId.set(taskId, task);
   }
-  return Array.from(latestByDirectiveId.values());
+  for (const row of Array.isArray(legacyWorkOrderData) ? legacyWorkOrderData : []) {
+    const task = row as JsonRecord;
+    const taskId = String(task.id || '').trim();
+    if (!taskId || byTaskId.has(taskId)) continue;
+    byTaskId.set(taskId, task);
+  }
+
+  return Array.from(byTaskId.values()).sort((a, b) => {
+    const aUpdatedAt = Date.parse(String(a.updated_at || a.created_at || ''));
+    const bUpdatedAt = Date.parse(String(b.updated_at || b.created_at || ''));
+    const aValue = Number.isFinite(aUpdatedAt) ? aUpdatedAt : 0;
+    const bValue = Number.isFinite(bUpdatedAt) ? bUpdatedAt : 0;
+    return bValue - aValue;
+  });
 }
 
 async function ensureConfigureDirectivesWorkOrder(params: {
@@ -327,6 +357,41 @@ async function ensureConfigureDirectivesWorkOrder(params: {
   return (created || {}) as JsonRecord;
 }
 
+function normalizeAtaForTaskNumber(ataCode: string | null): string {
+  const digits = String(ataCode || '').trim().replace(/\D/g, '');
+  if (!digits) return '0000';
+  return digits.length <= 2
+    ? digits.padStart(2, '0') + '00'
+    : digits.padStart(4, '0').slice(0, 4);
+}
+
+const TYPE_CODE_MAP: Record<string, string> = {
+  AD: 'AD', SB: 'SB', SBS: 'SB', ASB: 'SB',
+  SC: 'SC', SCHEDULED: 'SC', MPD: 'SC',
+  CM: 'CM', COMPONENT: 'CM',
+  DF: 'DF', DEFERRED: 'DF',
+  UN: 'UN', UNSCHEDULED: 'UN',
+  MEL: 'MEL', DIRECTIVES: 'AD', GENERAL: 'SC',
+};
+
+function normalizeTypeCode(categoryCode: string | null): string {
+  const key = String(categoryCode || '').trim().toUpperCase();
+  return TYPE_CODE_MAP[key] || 'SC';
+}
+
+function buildStandardTaskNumber(
+  ataCode: string | null,
+  categoryCode: string | null,
+  sequence: number,
+): string {
+  const ata = normalizeAtaForTaskNumber(ataCode);
+  const type = normalizeTypeCode(categoryCode);
+  const now = new Date();
+  const yyyymm = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+  const seq = String(sequence).padStart(6, '0');
+  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
+}
+
 function mapDirectiveToTaskInsert(params: {
   tenantId: string;
   franchiseId: string | null;
@@ -344,7 +409,11 @@ function mapDirectiveToTaskInsert(params: {
     franchise_id: params.franchiseId,
     work_order_id: params.workOrderId,
     directive_id: directiveId,
-    task_number: `${params.workOrderNumber}-${String(fallbackSequence).padStart(3, '0')}`,
+    task_number: buildStandardTaskNumber(
+      String(params.directive.ata_code || ''),
+      String(params.directive.category_code || ''),
+      fallbackSequence,
+    ),
     title: String(params.directive.code_form_no || params.directive.description || `Directive Task ${fallbackSequence}`),
     description: normalizeString(params.directive.description),
     task_category: String(params.directive.category_code || 'general'),

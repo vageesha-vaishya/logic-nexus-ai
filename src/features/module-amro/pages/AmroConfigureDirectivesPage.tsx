@@ -427,6 +427,22 @@ export function AmroConfigureDirectivesPage() {
 
   const statusOptions = activeTab === 'configured' ? taskStatuses : [];
   const selectedAircraftLabel = aircraftOptions.find((item) => item.id === advancedFilters.aircraftId)?.label || advancedFilters.aircraftId;
+  const configuredInfoMessage = useMemo(() => {
+    if (activeTab !== 'configured' || !advancedFilters.aircraftId) return null;
+    if (configuredQuery.isLoading) {
+      return 'Loading configured tasks for selected aircraft...';
+    }
+    if (!configuredQuery.isError && !configuredRecords.length) {
+      return 'No configured tasks found for the selected aircraft.';
+    }
+    return null;
+  }, [
+    activeTab,
+    advancedFilters.aircraftId,
+    configuredQuery.isError,
+    configuredQuery.isLoading,
+    configuredRecords.length,
+  ]);
 
   return (
     <DashboardLayout>
@@ -588,6 +604,7 @@ export function AmroConfigureDirectivesPage() {
           </div>
 
           <AmroCrudMessageBanner message={errorMessage} tone="error" />
+          <AmroCrudMessageBanner message={configuredInfoMessage} tone="info" />
 
           <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as ConfigureTab)}>
             <TabsList>

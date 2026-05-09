@@ -54,6 +54,8 @@ interface SourceRow {
   notes: string | null;
   ata_code: string | null;
   effective_from_2_actual_end_date: string | null;
+  category_code: string | null;
+  directive_type: string | null;
 }
 
 interface DirectiveRow {
@@ -71,14 +73,47 @@ interface AtaCodeRow {
 
 // ─── Pure helper functions (independently testable) ───────────────────────────
 
-export function buildTaskNumber(
-  registration: string | null,
-  directiveNo: string | null,
+function normalizeAtaForTaskNumber(ataCode: string | null): string {
+  const digits = String(ataCode || "").trim().replace(/\D/g, "");
+  if (!digits) return "0000";
+  return digits.length <= 2
+    ? digits.padStart(2, "0") + "00"
+    : digits.padStart(4, "0").slice(0, 4);
+}
+
+const TYPE_CODE_MAP: Record<string, string> = {
+  AD: "AD", SB: "SB", SBS: "SB", ASB: "SB",
+  SC: "SC", SCHEDULED: "SC", MPD: "SC",
+  CM: "CM", COMPONENT: "CM",
+  DF: "DF", DEFERRED: "DF",
+  UN: "UN", UNSCHEDULED: "UN",
+  MEL: "MEL", DIRECTIVES: "AD", GENERAL: "SC",
+};
+
+function normalizeTypeCode(categoryCode: string | null): string {
+  const key = String(categoryCode || "").trim().toUpperCase();
+  return TYPE_CODE_MAP[key] || "SC";
+}
+
+function buildStandardTaskNumber(
+  ataCode: string | null,
+  categoryCode: string | null,
+  sequence: number,
 ): string {
-  const reg = String(registration || "").trim();
-  const dn = String(directiveNo || "").trim();
-  const parts = [reg, dn].filter(Boolean).join(" ");
-  return parts ? `TSK-${parts}` : `TSK-UNKNOWN`;
+  const ata = normalizeAtaForTaskNumber(ataCode);
+  const type = normalizeTypeCode(categoryCode);
+  const now = new Date();
+  const yyyymm = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
+  const seq = String(sequence).padStart(6, "0");
+  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
+}
+
+export function buildTaskNumber(
+  ataCode: string | null,
+  categoryCode: string | null,
+  sequence: number,
+): string {
+  return buildStandardTaskNumber(ataCode, categoryCode, sequence);
 }
 
 export function buildTitle(
@@ -213,7 +248,7 @@ serveWithLogger(async (req, logger, supabase) => {
         .select(
           "id,frequency_sequence,tenant_id,franchise_id,directive_id," +
           "directive_no,registration,serial_number,notes,ata_code," +
-          "effective_from_2_actual_end_date",
+          "effective_from_2_actual_end_date,category_code,directive_type",
         )
         .not("directive_id", "is", null)
         .eq("is_row_processed_success", true)
@@ -323,7 +358,7 @@ serveWithLogger(async (req, logger, supabase) => {
             directive_id: rawRow.directive_id,
             aircraft_id: aircraftId,
             ata_code_id: ataCodeId,
-            task_number: buildTaskNumber(rawRow.registration, rawRow.directive_no),
+            task_number: buildTaskNumber(rawRow.ata_code, rawRow.directive_type ?? rawRow.category_code ?? null, seq),
             title: buildTitle(rawRow.directive_no, rawRow.registration, seq),
             notes: String(rawRow.notes || "").trim() || null,
             task_category: "directives",
