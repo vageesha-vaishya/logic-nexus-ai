@@ -3,11 +3,27 @@
  * Run with: deno test --allow-none supabase/functions/flypal_configured_directives_create_tasks/index.test.ts
  */
 
-import {
-  assertEquals,
-  assertNotEquals,
-  assertMatch,
-} from "https://deno.land/std@0.224.0/assert/mod.ts";
+declare const Deno: {
+  test(name: string, fn: () => void | Promise<void>): void;
+};
+
+function assertEquals<T>(actual: T, expected: T): void {
+  if (actual !== expected) {
+    throw new Error(`assertEquals failed: expected ${String(expected)}, got ${String(actual)}`);
+  }
+}
+
+function assertNotEquals<T>(actual: T, expected: T): void {
+  if (actual === expected) {
+    throw new Error(`assertNotEquals failed: both values are ${String(actual)}`);
+  }
+}
+
+function assertMatch(actual: string, pattern: RegExp): void {
+  if (!pattern.test(actual)) {
+    throw new Error(`assertMatch failed: "${actual}" does not match ${String(pattern)}`);
+  }
+}
 
 import {
   buildTaskNumber,
@@ -23,23 +39,23 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 Deno.test("buildTaskNumber: full values", () => {
-  assertEquals(buildTaskNumber("VT-ABC", "AMP-AD-001"), "TSK-VT-ABC AMP-AD-001");
+  const taskNumber = buildTaskNumber("32", "AD", "202401", 47);
+  assertEquals(taskNumber, "TSK-3200-AD-202401-000047");
 });
 
-Deno.test("buildTaskNumber: no directive_no", () => {
-  assertEquals(buildTaskNumber("VT-ABC", null), "TSK-VT-ABC");
+Deno.test("buildTaskNumber: ignores non-AD type input", () => {
+  const taskNumber = buildTaskNumber("28", "SB", "202412", 7);
+  assertEquals(taskNumber, "TSK-2800-AD-202412-000007");
 });
 
-Deno.test("buildTaskNumber: no registration", () => {
-  assertEquals(buildTaskNumber(null, "AMP-AD-001"), "TSK-AMP-AD-001");
+Deno.test("buildTaskNumber: handles missing ata", () => {
+  const taskNumber = buildTaskNumber(null, "SB", "202501", 1);
+  assertEquals(taskNumber, "TSK-0000-AD-202501-000001");
 });
 
-Deno.test("buildTaskNumber: both null", () => {
-  assertEquals(buildTaskNumber(null, null), "TSK-UNKNOWN");
-});
-
-Deno.test("buildTaskNumber: trims whitespace", () => {
-  assertEquals(buildTaskNumber("  VT-ABC  ", "  AD-001  "), "TSK-VT-ABC AD-001");
+Deno.test("buildTaskNumber: enforces 6-digit sequence", () => {
+  const taskNumber = buildTaskNumber("71", "TR", "202603", 1234);
+  assertEquals(taskNumber, "TSK-7100-AD-202603-001234");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -47,19 +63,24 @@ Deno.test("buildTaskNumber: trims whitespace", () => {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 Deno.test("buildTitle: full values", () => {
-  assertEquals(buildTitle("AD-2023-001", "VT-ABC", 1), "AD-2023-001 — VT-ABC");
+  assertEquals(
+    buildTitle("32", "AD-DGCA-2024-32-005", "Main Gear Retraction System Inspection"),
+    "[Landing Gear] AD-DGCA-2024-32-005 — Main Gear Retraction System Inspection",
+  );
 });
 
-Deno.test("buildTitle: only directive_no", () => {
-  assertEquals(buildTitle("AD-2023-001", null, 5), "AD-2023-001");
+Deno.test("buildTitle: falls back when reference missing", () => {
+  assertEquals(
+    buildTitle("28", null, "Fuel Boost Pump Replacement"),
+    "[Fuel System] DIRECTIVE — Fuel Boost Pump Replacement",
+  );
 });
 
-Deno.test("buildTitle: only registration", () => {
-  assertEquals(buildTitle(null, "VT-ABC", 5), "VT-ABC");
-});
-
-Deno.test("buildTitle: both null falls back to seq", () => {
-  assertEquals(buildTitle(null, null, 42), "Directive task (seq 42)");
+Deno.test("buildTitle: default chapter name when ATA unknown", () => {
+  assertEquals(
+    buildTitle("99", "REF-001", "Custom task"),
+    "[ATA 9900] REF-001 — Custom task",
+  );
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

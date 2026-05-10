@@ -329,24 +329,89 @@ async function ensureConfigureWorkOrder(params: {
   return (created || {}) as JsonRecord;
 }
 
+const TASK_TYPE_CODES = new Set([
+  'AD', 'SB', 'SC', 'CM', 'DF', 'UN', 'MEL', 'IN', 'RE', 'TR', 'CC', 'CT', 'CE', 'CF', 'GE',
+]);
+
+function normalizeAtaForTaskNumber(ataCode: string | null): string {
+  const digits = String(ataCode || '').trim().replace(/\D/g, '');
+  if (!digits) return '0000';
+  return digits.length <= 2
+    ? digits.padStart(2, '0') + '00'
+    : digits.padStart(4, '0').slice(0, 4);
+}
+
+function getUtcYearMonth(now: Date): string {
+  return `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+function resolveTaskTypeCode(template: JsonRecord): string {
+  const categoryCode = String(template.category_code || '').trim().toUpperCase();
+  if (TASK_TYPE_CODES.has(categoryCode)) return categoryCode;
+  const codeFormNo = String(template.code_form_no || '').trim().toUpperCase();
+  if (codeFormNo.startsWith('MPD')) return 'SC';
+  return 'SC';
+}
+
+function buildStandardTaskNumber(
+  ataCode: string | null,
+  taskTypeCode: string,
+  yearMonth: string,
+  sequence: number,
+): string {
+  const ata = normalizeAtaForTaskNumber(ataCode);
+  const type = String(taskTypeCode || 'SC').trim().toUpperCase() || 'SC';
+  const yyyymm = String(yearMonth || '').trim() || getUtcYearMonth(new Date());
+  const seq = String(Math.max(1, sequence)).padStart(6, '0');
+  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
+}
+
+async function reserveNextTaskSequence(params: {
+  supabase: SupabaseClient;
+  tenantId: string;
+  yearMonth: string;
+}): Promise<number> {
+  const { data, error } = await params.supabase.rpc('next_task_seq', {
+    p_tenant_id: params.tenantId,
+    p_yyyymm: params.yearMonth,
+  });
+  if (error) {
+    throw new Error(`Failed to reserve next task sequence: ${error.message}`);
+  }
+  const sequence = Number(data);
+  if (!Number.isFinite(sequence) || sequence < 1) {
+    throw new Error(`Invalid task sequence value returned by next_task_seq: ${String(data)}`);
+  }
+  return Math.trunc(sequence);
+}
+
 function mapTemplateToTaskInsert(params: {
   tenantId: string;
   franchiseId: string | null;
   userId: string;
   workOrderId: string;
-  workOrderNumber: string;
+  aircraftId: string;
+  taskYearMonth: string;
+  tenantScopedSequence: number;
   template: JsonRecord;
-  sequence: number;
+  templateSequence: number;
 }): JsonRecord {
   const ttSequence = normalizeInteger(params.template.tt_sequence);
-  const fallbackSequence = ttSequence ?? params.sequence;
+  const fallbackSequence = ttSequence ?? params.templateSequence;
   const taskTemplateId = String(params.template.id || '').trim();
+  const taskTypeCode = resolveTaskTypeCode(params.template);
   return {
     tenant_id: params.tenantId,
     franchise_id: params.franchiseId,
     work_order_id: params.workOrderId,
+    aircraft_id: params.aircraftId,
     task_template_id: taskTemplateId,
-    task_number: `${params.workOrderNumber}-${String(fallbackSequence).padStart(3, '0')}`,
+    task_number: buildStandardTaskNumber(
+      String(params.template.ata_code || ''),
+      taskTypeCode,
+      params.taskYearMonth,
+      params.tenantScopedSequence,
+    ),
     title: String(params.template.code_form_no || params.template.description || `Template Task ${fallbackSequence}`),
     description: normalizeString(params.template.description),
     task_category: String(params.template.category_code || 'general'),
@@ -718,20 +783,46 @@ router.post(
       aircraftId,
       userId,
     });
+    const { data: aircraftRow, error: aircraftError } = await supabase
+      .from('aircraft')
+      .select('franchise_id')
+      .eq('tenant_id', tenantId)
+      .eq('id', aircraftId)
+      .maybeSingle();
+    if (aircraftError) {
+      res.status(500).json({
+        error: `Failed to resolve aircraft franchise for task creation: ${aircraftError.message}`,
+        code: 'CONFIGURE_MPD_AIRCRAFT_QUERY_FAILED',
+        statusCode: 500,
+      });
+      return;
+    }
+    const aircraftFranchiseId = normalizeString((aircraftRow as JsonRecord | null)?.franchise_id) || null;
+    const taskFranchiseId = aircraftFranchiseId ?? franchiseId;
     const workOrderId = String(workOrder.id || '').trim();
-    const workOrderNumber = String(workOrder.work_order_number || '').trim() || `CFG-${Date.now()}`;
+    const taskYearMonth = getUtcYearMonth(new Date());
 
-    const inserts = templates.map((template, index) =>
-      mapTemplateToTaskInsert({
+    const inserts: JsonRecord[] = [];
+    for (const [index, template] of templates.entries()) {
+      const tenantScopedSequence = await reserveNextTaskSequence({
+        supabase,
         tenantId,
-        franchiseId,
-        userId,
-        workOrderId,
-        workOrderNumber,
-        template,
-        sequence: index + 1,
-      }),
-    );
+        yearMonth: taskYearMonth,
+      });
+      inserts.push(
+        mapTemplateToTaskInsert({
+          tenantId,
+          franchiseId: taskFranchiseId,
+          userId,
+          workOrderId,
+          aircraftId,
+          taskYearMonth,
+          tenantScopedSequence,
+          template,
+          templateSequence: index + 1,
+        }),
+      );
+    }
 
     if (inserts.length > 0) {
       const { error: insertError } = await supabase.from('tasks').insert(inserts);

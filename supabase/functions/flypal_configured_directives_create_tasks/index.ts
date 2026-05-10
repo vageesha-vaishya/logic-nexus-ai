@@ -81,25 +81,101 @@ function normalizeAtaForTaskNumber(ataCode: string | null): string {
     : digits.padStart(4, "0").slice(0, 4);
 }
 
+const TASK_TYPE_CODES = new Set([
+  "AD", "SB", "SC", "CM", "DF", "UN", "MEL", "IN", "RE", "TR", "CC", "CT", "CE", "CF", "GE",
+]);
+
+const ATA_CHAPTER_NAMES: Record<string, string> = {
+  "05": "Time Limits / Maintenance Checks",
+  "12": "Servicing",
+  "21": "Air Conditioning",
+  "22": "Auto Flight",
+  "23": "Communications",
+  "24": "Electrical Power",
+  "25": "Equipment / Furnishings",
+  "26": "Fire Protection",
+  "27": "Flight Controls",
+  "28": "Fuel System",
+  "29": "Hydraulic Power",
+  "30": "Ice and Rain Protection",
+  "31": "Indicating / Recording",
+  "32": "Landing Gear",
+  "33": "Lights",
+  "34": "Navigation",
+  "35": "Oxygen",
+  "36": "Pneumatic",
+  "38": "Water / Waste",
+  "49": "Auxiliary Power Unit",
+  "52": "Doors",
+  "53": "Fuselage",
+  "54": "Nacelles / Pylons",
+  "55": "Stabilizers",
+  "56": "Windows",
+  "57": "Wings",
+  "71": "Powerplant",
+  "72": "Engine",
+  "73": "Engine Fuel and Control",
+  "74": "Ignition",
+  "75": "Air",
+  "76": "Engine Controls",
+  "77": "Engine Indicating",
+  "78": "Exhaust",
+  "79": "Oil",
+  "80": "Starting",
+};
+
+function resolveTaskTypeCode(
+  directiveType: string | null,
+  categoryCode: string | null,
+  directiveNo: string | null,
+): string {
+  const normalizedDirectiveType = String(directiveType || "").trim().toUpperCase();
+  if (TASK_TYPE_CODES.has(normalizedDirectiveType)) return normalizedDirectiveType;
+  if (normalizedDirectiveType === "DIRECTIVES") return "AD";
+  if (normalizedDirectiveType === "GENERAL") return "GE";
+
+  const normalizedCategoryCode = String(categoryCode || "").trim().toUpperCase();
+  if (TASK_TYPE_CODES.has(normalizedCategoryCode)) return normalizedCategoryCode;
+  if (normalizedCategoryCode === "DIRECTIVES") return "AD";
+  if (normalizedCategoryCode === "GENERAL") return "GE";
+
+  const normalizedDirectiveNo = String(directiveNo || "").trim().toUpperCase();
+  if (normalizedDirectiveNo.startsWith("AD")) return "AD";
+  if (normalizedDirectiveNo.startsWith("SB")) return "SB";
+  if (normalizedDirectiveNo.startsWith("MPD")) return "SC";
+  if (normalizedDirectiveNo.startsWith("MEL")) return "MEL";
+  if (normalizedDirectiveNo.startsWith("TR")) return "TR";
+  if (normalizedDirectiveNo.startsWith("RE")) return "RE";
+  return "GE";
+}
+
+function resolveAtaChapterName(ataCode: string | null): string {
+  const normalizedAta = normalizeAtaForTaskNumber(ataCode);
+  const chapter = normalizedAta.slice(0, 2);
+  return ATA_CHAPTER_NAMES[chapter] || `ATA ${normalizedAta}`;
+}
+
 function buildStandardTaskNumber(
-  registration: string | null,
   ataCode: string | null,
+  _taskTypeCode: string,
+  yearMonth: string,
   sequence: number,
 ): string {
-  const reg = String(registration || "").trim().toUpperCase().replace(/\s+/g, "");
   const ata = normalizeAtaForTaskNumber(ataCode);
-  const now = new Date();
-  const yyyymm = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  const seq = String(Math.max(1, sequence)).padStart(4, "0");
-  return `TSK-${reg || "UNKNOWN"}-${ata}-AD-${yyyymm}-${seq}`;
+  const yyyymm = String(yearMonth || "").trim() || `${new Date().getUTCFullYear()}${String(new Date().getUTCMonth() + 1).padStart(2, "0")}`;
+  const seq = String(Math.max(1, sequence)).padStart(6, "0");
+  // This edge function processes only Airworthiness Directives (AD).
+  const type = "AD";
+  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
 }
 
 export function buildTaskNumber(
-  registration: string | null,
   ataCode: string | null,
+  taskTypeCode: string,
+  yearMonth: string,
   sequence: number,
 ): string {
-  return buildStandardTaskNumber(registration, ataCode, sequence);
+  return buildStandardTaskNumber(ataCode, taskTypeCode, yearMonth, sequence);
 }
 
 export function buildTitle(
@@ -107,10 +183,10 @@ export function buildTitle(
   directiveNo: string | null,
   description: string | null,
 ): string {
-  const ataName = `ATA ${normalizeAtaForTaskNumber(ataCode)}`;
+  const ataName = resolveAtaChapterName(ataCode);
   const directiveRef = String(directiveNo || "").trim() || "DIRECTIVE";
   const taskDescription = String(description || "").trim() || "No Description";
-  return `${ataName} - ${directiveRef} - ${taskDescription}`;
+  return `[${ataName}] ${directiveRef} — ${taskDescription}`.slice(0, 120);
 }
 
 export function buildProcedureReference(ataCode: string | null): string | null {
@@ -132,6 +208,25 @@ export function calcPlannedStartDate(
   const totalDaysBack = Math.ceil(workingDays) + 1;
   d.setUTCDate(d.getUTCDate() - totalDaysBack);
   return d.toISOString();
+}
+
+async function reserveNextTaskSequence(
+  supabase: any,
+  tenantId: string,
+  yearMonth: string,
+): Promise<number> {
+  const { data, error } = await supabase.rpc("next_task_seq", {
+    p_tenant_id: tenantId,
+    p_yyyymm: yearMonth,
+  });
+  if (error) {
+    throw new Error(`next_task_seq failed: ${error.message}`);
+  }
+  const sequence = Number(data);
+  if (!Number.isFinite(sequence) || sequence < 1) {
+    throw new Error(`next_task_seq returned invalid value: ${String(data)}`);
+  }
+  return Math.trunc(sequence);
 }
 
 // ─── Lookup helpers ───────────────────────────────────────────────────────────
@@ -279,7 +374,8 @@ serveWithLogger(async (req, logger, supabase) => {
       // ── Process each row — continue on both success and failure ───────────
       for (const rawRow of rows as unknown as SourceRow[]) {
         const rowId = String(rawRow.id || "");
-        const seq = Number(rawRow.frequency_sequence);
+        const sourceSeq = Number(rawRow.frequency_sequence);
+        const taskYearMonth = `${new Date().getUTCFullYear()}${String(new Date().getUTCMonth() + 1).padStart(2, "0")}`;
 
         try {
           // ── Guard: required context fields ────────────────────────────────
@@ -336,6 +432,11 @@ serveWithLogger(async (req, logger, supabase) => {
           );
 
           // ── Build task payload ────────────────────────────────────────────
+          const tenantSequence = await reserveNextTaskSequence(
+            supabase,
+            rawRow.tenant_id,
+            taskYearMonth,
+          );
           const taskPayload: Record<string, unknown> = {
             tenant_id: rawRow.tenant_id,
             franchise_id: rawRow.franchise_id ?? null,
@@ -343,7 +444,12 @@ serveWithLogger(async (req, logger, supabase) => {
             directive_id: rawRow.directive_id,
             aircraft_id: aircraftId,
             ata_code_id: ataCodeId,
-            task_number: buildTaskNumber(rawRow.registration, rawRow.ata_code, seq),
+            task_number: buildTaskNumber(
+              rawRow.ata_code,
+              "AD",
+              taskYearMonth,
+              tenantSequence,
+            ),
             title: buildTitle(rawRow.ata_code, rawRow.directive_no, rawRow.notes),
             notes: String(rawRow.notes || "").trim() || null,
             task_category: "directives",
@@ -388,7 +494,7 @@ serveWithLogger(async (req, logger, supabase) => {
 
           if (updateError) {
             await logger.warn("Task created but source-row update failed", {
-              rowId, seq, createdTaskId, error: updateError.message,
+              rowId, seq: sourceSeq, createdTaskId, error: updateError.message,
             });
           }
 
@@ -409,7 +515,7 @@ serveWithLogger(async (req, logger, supabase) => {
 
           failedCount += 1;
           if (failures.length < MAX_FAILURES_IN_RESPONSE) {
-            failures.push({ id: rowId, frequency_sequence: seq, reason });
+            failures.push({ id: rowId, frequency_sequence: sourceSeq, reason });
           }
         }
       }

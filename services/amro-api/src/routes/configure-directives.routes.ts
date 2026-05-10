@@ -365,17 +365,91 @@ function normalizeAtaForTaskNumber(ataCode: string | null): string {
     : digits.padStart(4, '0').slice(0, 4);
 }
 
+const TASK_TYPE_CODES = new Set([
+  'AD', 'SB', 'SC', 'CM', 'DF', 'UN', 'MEL', 'IN', 'RE', 'TR', 'CC', 'CT', 'CE', 'CF', 'GE',
+]);
+
+const ATA_CHAPTER_NAMES: Record<string, string> = {
+  '05': 'Time Limits / Maintenance Checks',
+  '12': 'Servicing',
+  '21': 'Air Conditioning',
+  '22': 'Auto Flight',
+  '23': 'Communications',
+  '24': 'Electrical Power',
+  '25': 'Equipment / Furnishings',
+  '26': 'Fire Protection',
+  '27': 'Flight Controls',
+  '28': 'Fuel System',
+  '29': 'Hydraulic Power',
+  '30': 'Ice and Rain Protection',
+  '31': 'Indicating / Recording',
+  '32': 'Landing Gear',
+  '33': 'Lights',
+  '34': 'Navigation',
+  '35': 'Oxygen',
+  '36': 'Pneumatic',
+  '38': 'Water / Waste',
+  '49': 'Auxiliary Power Unit',
+  '52': 'Doors',
+  '53': 'Fuselage',
+  '54': 'Nacelles / Pylons',
+  '55': 'Stabilizers',
+  '56': 'Windows',
+  '57': 'Wings',
+  '71': 'Powerplant',
+  '72': 'Engine',
+  '73': 'Engine Fuel and Control',
+  '74': 'Ignition',
+  '75': 'Air',
+  '76': 'Engine Controls',
+  '77': 'Engine Indicating',
+  '78': 'Exhaust',
+  '79': 'Oil',
+  '80': 'Starting',
+};
+
+function resolveTaskTypeCode(directive: JsonRecord): string {
+  const normalizedDirectivesType = String(directive.directives_type_id || '').trim().toUpperCase();
+  if (TASK_TYPE_CODES.has(normalizedDirectivesType)) return normalizedDirectivesType;
+  if (normalizedDirectivesType === 'DIRECTIVES') return 'AD';
+  if (normalizedDirectivesType === 'GENERAL') return 'GE';
+
+  const categoryCode = String(directive.category_code || '').trim().toUpperCase();
+  if (TASK_TYPE_CODES.has(categoryCode)) return categoryCode;
+  if (categoryCode === 'DIRECTIVES') return 'AD';
+  if (categoryCode === 'GENERAL') return 'GE';
+
+  const refText = String(directive.code_form_no || directive.reference_amp || '').trim().toUpperCase();
+  if (refText.startsWith('AD')) return 'AD';
+  if (refText.startsWith('SB')) return 'SB';
+  if (refText.startsWith('MPD')) return 'SC';
+  if (refText.startsWith('MEL')) return 'MEL';
+  if (refText.startsWith('TR')) return 'TR';
+  if (refText.startsWith('RE')) return 'RE';
+  return 'GE';
+}
+
+function resolveAtaChapterName(ataCode: string | null): string {
+  const normalizedAta = normalizeAtaForTaskNumber(ataCode);
+  const chapter = normalizedAta.slice(0, 2);
+  return ATA_CHAPTER_NAMES[chapter] || `ATA ${normalizedAta}`;
+}
+
+function getUtcYearMonth(now: Date): string {
+  return `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
 function buildStandardTaskNumber(
-  registration: string | null,
   ataCode: string | null,
+  taskTypeCode: string,
+  yearMonth: string,
   sequence: number,
 ): string {
-  const reg = String(registration || '').trim().toUpperCase().replace(/\s+/g, '');
   const ata = normalizeAtaForTaskNumber(ataCode);
-  const now = new Date();
-  const yyyymm = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-  const seq = String(Math.max(1, sequence)).padStart(4, '0');
-  return `TSK-${reg || 'UNKNOWN'}-${ata}-AD-${yyyymm}-${seq}`;
+  const type = String(taskTypeCode || 'GE').trim().toUpperCase() || 'GE';
+  const yyyymm = String(yearMonth || '').trim() || getUtcYearMonth(new Date());
+  const seq = String(Math.max(1, sequence)).padStart(6, '0');
+  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
 }
 
 function buildStandardTaskTitle(
@@ -383,10 +457,29 @@ function buildStandardTaskTitle(
   directiveRef: string | null,
   description: string | null,
 ): string {
-  const ataName = `ATA ${normalizeAtaForTaskNumber(ataCode)}`;
+  const ataName = resolveAtaChapterName(ataCode);
   const ref = String(directiveRef || '').trim() || 'DIRECTIVE';
   const desc = String(description || '').trim() || 'No Description';
-  return `${ataName} - ${ref} - ${desc}`;
+  return `[${ataName}] ${ref} - ${desc}`.slice(0, 120);
+}
+
+async function reserveNextTaskSequence(params: {
+  supabase: SupabaseClient;
+  tenantId: string;
+  yearMonth: string;
+}): Promise<number> {
+  const { data, error } = await params.supabase.rpc('next_task_seq', {
+    p_tenant_id: params.tenantId,
+    p_yyyymm: params.yearMonth,
+  });
+  if (error) {
+    throw new Error(`Failed to reserve next task sequence: ${error.message}`);
+  }
+  const sequence = Number(data);
+  if (!Number.isFinite(sequence) || sequence < 1) {
+    throw new Error(`Invalid task sequence value returned by next_task_seq: ${String(data)}`);
+  }
+  return Math.trunc(sequence);
 }
 
 function mapDirectiveToTaskInsert(params: {
@@ -395,13 +488,17 @@ function mapDirectiveToTaskInsert(params: {
   userId: string;
   workOrderId: string;
   aircraftId: string;
-  aircraftRegistration: string | null;
+  taskYearMonth: string;
+  tenantScopedSequence: number;
   directive: JsonRecord;
-  sequence: number;
+  directiveSequence: number;
 }): JsonRecord {
   const dirSequence = normalizeInteger(params.directive.directive_sequence);
-  const fallbackSequence = dirSequence ?? params.sequence;
+  const fallbackSequence = dirSequence ?? params.directiveSequence;
   const directiveId = String(params.directive.id || '').trim();
+  const taskTypeCode = resolveTaskTypeCode(params.directive);
+  const taskReference = String(params.directive.code_form_no || params.directive.reference_amp || '');
+  const taskDescription = String(params.directive.description || '');
   return {
     tenant_id: params.tenantId,
     franchise_id: params.franchiseId,
@@ -409,14 +506,15 @@ function mapDirectiveToTaskInsert(params: {
     aircraft_id: params.aircraftId,
     directive_id: directiveId,
     task_number: buildStandardTaskNumber(
-      params.aircraftRegistration,
       String(params.directive.ata_code || ''),
-      fallbackSequence,
+      taskTypeCode,
+      params.taskYearMonth,
+      params.tenantScopedSequence,
     ),
     title: buildStandardTaskTitle(
       String(params.directive.ata_code || ''),
-      String(params.directive.code_form_no || params.directive.reference_amp || ''),
-      String(params.directive.description || ''),
+      taskReference,
+      taskDescription,
     ),
     description: normalizeString(params.directive.description),
     task_category: String(params.directive.category_code || 'general'),
@@ -796,7 +894,7 @@ router.post(
     });
     const { data: aircraftRow, error: aircraftError } = await supabase
       .from('aircraft')
-      .select('registration')
+      .select('franchise_id')
       .eq('tenant_id', tenantId)
       .eq('id', aircraftId)
       .maybeSingle();
@@ -808,21 +906,31 @@ router.post(
       });
       return;
     }
-    const aircraftRegistration = normalizeString((aircraftRow as JsonRecord | null)?.registration) || null;
+    const aircraftFranchiseId = normalizeString((aircraftRow as JsonRecord | null)?.franchise_id) || null;
+    const taskFranchiseId = aircraftFranchiseId ?? franchiseId;
     const workOrderId = String(workOrder.id || '').trim();
-
-    const inserts = directives.map((directive, index) =>
-      mapDirectiveToTaskInsert({
+    const taskYearMonth = getUtcYearMonth(new Date());
+    const inserts: JsonRecord[] = [];
+    for (const [index, directive] of directives.entries()) {
+      const tenantScopedSequence = await reserveNextTaskSequence({
+        supabase,
         tenantId,
-        franchiseId,
-        userId,
-        workOrderId,
-        aircraftId,
-        aircraftRegistration,
-        directive,
-        sequence: index + 1,
-      }),
-    );
+        yearMonth: taskYearMonth,
+      });
+      inserts.push(
+        mapDirectiveToTaskInsert({
+          tenantId,
+          franchiseId: taskFranchiseId,
+          userId,
+          workOrderId,
+          aircraftId,
+          taskYearMonth,
+          tenantScopedSequence,
+          directive,
+          directiveSequence: index + 1,
+        }),
+      );
+    }
 
     if (inserts.length > 0) {
       const { error: insertError } = await supabase.from('tasks').insert(inserts);
