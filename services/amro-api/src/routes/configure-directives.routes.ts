@@ -439,17 +439,23 @@ function getUtcYearMonth(now: Date): string {
   return `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
 }
 
+function normalizeRegistrationForTaskNumber(registration: string | null): string {
+  const normalized = String(registration || '').trim().toUpperCase().replace(/\s+/g, '');
+  return normalized || 'UNKNOWN';
+}
+
 function buildStandardTaskNumber(
-  ataCode: string | null,
+  registration: string | null,
   taskTypeCode: string,
   yearMonth: string,
   sequence: number,
 ): string {
-  const ata = normalizeAtaForTaskNumber(ataCode);
-  const type = String(taskTypeCode || 'GE').trim().toUpperCase() || 'GE';
+  const reg = normalizeRegistrationForTaskNumber(registration);
+  const _type = String(taskTypeCode || 'GE').trim().toUpperCase() || 'GE';
+  const type = 'AD';
   const yyyymm = String(yearMonth || '').trim() || getUtcYearMonth(new Date());
   const seq = String(Math.max(1, sequence)).padStart(6, '0');
-  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
+  return `TSK-${reg}-${type}-${yyyymm}-${seq}`;
 }
 
 function buildStandardTaskTitle(
@@ -522,6 +528,7 @@ function mapDirectiveToTaskInsert(params: {
   userId: string;
   workOrderId: string;
   aircraftId: string;
+  aircraftRegistration: string | null;
   ataCodeId: string | null;
   taskYearMonth: string;
   tenantScopedSequence: number;
@@ -542,7 +549,7 @@ function mapDirectiveToTaskInsert(params: {
     directive_id: directiveId,
     ata_code_id: params.ataCodeId,
     task_number: buildStandardTaskNumber(
-      String(params.directive.ata_code || ''),
+      params.aircraftRegistration,
       taskTypeCode,
       params.taskYearMonth,
       params.tenantScopedSequence,
@@ -936,7 +943,7 @@ router.post(
     });
     const { data: aircraftRow, error: aircraftError } = await supabase
       .from('aircraft')
-      .select('franchise_id')
+      .select('franchise_id,registration')
       .eq('tenant_id', tenantId)
       .eq('id', aircraftId)
       .maybeSingle();
@@ -949,6 +956,7 @@ router.post(
       return;
     }
     const aircraftFranchiseId = normalizeString((aircraftRow as JsonRecord | null)?.franchise_id) || null;
+    const aircraftRegistration = normalizeString((aircraftRow as JsonRecord | null)?.registration) || null;
     const taskFranchiseId = aircraftFranchiseId ?? franchiseId;
     const workOrderId = String(workOrder.id || '').trim();
     const taskYearMonth = getUtcYearMonth(new Date());
@@ -968,6 +976,7 @@ router.post(
           userId,
           workOrderId,
           aircraftId,
+          aircraftRegistration,
           ataCodeId,
           taskYearMonth,
           tenantScopedSequence,

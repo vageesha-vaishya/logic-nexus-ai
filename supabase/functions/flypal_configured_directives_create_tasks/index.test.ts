@@ -41,23 +41,23 @@ import {
 // ═══════════════════════════════════════════════════════════════════════════════
 
 Deno.test("buildTaskNumber: full values", () => {
-  const taskNumber = buildTaskNumber("32", "AD", "202401", 47);
-  assertEquals(taskNumber, "TSK-3200-AD-202401-000047");
+  const taskNumber = buildTaskNumber("VT-ABC", "AD", "202401", 47);
+  assertEquals(taskNumber, "TSK-VT-ABC-AD-202401-000047");
 });
 
 Deno.test("buildTaskNumber: ignores non-AD type input", () => {
-  const taskNumber = buildTaskNumber("28", "SB", "202412", 7);
-  assertEquals(taskNumber, "TSK-2800-AD-202412-000007");
+  const taskNumber = buildTaskNumber("N12345", "SB", "202412", 7);
+  assertEquals(taskNumber, "TSK-N12345-AD-202412-000007");
 });
 
-Deno.test("buildTaskNumber: handles missing ata", () => {
+Deno.test("buildTaskNumber: handles missing registration", () => {
   const taskNumber = buildTaskNumber(null, "SB", "202501", 1);
-  assertEquals(taskNumber, "TSK-0000-AD-202501-000001");
+  assertEquals(taskNumber, "TSK-UNKNOWN-AD-202501-000001");
 });
 
 Deno.test("buildTaskNumber: enforces 6-digit sequence", () => {
-  const taskNumber = buildTaskNumber("71", "TR", "202603", 1234);
-  assertEquals(taskNumber, "TSK-7100-AD-202603-001234");
+  const taskNumber = buildTaskNumber("VT-DEF", "TR", "202603", 1234);
+  assertEquals(taskNumber, "TSK-VT-DEF-AD-202603-001234");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

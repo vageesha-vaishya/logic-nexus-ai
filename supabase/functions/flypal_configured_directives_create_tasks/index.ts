@@ -127,27 +127,32 @@ function resolveAtaChapterName(ataCode: string | null): string {
   return ATA_CHAPTER_NAMES[chapter] || `ATA ${normalizedAta}`;
 }
 
+function normalizeRegistrationForTaskNumber(registration: string | null): string {
+  const normalized = String(registration || "").trim().toUpperCase().replace(/\s+/g, "");
+  return normalized || "UNKNOWN";
+}
+
 function buildStandardTaskNumber(
-  ataCode: string | null,
+  registration: string | null,
   _taskTypeCode: string,
   yearMonth: string,
   sequence: number,
 ): string {
-  const ata = normalizeAtaForTaskNumber(ataCode);
+  const reg = normalizeRegistrationForTaskNumber(registration);
   const yyyymm = String(yearMonth || "").trim() || `${new Date().getUTCFullYear()}${String(new Date().getUTCMonth() + 1).padStart(2, "0")}`;
   const seq = String(Math.max(1, sequence)).padStart(6, "0");
   // This edge function processes only Airworthiness Directives (AD).
   const type = "AD";
-  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
+  return `TSK-${reg}-${type}-${yyyymm}-${seq}`;
 }
 
 export function buildTaskNumber(
-  ataCode: string | null,
+  registration: string | null,
   taskTypeCode: string,
   yearMonth: string,
   sequence: number,
 ): string {
-  return buildStandardTaskNumber(ataCode, taskTypeCode, yearMonth, sequence);
+  return buildStandardTaskNumber(registration, taskTypeCode, yearMonth, sequence);
 }
 
 export function buildTitle(
@@ -431,7 +436,7 @@ serveWithLogger(async (req, logger, supabase) => {
             aircraft_id: aircraftId,
             ata_code_id: ataCodeId,
             task_number: buildTaskNumber(
-              rawRow.ata_code,
+              rawRow.registration,
               "AD",
               taskYearMonth,
               tenantSequence,
