@@ -365,31 +365,28 @@ function normalizeAtaForTaskNumber(ataCode: string | null): string {
     : digits.padStart(4, '0').slice(0, 4);
 }
 
-const TYPE_CODE_MAP: Record<string, string> = {
-  AD: 'AD', SB: 'SB', SBS: 'SB', ASB: 'SB',
-  SC: 'SC', SCHEDULED: 'SC', MPD: 'SC',
-  CM: 'CM', COMPONENT: 'CM',
-  DF: 'DF', DEFERRED: 'DF',
-  UN: 'UN', UNSCHEDULED: 'UN',
-  MEL: 'MEL', DIRECTIVES: 'AD', GENERAL: 'SC',
-};
-
-function normalizeTypeCode(categoryCode: string | null): string {
-  const key = String(categoryCode || '').trim().toUpperCase();
-  return TYPE_CODE_MAP[key] || 'SC';
-}
-
 function buildStandardTaskNumber(
+  registration: string | null,
   ataCode: string | null,
-  categoryCode: string | null,
   sequence: number,
 ): string {
+  const reg = String(registration || '').trim().toUpperCase().replace(/\s+/g, '');
   const ata = normalizeAtaForTaskNumber(ataCode);
-  const type = normalizeTypeCode(categoryCode);
   const now = new Date();
   const yyyymm = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
-  const seq = String(sequence).padStart(6, '0');
-  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
+  const seq = String(Math.max(1, sequence)).padStart(4, '0');
+  return `TSK-${reg || 'UNKNOWN'}-${ata}-AD-${yyyymm}-${seq}`;
+}
+
+function buildStandardTaskTitle(
+  ataCode: string | null,
+  directiveRef: string | null,
+  description: string | null,
+): string {
+  const ataName = `ATA ${normalizeAtaForTaskNumber(ataCode)}`;
+  const ref = String(directiveRef || '').trim() || 'DIRECTIVE';
+  const desc = String(description || '').trim() || 'No Description';
+  return `${ataName} - ${ref} - ${desc}`;
 }
 
 function mapDirectiveToTaskInsert(params: {
@@ -397,7 +394,7 @@ function mapDirectiveToTaskInsert(params: {
   franchiseId: string | null;
   userId: string;
   workOrderId: string;
-  workOrderNumber: string;
+  aircraftRegistration: string | null;
   directive: JsonRecord;
   sequence: number;
 }): JsonRecord {
@@ -410,11 +407,15 @@ function mapDirectiveToTaskInsert(params: {
     work_order_id: params.workOrderId,
     directive_id: directiveId,
     task_number: buildStandardTaskNumber(
+      params.aircraftRegistration,
       String(params.directive.ata_code || ''),
-      String(params.directive.category_code || ''),
       fallbackSequence,
     ),
-    title: String(params.directive.code_form_no || params.directive.description || `Directive Task ${fallbackSequence}`),
+    title: buildStandardTaskTitle(
+      String(params.directive.ata_code || ''),
+      String(params.directive.code_form_no || params.directive.reference_amp || ''),
+      String(params.directive.description || ''),
+    ),
     description: normalizeString(params.directive.description),
     task_category: String(params.directive.category_code || 'general'),
     estimated_duration_hours: toIntervalLiteral(params.directive.estimated_man_hours),
@@ -791,8 +792,22 @@ router.post(
       aircraftId,
       userId,
     });
+    const { data: aircraftRow, error: aircraftError } = await supabase
+      .from('aircraft')
+      .select('registration')
+      .eq('tenant_id', tenantId)
+      .eq('id', aircraftId)
+      .maybeSingle();
+    if (aircraftError) {
+      res.status(500).json({
+        error: `Failed to resolve aircraft registration: ${aircraftError.message}`,
+        code: 'CONFIGURE_DIRECTIVES_AIRCRAFT_QUERY_FAILED',
+        statusCode: 500,
+      });
+      return;
+    }
+    const aircraftRegistration = normalizeString((aircraftRow as JsonRecord | null)?.registration) || null;
     const workOrderId = String(workOrder.id || '').trim();
-    const workOrderNumber = String(workOrder.work_order_number || '').trim() || `CFG-DIR-${Date.now()}`;
 
     const inserts = directives.map((directive, index) =>
       mapDirectiveToTaskInsert({
@@ -800,7 +815,7 @@ router.post(
         franchiseId,
         userId,
         workOrderId,
-        workOrderNumber,
+        aircraftRegistration,
         directive,
         sequence: index + 1,
       }),

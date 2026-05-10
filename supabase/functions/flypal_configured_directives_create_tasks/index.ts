@@ -81,51 +81,36 @@ function normalizeAtaForTaskNumber(ataCode: string | null): string {
     : digits.padStart(4, "0").slice(0, 4);
 }
 
-const TYPE_CODE_MAP: Record<string, string> = {
-  AD: "AD", SB: "SB", SBS: "SB", ASB: "SB",
-  SC: "SC", SCHEDULED: "SC", MPD: "SC",
-  CM: "CM", COMPONENT: "CM",
-  DF: "DF", DEFERRED: "DF",
-  UN: "UN", UNSCHEDULED: "UN",
-  MEL: "MEL", DIRECTIVES: "AD", GENERAL: "SC",
-};
-
-function normalizeTypeCode(categoryCode: string | null): string {
-  const key = String(categoryCode || "").trim().toUpperCase();
-  return TYPE_CODE_MAP[key] || "SC";
-}
-
 function buildStandardTaskNumber(
+  registration: string | null,
   ataCode: string | null,
-  categoryCode: string | null,
   sequence: number,
 ): string {
+  const reg = String(registration || "").trim().toUpperCase().replace(/\s+/g, "");
   const ata = normalizeAtaForTaskNumber(ataCode);
-  const type = normalizeTypeCode(categoryCode);
   const now = new Date();
   const yyyymm = `${now.getUTCFullYear()}${String(now.getUTCMonth() + 1).padStart(2, "0")}`;
-  const seq = String(sequence).padStart(6, "0");
-  return `TSK-${ata}-${type}-${yyyymm}-${seq}`;
+  const seq = String(Math.max(1, sequence)).padStart(4, "0");
+  return `TSK-${reg || "UNKNOWN"}-${ata}-AD-${yyyymm}-${seq}`;
 }
 
 export function buildTaskNumber(
+  registration: string | null,
   ataCode: string | null,
-  categoryCode: string | null,
   sequence: number,
 ): string {
-  return buildStandardTaskNumber(ataCode, categoryCode, sequence);
+  return buildStandardTaskNumber(registration, ataCode, sequence);
 }
 
 export function buildTitle(
+  ataCode: string | null,
   directiveNo: string | null,
-  registration: string | null,
-  seq: number,
+  description: string | null,
 ): string {
-  const parts = [
-    String(directiveNo || "").trim(),
-    String(registration || "").trim(),
-  ].filter(Boolean);
-  return parts.length > 0 ? parts.join(" — ") : `Directive task (seq ${seq})`;
+  const ataName = `ATA ${normalizeAtaForTaskNumber(ataCode)}`;
+  const directiveRef = String(directiveNo || "").trim() || "DIRECTIVE";
+  const taskDescription = String(description || "").trim() || "No Description";
+  return `${ataName} - ${directiveRef} - ${taskDescription}`;
 }
 
 export function buildProcedureReference(ataCode: string | null): string | null {
@@ -358,8 +343,8 @@ serveWithLogger(async (req, logger, supabase) => {
             directive_id: rawRow.directive_id,
             aircraft_id: aircraftId,
             ata_code_id: ataCodeId,
-            task_number: buildTaskNumber(rawRow.ata_code, rawRow.directive_type ?? rawRow.category_code ?? null, seq),
-            title: buildTitle(rawRow.directive_no, rawRow.registration, seq),
+            task_number: buildTaskNumber(rawRow.registration, rawRow.ata_code, seq),
+            title: buildTitle(rawRow.ata_code, rawRow.directive_no, rawRow.notes),
             notes: String(rawRow.notes || "").trim() || null,
             task_category: "directives",
             procedure_reference: buildProcedureReference(rawRow.ata_code),

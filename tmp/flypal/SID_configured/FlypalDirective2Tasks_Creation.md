@@ -256,7 +256,10 @@ Column Mapping: flypal_configured_directives → public.tasks
   ├────────────┼─────────┼───────────────────────────────────────────┤
   │ tenant_id  │ none    │ If set, only process rows for that tenant │
   └────────────┴─────────┴───────────────────────────────────────────┘                         
-  
+  select id from tasks where id in (
+select fcd.created_task_id from flypal.flypal_configured_directives fcd)
+
+
   refresh the data into tasks & flypal_configured_directives tables
 delete from tasks where id in (
 select id from tasks where id in (
