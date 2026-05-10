@@ -30,6 +30,7 @@ import {
   buildTitle,
   buildProcedureReference,
   calcPlannedStartDate,
+  resolveTaskCategory,
   resolveAircraftId,
   resolveAtaCodeId,
 } from "./index.ts";
@@ -101,6 +102,23 @@ Deno.test("buildProcedureReference: empty string returns null", () => {
 
 Deno.test("buildProcedureReference: trims whitespace", () => {
   assertEquals(buildProcedureReference("  21-00  "), "AMA-21-00-00-00");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// resolveTaskCategory
+// ═══════════════════════════════════════════════════════════════════════════════
+
+Deno.test("resolveTaskCategory: uses flypal category_code value", () => {
+  assertEquals(resolveTaskCategory("scheduled"), "scheduled");
+});
+
+Deno.test("resolveTaskCategory: trims whitespace", () => {
+  assertEquals(resolveTaskCategory("  directives  "), "directives");
+});
+
+Deno.test("resolveTaskCategory: falls back to general when empty", () => {
+  assertEquals(resolveTaskCategory(""), "general");
+  assertEquals(resolveTaskCategory(null), "general");
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

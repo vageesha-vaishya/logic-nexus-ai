@@ -14,7 +14,8 @@ import { requireServiceRoleOrAdmin } from "../_shared/auth.ts";
 // "TSK-" + registration + " " + directive_no             task_number                  e.g. "TSK-VT-ABC AMP-AD-001"
 // directive_no + " — " + registration                    title                        Required NOT NULL
 // notes                                                  notes                        Direct
-// (fixed) "directives"                                   task_category                Always "directives"
+// (fixed) "AD"                                           task_type                    Always "AD"
+// category_code                                           task_category                Direct from flypal row
 // "AMA-" + ata_code + "-00-00"                           procedure_reference          e.g. "AMA-05-10-00-00"
 // effective_from_2_actual_end_date                       actual_end_date              Cast date → timestamptz (midnight UTC)
 // effective_from_2_actual_end_date − (man_hrs/8) − 1d   planned_start_date           estimated_man_hours from public.directives
@@ -54,6 +55,7 @@ interface SourceRow {
   notes: string | null;
   ata_code: string | null;
   effective_from_2_actual_end_date: string | null;
+  category_code: string | null;
 }
 
 interface DirectiveRow {
@@ -161,6 +163,11 @@ export function buildTitle(
 export function buildProcedureReference(ataCode: string | null): string | null {
   const ata = String(ataCode || "").trim();
   return ata ? `AMA-${ata}-00-00` : null;
+}
+
+export function resolveTaskCategory(categoryCode: string | null): string {
+  const normalized = String(categoryCode || "").trim();
+  return normalized || "general";
 }
 
 export function calcPlannedStartDate(
@@ -297,7 +304,7 @@ serveWithLogger(async (req, logger, supabase) => {
         .select(
           "id,frequency_sequence,tenant_id,franchise_id,directive_id," +
           "directive_no,registration,serial_number,notes,ata_code," +
-          "effective_from_2_actual_end_date",
+          "effective_from_2_actual_end_date,category_code",
         )
         .not("directive_id", "is", null)
         .eq("is_row_processed_success", true)
@@ -421,7 +428,8 @@ serveWithLogger(async (req, logger, supabase) => {
             ),
             title: buildTitle(rawRow.ata_code, rawRow.directive_no, rawRow.notes),
             notes: String(rawRow.notes || "").trim() || null,
-            task_category: "directives",
+            task_type: "AD",
+            task_category: resolveTaskCategory(rawRow.category_code),
             procedure_reference: buildProcedureReference(rawRow.ata_code),
             actual_end_date: actualEndDate,
             planned_start_date: plannedStartDate,
