@@ -267,3 +267,23 @@ select fcd.created_task_id from flypal.flypal_configured_directives fcd))
 
 update flypal.flypal_configured_directives set is_task_created_success = FALSE and created_task_id = NULL and task_created_failure_reason = NULL where is_task_created_success = TRUE
 
+
+SELECT DISTINCT task_category FROM public.tasks;
+
+delete from tasks where id in (
+select id from tasks where id in (
+select fcd.created_task_id from flypal.flypal_configured_directives fcd))
+
+
+select * from tasks ta where ta.air
+aircraft_id ='ab198f14-bac3-4be9-8130-3d25187ffaa0'
+
+delete from tasks where id in (
+select id from tasks where tasks. directive_id is not NULL and aircraft_id = 'ab198f14-bac3-4be9-8130-3d25187ffaa0'
+)
+
+
+select id from tasks where tasks. directive_id is not NULL and aircraft_id = 'ab198f14-bac3-4be9-8130-3d25187ffaa0'
+select * from work_order where work_order_id = '4b5b26e5-1ec1-4273-be28-935d201cf611'
+
+

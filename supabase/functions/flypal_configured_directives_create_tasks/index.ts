@@ -54,8 +54,6 @@ interface SourceRow {
   notes: string | null;
   ata_code: string | null;
   effective_from_2_actual_end_date: string | null;
-  category_code: string | null;
-  directive_type: string | null;
 }
 
 interface DirectiveRow {
@@ -80,10 +78,6 @@ function normalizeAtaForTaskNumber(ataCode: string | null): string {
     ? digits.padStart(2, "0") + "00"
     : digits.padStart(4, "0").slice(0, 4);
 }
-
-const TASK_TYPE_CODES = new Set([
-  "AD", "SB", "SC", "CM", "DF", "UN", "MEL", "IN", "RE", "TR", "CC", "CT", "CE", "CF", "GE",
-]);
 
 const ATA_CHAPTER_NAMES: Record<string, string> = {
   "05": "Time Limits / Maintenance Checks",
@@ -123,31 +117,6 @@ const ATA_CHAPTER_NAMES: Record<string, string> = {
   "79": "Oil",
   "80": "Starting",
 };
-
-function resolveTaskTypeCode(
-  directiveType: string | null,
-  categoryCode: string | null,
-  directiveNo: string | null,
-): string {
-  const normalizedDirectiveType = String(directiveType || "").trim().toUpperCase();
-  if (TASK_TYPE_CODES.has(normalizedDirectiveType)) return normalizedDirectiveType;
-  if (normalizedDirectiveType === "DIRECTIVES") return "AD";
-  if (normalizedDirectiveType === "GENERAL") return "GE";
-
-  const normalizedCategoryCode = String(categoryCode || "").trim().toUpperCase();
-  if (TASK_TYPE_CODES.has(normalizedCategoryCode)) return normalizedCategoryCode;
-  if (normalizedCategoryCode === "DIRECTIVES") return "AD";
-  if (normalizedCategoryCode === "GENERAL") return "GE";
-
-  const normalizedDirectiveNo = String(directiveNo || "").trim().toUpperCase();
-  if (normalizedDirectiveNo.startsWith("AD")) return "AD";
-  if (normalizedDirectiveNo.startsWith("SB")) return "SB";
-  if (normalizedDirectiveNo.startsWith("MPD")) return "SC";
-  if (normalizedDirectiveNo.startsWith("MEL")) return "MEL";
-  if (normalizedDirectiveNo.startsWith("TR")) return "TR";
-  if (normalizedDirectiveNo.startsWith("RE")) return "RE";
-  return "GE";
-}
 
 function resolveAtaChapterName(ataCode: string | null): string {
   const normalizedAta = normalizeAtaForTaskNumber(ataCode);
@@ -328,7 +297,7 @@ serveWithLogger(async (req, logger, supabase) => {
         .select(
           "id,frequency_sequence,tenant_id,franchise_id,directive_id," +
           "directive_no,registration,serial_number,notes,ata_code," +
-          "effective_from_2_actual_end_date,category_code,directive_type",
+          "effective_from_2_actual_end_date",
         )
         .not("directive_id", "is", null)
         .eq("is_row_processed_success", true)

@@ -52,6 +52,16 @@ Type Codes:
   DF   Deferred Defect
   UN   Unscheduled / Non-routine
   MEL  Minimum Equipment List item
+  IN   Inspection
+  RE   Repair
+  TR   Troubleshooting
+  CC   Component Change
+  CT   Component Test
+  CE   Component Evaluation
+  CF   Certification
+  GE   General
+  DIRECTIVES  Airworthiness Directive
+  GENERAL  General
 ```
 
 **Rule:** The task number is immutable once issued. Amendments are tracked via revision suffix (e.g. `TSK-3200-AD-202401-000047-R1`).
@@ -583,3 +593,42 @@ WHERE t.id IN (
 GROUP BY t.aircraft_id, t.status
 ORDER BY t.aircraft_id, t.status;
 ```
+
+
+
+Naming Convention
+                                                     │
+│                                                                                              │
+│ ┌─────────────────────────────────────┬───────────────────────────┐                          │
+│ │               Before                │           After           │                          │
+│ ├─────────────────────────────────────┼───────────────────────────┤                          │
+│ │ CFG-DIR-ab198f14-1778311245029-4338 │ TSK-3400-SB-202601-004338 │                          │
+│ ├─────────────────────────────────────┼───────────────────────────┤                          │
+│ │ CFG-DIR-ab198f14-1778311245029-4339 │ TSK-3400-SB-202601-004339 │                          │
+│ ├─────────────────────────────────────┼───────────────────────────┤                          │
+│ │ CFG-DIR-ab198f14-1778311245029-4340 │ TSK-2300-SB-202601-004340 │                          │
+│ ├─────────────────────────────────────┼───────────────────────────┤                          │
+│ │ TSK-VT-ACG SB 33-027 R1             │ TSK-3300-SB-202601-004304 │                          │
+│ └─────────────────────────────────────┴───────────────────────────┘  
+
+ype Code Mapping Reference                                                                  │
+│                                                                                              │
+│ ┌──────────────────────────────┬────────────────────┐                                        │
+│ │     Input category_code      │    Output TYPE     │                                        │
+│ ├──────────────────────────────┼────────────────────┤                                        │
+│ │ AD                           │ AD                 │                                        │
+│ ├──────────────────────────────┼────────────────────┤                                        │
+│ │ SB, SBS, ASB                 │ SB                 │                                        │
+│ ├──────────────────────────────┼────────────────────┤                                        │
+│ │ SC, SCHEDULED, MPD           │ SC                 │                                        │
+│ ├──────────────────────────────┼────────────────────┤                                        │
+│ │ CM, COMPONENT                │ CM                 │                                        │
+│ ├──────────────────────────────┼────────────────────┤                                        │
+│ │ DF, DEFERRED                 │ DF                 │                                        │
+│ ├──────────────────────────────┼────────────────────┤                                        │
+│ │ UN, UNSCHEDULED              │ UN                 │                                        │
+│ ├──────────────────────────────┼────────────────────┤                                        │
+│ │ MEL                          │ MEL                │                                        │
+│ ├──────────────────────────────┼────────────────────┤                                        │
+│ │ DIRECTIVES, GENERAL, unknown │ SC / AD (fallback) │                                        │
+│ └──────────────────────────────┴────────────────────┘            
