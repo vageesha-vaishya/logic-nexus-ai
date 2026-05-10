@@ -31,6 +31,7 @@ import {
   buildProcedureReference,
   calcPlannedStartDate,
   resolveTaskCategory,
+  normalizeLinkedPreviousTaskDoneOn,
   resolveAircraftId,
   resolveAtaCodeId,
 } from "./index.ts";
@@ -119,6 +120,27 @@ Deno.test("resolveTaskCategory: trims whitespace", () => {
 Deno.test("resolveTaskCategory: falls back to general when empty", () => {
   assertEquals(resolveTaskCategory(""), "general");
   assertEquals(resolveTaskCategory(null), "general");
+});
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// normalizeLinkedPreviousTaskDoneOn
+// ═══════════════════════════════════════════════════════════════════════════════
+
+Deno.test("normalizeLinkedPreviousTaskDoneOn: keeps date-only values", () => {
+  assertEquals(normalizeLinkedPreviousTaskDoneOn("2026-05-09"), "2026-05-09");
+});
+
+Deno.test("normalizeLinkedPreviousTaskDoneOn: converts datetime to date", () => {
+  assertEquals(
+    normalizeLinkedPreviousTaskDoneOn("2026-05-09T16:45:00Z"),
+    "2026-05-09",
+  );
+});
+
+Deno.test("normalizeLinkedPreviousTaskDoneOn: returns null for empty/invalid", () => {
+  assertEquals(normalizeLinkedPreviousTaskDoneOn(""), null);
+  assertEquals(normalizeLinkedPreviousTaskDoneOn("not-a-date"), null);
+  assertEquals(normalizeLinkedPreviousTaskDoneOn(null), null);
 });
 
 // ═══════════════════════════════════════════════════════════════════════════════

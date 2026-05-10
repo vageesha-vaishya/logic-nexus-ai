@@ -482,12 +482,47 @@ async function reserveNextTaskSequence(params: {
   return Math.trunc(sequence);
 }
 
+async function resolveAtaCodeIdMap(params: {
+  supabase: SupabaseClient;
+  tenantId: string;
+  directiveRows: JsonRecord[];
+}): Promise<Map<string, string>> {
+  const ataCodes = Array.from(
+    new Set(
+      params.directiveRows
+        .map((row) => String(row.ata_code || '').trim())
+        .filter(Boolean),
+    ),
+  );
+  if (ataCodes.length === 0) return new Map<string, string>();
+
+  const { data, error } = await params.supabase
+    .from('ata_codes')
+    .select('id,code')
+    .eq('tenant_id', params.tenantId)
+    .in('code', ataCodes);
+  if (error) {
+    throw new Error(`Failed to resolve ATA code IDs for tasks: ${error.message}`);
+  }
+
+  const codeToId = new Map<string, string>();
+  for (const row of Array.isArray(data) ? data : []) {
+    const record = row as JsonRecord;
+    const code = String(record.code || '').trim();
+    const id = String(record.id || '').trim();
+    if (!code || !id) continue;
+    codeToId.set(code, id);
+  }
+  return codeToId;
+}
+
 function mapDirectiveToTaskInsert(params: {
   tenantId: string;
   franchiseId: string | null;
   userId: string;
   workOrderId: string;
   aircraftId: string;
+  ataCodeId: string | null;
   taskYearMonth: string;
   tenantScopedSequence: number;
   directive: JsonRecord;
@@ -505,6 +540,7 @@ function mapDirectiveToTaskInsert(params: {
     work_order_id: params.workOrderId,
     aircraft_id: params.aircraftId,
     directive_id: directiveId,
+    ata_code_id: params.ataCodeId,
     task_number: buildStandardTaskNumber(
       String(params.directive.ata_code || ''),
       taskTypeCode,
@@ -517,6 +553,7 @@ function mapDirectiveToTaskInsert(params: {
       taskDescription,
     ),
     description: normalizeString(params.directive.description),
+    task_type: 'AD',
     task_category: String(params.directive.category_code || 'general'),
     estimated_duration_hours: toIntervalLiteral(params.directive.estimated_man_hours),
     sequence_order: fallbackSequence,
@@ -885,6 +922,11 @@ router.post(
     }
 
     const directives = (Array.isArray(directiveRows) ? directiveRows : []) as JsonRecord[];
+    const ataCodeIdMap = await resolveAtaCodeIdMap({
+      supabase,
+      tenantId,
+      directiveRows: directives,
+    });
     const workOrder = await ensureConfigureDirectivesWorkOrder({
       supabase,
       tenantId,
@@ -912,6 +954,8 @@ router.post(
     const taskYearMonth = getUtcYearMonth(new Date());
     const inserts: JsonRecord[] = [];
     for (const [index, directive] of directives.entries()) {
+      const ataCode = String(directive.ata_code || '').trim();
+      const ataCodeId = ataCodeIdMap.get(ataCode) || null;
       const tenantScopedSequence = await reserveNextTaskSequence({
         supabase,
         tenantId,
@@ -924,6 +968,7 @@ router.post(
           userId,
           workOrderId,
           aircraftId,
+          ataCodeId,
           taskYearMonth,
           tenantScopedSequence,
           directive,

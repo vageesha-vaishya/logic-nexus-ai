@@ -56,6 +56,7 @@ interface SourceRow {
   ata_code: string | null;
   effective_from_2_actual_end_date: string | null;
   category_code: string | null;
+  last_done_on: string | null;
 }
 
 interface DirectiveRow {
@@ -168,6 +169,15 @@ export function buildProcedureReference(ataCode: string | null): string | null {
 export function resolveTaskCategory(categoryCode: string | null): string {
   const normalized = String(categoryCode || "").trim();
   return normalized || "general";
+}
+
+export function normalizeLinkedPreviousTaskDoneOn(value: string | null): string | null {
+  if (!value) return null;
+  const trimmed = String(value).trim();
+  if (!trimmed) return null;
+  const parsed = new Date(trimmed);
+  if (isNaN(parsed.getTime())) return null;
+  return parsed.toISOString().slice(0, 10);
 }
 
 export function calcPlannedStartDate(
@@ -304,7 +314,7 @@ serveWithLogger(async (req, logger, supabase) => {
         .select(
           "id,frequency_sequence,tenant_id,franchise_id,directive_id," +
           "directive_no,registration,serial_number,notes,ata_code," +
-          "effective_from_2_actual_end_date,category_code",
+          "effective_from_2_actual_end_date,category_code,last_done_on",
         )
         .not("directive_id", "is", null)
         .eq("is_row_processed_success", true)
@@ -431,6 +441,7 @@ serveWithLogger(async (req, logger, supabase) => {
             task_type: "AD",
             task_category: resolveTaskCategory(rawRow.category_code),
             procedure_reference: buildProcedureReference(rawRow.ata_code),
+            linked_previous_task_done_on: normalizeLinkedPreviousTaskDoneOn(rawRow.last_done_on),
             actual_end_date: actualEndDate,
             planned_start_date: plannedStartDate,
             estimated_duration_hours: estimatedManHours,
