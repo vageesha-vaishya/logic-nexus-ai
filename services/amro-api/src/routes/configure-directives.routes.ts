@@ -394,6 +394,7 @@ function mapDirectiveToTaskInsert(params: {
   franchiseId: string | null;
   userId: string;
   workOrderId: string;
+  aircraftId: string;
   aircraftRegistration: string | null;
   directive: JsonRecord;
   sequence: number;
@@ -405,6 +406,7 @@ function mapDirectiveToTaskInsert(params: {
     tenant_id: params.tenantId,
     franchise_id: params.franchiseId,
     work_order_id: params.workOrderId,
+    aircraft_id: params.aircraftId,
     directive_id: directiveId,
     task_number: buildStandardTaskNumber(
       params.aircraftRegistration,
@@ -815,6 +817,7 @@ router.post(
         franchiseId,
         userId,
         workOrderId,
+        aircraftId,
         aircraftRegistration,
         directive,
         sequence: index + 1,
