@@ -212,6 +212,15 @@ function paginate<T>(rows: T[], from: number, to: number): T[] {
   return rows.slice(safeFrom, safeTo + 1);
 }
 
+function chunkArray<T>(rows: T[], size: number): T[][] {
+  if (size <= 0 || rows.length === 0) return rows.length === 0 ? [] : [rows];
+  const chunks: T[][] = [];
+  for (let i = 0; i < rows.length; i += size) {
+    chunks.push(rows.slice(i, i + size));
+  }
+  return chunks;
+}
+
 async function fetchAircraftOptions(params: {
   supabase: SupabaseClient;
   tenantId: string;
@@ -777,25 +786,33 @@ router.get(
 
     let directiveById = new Map<string, JsonRecord>();
     if (directiveIds.length > 0) {
-      let directiveQuery = supabase
-        .from('directives')
-        .select('*')
-        .eq('tenant_id', tenantId)
-        .in('id', directiveIds);
-      if (franchiseId) {
-        directiveQuery = directiveQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
-      }
-      const { data: directiveRows, error: directiveError } = await directiveQuery;
-      if (directiveError) {
-        res.status(500).json({
-          error: `Failed to query configured directives: ${directiveError.message}`,
-          code: 'CONFIGURE_DIRECTIVES_CONFIGURED_QUERY_FAILED',
-          statusCode: 500,
-        });
-        return;
+      const uniqueDirectiveIds = Array.from(new Set(directiveIds));
+      const directiveIdChunks = chunkArray(uniqueDirectiveIds, 200);
+      const directiveRows: JsonRecord[] = [];
+      for (const idChunk of directiveIdChunks) {
+        let directiveQuery = supabase
+          .from('directives')
+          .select('*')
+          .eq('tenant_id', tenantId)
+          .in('id', idChunk);
+        if (franchiseId) {
+          directiveQuery = directiveQuery.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+        }
+        const { data, error: directiveError } = await directiveQuery;
+        if (directiveError) {
+          res.status(500).json({
+            error: `Failed to query configured directives: ${directiveError.message}`,
+            code: 'CONFIGURE_DIRECTIVES_CONFIGURED_QUERY_FAILED',
+            statusCode: 500,
+          });
+          return;
+        }
+        if (Array.isArray(data)) {
+          directiveRows.push(...(data as JsonRecord[]));
+        }
       }
       directiveById = new Map(
-        (Array.isArray(directiveRows) ? directiveRows : []).map((row) => [String((row as JsonRecord).id || ''), row as JsonRecord]),
+        directiveRows.map((row) => [String((row as JsonRecord).id || ''), row as JsonRecord]),
       );
     }
 

@@ -35,12 +35,20 @@ All reference numbers follow a structured, hierarchical format to ensure traceab
 ```
 Format:   TSK-{ATA}-{TYPE}-{YYYYMM}-{SEQ:06d}
 
-Fields:
+Fields from:
   TSK      — Fixed prefix (Task)
   {ATA}    — ATA chapter code, zero-padded to 4 digits (e.g. 3200)
   {TYPE}   — Work type code (see table below)
   {YYYYMM} — Year and month of task creation (e.g. 202401)
   {SEQ}    — Tenant-scoped 6-digit sequential number, zero-padded
+
+Fields to:
+  TSK      — Fixed prefix (Task)
+  {Registration}    — Aircraft Registration Number
+  {TYPE}   — Work type code (see table below)
+  {YYYYMM} — Year and month of task creation (e.g. 202401)
+  {SEQ}    — Tenant-scoped 6-digit sequential number, zero-padded
+
 
 Example:   TSK-3200-AD-202401-000047
 

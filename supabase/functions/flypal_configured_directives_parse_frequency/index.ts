@@ -26,6 +26,11 @@ interface ParsedCurrent {
   current_2_aircraft_current_reading_date: string | null;
 }
 
+interface ParsedCodeFormDetails {
+  code_form_no: string | null;
+  code_form_no_description: string | null;
+}
+
 const TOKEN_PATTERN = /(\d+(?::\d{1,2})?|\d+(?:\.\d+)?)\s*(Ho|RI|Dy|Mt|Yr|L|C|H)\b/gi;
 const EFFECTIVE_FROM_HOURS_PATTERN = /^(\d+(?::\d{1,2})?|\d+(?:\.\d+)?)\s*H$/i;
 const EFFECTIVE_FROM_DATE_PATTERN = /^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/;
@@ -231,6 +236,35 @@ function parseCurrent(raw: string): {
   };
 }
 
+function parseCodeFormDetails(raw: string): {
+  hasInput: boolean;
+  parsed: ParsedCodeFormDetails;
+} {
+  const normalized = raw.replace(/\r\n?/g, "\n").trim();
+  if (!normalized) {
+    return {
+      hasInput: false,
+      parsed: {
+        code_form_no: null,
+        code_form_no_description: null,
+      },
+    };
+  }
+
+  const lines = normalized
+    .split("\n")
+    .map((line) => line.trim())
+    .filter(Boolean);
+
+  return {
+    hasInput: true,
+    parsed: {
+      code_form_no: lines[0] ?? null,
+      code_form_no_description: lines[1] ?? null,
+    },
+  };
+}
+
 function parseFrequency(raw: string): { parsed: ParsedFrequency; errors: string[] } {
   const parsed: ParsedFrequency = {
     threshold_hours: null,
@@ -383,11 +417,25 @@ serveWithLogger(async (req, logger, supabase) => {
             (row as Record<string, unknown>).current_2_aircraft_current_landings ||
             (row as Record<string, unknown>).current_2_aircraft_current_reading_date,
           );
+          const codeFormRaw = String(
+            (row as Record<string, unknown>).code_form_no_and_description ??
+              (row as Record<string, unknown>)["directives.code_form_no + directives.description"] ??
+              "",
+          ).trim();
+          const {
+            hasInput: hasCodeFormInput,
+            parsed: parsedCodeForm,
+          } = parseCodeFormDetails(codeFormRaw);
+          const hasCodeFormTargetData = Boolean(
+            (row as Record<string, unknown>).code_form_no ||
+            (row as Record<string, unknown>).code_form_no_description,
+          );
 
           if (row.is_frequency_parsed_success === true) {
             const shouldProcessEffectiveFrom = hasEffectiveFromInput && !hasEffectiveFromTargetData;
             const shouldProcessCurrent = hasCurrentInput && !hasCurrentTargetData;
-            if (!shouldProcessEffectiveFrom && !shouldProcessCurrent) {
+            const shouldProcessCodeForm = hasCodeFormInput && !hasCodeFormTargetData;
+            if (!shouldProcessEffectiveFrom && !shouldProcessCurrent && !shouldProcessCodeForm) {
               skippedCount += 1;
               continue;
             }
@@ -430,6 +478,12 @@ serveWithLogger(async (req, logger, supabase) => {
                     current_2_aircraft_current_flight_hours: parsedCurrent.current_2_aircraft_current_flight_hours,
                     current_2_aircraft_current_landings: parsedCurrent.current_2_aircraft_current_landings,
                     current_2_aircraft_current_reading_date: parsedCurrent.current_2_aircraft_current_reading_date,
+                  }
+                  : {}),
+                ...(shouldProcessCodeForm
+                  ? {
+                    code_form_no: parsedCodeForm.code_form_no,
+                    code_form_no_description: parsedCodeForm.code_form_no_description,
                   }
                   : {}),
               })
@@ -480,7 +534,11 @@ serveWithLogger(async (req, logger, supabase) => {
             continue;
           }
 
-          if ((hasEffectiveFromInput && !hasEffectiveFromTargetData) || (hasCurrentInput && !hasCurrentTargetData)) {
+          if (
+            (hasEffectiveFromInput && !hasEffectiveFromTargetData) ||
+            (hasCurrentInput && !hasCurrentTargetData) ||
+            (hasCodeFormInput && !hasCodeFormTargetData)
+          ) {
             const { error: effectiveUpdateError } = await supabase
               .schema("flypal")
               .from("flypal_configured_directives")
@@ -496,6 +554,12 @@ serveWithLogger(async (req, logger, supabase) => {
                     current_2_aircraft_current_flight_hours: parsedCurrent.current_2_aircraft_current_flight_hours,
                     current_2_aircraft_current_landings: parsedCurrent.current_2_aircraft_current_landings,
                     current_2_aircraft_current_reading_date: parsedCurrent.current_2_aircraft_current_reading_date,
+                  }
+                  : {}),
+                ...(hasCodeFormInput && !hasCodeFormTargetData
+                  ? {
+                    code_form_no: parsedCodeForm.code_form_no,
+                    code_form_no_description: parsedCodeForm.code_form_no_description,
                   }
                   : {}),
               })
@@ -552,6 +616,10 @@ serveWithLogger(async (req, logger, supabase) => {
             updatePayload.current_2_aircraft_current_flight_hours = parsedCurrent.current_2_aircraft_current_flight_hours;
             updatePayload.current_2_aircraft_current_landings = parsedCurrent.current_2_aircraft_current_landings;
             updatePayload.current_2_aircraft_current_reading_date = parsedCurrent.current_2_aircraft_current_reading_date;
+          }
+          if (hasCodeFormInput) {
+            updatePayload.code_form_no = parsedCodeForm.code_form_no;
+            updatePayload.code_form_no_description = parsedCodeForm.code_form_no_description;
           }
 
           const { error: updateError } = await supabase
