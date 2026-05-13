@@ -12,11 +12,11 @@ import {
 } from '../../../_utils/http';
 import { sendErrorResponse } from '../../../_utils/errorHandler';
 import {
-  persistCreateWorkPackage,
-  fetchWorkPackageList,
+  persistCreateWorkOrder,
+  fetchWorkOrderList,
   checkPersistenceHealth,
   type MaintenanceType,
-} from '../work-package-persistence-db';
+} from '../work-order-persistence-db';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -114,7 +114,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new Error(`Invalid maintenance_type: ${maintenanceType}`);
       }
 
-      const { rows, total } = await fetchWorkPackageList({
+      const { rows, total } = await fetchWorkOrderList({
         tenantId,
         franchiseId,
         page,
@@ -129,7 +129,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       const records = rows.map((wp) => ({
         id: wp.id,
-        work_order_number: wp.work_package_number,
+        work_order_number: wp.work_order_number || wp.work_order_number,
         title: wp.title,
         aircraft_id: wp.aircraft_id,
         aircraft_registration: null, // Would join aircraft table in production
@@ -165,8 +165,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     if (req.method === 'POST') {
       const body = parseBody(req.body);
       const aircraftId = body.aircraft_id ? String(body.aircraft_id).trim() : null;
-      const workPackageTitleId = body.work_package_title_id ? String(body.work_package_title_id).trim() : undefined;
-      const title = workPackageTitleId
+      const workOrderTitleId = body.work_order_title_id ? String(body.work_order_title_id).trim() : undefined;
+      const title = workOrderTitleId
         ? String(body.title || '').trim() || undefined
         : assertNonEmpty(body.title, 'title');
       const maintenanceType = assertNonEmpty(body.maintenance_type, 'maintenance_type').toLowerCase();
@@ -178,7 +178,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
       // work_type is NOT NULL in DB; default to maintenance_type if not provided
       const workType = body.work_type ? String(body.work_type).trim() : maintenanceType;
-      const workPackageTemplateId = body.work_package_template_id ? String(body.work_package_template_id).trim() : undefined;
+      const workOrderTemplateId = body.work_order_template_id ? String(body.work_order_template_id).trim() : undefined;
       const description = body.description ? String(body.description).trim() : undefined;
       const source = body.source ? String(body.source).trim() : undefined;
       const plannedStartDate = parseOptionalDate(body.planned_start_date, 'planned_start_date');
@@ -193,7 +193,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         ? (Array.isArray(body.reference_documents) ? body.reference_documents : [String(body.reference_documents)])
         : undefined;
 
-      const persisted = await persistCreateWorkPackage({
+      const persisted = await persistCreateWorkOrder({
         tenantId,
         franchiseId,
         userId: authUser.userId,
@@ -213,8 +213,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         notes,
         referenceDocuments,
         externalReference,
-        workPackageTitleId,
-        workPackageTemplateId,
+        workOrderTitleId,
+        workOrderTemplateId,
       });
 
       res.status(201).json({
@@ -223,7 +223,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           id: persisted.id,
-          work_order_number: persisted.work_package_number,
+          work_order_number: persisted.work_order_number || persisted.work_order_number,
           status: persisted.status,
           created_at: persisted.created_at,
           generated_tasks_count: Number(persisted.generated_tasks_count || 0),

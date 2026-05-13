@@ -64,7 +64,7 @@ handleSave() constructs payload:
   tooling_json: form.tooling_json ✅
   compliance_requirements_json: form.compliance_requirements_json ✅
          ↓
-POST /api/v2/amro/master-data/work_package_templates
+POST /api/v2/amro/master-data/work_order_templates
          ↓
 Data saved to database
          ↓
@@ -89,7 +89,7 @@ form state updates via setField()
          ↓
 User clicks "Save Template"
          ↓
-PATCH /api/v2/amro/master-data/work_package_templates/:id
+PATCH /api/v2/amro/master-data/work_order_templates/:id
          ↓
 Updated data saved to database
          ↓

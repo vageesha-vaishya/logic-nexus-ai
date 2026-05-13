@@ -296,8 +296,8 @@ describe('AMRO Tracing Instrumentation', () => {
 
 describe('AMRO Tracing - Real-World Scenarios', () => {
   it('should trace work package creation flow', async () => {
-    const workPackageResult = await withSpan(
-      'work_package.create',
+    const workOrderResult = await withSpan(
+      'work_order.create',
       async () => {
         const wpData = {
           id: 'wp-' + Date.now(),
@@ -321,8 +321,8 @@ describe('AMRO Tracing - Real-World Scenarios', () => {
       },
     );
 
-    expect(workPackageResult.id).toMatch(/^wp-/);
-    expect(workPackageResult.aircraft_id).toBe('ac-123');
+    expect(workOrderResult.id).toMatch(/^wp-/);
+    expect(workOrderResult.aircraft_id).toBe('ac-123');
   });
 
   it('should trace task creation with proper context', async () => {
@@ -331,7 +331,7 @@ describe('AMRO Tracing - Real-World Scenarios', () => {
       async () => {
         const task = {
           id: 'task-' + Date.now(),
-          work_package_id: 'wp-123',
+          work_order_id: 'wp-123',
           title: 'Inspect Landing Gear',
           status: 'pending',
           sequence_number: 1,
@@ -347,7 +347,7 @@ describe('AMRO Tracing - Real-World Scenarios', () => {
       },
       {
         tenant_id: 'tenant-001',
-        work_package_id: 'wp-123',
+        work_order_id: 'wp-123',
         sequence_number: 1,
       },
     );
@@ -367,7 +367,7 @@ describe('AMRO Tracing - Real-World Scenarios', () => {
         },
         {
           tenant_id: 'tenant-001',
-          table: 'work_packages',
+          table: 'work_orders',
           operation: 'insert',
         },
       ),
@@ -393,7 +393,7 @@ describe('AMRO Tracing - Real-World Scenarios', () => {
       },
       {
         trace_id: traceId,
-        endpoint: '/api/v1/work-packages/wp-123',
+        endpoint: '/api/v1/work-orders/wp-123',
         method: 'GET',
       },
     );
@@ -404,9 +404,9 @@ describe('AMRO Tracing - Real-World Scenarios', () => {
 
   it('should integrate with work orders service', async () => {
     // This verifies the tracing wrapper pattern matches the expected service integration
-    const createWorkPackageWithTracing = async () => {
+    const createWorkOrderWithTracing = async () => {
       return withSpan(
-        'work_package.create',
+        'work_order.create',
         async () => {
           // Simulates service logic
           return { id: 'wp-test', status: 'planning' };
@@ -415,7 +415,7 @@ describe('AMRO Tracing - Real-World Scenarios', () => {
       );
     };
 
-    const result = await createWorkPackageWithTracing();
+    const result = await createWorkOrderWithTracing();
     expect(result.id).toBe('wp-test');
     expect(result.status).toBe('planning');
   });

@@ -560,7 +560,11 @@ export async function authMiddleware(
       statusCode,
       errorCode,
       message: String((err as { message?: unknown } | null)?.message || ''),
+      headersSent: res.headersSent,
     });
+    if (res.headersSent) {
+      return;
+    }
     res.status(statusCode).json({
       error: errorMessage,
       code: errorCode,

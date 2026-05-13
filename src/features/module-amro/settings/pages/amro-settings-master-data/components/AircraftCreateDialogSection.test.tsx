@@ -14,9 +14,9 @@ describe('AircraftCreateDialogSection', () => {
     aircraftListboxOptionsLoading: false,
     aircraftTenantOptionsLoading: false,
     aircraftFranchiseOptionsLoading: false,
+    aircraftTemplateOptionsLoading: false,
     aircraftTenantOptionsError: '',
     aircraftFranchiseOptionsError: '',
-    isSystemSelectValue: (value: string) => value.startsWith('__'),
     setAircraftTemplateModel: vi.fn(),
     setAircraftTenantValue: vi.fn(),
     setAircraftFranchiseValue: vi.fn(),
@@ -24,12 +24,8 @@ describe('AircraftCreateDialogSection', () => {
     systemTemplateModelOptions: [],
     franchiseAssemblyModelOptions: [],
     setFieldValue: vi.fn(),
-    hydrateAircraftCountersFromTemplate: vi.fn(async () => {}),
-    systemTemplateModelSelectOptions: [
+    aircraftTemplateSelectOptions: [
       { value: '__empty__', label: 'No aircraft templates available', disabled: true },
-    ],
-    franchiseAssemblyModelSelectOptions: [
-      { value: '__empty_assembly_models__', label: 'No models available for selected franchise', disabled: true },
     ],
     aircraftTenantSelectOptions: [
       { value: '', label: 'Select tenant', disabled: true },
@@ -41,13 +37,12 @@ describe('AircraftCreateDialogSection', () => {
     ],
     disableAircraftFranchiseSelection: true,
     disableAircraftModelSelection: true,
-    formValues: {},
+    formValues: { registration: '', serial_number: '', aircraft_operators_id: '', aircraft_owners_id: '', aircraft_base_location_id: '' },
     formErrors: {},
     firstFieldRef: { current: null },
-    aircraftModelNameValue: '',
-    aircraftModelTypeValue: '',
-    setSelectFieldValue: vi.fn(),
-    resolveSelectOptions: vi.fn(() => [{ value: '', label: 'Select', disabled: true }]),
+    selectedTemplateModelName: '',
+    selectedTemplateManufacturerName: '',
+    selectedTemplateAircraftType: '',
     aircraftNoSerialNumber: false,
     handleAircraftNoSerialChange: vi.fn(),
     aircraftManufacturingDate: '',
@@ -55,9 +50,26 @@ describe('AircraftCreateDialogSection', () => {
     aircraftBase: 'Nothing selected',
     setAircraftBase: vi.fn(),
     aircraftBaseSelectOptions: [{ value: 'Nothing selected', label: 'Nothing selected' }],
-    aircraftOwner: 'Nothing selected',
+    aircraftOperatorOwner: '',
+    setAircraftOperatorOwner: vi.fn(),
+    aircraftOperatorOwnerSelectOptions: [
+      { value: '', label: 'Nothing selected' },
+      { value: '157b8d12-c115-446e-a4dc-d12077751fe2', label: 'Deccan Charters Pvt Ltd (DECCAN)' },
+    ],
+    aircraftOwner: '',
     setAircraftOwner: vi.fn(),
-    aircraftOwnerSelectOptions: [{ value: 'Nothing selected', label: 'Nothing selected' }],
+    aircraftOwnerSelectOptions: [
+      { value: '', label: 'Nothing selected' },
+      { value: '257b8d12-c115-446e-a4dc-d12077751fe2', label: 'Global Ops Air (GLOBAL_OPS_AIR)' },
+    ],
+    aircraftBaseLocationId: '',
+    setAircraftBaseLocationId: vi.fn(),
+    aircraftBaseLocationSelectOptions: [
+      { value: '', label: 'Nothing selected' },
+      { value: '357b8d12-c115-446e-a4dc-d12077751fe2', label: 'Kempegowda Intl (BLR / VOBL)' },
+    ],
+    aircraftBaseLocationOptionsLoading: false,
+    aircraftBaseLocationOptionsError: '',
     aircraftLineNumber: '',
     setAircraftLineNumber: vi.fn(),
     aircraftVariableNumber: '',
@@ -75,20 +87,19 @@ describe('AircraftCreateDialogSection', () => {
     aircraftAuditTimeline: [],
   });
 
-  it('renders Aircraft Model section labels and cascade controls', () => {
+  it('renders optional ownership dropdowns', () => {
     render(<AircraftCreateDialogSection {...createProps()} />);
-    expect(screen.getAllByText('Aircraft Model').length).toBeGreaterThan(0);
+    expect(screen.getByLabelText('Operator Owner')).toBeInTheDocument();
+    expect(screen.getByLabelText('Aircraft Owner')).toBeInTheDocument();
+    expect(screen.getByLabelText('Base Location')).toBeInTheDocument();
+    expect(screen.queryByText('* Operator Owner')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Tenant')).toBeInTheDocument();
-    expect(screen.getByLabelText('Franchise')).toBeInTheDocument();
-    expect(screen.getByLabelText('Manufacturer')).toBeInTheDocument();
-    expect(screen.queryByText('System Details')).not.toBeInTheDocument();
-    const typeSelect = screen.getByLabelText('Aircraft Type:');
-    expect(typeSelect).toHaveValue('');
+    expect(screen.getByLabelText(/Franchise/)).toBeInTheDocument();
   });
 
   it('disables franchise selector when tenant prerequisite is missing', () => {
     render(<AircraftCreateDialogSection {...createProps()} />);
-    expect(screen.getByLabelText('Franchise')).toBeDisabled();
+    expect(screen.getByLabelText(/Franchise/)).toBeDisabled();
   });
 
   it('calls tenant and franchise setters on selection changes', async () => {
@@ -97,8 +108,25 @@ describe('AircraftCreateDialogSection', () => {
     props.disableAircraftFranchiseSelection = false;
     render(<AircraftCreateDialogSection {...props} />);
     await user.selectOptions(screen.getByLabelText('Tenant'), 'tenant-1');
-    await user.selectOptions(screen.getByLabelText('Franchise'), 'fr-1');
+    await user.selectOptions(screen.getByLabelText(/Franchise/), 'fr-1');
     expect(props.setAircraftTenantValue).toHaveBeenCalledWith('tenant-1');
     expect(props.setAircraftFranchiseValue).toHaveBeenCalledWith('fr-1');
+  });
+
+  it('binds owner dropdowns to UUID fields via aux setter', async () => {
+    const user = userEvent.setup();
+    const props = createProps();
+    render(<AircraftCreateDialogSection {...props} />);
+
+    await user.selectOptions(screen.getByLabelText('Operator Owner'), '157b8d12-c115-446e-a4dc-d12077751fe2');
+    await user.selectOptions(screen.getByLabelText('Aircraft Owner'), '257b8d12-c115-446e-a4dc-d12077751fe2');
+    await user.selectOptions(screen.getByLabelText('Base Location'), '357b8d12-c115-446e-a4dc-d12077751fe2');
+
+    expect(props.setAircraftOperatorOwner).toHaveBeenCalledWith('157b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(props.setAircraftAuxField).toHaveBeenCalledWith('aircraft_operators_id', '157b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(props.setAircraftOwner).toHaveBeenCalledWith('257b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(props.setAircraftAuxField).toHaveBeenCalledWith('aircraft_owners_id', '257b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(props.setAircraftBaseLocationId).toHaveBeenCalledWith('357b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(props.setAircraftAuxField).toHaveBeenCalledWith('aircraft_base_location_id', '357b8d12-c115-446e-a4dc-d12077751fe2');
   });
 });

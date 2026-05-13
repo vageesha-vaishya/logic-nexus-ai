@@ -1,7 +1,7 @@
 /**
  * React Query Hooks for AMRO Compliance Records
  * 
- * Follows the pattern established in useWorkPackageState.ts
+ * Follows the pattern established in useWorkOrderState.ts
  * Provides hooks for:
  * - Listing compliance records for a work package
  * - Creating compliance records
@@ -27,7 +27,7 @@ export type ComplianceStatus = 'pending' | 'in_progress' | 'completed' | 'deferr
 export interface ComplianceRecord {
   id: string;
   tenant_id: string;
-  work_package_id: string;
+  work_order_id: string;
   task_id: string | null;
   directive_id: string | null;
   compliance_type: ComplianceType;
@@ -64,7 +64,7 @@ export interface ComplianceRecord {
 }
 
 export interface ComplianceRecordListResponse {
-  work_package_id: string;
+  work_order_id: string;
   records: ComplianceRecord[];
   total: number;
 }
@@ -74,7 +74,7 @@ const COMPLIANCE_KEY = ['amro', 'compliance-records'] as const;
 // ── List compliance records ─────────────────────────────────────────────────
 
 interface UseListComplianceRecordsParams {
-  workPackageId: string;
+  workOrderId: string;
   complianceType?: ComplianceType;
   status?: ComplianceStatus;
   enabled?: boolean;
@@ -82,7 +82,7 @@ interface UseListComplianceRecordsParams {
 
 async function fetchComplianceRecords(
   params: {
-    work_package_id: string;
+    work_order_id: string;
     compliance_type?: string;
     status?: string;
   },
@@ -93,14 +93,14 @@ async function fetchComplianceRecords(
     ...(params.status ? { status: params.status } : {}),
   });
 
-  const url = `/api/v2/amro/work-packages/${params.work_package_id}/compliance-records?${qs.toString()}`;
+  const url = `/api/v2/amro/work-orders/${params.work_order_id}/compliance-records?${qs.toString()}`;
   const response = await fetch(url, { method: 'GET', headers });
   if (!response.ok) throw new Error(`Failed to list compliance records: ${response.status}`);
   const json = await response.json();
   
   const records = json.output?.records || json.data || [];
   return {
-    work_package_id: json.output?.work_package_id || params.work_package_id,
+    work_order_id: json.output?.work_order_id || params.work_order_id,
     records: Array.isArray(records) ? records : [],
     total: json.output?.total || records.length,
   };
@@ -108,24 +108,24 @@ async function fetchComplianceRecords(
 
 export function useListComplianceRecords(params: UseListComplianceRecordsParams) {
   const authHeaders = useAuthHeaders();
-  const { workPackageId, complianceType, status, enabled = true } = params;
+  const { workOrderId, complianceType, status, enabled = true } = params;
 
   return useQuery({
     queryKey: [
       ...COMPLIANCE_KEY,
       'list',
-      workPackageId,
+      workOrderId,
       complianceType || 'all',
       status || 'all',
     ] as const,
     queryFn: () =>
       authHeaders
         ? fetchComplianceRecords(
-            { work_package_id: workPackageId, compliance_type: complianceType, status },
+            { work_order_id: workOrderId, compliance_type: complianceType, status },
             authHeaders,
           )
         : Promise.reject(new Error('Not authenticated')),
-    enabled: enabled && !!authHeaders && !!workPackageId,
+    enabled: enabled && !!authHeaders && !!workOrderId,
     staleTime: 30_000,
     retry: 2,
   });
@@ -134,7 +134,7 @@ export function useListComplianceRecords(params: UseListComplianceRecordsParams)
 // ── Create compliance record ────────────────────────────────────────────────
 
 interface CreateComplianceRecordInput {
-  work_package_id: string;
+  work_order_id: string;
   compliance_type: ComplianceType;
   compliance_reference: string;
   task_id?: string;
@@ -152,8 +152,8 @@ interface CreateComplianceRecordInput {
 }
 
 async function mutateCreateComplianceRecord(input: CreateComplianceRecordInput, headers: HeadersInit): Promise<ComplianceRecord> {
-  const { work_package_id, ...createData } = input;
-  const response = await fetch(`/api/v2/amro/work-packages/${work_package_id}/compliance-records`, {
+  const { work_order_id, ...createData } = input;
+  const response = await fetch(`/api/v2/amro/work-orders/${work_order_id}/compliance-records`, {
     method: 'POST',
     headers,
     body: JSON.stringify(createData),
@@ -175,7 +175,7 @@ export function useCreateComplianceRecord() {
       return mutateCreateComplianceRecord(input, authHeaders);
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [...COMPLIANCE_KEY, 'list', data.work_package_id] });
+      queryClient.invalidateQueries({ queryKey: [...COMPLIANCE_KEY, 'list', data.work_order_id] });
     },
   });
 }
@@ -183,7 +183,7 @@ export function useCreateComplianceRecord() {
 // ── Generate Certificate of Release to Service ──────────────────────────────
 
 interface CreateCertificateInput {
-  work_package_id: string;
+  work_order_id: string;
   certifying_staff_id: string;
   staff_license_number: string;
   staff_license_type: string;
@@ -200,7 +200,7 @@ interface CertificateOutput {
   certificate_id: string;
   certificate_number: string;
   issue_date: string;
-  work_package_id: string;
+  work_order_id: string;
   aircraft_id: string;
   certifying_staff_id: string;
   staff_license_type: string;
@@ -209,8 +209,8 @@ interface CertificateOutput {
 }
 
 async function mutateCreateCertificate(input: CreateCertificateInput, headers: HeadersInit): Promise<CertificateOutput> {
-  const { work_package_id, ...certData } = input;
-  const response = await fetch(`/api/v2/amro/work-packages/${work_package_id}/certificates`, {
+  const { work_order_id, ...certData } = input;
+  const response = await fetch(`/api/v2/amro/work-orders/${work_order_id}/certificates`, {
     method: 'POST',
     headers,
     body: JSON.stringify(certData),
@@ -232,7 +232,7 @@ export function useCreateCertificate() {
       return mutateCreateCertificate(input, authHeaders);
     },
     onSuccess: (data) => {
-      queryClient.invalidateQueries({ queryKey: [...COMPLIANCE_KEY, 'list', data.work_package_id] });
+      queryClient.invalidateQueries({ queryKey: [...COMPLIANCE_KEY, 'list', data.work_order_id] });
     },
   });
 }

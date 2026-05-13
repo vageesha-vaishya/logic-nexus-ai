@@ -128,14 +128,14 @@ describe('AMRO Aircraft Dashboard API', () => {
 
 describe('Authentication Middleware', () => {
   it('should return 401 when Authorization header is missing', async () => {
-    const response = await request(app).get('/api/v1/work-packages');
+    const response = await request(app).get('/api/v1/work-orders');
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
 
   it('should return 401 when Authorization header is malformed', async () => {
     const response = await request(app)
-      .get('/api/v1/work-packages')
+      .get('/api/v1/work-orders')
       .set('Authorization', 'InvalidToken');
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
@@ -143,7 +143,7 @@ describe('Authentication Middleware', () => {
 
   it('should return 401 when Authorization header has no Bearer prefix', async () => {
     const response = await request(app)
-      .get('/api/v1/work-packages')
+      .get('/api/v1/work-orders')
       .set('Authorization', 'InvalidTokenFormat');
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
@@ -196,14 +196,14 @@ describe('CORS Headers', () => {
 });
 
 describe('Work Packages Endpoints - Authentication Required', () => {
-  it('should require authentication for GET /api/v1/work-packages', async () => {
-    const response = await request(app).get('/api/v1/work-packages');
+  it('should require authentication for GET /api/v1/work-orders', async () => {
+    const response = await request(app).get('/api/v1/work-orders');
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
 
-  it('should require authentication for POST /api/v1/work-packages', async () => {
-    const response = await request(app).post('/api/v1/work-packages').send({
+  it('should require authentication for POST /api/v1/work-orders', async () => {
+    const response = await request(app).post('/api/v1/work-orders').send({
       aircraft_id: 'ac-123',
       title: 'Test WP',
       maintenance_type: 'line',
@@ -212,39 +212,39 @@ describe('Work Packages Endpoints - Authentication Required', () => {
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
 
-  it('should require authentication for GET /api/v1/work-packages/:id', async () => {
-    const response = await request(app).get('/api/v1/work-packages/wp-123');
+  it('should require authentication for GET /api/v1/work-orders/:id', async () => {
+    const response = await request(app).get('/api/v1/work-orders/wp-123');
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
 
-  it('should require authentication for PATCH /api/v1/work-packages/:id', async () => {
+  it('should require authentication for PATCH /api/v1/work-orders/:id', async () => {
     const response = await request(app)
-      .patch('/api/v1/work-packages/wp-123')
+      .patch('/api/v1/work-orders/wp-123')
       .send({ title: 'Updated' });
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
 
-  it('should require authentication for DELETE /api/v1/work-packages/:id', async () => {
-    const response = await request(app).delete('/api/v1/work-packages/wp-123');
+  it('should require authentication for DELETE /api/v1/work-orders/:id', async () => {
+    const response = await request(app).delete('/api/v1/work-orders/wp-123');
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
 });
 
 describe('Tasks Endpoints - Authentication Required', () => {
-  it('should require authentication for GET /api/v1/work-packages/:id/tasks', async () => {
+  it('should require authentication for GET /api/v1/work-orders/:id/tasks', async () => {
     const response = await request(app).get(
-      '/api/v1/work-packages/wp-123/tasks',
+      '/api/v1/work-orders/wp-123/tasks',
     );
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });
 
-  it('should require authentication for POST /api/v1/work-packages/:id/tasks', async () => {
+  it('should require authentication for POST /api/v1/work-orders/:id/tasks', async () => {
     const response = await request(app)
-      .post('/api/v1/work-packages/wp-123/tasks')
+      .post('/api/v1/work-orders/wp-123/tasks')
       .send({
         title: 'Test Task',
         sequence_number: 1,
@@ -275,8 +275,8 @@ describe('Tasks Endpoints - Authentication Required', () => {
 });
 
 describe('Materials and Maintenance Event Endpoints - Authentication Required', () => {
-  it('should require authentication for GET /api/v1/work-packages/:id/materials', async () => {
-    const response = await request(app).get('/api/v1/work-packages/wp-123/materials');
+  it('should require authentication for GET /api/v1/work-orders/:id/materials', async () => {
+    const response = await request(app).get('/api/v1/work-orders/wp-123/materials');
     expect(response.status).toBe(401);
     expect(response.body.code).toBe('MISSING_TOKEN');
   });

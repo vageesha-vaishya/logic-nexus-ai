@@ -1,0 +1,395 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,12-A-34-21-00-00A-903A-A,Every 2 Years standby Magnetic Compass Inspection,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,DCPL Technical Circular 8 of 2009,Fuel MBT,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Aircraft Weighing,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 24 Months Pitot & Static system Inspection,CH*,,,0:00,Leak Test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Every 24 Months Attitude heading reference system (AHRS) Inspection,CH*,,,0:00,Check Swing
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Monthly VOR Check,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Every 24 Months Transponder System,CH*,,,0:00,Functional Test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Transponder-Functional Test,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Every 3 Months Terrain Database Inspection,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Every 24 Months Standby Magnetic Compass Inspection,CH*,,,0:00,Check Swing
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Aeromobile Licence,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Insurance,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 24 Months Altimeter check,CH*,,,0:00,caliberate
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,"CAR Section-2, Series-X, Part -III",First aid Kit re-certification,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 12 Months Internal Corrosion Inspection,CP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Passenger/crew door/cargo door Inspection,CP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 3 Months External Corrosion Inspection,CP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 24 Months Examine the corrosion protective layer of Battery 1 & 2 ground points Inspection,CP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Flexible drive shaft,LS*,,,0:00,"Remove clean, inspect & lubricate inner core"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,61,,Every 400 Hours / 6 Months Propeller Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,12,,Flap Actuator Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,SL139,24,Service Letter 139,"Electrical Wiring Schematic Diagram Correction Service Letter 139, dt:14-06-2009",OP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Nose Landing Gear (Ref CMM 02-100) Overhauk Kit P/N 500.60.12.029,OP1,,,0:00,overhaul
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,"Flight control cables,aileron",OP*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,71,,Engine torque and stick pusher torque transducers electrical connectors,OP*,,,0:00,Clean
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger oxygen masks,OP*,,,0:00,Inspection & Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,Stick pusher cable,OP*,,,0:00,DMC-12-A-04-00-00-00A-000A-A Structural.component and Miscellaneous .Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,73,,AGB internal scavenge oil pump inlet screen inspection,OP*,,,0:00,"Replace Oil filter element (for PRE SBs 14267, 14320 and 79-003)"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Elevator - Control System - AMM 12-A-27-30-00-00A-310A-A Inspection kit elevator control P/N 500.60.12.019,OP*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM(Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,"In-situ Inspection/Check (Refer AMM 12-A-27-51-00-00A- 313A-A) DGCA/Pilatus PC-12/52 Rev 2, EASA AD2014-0170",Inboard Flap drive arms,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,"Autopilot control cables,aileron",OP*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,Backlash check (Ref. 12-A-27-50-03-00A-313B-A),Flap actuators (black anodized),OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,61,,Propeller -lubrication,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,Backlash check (Ref. 12-A-27-50-03-00A-313A-A),Flap actuators (white colored),OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Actuator - Black Color,OP*,,,0:00,Lubricate
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Power plant Torque limiter test,OP*,,,0:00,Performance Test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,"autopilot control cables,rudder",OP*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,32,Inspection/Check (Ref.12-A-32-10-00-00A-313A-A),Main landing gear hinge pin and bushes,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Generator 2 brushes,OP*,,,0:00,Examin for wear
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Pitot Static System,OP*,,,0:00,Leak check single system
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,21,,Compressor condenser module assly inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Static system,OP*,,,0:00,Leak Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Altimeter,OP*,,,0:00,Calibrate
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,Inspection/check (Ref. 12-A-27- 00-00-00A-313A-A),Flight control cables including auto pilot and stick pusher cables,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,24,Inspection/check (Ref.12-A-24-30-04-00A-313AA),Generator 2 drive assembly housing (Pre SB 24-010),OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,"Flight control cables,elevator",OP*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flaps (LH & RH),OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,NLG-Right hand upper drag link(300hrs/400ldg),OP*,,,0:00,Inspection/Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,Servicing (AMM 12-A-12-20-07-00A- 902A-A),Flap up and down limit switches,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,500 Hours OOP Inspection,OP*,,,0:00,Brushes may be replaced if wear rate is not expected to match time till next inspection.
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,21,,Vapor Cycle compressor motor drive belt,OP*,,,0:00,Check for Tension
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,72,,Sunstrand fuel pump check,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,28,Operational test (Ref.12-A-28-10-01-00A-903AA),Fuel cross vent and outward check valve,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Oil pressure transducer electrical connector,OP*,,,0:00,Clean
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Duct Over temperature Switch,OP*,,,0:00,Remove & Test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,24,Inspection/check (Ref.12-A-24-30-04-00A-313AA),Generator 2 drive assembly housing (Post SB 24-010),OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,200 hours/ 6 month OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Pressurisation outflow valve and safety valve,OP*,,,0:00,Remove & Clean
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,28,Operational test MSN 101-105 (Ref.12-A-28-40-00-00A-903A-A) MSN 106-999 (12-A-28-40-00-00A-903B-A),Fuel low level warning system,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,"Flight control cables,rudder",OP*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,21,,Vapor Cycle compressor motor,OP*,,,0:00,Inspection/Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aerofoil Deicers,OP*,,,0:00,Apply a surface coat of Age master no.1
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,"Autopilots controls cables,elevator",OP*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,1000 Hours OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Ni-CD Battery,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,21,,Evaporator module assembly inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,Flap tension rods,OP*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap linear actuator,ROU1,,,0:00,978.73.20.307/308/309
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,"Pitch trim actuator attachment part,fail safe plates and their attachment parts",ROU1,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,57,,Wing structure (SSID),ROU1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Indicating/recording clock battery,ROU1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flight control cables including autopilot and stick pusher cables,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Frame 40 (AMM 12-A-53-30-02-00-A-353A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Elevator Drive Lever - AMM 12-A-55-20-01-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,C of A,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuel MBT Test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,NLG Drag Link,ROU*,,,0:00,Life Limit (Discard)
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Drive Arm (removed) - AMM 12-A-27-51-01-00A-353A-A AMM 12-A-27-51-02-00A-353A-A AMM 12-A-27-51-03-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 10,000 H/12,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 500 Hours Vapor Cycle compressor motor Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Bellcranks - AMM 12-A-27-51-01-00A-353A-A AMM 12-A-27-51-02-00A-353A-A AMM 12-A-27-51-03-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 10,000 H/12,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,Cargo Door lower lug fitting,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger and crew seat belt(RH),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Horizontal Stablizer Trim,ROU*,,,0:00,Functional Test of Trim run away aural warning system
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Rear Spar Fastener Holes Rib 2 thru Rib 3-AMM 12-A-57-20-10-00A-353B-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,P3 air Filter,ROU*,,,0:00,Clean
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"300 FH (12-A-05-40-01-01A-000B-A) & Items of inspection identified as ""Minor"" in EMM 72-00-00, Table 601. 300 FH / 12 M (12-A-05-40-01-02A-000B-A) 600 FH (12-A-05-40-01-03A-000B-A) 600 FH / 12 M (12-A-05-40-01-04A-000B-A) 1200 FH / 12 M (12-A-05-40-01-05A-000B-A) 2400 FH / 24 M (12-A-05-40-01-06A-000B-A)",1800 Hrs / 72 M,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cargo door lug fittings,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cargo door,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Engine Mount - AMM 12-A-71-00-05-00A-352A-A Inspection kit engine mount P/N 500.60.12.006,ROU*,,,0:00,"Supplemental Structural Inspection Program (Magnetic Particle Inspection) & Repeat at 6,600 H/8,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Torque limiter test performance test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,standby magnetic compass swing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cabin altitude switch,ROU*,,,0:00,Functional Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Heat Exchanger matrix,ROU*,,,0:00,Inspection/check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,ELT Battery Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Over temperature Switch,ROU*,,,0:00,Remove & Test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Ldg Gear Compartments,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vapor cycle compressor condenser module,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger and crew seat belt (LH),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Main Spar Fastener Holes Strap Rib 6 (AMM 12-A-57-20-10- 00A-353D-A),ROU*,,,0:00,Eddy Current Inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vertical Stabilizer Main and Rear Spar Attachment to Fuselage -AMM 12-A-53-30-02-00A-353A-A or AMM 12-A-55-30-03-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Water Separator condenser,ROU*,,,0:00,Clean
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cargo Door Piano Hinge (AMM 12-A-52-00-01-00-A-353A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 6 Months Airfoil De-icers Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,Fuselage Internal Bottom Surface(6000hrs/6yrs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cold Air Unit,ROU*,,,0:00,Re Oil
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Annual Inspection,ROU*,,,0:00,"Rev No:1, Form no. PC12/02/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Rear Spar at Rib 8 Flap Arm Attachment - AMM 12-A-57-20-10-00A-353C-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,AAC 12 of 2017Para 4.2,ELT Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Tips (AMM 12-A-57-33-00-00-A-310A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,32,,landing Gear Compartments(6000hrs/6yrs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,26,,Fire Extinguisher,ROU*,,,0:00,Contents Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Front Pressure Bulkhead,ROU*,,,0:00,"Examine with insulation on engine and cockpit. If insulation on cockpit side is wet, remove, dry and reinstall insulation"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap electrical system,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Bonding Lead to all flight Control Surfaces,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vapor Cycle compressor motor brushes,ROU*,,,0:00,Brush Inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Fuselage internal bottom surface Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rudder Control System - AMM 12-A-27-20-00-00A-310A-A Inspection kit P/N 500.50.12.018,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Actuator - Backlash Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aileron Control Rods - AMM 12-A-27-00-01-00A-352A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program(Magnetic Particle Inspection) Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Antenna - Bottom fuselage skin -AMM 12-A-53-00-00-00A-353A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Eddy Current Inspection) & Repeat at 8,300 H/10,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4800 Hours / 60 Months Duct Over temperature switch Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing internal surfaces and flap compartment,ROU*,,,0:00,Examine as far as possible with all wing panels removed
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Wing internal surfaces and flap compartment Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Fuel MBT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rear pressure bulk head,ROU*,,,0:00,Examine with trim removed
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"AMM 12-A-05-40-01-04A-000B-A EMM Ch 72-00-00, Table 601",Every 600 Hours / 12 Months Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,ELT Battery Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Landing gear compartments Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Front pressure bulkhead,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,P1 Altimeter.,ROU*,,,0:00,Calibrate.
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Structure (Without systems and control system structure such as flaps and ailerons),ROU*,,,0:00,Limit of Validity (Discard)
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuselage Frames 16 to 36 - AMM 12-A-53-20-00-00A-310A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM(Examine all structural elements) & Repeated at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Horizontal Stabilizer,ROU*,,,0:00,Life Limit (discard)
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aileron Cable Segment - AMM 12-A-27-10-09-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuselage Frames 36 to 43 - AMM 12-A-53-30-00-00A-310A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Examine all structural elements) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,ELT Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Passenger/crew door/cargo door Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuel MBT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,"Fuselage internal bottom surfaces, structure around windows, door frames and emergency exit frame",ROU*,,,0:00,Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 10000 Hours / 120 Months Horizontal stabilizer Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Propeller - Lubricate,ROU*,,,0:00,Lubricate
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aileron Bellcranks - AMM 12-A-27-10-08-00A-353A-A AMM 12-A-27-10-08-00A-353B-A AMM 12-A-27-10-08-00A-352B-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Currentand Magnetic Particle Inspections) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aileron Hinge Points - AMM 12-A-57-60-06-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Aeromobile License,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,FLAP ACTUATOR- BLACK COLOUR,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap linear actuator,ROU*,,,0:00,P/N 978.73.20.302/303/304/305/306
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main landing gear leg forward attachment bolt and rear attachment bolt and nut.,ROU*,,,0:00,Refer to AMM 12- A-32-10-00-00A-310A-A
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Weekly Inspection.,ROU*,,,0:00,Corrosion Inspection and Compressor wash.
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Horizontal stabilizers internal surfaces and horizontal / vertical stabilizer interface,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 60 Months Cabin differential pressure switch Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cockpit side windows,ROU*,,,0:00,Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,21,,Blower Motor,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,06Mts Corrosion Schedule,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Main Spar Fastener Holes Rib 1 thru Rib 6 - AMM 12-A-57-20-10-00A-353A-A Inspection kit P/N 500.60.12.030 or Inspection kit second oversize P/N 500.60.12.020,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 33,00 H/4,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,"Pitch Trim ActuatorAttachment parts,failsafe plates and their attachment parts",ROU*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Corrosion Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Landing gear compartment - Examin,ROU*,,,0:00,Examine - specially main and rear spar parts
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,Functional test (Ref.AMM12-A-21- 60-05-00A-903A-A),Duct over temperature switch- Remove and test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rear Pressure Bulk head - Examine with trim removed,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,MLG Actuator,ROU*,,,0:00,Life Limit Discard
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main landing gear - CMM 02099 Inspection kit P/N 500.60.12.027,ROU*,,,0:00,Supplemental Structural Inspection Programme(Overhaul) Initially at 25000hours/30000 landings then after everey 8300hours/10000landings/6years.
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger/Crew Door Skin (AMM 12-A-52-10-01-00-A-353A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 11000 Hours / 120 Months Cockpit Side Windows Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vertical Stabilizer Main Attachment to Horizontal Stabilizer - AMM 12-A-55-00-00-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Attitude heading reference system (AHRS),ROU*,,,0:00,Check swing
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Antenna - Upper fuselage skin -AMM 12-A-53-00-00-00A-353A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Back rest tubes on crew seats without a recline system,ROU*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuel low level warning system,ROU*,,,0:00,Operational Test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,A/C Weighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger / Crew door,ROU*,,,0:00,"Examine with trim removed.Examine the top step area around the insulation mat for corrosion.If corrosion is found,write to Pilatus for a specific repair.Examine door hinge pin & hinges"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vapor cycle compressor motor brushes inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Starter generator brushes,ROU*,,,0:00,Check for wear
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 1200 Hours / 48 Months Fuel low level warning system,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Propeller feathering micro switches,ROU*,,,0:00,Functional test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Airworthiness Review Certificate,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,12,,Flap Actuator (Black Anodised),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"300 FH (12-A-05-40-01-01A-000B-A) & Items of inspection identified as ""Minor"" in EMM 72-00-00, Table 601. 300 FH / 12 M (12-A-05-40-01-02A-000B-A) 600 FH / 12 M (12-A-05-40-01-04A-000B-A) 1200 FH / 12 M (12-A-05-40-01-05A-000B-A)",900 Hrs / 36 M,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,Clean per OSCMM 12-A-05-10-20-00A-281A-A,Vapor cycle compressor condenser module (including motor),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 500 Hours Vapor Cycle compressor motor drive belt Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Horizontal stabilizers internal surfaces and horizontal / vertical stabilizer interface,ROU*,,,0:00,Examine as far as possible with panels removed.
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Main Spar Fastener Holes Strap Rib 6 - AMM 12-A-57-20-05-00A-353A-A Inspection kit P/N 500.60.12.031 or Inspection kit second oversize P/N 500.60.12.043,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 33,00 H/4,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Elevator Control Lever - AMM 12-A-27-30-05-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vertical stabilizer internal surfaces,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Transponder system (Single & dual),ROU*,,,0:00,Functional Test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 2400 Hours / 3200 Cycles / 24 Months Backlash check of LH IB &OB and RH IB & OB Flap actuators (Black Colour) Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Bi-Weekly Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing to fuselage attachments,ROU*,,,0:00,Examine attachment fittings with wing removed
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Secondary heater thermal protection switches,ROU*,,,0:00,Test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger/crew door,ROU*,,,0:00,"Examine with trim removed (Ref. 12-A-25-21-03-00A-920A-A or 12-A-25-22-03-00A-920A-A). Examine the top step area around the insulation mat for corrosion. If corrosion is found, write to Pilatus for a specific repair. Examine door hinge pin and hinges (Ref.12-A-52-10-00-00A-313AA)"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,ELT Non Radiation Load test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rudder Hinges - AMM 12-A-55-40-05-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuel cross vent and outrward check valve - Operational test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4800 Hours / 60 Months Over Temperature Switches Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Support Arm - AMM 12-A-27-51-01-00A-353A-A AMM 12-A-27-51-02-00A-353A-A AMM 12-A-27-51-03-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 10,000 H/12,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Inboard Flap drive arms,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 600 Hours / 12 Months Inboard flap drive arms Inspection,ROU*,,,0:00,In-Situ Inspection/ Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,31,,RVSM Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,74,,Ignitino-Spark igniter,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cabin differential pressure switch,ROU*,,,0:00,Functional Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,24,,Gene-2 Drive Assy Housing Inspection,ROU*,,,0:00,Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"Spectrum Aeromed ICA Manual 6045MM,Section J ,S/N 1",Every 12 Months,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"300 FH (12-A-05-40-01-01A-000B-A) & Items of inspection identified as ""Minor"" in EMM 72-00-00, Table 601. 300 FH / 12 M (12-A-05-40-01-02A-000B-A) 600 FH (12-A-05-40-01-03A-000B-A) 600 FH / 12 M (12-A-05-40-01-04A-000B-A) 1200 FH / 12 M (12-A-05-40-01-05A-000B-A) 2400 FH / 24 M (12-A-05-40-01-06A-000B-A)",1200 Hrs / 48 M,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"AMM 12-A-05-40-01-01A-000B-A EMM Ch 72-00-00, Table 601",Every 300 Hours Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,1500 Hrs/60 M,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuselage internal bottom surface,ROU*,,,0:00,"Examine frames 10, 21, 24, 36 and frames adjacent to doors and to emergency exit, with insulation removed. If corrosion is found, examine all fuselage bottom surface with insulation removed. If insulation is wet, remove, dry and reinstall insulation"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Cove Rib FIttings - AMM 12-A-27-51-01-00A-353A-A AMM 12-A-27-51-02-00A-353A-A AMM 12-A-27-51-03-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 10,000 H/12,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,DMC-12-A-05-10-10-00A- 281A-A,ELT Nav. Interface Unit Serial Memory Module,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,MLG Trailing Link - CMM 02099,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM(Eddy Current Inspection) & Repeat at 8,300 H/10,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,03Mts corrosion Insp,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Structure around windows,ROU*,,,0:00,Examine
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuel pump outlet filter Replace,ROU*,,,0:00,"Rev No:0, Form no. PC12/04/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,Flap Screw Actuator - Lubrication,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,76,,Every 3000 Hours / 12 Months Propeller feathering microswitches Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 12 Months Fire Extinguisher Content check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Elevator Hinges - AMM 12-A-55-20-01-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 1200 Hours / 48 Months Fuel low level warning system Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vertical Stabilizer Forward Attachment to Frame 40 (AMM 12-A-55-30-03-00-A-353A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 16000 Hours / 22500 Cycles of Wing main spar fastener holes strap Rib 6 Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Monthly corrosion inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,DGCA Letter a-7/DAV/DAR/1728,Passenger and crew seat belt,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Oil filter Replace,ROU*,,,0:00,"Rev No:0, Form no. PC12/03/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Pressurisation System,ROU*,,,0:00,Test/adjustment
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,engine mounting frame,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main landing gear shock absorber top and bottom attachment bolts and nuts,ROU*,,,0:00,Refer to AMM 12- A-32-10- 00-00A-310A-A
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Elevator - AMM 12-A-55-20-00-00A-310A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM(Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Chip Detector continuity check,ROU*,,,0:00,Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Oil Filter Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Vertical stabilizer internal surfaces Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap actuators,ROU*,,,0:00,Backlash check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 12 Months Main and Nose wheel bearing Inspection,ROU*,,,0:00,Tire Change or Lubricate
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,Technical Manual DMA174T /CAR rule,ELT Monthly test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 2400 Hours / 12 Months Main landing gear hinge pin and bushes Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap actuator black anodized,ROU*,,,0:00,Backlash check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing internal surfaces and flap compartment,ROU*,,,0:00,Examine as far as possible with all wing panels removed.
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,NLG upper right hand drag link -532.20.12.289 or 532.20.12.140,ROU*,,,0:00,Inspection/check (refer to DM 12-A-32-20-06-00A-313A-A)
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"300 FH (12-A-05-40-01-01A-000B-A) & Items of inspection identified as ""Minor"" in EMM 72-00-00, Table 601. 300 FH / 12 M (12-A-05-40-01-02A-000B-A) 600 FH (12-A-05-40-01-03A-000B-A) 600 FH / 12 M (12-A-05-40-01-04A-000B-A) 1200 FH / 12 M (12-A-05-40-01-05A-000B-A) 2400 FH / 24 M (12-A-05-40-01-06A-000B-A)",600 Hrs / 24 M,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"CMM 21-00-23, Page 5001",Drive motor Bearing replacement.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,NLG DRAG LINK RIGHT PART P/N 532.20.12.289,ROU*,,,0:00,Inspection/CheckInitially at 2000hours/2500landings & then after every 300hours/400 landings
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main Landing gear hinge pin and bushes,ROU*,,,0:00,Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,BI-Weekly Onspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aileron Trim Tab (AMM 12-A-57-60-04-00-A-310A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,"Engine Mount frame replace all bolts, washers and nuts",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,Door Frames and Emergency exit Frame(6020hrs/6yrs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Inborad Flap drive arms,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"300 FH (12-A-05-40-01-01A-000B-A) & Items of inspection identified as ""Minor"" in EMM 72-00-00, Table 601. 300 FH / 12 M (12-A-05-40-01-02A-000B-A) 600 FH / 12 M (12-A-05-40-01-04A-000B-A) 1200 FH / 12 M (12-A-05-40-01-05A-000B-A)",1500 Hrs / 60 M,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,06 Month Corrosion Inspection (A/C External),ROU*,,,0:00,Aircraft Positioned in Moderate Environment
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Engine shock mount assemblies,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Door frames and emergency exit frame Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuselage Frames 10 to 16 - AMM 12-A-53-10-00-00A-310A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM(Examine all structural elements) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 72 Months Horizontal/vertical stabilizer attachment bolts Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Horizontal stabilizer internal surfaces and horizontal / vertical stabilizer interface,ROU*,,,0:00,Examine as far as possible with panels removed
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vertical stabilizer internal surfaces,ROU*,,,0:00,Examine
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,12,,Flap Actuator Lubrication,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,22,,Stabilizer Trim Actuator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Frames 41 and 43 Stabilizer Attachment AMM 12-A-53-30-02-00A-353A-A or AMM 12-A-55-30-03-00A-353A-A Inspection Kit vertical stabilizer p/n- 500.50.12.325,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 12 Months Main landing gear shock absorber top and bottom attachment bolts and nuts Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Nitogen accumulator,ROU*,,,0:00,Life Limit (discard)
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger/crew door AMM 12-A-52-10-00-00A-310A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Examine all structural elements) and Repeat at 12,500 H/15,000 L/6 Yrs"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4800 Hours / 60 Months Flight control cables including autopilot and stick pusher cables Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flight control cables including autopilot and stick pusher cables,ROU*,,,0:00,Examine
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap actuators (white colour),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Engine Mount frame,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 24 Months Generator 1 & Generator 2 ground points Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Structure around windows Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Standby Magnetic compass,ROU*,,,0:00,Check swing
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cargo door,ROU*,,,0:00,Examine with trim removed.Examine door hinge pin & hinges..
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fire Extinguisher - HST,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,32,,Ldg Gear Compartment Inspection (2000H / 24M),ROU*,,,0:00,"Examine, especially main & rear spar parts."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,74,,Ignition- Spark igniter,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Landing Gear Compartment - Examine,ROU*,,,0:00,Examine
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Aeromobile license,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Elevator Control Rods - AMM 12-A-27-00-01-00A-352A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Magnetic Particle Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,01 Month Corrosion Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main landing gear shock absorber top and bottom attachment bolts and nuts,ROU*,,,0:00,"Refer to AMM 12- B-32-10-00-00A-310A-A or 12- B-32-10-00-00A-310B-A & AMM 02049 REV 31, EASA AD No.: 2016-0083, Service letter 186"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,72,,Engine hot section Inspection .,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Upper Flange Carry Through Frames 21 and 24 - AMM 12-A-53-20-02-00A-310A-A Inspection kit P/N 500.50.12.327,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Examine) & Repeat at 10,000 H/12,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Mechanism - AMM 12-A-27-51-00-00A-310A-A Inspection kit flap LH Inner P/N 500.60.12.021 Inspection kit flap RH inner P/N 500.60.12.022 Inspection kit flap LH Center P/N 500.60.12.023 Inspection kit flap RH center P/N 500.60.12.024 Inspection kit flap LH and RH outer(one kit required for each ) P/N 500.60.12.025,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 10,000 H/12,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main landing gear leg forward attachment bolt and rear attachment bolt and nut,ROU*,,,0:00,"Refer to AMM 12- B-32-10-00-00A-310A-A or 12- B-32-10-00-00A-310B-A & AMM 02049 REV 31 , EASA AD No.: 2016-0083,Service letter 186"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Upper Longerons Frame 10 -AMM 12-A-53-10-06- 01A-353A-A Inspection kit longeron frame 10,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM(Eddy Current nspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,Structure Around Windows(6000hrs/6yrs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,First Aid Kit re-certification,ROU*,,,0:00,"To comply with CAR Section 2 Series-X, part III"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4800 Hours / 48 Months Cabin Pressurization Positive pressure relief valve Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Drive Arm (not removed) - AMM 12-A-27-51-00-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 25,00 H/3,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Back rest tubes on crew seats with a recline mechanism,ROU*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger/Crew door,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 6 Years Main landing gear actuator top and bottom attachment bolts and nuts Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Passenger/Crew Door Piano Hinge (AMM 12-A-52-00-01-00-A-353A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,NLG steering Mechanism (AMM 12-A-32-50-00-00-A-310A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 8,300 H/10,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,25,,Passenger and Crew Seat Belt,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vapor Cycle compressor motor drive belt,ROU*,,,0:00,Check for Tension
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuel pump inlet screen,ROU*,,,0:00,"Rev No:0, Form no. PC12/04/2010(Clean)"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,32,,NLG-Right Hand Upper Drag Link,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Stablizer trim actuator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Upper Longerons Frame 10 -AMM 12-A-53-10-06-01A-353A-A Inspection kit longeron frame 10 P/N 500.60.12.032,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM(Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuel low level warning system,ROU*,,,0:00,Operational test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Nose Landing Gear (Ref CMM 02-100),ROU*,,,0:00,"Supplemental Structural Inspection Program (Overhaul) & Repeat at 8,300 H/10,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 36 Months Passenger oxygen masks Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 12 Years Stretcher safety belt Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vertical Stabilizer - AMM 12-A-55-30-00-00A-310A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,P3 Filter cleaning,ROU*,,,0:00,Clean
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 1800 Hours Generator 2 drive assembly housing Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,100HRS INSPECTION,ROU*,,,0:00,"Rev No:0, Form no. PC12/01/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Antenna Structure - AMM 12-A-53-00-00-00A-310A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,24,,EPS Battery,ROU*,,,0:00,Remove and do a capacity check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Carnet Card Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,"Fuselage internal bottom surfaces, structure around windows, door frames and emergency exit frame",ROU*,,,0:00,"Examine frames 10,21,24,36 & frames adjacent to doors & to emergency exit,with insulation removed.If corrosion is found,examine all fuselage bottom surfacewith insulation removed.If insulation is wet,remove,dry & reinstall insulation."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,NLG Drag link right part,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,24,,Battery CT(1 Year),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,Rear Pressure Bulkhead(6000hrs/6yrs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,Front Pressure Bulkhead(6000hrs/6yrs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 300 Hours Vapor Cycle compressor condenser module (including motor) Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cargo door lower lug fittings,ROU*,,,0:00,Replace
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,C of A,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Fuel pump coupling shaft,ROU*,,,0:00,Inspect for fretting corrosion
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"AMM 12-A-05-40-01-03A-000B-A EMM Ch 72-00-00, Table 601",Every 600 Hours Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vertical stabilizer intrnal surfaces,ROU*,,,0:00,Examine as far as possible with panels remove
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rear Pressure bulkhead,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 6 Years Main landing gear leg forward attachment bolt and bush and rear attachment bolt and nut Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cargo Door Skin (AMM 12-A-52-10-01-00-A-353A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,21,,Vapor Cycle compressor motor drive belt,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing - Rib 1 to Rib 20 AMM 12-A-57-00-00-00A-310A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine all structural elements) & Repeat at 10,000 H/12,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aileron Control System - AMM 12-A-27-10-00-00A-310A-A Inspection kit cockpit P/N 500.50.12.314 Inspection kit floor MSN 101-683 P/N 500.50.12.315 Inspection kit wing MSN 101-683 P/N 500.50.12.316 Inspection kit floor (MSN 684-999) P/N 500.60.12.015(MSN 684 - 999) Inspection kit wing(MSN 684-999) P/N 500.60.12.016.,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Frames 21 and 24 Side Frame Attachments AMM 12-A-53-20-02-00A-353A-A Inspection kit carry through frames P/N 500.50.12.327,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Eddy Current Inspection) & Repeat at 10,000 H/12,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,First Aid Kit,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Emergency door - AMM 12-A-52-20-00-00A-310A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Examine all structural elements) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap actuator(Black anodized),ROU*,,,0:00,Backlash check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,Cockpit Side windows inspection,ROU*,,,0:00,Inspection/Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aileron Control Rods - AMM 12-A-27-00-01-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Ignition spark ignitors,ROU*,,,0:00,Examine
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 3000 Hours / 1 Year Horizontal stabilizer trim runaway Aural warning system Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Landing gear compartments,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Ni-Cad Battery,ROU*,,,0:00,Battery CT
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 60 Months Cabin altitude switch Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Misc mod 35,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rudder - AMM 12-A-55-40-00-00A-310A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Main and Rear Spar to Fuselage Attachment - AMM 12-A-57-00-03-00A-353A-A and AMM 12-A-57-00-03-01A-353A-A Inspection kit P/N 500.60.12.004 wing attachment Inspection kit P/N 500.60.12.007 double bush,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 10,000 H/12,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Reduction gearbox chip detector and accessory gearbox chip detector of post SB 79-005,ROU*,,,0:00,Inspect
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Frames 21 and 24 Wing Attachments AMM 12-A-53-20-02-00A-353A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Eddy Current Inspection) & Repeat at 10,000 H/12,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Misc Mod 35 (mode S&C transponder),ROU*,,,0:00,Functional Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing Skin around drain holes (AMM 12-A-57-20-01-00-A-353A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Rpeat at 2,500 H/3,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Landing gear compartments,ROU*,,,0:00,"Examine,especially main and rear spar parts"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rudder Trim Tab (AMM 12-A-55-40-04-00- A-310A-A),ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Hydraulic power pack,ROU*,,,0:00,Replace at 20000 FH or 27000 Landings
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"300 FH (12-A-05-40-01-01A-000B-A) & Items of inspection identified as ""Minor"" in EMM 72-00-00, Table 601. 300 FH / 12 M (12-A-05-40-01-02A-000B-A) 600 FH / 12 M (12-A-05-40-01-04A-000B-A) 1200 FH / 12 M (12-A-05-40-01-05A-000B-A) POM Chapter 61-00-49, Point 4.A)",300 Hrs / 12 M,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Battery CT (200H/3M),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,12 Mt Corrosion Inspection (A/C Internal),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Stretcher Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Aileron - AMM 12-A-57-60-00-00A-310A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,"Servo Mount (pitch, roll & yaw)",ROU*,,,0:00,Remove & clutch check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Front Pressure bulkhead,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,AMM 12-A-05-40-01-06A-000B-A,Every 2400 Hours / 24 Months Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rudder Cable Quadrant Shear Spigot- AMM 12-A-27-20-05-00A-310A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 2400 Hours Fuel cross vent and outward check valve Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Windshield LH and RH and Cockpit Side Windows - AMM 12-A-56-11-01-00A-310A-A and AMM 12-A-56-11-02-00A-310A-A And AMM 12-A-53-10-16-00A-310A-A Inspection kit Windshield P/N 500.50.12.326,ROU*,,,0:00,"Supplemental Structural Inspection Program 9Examine with windshield and side windows removed)&Repeat at 12,500H/15000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,"Fuselage internal bottom surfaces, structure around windows, door frames and emergency exit frame",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main and Nose wheel bearing,ROU*,,,0:00,Lubricate
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Wing internal surfaces and flap compartment,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,29,,CAWS CACU Battery,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Front pressure bulkhead,ROU*,,,0:00,"Examine with insulation on engine & cockpit. If insulation on cockpit side is wet, remove, dry & reinstall insulation"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Aft Links - AMM 12-A-27-51-01-00A-353A-A AMM 12-A-27-51-02-00A-353A-A AMM 12-A-27-51-03-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 10,000 H/12,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rudder Bellcranks - AMM 12-A-27-20-04-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,MLG Trailing Link - CMM 02099,ROU*,,,0:00,Supplement Structural Inspection Programme (Examine all structural elements) Initially at 32500hours/42000landings then repeat every 12500hours/15000landings
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Range and Performance check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Annual Radio Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cabin Positive Pressure Relief,ROU*,,,0:00,Test/adjustment
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main landing gear actuator top and bottom attachment bolts and nuts,ROU*,,,0:00,Refer to AMM 12- A-32-10-00-00A-310A-A
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rear pressure bulkhead,ROU*,,,0:00,Examine with trim remove
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Compass Swing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Door frames and emergency exit frame,ROU*,,,0:00,"Examine.if insulation is installed in the door frames and is wet, remove and discard it."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,100,,cargo Door Lower Lug Fitting,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,MLG Yoke fitting - CMM 02099,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Eddy Current Inspection) & Repeat at 8,300 H/10,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Flap Actuator Black Color,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,53,,PTA attachment part,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,27,,Flap Actuator (Black Colour-4 nos),ROU*,,,0:00,Backlash Check
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Power plant,ROU*,,,0:00,Torque limiter test and performance test
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,Functional test (Ref.AMM12-A-21- 40-06-00A-903A-A),Over temperature switch,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Standby Magnetic Compass,ROU*,,,0:00,Check Swing
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Windshield LH and RH and Cockpit Side Windows - AMM 12-A-56-11-01-00A-310A-A and AMM 12-A-56-11-02-00A-310A-A And AMM 12-A-53-10-16-00A-310A-A Inspection kit Windshield P/N 500.50.12.326,ROU*,,,0:00,"Supplemental Structural Inspection Program (Examine with windshield and side windows removed) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 4000 Hours / 48 Months Rear pressure bulkhead Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,"Main landing gear actuator top and bottom attachment bolts and nuts ,Replace bolt & Nuts",ROU*,,,0:00,"Refer to AMM 12- B-32-10-00-00A-310A-A or 12- B-32-10-00-00A-310B-A & AMM 02049 REV 31 , EASA AD No.: 2016-0083, Service letter 186"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Vertical Stabilizer Pitch Trim Actuator Fitting and Attachment - AMM 12-A-55-30-02-00A-353A-A,ROU*,,,0:00,"Supplemental Structural Inspection Program (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Rear pressure bulk head,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Generator 1 & Generator 2 ground points,ROU*,,,0:00,Examine the corrosion protective layer
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cargo door - AMM 12-A-52-30-00-00A-310A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM(Examine all structural elements) & Repeat at 12,500 H/15,000 L/6 Yrs."
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Every 11000 Hours / 120 Months Wing to fuselage attachments Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,"AMM 12-A-05-40-01-02A-000B-A EMM Ch 72-00-00, Table 601.",Every 300 Hours / 12 Months Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Main landing gear - CMM 02099 Inspection kit P/N 500.60.12.027,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Overhaul) & Repeat at 8300Hrs/10,000ldgs/6years"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Elevator Control Rods - AMM 12-A-27-00-01-00A-353A-A,ROU*,,,0:00,"SUPPLEMENTAL STRUCTURAL INSPECTION PROGRAM (Eddy Current Inspection) & Repeat at 12,500 H/15,000 L"
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,AMM 12-A-05-40-01-05A-000B-A,Every 1200 Hours / 12 Months Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Check the AGB internal Scavenge pump inlet screen,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,5,,Cargo Door - Examine door & door hinge pin with trim removed,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,NSOP Renewal,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,Insurance Renewal,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,39d35649-fa38-477f-8e14-e78109fd1fed,,101,,ELT Self Test,SP*,,,0:00,

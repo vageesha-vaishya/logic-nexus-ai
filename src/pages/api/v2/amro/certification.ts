@@ -368,7 +368,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     if (interfaceName === 'submit-certification-decision') {
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
       const decision = parseDecision(body.decision);
       const signatures = parseObjectArray(body.signatures, 'signatures');
       const nonRepudiation = buildNonRepudiationSignatureBundle(signatures);
@@ -377,7 +377,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const complianceGate = parseBody(body.compliance_gate);
       const complianceGateDecision = parseComplianceGateDecision(complianceGate.decision);
       const complianceGateEvaluationId = assertNonEmpty(
-        complianceGate.evaluation_id || `${tenantId}-${workPackageId}-compliance-eval`,
+        complianceGate.evaluation_id || `${tenantId}-${workOrderId}-compliance-eval`,
         'compliance_gate.evaluation_id',
       );
       if (decision === 'approve' && complianceGateDecision !== 'pass') {
@@ -390,19 +390,19 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       }
       const actionStatus = decision === 'approve' ? 'approved' : decision === 'reject' ? 'rejected' : 'deferred';
       const transactionalCommit = {
-        commit_id: `${tenantId}-${workPackageId}-release-commit-${Date.now()}`,
+        commit_id: `${tenantId}-${workOrderId}-release-commit-${Date.now()}`,
         task_state_commit: decision === 'approve' ? 'committed' : 'not-required',
-        work_package_state_commit: decision === 'approve' ? 'committed' : 'not-required',
+        work_order_state_commit: decision === 'approve' ? 'committed' : 'not-required',
         commit_successful: true,
       };
       const releaseArtifactStorage = decision === 'approve'
         ? {
-          artifact_id: `${tenantId}-${workPackageId}-release-artifact-${Date.now()}`,
-          storage_uri: `amro://release-artifacts/${tenantId}/${workPackageId}/release-${Date.now()}.json`,
+          artifact_id: `${tenantId}-${workOrderId}-release-artifact-${Date.now()}`,
+          storage_uri: `amro://release-artifacts/${tenantId}/${workOrderId}/release-${Date.now()}.json`,
           storage_status: parseBodyBoolean(body.release_artifact_storage_successful, true) ? 'stored' : 'pending-store-retry',
           artifact_hash: createHash('sha256').update(
             JSON.stringify({
-              work_package_id: workPackageId,
+              work_order_id: workOrderId,
               decision,
               compliance_gate_evaluation_id: complianceGateEvaluationId,
               non_repudiation_signature_bundle_hash: nonRepudiation.signature_bundle_hash,
@@ -417,7 +417,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           capability: 'certification',
           eventType: 'amro.audit.recorded.v1',
           entityType: 'certification-action',
-          entityId: workPackageId,
+          entityId: workOrderId,
           correlationId: ctx.correlationId,
           action: interfaceName,
           compatMode: compatDecision.compatMode,
@@ -434,7 +434,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             nonRepudiation,
             actor: actorAttribution,
           },
-          sourceHash: `${tenantId}:${workPackageId}:${decision}`,
+          sourceHash: `${tenantId}:${workOrderId}:${decision}`,
           migrationBatchId: `migration-${tenantId}-${Date.now()}`,
           replayCheckpoint: `cert-${Date.now()}`,
         })
@@ -444,7 +444,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         interface: interfaceName,
         correlationId: ctx.correlationId,
         output: {
-          certification_action_id: `${tenantId}-${workPackageId}-cert-${Date.now()}`,
+          certification_action_id: `${tenantId}-${workOrderId}-cert-${Date.now()}`,
           action_status: actionStatus,
           blockers,
           workflow: {
@@ -487,7 +487,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     if (interfaceName === 'escalate-blocked-certification') {
-      const workPackageId = assertNonEmpty(body.work_package_id, 'work_package_id');
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
       const blockReason = assertNonEmpty(body.block_reason, 'block_reason');
       const escalationTarget = assertNonEmpty(body.escalation_target, 'escalation_target');
       const authorityChain = parseStringArray(body.authority_chain || [], 'authority_chain');
@@ -499,12 +499,12 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           capability: 'certification',
           eventType: 'amro.audit.recorded.v1',
           entityType: 'certification-action',
-          entityId: workPackageId,
+          entityId: workOrderId,
           correlationId: ctx.correlationId,
           action: interfaceName,
           compatMode: compatDecision.compatMode,
           context: { blockReason, escalationTarget, actor: actorAttribution },
-          sourceHash: `${tenantId}:${workPackageId}:${escalationTarget}`,
+          sourceHash: `${tenantId}:${workOrderId}:${escalationTarget}`,
           migrationBatchId: `migration-${tenantId}-${Date.now()}`,
           replayCheckpoint: `cert-${Date.now()}`,
         })
@@ -514,7 +514,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         interface: interfaceName,
         correlationId: ctx.correlationId,
         output: {
-          escalation_event_id: `${tenantId}-${workPackageId}-escalation-${Date.now()}`,
+          escalation_event_id: `${tenantId}-${workOrderId}-escalation-${Date.now()}`,
           escalation_status: 'escalated',
         },
         domainAccess: {

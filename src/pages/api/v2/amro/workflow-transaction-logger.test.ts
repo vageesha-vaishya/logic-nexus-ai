@@ -39,7 +39,7 @@ describe('workflow-transaction-logger', () => {
 
     const record = await logWorkflowTransaction({
       transitionId: 'tr-001',
-      gateName: 'work-package-transition',
+      gateName: 'work-order-transition',
       inputPayload: { actor_signature: 'sig-123' },
       outputPayload: { status: 'ok' },
       userContext: { user_id: 'user-1' },
@@ -61,7 +61,7 @@ describe('workflow-transaction-logger', () => {
       data: {
         tx_id: 'wf-tx-001',
         transition_id: 'tr-001',
-        gate_name: 'work-package-transition',
+        gate_name: 'work-order-transition',
         input_payload: '{"actor_signature":"***","expected_version":1}',
         output_payload: '{"updated_status":"completed"}',
         tx_timestamp: '2026-03-24T00:00:00.000Z',

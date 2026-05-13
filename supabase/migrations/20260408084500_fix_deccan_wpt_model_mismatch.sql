@@ -1,6 +1,6 @@
 -- Repair WPT model mismatch for Deccan tenant / Deccan Fly franchise scope.
 -- Root cause addressed:
--- - work_package_templates.model_id can drift from model resolved by selected task templates
+-- - work_order_templates.model_id can drift from model resolved by selected task templates
 --   (task_templates.assembly_models), causing save validation:
 --   "selected task templates do not match selected model_id".
 
@@ -81,7 +81,7 @@ BEGIN
   END IF;
 
   -- Keep Deccan templates scoped to Deccan Fly where scope is missing.
-  UPDATE public.work_package_templates w
+  UPDATE public.work_order_templates w
   SET franchise_id = v_franchise_id
   WHERE w.tenant_id = v_tenant_id
     AND w.franchise_id IS NULL;
@@ -91,7 +91,7 @@ BEGIN
   -- 2) task ids present in tasks_json payload
   WITH template_scope AS (
     SELECT w.id, w.tenant_id, w.franchise_id, w.created_by, w.updated_by
-    FROM public.work_package_templates w
+    FROM public.work_order_templates w
     WHERE w.tenant_id = v_tenant_id
       AND (w.franchise_id = v_franchise_id OR w.franchise_id IS NULL)
       AND w.deleted_at IS NULL
@@ -101,8 +101,8 @@ BEGIN
       t.id AS template_id,
       r.task_template_id::text AS task_template_id
     FROM template_scope t
-    JOIN public.work_package_template_task_templates r
-      ON r.work_package_template_id = t.id
+    JOIN public.work_order_template_task_templates r
+      ON r.work_order_template_id = t.id
      AND r.tenant_id = t.tenant_id
      AND (r.franchise_id = v_franchise_id OR r.franchise_id IS NULL)
     WHERE r.task_template_id IS NOT NULL
@@ -122,7 +122,7 @@ BEGIN
         ''
       ) AS task_template_id
     FROM template_scope t
-    JOIN public.work_package_templates w
+    JOIN public.work_order_templates w
       ON w.id = t.id
     CROSS JOIN LATERAL jsonb_array_elements(coalesce(w.tasks_json, '[]'::jsonb)) elem
   ),
@@ -153,7 +153,7 @@ BEGIN
     WHERE model_count = 1
   )
   -- Update template model_id for templates where selected tasks resolve to one model.
-  UPDATE public.work_package_templates w
+  UPDATE public.work_order_templates w
   SET model_id = s.resolved_model_id,
       franchise_id = coalesce(w.franchise_id, v_franchise_id),
       updated_at = now()
@@ -167,25 +167,25 @@ BEGIN
     SELECT
       w.id AS template_id,
       w.model_id AS resolved_model_id
-    FROM public.work_package_templates w
+    FROM public.work_order_templates w
     WHERE w.tenant_id = v_tenant_id
       AND (w.franchise_id = v_franchise_id OR w.franchise_id IS NULL)
       AND w.deleted_at IS NULL
       AND w.model_id IS NOT NULL
   )
-  UPDATE public.work_package_template_task_templates r
+  UPDATE public.work_order_template_task_templates r
   SET model_id = s.resolved_model_id,
       franchise_id = coalesce(r.franchise_id, v_franchise_id),
       updated_at = now()
   FROM single_model_templates s
-  WHERE r.work_package_template_id = s.template_id
+  WHERE r.work_order_template_id = s.template_id
     AND r.tenant_id = v_tenant_id
     AND r.model_id IS DISTINCT FROM s.resolved_model_id;
 
   -- Insert missing relation rows from tasks_json using resolved template model.
   WITH template_scope AS (
     SELECT w.id, w.tenant_id, coalesce(w.franchise_id, v_franchise_id) AS franchise_id, w.model_id, w.created_by, w.updated_by
-    FROM public.work_package_templates w
+    FROM public.work_order_templates w
     WHERE w.tenant_id = v_tenant_id
       AND (w.franchise_id = v_franchise_id OR w.franchise_id IS NULL)
       AND w.deleted_at IS NULL
@@ -206,7 +206,7 @@ BEGIN
         ''
       ) AS task_template_id
     FROM template_scope t
-    JOIN public.work_package_templates w
+    JOIN public.work_order_templates w
       ON w.id = t.id
     CROSS JOIN LATERAL jsonb_array_elements(coalesce(w.tasks_json, '[]'::jsonb)) elem
     WHERE nullif(
@@ -221,10 +221,10 @@ BEGIN
       ''
     ) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
   )
-  INSERT INTO public.work_package_template_task_templates (
+  INSERT INTO public.work_order_template_task_templates (
     tenant_id,
     franchise_id,
-    work_package_template_id,
+    work_order_template_id,
     model_id,
     task_template_id,
     created_by,
@@ -241,9 +241,9 @@ BEGIN
   FROM template_scope t
   JOIN json_task_ids j
     ON j.template_id = t.id
-  LEFT JOIN public.work_package_template_task_templates r
+  LEFT JOIN public.work_order_template_task_templates r
     ON r.tenant_id = t.tenant_id
-   AND r.work_package_template_id = t.id
+   AND r.work_order_template_id = t.id
    AND r.task_template_id = j.task_template_id::uuid
   WHERE r.id IS NULL;
 END $$;

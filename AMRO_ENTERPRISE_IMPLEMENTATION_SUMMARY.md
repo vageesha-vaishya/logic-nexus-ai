@@ -270,7 +270,7 @@ useEnterpriseDashboard(enabled)          // All-in-one dashboard data
    - Fleet impact analyzer
 
 2. **Integration with Existing Components**
-   - Update `AmroWorkPackageTemplatesPage.tsx` to use new editors
+   - Update `AmroWorkOrderTemplatesPage.tsx` to use new editors
    - Replace basic JSON editors with enterprise components
    - Add tab navigation for enterprise features
    - Implement bulk import/export (CSV/Excel)
@@ -467,7 +467,7 @@ supabase db push
 
 ### Backward Compatibility
 
-- ✅ Existing `work_package_templates` table unchanged
+- ✅ Existing `work_order_templates` table unchanged
 - ✅ JSONB columns (`materials_json`, `tooling_json`, `compliance_requirements_json`) still supported
 - ✅ New normalized tables work alongside existing structure
 - ✅ Migration includes sample seed data for testing
@@ -579,7 +579,7 @@ function MaterialReservation({ materialId, templateId }) {
       await reserveMutation.mutateAsync({
         materialId,
         quantity: 5,
-        work_package_template_id: templateId,
+        work_order_template_id: templateId,
         expected_issue_date: '2026-04-20',
       });
       toast.success('Material reserved!');

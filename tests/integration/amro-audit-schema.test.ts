@@ -202,8 +202,8 @@ amroAuditSchemaSuite('AMRO Audit Schema', () => {
         .from('trails')
         .insert({
           tenant_id: testTenantId,
-          event_type: 'work_package_created',
-          entity_type: 'work_package',
+          event_type: 'work_order_created',
+          entity_type: 'work_order',
           entity_id: 'wp-001',
           user_id: testUserId,
           user_email: 'test@example.com',
@@ -306,7 +306,7 @@ amroAuditSchemaSuite('AMRO Audit Schema', () => {
       const { data, error } = await supabase
         .from('trails')
         .select('id, event_type')
-        .eq('entity_type', 'work_package')
+        .eq('entity_type', 'work_order')
         .eq('entity_id', 'wp-test')
         .schema('mro_audit');
 

@@ -56,29 +56,29 @@ const authorityLabel: Record<AmroAuthorityLevel, string> = {
 };
 
 const authorityOptions: AmroAuthorityLevel[] = ['technician', 'supervisor', 'engineering', 'qa', 'compliance'];
-const workPackageStatusFilters = ['all', 'planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'] as const;
+const workOrderStatusFilters = ['all', 'planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'] as const;
 const regulatorProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
 const certificationAuthorityProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
 const workspaceViewModes = ['kanban', 'card', 'grid', 'list'] as const;
 const amroHeaderActionOrder = ['Search', 'Filter', 'View', 'Create', 'Refresh', 'Import/Export', 'Theme'] as const;
 const workspaceThemeOptions = ['Azure Sky', 'Hangar Dark', 'Maintenance Slate'] as const;
-const workPackagePageSizes = [10, 25, 50] as const;
+const workOrderPageSizes = [10, 25, 50] as const;
 const workspaceLocaleOptions = ['en-US', 'en-GB', 'fr-FR', 'de-DE'] as const;
 const amroWorkspaceViewStorageKey = 'amro.workspace.view';
 const amroWorkspaceThemeStorageKey = 'amro.workspace.theme';
-const amroWorkPackagePageSizeStorageKey = 'amro.workspace.work-package-page-size';
+const amroWorkOrderPageSizeStorageKey = 'amro.workspace.work-order-page-size';
 const amroWorkspaceLocaleStorageKey = 'amro.workspace.locale';
-const amroManualWorkPackageOrderStorageKey = 'amro.workspace.work-package-order';
+const amroManualWorkOrderOrderStorageKey = 'amro.workspace.work-order-order';
 const amroGridPreferencesStorageKey = 'amro-grid-preferences';
 const amroDashboardLoadBenchmark = { targetMs: 1000, hardLimitMs: 1500 };
-const amroWorkPackageFilterApplyBenchmark = { targetMs: 500, hardLimitMs: 900 };
+const amroWorkOrderFilterApplyBenchmark = { targetMs: 500, hardLimitMs: 900 };
 const amroDetailTabSwitchBenchmark = { targetMs: 250, hardLimitMs: 500 };
 const amroTaskStepSubmitBenchmark = { targetMs: 400, hardLimitMs: 800 };
 type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
 type AmroWorkspaceModuleKey =
   | 'overview'
   | 'primary-users'
-  | 'work-packages'
+  | 'work-orders'
   | 'task-execution'
   | 'scheduling'
   | 'parts'
@@ -105,7 +105,7 @@ type AmroOwnedWorkspaceProps = {
     exporting?: boolean;
   };
   overviewTelemetry?: {
-    openWorkPackages?: number;
+    openWorkOrders?: number;
     aogCount?: number;
     complianceRiskCount?: number;
     deferredCount?: number;
@@ -135,9 +135,9 @@ type AmroRoleVariant = {
   restrictedActions: string;
 };
 
-type WorkPackageCreateTab = 'wp' | 'besting_wp' | 'task_payload' | 'workflow';
+type WorkOrderCreateTab = 'wp' | 'besting_wp' | 'task_payload' | 'workflow';
 
-type WorkPackageCreateFormState = {
+type WorkOrderCreateFormState = {
   packageNumber: string;
   topic: string;
   locationStation: string;
@@ -147,7 +147,7 @@ type WorkPackageCreateFormState = {
   aircraftId: string;
   selectedAircraftModel: string;
   selectedAircraftSerialOrRegistration: string;
-  workPackageDetails: string;
+  workOrderDetails: string;
   revision: string;
   selectedTaskIds: string[];
   maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
@@ -158,9 +158,9 @@ type WorkPackageCreateFormState = {
   workflowStatus: 'planning' | 'scheduled' | 'in_progress' | 'blocked';
 };
 
-type WorkPackageCreateFormErrors = Partial<Record<keyof WorkPackageCreateFormState, string>>;
+type WorkOrderCreateFormErrors = Partial<Record<keyof WorkOrderCreateFormState, string>>;
 
-type WorkPackageCreateAircraftOption = {
+type WorkOrderCreateAircraftOption = {
   id: string;
   registration: string;
   serialNumber: string;
@@ -174,7 +174,7 @@ type WorkPackageCreateAircraftOption = {
   currentCycles: number;
 };
 
-type WorkPackageCreateTaskOption = {
+type WorkOrderCreateTaskOption = {
   value: string;
   taskNumber: string;
   title: string;
@@ -191,16 +191,16 @@ type TaskConflictInfo = {
   reason: string;
 };
 
-type WorkPackageGridColumnKey = 'packageNumber' | 'aircraft' | 'priority' | 'category' | 'station' | 'due' | 'status' | 'owner';
+type WorkOrderGridColumnKey = 'packageNumber' | 'aircraft' | 'priority' | 'category' | 'station' | 'due' | 'status' | 'owner';
 
-type WorkPackageGridSortKey = WorkPackageGridColumnKey;
+type WorkOrderGridSortKey = WorkOrderGridColumnKey;
 
-type WorkPackageGridPreferences = {
-  visibleColumns: Record<WorkPackageGridColumnKey, boolean>;
-  columnWidths: Record<WorkPackageGridColumnKey, number>;
+type WorkOrderGridPreferences = {
+  visibleColumns: Record<WorkOrderGridColumnKey, boolean>;
+  columnWidths: Record<WorkOrderGridColumnKey, number>;
 };
 
-type WorkPackageGridRuntimeRow = {
+type WorkOrderGridRuntimeRow = {
   id: string;
   packageNumber: string;
   aircraft: string;
@@ -215,7 +215,7 @@ type WorkPackageGridRuntimeRow = {
 
 type PartsFormSectionKey = 'basic' | 'stock' | 'location' | 'supplier';
 
-const defaultGridVisibleColumns: Record<WorkPackageGridColumnKey, boolean> = {
+const defaultGridVisibleColumns: Record<WorkOrderGridColumnKey, boolean> = {
   packageNumber: true,
   aircraft: true,
   priority: true,
@@ -226,7 +226,7 @@ const defaultGridVisibleColumns: Record<WorkPackageGridColumnKey, boolean> = {
   owner: true,
 };
 
-const defaultGridColumnWidths: Record<WorkPackageGridColumnKey, number> = {
+const defaultGridColumnWidths: Record<WorkOrderGridColumnKey, number> = {
   packageNumber: 140,
   aircraft: 160,
   priority: 110,
@@ -237,7 +237,7 @@ const defaultGridColumnWidths: Record<WorkPackageGridColumnKey, number> = {
   owner: 120,
 };
 
-const workPackageGridColumnLabels: Record<WorkPackageGridColumnKey, string> = {
+const workOrderGridColumnLabels: Record<WorkOrderGridColumnKey, string> = {
   packageNumber: 'Work Order #',
   aircraft: 'Aircraft',
   priority: 'Priority',
@@ -248,7 +248,7 @@ const workPackageGridColumnLabels: Record<WorkPackageGridColumnKey, string> = {
   owner: 'Owner',
 };
 
-const workPackageGridSortableColumns: WorkPackageGridSortKey[] = ['packageNumber', 'aircraft', 'priority', 'category', 'station', 'due', 'status', 'owner'];
+const workOrderGridSortableColumns: WorkOrderGridSortKey[] = ['packageNumber', 'aircraft', 'priority', 'category', 'station', 'due', 'status', 'owner'];
 
 const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
   technician: {
@@ -278,7 +278,7 @@ const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
   },
 };
 
-const createDefaultWorkPackageCreateFormState = (): WorkPackageCreateFormState => {
+const createDefaultWorkOrderCreateFormState = (): WorkOrderCreateFormState => {
   const start = new Date();
   const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
   const today = start.toISOString().slice(0, 10);
@@ -292,7 +292,7 @@ const createDefaultWorkPackageCreateFormState = (): WorkPackageCreateFormState =
     aircraftId: '',
     selectedAircraftModel: '',
     selectedAircraftSerialOrRegistration: '',
-    workPackageDetails: '',
+    workOrderDetails: '',
     revision: '1',
     selectedTaskIds: [],
     maintenanceType: 'line',
@@ -319,11 +319,11 @@ const AircraftSearchSection = memo(function AircraftSearchSection({
 }: {
   aircraftSearchTerm: string;
   onSearchChange: (value: string) => void;
-  filteredAircraftOptions: WorkPackageCreateAircraftOption[];
+  filteredAircraftOptions: WorkOrderCreateAircraftOption[];
   selectedAircraftId: string | undefined;
   onSelectAircraft: (id: string) => void;
   isLoading: boolean;
-  selectedAircraft: WorkPackageCreateAircraftOption | null;
+  selectedAircraft: WorkOrderCreateAircraftOption | null;
 }) {
   return (
     <div className="space-y-1">
@@ -374,7 +374,7 @@ export function AmroOwnedWorkspace({
   const { scopedDb, context } = useCRM();
   const { session, hasRole } = useAuth();
   const state = useAmroWorkspaceState();
-  const [newWorkPackageTitle, setNewWorkPackageTitle] = useState('');
+  const [newWorkOrderTitle, setNewWorkOrderTitle] = useState('');
   const [savedViewName, setSavedViewName] = useState('');
   const [detailTab, setDetailTab] = useState('overview');
   const [detailDraft, setDetailDraft] = useState('');
@@ -382,13 +382,13 @@ export function AmroOwnedWorkspace({
   const [workspaceViewMode, setWorkspaceViewMode] = useState<(typeof workspaceViewModes)[number]>('kanban');
   const [workspaceTheme, setWorkspaceTheme] = useState<(typeof workspaceThemeOptions)[number]>('Azure Sky');
   const [workspaceLocale, setWorkspaceLocale] = useState<(typeof workspaceLocaleOptions)[number]>('en-US');
-  const [workPackagePageSize, setWorkPackagePageSize] = useState<number>(workPackagePageSizes[0]);
-  const [workPackagePage, setWorkPackagePage] = useState(1);
-  const [workPackageSortField, setWorkPackageSortField] = useState<'manual' | WorkPackageGridSortKey>('manual');
-  const [workPackageSortDirection, setWorkPackageSortDirection] = useState<'asc' | 'desc'>('asc');
-  const [workPackageGridVisibleColumns, setWorkPackageGridVisibleColumns] = useState<Record<WorkPackageGridColumnKey, boolean>>(defaultGridVisibleColumns);
-  const [workPackageGridColumnWidths, setWorkPackageGridColumnWidths] = useState<Record<WorkPackageGridColumnKey, number>>(defaultGridColumnWidths);
-  const [workPackageGridFilters, setWorkPackageGridFilters] = useState<Record<WorkPackageGridColumnKey, string>>({
+  const [workOrderPageSize, setWorkOrderPageSize] = useState<number>(workOrderPageSizes[0]);
+  const [workOrderPage, setWorkOrderPage] = useState(1);
+  const [workOrderSortField, setWorkOrderSortField] = useState<'manual' | WorkOrderGridSortKey>('manual');
+  const [workOrderSortDirection, setWorkOrderSortDirection] = useState<'asc' | 'desc'>('asc');
+  const [workOrderGridVisibleColumns, setWorkOrderGridVisibleColumns] = useState<Record<WorkOrderGridColumnKey, boolean>>(defaultGridVisibleColumns);
+  const [workOrderGridColumnWidths, setWorkOrderGridColumnWidths] = useState<Record<WorkOrderGridColumnKey, number>>(defaultGridColumnWidths);
+  const [workOrderGridFilters, setWorkOrderGridFilters] = useState<Record<WorkOrderGridColumnKey, string>>({
     packageNumber: '',
     aircraft: '',
     priority: '',
@@ -398,7 +398,7 @@ export function AmroOwnedWorkspace({
     status: '',
     owner: '',
   });
-  const [debouncedWorkPackageGridFilters, setDebouncedWorkPackageGridFilters] = useState<Record<WorkPackageGridColumnKey, string>>({
+  const [debouncedWorkOrderGridFilters, setDebouncedWorkOrderGridFilters] = useState<Record<WorkOrderGridColumnKey, string>>({
     packageNumber: '',
     aircraft: '',
     priority: '',
@@ -417,16 +417,16 @@ export function AmroOwnedWorkspace({
   const [deferralConfirmOpen, setDeferralConfirmOpen] = useState(false);
   const [deferralRationale, setDeferralRationale] = useState('');
   const [lastInteractionMessage, setLastInteractionMessage] = useState('Ready for module actions.');
-  const [busyWorkPackageActionId, setBusyWorkPackageActionId] = useState<string | null>(null);
-  const [manualWorkPackageOrder, setManualWorkPackageOrder] = useState<string[]>([]);
-  const [draggingWorkPackageId, setDraggingWorkPackageId] = useState<string | null>(null);
+  const [busyWorkOrderActionId, setBusyWorkOrderActionId] = useState<string | null>(null);
+  const [manualWorkOrderOrder, setManualWorkOrderOrder] = useState<string[]>([]);
+  const [draggingWorkOrderId, setDraggingWorkOrderId] = useState<string | null>(null);
   const [lastWorkspaceExportAt, setLastWorkspaceExportAt] = useState<string | null>(null);
-  const [workPackageCreateDialogOpen, setWorkPackageCreateDialogOpen] = useState(false);
-  const [workPackageCreateTab, setWorkPackageCreateTab] = useState<WorkPackageCreateTab>('wp');
-  const [workPackageCreateForm, setWorkPackageCreateForm] = useState<WorkPackageCreateFormState>(() => createDefaultWorkPackageCreateFormState());
-  const [workPackageCreateErrors, setWorkPackageCreateErrors] = useState<WorkPackageCreateFormErrors>({});
-  const [maintenanceTaskSelectionOptions, setMaintenanceTaskSelectionOptions] = useState<WorkPackageCreateTaskOption[]>([]);
-  const [workPackageAircraftOptions, setWorkPackageAircraftOptions] = useState<WorkPackageCreateAircraftOption[]>([]);
+  const [workOrderCreateDialogOpen, setWorkOrderCreateDialogOpen] = useState(false);
+  const [workOrderCreateTab, setWorkOrderCreateTab] = useState<WorkOrderCreateTab>('wp');
+  const [workOrderCreateForm, setWorkOrderCreateForm] = useState<WorkOrderCreateFormState>(() => createDefaultWorkOrderCreateFormState());
+  const [workOrderCreateErrors, setWorkOrderCreateErrors] = useState<WorkOrderCreateFormErrors>({});
+  const [maintenanceTaskSelectionOptions, setMaintenanceTaskSelectionOptions] = useState<WorkOrderCreateTaskOption[]>([]);
+  const [workOrderAircraftOptions, setWorkOrderAircraftOptions] = useState<WorkOrderCreateAircraftOption[]>([]);
   const [aircraftSearchTerm, setAircraftSearchTerm] = useState('');
   const [debouncedAircraftSearchTerm, setDebouncedAircraftSearchTerm] = useState('');
   const [taskSearchTerm, setTaskSearchTerm] = useState('');
@@ -451,13 +451,13 @@ export function AmroOwnedWorkspace({
   const [taskSelectionLoading, setTaskSelectionLoading] = useState(false);
   const [aircraftSelectionLoading, setAircraftSelectionLoading] = useState(false);
   const [reviewSubmitDialogOpen, setReviewSubmitDialogOpen] = useState(false);
-  const [workPackageCreateSubmitting, setWorkPackageCreateSubmitting] = useState(false);
-  const workPackageCreateDraftCacheRef = useRef<Map<WorkPackageCreateTab, WorkPackageCreateFormState>>(new Map());
+  const [workOrderCreateSubmitting, setWorkOrderCreateSubmitting] = useState(false);
+  const workOrderCreateDraftCacheRef = useRef<Map<WorkOrderCreateTab, WorkOrderCreateFormState>>(new Map());
   const workspaceLoadStartedAtRef = useRef(typeof performance !== 'undefined' ? performance.now() : Date.now());
   const workspaceLoadMetricPublishedRef = useRef(false);
   const filterApplyStartedAtRef = useRef<number | null>(null);
   const gridResizeActiveRef = useRef<{
-    columnKey: WorkPackageGridColumnKey;
+    columnKey: WorkOrderGridColumnKey;
     startX: number;
     startWidth: number;
   } | null>(null);
@@ -472,9 +472,9 @@ export function AmroOwnedWorkspace({
           ? 'planner'
           : 'management';
   const roleVariant = amroRoleVariants[activeUxRole];
-  const selectedTask = state.selectedWorkPackage?.tasks?.[0] ?? null;
-  const mobileQueuedEvents = Math.max(0, (state.selectedWorkPackage?.tasks?.filter((task) => !task.completed).length ?? 0) - 1);
-  const canRunWorkPackageClosure = activeUxRole !== 'technician';
+  const selectedTask = state.selectedWorkOrder?.tasks?.[0] ?? null;
+  const mobileQueuedEvents = Math.max(0, (state.selectedWorkOrder?.tasks?.filter((task) => !task.completed).length ?? 0) - 1);
+  const canRunWorkOrderClosure = activeUxRole !== 'technician';
   const canRunComplianceOverride = activeUxRole !== 'technician';
   const canEditPartsAllocation = activeUxRole !== 'inspector';
   const canDirectTaskExecution = activeUxRole !== 'management';
@@ -641,7 +641,7 @@ export function AmroOwnedWorkspace({
   const isScopedToModule = Boolean(moduleKey);
   const showOverviewModule = !moduleKey || moduleKey === 'overview';
   const showPrimaryUsersModule = !moduleKey || moduleKey === 'primary-users';
-  const showWorkPackagesModule = !moduleKey || moduleKey === 'work-packages';
+  const showWorkOrdersModule = !moduleKey || moduleKey === 'work-orders';
   const showTaskExecutionModule = !moduleKey || moduleKey === 'task-execution';
   const showSchedulingModule = !moduleKey || moduleKey === 'scheduling';
   const showPartsModule = !moduleKey || moduleKey === 'parts';
@@ -1007,9 +1007,9 @@ export function AmroOwnedWorkspace({
         {
           id: 'overview-refresh',
           label: 'Refresh Workspace',
-          onClick: state.refreshWorkPackages,
-          disabled: state.loadingWorkPackages,
-          disabledReason: state.loadingWorkPackages ? 'Work package refresh is already running.' : 'Ready.',
+          onClick: state.refreshWorkOrders,
+          disabled: state.loadingWorkOrders,
+          disabledReason: state.loadingWorkOrders ? 'Work package refresh is already running.' : 'Ready.',
         },
         {
           id: 'overview-anomalies',
@@ -1022,20 +1022,20 @@ export function AmroOwnedWorkspace({
           id: 'overview-compliance-gate',
           label: 'Load Compliance Gate',
           onClick: () => void handleOpenComplianceGate(),
-          disabled: !state.selectedWorkPackageId,
-          disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+          disabled: !state.selectedWorkOrderId,
+          disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
         },
       ]
-    : moduleKey === 'work-packages'
+    : moduleKey === 'work-orders'
       ? []
       : moduleKey === 'primary-users'
         ? [
             {
               id: 'primary-users-refresh',
               label: 'Refresh Workspace',
-              onClick: state.refreshWorkPackages,
-              disabled: state.loadingWorkPackages,
-              disabledReason: state.loadingWorkPackages ? 'Work package refresh is already running.' : 'Ready.',
+              onClick: state.refreshWorkOrders,
+              disabled: state.loadingWorkOrders,
+              disabledReason: state.loadingWorkOrders ? 'Work package refresh is already running.' : 'Ready.',
             },
             {
               id: 'primary-users-anomaly',
@@ -1074,23 +1074,23 @@ export function AmroOwnedWorkspace({
               {
                 id: 'scheduling-assign',
                 label: 'Assign Next Slot',
-                onClick: () => void state.assignSelectedWorkPackageToNextSlot(),
-                disabled: !state.selectedWorkPackageId,
-                disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                onClick: () => void state.assignSelectedWorkOrderToNextSlot(),
+                disabled: !state.selectedWorkOrderId,
+                disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
               },
               {
                 id: 'scheduling-replan-simulate',
                 label: 'Run Replan Simulation',
-                onClick: () => void state.runWorkPackageReplanSimulation(),
-                disabled: !state.selectedWorkPackageId,
-                disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                onClick: () => void state.runWorkOrderReplanSimulation(),
+                disabled: !state.selectedWorkOrderId,
+                disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
               },
               {
                 id: 'scheduling-replan-confirm',
                 label: 'Confirm Replan',
-                onClick: () => void state.confirmWorkPackageReplan(),
-                disabled: state.workPackageReplanOptions.length === 0,
-                disabledReason: state.workPackageReplanOptions.length > 0 ? 'Ready.' : 'Run simulation first.',
+                onClick: () => void state.confirmWorkOrderReplan(),
+                disabled: state.workOrderReplanOptions.length === 0,
+                disabledReason: state.workOrderReplanOptions.length > 0 ? 'Ready.' : 'Run simulation first.',
               },
               {
                 id: 'scheduling-refresh-optimization',
@@ -1105,23 +1105,23 @@ export function AmroOwnedWorkspace({
                 {
                   id: 'parts-build-allocation',
                   label: 'Build Allocation',
-                  onClick: () => void state.reservePartsAllocationForSelectedWorkPackage(),
-                  disabled: !state.selectedWorkPackageId,
-                  disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                  onClick: () => void state.reservePartsAllocationForSelectedWorkOrder(),
+                  disabled: !state.selectedWorkOrderId,
+                  disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                 },
                 {
                   id: 'parts-run-optimization',
                   label: 'Run Inventory Optimization',
                   onClick: () => void state.runInventoryOptimizationModel(),
-                  disabled: !state.selectedWorkPackageId,
-                  disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                  disabled: !state.selectedWorkOrderId,
+                  disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                 },
                 {
                   id: 'parts-sync-eta',
                   label: 'Sync Supplier ETA',
-                  onClick: () => void state.syncSupplierEtaForSelectedWorkPackage(),
-                  disabled: !state.selectedWorkPackageId,
-                  disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                  onClick: () => void state.syncSupplierEtaForSelectedWorkOrder(),
+                  disabled: !state.selectedWorkOrderId,
+                  disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                 },
                 {
                   id: 'parts-sync-procurement',
@@ -1137,15 +1137,15 @@ export function AmroOwnedWorkspace({
                     id: 'compliance-gate',
                     label: 'Load Compliance Gate',
                     onClick: () => void handleOpenComplianceGate(),
-                    disabled: !state.selectedWorkPackageId,
-                    disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                    disabled: !state.selectedWorkOrderId,
+                    disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                   },
                   {
                     id: 'compliance-replay',
                     label: 'Load Audit Replay',
                     onClick: () => void state.loadAuditReplayTimeline(),
-                    disabled: !state.selectedWorkPackageId,
-                    disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                    disabled: !state.selectedWorkOrderId,
+                    disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                   },
                   {
                     id: 'compliance-anomaly',
@@ -1168,8 +1168,8 @@ export function AmroOwnedWorkspace({
                       id: 'certification-approve',
                       label: 'Approve Decision',
                       onClick: () => void state.submitCertificationDecision('approve'),
-                      disabled: !state.selectedWorkPackageId,
-                      disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                      disabled: !state.selectedWorkOrderId,
+                      disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                     },
                     {
                       id: 'certification-deferral',
@@ -1185,8 +1185,8 @@ export function AmroOwnedWorkspace({
                         id: 'audit-replay',
                         label: 'Load Audit Replay',
                         onClick: () => void state.loadAuditReplayTimeline(),
-                        disabled: !state.selectedWorkPackageId,
-                        disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                        disabled: !state.selectedWorkOrderId,
+                        disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                       },
                       {
                         id: 'audit-anomaly',
@@ -1201,16 +1201,16 @@ export function AmroOwnedWorkspace({
                         {
                           id: 'integration-refresh',
                           label: 'Refresh Workspace',
-                          onClick: state.refreshWorkPackages,
-                          disabled: state.loadingWorkPackages,
-                          disabledReason: state.loadingWorkPackages ? 'Work package refresh is already running.' : 'Ready.',
+                          onClick: state.refreshWorkOrders,
+                          disabled: state.loadingWorkOrders,
+                          disabledReason: state.loadingWorkOrders ? 'Work package refresh is already running.' : 'Ready.',
                         },
                         {
                           id: 'integration-audit-replay',
                           label: 'Open Replay Feed',
                           onClick: () => void state.loadAuditReplayTimeline(),
-                          disabled: !state.selectedWorkPackageId,
-                          disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                          disabled: !state.selectedWorkOrderId,
+                          disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                         },
                       ]
                     : moduleKey === 'intelligence'
@@ -1219,8 +1219,8 @@ export function AmroOwnedWorkspace({
                             id: 'intelligence-optimization',
                             label: 'Run Inventory Optimization',
                             onClick: () => void state.runInventoryOptimizationModel(),
-                            disabled: !state.selectedWorkPackageId,
-                            disabledReason: state.selectedWorkPackageId ? 'Ready.' : 'Select a work package first.',
+                            disabled: !state.selectedWorkOrderId,
+                            disabledReason: state.selectedWorkOrderId ? 'Ready.' : 'Select a work package first.',
                           },
                           {
                             id: 'intelligence-anomalies',
@@ -1252,7 +1252,7 @@ export function AmroOwnedWorkspace({
         return;
       }
       if (error) {
-        setWorkPackageAircraftOptions([]);
+        setWorkOrderAircraftOptions([]);
         setAircraftSelectionLoading(false);
         return;
       }
@@ -1284,7 +1284,7 @@ export function AmroOwnedWorkspace({
             currentCycles: Number(item.current_cycles || 0),
           };
         });
-      setWorkPackageAircraftOptions(options);
+      setWorkOrderAircraftOptions(options);
       setAircraftSelectionLoading(false);
     };
     void loadAircraftSelectionOptions();
@@ -1295,7 +1295,7 @@ export function AmroOwnedWorkspace({
   useEffect(() => {
     let active = true;
     const loadMaintenanceTaskSelectionOptions = async () => {
-      if (!workPackageCreateForm.aircraftId) {
+      if (!workOrderCreateForm.aircraftId) {
         setMaintenanceTaskSelectionOptions([]);
         setTaskConflictById({});
         return;
@@ -1314,7 +1314,7 @@ export function AmroOwnedWorkspace({
         setTaskSelectionLoading(false);
         return;
       }
-      const selectedModel = workPackageCreateForm.selectedAircraftModel.trim().toLowerCase();
+      const selectedModel = workOrderCreateForm.selectedAircraftModel.trim().toLowerCase();
       const normalizedModelTokens = selectedModel.length > 0
         ? selectedModel.split(/[\s/-]+/).map((token) => token.trim()).filter((token) => token.length >= 3)
         : [];
@@ -1362,18 +1362,18 @@ export function AmroOwnedWorkspace({
     return () => {
       active = false;
     };
-  }, [scopedDb, workPackageCreateForm.aircraftId, workPackageCreateForm.selectedAircraftModel]);
+  }, [scopedDb, workOrderCreateForm.aircraftId, workOrderCreateForm.selectedAircraftModel]);
   useEffect(() => {
     let active = true;
     const loadTaskConflicts = async () => {
-      if (!workPackageCreateForm.aircraftId || maintenanceTaskSelectionOptions.length === 0) {
+      if (!workOrderCreateForm.aircraftId || maintenanceTaskSelectionOptions.length === 0) {
         setTaskConflictById({});
         return;
       }
       const { data: linkedTasks, error: linkedTasksError } = await scopedDb
         .from('aircraft_maintenance_tasks')
         .select('task_id')
-        .eq('aircraft_id', workPackageCreateForm.aircraftId)
+        .eq('aircraft_id', workOrderCreateForm.aircraftId)
         .eq('is_active', true)
         .limit(2000);
       if (!active) {
@@ -1396,88 +1396,88 @@ export function AmroOwnedWorkspace({
         }
       });
       setTaskConflictById(nextConflictMap);
-      const selectedConflicts = workPackageCreateForm.selectedTaskIds.filter((taskId) => Boolean(nextConflictMap[taskId]));
+      const selectedConflicts = workOrderCreateForm.selectedTaskIds.filter((taskId) => Boolean(nextConflictMap[taskId]));
       if (selectedConflicts.length > 0) {
-        handleWorkPackageCreateFormChange('selectedTaskIds', workPackageCreateForm.selectedTaskIds.filter((taskId) => !nextConflictMap[taskId]));
+        handleWorkOrderCreateFormChange('selectedTaskIds', workOrderCreateForm.selectedTaskIds.filter((taskId) => !nextConflictMap[taskId]));
       }
     };
     void loadTaskConflicts();
     return () => {
       active = false;
     };
-  }, [scopedDb, workPackageCreateForm.aircraftId, maintenanceTaskSelectionOptions]);
+  }, [scopedDb, workOrderCreateForm.aircraftId, maintenanceTaskSelectionOptions]);
   useEffect(() => {
-    setManualWorkPackageOrder((current) => {
-      const liveIds = state.workPackages.map((workPackage) => workPackage.id);
+    setManualWorkOrderOrder((current) => {
+      const liveIds = state.workOrders.map((workOrder) => workOrder.id);
       const retained = current.filter((id) => liveIds.includes(id));
       const appended = liveIds.filter((id) => !retained.includes(id));
       return [...retained, ...appended];
     });
-  }, [state.workPackages]);
-  const workPackageRuntimeRows = useMemo<Record<string, WorkPackageGridRuntimeRow>>(
+  }, [state.workOrders]);
+  const workOrderRuntimeRows = useMemo<Record<string, WorkOrderGridRuntimeRow>>(
     () =>
-      state.workPackages.reduce<Record<string, WorkPackageGridRuntimeRow>>((accumulator, workPackage) => {
-        const assetTag = state.assets.find((asset) => asset.id === workPackage.assetId)?.assetTag || workPackage.assetId;
-        const scheduleRow = state.scheduleBoardRows.find((row) => row.work_package_id === workPackage.id);
+      state.workOrders.reduce<Record<string, WorkOrderGridRuntimeRow>>((accumulator, workOrder) => {
+        const assetTag = state.assets.find((asset) => asset.id === workOrder.assetId)?.assetTag || workOrder.assetId;
+        const scheduleRow = state.scheduleBoardRows.find((row) => row.work_order_id === workOrder.id);
         const dueLabel = scheduleRow?.slot_end || 'TBD';
-        accumulator[workPackage.id] = {
-          id: workPackage.id,
-          packageNumber: workPackage.packageNumber,
+        accumulator[workOrder.id] = {
+          id: workOrder.id,
+          packageNumber: workOrder.packageNumber,
           aircraft: assetTag,
           priority: 'Normal',
           category: 'Line',
           station: scheduleRow?.station_code || 'N/A',
           due: dueLabel,
-          status: String(workPackage.lifecycleStage),
+          status: String(workOrder.lifecycleStage),
           owner: activeUxRole,
           dueEpoch: dueLabel === 'TBD' ? Number.MAX_SAFE_INTEGER : new Date(dueLabel).getTime(),
         };
         return accumulator;
       }, {}),
-    [activeUxRole, state.assets, state.scheduleBoardRows, state.workPackages],
+    [activeUxRole, state.assets, state.scheduleBoardRows, state.workOrders],
   );
-  const filteredWorkPackages = state.workPackages.filter((workPackage) => {
-    const runtimeRow = workPackageRuntimeRows[workPackage.id];
+  const filteredWorkOrders = state.workOrders.filter((workOrder) => {
+    const runtimeRow = workOrderRuntimeRows[workOrder.id];
     const fleetMatch = selectedFleetFilter === 'all' || runtimeRow.aircraft === selectedFleetFilter;
     const stationMatch = selectedStationFilter === 'all' || runtimeRow.station === selectedStationFilter;
-    const columnFilterMatch = (Object.entries(debouncedWorkPackageGridFilters) as Array<[WorkPackageGridColumnKey, string]>).every(([columnKey, rawFilterValue]) => {
+    const columnFilterMatch = (Object.entries(debouncedWorkOrderGridFilters) as Array<[WorkOrderGridColumnKey, string]>).every(([columnKey, rawFilterValue]) => {
       const normalizedFilterValue = rawFilterValue.trim().toLowerCase();
       if (!normalizedFilterValue) return true;
       return String(runtimeRow[columnKey]).toLowerCase().includes(normalizedFilterValue);
     });
     return fleetMatch && stationMatch && columnFilterMatch;
   });
-  const manuallyOrderedWorkPackages = [...filteredWorkPackages].sort((left, right) => {
-    const leftIndex = manualWorkPackageOrder.indexOf(left.id);
-    const rightIndex = manualWorkPackageOrder.indexOf(right.id);
+  const manuallyOrderedWorkOrders = [...filteredWorkOrders].sort((left, right) => {
+    const leftIndex = manualWorkOrderOrder.indexOf(left.id);
+    const rightIndex = manualWorkOrderOrder.indexOf(right.id);
     if (leftIndex === -1 && rightIndex === -1) return 0;
     if (leftIndex === -1) return 1;
     if (rightIndex === -1) return -1;
     return leftIndex - rightIndex;
   });
-  const sortedWorkPackages = workPackageSortField === 'manual'
-    ? manuallyOrderedWorkPackages
-    : [...filteredWorkPackages].sort((left, right) => {
-      const leftRuntime = workPackageRuntimeRows[left.id];
-      const rightRuntime = workPackageRuntimeRows[right.id];
-      if (workPackageSortField === 'due') {
+  const sortedWorkOrders = workOrderSortField === 'manual'
+    ? manuallyOrderedWorkOrders
+    : [...filteredWorkOrders].sort((left, right) => {
+      const leftRuntime = workOrderRuntimeRows[left.id];
+      const rightRuntime = workOrderRuntimeRows[right.id];
+      if (workOrderSortField === 'due') {
         const compareDue = leftRuntime.dueEpoch - rightRuntime.dueEpoch;
-        return workPackageSortDirection === 'asc' ? compareDue : compareDue * -1;
+        return workOrderSortDirection === 'asc' ? compareDue : compareDue * -1;
       }
-      const compare = String(leftRuntime[workPackageSortField]).localeCompare(String(rightRuntime[workPackageSortField]));
-      return workPackageSortDirection === 'asc' ? compare : compare * -1;
+      const compare = String(leftRuntime[workOrderSortField]).localeCompare(String(rightRuntime[workOrderSortField]));
+      return workOrderSortDirection === 'asc' ? compare : compare * -1;
     });
-  const workPackageTotalPages = Math.max(1, Math.ceil(sortedWorkPackages.length / workPackagePageSize));
-  const pagedWorkPackages = sortedWorkPackages.slice((workPackagePage - 1) * workPackagePageSize, workPackagePage * workPackagePageSize);
-  const hasAnyWorkPackages = state.workPackages.length > 0;
-  const hasVisibleWorkPackages = pagedWorkPackages.length > 0;
-  const hasActiveScopeFilters = state.workPackageStatusFilter !== 'all'
-    || state.workPackageSearch.trim().length > 0
+  const workOrderTotalPages = Math.max(1, Math.ceil(sortedWorkOrders.length / workOrderPageSize));
+  const pagedWorkOrders = sortedWorkOrders.slice((workOrderPage - 1) * workOrderPageSize, workOrderPage * workOrderPageSize);
+  const hasAnyWorkOrders = state.workOrders.length > 0;
+  const hasVisibleWorkOrders = pagedWorkOrders.length > 0;
+  const hasActiveScopeFilters = state.workOrderStatusFilter !== 'all'
+    || state.workOrderSearch.trim().length > 0
     || state.selectedSavedViewId !== 'default-all'
     || selectedFleetFilter !== 'all'
     || selectedStationFilter !== 'all';
-  const isFilterScopedEmpty = hasAnyWorkPackages && filteredWorkPackages.length === 0;
-  const isWorkspaceEmpty = !state.loadingWorkPackages && !hasVisibleWorkPackages;
+  const isFilterScopedEmpty = hasAnyWorkOrders && filteredWorkOrders.length === 0;
+  const isWorkspaceEmpty = !state.loadingWorkOrders && !hasVisibleWorkOrders;
   const predictiveRiskSegments = state.predictiveRecommendations.reduce(
     (summary, recommendation) => {
       if (recommendation.riskScore >= 80) summary.high += 1;
@@ -1487,21 +1487,21 @@ export function AmroOwnedWorkspace({
     },
     { high: 0, medium: 0, low: 0 },
   );
-  const visibleWorkspaceError = state.workPackagesError?.trim().toLowerCase() === 'not found' ? null : state.workPackagesError;
+  const visibleWorkspaceError = state.workOrdersError?.trim().toLowerCase() === 'not found' ? null : state.workOrdersError;
   const taskActionDisabledReason = canDirectTaskExecution ? '' : 'Disabled by policy: management role cannot submit technician execution actions.';
-  const selectedWorkPackageAssignee = state.selectedWorkPackage?.tasks?.[0]?.assignedRole || 'Unassigned';
+  const selectedWorkOrderAssignee = state.selectedWorkOrder?.tasks?.[0]?.assignedRole || 'Unassigned';
   const selectedAircraft = useMemo(() => 
-    workPackageAircraftOptions.find((aircraft) => aircraft.id === workPackageCreateForm.aircraftId) || null,
-    [workPackageAircraftOptions, workPackageCreateForm.aircraftId]
+    workOrderAircraftOptions.find((aircraft) => aircraft.id === workOrderCreateForm.aircraftId) || null,
+    [workOrderAircraftOptions, workOrderCreateForm.aircraftId]
   );
   
   // Memoized aircraft filtering using debounced search to prevent flickering
   const filteredAircraftOptions = useMemo(() => {
     const searchTerm = debouncedAircraftSearchTerm.trim();
-    if (!searchTerm) return workPackageAircraftOptions;
+    if (!searchTerm) return workOrderAircraftOptions;
     
     const token = searchTerm.toLowerCase();
-    return workPackageAircraftOptions.filter((aircraft) =>
+    return workOrderAircraftOptions.filter((aircraft) =>
       [
         aircraft.aircraftModel,
         aircraft.registration,
@@ -1509,7 +1509,7 @@ export function AmroOwnedWorkspace({
         aircraft.operatorCode,
       ].some((entry) => entry?.toLowerCase().includes(token))
     );
-  }, [workPackageAircraftOptions, debouncedAircraftSearchTerm]);
+  }, [workOrderAircraftOptions, debouncedAircraftSearchTerm]);
   
   // Memoized task filtering using debounced search to prevent flickering
   const taskSelectionOptions = useMemo(() => {
@@ -1527,11 +1527,11 @@ export function AmroOwnedWorkspace({
     );
   }, [maintenanceTaskSelectionOptions, debouncedTaskSearchTerm]);
   const selectedTaskOptions = maintenanceTaskSelectionOptions
-    .filter((task) => workPackageCreateForm.selectedTaskIds.includes(task.value));
+    .filter((task) => workOrderCreateForm.selectedTaskIds.includes(task.value));
   const selectedTaskCount = selectedTaskOptions.length;
   const selectedTaskConflicts = selectedTaskOptions.filter((task) => taskConflictById[task.value]);
-  const workPackageValidationSummary = Array.from(new Set(Object.values(workPackageCreateErrors).filter(Boolean)));
-  const canSelectTasks = Boolean(workPackageCreateForm.aircraftId);
+  const workOrderValidationSummary = Array.from(new Set(Object.values(workOrderCreateErrors).filter(Boolean)));
+  const canSelectTasks = Boolean(workOrderCreateForm.aircraftId);
   const formatDateTime = (value: string | number) => new Intl.DateTimeFormat(workspaceLocale, {
     dateStyle: 'medium',
     timeStyle: 'short',
@@ -1574,7 +1574,7 @@ export function AmroOwnedWorkspace({
     if (typeof window === 'undefined') return;
     window.dispatchEvent(new CustomEvent('amro:performance-trace', {
       detail: {
-        interaction: 'work_package_filter_apply',
+        interaction: 'work_order_filter_apply',
         trigger,
         startedAt: new Date().toISOString(),
       },
@@ -1616,10 +1616,10 @@ export function AmroOwnedWorkspace({
     toast.error('Unable to load compliance gate.');
   };
 
-  const handleOpenWorkPackage = async (workPackageId: string, packageNumber: string) => {
-    setBusyWorkPackageActionId(`open-${workPackageId}`);
+  const handleOpenWorkOrder = async (workOrderId: string, packageNumber: string) => {
+    setBusyWorkOrderActionId(`open-${workOrderId}`);
     try {
-      const ok = await state.openWorkPackageDetails(workPackageId);
+      const ok = await state.openWorkOrderDetails(workOrderId);
       setLastInteractionMessage(ok ? `Opened work package ${packageNumber}.` : `Unable to open work package ${packageNumber}.`);
       if (ok) {
         toast.success(`Opened ${packageNumber}.`);
@@ -1627,15 +1627,15 @@ export function AmroOwnedWorkspace({
         toast.error(`Unable to open ${packageNumber}.`);
       }
     } finally {
-      setBusyWorkPackageActionId(null);
+      setBusyWorkOrderActionId(null);
     }
   };
 
-  const handleScheduleWorkPackage = async (workPackageId: string, packageNumber: string) => {
-    state.setSelectedWorkPackageId(workPackageId);
-    setBusyWorkPackageActionId(`schedule-${workPackageId}`);
+  const handleScheduleWorkOrder = async (workOrderId: string, packageNumber: string) => {
+    state.setSelectedWorkOrderId(workOrderId);
+    setBusyWorkOrderActionId(`schedule-${workOrderId}`);
     try {
-      const ok = await state.updateWorkPackageScheduling(workPackageId);
+      const ok = await state.updateWorkOrderScheduling(workOrderId);
       setLastInteractionMessage(ok ? `Scheduled work package ${packageNumber}.` : `Unable to schedule work package ${packageNumber}.`);
       if (ok) {
         toast.success(`Scheduled ${packageNumber}.`);
@@ -1643,15 +1643,15 @@ export function AmroOwnedWorkspace({
         toast.error(`Unable to schedule ${packageNumber}.`);
       }
     } finally {
-      setBusyWorkPackageActionId(null);
+      setBusyWorkOrderActionId(null);
     }
   };
 
-  const handleHoldWorkPackage = async (workPackageId: string, packageNumber: string) => {
-    state.setSelectedWorkPackageId(workPackageId);
-    setBusyWorkPackageActionId(`hold-${workPackageId}`);
+  const handleHoldWorkOrder = async (workOrderId: string, packageNumber: string) => {
+    state.setSelectedWorkOrderId(workOrderId);
+    setBusyWorkOrderActionId(`hold-${workOrderId}`);
     try {
-      const ok = await state.toggleWorkPackageHold(workPackageId);
+      const ok = await state.toggleWorkOrderHold(workOrderId);
       setLastInteractionMessage(ok ? `Hold status updated for ${packageNumber}.` : `Unable to update hold status for ${packageNumber}.`);
       if (ok) {
         toast.success(`Hold status updated for ${packageNumber}.`);
@@ -1659,14 +1659,14 @@ export function AmroOwnedWorkspace({
         toast.error(`Unable to update hold for ${packageNumber}.`);
       }
     } finally {
-      setBusyWorkPackageActionId(null);
+      setBusyWorkOrderActionId(null);
     }
   };
 
-  const handleCloneWorkPackage = async (workPackageId: string, packageNumber: string) => {
-    setBusyWorkPackageActionId(`clone-${workPackageId}`);
+  const handleCloneWorkOrder = async (workOrderId: string, packageNumber: string) => {
+    setBusyWorkOrderActionId(`clone-${workOrderId}`);
     try {
-      const ok = await state.cloneWorkPackageFromTemplate(workPackageId);
+      const ok = await state.cloneWorkOrderFromTemplate(workOrderId);
       setLastInteractionMessage(ok ? `Cloned from ${packageNumber}.` : `Clone failed for ${packageNumber}.`);
       if (ok) {
         toast.success(`Cloned ${packageNumber}.`);
@@ -1674,45 +1674,45 @@ export function AmroOwnedWorkspace({
         toast.error(`Clone failed for ${packageNumber}.`);
       }
     } finally {
-      setBusyWorkPackageActionId(null);
+      setBusyWorkOrderActionId(null);
     }
   };
 
-  const handleWorkPackageExport = (workPackageId: string, packageNumber: string) => {
-    const workPackage = state.workPackages.find((item) => item.id === workPackageId);
-    if (!workPackage) {
+  const handleWorkOrderExport = (workOrderId: string, packageNumber: string) => {
+    const workOrder = state.workOrders.find((item) => item.id === workOrderId);
+    if (!workOrder) {
       toast.error(`Unable to export ${packageNumber}.`);
       return;
     }
-    const assetTag = state.assets.find((asset) => asset.id === workPackage.assetId)?.assetTag || 'Unknown';
+    const assetTag = state.assets.find((asset) => asset.id === workOrder.assetId)?.assetTag || 'Unknown';
     const exportRows = [
       {
-        workPackageId: workPackage.id,
-        packageNumber: workPackage.packageNumber,
-        lifecycleStage: workPackage.lifecycleStage,
+        workOrderId: workOrder.id,
+        packageNumber: workOrder.packageNumber,
+        lifecycleStage: workOrder.lifecycleStage,
         assetTag,
       },
     ];
     const exportPayload = {
-      workPackageId,
+      workOrderId,
       packageNumber,
       moduleKey: moduleKey || 'amro',
       view: workspaceViewMode,
       theme: workspaceTheme,
       exportedAt: new Date().toISOString(),
     };
-    publishWorkspaceExport('work-package', {
+    publishWorkspaceExport('work-order', {
       ...exportPayload,
     });
     if (typeof window !== 'undefined') {
       const workbook = XLSX.utils.book_new();
       const worksheet = XLSX.utils.json_to_sheet(exportRows);
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'WorkPackage');
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'WorkOrder');
       XLSX.writeFile(workbook, `${packageNumber}-export.xlsx`);
       const pdf = new jsPDF({ unit: 'pt', format: 'a4' });
       autoTable(pdf, {
         head: [['Work Package ID', 'Package Number', 'Lifecycle Stage', 'Asset']],
-        body: exportRows.map((row) => [row.workPackageId, row.packageNumber, row.lifecycleStage, row.assetTag]),
+        body: exportRows.map((row) => [row.workOrderId, row.packageNumber, row.lifecycleStage, row.assetTag]),
       });
       pdf.save(`${packageNumber}-export.pdf`);
     }
@@ -1725,7 +1725,7 @@ export function AmroOwnedWorkspace({
       view: workspaceViewMode,
       theme: workspaceTheme,
       locale: workspaceLocale,
-      visibleWorkPackages: pagedWorkPackages.length,
+      visibleWorkOrders: pagedWorkOrders.length,
     });
   };
 
@@ -1736,33 +1736,33 @@ export function AmroOwnedWorkspace({
     setLastInteractionMessage(`Workspace theme switched to ${nextTheme}.`);
   };
 
-  const handleBulkWorkPackageAction = async () => {
-    if (!state.selectedWorkPackageId) {
+  const handleBulkWorkOrderAction = async () => {
+    if (!state.selectedWorkOrderId) {
       setLastInteractionMessage('Select a work package before running bulk actions.');
       return;
     }
-    const ok = await state.advanceWorkPackageLifecycle();
+    const ok = await state.advanceWorkOrderLifecycle();
     setLastInteractionMessage(ok ? 'Bulk action completed for selected work package.' : 'Bulk action failed for selected work package.');
   };
 
   const handleStickyAssignAction = async () => {
-    if (!state.selectedWorkPackage) {
+    if (!state.selectedWorkOrder) {
       setLastInteractionMessage('Select a work package before assigning.');
       return;
     }
-    await handleScheduleWorkPackage(state.selectedWorkPackage.id, state.selectedWorkPackage.packageNumber);
+    await handleScheduleWorkOrder(state.selectedWorkOrder.id, state.selectedWorkOrder.packageNumber);
   };
 
   const handleStickyScheduleAction = async () => {
-    if (!state.selectedWorkPackage) {
+    if (!state.selectedWorkOrder) {
       setLastInteractionMessage('Select a work package before scheduling.');
       return;
     }
-    await handleScheduleWorkPackage(state.selectedWorkPackage.id, state.selectedWorkPackage.packageNumber);
+    await handleScheduleWorkOrder(state.selectedWorkOrder.id, state.selectedWorkOrder.packageNumber);
   };
 
   const handleStickyGateCheckAction = async () => {
-    if (!state.selectedWorkPackageId) {
+    if (!state.selectedWorkOrderId) {
       setLastInteractionMessage('Select a work package before running compliance gate checks.');
       return;
     }
@@ -1770,11 +1770,11 @@ export function AmroOwnedWorkspace({
   };
 
   const handleStickyHoldAction = async () => {
-    if (!state.selectedWorkPackage) {
+    if (!state.selectedWorkOrder) {
       setLastInteractionMessage('Select a work package before placing hold transition.');
       return;
     }
-    await handleHoldWorkPackage(state.selectedWorkPackage.id, state.selectedWorkPackage.packageNumber);
+    await handleHoldWorkOrder(state.selectedWorkOrder.id, state.selectedWorkOrder.packageNumber);
   };
 
   const handleEscalateAction = (target: 'engineering' | 'compliance') => {
@@ -1782,7 +1782,7 @@ export function AmroOwnedWorkspace({
       window.dispatchEvent(new CustomEvent('amro:escalation-requested', {
         detail: {
           target,
-          workPackageId: state.selectedWorkPackageId || null,
+          workOrderId: state.selectedWorkOrderId || null,
           requestedAt: new Date().toISOString(),
         },
       }));
@@ -1790,13 +1790,13 @@ export function AmroOwnedWorkspace({
     setLastInteractionMessage(`Escalation request submitted to ${target}.`);
   };
 
-  const handleDragHandleInteraction = (workPackageId: string, packageNumber: string) => {
-    state.setSelectedWorkPackageId(workPackageId);
+  const handleDragHandleInteraction = (workOrderId: string, packageNumber: string) => {
+    state.setSelectedWorkOrderId(workOrderId);
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('amro:work-package-drag-handle', {
+      window.dispatchEvent(new CustomEvent('amro:work-order-drag-handle', {
         detail: {
           packageNumber,
-          selectedWorkPackageId: workPackageId,
+          selectedWorkOrderId: workOrderId,
           triggeredAt: new Date().toISOString(),
         },
       }));
@@ -1805,15 +1805,15 @@ export function AmroOwnedWorkspace({
     toast.success(`Drag handle active for ${packageNumber}.`);
   };
 
-  const handleWorkPackageReorder = (sourceWorkPackageId: string, targetWorkPackageId: string) => {
-    if (sourceWorkPackageId === targetWorkPackageId) return;
-    const sourceWorkPackage = state.workPackages.find((workPackage) => workPackage.id === sourceWorkPackageId);
-    const targetWorkPackage = state.workPackages.find((workPackage) => workPackage.id === targetWorkPackageId);
+  const handleWorkOrderReorder = (sourceWorkOrderId: string, targetWorkOrderId: string) => {
+    if (sourceWorkOrderId === targetWorkOrderId) return;
+    const sourceWorkOrder = state.workOrders.find((workOrder) => workOrder.id === sourceWorkOrderId);
+    const targetWorkOrder = state.workOrders.find((workOrder) => workOrder.id === targetWorkOrderId);
     let reorderedOutput: string[] = [];
-    setManualWorkPackageOrder((current) => {
-      const order = current.length > 0 ? current : state.workPackages.map((workPackage) => workPackage.id);
-      const sourceIndex = order.indexOf(sourceWorkPackageId);
-      const targetIndex = order.indexOf(targetWorkPackageId);
+    setManualWorkOrderOrder((current) => {
+      const order = current.length > 0 ? current : state.workOrders.map((workOrder) => workOrder.id);
+      const sourceIndex = order.indexOf(sourceWorkOrderId);
+      const targetIndex = order.indexOf(targetWorkOrderId);
       if (sourceIndex === -1 || targetIndex === -1) return current;
       const reordered = [...order];
       const [movedItem] = reordered.splice(sourceIndex, 1);
@@ -1821,22 +1821,22 @@ export function AmroOwnedWorkspace({
       reorderedOutput = reordered;
       return reordered;
     });
-    setWorkPackageSortField('manual');
+    setWorkOrderSortField('manual');
     if (typeof window !== 'undefined' && reorderedOutput.length > 0) {
-      window.localStorage.setItem(amroManualWorkPackageOrderStorageKey, JSON.stringify(reorderedOutput));
-      window.dispatchEvent(new CustomEvent('amro:work-package-order-updated', {
+      window.localStorage.setItem(amroManualWorkOrderOrderStorageKey, JSON.stringify(reorderedOutput));
+      window.dispatchEvent(new CustomEvent('amro:work-order-order-updated', {
         detail: {
-          orderedWorkPackageIds: reorderedOutput,
+          orderedWorkOrderIds: reorderedOutput,
           updatedAt: new Date().toISOString(),
         },
       }));
     }
-    setLastInteractionMessage(`Reordered ${sourceWorkPackage?.packageNumber || sourceWorkPackageId} before ${targetWorkPackage?.packageNumber || targetWorkPackageId}.`);
-    toast.success(`Reordered ${sourceWorkPackage?.packageNumber || 'work package'}.`);
+    setLastInteractionMessage(`Reordered ${sourceWorkOrder?.packageNumber || sourceWorkOrderId} before ${targetWorkOrder?.packageNumber || targetWorkOrderId}.`);
+    toast.success(`Reordered ${sourceWorkOrder?.packageNumber || 'work package'}.`);
   };
 
   const handleIntegrationRefresh = () => {
-    void state.refreshWorkPackages();
+    void state.refreshWorkOrders();
     void state.loadAuditReplayTimeline();
     setLastInteractionMessage('Integration monitor refreshed with latest workspace and replay feed.');
   };
@@ -1863,50 +1863,50 @@ export function AmroOwnedWorkspace({
 
   const handleStatusFilterChange = (value: string) => {
     startFilterApplyTimer('status');
-    state.setWorkPackageStatusFilter(value);
+    state.setWorkOrderStatusFilter(value);
   };
 
   const handleSearchFilterChange = (value: string) => {
     startFilterApplyTimer('search');
-    state.setWorkPackageSearch(value);
+    state.setWorkOrderSearch(value);
   };
 
   /**
    * Updates a per-column filter value used by the AMRO work package data grid.
    */
-  const handleGridFilterChange = (columnKey: WorkPackageGridColumnKey, value: string) => {
+  const handleGridFilterChange = (columnKey: WorkOrderGridColumnKey, value: string) => {
     startFilterApplyTimer(`column_${columnKey}`);
-    setWorkPackageGridFilters((current) => ({
+    setWorkOrderGridFilters((current) => ({
       ...current,
       [columnKey]: value,
     }));
-    setWorkPackagePage(1);
+    setWorkOrderPage(1);
   };
 
   /**
    * Clears a single per-column filter while preserving other active column filters.
    */
-  const handleGridFilterClear = (columnKey: WorkPackageGridColumnKey) => {
+  const handleGridFilterClear = (columnKey: WorkOrderGridColumnKey) => {
     handleGridFilterChange(columnKey, '');
   };
 
   /**
    * Sorts by clicking a semantic column header and toggles ascending/descending.
    */
-  const handleGridSortToggle = (columnKey: WorkPackageGridSortKey) => {
-    if (workPackageSortField === columnKey) {
-      setWorkPackageSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
+  const handleGridSortToggle = (columnKey: WorkOrderGridSortKey) => {
+    if (workOrderSortField === columnKey) {
+      setWorkOrderSortDirection((current) => (current === 'asc' ? 'desc' : 'asc'));
       return;
     }
-    setWorkPackageSortField(columnKey);
-    setWorkPackageSortDirection('asc');
+    setWorkOrderSortField(columnKey);
+    setWorkOrderSortDirection('asc');
   };
 
   /**
    * Toggles a column visibility preference while preserving at least one visible column.
    */
-  const handleGridColumnVisibilityToggle = (columnKey: WorkPackageGridColumnKey) => {
-    setWorkPackageGridVisibleColumns((current) => {
+  const handleGridColumnVisibilityToggle = (columnKey: WorkOrderGridColumnKey) => {
+    setWorkOrderGridVisibleColumns((current) => {
       const currentlyVisible = Object.values(current).filter(Boolean).length;
       if (current[columnKey] && currentlyVisible === 1) return current;
       return {
@@ -1919,12 +1919,12 @@ export function AmroOwnedWorkspace({
   /**
    * Starts pointer-driven column resizing with hard min/max width constraints.
    */
-  const handleGridResizeStart = (columnKey: WorkPackageGridColumnKey, event: ReactMouseEvent<HTMLButtonElement>) => {
+  const handleGridResizeStart = (columnKey: WorkOrderGridColumnKey, event: ReactMouseEvent<HTMLButtonElement>) => {
     event.preventDefault();
     gridResizeActiveRef.current = {
       columnKey,
       startX: event.clientX,
-      startWidth: workPackageGridColumnWidths[columnKey],
+      startWidth: workOrderGridColumnWidths[columnKey],
     };
   };
 
@@ -1933,63 +1933,63 @@ export function AmroOwnedWorkspace({
     state.setSelectedSavedViewId(value);
   };
 
-  const handleResetWorkPackageScope = () => {
+  const handleResetWorkOrderScope = () => {
     setSelectedFleetFilter('all');
     setSelectedStationFilter('all');
     state.setSelectedSavedViewId('default-all');
-    state.setWorkPackageStatusFilter('all');
-    state.setWorkPackageSearch('');
-    setWorkPackagePage(1);
+    state.setWorkOrderStatusFilter('all');
+    state.setWorkOrderSearch('');
+    setWorkOrderPage(1);
     setLastInteractionMessage('Work package scope reset to defaults.');
   };
 
   const handleRetryWorkspaceLoad = () => {
-    void state.refreshWorkPackages();
+    void state.refreshWorkOrders();
     setLastInteractionMessage('Work package refresh requested.');
   };
 
-  const handleCreateStarterWorkPackage = async () => {
-    const ok = await state.createWorkPackage('Starter Work Package');
+  const handleCreateStarterWorkOrder = async () => {
+    const ok = await state.createWorkOrder('Starter Work Package');
     setLastInteractionMessage(ok ? 'Starter work package created.' : 'Unable to create starter work package.');
   };
 
-  const handleCreateWorkPackage = async () => {
-    const ok = await state.createWorkPackage(newWorkPackageTitle);
+  const handleCreateWorkOrder = async () => {
+    const ok = await state.createWorkOrder(newWorkOrderTitle);
     if (ok) {
-      setNewWorkPackageTitle('');
+      setNewWorkOrderTitle('');
     }
   };
 
-  const handleOpenWorkPackageCreateDialog = () => {
-    const cached = workPackageCreateDraftCacheRef.current.get(workPackageCreateTab);
-    const defaultState = createDefaultWorkPackageCreateFormState();
-    setWorkPackageCreateForm({
+  const handleOpenWorkOrderCreateDialog = () => {
+    const cached = workOrderCreateDraftCacheRef.current.get(workOrderCreateTab);
+    const defaultState = createDefaultWorkOrderCreateFormState();
+    setWorkOrderCreateForm({
       ...defaultState,
       ...cached,
     });
-    setWorkPackageCreateErrors({});
+    setWorkOrderCreateErrors({});
     setTaskSearchTerm('');
     setAircraftSearchTerm('');
     setTaskConflictById({});
     setReviewSubmitDialogOpen(false);
-    setWorkPackageCreateDialogOpen(true);
+    setWorkOrderCreateDialogOpen(true);
   };
 
-  const handleWorkPackageCreateTabChange = (nextTab: WorkPackageCreateTab) => {
-    workPackageCreateDraftCacheRef.current.set(workPackageCreateTab, workPackageCreateForm);
-    const cachedNext = workPackageCreateDraftCacheRef.current.get(nextTab);
+  const handleWorkOrderCreateTabChange = (nextTab: WorkOrderCreateTab) => {
+    workOrderCreateDraftCacheRef.current.set(workOrderCreateTab, workOrderCreateForm);
+    const cachedNext = workOrderCreateDraftCacheRef.current.get(nextTab);
     if (cachedNext) {
-      setWorkPackageCreateForm(cachedNext);
+      setWorkOrderCreateForm(cachedNext);
     }
-    setWorkPackageCreateTab(nextTab);
+    setWorkOrderCreateTab(nextTab);
   };
 
-  const handleWorkPackageCreateFormChange = useCallback(<K extends keyof WorkPackageCreateFormState>(key: K, value: WorkPackageCreateFormState[K]) => {
-    setWorkPackageCreateForm((current) => ({
+  const handleWorkOrderCreateFormChange = useCallback(<K extends keyof WorkOrderCreateFormState>(key: K, value: WorkOrderCreateFormState[K]) => {
+    setWorkOrderCreateForm((current) => ({
       ...current,
       [key]: value,
     }));
-    setWorkPackageCreateErrors((current) => {
+    setWorkOrderCreateErrors((current) => {
       if (!current[key]) {
         return current;
       }
@@ -1999,39 +1999,39 @@ export function AmroOwnedWorkspace({
     });
   }, []);
 
-  const handleSelectWorkPackageAircraft = useCallback((aircraftId: string) => {
-    const selected = workPackageAircraftOptions.find((aircraft) => aircraft.id === aircraftId);
-    handleWorkPackageCreateFormChange('aircraftId', aircraftId);
-    handleWorkPackageCreateFormChange('selectedAircraftModel', selected?.aircraftModel || '');
-    handleWorkPackageCreateFormChange('selectedAircraftSerialOrRegistration', selected?.serialNumber || selected?.registration || '');
-    handleWorkPackageCreateFormChange('locationStation', selected?.stationCode || '');
-    handleWorkPackageCreateFormChange('selectedTaskIds', []);
+  const handleSelectWorkOrderAircraft = useCallback((aircraftId: string) => {
+    const selected = workOrderAircraftOptions.find((aircraft) => aircraft.id === aircraftId);
+    handleWorkOrderCreateFormChange('aircraftId', aircraftId);
+    handleWorkOrderCreateFormChange('selectedAircraftModel', selected?.aircraftModel || '');
+    handleWorkOrderCreateFormChange('selectedAircraftSerialOrRegistration', selected?.serialNumber || selected?.registration || '');
+    handleWorkOrderCreateFormChange('locationStation', selected?.stationCode || '');
+    handleWorkOrderCreateFormChange('selectedTaskIds', []);
     setTaskConflictById({});
-  }, [workPackageAircraftOptions, handleWorkPackageCreateFormChange]);
+  }, [workOrderAircraftOptions, handleWorkOrderCreateFormChange]);
 
-  const handleToggleWorkPackageCreateTaskSelection = (taskId: string, checked: boolean) => {
+  const handleToggleWorkOrderCreateTaskSelection = (taskId: string, checked: boolean) => {
     if (taskConflictById[taskId]) {
       return;
     }
-    const selected = workPackageCreateForm.selectedTaskIds;
+    const selected = workOrderCreateForm.selectedTaskIds;
     const nextSelected = checked
       ? selected.includes(taskId) ? selected : [...selected, taskId]
       : selected.filter((id) => id !== taskId);
-    handleWorkPackageCreateFormChange('selectedTaskIds', nextSelected);
+    handleWorkOrderCreateFormChange('selectedTaskIds', nextSelected);
   };
 
-  const handleOpenWorkPackageSubmitReview = () => {
-    const validationErrors = validateWorkPackageCreateForm(workPackageCreateForm);
+  const handleOpenWorkOrderSubmitReview = () => {
+    const validationErrors = validateWorkOrderCreateForm(workOrderCreateForm);
     if (Object.keys(validationErrors).length > 0) {
-      setWorkPackageCreateErrors(validationErrors);
+      setWorkOrderCreateErrors(validationErrors);
       toast.error('Validation failed for work package form.');
       return;
     }
     setReviewSubmitDialogOpen(true);
   };
 
-  const validateWorkPackageCreateForm = (values: WorkPackageCreateFormState): WorkPackageCreateFormErrors => {
-    const nextErrors: WorkPackageCreateFormErrors = {};
+  const validateWorkOrderCreateForm = (values: WorkOrderCreateFormState): WorkOrderCreateFormErrors => {
+    const nextErrors: WorkOrderCreateFormErrors = {};
     if (!values.aircraftId.trim()) {
       nextErrors.aircraftId = 'Aircraft is required before task selection.';
     }
@@ -2041,8 +2041,8 @@ export function AmroOwnedWorkspace({
     if (!values.topic.trim()) {
       nextErrors.topic = 'Topic is required.';
     }
-    if (!values.workPackageDetails.trim()) {
-      nextErrors.workPackageDetails = 'Work package details is required.';
+    if (!values.workOrderDetails.trim()) {
+      nextErrors.workOrderDetails = 'Work package details is required.';
     }
     if (!values.locationStation.trim()) {
       nextErrors.locationStation = 'Location or station is required.';
@@ -2069,12 +2069,12 @@ export function AmroOwnedWorkspace({
     return nextErrors;
   };
 
-  const handleSubmitWorkPackageCreateForm = async () => {
-    const validationErrors = validateWorkPackageCreateForm(workPackageCreateForm);
+  const handleSubmitWorkOrderCreateForm = async () => {
+    const validationErrors = validateWorkOrderCreateForm(workOrderCreateForm);
     if (Object.keys(validationErrors).length > 0) {
-      setWorkPackageCreateErrors(validationErrors);
+      setWorkOrderCreateErrors(validationErrors);
       if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('amro:work-package-form-validation-error', {
+        window.dispatchEvent(new CustomEvent('amro:work-order-form-validation-error', {
           detail: {
             errors: validationErrors,
             submittedAt: new Date().toISOString(),
@@ -2086,26 +2086,26 @@ export function AmroOwnedWorkspace({
       return;
     }
     const selectedTaskLabels = selectedTaskOptions.map((task) => `${task.taskNumber} · ${task.title}`);
-    setWorkPackageCreateSubmitting(true);
-    const ok = await state.createWorkPackage(
-      workPackageCreateForm.topic || workPackageCreateForm.workPackageDetails || workPackageCreateForm.packageNumber,
+    setWorkOrderCreateSubmitting(true);
+    const ok = await state.createWorkOrder(
+      workOrderCreateForm.topic || workOrderCreateForm.workOrderDetails || workOrderCreateForm.packageNumber,
       {
-        aircraftId: workPackageCreateForm.aircraftId,
-        maintenanceType: workPackageCreateForm.maintenanceType,
-        priority: workPackageCreateForm.priority,
-        plannedStartIso: `${workPackageCreateForm.plannedStartDate}T00:00:00.000Z`,
-        plannedEndIso: `${workPackageCreateForm.plannedEndDate}T23:59:59.000Z`,
-        station: workPackageCreateForm.locationStation || (selectedStationFilter === 'all' ? undefined : selectedStationFilter),
+        aircraftId: workOrderCreateForm.aircraftId,
+        maintenanceType: workOrderCreateForm.maintenanceType,
+        priority: workOrderCreateForm.priority,
+        plannedStartIso: `${workOrderCreateForm.plannedStartDate}T00:00:00.000Z`,
+        plannedEndIso: `${workOrderCreateForm.plannedEndDate}T23:59:59.000Z`,
+        station: workOrderCreateForm.locationStation || (selectedStationFilter === 'all' ? undefined : selectedStationFilter),
         scopeItems: [
-          workPackageCreateForm.packageNumber,
-          workPackageCreateForm.topic,
-          workPackageCreateForm.workPackageDetails,
+          workOrderCreateForm.packageNumber,
+          workOrderCreateForm.topic,
+          workOrderCreateForm.workOrderDetails,
           ...selectedTaskLabels,
         ].filter((item) => item.trim().length > 0),
-        taskPlan: workPackageCreateForm.selectedTaskIds,
-        revision: workPackageCreateForm.revision,
-        assignedRole: workPackageCreateForm.assignedRole,
-        workflowStatus: workPackageCreateForm.workflowStatus,
+        taskPlan: workOrderCreateForm.selectedTaskIds,
+        revision: workOrderCreateForm.revision,
+        assignedRole: workOrderCreateForm.assignedRole,
+        workflowStatus: workOrderCreateForm.workflowStatus,
         taskSnapshot: selectedTaskOptions.map((task) => ({
           id: task.value,
           taskNumber: task.taskNumber,
@@ -2115,46 +2115,46 @@ export function AmroOwnedWorkspace({
           category: task.category,
         })),
         clientMetadata: {
-          createdBy: workPackageCreateForm.createdBy,
+          createdBy: workOrderCreateForm.createdBy,
           createdAt: new Date().toISOString(),
           clientTimestamp: new Date().toISOString(),
           clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
           duplicateCheckPassed: selectedTaskConflicts.length === 0,
-          planningDate: workPackageCreateForm.planningDate,
-          remarks: workPackageCreateForm.remarks,
-          serialOrRegistration: workPackageCreateForm.selectedAircraftSerialOrRegistration,
-          aircraftModel: workPackageCreateForm.selectedAircraftModel,
+          planningDate: workOrderCreateForm.planningDate,
+          remarks: workOrderCreateForm.remarks,
+          serialOrRegistration: workOrderCreateForm.selectedAircraftSerialOrRegistration,
+          aircraftModel: workOrderCreateForm.selectedAircraftModel,
         },
       },
     );
-    setWorkPackageCreateSubmitting(false);
+    setWorkOrderCreateSubmitting(false);
     if (!ok) {
       setLastInteractionMessage('Unable to add work package. Retry after resolving API issues.');
       toast.error('Unable to add work package.');
       return;
     }
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('amro:work-package-created', {
+      window.dispatchEvent(new CustomEvent('amro:work-order-created', {
         detail: {
-          source: 'work-package-create-dialog',
-          ...workPackageCreateForm,
+          source: 'work-order-create-dialog',
+          ...workOrderCreateForm,
           selectedTaskCount: selectedTaskOptions.length,
           createdAt: new Date().toISOString(),
         },
       }));
     }
-    workPackageCreateDraftCacheRef.current.clear();
-    setWorkPackageCreateForm(createDefaultWorkPackageCreateFormState());
-    setWorkPackageCreateErrors({});
+    workOrderCreateDraftCacheRef.current.clear();
+    setWorkOrderCreateForm(createDefaultWorkOrderCreateFormState());
+    setWorkOrderCreateErrors({});
     setTaskConflictById({});
     setReviewSubmitDialogOpen(false);
-    setWorkPackageCreateDialogOpen(false);
+    setWorkOrderCreateDialogOpen(false);
     setLastInteractionMessage('Work package added successfully.');
     toast.success('Work package added.');
   };
 
-  const handleDeleteWorkPackage = async (workPackageId: string, packageNumber: string) => {
-    if (!state.canDeleteWorkPackage) {
+  const handleDeleteWorkOrder = async (workOrderId: string, packageNumber: string) => {
+    if (!state.canDeleteWorkOrder) {
       toast.error('Insufficient permissions to delete work package.');
       return;
     }
@@ -2164,17 +2164,17 @@ export function AmroOwnedWorkspace({
         return;
       }
     }
-    state.setSelectedWorkPackageId(workPackageId);
-    setBusyWorkPackageActionId(`delete-${workPackageId}`);
+    state.setSelectedWorkOrderId(workOrderId);
+    setBusyWorkOrderActionId(`delete-${workOrderId}`);
     try {
-      const ok = await state.softDeleteWorkPackage(workPackageId);
+      const ok = await state.softDeleteWorkOrder(workOrderId);
       setLastInteractionMessage(ok ? `Deleted work package ${packageNumber}.` : `Unable to delete work package ${packageNumber}.`);
       if (ok) {
         toast.success(`Deleted ${packageNumber}.`, {
           action: {
             label: 'Undo',
             onClick: () => {
-              void state.restoreSoftDeletedWorkPackage(workPackageId).then((restored) => {
+              void state.restoreSoftDeletedWorkOrder(workOrderId).then((restored) => {
                 if (restored) {
                   setLastInteractionMessage(`Recovered work package ${packageNumber}.`);
                   toast.success(`Recovered ${packageNumber}.`);
@@ -2189,12 +2189,12 @@ export function AmroOwnedWorkspace({
         toast.error(`Unable to delete ${packageNumber}.`);
       }
     } finally {
-      setBusyWorkPackageActionId(null);
+      setBusyWorkOrderActionId(null);
     }
   };
 
   const handleSaveCurrentView = async () => {
-    const ok = await state.saveCurrentWorkPackageView(savedViewName);
+    const ok = await state.saveCurrentWorkOrderView(savedViewName);
     if (ok) {
       setSavedViewName('');
     }
@@ -2204,9 +2204,9 @@ export function AmroOwnedWorkspace({
     setLastSavedDetailDraft(detailDraft);
   };
 
-  const handleConfirmWorkPackageClosure = async () => {
+  const handleConfirmWorkOrderClosure = async () => {
     if (!closureRationale.trim()) return;
-    await state.advanceWorkPackageLifecycle();
+    await state.advanceWorkOrderLifecycle();
     setClosureConfirmOpen(false);
     setClosureRationale('');
   };
@@ -2246,39 +2246,39 @@ export function AmroOwnedWorkspace({
     if (storedTheme && workspaceThemeOptions.includes(storedTheme as (typeof workspaceThemeOptions)[number])) {
       setWorkspaceTheme(storedTheme as (typeof workspaceThemeOptions)[number]);
     }
-    const storedPageSize = Number(window.localStorage.getItem(amroWorkPackagePageSizeStorageKey));
-    if (workPackagePageSizes.includes(storedPageSize as (typeof workPackagePageSizes)[number])) {
-      setWorkPackagePageSize(storedPageSize);
+    const storedPageSize = Number(window.localStorage.getItem(amroWorkOrderPageSizeStorageKey));
+    if (workOrderPageSizes.includes(storedPageSize as (typeof workOrderPageSizes)[number])) {
+      setWorkOrderPageSize(storedPageSize);
     }
     const storedLocale = window.localStorage.getItem(amroWorkspaceLocaleStorageKey);
     if (storedLocale && workspaceLocaleOptions.includes(storedLocale as (typeof workspaceLocaleOptions)[number])) {
       setWorkspaceLocale(storedLocale as (typeof workspaceLocaleOptions)[number]);
     }
-    const storedManualOrder = window.localStorage.getItem(amroManualWorkPackageOrderStorageKey);
+    const storedManualOrder = window.localStorage.getItem(amroManualWorkOrderOrderStorageKey);
     if (storedManualOrder) {
       try {
         const parsed = JSON.parse(storedManualOrder);
         if (Array.isArray(parsed)) {
-          setManualWorkPackageOrder(parsed.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0));
+          setManualWorkOrderOrder(parsed.filter((entry): entry is string => typeof entry === 'string' && entry.length > 0));
         }
       } catch {
-        setManualWorkPackageOrder([]);
+        setManualWorkOrderOrder([]);
       }
     }
     const storedGridPreferences = window.localStorage.getItem(amroGridPreferencesStorageKey);
     if (storedGridPreferences) {
       try {
-        const parsed = JSON.parse(storedGridPreferences) as Partial<WorkPackageGridPreferences>;
+        const parsed = JSON.parse(storedGridPreferences) as Partial<WorkOrderGridPreferences>;
         if (parsed.visibleColumns) {
-          setWorkPackageGridVisibleColumns((current) => ({
+          setWorkOrderGridVisibleColumns((current) => ({
             ...current,
             ...parsed.visibleColumns,
           }));
         }
         if (parsed.columnWidths) {
-          setWorkPackageGridColumnWidths((current) => {
+          setWorkOrderGridColumnWidths((current) => {
             const next = { ...current };
-            (Object.keys(current) as WorkPackageGridColumnKey[]).forEach((columnKey) => {
+            (Object.keys(current) as WorkOrderGridColumnKey[]).forEach((columnKey) => {
               const candidate = Number(parsed.columnWidths?.[columnKey]);
               if (Number.isFinite(candidate)) {
                 next[columnKey] = Math.max(80, Math.min(400, candidate));
@@ -2288,8 +2288,8 @@ export function AmroOwnedWorkspace({
           });
         }
       } catch {
-        setWorkPackageGridVisibleColumns(defaultGridVisibleColumns);
-        setWorkPackageGridColumnWidths(defaultGridColumnWidths);
+        setWorkOrderGridVisibleColumns(defaultGridVisibleColumns);
+        setWorkOrderGridColumnWidths(defaultGridColumnWidths);
       }
     }
   }, []);
@@ -2306,8 +2306,8 @@ export function AmroOwnedWorkspace({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(amroWorkPackagePageSizeStorageKey, String(workPackagePageSize));
-  }, [workPackagePageSize]);
+    window.localStorage.setItem(amroWorkOrderPageSizeStorageKey, String(workOrderPageSize));
+  }, [workOrderPageSize]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -2316,35 +2316,35 @@ export function AmroOwnedWorkspace({
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    window.localStorage.setItem(amroManualWorkPackageOrderStorageKey, JSON.stringify(manualWorkPackageOrder));
-  }, [manualWorkPackageOrder]);
+    window.localStorage.setItem(amroManualWorkOrderOrderStorageKey, JSON.stringify(manualWorkOrderOrder));
+  }, [manualWorkOrderOrder]);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
     window.localStorage.setItem(
       amroGridPreferencesStorageKey,
       JSON.stringify({
-        visibleColumns: workPackageGridVisibleColumns,
-        columnWidths: workPackageGridColumnWidths,
-      } satisfies WorkPackageGridPreferences),
+        visibleColumns: workOrderGridVisibleColumns,
+        columnWidths: workOrderGridColumnWidths,
+      } satisfies WorkOrderGridPreferences),
     );
-  }, [workPackageGridColumnWidths, workPackageGridVisibleColumns]);
+  }, [workOrderGridColumnWidths, workOrderGridVisibleColumns]);
 
   useEffect(() => {
     const timerId = window.setTimeout(() => {
-      setDebouncedWorkPackageGridFilters(workPackageGridFilters);
+      setDebouncedWorkOrderGridFilters(workOrderGridFilters);
     }, 300);
     return () => {
       window.clearTimeout(timerId);
     };
-  }, [workPackageGridFilters]);
+  }, [workOrderGridFilters]);
 
   useEffect(() => {
     const handleMouseMove = (event: MouseEvent) => {
       const activeResize = gridResizeActiveRef.current;
       if (!activeResize) return;
       const nextWidth = activeResize.startWidth + (event.clientX - activeResize.startX);
-      setWorkPackageGridColumnWidths((current) => ({
+      setWorkOrderGridColumnWidths((current) => ({
         ...current,
         [activeResize.columnKey]: Math.max(80, Math.min(400, nextWidth)),
       }));
@@ -2361,43 +2361,43 @@ export function AmroOwnedWorkspace({
   }, []);
 
   useEffect(() => {
-    if (workPackagePage <= workPackageTotalPages) return;
-    setWorkPackagePage(workPackageTotalPages);
-  }, [workPackagePage, workPackageTotalPages]);
+    if (workOrderPage <= workOrderTotalPages) return;
+    setWorkOrderPage(workOrderTotalPages);
+  }, [workOrderPage, workOrderTotalPages]);
 
   useEffect(() => {
-    if (state.loadingWorkPackages || workspaceLoadMetricPublishedRef.current) return;
+    if (state.loadingWorkOrders || workspaceLoadMetricPublishedRef.current) return;
     const completedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     emitPerformanceMetric(
       'overview_dashboard_initial_load',
       completedAt - workspaceLoadStartedAtRef.current,
       amroDashboardLoadBenchmark.targetMs,
       amroDashboardLoadBenchmark.hardLimitMs,
-      { workPackageCount: state.workPackages.length },
+      { workOrderCount: state.workOrders.length },
     );
     workspaceLoadMetricPublishedRef.current = true;
-  }, [state.loadingWorkPackages, state.workPackages.length]);
+  }, [state.loadingWorkOrders, state.workOrders.length]);
 
   useEffect(() => {
-    if (state.loadingWorkPackages || filterApplyStartedAtRef.current === null) return;
+    if (state.loadingWorkOrders || filterApplyStartedAtRef.current === null) return;
     const completedAt = typeof performance !== 'undefined' ? performance.now() : Date.now();
     emitPerformanceMetric(
-      'work_package_list_filter_apply',
+      'work_order_list_filter_apply',
       completedAt - filterApplyStartedAtRef.current,
-      amroWorkPackageFilterApplyBenchmark.targetMs,
-      amroWorkPackageFilterApplyBenchmark.hardLimitMs,
+      amroWorkOrderFilterApplyBenchmark.targetMs,
+      amroWorkOrderFilterApplyBenchmark.hardLimitMs,
       {
-        statusFilter: state.workPackageStatusFilter,
-        searchFilterLength: state.workPackageSearch.length,
+        statusFilter: state.workOrderStatusFilter,
+        searchFilterLength: state.workOrderSearch.length,
         savedViewId: state.selectedSavedViewId || null,
       },
     );
     filterApplyStartedAtRef.current = null;
-  }, [state.loadingWorkPackages, state.selectedSavedViewId, state.workPackageSearch, state.workPackageStatusFilter]);
+  }, [state.loadingWorkOrders, state.selectedSavedViewId, state.workOrderSearch, state.workOrderStatusFilter]);
 
   return (
     <section className="space-y-4" aria-label="AMRO workspace">
-      {state.loadingWorkPackages ? (
+      {state.loadingWorkOrders ? (
         <div className="rounded-md border px-3 py-2 text-xs text-muted-foreground" role="status" aria-live="polite">
           Loading latest AMRO workspace data...
         </div>
@@ -2407,7 +2407,7 @@ export function AmroOwnedWorkspace({
           {visibleWorkspaceError}
         </div>
       ) : null}
-      {moduleKey && moduleKey !== 'work-packages' && moduleKey !== 'parts' ? (
+      {moduleKey && moduleKey !== 'work-orders' && moduleKey !== 'parts' ? (
         <Card data-amro-owned-surface="module-action-bar">
           <CardHeader className="pb-2">
             <CardTitle>{moduleActionBarTitle} Module Actions</CardTitle>
@@ -2468,13 +2468,13 @@ export function AmroOwnedWorkspace({
               ))}
             </div>
             <div className="mt-3 grid grid-cols-1 gap-2 md:grid-cols-4">
-              <Input value={state.workPackageSearch} onChange={(event) => handleSearchFilterChange(event.target.value)} placeholder="Search" />
-              <Select value={state.workPackageStatusFilter} onValueChange={handleStatusFilterChange}>
+              <Input value={state.workOrderSearch} onChange={(event) => handleSearchFilterChange(event.target.value)} placeholder="Search" />
+              <Select value={state.workOrderStatusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filter" />
                 </SelectTrigger>
                 <SelectContent>
-                  {workPackageStatusFilters.map((status) => (
+                  {workOrderStatusFilters.map((status) => (
                     <SelectItem key={status} value={status}>
                       {status}
                     </SelectItem>
@@ -2493,13 +2493,13 @@ export function AmroOwnedWorkspace({
                   ))}
                 </SelectContent>
               </Select>
-              <Button onClick={handleCreateWorkPackage} disabled={!newWorkPackageTitle.trim() || !state.canCreateWorkPackage}>
+              <Button onClick={handleCreateWorkOrder} disabled={!newWorkOrderTitle.trim() || !state.canCreateWorkOrder}>
                 Create
               </Button>
             </div>
             <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-3">
-              <Button variant="outline" onClick={state.refreshWorkPackages} disabled={state.loadingWorkPackages}>
-                {state.loadingWorkPackages ? 'Refreshing...' : 'Refresh'}
+              <Button variant="outline" onClick={state.refreshWorkOrders} disabled={state.loadingWorkOrders}>
+                {state.loadingWorkOrders ? 'Refreshing...' : 'Refresh'}
               </Button>
               <Button variant="outline" onClick={handleWorkspaceImportExport}>Import/Export</Button>
               <Button variant="outline" onClick={handleWorkspaceThemeCycle}>Theme</Button>
@@ -2553,7 +2553,7 @@ export function AmroOwnedWorkspace({
             ))}
           </div>
           <div className="grid grid-cols-1 gap-2 md:grid-cols-3">
-            <Button variant="outline" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Run work package closure transition">
+            <Button variant="outline" disabled={!canRunWorkOrderClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Run work package closure transition">
               Work Package Closure
             </Button>
             <Button variant="outline" disabled={!canRunComplianceOverride} onClick={() => setOverrideConfirmOpen(true)} aria-label="Run compliance override transition">
@@ -2606,7 +2606,7 @@ export function AmroOwnedWorkspace({
           <div className="grid grid-cols-1 gap-2 text-xs md:grid-cols-4">
             <div className="rounded-md border p-2">AMRO Authorized: {state.isAmroAuthorized ? 'Yes' : 'No'}</div>
             <div className="rounded-md border p-2">Active Role: {state.activeRole}</div>
-            <div className="rounded-md border p-2">Create Scope: {state.canCreateWorkPackage ? 'Enabled' : 'Restricted'}</div>
+            <div className="rounded-md border p-2">Create Scope: {state.canCreateWorkOrder ? 'Enabled' : 'Restricted'}</div>
             <div className="rounded-md border p-2">Certifying Sign-off: {state.canSignOff ? 'Available' : 'Blocked'}</div>
           </div>
         </CardContent>
@@ -2632,8 +2632,8 @@ export function AmroOwnedWorkspace({
       </Card>
       ) : null}
 
-      {showWorkPackagesModule ? (
-      <Card data-amro-owned-surface="work-package-task-lifecycle-orchestration">
+      {showWorkOrdersModule ? (
+      <Card data-amro-owned-surface="work-order-task-lifecycle-orchestration">
         <CardHeader className="pb-2">
           <CardTitle>Work Packages</CardTitle>
         </CardHeader>
@@ -2642,27 +2642,27 @@ export function AmroOwnedWorkspace({
             <div className="mt-2 grid grid-cols-1 gap-2 xl:grid-cols-[1fr_auto]">
               <div className="flex flex-wrap items-center justify-end gap-2">
                 <Input
-                  value={state.workPackageSearch}
+                  value={state.workOrderSearch}
                   onChange={(event) => handleSearchFilterChange(event.target.value)}
                   placeholder="Search"
                   className="w-[180px]"
                 />
-                <Select value={state.workPackageStatusFilter} onValueChange={handleStatusFilterChange}>
+                <Select value={state.workOrderStatusFilter} onValueChange={handleStatusFilterChange}>
                   <SelectTrigger className="w-[120px]" aria-label="Filters">
                     <SelectValue placeholder="Filters" />
                   </SelectTrigger>
                   <SelectContent>
-                    {workPackageStatusFilters.map((status) => (
+                    {workOrderStatusFilters.map((status) => (
                       <SelectItem key={status} value={status}>
                         {status}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Select value={`${workPackageSortField}:${workPackageSortDirection}`} onValueChange={(value) => {
-                  const [field, direction] = value.split(':') as ['manual' | WorkPackageGridSortKey, 'asc' | 'desc'];
-                  setWorkPackageSortField(field);
-                  setWorkPackageSortDirection(direction);
+                <Select value={`${workOrderSortField}:${workOrderSortDirection}`} onValueChange={(value) => {
+                  const [field, direction] = value.split(':') as ['manual' | WorkOrderGridSortKey, 'asc' | 'desc'];
+                  setWorkOrderSortField(field);
+                  setWorkOrderSortDirection(direction);
                 }}>
                   <SelectTrigger className="w-[140px]" aria-label="Group">
                     <SelectValue placeholder="Group" />
@@ -2680,34 +2680,34 @@ export function AmroOwnedWorkspace({
                     <SelectValue placeholder="Saved View" />
                   </SelectTrigger>
                   <SelectContent>
-                    {state.savedWorkPackageViews.map((view) => (
+                    {state.savedWorkOrderViews.map((view) => (
                       <SelectItem key={view.id} value={view.id}>
                         {view.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                <Button onClick={() => void handleCreateStarterWorkPackage()} disabled={!state.canCreateWorkPackage}>
+                <Button onClick={() => void handleCreateStarterWorkOrder()} disabled={!state.canCreateWorkOrder}>
                   New WP
                 </Button>
-                <Button onClick={handleOpenWorkPackageCreateDialog} disabled={!state.canCreateWorkPackage}>
+                <Button onClick={handleOpenWorkOrderCreateDialog} disabled={!state.canCreateWorkOrder}>
                   Add WP
                 </Button>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
               <Badge variant="outline">Frozen identifiers: WO# / Aircraft</Badge>
-              <Badge variant="outline">Sort: {workPackageSortField === 'manual' ? 'Manual' : workPackageSortField}</Badge>
-              <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('manual')}>Manual Order</Button>
-              <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('packageNumber')}>Sort WO#</Button>
-              <Button variant="outline" size="sm" onClick={() => setWorkPackageSortField('status')}>Sort Status</Button>
+              <Badge variant="outline">Sort: {workOrderSortField === 'manual' ? 'Manual' : workOrderSortField}</Badge>
+              <Button variant="outline" size="sm" onClick={() => setWorkOrderSortField('manual')}>Manual Order</Button>
+              <Button variant="outline" size="sm" onClick={() => setWorkOrderSortField('packageNumber')}>Sort WO#</Button>
+              <Button variant="outline" size="sm" onClick={() => setWorkOrderSortField('status')}>Sort Status</Button>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setWorkPackageSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'))}
-                disabled={workPackageSortField === 'manual'}
+                onClick={() => setWorkOrderSortDirection((previous) => (previous === 'asc' ? 'desc' : 'asc'))}
+                disabled={workOrderSortField === 'manual'}
               >
-                Sort Direction: {workPackageSortDirection.toUpperCase()}
+                Sort Direction: {workOrderSortDirection.toUpperCase()}
               </Button>
             </div>
             <div className="mt-2 flex flex-wrap gap-2 text-xs">
@@ -2724,27 +2724,27 @@ export function AmroOwnedWorkspace({
               {isWorkspaceEmpty ? (
                 <div className="rounded-md border border-dashed p-3 text-xs">
                   <p className="font-medium">
-                    {state.workPackagesError
+                    {state.workOrdersError
                       ? 'Unable to load AMRO work packages.'
                       : isFilterScopedEmpty
                         ? 'No work packages match the current scope.'
                         : 'No AMRO work packages are available yet.'}
                   </p>
                   <p className="mt-1 text-muted-foreground">
-                    {state.workPackagesError
+                    {state.workOrdersError
                       ? 'Retry workspace refresh or reset scope filters to recover.'
                       : isFilterScopedEmpty
                         ? 'Clear dashboard scope or filters to restore list visibility.'
                         : 'Create a starter package to initialize the module surfaces.'}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    <Button variant="outline" size="sm" onClick={handleRetryWorkspaceLoad} disabled={state.loadingWorkPackages}>
-                      {state.loadingWorkPackages ? 'Refreshing...' : 'Retry Refresh'}
+                    <Button variant="outline" size="sm" onClick={handleRetryWorkspaceLoad} disabled={state.loadingWorkOrders}>
+                      {state.loadingWorkOrders ? 'Refreshing...' : 'Retry Refresh'}
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleResetWorkPackageScope} disabled={!hasActiveScopeFilters}>
+                    <Button variant="outline" size="sm" onClick={handleResetWorkOrderScope} disabled={!hasActiveScopeFilters}>
                       Clear Scope
                     </Button>
-                    <Button size="sm" onClick={() => void handleCreateStarterWorkPackage()} disabled={!state.canCreateWorkPackage}>
+                    <Button size="sm" onClick={() => void handleCreateStarterWorkOrder()} disabled={!state.canCreateWorkOrder}>
                       Create Starter Package
                     </Button>
                   </div>
@@ -2752,23 +2752,23 @@ export function AmroOwnedWorkspace({
               ) : (
                 <div className="space-y-2">
                   <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2 text-xs">
-                    {(Object.keys(workPackageGridColumnLabels) as WorkPackageGridColumnKey[]).map((columnKey) => (
+                    {(Object.keys(workOrderGridColumnLabels) as WorkOrderGridColumnKey[]).map((columnKey) => (
                       <Button
                         key={`toggle-${columnKey}`}
                         type="button"
                         size="sm"
-                        variant={workPackageGridVisibleColumns[columnKey] ? 'default' : 'outline'}
+                        variant={workOrderGridVisibleColumns[columnKey] ? 'default' : 'outline'}
                         onClick={() => handleGridColumnVisibilityToggle(columnKey)}
                         className="h-7 px-2 text-[11px]"
-                        aria-pressed={workPackageGridVisibleColumns[columnKey]}
+                        aria-pressed={workOrderGridVisibleColumns[columnKey]}
                       >
-                        {workPackageGridColumnLabels[columnKey]}
+                        {workOrderGridColumnLabels[columnKey]}
                       </Button>
                     ))}
                   </div>
-                  {state.loadingWorkPackages ? (
+                  {state.loadingWorkOrders ? (
                     <div className="space-y-2">
-                      {Array.from({ length: Math.min(workPackagePageSize, 5) }).map((_, index) => (
+                      {Array.from({ length: Math.min(workOrderPageSize, 5) }).map((_, index) => (
                         <div key={`grid-skeleton-${index}`} className="animate-pulse rounded-md border p-2">
                           <div className="h-4 w-3/4 rounded bg-muted/60" />
                           <div className="mt-2 h-4 w-1/2 rounded bg-muted/50" />
@@ -2780,25 +2780,25 @@ export function AmroOwnedWorkspace({
                       <div
                         className="grid min-w-[920px] items-center bg-muted/30 px-2 py-2 text-[11px] font-semibold text-muted-foreground"
                         style={{
-                          gridTemplateColumns: `${workPackageGridSortableColumns
-                            .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
-                            .map((columnKey) => `minmax(80px, ${workPackageGridColumnWidths[columnKey]}px)`)
+                          gridTemplateColumns: `${workOrderGridSortableColumns
+                            .filter((columnKey) => workOrderGridVisibleColumns[columnKey])
+                            .map((columnKey) => `minmax(80px, ${workOrderGridColumnWidths[columnKey]}px)`)
                             .join(' ')} 156px`,
                         }}
                       >
-                        {workPackageGridSortableColumns
-                          .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                        {workOrderGridSortableColumns
+                          .filter((columnKey) => workOrderGridVisibleColumns[columnKey])
                           .map((columnKey) => (
                             <div key={`header-${columnKey}`} className="flex min-w-0 items-center gap-1 pr-2">
                               <button
                                 type="button"
                                 className="inline-flex min-w-0 items-center gap-1 truncate text-left text-[11px] transition-colors duration-200 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
                                 onClick={() => handleGridSortToggle(columnKey)}
-                                aria-label={`Sort by ${workPackageGridColumnLabels[columnKey]}`}
+                                aria-label={`Sort by ${workOrderGridColumnLabels[columnKey]}`}
                               >
-                                <span className="truncate">{workPackageGridColumnLabels[columnKey]}</span>
-                                {workPackageSortField === columnKey ? (
-                                  workPackageSortDirection === 'asc' ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />
+                                <span className="truncate">{workOrderGridColumnLabels[columnKey]}</span>
+                                {workOrderSortField === columnKey ? (
+                                  workOrderSortDirection === 'asc' ? <ChevronUp className="h-4 w-4" aria-hidden="true" /> : <ChevronDown className="h-4 w-4" aria-hidden="true" />
                                 ) : (
                                   <ArrowDownUp className="h-4 w-4 opacity-50" aria-hidden="true" />
                                 )}
@@ -2807,7 +2807,7 @@ export function AmroOwnedWorkspace({
                                 type="button"
                                 className="ml-auto inline-flex h-4 w-4 items-center justify-center rounded transition-colors duration-200 hover:bg-muted"
                                 onMouseDown={(event) => handleGridResizeStart(columnKey, event)}
-                                aria-label={`Resize ${workPackageGridColumnLabels[columnKey]} column`}
+                                aria-label={`Resize ${workOrderGridColumnLabels[columnKey]} column`}
                               >
                                 <GripVertical className="h-4 w-4" aria-hidden="true" />
                               </button>
@@ -2818,31 +2818,31 @@ export function AmroOwnedWorkspace({
                       <div
                         className="grid min-w-[920px] items-center border-t bg-muted/10 px-2 py-2"
                         style={{
-                          gridTemplateColumns: `${workPackageGridSortableColumns
-                            .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
-                            .map((columnKey) => `minmax(80px, ${workPackageGridColumnWidths[columnKey]}px)`)
+                          gridTemplateColumns: `${workOrderGridSortableColumns
+                            .filter((columnKey) => workOrderGridVisibleColumns[columnKey])
+                            .map((columnKey) => `minmax(80px, ${workOrderGridColumnWidths[columnKey]}px)`)
                             .join(' ')} 156px`,
                         }}
                       >
-                        {workPackageGridSortableColumns
-                          .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                        {workOrderGridSortableColumns
+                          .filter((columnKey) => workOrderGridVisibleColumns[columnKey])
                           .map((columnKey) => (
                             <div key={`filter-${columnKey}`} className="pr-2">
                               <div className="flex items-center gap-1">
                                 <Input
-                                  value={workPackageGridFilters[columnKey]}
+                                  value={workOrderGridFilters[columnKey]}
                                   onChange={(event) => handleGridFilterChange(columnKey, event.target.value)}
-                                  placeholder={`Filter ${workPackageGridColumnLabels[columnKey]}`}
+                                  placeholder={`Filter ${workOrderGridColumnLabels[columnKey]}`}
                                   className="h-7 text-[11px]"
-                                  aria-label={`Filter ${workPackageGridColumnLabels[columnKey]}`}
+                                  aria-label={`Filter ${workOrderGridColumnLabels[columnKey]}`}
                                 />
-                                {workPackageGridFilters[columnKey] ? (
+                                {workOrderGridFilters[columnKey] ? (
                                   <Button
                                     variant="ghost"
                                     size="sm"
                                     className="h-7 px-2 text-[11px]"
                                     onClick={() => handleGridFilterClear(columnKey)}
-                                    aria-label={`Clear filter ${workPackageGridColumnLabels[columnKey]}`}
+                                    aria-label={`Clear filter ${workOrderGridColumnLabels[columnKey]}`}
                                   >
                                     Clear
                                   </Button>
@@ -2852,41 +2852,41 @@ export function AmroOwnedWorkspace({
                           ))}
                         <div />
                       </div>
-                      {pagedWorkPackages.map((workPackage) => {
-                        const runtimeRow = workPackageRuntimeRows[workPackage.id];
+                      {pagedWorkOrders.map((workOrder) => {
+                        const runtimeRow = workOrderRuntimeRows[workOrder.id];
                         const isOverdue = runtimeRow.dueEpoch !== Number.MAX_SAFE_INTEGER && runtimeRow.dueEpoch < nowEpoch;
-                        const gridTemplateColumns = `${workPackageGridSortableColumns
-                          .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
-                          .map((columnKey) => `minmax(80px, ${workPackageGridColumnWidths[columnKey]}px)`)
+                        const gridTemplateColumns = `${workOrderGridSortableColumns
+                          .filter((columnKey) => workOrderGridVisibleColumns[columnKey])
+                          .map((columnKey) => `minmax(80px, ${workOrderGridColumnWidths[columnKey]}px)`)
                           .join(' ')} 156px`;
                         return (
                           <div
-                            key={`list-${workPackage.id}`}
+                            key={`list-${workOrder.id}`}
                             draggable
                             onDragStart={() => {
-                              setDraggingWorkPackageId(workPackage.id);
-                              handleDragHandleInteraction(workPackage.id, workPackage.packageNumber);
+                              setDraggingWorkOrderId(workOrder.id);
+                              handleDragHandleInteraction(workOrder.id, workOrder.packageNumber);
                             }}
-                            onDragEnd={() => setDraggingWorkPackageId(null)}
+                            onDragEnd={() => setDraggingWorkOrderId(null)}
                             onDragOver={(event) => event.preventDefault()}
                             onDrop={() => {
-                              if (!draggingWorkPackageId) return;
-                              handleWorkPackageReorder(draggingWorkPackageId, workPackage.id);
-                              setDraggingWorkPackageId(null);
+                              if (!draggingWorkOrderId) return;
+                              handleWorkOrderReorder(draggingWorkOrderId, workOrder.id);
+                              setDraggingWorkOrderId(null);
                             }}
                             className={`grid min-w-[920px] items-center border-t px-2 py-2 text-xs transition-colors duration-200 hover:bg-muted/40 ${
                               isOverdue
                                 ? 'border-destructive/40 bg-destructive/5'
-                                : state.selectedWorkPackageId === workPackage.id
+                                : state.selectedWorkOrderId === workOrder.id
                                   ? 'border-primary bg-primary/5'
                                   : ''
-                            } ${draggingWorkPackageId === workPackage.id ? 'opacity-60 ring-2 ring-primary' : ''}`}
+                            } ${draggingWorkOrderId === workOrder.id ? 'opacity-60 ring-2 ring-primary' : ''}`}
                             style={{ gridTemplateColumns }}
                           >
-                            {workPackageGridSortableColumns
-                              .filter((columnKey) => workPackageGridVisibleColumns[columnKey])
+                            {workOrderGridSortableColumns
+                              .filter((columnKey) => workOrderGridVisibleColumns[columnKey])
                               .map((columnKey) => (
-                                <span key={`${workPackage.id}-${columnKey}`} className="truncate pr-2">
+                                <span key={`${workOrder.id}-${columnKey}`} className="truncate pr-2">
                                   {columnKey === 'status' ? <Badge variant="outline">{runtimeRow.status}</Badge> : runtimeRow[columnKey]}
                                 </span>
                               ))}
@@ -2895,9 +2895,9 @@ export function AmroOwnedWorkspace({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8 transition-all duration-200 hover:scale-105"
-                                aria-label={`Open work package ${workPackage.packageNumber}`}
-                                onClick={() => void handleOpenWorkPackage(workPackage.id, workPackage.packageNumber)}
-                                disabled={busyWorkPackageActionId !== null}
+                                aria-label={`Open work package ${workOrder.packageNumber}`}
+                                onClick={() => void handleOpenWorkOrder(workOrder.id, workOrder.packageNumber)}
+                                disabled={busyWorkOrderActionId !== null}
                               >
                                 <Eye className="h-4 w-4" aria-hidden="true" />
                               </Button>
@@ -2905,9 +2905,9 @@ export function AmroOwnedWorkspace({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8 transition-all duration-200 hover:scale-105"
-                                aria-label={`Schedule work package ${workPackage.packageNumber}`}
-                                onClick={() => void handleScheduleWorkPackage(workPackage.id, workPackage.packageNumber)}
-                                disabled={busyWorkPackageActionId !== null}
+                                aria-label={`Schedule work package ${workOrder.packageNumber}`}
+                                onClick={() => void handleScheduleWorkOrder(workOrder.id, workOrder.packageNumber)}
+                                disabled={busyWorkOrderActionId !== null}
                               >
                                 <PlayCircle className="h-4 w-4" aria-hidden="true" />
                               </Button>
@@ -2915,9 +2915,9 @@ export function AmroOwnedWorkspace({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8 transition-all duration-200 hover:scale-105"
-                                aria-label={`Hold work package ${workPackage.packageNumber}`}
-                                onClick={() => void handleHoldWorkPackage(workPackage.id, workPackage.packageNumber)}
-                                disabled={busyWorkPackageActionId !== null}
+                                aria-label={`Hold work package ${workOrder.packageNumber}`}
+                                onClick={() => void handleHoldWorkOrder(workOrder.id, workOrder.packageNumber)}
+                                disabled={busyWorkOrderActionId !== null}
                               >
                                 <PauseCircle className="h-4 w-4" aria-hidden="true" />
                               </Button>
@@ -2925,9 +2925,9 @@ export function AmroOwnedWorkspace({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8 transition-all duration-200 hover:scale-105"
-                                aria-label={`Clone work package ${workPackage.packageNumber}`}
-                                onClick={() => void handleCloneWorkPackage(workPackage.id, workPackage.packageNumber)}
-                                disabled={busyWorkPackageActionId !== null}
+                                aria-label={`Clone work package ${workOrder.packageNumber}`}
+                                onClick={() => void handleCloneWorkOrder(workOrder.id, workOrder.packageNumber)}
+                                disabled={busyWorkOrderActionId !== null}
                               >
                                 <Copy className="h-4 w-4" aria-hidden="true" />
                               </Button>
@@ -2935,9 +2935,9 @@ export function AmroOwnedWorkspace({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8 transition-all duration-200 hover:scale-105"
-                                aria-label={`Export work package ${workPackage.packageNumber}`}
-                                onClick={() => handleWorkPackageExport(workPackage.id, workPackage.packageNumber)}
-                                disabled={busyWorkPackageActionId !== null}
+                                aria-label={`Export work package ${workOrder.packageNumber}`}
+                                onClick={() => handleWorkOrderExport(workOrder.id, workOrder.packageNumber)}
+                                disabled={busyWorkOrderActionId !== null}
                               >
                                 <Download className="h-4 w-4" aria-hidden="true" />
                               </Button>
@@ -2945,9 +2945,9 @@ export function AmroOwnedWorkspace({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8 transition-all duration-200 hover:scale-105"
-                                aria-label={`Delete work package ${workPackage.packageNumber}`}
-                                onClick={() => void handleDeleteWorkPackage(workPackage.id, workPackage.packageNumber)}
-                                disabled={busyWorkPackageActionId !== null || !state.canDeleteWorkPackage}
+                                aria-label={`Delete work package ${workOrder.packageNumber}`}
+                                onClick={() => void handleDeleteWorkOrder(workOrder.id, workOrder.packageNumber)}
+                                disabled={busyWorkOrderActionId !== null || !state.canDeleteWorkOrder}
                               >
                                 <Trash2 className="h-4 w-4" aria-hidden="true" />
                               </Button>
@@ -2955,8 +2955,8 @@ export function AmroOwnedWorkspace({
                                 variant="outline"
                                 size="icon"
                                 className="h-8 w-8 transition-all duration-200 hover:scale-105"
-                                aria-label={`Drag handle for ${workPackage.packageNumber}`}
-                                onClick={() => handleDragHandleInteraction(workPackage.id, workPackage.packageNumber)}
+                                aria-label={`Drag handle for ${workOrder.packageNumber}`}
+                                onClick={() => handleDragHandleInteraction(workOrder.id, workOrder.packageNumber)}
                               >
                                 <GripVertical className="h-4 w-4" aria-hidden="true" />
                               </Button>
@@ -2974,44 +2974,44 @@ export function AmroOwnedWorkspace({
                 <p className="font-medium">Right Rail Summary</p>
                 <p className="text-muted-foreground">Parts readiness: {state.materialsSummary.shortageCount === 0 ? 'Ready' : 'At risk'}</p>
                 <p className="text-muted-foreground">Compliance blockers: {state.complianceAnomalyAlerts.length}</p>
-                <p className="text-muted-foreground">Assignee: {selectedWorkPackageAssignee}</p>
+                <p className="text-muted-foreground">Assignee: {selectedWorkOrderAssignee}</p>
               </div>
               <div className="rounded-md border p-2 text-xs md:col-span-2">
                 <p className="font-medium">Footer Controls</p>
                 <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setWorkPackagePage((current) => Math.max(1, current - 1))} disabled={workPackagePage === 1}>
+                  <Button variant="outline" size="sm" onClick={() => setWorkOrderPage((current) => Math.max(1, current - 1))} disabled={workOrderPage === 1}>
                     Previous
                   </Button>
-                  <Badge variant="outline">Page {workPackagePage} / {workPackageTotalPages}</Badge>
-                  <Button variant="outline" size="sm" onClick={() => setWorkPackagePage((current) => Math.min(workPackageTotalPages, current + 1))} disabled={workPackagePage === workPackageTotalPages}>
+                  <Badge variant="outline">Page {workOrderPage} / {workOrderTotalPages}</Badge>
+                  <Button variant="outline" size="sm" onClick={() => setWorkOrderPage((current) => Math.min(workOrderTotalPages, current + 1))} disabled={workOrderPage === workOrderTotalPages}>
                     Next
                   </Button>
-                  <Select value={String(workPackagePageSize)} onValueChange={(value) => { setWorkPackagePageSize(Number(value)); setWorkPackagePage(1); }}>
+                  <Select value={String(workOrderPageSize)} onValueChange={(value) => { setWorkOrderPageSize(Number(value)); setWorkOrderPage(1); }}>
                     <SelectTrigger className="w-[120px]" aria-label="Page size">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {workPackagePageSizes.map((size) => (
+                      {workOrderPageSizes.map((size) => (
                         <SelectItem key={size} value={String(size)}>{size} / page</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                  <Button variant="outline" size="sm" onClick={() => void handleBulkWorkPackageAction()}>Bulk Actions</Button>
+                  <Button variant="outline" size="sm" onClick={() => void handleBulkWorkOrderAction()}>Bulk Actions</Button>
                   <Badge variant="outline">Export state: ready</Badge>
                 </div>
               </div>
             </div>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => void state.assignSelectedWorkPackageToNextSlot()}>
+              <Button variant="outline" size="sm" onClick={() => void state.assignSelectedWorkOrderToNextSlot()}>
                 Assign
               </Button>
               <Button variant="outline" size="sm" onClick={() => void state.fetchScheduleOptimizationRecommendations()}>
                 Shift Window
               </Button>
-              <Button variant="outline" size="sm" disabled={!canEditPartsAllocation} onClick={() => void state.reservePartsAllocationForSelectedWorkPackage()}>
+              <Button variant="outline" size="sm" disabled={!canEditPartsAllocation} onClick={() => void state.reservePartsAllocationForSelectedWorkOrder()}>
                 Material Reserve
               </Button>
-              <Button variant="outline" size="sm" onClick={() => void state.syncSupplierEtaForSelectedWorkPackage()} disabled={!state.selectedWorkPackageId}>
+              <Button variant="outline" size="sm" onClick={() => void state.syncSupplierEtaForSelectedWorkOrder()} disabled={!state.selectedWorkOrderId}>
                 Supplier ETA
               </Button>
               <Button variant="outline" size="sm" onClick={() => void handleOpenComplianceGate()}>
@@ -3019,33 +3019,33 @@ export function AmroOwnedWorkspace({
               </Button>
             </div>
           </div>
-          {state.workPackagesError ? (
+          {state.workOrdersError ? (
             <div className="rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
-              {state.workPackagesError}
+              {state.workOrdersError}
             </div>
           ) : null}
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <Input
-              value={newWorkPackageTitle}
-              onChange={(event) => setNewWorkPackageTitle(event.target.value)}
+              value={newWorkOrderTitle}
+              onChange={(event) => setNewWorkOrderTitle(event.target.value)}
               placeholder="New work package title"
             />
-            <Button onClick={handleCreateWorkPackage} disabled={!newWorkPackageTitle.trim() || !state.canCreateWorkPackage}>
+            <Button onClick={handleCreateWorkOrder} disabled={!newWorkOrderTitle.trim() || !state.canCreateWorkOrder}>
               Create Work Package
             </Button>
-            <Button variant="outline" onClick={state.refreshWorkPackages} disabled={state.loadingWorkPackages}>
-              {state.loadingWorkPackages ? 'Refreshing...' : 'Refresh'}
+            <Button variant="outline" onClick={state.refreshWorkOrders} disabled={state.loadingWorkOrders}>
+              {state.loadingWorkOrders ? 'Refreshing...' : 'Refresh'}
             </Button>
           </div>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4" data-amro-screen="SCR-AMRO-003" role="region" aria-label="SCR-AMRO-003 Work Package Create Drawer">
             <div className="space-y-1">
               <Label>Status Filter</Label>
-              <Select value={state.workPackageStatusFilter} onValueChange={handleStatusFilterChange}>
+              <Select value={state.workOrderStatusFilter} onValueChange={handleStatusFilterChange}>
                 <SelectTrigger>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {workPackageStatusFilters.map((status) => (
+                  {workOrderStatusFilters.map((status) => (
                     <SelectItem key={status} value={status}>
                       {status}
                     </SelectItem>
@@ -3055,7 +3055,7 @@ export function AmroOwnedWorkspace({
             </div>
             <div className="space-y-1">
               <Label>Search</Label>
-              <Input value={state.workPackageSearch} onChange={(event) => handleSearchFilterChange(event.target.value)} placeholder="Search code or id" />
+              <Input value={state.workOrderSearch} onChange={(event) => handleSearchFilterChange(event.target.value)} placeholder="Search code or id" />
             </div>
             <div className="space-y-1">
               <Label>Saved View</Label>
@@ -3064,7 +3064,7 @@ export function AmroOwnedWorkspace({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {state.savedWorkPackageViews.map((view) => (
+                  {state.savedWorkOrderViews.map((view) => (
                     <SelectItem key={view.id} value={view.id}>
                       {view.name}
                     </SelectItem>
@@ -3085,14 +3085,14 @@ export function AmroOwnedWorkspace({
           <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
             <div className="space-y-1">
               <Label>Work Package</Label>
-              <Select value={state.selectedWorkPackageId} onValueChange={state.setSelectedWorkPackageId}>
+              <Select value={state.selectedWorkOrderId} onValueChange={state.setSelectedWorkOrderId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Select work package" />
                 </SelectTrigger>
                 <SelectContent>
-                  {state.workPackages.map((workPackage) => (
-                    <SelectItem key={workPackage.id} value={workPackage.id}>
-                      {workPackage.packageNumber}
+                  {state.workOrders.map((workOrder) => (
+                    <SelectItem key={workOrder.id} value={workOrder.id}>
+                      {workOrder.packageNumber}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -3100,50 +3100,50 @@ export function AmroOwnedWorkspace({
             </div>
             <div className="rounded-md border p-3">
               <p className="text-xs text-muted-foreground">Lifecycle Stage</p>
-              <p className="text-sm font-medium">{state.selectedWorkPackage?.lifecycleStage ?? 'N/A'}</p>
+              <p className="text-sm font-medium">{state.selectedWorkOrder?.lifecycleStage ?? 'N/A'}</p>
             </div>
             <div className="flex items-center">
-              <Button onClick={() => void state.advanceWorkPackageLifecycle()} disabled={!state.canAdvanceLifecycle}>
+              <Button onClick={() => void state.advanceWorkOrderLifecycle()} disabled={!state.canAdvanceLifecycle}>
                 Advance Stage
               </Button>
             </div>
           </div>
           <div className="flex flex-wrap gap-2 text-xs">
             <Badge variant="outline">Role: {state.activeRole}</Badge>
-            <Badge variant={state.canCreateWorkPackage ? 'secondary' : 'outline'}>
-              {state.canCreateWorkPackage ? 'Create Allowed' : 'Create Restricted'}
+            <Badge variant={state.canCreateWorkOrder ? 'secondary' : 'outline'}>
+              {state.canCreateWorkOrder ? 'Create Allowed' : 'Create Restricted'}
             </Badge>
-            <Badge variant={state.canDeleteWorkPackage ? 'secondary' : 'outline'}>
-              {state.canDeleteWorkPackage ? 'Delete Allowed' : 'Delete Restricted'}
+            <Badge variant={state.canDeleteWorkOrder ? 'secondary' : 'outline'}>
+              {state.canDeleteWorkOrder ? 'Delete Allowed' : 'Delete Restricted'}
             </Badge>
           </div>
           <div className="flex items-center gap-2">
             <Button
               variant="destructive"
               onClick={() => {
-                if (!state.selectedWorkPackage) return;
-                void handleDeleteWorkPackage(state.selectedWorkPackage.id, state.selectedWorkPackage.packageNumber);
+                if (!state.selectedWorkOrder) return;
+                void handleDeleteWorkOrder(state.selectedWorkOrder.id, state.selectedWorkOrder.packageNumber);
               }}
-              disabled={!state.selectedWorkPackageId || !state.canDeleteWorkPackage}
+              disabled={!state.selectedWorkOrderId || !state.canDeleteWorkOrder}
             >
               Delete Selected
             </Button>
           </div>
           <div className="grid grid-cols-1 gap-3 xl:grid-cols-3" data-amro-screen="SCR-AMRO-004" role="region" aria-label="SCR-AMRO-004 Work Package Detail Sheet">
             <div className="xl:col-span-2">
-              {state.selectedWorkPackage ? (
+              {state.selectedWorkOrder ? (
                 <Tabs value={detailTab} onValueChange={handleDetailTabChange}>
             <div className="mb-2 flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-xs">
               <div className="flex items-center gap-2">
-                <span className="font-semibold">{state.selectedWorkPackage.packageNumber}</span>
-                <Badge variant="outline">{state.selectedWorkPackage.lifecycleStage}</Badge>
+                <span className="font-semibold">{state.selectedWorkOrder.packageNumber}</span>
+                <Badge variant="outline">{state.selectedWorkOrder.lifecycleStage}</Badge>
               </div>
               <div className="flex flex-wrap gap-2">
                 <Button variant="outline" size="sm" aria-label="Update work package status" onClick={() => void handleStickyHoldAction()}>Status</Button>
                 <Button variant="outline" size="sm" aria-label="Assign work package" onClick={() => void handleStickyAssignAction()}>Assign</Button>
                 <Button variant="outline" size="sm" aria-label="Schedule work package" onClick={() => void handleStickyScheduleAction()}>Schedule</Button>
                 <Button variant="outline" size="sm" aria-label="Run compliance gate check" onClick={() => void handleStickyGateCheckAction()}>Gate Check</Button>
-                <Button size="sm" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
+                <Button size="sm" disabled={!canRunWorkOrderClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
                   Close
                 </Button>
               </div>
@@ -3168,7 +3168,7 @@ export function AmroOwnedWorkspace({
                   <Button variant="outline" size="sm" aria-label="Assign work package" onClick={() => void handleStickyAssignAction()}>Assign</Button>
                   <Button variant="outline" size="sm" aria-label="Schedule work package" onClick={() => void handleStickyScheduleAction()}>Schedule</Button>
                   <Button variant="outline" size="sm" aria-label="Run compliance gate check" onClick={() => void handleStickyGateCheckAction()}>Gate Check</Button>
-                  <Button size="sm" disabled={!canRunWorkPackageClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
+                  <Button size="sm" disabled={!canRunWorkOrderClosure} onClick={() => setClosureConfirmOpen(true)} aria-label="Close work package with confirmation">
                     Close
                   </Button>
                 </div>
@@ -3192,7 +3192,7 @@ export function AmroOwnedWorkspace({
               </div>
             </TabsContent>
             <TabsContent value="tasks" className="space-y-2">
-              {(state.selectedWorkPackage?.tasks ?? []).map((task) => (
+              {(state.selectedWorkOrder?.tasks ?? []).map((task) => (
                 <div key={task.id} className="rounded-md border p-2 text-sm">
                   <p className="font-medium">{task.title}</p>
                   <p className="text-xs text-muted-foreground">
@@ -3254,13 +3254,13 @@ export function AmroOwnedWorkspace({
                 <div className="rounded-md border p-2">Active Packs: {state.complianceCoverage.activePacks}</div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button variant="outline" size="sm" onClick={state.ingestAdSbObligations} disabled={!state.selectedWorkPackageId}>
+                <Button variant="outline" size="sm" onClick={state.ingestAdSbObligations} disabled={!state.selectedWorkOrderId}>
                   Ingest AD/SB
                 </Button>
-                <Button variant="outline" size="sm" onClick={state.evaluateMelCdlDeferral} disabled={!state.selectedWorkPackageId}>
+                <Button variant="outline" size="sm" onClick={state.evaluateMelCdlDeferral} disabled={!state.selectedWorkOrderId}>
                   Evaluate MEL/CDL
                 </Button>
-                <Button variant="outline" size="sm" onClick={() => void handleOpenComplianceGate()} disabled={!state.selectedWorkPackageId}>
+                <Button variant="outline" size="sm" onClick={() => void handleOpenComplianceGate()} disabled={!state.selectedWorkOrderId}>
                   Open Gate Modal
                 </Button>
                 <Button variant="outline" size="sm" onClick={state.loadAuditReplayTimeline}>
@@ -3319,17 +3319,17 @@ export function AmroOwnedWorkspace({
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        if (!state.workPackages[0]) return;
-                        handleOpenWorkPackage(state.workPackages[0].id, state.workPackages[0].packageNumber);
+                        if (!state.workOrders[0]) return;
+                        handleOpenWorkOrder(state.workOrders[0].id, state.workOrders[0].packageNumber);
                       }}
-                      disabled={!state.workPackages[0]}
+                      disabled={!state.workOrders[0]}
                     >
                       Select First Package
                     </Button>
-                    <Button variant="outline" size="sm" onClick={handleRetryWorkspaceLoad} disabled={state.loadingWorkPackages}>
-                      {state.loadingWorkPackages ? 'Refreshing...' : 'Retry Refresh'}
+                    <Button variant="outline" size="sm" onClick={handleRetryWorkspaceLoad} disabled={state.loadingWorkOrders}>
+                      {state.loadingWorkOrders ? 'Refreshing...' : 'Retry Refresh'}
                     </Button>
-                    <Button size="sm" onClick={() => void handleCreateStarterWorkPackage()} disabled={!state.canCreateWorkPackage}>
+                    <Button size="sm" onClick={() => void handleCreateStarterWorkOrder()} disabled={!state.canCreateWorkOrder}>
                       Create Starter Package
                     </Button>
                   </div>
@@ -3507,18 +3507,18 @@ export function AmroOwnedWorkspace({
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <Button
-              onClick={() => void state.assignSelectedWorkPackageToNextSlot()}
-              disabled={!state.selectedWorkPackageId}
+              onClick={() => void state.assignSelectedWorkOrderToNextSlot()}
+              disabled={!state.selectedWorkOrderId}
             >
               Assign Next Slot
             </Button>
             <Button variant="outline" onClick={state.fetchScheduleOptimizationRecommendations}>
               Refresh Optimization Recommendations
             </Button>
-            <Button variant="outline" onClick={() => void state.runWorkPackageReplanSimulation()} disabled={!state.selectedWorkPackageId}>
+            <Button variant="outline" onClick={() => void state.runWorkOrderReplanSimulation()} disabled={!state.selectedWorkOrderId}>
               Run Replan Simulation
             </Button>
-            <Button variant="outline" onClick={() => void state.confirmWorkPackageReplan()} disabled={state.workPackageReplanOptions.length === 0}>
+            <Button variant="outline" onClick={() => void state.confirmWorkOrderReplan()} disabled={state.workOrderReplanOptions.length === 0}>
               Confirm Replan
             </Button>
           </div>
@@ -3530,7 +3530,7 @@ export function AmroOwnedWorkspace({
                 <div key={row.schedule_id} className="rounded-md border p-2 text-sm">
                   <p className="font-medium">{row.schedule_id}</p>
                   <p className="text-xs text-muted-foreground">
-                    {row.work_package_id} · {row.station_code}
+                    {row.work_order_id} · {row.station_code}
                   </p>
                   <p className="text-xs text-muted-foreground">{formatDateTime(row.slot_start)} → {formatDateTime(row.slot_end)}</p>
                   <p className="text-xs text-muted-foreground">
@@ -3539,7 +3539,7 @@ export function AmroOwnedWorkspace({
                   <div className="mt-2">
                     <Button
                       variant="secondary"
-                      onClick={() => state.acknowledgeScheduleUpdate(row.schedule_id, row.work_package_id)}
+                      onClick={() => state.acknowledgeScheduleUpdate(row.schedule_id, row.work_order_id)}
                     >
                       Acknowledge Schedule Update
                     </Button>
@@ -3563,7 +3563,7 @@ export function AmroOwnedWorkspace({
             ))}
           </div>
           <div className="space-y-2">
-            {state.workPackageReplanOptions.map((option) => (
+            {state.workOrderReplanOptions.map((option) => (
               <div key={option.option_id} className="rounded-md border p-2 text-xs">
                 <p className="font-medium">{option.title}</p>
                 <p className="text-muted-foreground">Option {option.option_id}</p>
@@ -3680,13 +3680,13 @@ export function AmroOwnedWorkspace({
             <Button variant="outline" size="sm" onClick={state.validateCertifyingPrivilege}>
               Validate Privilege
             </Button>
-            <Button size="sm" onClick={() => state.submitCertificationDecision('approve')} disabled={!state.selectedWorkPackageId}>
+            <Button size="sm" onClick={() => state.submitCertificationDecision('approve')} disabled={!state.selectedWorkOrderId}>
               Approve
             </Button>
-            <Button variant="outline" size="sm" onClick={() => state.submitCertificationDecision('reject')} disabled={!state.selectedWorkPackageId}>
+            <Button variant="outline" size="sm" onClick={() => state.submitCertificationDecision('reject')} disabled={!state.selectedWorkOrderId}>
               Reject
             </Button>
-            <Button variant="outline" size="sm" onClick={() => setDeferralConfirmOpen(true)} disabled={!state.selectedWorkPackageId} aria-label="Defer certification decision with rationale">
+            <Button variant="outline" size="sm" onClick={() => setDeferralConfirmOpen(true)} disabled={!state.selectedWorkOrderId} aria-label="Defer certification decision with rationale">
               Defer
             </Button>
             <Button variant="outline" size="sm" onClick={state.runExpiryWarningAndSuspension}>
@@ -4046,20 +4046,20 @@ export function AmroOwnedWorkspace({
               aria-label="Closure rationale"
               className="min-h-[96px]"
             />
-            <Button onClick={() => void handleConfirmWorkPackageClosure()} disabled={!closureRationale.trim()} aria-label="Confirm closure with rationale">
+            <Button onClick={() => void handleConfirmWorkOrderClosure()} disabled={!closureRationale.trim()} aria-label="Confirm closure with rationale">
               Confirm Closure
             </Button>
           </div>
         </DialogContent>
       </Dialog>
-      <Dialog open={workPackageCreateDialogOpen} onOpenChange={setWorkPackageCreateDialogOpen}>
+      <Dialog open={workOrderCreateDialogOpen} onOpenChange={setWorkOrderCreateDialogOpen}>
         <DialogContent className="mdm-template-dialog mdm-template-dialog-large h-[92vh] w-[96vw] max-h-[92vh] max-w-[1600px] overflow-hidden p-0">
           <DialogHeader className="border-b border-[#efefef] px-5 py-3">
             <DialogTitle className="text-[32px] font-semibold leading-none text-[#4c4c4c]">Add Work Package</DialogTitle>
           </DialogHeader>
-          {workPackageValidationSummary.length > 0 ? (
+          {workOrderValidationSummary.length > 0 ? (
             <div className="mx-3 mt-2 rounded-md border border-destructive/40 bg-destructive/5 p-3 text-xs text-destructive">
-              {workPackageValidationSummary.map((error) => (
+              {workOrderValidationSummary.map((error) => (
                 <p key={error}>{error}</p>
               ))}
             </div>
@@ -4071,45 +4071,45 @@ export function AmroOwnedWorkspace({
                 aircraftSearchTerm={aircraftSearchTerm}
                 onSearchChange={setAircraftSearchTerm}
                 filteredAircraftOptions={filteredAircraftOptions}
-                selectedAircraftId={workPackageCreateForm.aircraftId}
-                onSelectAircraft={handleSelectWorkPackageAircraft}
+                selectedAircraftId={workOrderCreateForm.aircraftId}
+                onSelectAircraft={handleSelectWorkOrderAircraft}
                 isLoading={aircraftSelectionLoading}
                 selectedAircraft={selectedAircraft}
               />
-              {workPackageCreateErrors.aircraftId ? <p className="text-xs text-destructive">{workPackageCreateErrors.aircraftId}</p> : null}
+              {workOrderCreateErrors.aircraftId ? <p className="text-xs text-destructive">{workOrderCreateErrors.aircraftId}</p> : null}
               <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                 <div className="space-y-1">
                   <Label htmlFor="wp-number">Package Number</Label>
-                  <TextInput id="wp-number" value={workPackageCreateForm.packageNumber} onChange={(event) => handleWorkPackageCreateFormChange('packageNumber', event.target.value)} />
-                  {workPackageCreateErrors.packageNumber ? <p className="text-xs text-destructive">{workPackageCreateErrors.packageNumber}</p> : null}
+                  <TextInput id="wp-number" value={workOrderCreateForm.packageNumber} onChange={(event) => handleWorkOrderCreateFormChange('packageNumber', event.target.value)} />
+                  {workOrderCreateErrors.packageNumber ? <p className="text-xs text-destructive">{workOrderCreateErrors.packageNumber}</p> : null}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="wp-topic">Topic</Label>
-                  <TextInput id="wp-topic" value={workPackageCreateForm.topic} onChange={(event) => handleWorkPackageCreateFormChange('topic', event.target.value)} />
-                  {workPackageCreateErrors.topic ? <p className="text-xs text-destructive">{workPackageCreateErrors.topic}</p> : null}
+                  <TextInput id="wp-topic" value={workOrderCreateForm.topic} onChange={(event) => handleWorkOrderCreateFormChange('topic', event.target.value)} />
+                  {workOrderCreateErrors.topic ? <p className="text-xs text-destructive">{workOrderCreateErrors.topic}</p> : null}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="wp-location">Location/Station</Label>
-                  <TextInput id="wp-location" value={workPackageCreateForm.locationStation} onChange={(event) => handleWorkPackageCreateFormChange('locationStation', event.target.value)} />
-                  {workPackageCreateErrors.locationStation ? <p className="text-xs text-destructive">{workPackageCreateErrors.locationStation}</p> : null}
+                  <TextInput id="wp-location" value={workOrderCreateForm.locationStation} onChange={(event) => handleWorkOrderCreateFormChange('locationStation', event.target.value)} />
+                  {workOrderCreateErrors.locationStation ? <p className="text-xs text-destructive">{workOrderCreateErrors.locationStation}</p> : null}
                 </div>
                 <div className="space-y-1">
                   <Label htmlFor="wp-planning-date">Planning Date</Label>
-                  <DatePicker id="wp-planning-date" value={workPackageCreateForm.planningDate} onChange={(event) => handleWorkPackageCreateFormChange('planningDate', event.target.value)} />
+                  <DatePicker id="wp-planning-date" value={workOrderCreateForm.planningDate} onChange={(event) => handleWorkOrderCreateFormChange('planningDate', event.target.value)} />
                 </div>
               </div>
               <div className="space-y-1">
                 <Label htmlFor="wp-details">Work Package Details</Label>
-                <Textarea id="wp-details" value={workPackageCreateForm.workPackageDetails} onChange={(event) => handleWorkPackageCreateFormChange('workPackageDetails', event.target.value)} />
-                {workPackageCreateErrors.workPackageDetails ? <p className="text-xs text-destructive">{workPackageCreateErrors.workPackageDetails}</p> : null}
+                <Textarea id="wp-details" value={workOrderCreateForm.workOrderDetails} onChange={(event) => handleWorkOrderCreateFormChange('workOrderDetails', event.target.value)} />
+                {workOrderCreateErrors.workOrderDetails ? <p className="text-xs text-destructive">{workOrderCreateErrors.workOrderDetails}</p> : null}
               </div>
               <div className="space-y-1">
                 <Label htmlFor="wp-remarks">Remarks</Label>
-                <Textarea id="wp-remarks" value={workPackageCreateForm.remarks} onChange={(event) => handleWorkPackageCreateFormChange('remarks', event.target.value)} />
+                <Textarea id="wp-remarks" value={workOrderCreateForm.remarks} onChange={(event) => handleWorkOrderCreateFormChange('remarks', event.target.value)} />
               </div>
             </div>
             <div className="space-y-3 overflow-hidden border border-[#e5e5e5] bg-white p-2.5">
-              <Tabs value={workPackageCreateTab} onValueChange={(value) => handleWorkPackageCreateTabChange(value as WorkPackageCreateTab)}>
+              <Tabs value={workOrderCreateTab} onValueChange={(value) => handleWorkOrderCreateTabChange(value as WorkOrderCreateTab)}>
                 <TabsList className="h-auto w-full justify-start gap-0 overflow-x-auto rounded-none bg-transparent p-0">
                   <TabsTrigger value="wp" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Tasks</TabsTrigger>
                   <TabsTrigger value="besting_wp" className="h-[20px] rounded-none border border-r-0 border-[#d7d7d7] px-[7px] text-[10px] font-semibold leading-none text-[#6a6a6a] data-[state=active]:border-[#12aeb1] data-[state=active]:bg-[#12aeb1] data-[state=active]:text-white">Tools/Spares</TabsTrigger>
@@ -4139,11 +4139,11 @@ export function AmroOwnedWorkspace({
                         ) : taskSelectionOptions.length === 0 ? (
                           <tr><td className="p-2 text-muted-foreground" colSpan={6}>No tasks available.</td></tr>
                         ) : taskSelectionOptions.map((task) => {
-                          const checked = workPackageCreateForm.selectedTaskIds.includes(task.value);
+                          const checked = workOrderCreateForm.selectedTaskIds.includes(task.value);
                           const conflict = taskConflictById[task.value];
                           return (
                             <tr key={task.value} className={conflict ? 'bg-amber-50/40' : ''}>
-                              <td className="p-2"><Checkbox checked={checked} onCheckedChange={(value) => handleToggleWorkPackageCreateTaskSelection(task.value, Boolean(value))} disabled={!canSelectTasks || Boolean(conflict)} /></td>
+                              <td className="p-2"><Checkbox checked={checked} onCheckedChange={(value) => handleToggleWorkOrderCreateTaskSelection(task.value, Boolean(value))} disabled={!canSelectTasks || Boolean(conflict)} /></td>
                               <td className="p-2">{task.taskNumber}</td>
                               <td className="p-2"><p>{task.title}</p>{conflict ? <p className="text-amber-700">{conflict.reason}</p> : null}</td>
                               <td className="p-2">{task.dueBasis}</td>
@@ -4158,19 +4158,19 @@ export function AmroOwnedWorkspace({
                   <div className="flex items-center justify-between text-xs text-muted-foreground">
                     <p>{selectedTaskCount} selected</p>
                     <div className="flex items-center gap-2">
-                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleWorkPackageCreateFormChange('selectedTaskIds', taskSelectionOptions.filter((task) => !taskConflictById[task.value]).map((task) => task.value))}>Select all valid</Button>
-                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleWorkPackageCreateFormChange('selectedTaskIds', [])}>Clear</Button>
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleWorkOrderCreateFormChange('selectedTaskIds', taskSelectionOptions.filter((task) => !taskConflictById[task.value]).map((task) => task.value))}>Select all valid</Button>
+                      <Button type="button" variant="ghost" size="sm" className="h-7 px-2 text-xs" onClick={() => handleWorkOrderCreateFormChange('selectedTaskIds', [])}>Clear</Button>
                     </div>
                   </div>
-                  {workPackageCreateErrors.selectedTaskIds ? <p className="text-xs text-destructive">{workPackageCreateErrors.selectedTaskIds}</p> : null}
+                  {workOrderCreateErrors.selectedTaskIds ? <p className="text-xs text-destructive">{workOrderCreateErrors.selectedTaskIds}</p> : null}
                 </TabsContent>
                 <TabsContent value="besting_wp" className="space-y-3 pt-2">
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-1">
                       <Label>Maintenance Type</Label>
                       <select
-                        value={workPackageCreateForm.maintenanceType}
-                        onChange={(event) => handleWorkPackageCreateFormChange('maintenanceType', event.target.value as WorkPackageCreateFormState['maintenanceType'])}
+                        value={workOrderCreateForm.maintenanceType}
+                        onChange={(event) => handleWorkOrderCreateFormChange('maintenanceType', event.target.value as WorkOrderCreateFormState['maintenanceType'])}
                         className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1.5 text-sm text-[#4f4f4f] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       >
                         <option value="line">Line</option>
@@ -4182,8 +4182,8 @@ export function AmroOwnedWorkspace({
                     <div className="space-y-1">
                       <Label>Priority</Label>
                       <select
-                        value={workPackageCreateForm.priority}
-                        onChange={(event) => handleWorkPackageCreateFormChange('priority', event.target.value as WorkPackageCreateFormState['priority'])}
+                        value={workOrderCreateForm.priority}
+                        onChange={(event) => handleWorkOrderCreateFormChange('priority', event.target.value as WorkOrderCreateFormState['priority'])}
                         className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1.5 text-sm text-[#4f4f4f] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       >
                         <option value="low">Low</option>
@@ -4198,19 +4198,19 @@ export function AmroOwnedWorkspace({
                   <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
                     <div className="space-y-1">
                       <Label htmlFor="wp-planned-start">Planned Start</Label>
-                      <DatePicker id="wp-planned-start" value={workPackageCreateForm.plannedStartDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedStartDate', event.target.value)} />
+                      <DatePicker id="wp-planned-start" value={workOrderCreateForm.plannedStartDate} onChange={(event) => handleWorkOrderCreateFormChange('plannedStartDate', event.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="wp-planned-end">Planned End</Label>
-                      <DatePicker id="wp-planned-end" value={workPackageCreateForm.plannedEndDate} onChange={(event) => handleWorkPackageCreateFormChange('plannedEndDate', event.target.value)} />
+                      <DatePicker id="wp-planned-end" value={workOrderCreateForm.plannedEndDate} onChange={(event) => handleWorkOrderCreateFormChange('plannedEndDate', event.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="wp-created-by">Created By</Label>
-                      <TextInput id="wp-created-by" value={workPackageCreateForm.createdBy} onChange={(event) => handleWorkPackageCreateFormChange('createdBy', event.target.value)} />
+                      <TextInput id="wp-created-by" value={workOrderCreateForm.createdBy} onChange={(event) => handleWorkOrderCreateFormChange('createdBy', event.target.value)} />
                     </div>
                     <div className="space-y-1">
                       <Label htmlFor="wp-revision">Revision</Label>
-                      <TextInput id="wp-revision" type="number" min={1} value={workPackageCreateForm.revision} onChange={(event) => handleWorkPackageCreateFormChange('revision', event.target.value)} />
+                      <TextInput id="wp-revision" type="number" min={1} value={workOrderCreateForm.revision} onChange={(event) => handleWorkOrderCreateFormChange('revision', event.target.value)} />
                     </div>
                   </div>
                 </TabsContent>
@@ -4219,8 +4219,8 @@ export function AmroOwnedWorkspace({
                     <div className="space-y-1">
                       <Label>Assigned Role</Label>
                       <select
-                        value={workPackageCreateForm.assignedRole}
-                        onChange={(event) => handleWorkPackageCreateFormChange('assignedRole', event.target.value as WorkPackageCreateFormState['assignedRole'])}
+                        value={workOrderCreateForm.assignedRole}
+                        onChange={(event) => handleWorkOrderCreateFormChange('assignedRole', event.target.value as WorkOrderCreateFormState['assignedRole'])}
                         className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1.5 text-sm text-[#4f4f4f] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       >
                         <option value="planner">Planner</option>
@@ -4232,8 +4232,8 @@ export function AmroOwnedWorkspace({
                     <div className="space-y-1">
                       <Label>Workflow Status</Label>
                       <select
-                        value={workPackageCreateForm.workflowStatus}
-                        onChange={(event) => handleWorkPackageCreateFormChange('workflowStatus', event.target.value as WorkPackageCreateFormState['workflowStatus'])}
+                        value={workOrderCreateForm.workflowStatus}
+                        onChange={(event) => handleWorkOrderCreateFormChange('workflowStatus', event.target.value as WorkOrderCreateFormState['workflowStatus'])}
                         className="flex h-9 w-full rounded-md border border-input bg-white px-2.5 py-1.5 text-sm text-[#4f4f4f] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
                       >
                         <option value="planning">Planning</option>
@@ -4253,8 +4253,8 @@ export function AmroOwnedWorkspace({
             </div>
           </div>
           <div className="mt-auto flex items-center justify-end gap-2 border-t border-[#ececec] bg-white px-3 py-2">
-            <Button variant="outline" onClick={() => setWorkPackageCreateDialogOpen(false)}>Cancel</Button>
-            <Button variant="secondary" onClick={handleOpenWorkPackageSubmitReview} disabled={workPackageCreateSubmitting}>Review</Button>
+            <Button variant="outline" onClick={() => setWorkOrderCreateDialogOpen(false)}>Cancel</Button>
+            <Button variant="secondary" onClick={handleOpenWorkOrderSubmitReview} disabled={workOrderCreateSubmitting}>Review</Button>
           </div>
         </DialogContent>
       </Dialog>
@@ -4265,15 +4265,15 @@ export function AmroOwnedWorkspace({
           </DialogHeader>
           <div className="space-y-2 text-sm">
             <p>Aircraft: {selectedAircraft?.aircraftModel || '-'} · {selectedAircraft?.registration || selectedAircraft?.serialNumber || '-'}</p>
-            <p>Package Number: {workPackageCreateForm.packageNumber || '-'}</p>
-            <p>Topic: {workPackageCreateForm.topic || '-'}</p>
+            <p>Package Number: {workOrderCreateForm.packageNumber || '-'}</p>
+            <p>Topic: {workOrderCreateForm.topic || '-'}</p>
             <p>Tasks: {selectedTaskCount}</p>
             <p>Conflicts: {selectedTaskConflicts.length}</p>
           </div>
           <div className="flex items-center justify-end gap-2">
             <Button variant="outline" onClick={() => setReviewSubmitDialogOpen(false)}>Back</Button>
-            <Button onClick={() => void handleSubmitWorkPackageCreateForm()} disabled={workPackageCreateSubmitting || selectedTaskConflicts.length > 0}>
-              {workPackageCreateSubmitting ? 'Submitting...' : 'Submit'}
+            <Button onClick={() => void handleSubmitWorkOrderCreateForm()} disabled={workOrderCreateSubmitting || selectedTaskConflicts.length > 0}>
+              {workOrderCreateSubmitting ? 'Submitting...' : 'Submit'}
             </Button>
           </div>
         </DialogContent>

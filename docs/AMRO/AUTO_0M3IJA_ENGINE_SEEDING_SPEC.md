@@ -10,7 +10,7 @@
 - Verification RPC: `public.verify_auto_0m3ija_engine_seed()`
 
 ## Design Summary
-- Reuses existing AMRO core schema (`aircraft`, `components`, `maintenance_events`, `maintenance_schedule`, `asset_health_signals`, `work_packages`, `parts_inventory`, `flight_logs`, `compliance_obligations`, `compliance_records`, `staff_qualifications`).
+- Reuses existing AMRO core schema (`aircraft`, `components`, `maintenance_events`, `maintenance_schedule`, `asset_health_signals`, `work_orders`, `parts_inventory`, `flight_logs`, `compliance_obligations`, `compliance_records`, `staff_qualifications`).
 - Adds engine-specific versioning and history where existing tables were insufficient:
 - `engine_configuration_versions`
 - `engine_parameter_history`

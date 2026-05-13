@@ -295,11 +295,11 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     });
     return rendered as ReturnType<typeof render>;
   };
-  const renderWorkPackageTemplatesPage = () => {
+  const renderWorkOrderTemplatesPage = () => {
     let rendered: ReturnType<typeof render> | undefined;
     act(() => {
       rendered = render(
-        <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/work-package-templates']} future={memoryRouterFuture}>
+        <MemoryRouter initialEntries={['/dashboard/amro/settings/master-data/work-order-templates']} future={memoryRouterFuture}>
           <Routes>
             <Route path="/dashboard/amro/settings/master-data/:entity/*" element={<AmroSettingsMasterDataPage />} />
           </Routes>
@@ -562,7 +562,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
               }),
           };
         }
-        if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+        if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_order_templates')) {
           return {
             ok: true,
             text: async () =>
@@ -661,7 +661,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
                     cache: 'miss',
                   },
                   kpis: {
-                    open_work_packages: 4,
+                    open_work_orders: 4,
                     open_defects: 2,
                     total_flight_hours: 95.4,
                   },
@@ -762,8 +762,25 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
               }),
           };
         }
+        if (method === 'GET' && url.includes('/api/v2/amro/pilot-users')) {
+          return {
+            ok: true,
+            text: async () =>
+              JSON.stringify({
+                output: {
+                  records: [
+                    { user_id: 'pilot-1', display_name: 'Captain Rao', email: 'captain.rao@example.com' },
+                    { user_id: 'pilot-2', display_name: 'Captain Iyer', email: 'captain.iyer@example.com' },
+                  ],
+                  co_pilot_records: [
+                    { user_id: 'co-pilot-1', display_name: 'First Officer Das', email: 'fo.das@example.com' },
+                  ],
+                },
+              }),
+          };
+        }
         if (method === 'GET') {
-          if (url.includes('/api/v2/amro/work-packages')) {
+          if (url.includes('/api/v2/amro/work-orders')) {
             return {
               ok: true,
               text: async () =>
@@ -968,7 +985,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       { tab: 'Model', entity: 'assembly_models', labels: ['Model Code', 'Name'] },
       { tab: 'Regulator Profiles', entity: 'regulator_profiles', labels: ['Regulator Code', 'Policy Version'] },
       { tab: 'Shift Calendars', entity: 'shift_calendars', labels: ['Shift Start', 'Shift End'] },
-      { tab: 'Work Package Templates', entity: 'work_package_templates', labels: ['Template Code', 'Maintenance Type'] },
+      { tab: 'Work Package Templates', entity: 'work_order_templates', labels: ['Template Code', 'Maintenance Type'] },
     ];
 
     for (const entry of matrix) {
@@ -1157,22 +1174,22 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
     expect(await screen.findByText('Add work package')).toBeInTheDocument();
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
 
-    const createNewWorkPackageButton = within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' });
-    expect(createNewWorkPackageButton).toBeDisabled();
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
-    expect(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' })).toBeDisabled();
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'New WP' }));
+    const createNewWorkOrderButton = within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' });
+    expect(createNewWorkOrderButton).toBeDisabled();
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'Selected task' }));
+    expect(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' })).toBeDisabled();
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'New WP' }));
 
-    expect(await within(workPackageDialog).findByLabelText('Template registry')).toBeInTheDocument();
+    expect(await within(workOrderDialog).findByLabelText('Template registry')).toBeInTheDocument();
     await waitFor(() => {
-      expect(within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
+      expect(within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    const lineTemplateOption = within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
-    fireEvent.change(within(workPackageDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
-    expect(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' })).toBeEnabled();
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
+    const lineTemplateOption = within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
+    fireEvent.change(within(workOrderDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
+    expect(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' })).toBeEnabled();
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'Selected task' }));
 
     fireEvent.change(screen.getByLabelText('Number'), { target: { value: '145' } });
     fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'Hydraulic inspection campaign' } });
@@ -1187,32 +1204,32 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(screen.getByLabelText('Trigger source'));
     fireEvent.click(await screen.findByRole('option', { name: 'Defect' }));
 
-    expect(within(workPackageDialog).getByRole('tab', { name: 'New WP' })).toBeInTheDocument();
-    expect(within(workPackageDialog).getByRole('tab', { name: 'Existing WP' })).toBeInTheDocument();
-    expect(within(workPackageDialog).getByRole('tab', { name: 'Non performed tasks' })).toBeInTheDocument();
-    expect(within(workPackageDialog).getByRole('tab', { name: 'All Tasks' })).toBeInTheDocument();
-    expect(within(workPackageDialog).getByRole('tab', { name: 'Selected task' })).toBeInTheDocument();
+    expect(within(workOrderDialog).getByRole('tab', { name: 'New WP' })).toBeInTheDocument();
+    expect(within(workOrderDialog).getByRole('tab', { name: 'Existing WP' })).toBeInTheDocument();
+    expect(within(workOrderDialog).getByRole('tab', { name: 'Non performed tasks' })).toBeInTheDocument();
+    expect(within(workOrderDialog).getByRole('tab', { name: 'All Tasks' })).toBeInTheDocument();
+    expect(within(workOrderDialog).getByRole('tab', { name: 'Selected task' })).toBeInTheDocument();
 
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Existing WP' }));
-    expect(await within(workPackageDialog).findByText('Apply to Form')).toBeInTheDocument();
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'Existing WP' }));
+    expect(await within(workOrderDialog).findByText('Apply to Form')).toBeInTheDocument();
 
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'All Tasks' }));
-    expect(await within(workPackageDialog).findByText(/No tasks available for this aircraft context|Task number/i)).toBeInTheDocument();
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'All Tasks' }));
+    expect(await within(workOrderDialog).findByText(/No tasks available for this aircraft context|Task number/i)).toBeInTheDocument();
 
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
-    fireEvent.click(within(workPackageDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
-    fireEvent.click(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' }));
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'Selected task' }));
+    fireEvent.click(within(workOrderDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
+    fireEvent.click(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' }));
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package created');
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
 
-    const createWorkPackageCall = vi
+    const createWorkOrderCall = vi
       .mocked(fetch)
       .mock.calls.find(([input, init]) =>
-        String(input).includes('/api/v2/amro/work-packages?interface=create-work-package')
+        String(input).includes('/api/v2/amro/work-orders?interface=create-work-order')
         && String(init?.method || 'GET').toUpperCase() === 'POST');
-    expect(createWorkPackageCall).toBeDefined();
-    const createPayload = JSON.parse(String(createWorkPackageCall?.[1]?.body || '{}')) as Record<string, unknown>;
+    expect(createWorkOrderCall).toBeDefined();
+    const createPayload = JSON.parse(String(createWorkOrderCall?.[1]?.body || '{}')) as Record<string, unknown>;
     expect(createPayload.trigger_source).toBe('defect');
     expect(createPayload.trigger_reference_id).toBe('ac-1');
   });
@@ -1226,16 +1243,16 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
 
-    expect(await within(workPackageDialog).findByLabelText('Template registry')).toBeInTheDocument();
+    expect(await within(workOrderDialog).findByLabelText('Template registry')).toBeInTheDocument();
     await waitFor(() => {
-      expect(within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
+      expect(within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    const lineTemplateOption = within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
-    fireEvent.change(within(workPackageDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
+    const lineTemplateOption = within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
+    fireEvent.change(within(workOrderDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
 
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'Selected task' }));
     fireEvent.change(screen.getByLabelText('Number'), { target: { value: `145-${triggerValue}` } });
     fireEvent.change(screen.getByLabelText('Topic'), { target: { value: `${triggerLabel} verification package` } });
     fireEvent.change(screen.getByLabelText('Revision'), { target: { value: 'R2' } });
@@ -1250,8 +1267,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(screen.getByLabelText('Trigger source'));
     fireEvent.click(await screen.findByRole('option', { name: triggerLabel }));
 
-    fireEvent.click(within(workPackageDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
-    fireEvent.click(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' }));
+    fireEvent.click(within(workOrderDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
+    fireEvent.click(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' }));
     await waitFor(() => {
       expect(mockToastSuccess).toHaveBeenCalledWith('Aircraft work package created');
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
@@ -1260,7 +1277,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       .mocked(fetch)
       .mock.calls
       .filter(([input, init]) =>
-        String(input).includes('/api/v2/amro/work-packages?interface=create-work-package')
+        String(input).includes('/api/v2/amro/work-orders?interface=create-work-order')
         && String(init?.method || 'GET').toUpperCase() === 'POST');
     expect(createCalls.length).toBeGreaterThan(0);
     const createPayload = JSON.parse(String(createCalls[createCalls.length - 1]?.[1]?.body || '{}')) as Record<string, unknown>;
@@ -1276,7 +1293,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_order_templates')) {
         templateRegistryCallCount += 1;
         if (templateRegistryCallCount <= 2) {
           return {
@@ -1294,15 +1311,15 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
-    expect(await within(workPackageDialog).findByText('Template registry unavailable')).toBeInTheDocument();
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
+    expect(await within(workOrderDialog).findByText('Template registry unavailable')).toBeInTheDocument();
 
-    fireEvent.click(within(workPackageDialog).getByRole('button', { name: 'Refresh Templates' }));
+    fireEvent.click(within(workOrderDialog).getByRole('button', { name: 'Refresh Templates' }));
     await waitFor(() => {
-      expect(within(workPackageDialog).queryByText('Template registry unavailable')).not.toBeInTheDocument();
+      expect(within(workOrderDialog).queryByText('Template registry unavailable')).not.toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     await waitFor(() => {
-      expect(within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
+      expect(within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
   });
 
@@ -1312,7 +1329,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_order_templates')) {
         return {
           ok: true,
           text: async () => JSON.stringify({ output: { records: [] } }),
@@ -1327,9 +1344,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
-    expect(await within(workPackageDialog).findByText('No templates available. Add templates in Template Registry and refresh.')).toBeInTheDocument();
-    expect(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' })).toBeDisabled();
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
+    expect(await within(workOrderDialog).findByText('No templates available. Add templates in Template Registry and refresh.')).toBeInTheDocument();
+    expect(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' })).toBeDisabled();
   });
 
   it('supports template registry payloads that return output.items instead of output.records', async () => {
@@ -1338,7 +1355,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_order_templates')) {
         return {
           ok: true,
           text: async () =>
@@ -1378,13 +1395,13 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
     await waitFor(() => {
-      expect(within(workPackageDialog).getByRole('option', { name: /Items Payload Package.*v3/i })).toBeInTheDocument();
+      expect(within(workOrderDialog).getByRole('option', { name: /Items Payload Package.*v3/i })).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    const itemsTemplateOption = within(workPackageDialog).getByRole('option', { name: /Items Payload Package.*v3/i }) as HTMLOptionElement;
-    fireEvent.change(within(workPackageDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: itemsTemplateOption.value } });
-    expect(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' })).toBeEnabled();
+    const itemsTemplateOption = within(workOrderDialog).getByRole('option', { name: /Items Payload Package.*v3/i }) as HTMLOptionElement;
+    fireEvent.change(within(workOrderDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: itemsTemplateOption.value } });
+    expect(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' })).toBeEnabled();
   });
 
   it('supports template registry payloads with nested arrays and template_id fallback binding', async () => {
@@ -1393,7 +1410,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_order_templates')) {
         return {
           ok: true,
           text: async () =>
@@ -1436,13 +1453,13 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
     await waitFor(() => {
-      expect(within(workPackageDialog).getByRole('option', { name: /Fallback Id Package.*v5/i })).toBeInTheDocument();
+      expect(within(workOrderDialog).getByRole('option', { name: /Fallback Id Package.*v5/i })).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    const fallbackTemplateOption = within(workPackageDialog).getByRole('option', { name: /Fallback Id Package.*v5/i }) as HTMLOptionElement;
-    fireEvent.change(within(workPackageDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: fallbackTemplateOption.value } });
-    expect(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' })).toBeEnabled();
+    const fallbackTemplateOption = within(workOrderDialog).getByRole('option', { name: /Fallback Id Package.*v5/i }) as HTMLOptionElement;
+    fireEvent.change(within(workOrderDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: fallbackTemplateOption.value } });
+    expect(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' })).toBeEnabled();
   });
 
   it('surfaces timeout errors for template registry loading', async () => {
@@ -1451,7 +1468,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_order_templates')) {
         throw new DOMException('The operation was aborted.', 'AbortError');
       }
       if (!baseImplementation) {
@@ -1463,8 +1480,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
-    expect(await within(workPackageDialog).findByText('Request timed out. Please check your connection and retry.')).toBeInTheDocument();
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
+    expect(await within(workOrderDialog).findByText('Request timed out. Please check your connection and retry.')).toBeInTheDocument();
   });
 
   it('surfaces network errors for template registry loading', async () => {
@@ -1473,7 +1490,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_order_templates')) {
         throw new TypeError('Failed to fetch');
       }
       if (!baseImplementation) {
@@ -1485,17 +1502,17 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
-    expect(await within(workPackageDialog).findByText('Network error. Verify connectivity and try again.')).toBeInTheDocument();
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
+    expect(await within(workOrderDialog).findByText('Network error. Verify connectivity and try again.')).toBeInTheDocument();
   });
 
-  it('surfaces server errors during create-work-package submission and keeps draft', async () => {
+  it('surfaces server errors during create-work-order submission and keeps draft', async () => {
     const fetchMock = vi.mocked(fetch);
     const baseImplementation = fetchMock.getMockImplementation();
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'POST' && url.includes('/api/v2/amro/work-packages?interface=create-work-package')) {
+      if (method === 'POST' && url.includes('/api/v2/amro/work-orders?interface=create-work-order')) {
         return {
           ok: false,
           status: 503,
@@ -1511,13 +1528,13 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
     await waitFor(() => {
-      expect(within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
+      expect(within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    const lineTemplateOption = within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
-    fireEvent.change(within(workPackageDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
+    const lineTemplateOption = within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
+    fireEvent.change(within(workOrderDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'Selected task' }));
     fireEvent.change(screen.getByLabelText('Number'), { target: { value: '145' } });
     fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'Hydraulic inspection campaign' } });
     fireEvent.change(screen.getByLabelText('Revision'), { target: { value: 'R2' } });
@@ -1526,8 +1543,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Planning' }));
     fireEvent.click(screen.getByLabelText('Validation'));
     fireEvent.click(await screen.findByRole('option', { name: 'Pending' }));
-    fireEvent.click(within(workPackageDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
-    fireEvent.click(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' }));
+    fireEvent.click(within(workOrderDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
+    fireEvent.click(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' }));
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('Work package service is temporarily unavailable. Try again shortly.');
@@ -1535,13 +1552,13 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(localStorage.getItem('amro:aircraft-wp-draft:ac-1')).toBeTruthy();
   });
 
-  it('surfaces timeout errors during create-work-package submission', async () => {
+  it('surfaces timeout errors during create-work-order submission', async () => {
     const fetchMock = vi.mocked(fetch);
     const baseImplementation = fetchMock.getMockImplementation();
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = String(init?.method || 'GET').toUpperCase();
-      if (method === 'POST' && url.includes('/api/v2/amro/work-packages?interface=create-work-package')) {
+      if (method === 'POST' && url.includes('/api/v2/amro/work-orders?interface=create-work-order')) {
         throw new DOMException('The operation was aborted.', 'AbortError');
       }
       if (!baseImplementation) {
@@ -1553,13 +1570,13 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
     await waitFor(() => {
-      expect(within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
+      expect(within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i })).toBeInTheDocument();
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
-    const lineTemplateOption = within(workPackageDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
-    fireEvent.change(within(workPackageDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'Selected task' }));
+    const lineTemplateOption = within(workOrderDialog).getByRole('option', { name: /Line Check Package.*v1/i }) as HTMLOptionElement;
+    fireEvent.change(within(workOrderDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' }), { target: { value: lineTemplateOption.value } });
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'Selected task' }));
     fireEvent.change(screen.getByLabelText('Number'), { target: { value: '145' } });
     fireEvent.change(screen.getByLabelText('Topic'), { target: { value: 'Hydraulic inspection campaign' } });
     fireEvent.change(screen.getByLabelText('Revision'), { target: { value: 'R2' } });
@@ -1568,8 +1585,8 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     fireEvent.click(await screen.findByRole('option', { name: 'Planning' }));
     fireEvent.click(screen.getByLabelText('Validation'));
     fireEvent.click(await screen.findByRole('option', { name: 'Pending' }));
-    fireEvent.click(within(workPackageDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
-    fireEvent.click(within(workPackageDialog).getByRole('button', { name: 'Create New Work Package' }));
+    fireEvent.click(within(workOrderDialog).getByRole('checkbox', { name: 'Select all tasks in page' }));
+    fireEvent.click(within(workOrderDialog).getByRole('button', { name: 'Create New Work Package' }));
 
     await waitFor(() => {
       expect(mockToastError).toHaveBeenCalledWith('Request timed out. Please check your connection and retry.');
@@ -1580,16 +1597,16 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     renderAircraftPage();
     await screen.findByText('Aircraft Operations Snapshot');
     fireEvent.click(screen.getByRole('button', { name: 'Create Work Package' }));
-    const workPackageDialog = await screen.findByTestId('amro-aircraft-work-package-dialog');
-    fireEvent.click(within(workPackageDialog).getByRole('tab', { name: 'New WP' }));
+    const workOrderDialog = await screen.findByTestId('amro-aircraft-work-order-dialog');
+    fireEvent.click(within(workOrderDialog).getByRole('tab', { name: 'New WP' }));
 
-    const result = await axe(workPackageDialog);
+    const result = await axe(workOrderDialog);
     expect(result).toHaveNoViolations();
 
-    const newWpTab = within(workPackageDialog).getByRole('tab', { name: 'New WP' });
+    const newWpTab = within(workOrderDialog).getByRole('tab', { name: 'New WP' });
     expect(newWpTab).toHaveAttribute('aria-controls');
-    expect(within(workPackageDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' })).toBeInTheDocument();
-    expect(within(workPackageDialog).getByRole('button', { name: /Refresh Templates|Refreshing/i })).toBeInTheDocument();
+    expect(within(workOrderDialog).getByLabelText('Template registry', { selector: '#aircraft-wp-template' })).toBeInTheDocument();
+    expect(within(workOrderDialog).getByRole('button', { name: /Refresh Templates|Refreshing/i })).toBeInTheDocument();
   });
 
   it('hides aircraft operations overview in aircraft list workspace while preventing module leakage', async () => {
@@ -2020,7 +2037,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   });
 
   it('hides configured work package columns while preserving filter and export actions', async () => {
-    renderWorkPackageTemplatesPage();
+    renderWorkOrderTemplatesPage();
 
     await screen.findByText('WP-LINE-001');
     expect(screen.queryByRole('columnheader', { name: /^ID$/i })).not.toBeInTheDocument();
@@ -2039,7 +2056,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
   });
 
   it('opens work package update form on row double click with prepopulated data and CRUD controls', async () => {
-    renderWorkPackageTemplatesPage();
+    renderWorkOrderTemplatesPage();
 
     const table = await screen.findByRole('table');
     const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
@@ -2064,7 +2081,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
   it('keeps legacy work package form path when standard template flag is off', async () => {
     vi.stubEnv('VITE_AMRO_WPT_STANDARD_TEMPLATE', 'false');
-    renderWorkPackageTemplatesPage();
+    renderWorkOrderTemplatesPage();
 
     const table = await screen.findByRole('table');
     const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
@@ -2077,7 +2094,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
   it('uses standard template adapter for work package form when feature flag is on', async () => {
     vi.stubEnv('VITE_AMRO_WPT_STANDARD_TEMPLATE', 'true');
-    renderWorkPackageTemplatesPage();
+    renderWorkOrderTemplatesPage();
 
     const table = await screen.findByRole('table');
     const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
@@ -2108,7 +2125,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
   it('keeps selected tasks header/filter UI parity with sort and summary behavior', async () => {
     vi.stubEnv('VITE_AMRO_WPT_STANDARD_TEMPLATE', 'true');
-    renderWorkPackageTemplatesPage();
+    renderWorkOrderTemplatesPage();
 
     const table = await screen.findByRole('table');
     const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
@@ -2143,7 +2160,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     vi.mocked(fetch).mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input);
       const method = init?.method || 'GET';
-      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_package_templates')) {
+      if (method === 'GET' && url.includes('/api/v2/amro/master-data/work_order_templates')) {
         return {
           ok: true,
           text: async () =>
@@ -2167,7 +2184,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       return baseFetch(input, init);
     });
 
-    renderWorkPackageTemplatesPage();
+    renderWorkOrderTemplatesPage();
     const table = await screen.findByRole('table');
     const dataRows = within(table).getAllByRole('row').filter((row) => row.querySelector('td'));
     fireEvent.doubleClick(dataRows[0]);
@@ -2185,7 +2202,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
 
     for (const profile of permissionProfiles) {
       mockHasPermission.mockImplementation(profile.hasPermission);
-      const view = renderWorkPackageTemplatesPage();
+      const view = renderWorkOrderTemplatesPage();
       await screen.findByText('WP-LINE-001');
       expect(screen.queryByRole('columnheader', { name: /^ID$/i })).not.toBeInTheDocument();
       const table = await screen.findByRole('table');
@@ -2203,7 +2220,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     await waitFor(() => {
       const snapshotCalls = vi
         .mocked(fetch)
-        .mock.calls.filter(([input]) => String(input).includes('/api/v2/amro/work-packages'));
+        .mock.calls.filter(([input]) => String(input).includes('/api/v2/amro/work-orders'));
       expect(snapshotCalls.length).toBeGreaterThan(0);
       const hasBearerHeader = snapshotCalls.some(([, init]) => resolveAuthorizationHeader(init?.headers).startsWith('Bearer token-1'));
       expect(hasBearerHeader).toBe(true);
@@ -2223,7 +2240,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     }, { timeout: ASYNC_WAIT_TIMEOUT_MS });
     const snapshotCalls = vi
       .mocked(fetch)
-      .mock.calls.filter(([input]) => String(input).includes('/api/v2/amro/work-packages'));
+      .mock.calls.filter(([input]) => String(input).includes('/api/v2/amro/work-orders'));
     expect(snapshotCalls.length).toBe(0);
   });
 
@@ -2412,7 +2429,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       { entity: 'manufacturers', field: 'manufacturer_code', message: 'Manufacturer Code is required' },
       { entity: 'regulator_profiles', field: 'regulator_code', message: 'Regulator Code is required' },
       { entity: 'shift_calendars', field: 'station_code', message: 'Station Code is required' },
-      { entity: 'work_package_templates', field: 'template_code', message: 'Template Code is required' },
+      { entity: 'work_order_templates', field: 'template_code', message: 'Template Code is required' },
     ];
 
     requiredMatrix.forEach(({ entity, field, message }) => {
@@ -2423,7 +2440,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     const aircraftStatuses = AMRO_MASTER_ENTITY_FORM_FIELDS.aircraft
       .find((field) => field.key === 'status')
       ?.options ?? [];
-    expect(aircraftStatuses).toEqual(['active', 'maintenance', 'grounded', 'retired', 'storage']);
+    expect(aircraftStatuses).toEqual(['active', 'pending', 'maintenance', 'grounded', 'retired', 'storage']);
     expect(AMRO_MASTER_ENTITY_FORM_FIELDS.aircraft.some((field) => field.key === 'engine_type')).toBe(true);
 
     const aircraftRetiredStatus = buildPayloadFromForm('aircraft', {
@@ -2458,6 +2475,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       manufacturing_date: '2026-03-11',
       base_location: 'DXB',
       owner_name: 'Owned',
+      aircraft_operators_id: '157b8d12-c115-446e-a4dc-d12077751fe2',
+      aircraft_owners_id: '257b8d12-c115-446e-a4dc-d12077751fe2',
+      aircraft_base_location_id: '357b8d12-c115-446e-a4dc-d12077751fe2',
       current_flight_hours: '2401.7',
       current_cycles: '901',
     });
@@ -2468,6 +2488,9 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     expect(aircraftOperationalFields.payload.engine_type).toBe('CFM56-5B');
     expect(aircraftOperationalFields.payload.base_location).toBe('DXB');
     expect(aircraftOperationalFields.payload.owner_name).toBe('Owned');
+    expect(aircraftOperationalFields.payload.aircraft_operators_id).toBe('157b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(aircraftOperationalFields.payload.aircraft_owners_id).toBe('257b8d12-c115-446e-a4dc-d12077751fe2');
+    expect(aircraftOperationalFields.payload.aircraft_base_location_id).toBe('357b8d12-c115-446e-a4dc-d12077751fe2');
     expect(aircraftOperationalFields.payload.current_flight_hours).toBe(2401.7);
     expect(aircraftOperationalFields.payload.current_cycles).toBe(901);
 
@@ -2480,9 +2503,30 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
       status: 'active',
       base_location: 'Nothing selected',
       owner_name: 'Nothing selected',
+      aircraft_operators_id: '',
+      aircraft_owners_id: '',
+      aircraft_base_location_id: '',
     });
     expect(aircraftOptionalPlaceholders.payload.base_location).toBeUndefined();
     expect(aircraftOptionalPlaceholders.payload.owner_name).toBeUndefined();
+    expect(aircraftOptionalPlaceholders.payload.aircraft_operators_id).toBeUndefined();
+    expect(aircraftOptionalPlaceholders.payload.aircraft_owners_id).toBeUndefined();
+    expect(aircraftOptionalPlaceholders.payload.aircraft_base_location_id).toBeUndefined();
+
+    const aircraftInvalidOwners = buildPayloadFromForm('aircraft', {
+      tail_number: 'N909AE',
+      serial_number: 'SN-913',
+      aircraft_type: 'NarrowBody',
+      manufacturer_id: 'manu-1',
+      aircraft_model: 'A320-200',
+      status: 'active',
+      aircraft_operators_id: 'invalid-operator-id',
+      aircraft_owners_id: 'invalid-owner-id',
+      aircraft_base_location_id: 'invalid-base-location-id',
+    });
+    expect(aircraftInvalidOwners.errors.aircraft_operators_id).toBe('Operator Owner must be a valid UUID');
+    expect(aircraftInvalidOwners.errors.aircraft_owners_id).toBe('Aircraft Owner must be a valid UUID');
+    expect(aircraftInvalidOwners.errors.aircraft_base_location_id).toBe('Base Location must be a valid UUID');
 
     const supplierMalformed = buildPayloadFromForm('suppliers', {
       supplier_code: 'SUP-1',
@@ -2516,7 +2560,7 @@ describe('AmroSettingsMasterDataPage', { timeout: 12000 }, () => {
     });
     expect(shiftInvalidRange.errors.shift_end_time).toBe('Shift End must be after Shift Start');
 
-    const templateMalformedJson = buildPayloadFromForm('work_package_templates', {
+    const templateMalformedJson = buildPayloadFromForm('work_order_templates', {
       template_code: 'TMP-1',
       template_name: 'Template',
       maintenance_type: 'line',

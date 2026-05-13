@@ -369,7 +369,7 @@ BEGIN
       'amro-seed-reservation-001',
       'AMRO',
       v_wp_reference_id,
-      jsonb_build_object('work_package_id', 'WP-0001', 'external_reference', 'WP-0001', 'seed_source', 'amro-uim-phase5'),
+      jsonb_build_object('work_order_id', 'WP-0001', 'external_reference', 'WP-0001', 'seed_source', 'amro-uim-phase5'),
       v_actor,
       v_actor
     )

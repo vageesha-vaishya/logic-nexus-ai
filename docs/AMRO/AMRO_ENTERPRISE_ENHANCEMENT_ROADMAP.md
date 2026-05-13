@@ -2385,7 +2385,7 @@ interface FieldVisibilityRule {
 
 | # | Activity | Priority | Missing Feature Addressed | Est. Effort | Status | Dependencies | Acceptance Criteria |
 |---|----------|----------|--------------------------|-------------|--------|--------------|---------------------|
-| 1.1.1 | Audit existing AMRO database tables (aircraft, parts, work_packages, tasks, compliance) | P0 | Current schema gaps | 2 days | ⬜ | None | Complete schema inventory document |
+| 1.1.1 | Audit existing AMRO database tables (aircraft, parts, work_orders, tasks, compliance) | P0 | Current schema gaps | 2 days | ⬜ | None | Complete schema inventory document |
 | 1.1.2 | Design `asset_lifecycle` table (acquisition → disposal phases) | P0 | No lifecycle tracking | 3 days | ⬜ | 1.1.1 | Schema DDL reviewed & approved |
 | 1.1.3 | Design `vendor_evaluation` table (scoring matrices, criteria weights) | P0 | No vendor management | 2 days | ⬜ | 1.1.1 | Schema DDL reviewed & approved |
 | 1.1.4 | Design `vendor_scorecards` table (KPIs, periodic scores, trends) | P1 | No vendor analytics | 2 days | ⬜ | 1.1.3 | Schema DDL reviewed & approved |
@@ -3508,12 +3508,12 @@ Based on a thorough audit of the existing AMRO module codebase (723 migrations, 
 | 1 | **Aircraft/Asset Registry** | ✅ EXISTS | `aircraft` table, full CRUD in MasterData page, E2E tests, engine JSONB tracking | — | Tier 0 (Foundation) |
 | 2 | **Parts Inventory & Stock Management** | ✅ EXISTS | `parts_inventory` table, workbench (1598 lines), stock ledger (9 movement types, 3 valuation methods), period management, reconciliation, approval workflow, 3 reports | Multi-warehouse transfer workflows, cycle counting | Tier 0 (Foundation) |
 | 3 | **Component/Part Tracking** | ⚠️ PARTIAL | `components` table with LLP fields, installation/removal dates, ATA chapter | Dedicated component lifecycle UI, LLP surfacing in parts UI | Tier 1 |
-| 4 | **Work Order Management** | ⚠️ PARTIAL | `work_packages` table, full CRUD API (2554 lines), state transitions, dual-write reconciliation | Dedicated work order management UI (separate from settings), Gantt view | Tier 1 |
+| 4 | **Work Order Management** | ⚠️ PARTIAL | `work_orders` table, full CRUD API (2554 lines), state transitions, dual-write reconciliation | Dedicated work order management UI (separate from settings), Gantt view | Tier 1 |
 | 5 | **Task Cards & Procedures** | ⚠️ PARTIAL | `tasks` table with steps/evidence/qualifications JSONB, API endpoint | Task card execution UI, technician mobile view, digital signatures | Tier 1 |
 | 6 | **Maintenance Planning & Scheduling** | ⚠️ PARTIAL | `schedules/` API (index, replan), work package templates | Visual scheduling board, Gantt chart, calendar view | Tier 1 |
 | 7 | **Compliance Tracking (AD/SB)** | ⚠️ PARTIAL | `compliance-gates.ts` API, `compliance/obligations.ts`, compliance rule packs in workspace model | Dedicated AD/SB tracking UI, regulatory ingestion | Tier 2 |
 | 8 | **Vendor/Supplier Management** | ⚠️ PARTIAL | `suppliers` table, CRUD in master data | Supplier performance tracking, scorecards, dedicated UI | Tier 2 |
-| 9 | **Cost Tracking** | ⚠️ PARTIAL | `estimated_cost`/`actual_cost` on work_packages, stock ledger cost tracking | Budget management, cost center, financial reporting | Tier 2 |
+| 9 | **Cost Tracking** | ⚠️ PARTIAL | `estimated_cost`/`actual_cost` on work_orders, stock ledger cost tracking | Budget management, cost center, financial reporting | Tier 2 |
 | 10 | **Reporting & Analytics** | ⚠️ PARTIAL | Overview KPI dashboard, stock ledger reports (3 types), aircraft dashboard | Custom report builder, scheduled reporting UI | Tier 2 |
 | 11 | **Barcode/QR Scanning** | ⚠️ PARTIAL | `inventory/scan.ts` API endpoint | Barcode scanning UI component, scanner integration | Tier 2 |
 | 12 | **Life-Limited Parts Tracking** | ⚠️ PARTIAL | LLP fields on `components` table (is_llp_part, llp_hours, llp_cycles) | Not surfaced in parts UI, no LLP lifecycle management | Tier 2 |
@@ -3543,7 +3543,7 @@ The following sequence ensures that each feature builds on already-implemented f
 | 0.1 | Aircraft Registry | `aircraft` table, MasterData CRUD, E2E tests | Run E2E tests, verify all fields, test engine JSONB | 1 day |
 | 0.2 | Parts Inventory Workbench | `AmroPartsInventoryWorkbench.tsx` (1598 lines), `parts_inventory` table | Test all filters, grouping, alerts, risk bands, ABC classification | 2 days |
 | 0.3 | Stock Ledger | `stockLedgerApi.ts` (710 lines), `amro_stock_ledger_transactions` table, 9 movement types, 3 valuation methods | Test all movement types, period open/close, reconciliation, approvals | 3 days |
-| 0.4 | Work Package CRUD | `work_packages` table, API (2554 lines), template adapter | Test create/update/transition, template-based creation, dual-write | 2 days |
+| 0.4 | Work Package CRUD | `work_orders` table, API (2554 lines), template adapter | Test create/update/transition, template-based creation, dual-write | 2 days |
 | 0.5 | Task Management | `tasks` table, `tasks.ts` API | Test CRUD, verify JSONB fields (steps, evidence, qualifications) | 1 day |
 | 0.6 | Master Data Management | `AmroSettingsMasterDataPage.tsx` (9410 lines), 12 entities | Test CRUD for all 12 entities, verify export functionality | 2 days |
 | 0.7 | Overview Dashboard | `useAmroOverviewKpi.ts`, KPI cards, risk heatmap, trend lines | Verify data accuracy, test auto-refresh, test export | 1 day |
@@ -3565,7 +3565,7 @@ These are the features that, if missing, prevent the platform from functioning a
 | 1.1.2 | Design `quality_inspections` schema | `quality_inspections`, `ncr_reports`, `inspection_checklists` | Tier 0 complete | 2 days |
 | 1.1.3 | Design `certificates` schema | `certificates` (FAA 8130, EASA Form 1), `certificate_attachments` | Tier 0 complete | 1 day |
 | 1.1.4 | Design `component_lifecycle` schema | `component_lifecycle` (enhanced from `components`), `component_removal_reasons` | Tier 0 complete | 2 days |
-| 1.1.5 | Design `work_order_management` schema | `work_orders` (separate from `work_packages`), `work_order_assignments`, `work_order_materials` | Tier 0 complete | 2 days |
+| 1.1.5 | Design `work_order_management` schema | `work_orders` (separate from `work_orders`), `work_order_assignments`, `work_order_materials` | Tier 0 complete | 2 days |
 | 1.1.6 | Design `task_execution` schema | `task_execution_records`, `task_signatures`, `task_evidence` | Tier 0 complete | 2 days |
 | 1.1.7 | Design `scheduling_board` schema | `schedule_events`, `schedule_assignments`, `schedule_conflicts` | Tier 0 complete | 2 days |
 | 1.1.8 | Write & execute all Tier 1 migrations | All above tables + FKs, indexes, RLS policies | 1.1.1 - 1.1.7 | 3 days |

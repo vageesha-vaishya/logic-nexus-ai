@@ -1,7 +1,7 @@
 DO $migration$
 BEGIN
   EXECUTE $fn$
-    CREATE OR REPLACE FUNCTION public.amro_create_work_package_template_atomic(
+    CREATE OR REPLACE FUNCTION public.amro_create_work_order_template_atomic(
       p_tenant_id uuid,
       p_franchise_id uuid,
       p_user_id uuid,
@@ -13,7 +13,7 @@ BEGIN
     AS $body$
     DECLARE
       v_existing jsonb;
-      v_record public.work_package_templates%ROWTYPE;
+      v_record public.work_order_templates%ROWTYPE;
       v_created_at timestamptz := now();
       v_updated_at timestamptz := v_created_at;
       v_scope_json jsonb := '[]'::jsonb;
@@ -35,7 +35,7 @@ BEGIN
       FROM public.amro_request_idempotency
       WHERE tenant_id = p_tenant_id
         AND franchise_id IS NOT DISTINCT FROM p_franchise_id
-        AND operation = 'work_package_templates.create'
+        AND operation = 'work_order_templates.create'
         AND correlation_id = p_correlation_id
       LIMIT 1;
 
@@ -107,7 +107,7 @@ BEGIN
         END IF;
       END IF;
 
-      INSERT INTO public.work_package_templates (
+      INSERT INTO public.work_order_templates (
         tenant_id,
         franchise_id,
         template_code,
@@ -157,10 +157,10 @@ BEGIN
           RAISE EXCEPTION 'Validation failed: selected task templates belong to different or missing assembly_models';
         END IF;
 
-        INSERT INTO public.work_package_template_task_templates (
+        INSERT INTO public.work_order_template_task_templates (
           tenant_id,
           franchise_id,
-          work_package_template_id,
+          work_order_template_id,
           model_id,
           task_template_id,
           created_by,
@@ -179,12 +179,12 @@ BEGIN
           v_created_at,
           v_updated_at
         FROM unnest(v_task_ids) AS task_id
-        ON CONFLICT ON CONSTRAINT uq_work_package_template_task_templates_scope DO NOTHING;
+        ON CONFLICT ON CONSTRAINT uq_work_order_template_task_templates_scope DO NOTHING;
 
         SELECT COALESCE(
           jsonb_agg(
             jsonb_build_object(
-              'work_package_template_id', r.work_package_template_id,
+              'work_order_template_id', r.work_order_template_id,
               'task_template_id', r.task_template_id,
               'tenant_id', r.tenant_id,
               'model_id', r.model_id,
@@ -195,9 +195,9 @@ BEGIN
           '[]'::jsonb
         )
         INTO v_relationships
-        FROM public.work_package_template_task_templates r
+        FROM public.work_order_template_task_templates r
         WHERE r.tenant_id = p_tenant_id
-          AND r.work_package_template_id = v_record.id;
+          AND r.work_order_template_id = v_record.id;
       END IF;
 
       v_response := jsonb_build_object(
@@ -214,7 +214,7 @@ BEGIN
       ) VALUES (
         p_tenant_id,
         p_franchise_id,
-        'work_package_templates.create',
+        'work_order_templates.create',
         p_correlation_id,
         v_response
       )

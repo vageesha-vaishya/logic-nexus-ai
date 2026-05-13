@@ -24,8 +24,8 @@
 |---|---|---|---|---|
 | Overview | `/dashboard/amro/overview` | `view_amro_dashboard` | `amro.overview` | `amro.overview.read` |
 | Aircraft | `/dashboard/amro/aircraft` | `edit_aircraft_records` | `amro.aircraft` | `amro.aircraft.read` |
-| Work Package Templates | `/dashboard/amro/settings/work-package-templates` | `edit_aircraft_records` | `amro.work_package_templates` | `amro.work_package_templates.read` |
-| Work Packages | `/dashboard/amro/work-packages` | `create_maintenance_request` | `amro.work_packages` | `amro.work_packages.read` |
+| Work Package Templates | `/dashboard/amro/settings/work-order-templates` | `edit_aircraft_records` | `amro.work_order_templates` | `amro.work_order_templates.read` |
+| Work Packages | `/dashboard/amro/work-orders` | `create_maintenance_request` | `amro.work_orders` | `amro.work_orders.read` |
 | Task Execution | `/dashboard/amro/task-execution` | `create_maintenance_request` | `amro.task_execution` | `amro.task_execution.read` |
 | Scheduling | `/dashboard/amro/scheduling` | `edit_aircraft_records` | `amro.scheduling` | `amro.scheduling.read` |
 | Parts | `/dashboard/amro/parts` | `edit_aircraft_records` | `amro.parts` | `amro.parts.read` |
@@ -63,7 +63,7 @@
   4. Fallback deny
 - Add middleware contract:
   - `authorize(resource, action, scopeContext)`
-  - Example: `authorize('amro.work_package_templates', 'update', { tenantId, franchiseId })`
+  - Example: `authorize('amro.work_order_templates', 'update', { tenantId, franchiseId })`
 
 ---
 
@@ -96,16 +96,16 @@
 - `<domain>.<resource>.<action>`
 - AMRO examples:
   - `amro.aircraft.read|create|update|delete`
-  - `amro.work_package_templates.read|create|update|delete`
-  - `amro.work_package_templates.publish`
-  - `amro.work_packages.assign`
+  - `amro.work_order_templates.read|create|update|delete`
+  - `amro.work_order_templates.publish`
+  - `amro.work_orders.assign`
   - `amro.compliance.approve`
 
 ### Minimum Resource Set
 - `amro.overview`
 - `amro.aircraft`
-- `amro.work_package_templates`
-- `amro.work_packages`
+- `amro.work_order_templates`
+- `amro.work_orders`
 - `amro.task_execution`
 - `amro.scheduling`
 - `amro.parts`
@@ -173,7 +173,7 @@
 ```sql
 create table if not exists public.rbac_resources (
   id uuid primary key default gen_random_uuid(),
-  key text unique not null,                 -- amro.work_package_templates
+  key text unique not null,                 -- amro.work_order_templates
   domain text not null,                     -- amro
   display_name text not null,
   parent_key text null references public.rbac_resources(key),
@@ -185,16 +185,16 @@ create table if not exists public.rbac_resource_actions (
   id uuid primary key default gen_random_uuid(),
   resource_key text not null references public.rbac_resources(key) on delete cascade,
   action text not null,                     -- read/create/update/delete/approve/assign/publish
-  permission_key text unique not null,      -- amro.work_package_templates.update
+  permission_key text unique not null,      -- amro.work_order_templates.update
   created_at timestamptz not null default now(),
   unique(resource_key, action)
 );
 
 create table if not exists public.rbac_menu_binding (
   id uuid primary key default gen_random_uuid(),
-  menu_path text not null unique,           -- /dashboard/amro/settings/work-package-templates
+  menu_path text not null unique,           -- /dashboard/amro/settings/work-order-templates
   resource_key text not null references public.rbac_resources(key),
-  read_permission_key text not null,        -- amro.work_package_templates.read
+  read_permission_key text not null,        -- amro.work_order_templates.read
   feature_flag text null,
   created_at timestamptz not null default now()
 );

@@ -397,13 +397,13 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     const assemblyModelsEqMock = vi.fn().mockReturnValue({ or: assemblyModelsOrPrimaryMock });
     const assemblyModelsSelectMock = vi.fn().mockReturnValue({ eq: assemblyModelsEqMock });
     const fromMock = vi.fn((table: string) => {
-      if (table === 'work_package_templates') {
+      if (table === 'work_order_templates') {
         if (fromMock.mock.calls.length === 1) {
           return { select: existingSelectMock };
         }
         return { update: updateMock };
       }
-      if (table === 'work_package_template_task_templates') {
+      if (table === 'work_order_template_task_templates') {
         return { select: linkSelectMock, delete: relationDeleteMock, insert: relationInsertMock };
       }
       if (table === 'task_templates') {
@@ -421,7 +421,7 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
 
     const req: ApiRequest = {
       method: 'PATCH',
-      query: { entity: 'work_package_templates', id: 'wpt-1' },
+      query: { entity: 'work_order_templates', id: 'wpt-1' },
       body: {
         template_name: 'Line Check Updated',
         assembly_models_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -440,8 +440,8 @@ describe('/api/v2/amro/master-data/[entity]/[id]', () => {
     expect(updatePayload.aircraft_model).toBe('A320neo');
     expect((res.jsonBody as any)?.output?.record?.assembly_models_id).toBe('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa');
     expect((res.jsonBody as any)?.output?.record?.aircraft_model).toBe('A320neo');
-    expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
-    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
+    expect(fromMock).toHaveBeenCalledWith('work_order_template_task_templates');
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_order_template_id', 'wpt-1');
   });
 
   it('rejects ATA update when parent relationship introduces a circular chain', async () => {

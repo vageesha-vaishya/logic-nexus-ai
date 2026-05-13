@@ -1,0 +1,174 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,65,"EMM,CH 65-21-00",Carry out 5 to 15 hours Re-torque check after Installation of tail rotor blades,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,65,"AMM 5-50-00, 65-21-00",Carry out 5 to 15 hours Re-torque check after installation of Tail Rotor Blades.,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,66,"AMM 05-50-00, 66-20-00",Carry out 5 to 15 hours Re-torque check after installation of an Intermediate Gear Box.,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,65,"AMM 5-50-00, 65-11-00",Carry out 5 to 15 hours Re-torque check after installation of Main Rotor Blade,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,71,"AMM 5-50-00, 71-02-00",Carry out 5 to 15 hours Re-torque check after installation of Engine Drive shaft.,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,55,"EMM,CH 55-10-00",Carry out 5 to 15 hours Re-torque check after Installation of Stabilizer support fitting,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,65,"AMM 5-50-00,65-12-06",Carry out 5 to 15 hours Re-torque check after installation of Main Rotor Pitch Control Rod,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,65,"AMM 5-50-00,65-11-00",Carry out 5 to 15 hours Re-torque check after installation of Main Rotor Blade,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,65,"AMM 5-50-00, 65-11-00",Carry out 5 to 15 hours Re-torque check after installation of Main Rotor Blade.,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,24,AMM 24-22-01,Carry out 5 to 15 hours Re-torque check after Installation of AC Generator.,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,66,"AMM 05-50-00, 66-40-00",Carry out 5 to 15 hours Re-torque check after installation of Tail Drive Shaft.,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,65,"AMM 5-50-00, 65-12-06",Carry out 5 to 15 hours Re-torque check after installation of Main Rotor Pitch Control Rod,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,55,"AMM 5-50-00,55-10-00",Carry out 5 to 15 hours Re-torque check after installation of Stabilizer Support Fitting,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Aeromobile Licence,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 12 months corrosion inspection,CP*,,,0:00,we are following Severe Conditions
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 06 months corrosion inspection,CP*,,,0:00,As per Schedule Form No: S76C++/88 (Severe conditions)
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 24 months corrosion inspection,CP*,,,0:00,Mild/Moderate conditions
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 12 months corrosion inspection,CP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 100Hrs Lubrication Inspection,LS*,,,0:00,As per Schedule Form No: S76C++/72
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 1500 Hours/2 years Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 900Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 1500Hrs Lubrication,LS*,,,0:00,As per Schedule Form No: S76C++/107
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 600 Hours/12 Months Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,12 MONTHS/AT BRAKE MAINTENANCE,LS*,,,0:00,Every 12 months or at every brake maintenance whichever occurs first
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Initially at 750 Hrs & Thereafter Every 150 Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 50Hrs Lubrication Inspection,LS*,,,0:00,As per Schedule Form No: S76C++/71
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 300 hours/12 Months Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 12 Months lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 2500Hrs lubrication,LS*,,,0:00,Landing Gear Hydraulic Oil Change
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,12,,Every 900 Hrs/12 Mths Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Initially 600Hrs Out of Phase Inspection & Thereafter On Condition,OP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,34,,Every 300Hrs/12month Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 300 Hours/12 Months Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3 Months Inspection,OP*,,,0:00,"Frequency revised as per approved AMP Issue 1, Rev. 02, Dt: Aug 2025 & Schedule Form No: S76C ++/113"
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 500Hrs Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1500 Hours/1 Year Out of Phase inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 07Days Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 900 Hours Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 6 Months/12 Months OOP inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1500Hrs/1 Year OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 30 Days OOP Inspection,OP*,,,0:00,As per Schedule Form No: S76C++/47
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,fire extinguisher re-weighing,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 30Days OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 600 HRS OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,450Hrs Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 30Days out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1250 Hours Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,250 HRS OOP INSPECTION,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 60Days OOP Inspection,OP*,,,0:00,As per Schedule Form No: S76C++/48
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,500 Hours/06 Months OOP Inspection,OP*,,,0:00,As per Schedule Form No: S76C++/52
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 6 Months Out of Phase inspection,OP*,,,0:00,As per Schedule Form No: S76C++/51
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 4 Years Out of Phase inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3 Months /12 Months L3 avionics,OP*,,,0:00,As per Schedule Form No: S76C++/50
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 750Hrs Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3 Months Out of Phase inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1500 Hours/2 Years Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3000 Hours/ 4 Years Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 200Hrs/12Mths Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3-6 Mths/12 Mths Out of Phase,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 600 hours/12 Months Out of Phase inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 2250 Hours Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3000 Hours/3 years Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,600 Hours/06 Months OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 600 Hours /12 months Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1250 Hours / 3 Years Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3000 Hours Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1500Hrs/3 year OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 5 Years Out of Phase inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 300 Hours/3 Months Inspection,OP*,,,0:00,As per Schedule Form No: S76C++/49
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 340Hrs Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,AAC 03 OF 2004,CVR READOUT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,23,,Every 06 Months Avionics Inspection,ROU*,,,0:00,As per Schedule Form No:S76C++/41.
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Mode 'S' Transponder Pilot's Guide (Collins TDR - 94/94D),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1500 Hours Inspection.,ROU*,,,0:00,As per Schedule Form No: S76C++/105
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,C of R,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 12 month routine inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Cabin Fire-ex monthly inspection,ROU*,,,0:00,Included in 30 Days inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,ALTIMETER,ROU*,,,0:00,Overhaul
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,23,,Airframe ULB P/N: DK-120 - Functional Test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,CVR/FDR Readout(MPFR),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,24,,A/F ULB Battery Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,99,,CVR/FDR Readout(MPFR),ROU*,,,0:00,KHC Doc No. MM00714
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ELT Self Test,ROU*,,,0:00,As per Schedule Form No: RN/020
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Transponder Check - As per new misc mod -35,ROU*,,,0:00,DGCA/New Misc./35
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Annual Compass Swing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ULB Functional Test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 100Hrs Routine Inspection,ROU*,,,0:00,As per Schedule Form No: S76C++/13
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,NSOP Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,MAGNETIC COMPASS,ROU*,,,0:00,SWINGING
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,RANGE & PERFORMANCE CHECK,ROU*,,,0:00,"CAR section 2 , Series R -Part III, Para 6"
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,ATC Transponder - Test & Inspect,ROU*,,,0:00,Part of 24 months avionics Inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,First Aid Kit certification,ROU*,,,0:00,"To comply with CAR Series-X, part III"
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 25Hrs (Airframe & Engine) Inspection,ROU*,,,0:00,As per Schedule Form No: S76C ++/11
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,DK140 ULB installed on MPFR,ROU*,,,0:00,Functional Test
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,FDR Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,1500 Hr/03 Year Supplementary inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Aeromobile License,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3 Years Out Of Phase Inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1500Hrs Routine Inspection,ROU*,,,0:00,As per Schedule Form No: S76C++/105
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Compass Swinging,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,ELT - Annual Inspection,ROU*,,,0:00,The ELT Battery pack must be replaced on or before the battery Expiration date shown on the battery label.
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,Altimeter - Test and Inspect,ROU*,,,0:00,Leak test after every installation
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ARC Renewal,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3000Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Airspeed Indicator,ROU*,,,0:00,Bench Check
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 1250 Hours Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,Altimeter Bench Check,ROU*,,,0:00,Perform Leak test after every installation
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 2 Years Out Of Phase Inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,600Hrs Lubrication,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,FDR Sensor Calibration,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,34,,"Avionics Equipments including VHF, NAV COMM, ADF, DME, GPS, Radio Altimeter",ROU*,,,0:00,(annual inspection)
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Cabin Fire Ex yearly Weighing,ROU*,,,0:00,Included in 12 months inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Vertical Speed Indicator,ROU*,,,0:00,Bench Check
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 4 Years Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Horizontal Stabilizer Support Fiting Attachment bolt,ROU*,,,0:00,Replace with 1500 Hrs/ 2 years inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,Magnetic compass,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,32,"AMP Issue1, Rev 0, July 2021",Proof Pressure Test of Landing gear emergency blowdown bottle,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Weight Schedule,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 5 Years Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ELT Annual Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Annual Radio Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,1500 HRS/ 3 YEARS Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ULB Battery Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ELT Battery Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,FDR Data Download (Annual Inspection),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,(MPFR) CVR & FDR Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,MPFR ( CVR/FDR ) Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,(MPFR) CVR & FDR Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,99,,Every 300 Hours Avionics Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,24,,MPFR ULB Battery Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 300Hrs Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Aeromobile License Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,450Hrs Lubrication,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 2 year Avionics Inspection,ROU*,,,0:00,As per Schedule Form No:S76C++/43.
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,First Aid Kit re-certification,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3000 Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,Air Speed Indicator-Test and Inspect,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,7 days inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,ULB Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,Air Speed Indicator,ROU*,,,0:00,Overhaul
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,26,"AMP Issue 1, Rev 0, July 2021",Weight check of portable fire extinguishers (Cabin & Cockpit),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 15Hrs / 7days Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Fire Extinguisher (HST),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,26,"AMP Issue 1, Rev 0, July 2021",Weight check of Engine fire extinguisher container,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Tail Rotor Cable,ROU*,,,0:00,Replace at every 1500 Hrs/3 years Whichever occurs first This replacement time does not apply if cables are inspected at 750 hours and lubricated every 150 hours or annually if 150 hours isnt reached
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,FDR Annual inspection,ROU*,,,0:00,Part Of Every 12th month Radio Inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3 Years Routine Inspection,ROU*,,,0:00,"Dgca Letter No-EON/AVN/11-12/DBH/DGCA dated-05/10/2011. Complied 20/10/2011, next due-19/11/2011"
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 12 Months Inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Range & Performance Check,ROU*,,,0:00,"CAR section 2 , Series R -Part III, Para 6"
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 100hrs Radio inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 300 Hours/12 Months Avionics Inspection,ROU*,,,0:00,As per Schedule Form No:S76C++/40.
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,CVR Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Vertical speed indicator (calibration),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 3 Months /12 Months L3 avionics,ROU*,,,0:00,As per Schedule Form No: S76C++/50
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 50Hrs Routine Inspection,ROU*,,,0:00,As per Schedule Form No: S76C++/12
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ELT Battery Replacement,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,31,,DK 120 ULB installed on Airframe,ROU*,,,0:00,Functional Test
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,34,,Every 12 Months Avionics Inspection,ROU*,,,0:00,As per Schedule Form No:S76C++/42.
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Aircraft Weighing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Cabin Fire Extinguisher (KIDDIE-898052),ROU*,,,0:00,HST
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,26,,Weight check of portable fire Extinguisher (cabin & cockpit),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 600Hrs Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Transponder Check as per DGCA/New-Misc/35,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,23,,MPFR ULB P/N: DK-120 - Functional Test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,C of A Renewal,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,Every 6 Months inspection,ROU*,,,0:00,As per Schedule Form No: S76C++/51
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,5,,1500/02 Year supplementary inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Fuel MBT,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,55,"AMM 5-50-00, 55-10-00",Carry out 5 to 15 hours Re-torque check after installation of Stabilizer Support Fitting,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,Insurance Renewal,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ELT Self test by Pilot,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,ELT Self Test (By Pilot),SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,b9b6e5b8-7080-440f-9510-e1a67e3b855b,,101,,NSOP Renewal,SP*,,,0:00,

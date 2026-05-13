@@ -620,7 +620,7 @@ Day 15 (3 hours): Extraction & API Layer
       reservedBy: string;
       reservedAt: string;
       workOrderId?: string;
-      workPackageId?: string;
+      workOrderId?: string;
       status: 'active' | 'fulfilled' | 'cancelled' | 'expired';
       expiresAt?: string;
       notes?: string;

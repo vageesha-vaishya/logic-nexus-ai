@@ -1,0 +1,450 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,"Every 2500 Hours Inspection on Frame web, FS 179 thru FS 271",CH*,,,0:00,Initially at 2500 Cyc. and 2500 Cyc Recurring upto 10000 cyc Thereafter Recurring 1000 cyc.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 10000 L Inspection of stringers from FS 88 thru FS 125 and instrument panel support brackets for cracks,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Monthly Inspection of Cabin Fire Extinguisher,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 10000 L Inspection of AFT fuselage area & rear pressure bulkhead,CH*,,,0:00,Initially at 10000 cycle and thereafter every 500 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 10000 Landings Inspection of upper and lower windshield and storm window corners,CH*,,,0:00,Initially at 10000 cycle and thereafter every 1000 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,"Inspection of Frames web, fuselage FS 179 to FS 271",CH*,,,0:00,Initially at 5000 cycle and thereafter every 1000 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 5 Year visual inspection for cracks corrosion and mechanical damage of lower forward main spar Clevis fitting,CH*,,,0:00,visual inspection for cracks corrosion and mechanical damage
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Monthly Inspection of Cockpit Fire Extinguisher,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 27000 L Eddy Current Inspection of Centre section lower aft spar cap fitting,CH*,,,0:00,Eddy Current Inspection Initially at 27000 Hrs and thereafter every 1500 Hrs
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 22500 Hours Eddy Current Inspection of Centre Section of Belly Skin,CH*,,,0:00,Initially at 22500 Hrs and thereafter every 3000 Hrs subsequently
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 10000 L Inspection on Skin exterior ( Including Nose wheel well keels ),CH*,,,0:00,Initially at 10000 cycle and thereafter Every 1000 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Every 500 L Inspection on Non Reworked Stringers 5 thru 11 (DGCA/B200/17),CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Fuselage Stringers 5 thru 11(Non Reworked Stringers),CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 10000 L Inspection of fuselage frames FS84 thru FS347.75,CH*,,,0:00,Initially at 10000 cycle and thereafter every 1000 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 10000 L Inspection on Fuselage frames & cabin door,CH*,,,0:00,Initially at 10000 cycle and thereafter every 500 cycle.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Insurance Renewal,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 10000 L Inspection on stringers with internal Reinforcement kits installed,CH*,,,0:00,Initially at 10000 cycle and thereafter every 2500 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Stringers with External Doublers,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"Non reworked stringers on the aft side of the rear pressure bulkhead if stringers 8, 9 &10 (left & right ) have internal Reinforcement kits installed",CH*,,,0:00,Initially at 2500 cycle and thereafter every 500 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Stringers with External Doubler installed,CH*,,,0:00,Initially at 2500 cycle and thereafter every 1000 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 18000 Hours Inspection on Centre Section Lower Forward Spar Cap.,CH*,,,0:00,Eddy Current Inspection Initially at 18000 Hrs and thereafter every 3000 Hrs
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 15000 L Eddy Current Inspection Lower FWD Main Spar Lugs,CH*,,,0:00,Eddy Current Inspection for cracks Initially at 15000 Hrs and thereafter every 6000 Hrs subsequently
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Non reworked stringers 5 thru 11 ( Both LH & RH ) on the aft side of the rear pressure bulkhead at the point where zee stiffeners with are attached to the stringer with 6 rivets.,CH*,,,0:00,Initially at 2500 cycle and thereafter every 500 cycle
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,CPCP (4 Yrs / 2 Yrs) Inspection - 2 Yrs frequency,CP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,8Yrs / 4Yrs CPCP,CP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,800Hrs/24Mts Lubricatin Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,1200Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,Flap Actuator Piston-LH-IB,Lubrication of Flap Actuator Piston LH-IB,LS*,,,0:00,P/N- 50-521151-6 S/N- UNK
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,600Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,Flap Actuator Piston,Lubrication of Flap Actuator Piston RH-OB,LS*,,,0:00,P/N-50-521151-6 S/N- UNK...
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,Flap Actuator Piston LH-OB,Lubrication of Flap Actuator Piston LH-OB,LS*,,,0:00,P/N-50-521151-6 S/N- UNK.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,12 Mts Lubrication inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,Every Yearly Lubrication Inspection of Upper forward wing bolts,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,800Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,Flap Actuator Piston,Lubrication of Flap Actuator Piston RH-IB,LS*,,,0:00,P/N-50-521151-6 S/N- UNK..
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,400Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,400Hrs/12Mts Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,934,5,"PArt D, No. 10",10000cycles initial and there after every 1000cycles,OP*,,,0:00,Intially done at 10000 Landings then change the frequency to 1000 Landings
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,20000 Hrs Out of Phase inspection (Inspection Document ML),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 3600 Hrs repetative inspection from 20000 hrs one time inspection."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,"Airstair Door - (Inspect for cracks) (including all upper latches, latch rods and hinges )",OP*,,,0:00,Initially at 5000 cycles and thereafter every 1000 cycles
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 11,1600 Hours/24 Months (Inspection Document 11),OP*,,,0:00,Inspection Document 11
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,384,5,"Part D, No.24",1000Hrs / 1Year Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Remove Nose wheel Assy. as due for penetrant or eddy current inspection of wheel halves . install serviceable one,OP*,,,0:00,NOSE WHEEL ASSY
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Every 5000 Landings Inspection of Flap Flexible Drive Shaft - RH (IB),OP*,,,0:00,TASK REQUIREMENT:-Inspect for wear and freedom of operation with both endsdisconnected.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,32-30-00-18-240-LH,Insp. Clevis Hole of actuator Clevis Main L/G LH,OP*,,,0:00,Inspect Clevis Hole
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,366,5,"Part D, No.6",5000 Hr Out of phase Inspection (Inspection Document 14),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 2500 Hrs repetative inspection from 5000 hrs one time inspection.Inspection Document 14."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,381,5,"Part D, No.21",400Hrs / 6Months Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,15000Hrs and thereafter at every 3000Hrs Out of Phase Inspection.,OP*,,,0:00,Intially done at 15000 Hrs then change the frequency to 3000 Hrs
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,379,5,"Part D, No.19",6 Years Out of Phase Inspection (Inspection Document 04),OP*,,,0:00,Inspection Document 04
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,10000 Cycles and thereafter at every 5000 Cycles Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 12,1600 Hours/60 Months (Inspection Document 12),OP*,,,0:00,Inspection Document 12
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,5Yrs/1Yr OOP Inspection,OP*,,,0:00,Initially at 5Yrs thereafter every 1Yr.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 0A,Annual Inspection (Inspection Document 0A),OP*,,,0:00,Inspection Document 0A
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,28,,Every 2400 Hours / 30 Months Inspection of Nacelle And Aux Fuel Cells And Probes (RH),OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 10,800 Hours/24 Months (Inspection Document 10),OP*,,,0:00,Inspection Document 10
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,0,34,,Calibration of Altimeter Servo-pilot,OP*,,,0:00,Altimeter Pilot
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,375,5,"Part D, No.15",1 Year out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,391,5,,25000 Hours out of phase inpection,OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 5000 hours repetative inspection from 25000 hours one time inspection."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,34,,Every 2 Years System Check and Leak Check of Pitot-Static system,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,20000 Hrs Out of Phase Inspection (Inspection Document AD),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 5000 Hrs repetative inspection from 20000 hrs one time inspection. Inspection Document AD"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,935,5,"Part D, No.13",12Months OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,28,,Every 2400 Hours / 30 Months Inspection of Nacelle And Aux Fuel Cells And Probes (LH) & (RH),OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Every 8000 L / 6 Yr Inspection for cracks, corrosion & wear of Main Landing Gear Drag Brace Assembly (LH)",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Every 8000 L / 6 Yr Inspection for cracks, corrosion & wear of Main L/G shock absorber (Main) RH",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,33,,Calibration of Transponder LH,OP*,,,0:00,Calibration check
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,937,5,"Part D, No. 11",5 Years OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,28,,every 12 months fuel system collector tank,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Every 5000 Landings Inspection of Flap Flexible Drive Shaft - LH (OB),OP*,,,0:00,TASK REQUIREMENT :-Inspect for wear and freedom of operation with both ends disconnected.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,27000Hrs and thereafter at every 1500Hrs Out of Phase Inspection.,OP*,,,0:00,Intially done at 27000 Hrs then change the frequency to 1500 Hrs
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,25000 Landings OOP Inspection (Inspection Document AJ),OP*,,,0:00,"After completion of this inspection Downgrade the frequency,and make it 5000 Ldgs repetitive insp from 25000 ldgs one time insp"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,32-30-00-18-240 RH,Insp. Clevis Hole of actuator Clevis Main L/G RH,OP*,,,0:00,Inspect Clevis Hole
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Every 5000 Landings Inspection of Flap Flexible Drive Shaft - RH (OB),OP*,,,0:00,TASK REQUIREMENT :- Inspect for wear and freedom of operation with both ends disconnected.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,27000Hrs and thereafter at every 6000Hrs Out of Phase Inspection.,OP*,,,0:00,Intially done at 27000 Hrs then change the frequency to 6000 Hrs
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,4000 Ldgs out of phase inpection. (Inspection Document MC),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 500 Ldgs repetative inspection from 4000 Ldgs one time inspection."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,32-30-00-20-160,Insp. Clevis Hole of actuator Clevis nose LG,OP*,,,0:00,Inspect Clevis Hole
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 20,12 calendar months phase Inspection (Inspection Document 20),OP*,,,0:00,ELT Functional Check
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,363,5,"Part D, No.3",1000Hrs Out of phase inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 21,24 Calendar Months Inspection (Inspection Document 21),OP*,,,0:00,Inspection Document 21
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Every 1000 Landings Inspection on Nose L/G Actuator Clevis,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,05Yrs/01Yr OOP Inspection,OP*,,,0:00,Initially at 5Yrs thereafter every 1Yr.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 05,144 Calender Months Inspection (Inspection Document 05),OP*,,,0:00,Inspection Document 05
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Reference Document 16,"12,500 Hours Inspection (Inspection Document 16)",OP*,,,0:00,"Initially 12,500 Hours and every 2500 Hours thereafter. Reference Document 16"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document MI,5000 Hours Inspection (Inspection Document MI),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 500 Hrs repetative inspection from 5000 hrs one time inspection. Inspection Document MI."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,373,5,"Part D, No.13",17500 Hrs out of phase inpection (Inspection Document 18),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 1000 Hrs repetative inspection from 17500 hrs one time inspection.Inspection Document 18."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,(05Yrs/01Yr) OOP Inspection,OP*,,,0:00,Initially at 5Yrs thereafter every 1Yr.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,928,5,"Part D, No.4",2000Hrs/4Yrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Every 8000 L / 6 Yr Inspection for cracks, corrosion, wear of axle assy. & torque knee (Nose Ldg. Gear)",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"25,000 Landings Inspection (Inspection Document 19)",OP*,,,0:00,"First 25,000 Landings and every 5000 landings thereafter. Inspection Document 19"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,20000 Hrs out of phase inspection (Inspection Document MF),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 5000 Hrs repetative inspection from 20000 hrs one time inspection. Inspection Document MF"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,2500 Cycles Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,5000Cycles initial and there after every 1000cycles,OP*,,,0:00,"Initially complied at 4985 Landings, via w/o no. VT-DAF/2011/11/15/178"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document MA,10000 Hrs Out of phase inpection (Inspection Document MA),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 5000 Hrs repetative inspection from 10000 hrs one time inspection."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 15,7500 Hours Inspection (Inspection Document 15),OP*,,,0:00,Initially 7500 Hours and every 2500 hours thereafter. Inspection Document 15
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,600Hrs/18Mts Out of Phase Inspetion,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,50 Hrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Documents MB,5000 Ldgs out of phase inpection (Inspection Documents MB),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 1000 Ldgs repetative. Inspection Document MB"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 02,24 Calender Months Inspection (Inspection Document 02),OP*,,,0:00,Inspection Document 02
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Replacement of Lower fwd wing bolt & nuts,OP*,,,0:00,Kit 101-4083
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Every 8000 L / 6 Yr Inspection for cracks, corrosion & wear of Nose L/G shock absorber Assembly",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"20,000 Hours Out Of Phase Inspection (Inspection Document MK)",OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 4400 Hrs repetative inspection from 20,000 hrs one time inspection. Inspection Document MK"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Cockpit Fire Extinguisher Weighing,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,10000 Hrs Out of phase inpection (Inspection Document MH),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 2500 Hrs repetative inspection from 10000 hrs one time inspection. Inspection Document MH"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"Every 5Yrs. Flat surfaces depression/ counterbores-up, fd. Up & lwr aft wing jn pts.",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 13,"20,000 Hours Inspection (Inspection Document 13)",OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 5000 Hrs repetative inspection from 20,000 hrs one time inspection. Inspection Document 13"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Every 8000 L / 6 Yr Inspection for cracks, corr & wear of Nose Landing Gear Drag Brace Assembly",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,372,5,"Part D, No.12",16500 Hrs out of phase inpection (Inspection Document 17),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 5000 Hrs repetative inspection from 16500 hrs one time inspection. Inspection Document 17."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 27000 L Eddy Current Inspection of out board wing panel aft spar lower fitting,OP*,,,0:00,Initially at 27000 Hrs and thereafter every 1500 Hrs subsequently
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"20,000 Hours Out of Phase Inspection (Inspection Document ML)",OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 3600 Hrs repetative inspection from 20,000 hrs one time inspection. Inspection Document ML"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,926,5,"Part D, No.2",1000cycles OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 17,"16,500 Hours Inspection (Inspection Document 17)",OP*,,,0:00,"Initially 16,500 Hours and every 5000 Hours thereafter. Inspection Document 17"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,387,5,"Part D, No.27",2000Hrs/2Yrs Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,2,33,,Calibration of Transponder RH,OP*,,,0:00,Calibration check
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Every 8000 L / 6 Yr Inspection for cracks, corrosion & wear of Main Landing Gear Drag Brace Assembly (RH)",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,405,5,"Part G, No.05",CPCP (5Yrs/ 2Yrs) - 5Years frequency,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,8000Cycles/6Yrs Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,361,5,"Part D, No.1",500Hrs Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,18000Hrs and thereafter at every 3000Hrs Out of Phase Inspection.,OP*,,,0:00,Intially done at 18000 Hrs then change the frequency to 3000 Hrs
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,20,,Annual Inspection of Pilot's Fuel Control Panel & Lower Panel co-pilot's Circuit Breaker Panel and other wiring circuitry below the storm windows,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,376,5,"Part D, No.16",2 Years Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,15000 Ldgs out of phase inpection (Inspection Document MD),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 3000 Ldgs repetative inspection from 15000 Ldgs one time inspection. Inspection Document MD"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,5000 Hrs Out of Phase Inpection (Inspection Document MG),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 1200 Hrs repetative inspection from 5000 hrs one time inspection. Inspection Document MG"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,933,5,"PArt D, No.9",10000cycles initial and there after every 500cycles,OP*,,,0:00,Intially done at 10000 Landings then change the frequency to 500 Landings
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,380,5,Inspection Document 05,12 Yearly Out of phase Inspection (Inspection Document 05),OP*,,,0:00,Inspection Document 05
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document,24 calendar months Inspection (Inspection Document 02),OP*,,,0:00,Inspection Document 02
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,927,5,"Part D, No.3",1200Hrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Cabin Fire Extinguisher Weighing,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,938,5,"Part D, No. 12",12Years OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Every 8000 L / 6 Yr Inspection for cracks, corrosion & wear of Main L/G shock absorber Assembly (LH)",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,LH,"Every 8000 L / 6 Yr Inspection for cracks, corrosion, wear of axle assy. & torque knee (Main Ldg. Gear LH)",OP*,,,0:00,LH
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,386,5,Inspection Document 12,1600Hrs/5Yrs Out of phase Inspection (Inspection Document 12),OP*,,,0:00,Inspection Document 12
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,55,,Annual Inspection of Horizontal & vertical stabilizer,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,364,5,"Part D, No. 4",1800Hrs Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,"Inspection Document 21 (Altimeter bench check, ASI,VSI leak test)",24 Calendar Month Inspection (Inspection Document 21),OP*,,,0:00,Pitot/Static system Functional check
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Every 1000 Landings Inspection on RH Main L/G Actuator Clevis,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Every 8000 L / 6 Yr Inspection for cracks, corrosion, wear of axle assy. & torque knee (Main Ldg. Gear) RH",OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Aeromobile Station licence Renewal,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,383,5,"Part D, No.23",800Hrs / 1 Year Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 14,5000 Hours Inspection (Inspection Document 14),OP*,,,0:00,Initially 5000 Hours and every 2500 hours thereafter. Inspection Document 14
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,"Every 5 Year Flat surfaces, depressions, counterbores, and bolt bores at the upper forward, upper and lower aft wing joining points",OP*,,,0:00,"Magnified Visual check and Eddy current for cracks, corrosion and mechanical damage"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Every 5000 Landings Inspection of Flap Flexible Drive Shaft - LH (IB),OP*,,,0:00,TASK REQUIREMENT:-Inspect for wear and freedom of operation with both ends disconnected.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,5000 Hrs Out of Phase Inpection (Inspection Document ME),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 3600 Hrs repetative inspection from 5000 hrs one time inspection. Inspection Document ME"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 18,"17,500 Hours Inspection (Inspection Document 18)",OP*,,,0:00,"Initially 17,500 Hours and every 1000 Hours thereafter. Inspection Document 18"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,28,Nacelle fuel tank probes,Inspection of Nacelle fuel tank probes RH,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,33,,Every 2000 Hrs / 4 Yr Inspection for Condition of Edgelighted panel Assy.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,929,5,"Part D, No. 5",2400Hrs/30Mths OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,371,5,"Part D, No.11",12500Hours Out of phase Inspection (Inspection Document 16),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 2500Hrs repetative inspection from 12500hrs one time inspection. Inspection Document 16"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,15000Hrs and thereafter at every 6000Hrs Out of Phase Inspection.,OP*,,,0:00,Intially done at 15000 Hrs then change the frequency to 6000 Hrs
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 08,Every 400 Hours/24 Months Phase II Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 09,800 Hours/12 Months (Inspection Document 09),OP*,,,0:00,Inspection Document 09
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,378,5,"Part D, No.18",4 Years Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,37,,Instrument Air Filter,OP*,,,0:00,Replace(Every 600Hrs.or more often if conditions(operating in heavy smoke or dust)warrant)
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,35,,Annual Barometric pressure switch check of Oxygen System,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Every 1000 Landings Inspection on LH Main L/G Actuator Clevis,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,34,24-31-00-01-10,Remove standby power supply battery PS835 for capacity test and install serviceable battery after CT,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,938,5,"Part D, No. 12",12 Years OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,932,5,"Part D, No.8",10000cycles OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Initially 5 years/ thereafter every 5 years Lower fwd main spar clevis fitting,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,377,5,"Part D, No. 17",3 Years Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,22500Hrs and thereafter at every 3000Hrs Out of Phase Inspection.,OP*,,,0:00,Intially done at 22500 Hrs then change the frequency to 3000 Hrs
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,382,5,"Part D, No.22",500Hrs/1Yr Out of Phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,931,5,"Part D, No.7",5000Cycles initial and there after every 1000cycles,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,34,,Every 2 Year System Check and Leak Check of Altimeter,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,385,5,"Part D, No.25",1200Hrs/1Yr Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 04,72 Calender Months Inspection (Inspection Document 04),OP*,,,0:00,Inspection Document 04
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,"Escape Hatches - Inspect for cracks (including all upper latches, latch rods and hinges )",OP*,,,0:00,Initially at 5000 cycles and thereafter every 1000 cycles
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,"Every 5 Year Inspection of Wing bolts at the upper forward, upper and lower aft wing joining points",OP*,,,0:00,"Magnified Visual check and fluorescent liquid penetrant for cracks, corrosion and mechanical damage"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,5000 Hours Inspection (Inspection Document MJ),OP*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 400 Hrs repetative inspection from 5000 hrs one time inspection. Inspection Document MJ"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,930,5,"Part D, No.6",5000Cycles OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,936,5,"Part D, No. 14",24 Mths OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 22,24 Calendar Months Inspection (Inspection Document 22),OP*,,,0:00,Transponder Functional Check
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 2500 L Inspection of Forward Pressure Bulkhead,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,71,,Every 30 Days Desalination wash of LH & RH Engine,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,362,5,"Part D, No.2",600Hrs Out of phase Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 03,48 Calender Months Inspection (Inspection Document 03),OP*,,,0:00,Inspection Document 03
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Cargo Door,ROU1,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 1000 cycles repetative inspection from 5000 Cycles one time inspection"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,73,,FCU Shop Visit For Inspection,ROU1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase I Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,25,,First Aid Kit(1 Year) Recertification,ROU*,,,0:00,"To comply with CAR Series-X, part III"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Every 3000 L / 3 Yr Inspection of Flaps,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MH,ROU*,,,0:00,Initially at 10000 hours then every 2500 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,406,5,,CPCP 6Yrs/3Yrs,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Wing bolt inconel,ROU*,,,0:00,"Replace at 15 years or 15, 000 hours, whichever occurs first, of installed bolt and one nut at a time."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Compressor turbine disc & blade set. Post-SB 1669 with full or partial set of previously run turbine blade installed,ROU*,,,0:00,The compressor turbine disc & blade set must be sent for an inspection.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Ng Indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Main landing gear actuator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Rudder boost filter,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Vertical speed indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,CAMO Contract valadity,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Carry Out Trim Tab Free Play Checks. Check Aileron Trim Tab Free Play.,ROU*,,,0:00,(Part Of Phase I Inspection)
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,52,,"Cargo Door - Inspect for cracks (including all upper latches, latch rods and hinges )",ROU*,,,0:00,Initially at 5000 cycles and thereafter every 1000 cycles
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,28,,Fuel Outlet filter Replacement,ROU*,,,0:00,"Service Life Limeted Component, Replace at every 600 Hr"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,First Aid Kit Certificate,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Centre section lower aft spar fitting,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 02,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Reference Document ME,5000 Hours Inspection,ROU*,,,0:00,Initially 5000 Hours then every 3600 Hour
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Oxygen cylender HST,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Air data System,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase II Inspection schedule,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Airworthiness Review Certificate (ARC),ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Cabin ROC Indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,28,,Fuel Samples for MBT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 03,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Every 6 Years Cockpit Fire Extinguisher - Maintenance / Recharge,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document ME,ROU*,,,0:00,Initially at 5000 hours then every 3600 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Gyro Horozon (Air) Co-Pilot,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Oxygen Cylinder,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"10,000 Hours Inspection",ROU*,,,0:00,"First 10,000 Hours and every 5000 Hours thereafter. Reference Document 05 MA"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,"Every 500 L Inspection of Non-reworked stringers on the aft side of the rear pressure Bulkhead if stringers 8,9 and 10 (both left and right) have internal reinforcement kits installed - ( Inspect for cracks )",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Turn & Slip indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Main Landing gear,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,180 days radio inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,402,5,"Part G, No.2",CPCP (2Yrs/1Yr) - 2 Years frequency,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Airworthiness Review Certificate,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Wing Centre Section,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,403,5,"Part G, No.3",CPCP 3Yrs/1Yr - 1Year frequency,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Reference Document MF,"20,000 Hours Inspection",ROU*,,,0:00,"20,000 Hours and every 5000 Hours thereafter."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Flaps Left and Right (Both Inboard and outboard),ROU*,,,0:00,"Remove flaps and inspect flap attach brackets, flap structure, tracks, roller bearings, and attachment hardware for wear."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ELT Battery Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,37,,Wing centre upper surface bonded panel skin inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Landing Gear Hydraulic system filter & 'O' ring replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase II Inspection - 400hrs/12mths,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 09,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,CPCP 04Yrs / 2Yrs - 2Years frequency,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Flight Control Gust Lock Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Fire Ext. Monthly Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,OAT gage,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,DGCA/NEW MISC./35,Transponder Check-As Per New Misc Mod-35,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,403,5,"Part G, No.3",CPCP (3Yrs / 1Yr) - 3 Years frequency,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Short term Aeromobile License,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Suction gage,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Reference Document MD,"15,000 Landings Inspection",ROU*,,,0:00,"15,000 Landings and every 3000 landings thereafter."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 07 (Phase Inspection),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,21,,Every 12 Months Check of Cabin Altitude Warning Pressure switch,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,200Hrs Lubrication,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,34,Cesscom,Pitot & Static Hoses Replacement,ROU*,,,0:00,"Service Life Limited Component, Replace at every 10 Yrs"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Flight Controls,ROU*,,,0:00,"PERIODICITY :-Initially at 10,000 Cycle and every 5000 Cycles thereafter. TASK REQUIREMENT :-Inspect all flight control pulley bracket and casting for crack, corrosion, wear and attachment."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,72,,Engine HSI,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,404,5,"Part G, No.4",CPCP (4Yrs / 2Yrs) - 4Years frequency,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,368,5,"Part D, No.8",7500 Hrs Out of Phase Inspection (Inspection Document 15),ROU*,,,0:00,"After completion of this inspection please downgrade the frequency, and make it 2500 Hrs repetative inspection from 7500 hrs one time inspection.Inspection Document 15."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Carry Out Ground Run Of Both LH & RH Engine,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,"Carry Out Visual check and fluorescent liquid penetrant for cracks, corrosion and mechanical damage of wing bolts at the upper forward, upper and lower aft wing joining point",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 05,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,23,,Periodic Inspection of ELT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 19,ROU*,,,0:00,Initially at 25000 landings then every 5000 landings
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Cabin Fire Extinguisher - Yearly Maintenance,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,359,5,"Part C, No.5",200Hrs Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MJ,ROU*,,,0:00,Initially at 5000 hours then every 400 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase II Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Fire Ext. Maint. & Recharge,ROU*,,,0:00,Internal Inspection (Task 26-20-00-290)
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Np Indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Centre section belly skin,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,CVR Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,400 HRS/12 MONTHS INSPECTION,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MF,ROU*,,,0:00,Initially at 20000 hours then every 5000 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Airspeed Indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Every 400 Hours / 24 Months Phase II Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Fire Extinguisher Contents Check,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Standby power supply battery,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Magnetic Compass,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,"Carry out Magnified visual and Eddy current of Flat surfaces, depressions, counterbores, and bolt bores at the upper forward, upper and lower aft wing joining points",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Horizontal & vertical stabilizer,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 12,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Every 800 Hours/ 12 Months Phase IV Inspection,ROU*,,,0:00,To be performed at 800 hours. Then 800 hours after the last complete Phase 4 inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 04,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,Upper Forward wing Bolts.,ROU*,,,0:00,First scheduled inspection after wing installation and annually thereafter.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Torque indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Cabin door and fuselage frame,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"Initial 5Yrs and thereafter at every 5Yrs Out of Phase Inspection (Upper fwd, upper & lower aft wing joining points)",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,Every 1200 Hours Lubrication Inspection of Flap Motor Gear box,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Wing Forward Spar Angle,ROU*,,,0:00,eddy current inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,23,,ELT Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Every 2500 L Inspection on Stringers with external doublers,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Nose Landing gear actuator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Fuel Flow Indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,37,Cesscom,10 Years Vacuum Hoses Replacement,ROU*,,,0:00,Service Life limit Component
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Nose and Main Landing Gear Trunnion Bolt Holes and Drag Brace Attach Holes,ROU*,,,0:00,"Inspect for cracks, corrosion, damage, and elongation of holes."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Nacelle Splice Plates,ROU*,,,0:00,Initial 6 Years/ Recurring 1 Year
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Directional Gyro,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,100 Hrs/Annual Inspection,ROU*,,,0:00,Inspection Document 0A
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,72,,Ignition system,ROU*,,,0:00,"1.examine the ignition exciter for the correct installation and condition 2.Examine the ignition cables for chafing, wear and correct installation 3.Examine the ignition cables for chafing, wear and correct installation"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Reference Document MB,5000 Hours Inspection,ROU*,,,0:00,Initially 5000 Hours then every 1000 Hours upto 10000 landings
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,402,5,"Part G, No.2",CPCP (2Yrs / 1Yr) - 1 Year frequency,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Aeromobile Licence,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Aircraft Insurance.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,Every 800 Hours/ 24 Months Lubrication Inspection of Downlock Hooks and Pin contact areas,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Retract gear box and clutch,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Carry Out Replacement of Landing Gear Retraction and Extension Teflon Hydraulic Hoses,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MA,ROU*,,,0:00,Initially at 10000 hours then every 5000 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,37,,100 Hr/12Months Vacuum relief valve filter Replacement,ROU*,,,0:00,Service life limit is 100Hr/12Months
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,25,,Life Jacket,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Reference Document MH,10000 Hours Inspection,ROU*,,,0:00,"10,000 Hours and every 2500 Hours thereafter."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"Out bd. Wing panel , aft spar lower fitting",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Annual Cockpit Fire Extinguisher - Maintenance,ROU*,,,0:00,P/N: 344TS S/N: B-65822155
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ELT Battery Replacement - Pointer ELT,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,CPCP 5Yrs / 2Yrs - 2Years frequency,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase III Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,C of A - 5 Years frequency,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Range & Performance Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,34,,Every 24 Months Transponder - Calibration,ROU*,,,0:00,P/N:622-1270-001 S/N:41196 & 25989
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Altitude warning system,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Flap Actuator Piston,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,35,,Every Yearly Inspection of Co-Pilot Oxygen Mask,ROU*,,,0:00,"Inspect co-pilot mask for condition, cleanliness and operation. check hoses for condition mask"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,"Visual & Flourescent inspection of wing bolt/nut, Inconel (upper, forward, upper & lower aft) Wing joining point Inconel",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Annual Compass Swing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Every 1200 Hours Lubrication of Flap Actuator Piston(LH IB),ROU*,,,0:00,Position: 27-50-00-08-515-LH-IB
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase IV Inspection (800hrs/24mths),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Aircraft Weighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase III Inspection schedule,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Annual Cabin Fire Extinguisher - Maintenance,ROU*,,,0:00,P/N: C352TS S/N: H-21670863
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Centre section lower aft spar cap,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,C of A,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Autopilot servo mount slipcluch test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,Every 1200 Hours Lubrication of Flap Actuator Piston (RH OB),ROU*,,,0:00,Position: 27-50-00-08-515-RH-OB
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase I Inspection - 200hrs/6mths,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,20,,Every 2500 L / 6 Yrs Inspection of Cabin and Cockpit with Interior Removed.,ROU*,,,0:00,"1.Inspect the oxygen system components and plumbing for damage and security of attachment. 2.Visually inspect plumbing in the cockpit and cabin sidewall areas and overhead areas for chafing, condition, correct routing including oxygen, pressurization control and window defog systems. 3.Visually inspect the electrical wiring in the cockpit and cabin side walls and overhead areas for chafing, condition and correct routing. 4.Visually inspect the environmental ducting in the cockpit and cabin side walls and overhead areas for condition and attachment. 5.Visually inspect cockpit and cabin fuselage skins and structure for cracks, corrosion, loose, or missing fasteners and general cleanliness and condition. Pay particular attention to the crossties at the Stringer number 7 position (Ref. 53-10-00, Figure 211)."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,401,5,"Part G, No.1",CPCP (1Yr/ 2Yr),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,10,,Every 12 Months Inspection of Control Lock,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,23,,ELT Self Test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Wing centre section and outboard wing .,ROU*,,,0:00,"9,500 hours unless inspected and bushings replaced per Kit 101-4050, Kit Information - Spar Bushing."
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Fire Extinguisher Reweighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Cockpit & Cabin Fire Extinguisher - Reweighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Annual Radio Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Aeromobile license renewal,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ELT Annual inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Out bd. Wing panel lower fwd spar cap,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Altimeter Bench Check,ROU*,,,0:00,In addition ASI & Instantaneous VSI Leak Test
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Inspection Document 06,200 Hours/12 Months Phase Inspection (Inspection Document 06),ROU*,,,0:00,Inspection Document 06
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,24,AMM chap 5-20-05,Standby Power Supply Load test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 08,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,Stringers with external doublers are installed,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,37,,100Hrs/12 Months Vacuum Relief Valve Filter Replacement,ROU*,,,0:00,Service Life Limit Component P/N-B3-5-1
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 11,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,400 Hours/12 Month Phase Inspection (Inspection Document 07),ROU*,,,0:00,Inspection Document 07
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,CVR ULB BATTERY CHANGE,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,First Aid Kit Certification,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,RANGE TEST,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MI,ROU*,,,0:00,Initially at 5000 hours then every 500 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,23,,Operational test of CVR ULB,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Compressor turbine disc & blade set. Pre-SB 1669 with full or partial set of previously run turbine blade installed,ROU*,,,0:00,The compressor turbine disc & blade set must be sent for an inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Aeromobile License,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,180 Days Radio Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 18,ROU*,,,0:00,Initially at 17500 hours then every 1000 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document ML,ROU*,,,0:00,Initially at 20000 hours then every 3600 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,34,,Altimeter & Static System - Functional Test,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Every 600 Hours/ 12 Months Phase III Inspection,ROU*,,,0:00,To be performed at 600 hours. Then 600 hours after the last complete Phase 4 inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 21,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Tansponder Rectification,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Fuel Quantity Gauge - Calibrate,ROU*,,,0:00,Part of 01 Yr Inspection.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,360,5,"Part C, No.6",400Hrs Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Fuselage frames FS84 thru FS 347.75,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MK,ROU*,,,0:00,Initially at 20000 hours then every 4400 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,23,,Every 2 Years Operational Test of CVR,ROU*,,,0:00,AMM Ch. 05-20 20-05-601
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Range & Performance Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Emergency Exit Sign Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspect Non Reworked Stringer 5 Thru 11 (DGCA/B200/17),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,"Eddy Current Inspection of Outboard Wing Panel Lower, Forward Spar Cap",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 22,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,"Every 10000 Landings Inspection of Flap motor, gearbox, actuators and 90° Drives",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Cabin door,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 12 Months Inpsectinon of upper & lower main spar cap.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,35,,Oxygen System(BAROMETRIC PRESSURE SWITCH),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 600 Hours /18 Months Inspection on Wing center section upper surface bonded panel skin,ROU*,,,0:00,(Wing centre section upp. Bonded panel Skin inspection)
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Carry Out Replacement of Packings of Passenger Oxygen Shut-Off Valve,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,12 calendar months phase Inspection (Inspection Document 01),ROU*,,,0:00,Inspection Document 01
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,35,,Every Yearly Inspection of Pilot Oxygen Mask,ROU*,,,0:00,"Inspect Pilot mask for condition, cleanliness and operation. check hoses for condition mask"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Oxygen press. gage,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,53,,"Cargo Door - (Inspect for cracks) (including all upper latches, latch rods and hinges )",ROU*,,,0:00,Initially at 5000 cycles and thereafter every 1000 cycles.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Carry Out Phase Cycle,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 06 (Phase inspection),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Barometric press. Stw.check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase IV Inspection,ROU*,,,0:00,At least one phase inspection must be carried out within 12 months calendar time and all four Phase Inspection within a 24-calendar-month period.
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,24 months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MD,ROU*,,,0:00,Initially at 15000 landings then every 3000 landings
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,Every 1200 Hours Lubrication of Flap Actuator Piston (LH OB),ROU*,,,0:00,Position: 27-50-00-08-515-LH-OB
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 13,ROU*,,,0:00,"Initially at 20,000 Hours then every 5000 Hours thereafter"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Compass Swing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Cabin Fire Extinguisher,ROU*,,,0:00,HST
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Exterior skin (including NWW keels,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Every 1 Year Nacelle splice plates Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Every 800 Hours/ 24 Months Phase IV Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase III Inspection - 600hrs/18mths,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Compressor turbine disc & blade set. Pre-SB 1669 with full set of new blades installed at last shop visit.,ROU*,,,0:00,The compressor turbine disk & blade set must be sent for an inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Prop. Amp Indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,28,,Carry Out Inspection of Fuel Control Unit,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,407,5,"Part G, No.7",CPCP (8Yrs / 4Yrs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,Airworthiness Limitations Manual 04-00-00-601,"Upper Forward, Upper and Lower Aft Wing Bolts and Nuts.",ROU*,,,0:00,"Replace at 20 years Service or 20,000 FH Whichever Occurs first"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Lower fwd. (main spar lugs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Flap position Indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Carry Out Zone 3 External Airplane Wash,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 0A,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase I Inspection schedule,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ARC Renewal,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,First Aid Kit - Contents check,ROU*,,,0:00,"CAR Requirement. To comply with CAR Series-X, part III"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 10,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Fire Ext. Yearly Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Instrument air filter,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"Frames web, fuselage FS 179 to FS 271",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Cockpit & Cabin Fire Extinguisher - Every 6 Year - Maintenance/Recharge,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,23,,CVR Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Deicer press gage,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Every 600 Hours/ 24 Months Phase III Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,12 months inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Every 5000 Hours Inspection of Bob Weight Link Assembly,ROU*,,,0:00,Perform the Elevator Bobweight Link Assembly
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Misc Mod 35,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Phase IV Inspection schedule,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 14,ROU*,,,0:00,Initially at 5000 hours then every 2500 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Weighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,"All cable seals ( Rudder trim tab cable seals,Rudder cable seals,Aileron tab cable seals ,Aileron cable seals,Elevator trim tab cable seals,Elevator cable seals)",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,26,,Cabin Fire Extinguisher -Maintenance/Recharge,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,ITT INDICATOR,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,358,5,"Part C, No.4",100Hrs Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,"Fork Assembly, Nose gear Spring",ROU*,,,0:00,"Fork Assembly, Nose gear Spring Replacement"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,27,,Every 4 Years Flight Control Cable Tension Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,23,,CVR Readout,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Centre section lower fwd spar fitting,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Aeromobile License Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 17,ROU*,,,0:00,Initially at 16500 hours then every 5000 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Air conditioner Compressor belt drive,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,37,,Vacuum Central Air Filter,ROU*,,,0:00,Service Life Limit Component
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Outboard Wing Structure,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MG,ROU*,,,0:00,Initially at 5000 hours then every 1200 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,23,,CVR Annual Readout,ROU*,,,0:00,AAC 4 of 2019
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 16,ROU*,,,0:00,Initially at 12500 hours then every 2500 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Doubler & clips at upper & lower W/S corner,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Fuel MBT,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ELT Battery Replacement - Artex ELT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document MB,ROU*,,,0:00,"Initially at 5000 landings then every 1000 landings upto 10,000 landings"
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,6Months Corrosion Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,Reference Document MG,5000 Hours Inspection,ROU*,,,0:00,Initially 5000 Hours then every 1200 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 15,ROU*,,,0:00,Initially at 7500 hours then every 2500 hours
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ELT Monthly Inspection,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,57,,Visual Inspection of Accessible Flat Surfaces Of The Clevis Fitting At The Lower Forward Attach Fitting,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,12,,Every 1200 Hours Lubrication of Flap Actuator Piston RH IB,ROU*,,,0:00,Position: 27-50-00-08-515-RH-IB
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 20,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Volt/Frequency meter,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,32,,Nose wheel Assembly-Penetrant or Eddy Current Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,cargo door,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Every 200 Hours / 1 Years Phase I Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ELT Battery Replacement - 406MHz ELT,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Inspection Document 01 (Phase Inspection),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,"Calibration of ITT,Tq (Except proline 21) Mag. Com.check",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Fuselage frames & cabin door,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,5000 Landings Inspection,ROU*,,,0:00,5000 Landings and every 1000 landings thereafter (chapter 4 requirement- Nograce period)
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ULB Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,406,5,"Part G, No.6",CPCP (6Yrs / 3Yrs),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,ELT Self Test (By Pilot),SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,5,,Carry out preservation of Airplane and engine more than 90 days.,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,Insurance Renewal,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,86906960-e109-40fd-8ff9-a75f1754ba02,,101,,CAMO Contract Validity,SP*,,,0:00,

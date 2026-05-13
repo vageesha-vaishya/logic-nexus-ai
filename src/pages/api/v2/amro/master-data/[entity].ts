@@ -358,7 +358,7 @@ async function validateAircraftModelManufacturerReferences(
 
   const issues = new Map<number, { field: string; message: string }[]>();
   records.forEach((record, index) => {
-    const modelToken = asNullableString(record.aircraft_model || record.model);
+    const modelToken = asNullableString(record.assembly_models || record.aircraft_model || record.model);
     const manufacturerId = asNullableString(record.manufacturer_id);
     if (!modelToken || !manufacturerId) {
       return;
@@ -480,6 +480,10 @@ function markMissingColumn(entity: string, rawColumnName: string, listColumns: s
 
 function resolveSortColumn(entity: string, requestedSortBy: string, listColumns: string): string {
   const columns = getActiveColumns(entity, listColumns);
+  if (entity === 'assembly_models' && (requestedSortBy === 'planning_capability' || requestedSortBy === 'directive_capability')) {
+    // Capability columns are computed at runtime, so keep DB ordering stable and sort in-memory later.
+    return columns.includes('updated_at') ? 'updated_at' : columns[0] || 'updated_at';
+  }
   if (!columns.length) {
     return requestedSortBy || 'updated_at';
   }
@@ -493,6 +497,173 @@ function resolveSortColumn(entity: string, requestedSortBy: string, listColumns:
     return 'created_at';
   }
   return columns[0];
+}
+
+function stripColumnFromRecord(record: Record<string, unknown>, column: string): Record<string, unknown> {
+  if (!Object.prototype.hasOwnProperty.call(record, column)) {
+    return record;
+  }
+  const next = { ...record };
+  delete next[column];
+  return next;
+}
+
+function isMissingColumnErrorMessage(errorMessage: string, column: string): boolean {
+  const normalizedMessage = errorMessage.toLowerCase();
+  const normalizedColumn = column.toLowerCase();
+  return normalizedMessage.includes(normalizedColumn) && normalizedMessage.includes('column');
+}
+
+type AggregateCountAttemptResult =
+  | { status: 'ok'; counts: Map<string, number> }
+  | { status: 'missing_model_column' }
+  | { status: 'missing_table' }
+  | { status: 'error'; message: string };
+
+async function queryAggregateCountsByModelColumn(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  table: 'task_templates' | 'directives';
+  modelColumn: string;
+  modelIds: string[];
+  tenantId: string;
+  franchiseId: string | null;
+}): Promise<AggregateCountAttemptResult> {
+  const counts = new Map<string, number>();
+  let applyFranchiseScope = Boolean(params.franchiseId);
+
+  for (const modelId of params.modelIds) {
+    const runCount = async (withFranchiseScope: boolean) => {
+      let query = params.supabase
+        .from(params.table)
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', params.tenantId)
+        .eq(params.modelColumn, modelId);
+      if (withFranchiseScope && params.franchiseId) {
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+      }
+      return query;
+    };
+
+    let { count, error } = await runCount(applyFranchiseScope);
+
+    if (error && applyFranchiseScope && isMissingColumnErrorMessage(String(error.message || ''), 'franchise_id')) {
+      applyFranchiseScope = false;
+      ({ count, error } = await runCount(false));
+    }
+
+    if (error) {
+      const message = String(error.message || '');
+      if (isMissingTableError(message)) {
+        return { status: 'missing_table' };
+      }
+      if (isMissingColumnErrorMessage(message, params.modelColumn)) {
+        return { status: 'missing_model_column' };
+      }
+      return { status: 'error', message };
+    }
+    counts.set(modelId, Number(count || 0));
+  }
+
+  return { status: 'ok', counts };
+}
+
+async function resolveAggregateCountsByModel(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  table: 'task_templates' | 'directives';
+  modelIds: string[];
+  tenantId: string;
+  franchiseId: string | null;
+  modelColumnCandidates: string[];
+  correlationId: string;
+}): Promise<Map<string, number>> {
+  if (params.modelIds.length === 0) {
+    return new Map<string, number>();
+  }
+
+  for (const modelColumn of params.modelColumnCandidates) {
+    const result = await queryAggregateCountsByModelColumn({
+      supabase: params.supabase,
+      table: params.table,
+      modelColumn,
+      modelIds: params.modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+    });
+
+    if (result.status === 'ok') {
+      return result.counts;
+    }
+    if (result.status === 'missing_model_column') {
+      continue;
+    }
+    if (result.status === 'missing_table') {
+      return new Map<string, number>();
+    }
+    logger.warn('[AMRO Master Data API] failed to resolve aggregate model counts', {
+      correlationId: params.correlationId,
+      table: params.table,
+      message: result.message,
+    });
+    return new Map<string, number>();
+  }
+
+  return new Map<string, number>();
+}
+
+async function enrichAssemblyModelRowsWithCapabilityCounts(params: {
+  supabase: ReturnType<typeof getSupabaseAdminClient>;
+  rows: Record<string, unknown>[];
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+}): Promise<Record<string, unknown>[]> {
+  const modelIds = Array.from(
+    new Set(
+      params.rows
+        .map((row) => asNullableString(row.id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  if (modelIds.length === 0) {
+    return params.rows.map((row) => ({
+      ...row,
+      planning_capability: 0,
+      directive_capability: 0,
+    }));
+  }
+
+  const [planningCounts, directiveCounts] = await Promise.all([
+    resolveAggregateCountsByModel({
+      supabase: params.supabase,
+      table: 'task_templates',
+      modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+      modelColumnCandidates: ['assembly_models', 'model_id'],
+      correlationId: params.correlationId,
+    }),
+    resolveAggregateCountsByModel({
+      supabase: params.supabase,
+      table: 'directives',
+      modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+      modelColumnCandidates: ['assembly_models', 'assembly_model_id', 'model_id'],
+      correlationId: params.correlationId,
+    }),
+  ]);
+
+  return params.rows.map((row) => {
+    const modelId = asNullableString(row.id);
+    const planningCapability = modelId ? Number(planningCounts.get(modelId) || 0) : 0;
+    const directiveCapability = modelId ? Number(directiveCounts.get(modelId) || 0) : 0;
+    return {
+      ...row,
+      planning_capability: planningCapability,
+      directive_capability: directiveCapability,
+    };
+  });
 }
 
 function matchesSearch(row: Record<string, unknown>, searchableColumns: string[], search: string): boolean {
@@ -627,17 +798,17 @@ export function extractSelectedTaskTemplateResolution(payload: Record<string, un
   };
 }
 
-async function logWorkPackageTemplateLinkSnapshot(params: {
+async function logWorkOrderTemplateLinkSnapshot(params: {
   supabase: ReturnType<typeof getSupabaseAdminClient>;
   correlationId: string;
   templateId: string;
   tenantId: string;
 }) {
   const { data, error } = await params.supabase
-    .from('work_package_template_task_templates')
+    .from('work_order_template_task_templates')
     .select('task_template_id', { count: 'exact' })
     .eq('tenant_id', params.tenantId)
-    .eq('work_package_template_id', params.templateId);
+    .eq('work_order_template_id', params.templateId);
   if (error) {
     logger.warn('[AMRO Master Data API] failed to read work package template link snapshot', {
       correlationId: params.correlationId,
@@ -662,7 +833,7 @@ function isFranchiseCompatible(
   return recordFranchiseId === requestFranchiseId;
 }
 
-async function resolveWorkPackageTemplateModelId(
+async function resolveWorkOrderTemplateModelId(
   supabase: ReturnType<typeof getSupabaseAdminClient>,
   tenantId: string,
   franchiseId: string | null,
@@ -706,13 +877,13 @@ async function resolveWorkPackageTemplateModelId(
   return asNullableString((resolved as Record<string, unknown>).id);
 }
 
-export async function syncWorkPackageTemplateTaskLinks(params: {
+export async function syncWorkOrderTemplateTaskLinks(params: {
   supabase: ReturnType<typeof getSupabaseAdminClient>;
   tenantId: string;
   franchiseId: string | null;
   userId: string;
   correlationId: string;
-  workPackageTemplateId: string;
+  workOrderTemplateId: string;
   taskTemplateIds: string[];
   taskReferenceTokens: string[];
   aircraftModelToken: string | null;
@@ -721,7 +892,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     correlationId: params.correlationId,
     tenantId: params.tenantId,
     franchiseId: params.franchiseId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     requestedTaskTemplateCount: params.taskTemplateIds.length,
     requestedTaskReferenceCount: params.taskReferenceTokens.length,
     aircraftModelToken: params.aircraftModelToken || null,
@@ -740,7 +911,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   ));
   logger.info('[AMRO Master Data API] work package template relationship sync started', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     selectedTaskTemplateCount: uniqueTaskTemplateIds.length,
     selectedTaskTemplateIds: uniqueTaskTemplateIds,
     selectedTaskReferenceCount: uniqueTaskReferenceTokens.length,
@@ -749,7 +920,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   });
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-02 normalized-identifiers', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     uniqueTaskTemplateCount: uniqueTaskTemplateIds.length,
     uniqueTaskReferenceCount: uniqueTaskReferenceTokens.length,
   });
@@ -769,7 +940,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (uniqueTaskTemplateIds.length > 0) {
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-03 querying-task-templates-by-id', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       queryIdCount: uniqueTaskTemplateIds.length,
     });
     const { data: byIdRows, error: byIdError } = await resolveScopedTaskTemplateQuery().in('id', uniqueTaskTemplateIds);
@@ -786,7 +957,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (uniqueTaskReferenceTokens.length > 0) {
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-04 querying-task-templates-by-reference', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       queryReferenceCount: uniqueTaskReferenceTokens.length,
     });
     const { data: byTaskIdRows, error: byTaskIdError } = await resolveScopedTaskTemplateQuery().in('tt_sequence', uniqueTaskReferenceTokens);
@@ -825,7 +996,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   const missingReferenceTokens = uniqueTaskReferenceTokens.filter((token) => !resolvedReferenceTokens.has(token));
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-05 resolution-summary', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     resolvedTaskTemplateCount: availableIds.size,
     missingTaskTemplateCount: missingIds.length,
     missingReferenceTokenCount: missingReferenceTokens.length,
@@ -834,7 +1005,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     const missingTokens = [...missingIds, ...missingReferenceTokens];
     logger.warn('[AMRO Master Data API] task template validation failed for work package template', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       missingTaskTemplateIds: missingIds,
       missingTaskReferenceTokens: missingReferenceTokens,
     });
@@ -844,13 +1015,13 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (resolvedTaskTemplateIds.length === 0) {
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-06 no-task-resolved-cleanup-start', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
     });
     let cleanupQuery = params.supabase
-      .from('work_package_template_task_templates')
+      .from('work_order_template_task_templates')
       .delete()
       .eq('tenant_id', params.tenantId)
-      .eq('work_package_template_id', params.workPackageTemplateId);
+      .eq('work_order_template_id', params.workOrderTemplateId);
     if (params.franchiseId) {
       cleanupQuery = cleanupQuery.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
     }
@@ -860,16 +1031,16 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
     }
     logger.info('[AMRO Master Data API] no task templates resolved for work package template sync, existing links cleared', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
     });
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-07 no-task-resolved-cleanup-complete', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
     });
     return;
   }
 
-  let modelId = await resolveWorkPackageTemplateModelId(
+  let modelId = await resolveWorkOrderTemplateModelId(
     params.supabase,
     params.tenantId,
     params.franchiseId,
@@ -893,19 +1064,19 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   }
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-08 model-resolved', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     resolvedModelId: modelId,
     resolvedTaskTemplateCount: resolvedTaskTemplateIds.length,
   });
 
   let deleteQuery = params.supabase
-    .from('work_package_template_task_templates')
+    .from('work_order_template_task_templates')
     .delete()
     .eq('tenant_id', params.tenantId)
-    .eq('work_package_template_id', params.workPackageTemplateId);
+    .eq('work_order_template_id', params.workOrderTemplateId);
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-09 deleting-existing-links', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     franchiseScoped: Boolean(params.franchiseId),
   });
   if (params.franchiseId) {
@@ -915,7 +1086,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (deleteError) {
     logger.error('[AMRO WORK PACKAGE TEMPLATE SYNC] step-09-delete-failed', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       message: String(deleteError.message || ''),
     });
     throw new HttpError(deleteError.message, 400);
@@ -924,7 +1095,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   const relationshipRows = resolvedTaskTemplateIds.map((taskTemplateId) => ({
     tenant_id: params.tenantId,
     franchise_id: params.franchiseId,
-    work_package_template_id: params.workPackageTemplateId,
+    work_order_template_id: params.workOrderTemplateId,
     model_id: modelId,
     task_template_id: taskTemplateId,
     created_by: params.userId,
@@ -932,11 +1103,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   }));
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-10 inserting-links', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     insertRowCount: relationshipRows.length,
   });
   let relationInsertResult = await params.supabase
-    .from('work_package_template_task_templates')
+    .from('work_order_template_task_templates')
     .insert(relationshipRows);
   if (
     relationInsertResult.error &&
@@ -944,11 +1115,11 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   ) {
     logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-11 retry-insert-without-audit-columns', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       message: String(relationInsertResult.error.message || ''),
     });
     relationInsertResult = await params.supabase
-      .from('work_package_template_task_templates')
+      .from('work_order_template_task_templates')
       .insert(relationshipRows.map((row) => {
         const { created_by, updated_by, ...rest } = row;
         return rest;
@@ -957,7 +1128,7 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
   if (relationInsertResult.error) {
     logger.error('[AMRO WORK PACKAGE TEMPLATE SYNC] step-12-insert-failed', {
       correlationId: params.correlationId,
-      workPackageTemplateId: params.workPackageTemplateId,
+      workOrderTemplateId: params.workOrderTemplateId,
       message: String(relationInsertResult.error.message || ''),
     });
     throw new HttpError(relationInsertResult.error.message, 400);
@@ -965,14 +1136,14 @@ export async function syncWorkPackageTemplateTaskLinks(params: {
 
   logger.info('[AMRO Master Data API] linked work package template task templates', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     linkedTaskTemplateCount: resolvedTaskTemplateIds.length,
     linkedTaskTemplateIds: resolvedTaskTemplateIds,
     resolvedModelId: modelId,
   });
   logger.info('[AMRO WORK PACKAGE TEMPLATE SYNC] step-13 sync-completed', {
     correlationId: params.correlationId,
-    workPackageTemplateId: params.workPackageTemplateId,
+    workOrderTemplateId: params.workOrderTemplateId,
     linkedTaskTemplateCount: resolvedTaskTemplateIds.length,
   });
 }
@@ -1349,7 +1520,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new HttpError(errorMessage, 400);
       }
 
-      const allowTenantNullFallback = entity !== 'work_package_templates';
+      const allowTenantNullFallback = entity !== 'work_order_templates';
       if (tenantId && finalData.length === 0 && allowTenantNullFallback) {
         let fallbackData: unknown[] = [];
         let fallbackCount = 0;
@@ -1420,13 +1591,22 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         }
       }
 
+      const baseRows = (finalData || []) as Record<string, unknown>[];
       const rawRows = entity === 'flight_logs'
         ? await enrichFlightLogRowsWithAirportData(
             supabase,
             tenantId,
-            await enrichFlightLogRowsWithAircraftData(supabase, tenantId, (finalData || []) as Record<string, unknown>[]),
+            await enrichFlightLogRowsWithAircraftData(supabase, tenantId, baseRows),
           )
-        : ((finalData || []) as Record<string, unknown>[]);
+        : entity === 'assembly_models'
+          ? await enrichAssemblyModelRowsWithCapabilityCounts({
+              supabase,
+              rows: baseRows,
+              tenantId,
+              franchiseId,
+              correlationId: ctx.correlationId,
+            })
+          : baseRows;
       const activeSearchableColumns = getActiveSearchableColumns(entity, entityConfig.searchableColumns);
       const rows = franchiseId && search ? rawRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : rawRows;
       if (exportRequested) {
@@ -1470,20 +1650,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new HttpError('bulk import supports up to 500 records per request', 400);
       }
       let resolvedRecords = records;
-      let manufacturerIssues = new Map<number, { field: string; message: string }[]>();
-      let aircraftModelIssues = new Map<number, { field: string; message: string }[]>();
       let assemblyModelIssues = new Map<number, { field: string; message: string }[]>();
-      if (entity === 'aircraft') {
-        const resolved = await resolveAircraftManufacturerReferences(supabase, records);
-        resolvedRecords = resolved.resolved;
-        manufacturerIssues = resolved.issues;
-        aircraftModelIssues = await validateAircraftModelManufacturerReferences(
-          supabase,
-          tenantId,
-          franchiseId,
-          resolvedRecords,
-        );
-      }
       if (entity === 'assembly_models') {
         assemblyModelIssues = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, records);
       }
@@ -1493,8 +1660,6 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const validationResults = prepared.map((record, index) => ({
         index,
         issues: [
-          ...(manufacturerIssues.get(index) || []),
-          ...(aircraftModelIssues.get(index) || []),
           ...(assemblyModelIssues.get(index) || []),
           ...buildRequiredFieldIssues(entity, record),
           ...validatePayload(entity, record),
@@ -1533,11 +1698,38 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         }
         return insertRow;
       });
-      const { data, error } = await supabase
-        .from(entityConfig.table)
-        .insert(insertRows)
-        .select(entityConfig.listColumns);
-      if (error) throw new HttpError(error.message, 400);
+      let bulkInsertRows = insertRows;
+      let bulkData: unknown[] | null = null;
+      let bulkErrorMessage = '';
+      for (let attempt = 0; attempt < 4; attempt += 1) {
+        const selectClause = getSelectClause(entity, entityConfig.listColumns);
+        const { data, error } = await supabase
+          .from(entityConfig.table)
+          .insert(bulkInsertRows)
+          .select(selectClause);
+        if (!error) {
+          bulkData = Array.isArray(data) ? data : [];
+          bulkErrorMessage = '';
+          break;
+        }
+        bulkErrorMessage = String(error.message || '');
+        const missingColumn = extractMissingColumn(bulkErrorMessage);
+        if (!missingColumn) {
+          break;
+        }
+        const schemaAdjusted = markMissingColumn(
+          entity,
+          missingColumn,
+          entityConfig.listColumns,
+          entityConfig.searchableColumns,
+        );
+        const hadPayloadColumn = bulkInsertRows.some((row) => Object.prototype.hasOwnProperty.call(row, missingColumn));
+        if (!schemaAdjusted && !hadPayloadColumn) {
+          break;
+        }
+        bulkInsertRows = bulkInsertRows.map((row) => stripColumnFromRecord(row, missingColumn));
+      }
+      if (bulkErrorMessage) throw new HttpError(bulkErrorMessage, 400);
       if (entity === 'ata_codes') {
         ATA_TREE_CACHE.clear();
       }
@@ -1557,22 +1749,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         output: {
           entity,
           imported_count: insertRows.length,
-          records: data || [],
+          records: bulkData || [],
         },
       });
       return;
     }
 
     let resolvedBody = body;
-    let manufacturerIssues: { field: string; message: string }[] = [];
-    let aircraftModelIssues: { field: string; message: string }[] = [];
-    if (entity === 'aircraft') {
-      const resolved = await resolveAircraftManufacturerReferences(supabase, [body]);
-      resolvedBody = resolved.resolved[0] || body;
-      manufacturerIssues = resolved.issues.get(0) || [];
-      const validation = await validateAircraftModelManufacturerReferences(supabase, tenantId, franchiseId, [resolvedBody]);
-      aircraftModelIssues = validation.get(0) || [];
-    }
     const payload = sanitizeWritePayload(entity, resolvedBody, { requireCreateFields: entity !== 'aircraft' });
     if (entity === 'ata_codes') {
       payload.code = String(payload.code || '').trim().toUpperCase();
@@ -1592,7 +1775,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         payload.is_active = true;
       }
     }
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       if (Object.prototype.hasOwnProperty.call(payload, 'policy_snapshot_id')) {
         payload.policy_snapshot_id = asNullableString(payload.policy_snapshot_id);
       }
@@ -1605,28 +1788,26 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       const validation = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, [payload]);
       assemblyModelIssues = validation.get(0) || [];
     }
-    const workPackageTemplateIssues: { field: string; message: string }[] = [];
-    if (entity === 'work_package_templates') {
+    const workOrderTemplateIssues: { field: string; message: string }[] = [];
+    if (entity === 'work_order_templates') {
       const policySnapshotId = asNullableString(payload.policy_snapshot_id);
       const modelId = asNullableString(payload.assembly_models_id);
       if (policySnapshotId && !isUuid(policySnapshotId)) {
-        workPackageTemplateIssues.push({
+        workOrderTemplateIssues.push({
           field: 'policy_snapshot_id',
           message: 'Policy Snapshot ID must be a valid UUID.',
         });
       }
       if (modelId && !isUuid(modelId)) {
-        workPackageTemplateIssues.push({
+        workOrderTemplateIssues.push({
           field: 'assembly_models_id',
           message: 'Aircraft Model reference must be a valid UUID.',
         });
       }
     }
     const issues = [
-      ...manufacturerIssues,
-      ...aircraftModelIssues,
       ...assemblyModelIssues,
-      ...workPackageTemplateIssues,
+      ...workOrderTemplateIssues,
       ...buildRequiredFieldIssues(entity, payload),
       ...validatePayload(entity, payload),
     ];
@@ -1674,7 +1855,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         ? (asNullableString(payload.franchise_id) || franchiseId)
         : franchiseId;
     }
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       const { taskTemplateIds, taskReferenceTokens, aircraftModelToken } = extractSelectedTaskTemplateResolution(payload);
       logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP 000] ', {function: 'insertPayload'});
       logger.info('[AMRO Master Data API] create request received for work package template', {
@@ -1721,9 +1902,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       logger.info('[AMRO WORK PACKAGE TEMPLATE CREATE] step-02 calling-atomic-function', {
         correlationId: ctx.correlationId,
-        functionName: 'amro_create_work_package_template_atomic',
+        functionName: 'amro_create_work_order_template_atomic',
       });
-      const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_package_template_atomic', {
+      const { data: atomicResult, error: atomicError } = await supabase.rpc('amro_create_work_order_template_atomic', {
         p_tenant_id: tenantId,
         p_franchise_id: franchiseId,
         p_user_id: auth.userId,
@@ -1739,7 +1920,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         if (/validation failed/i.test(message)) {
           throw new HttpError(message, 422);
         }
-        if (/amro_create_work_package_template_atomic/i.test(message) && /does not exist|undefined function/i.test(message)) {
+        if (/amro_create_work_order_template_atomic/i.test(message) && /does not exist|undefined function/i.test(message)) {
           logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-04 atomic-function-missing', {
             correlationId: ctx.correlationId,
             message,
@@ -1776,7 +1957,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         if (requestedAircraftModel) patchPayload.aircraft_model = requestedAircraftModel;
         if (Object.keys(patchPayload).length > 0) {
           const { data: patchedRecord, error: patchError } = await supabase
-            .from('work_package_templates')
+            .from('work_order_templates')
             .update(patchPayload)
             .eq('tenant_id', tenantId)
             .eq('id', createdTemplateId)
@@ -1802,7 +1983,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       createdRelationships.forEach((relationship, index) => {
         logger.debug('[AMRO Master Data API] inserted work package template task relationship', {
           correlationId: ctx.correlationId,
-          workPackageTemplateId: createdTemplateId,
+          workOrderTemplateId: createdTemplateId,
           relationshipIndex: index,
           taskTemplateId: asNullableString(relationship.task_template_id),
           modelId: asNullableString(relationship.model_id),
@@ -1810,10 +1991,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       const requestedTaskCount = Array.isArray(createdRecord?.tasks_json) ? createdRecord?.tasks_json.length : 0;
       const { data: verificationRows, error: verificationError } = await supabase
-        .from('work_package_template_task_templates')
+        .from('work_order_template_task_templates')
         .select('task_template_id')
         .eq('tenant_id', tenantId)
-        .eq('work_package_template_id', createdTemplateId);
+        .eq('work_order_template_id', createdTemplateId);
       if (verificationError) {
         logger.error('[AMRO WORK PACKAGE TEMPLATE CREATE] step-07 verification-query-failed', {
           correlationId: ctx.correlationId,
@@ -1869,13 +2050,42 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       });
       return;
     }
-    const { data, error } = await supabase
-      .from(entityConfig.table)
-      .insert(insertPayload)
-      .select(entityConfig.listColumns)
-      .maybeSingle();
-    if (error) {
-      throw new HttpError(error.message, 400);
+    let createPayload = insertPayload;
+    let createRecord: Record<string, unknown> | null = null;
+    let createErrorMessage = '';
+    for (let attempt = 0; attempt < 4; attempt += 1) {
+      const selectClause = getSelectClause(entity, entityConfig.listColumns);
+      const { data, error } = await supabase
+        .from(entityConfig.table)
+        .insert(createPayload)
+        .select(selectClause)
+        .maybeSingle();
+      if (!error) {
+        createRecord = data && typeof data === 'object' && !Array.isArray(data)
+          ? (data as unknown as Record<string, unknown>)
+          : null;
+        createErrorMessage = '';
+        break;
+      }
+      createErrorMessage = String(error.message || '');
+      const missingColumn = extractMissingColumn(createErrorMessage);
+      if (!missingColumn) {
+        break;
+      }
+      const schemaAdjusted = markMissingColumn(
+        entity,
+        missingColumn,
+        entityConfig.listColumns,
+        entityConfig.searchableColumns,
+      );
+      const hadPayloadColumn = Object.prototype.hasOwnProperty.call(createPayload, missingColumn);
+      if (!schemaAdjusted && !hadPayloadColumn) {
+        break;
+      }
+      createPayload = stripColumnFromRecord(createPayload, missingColumn);
+    }
+    if (createErrorMessage) {
+      throw new HttpError(createErrorMessage, 400);
     }
     if (entity === 'ata_codes') {
       ATA_TREE_CACHE.clear();
@@ -1886,15 +2096,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       userId: auth.userId,
       entity,
       action: 'create',
-      entityId: String(((data as unknown as Record<string, unknown> | null)?.id) || ''),
-      afterData: data,
+      entityId: String((createRecord?.id) || ''),
+      afterData: createRecord,
     });
     res.status(201).json({
       version: 'v2',
       correlationId: ctx.correlationId,
       output: {
         entity,
-        record: data,
+        record: createRecord,
       },
     });
   } catch (error) {

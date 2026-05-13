@@ -48,7 +48,7 @@ export function mapAmroPayloadToUimMetadata(payload: Record<string, unknown>): R
   return {
     amro_reference: payload.amro_reference || null,
     maintenance_order_id: payload.maintenance_order_id || null,
-    work_package_id: payload.work_package_id || null,
+    work_order_id: payload.work_order_id || null,
     task_id: payload.task_id || null,
     requested_by: payload.requested_by || null,
     source: 'amro',

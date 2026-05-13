@@ -1,0 +1,81 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Aeromobile Licence,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,12,,Every 600 Hours/24 Months Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,12,,Every 100 Hours Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,12,,Every 600 Hours /24 Months Engine Oil System- Draining,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,12,,Every 3000 Hours/24 Months Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,12,,Every 3000 Hours/48 Months Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,3000 Hrs / 4 Yrs Lubrication.,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,12,,Carry Out 150 Hrs / 6 M Lubrication Inspection.,LS*,,,0:00,Note: As Per Schedule Form No: AS350B3/49
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,12,,150 Hours / 6 Months Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,12,,Carry Out 150 Hrs / 3 M Lubrication Inspection.,LS*,,,0:00,Note: As Per Schedule Form No: AS350B3/49
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 5400 Hours / 6 Years OOP inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 100 Hours Air-conditioning (Air-Comm),OP*,,,0:00,Form No: AS350B3/10
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 2400 Hrs / 6 Yrs OOP Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 1200 Hrs / 2 Yrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,"MSM 05-25-00, 60-00,62-30",Every 72 Months Airframe Inspection,OP*,,,0:00,Form No:AS350B3/130
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 50 Hrs OOP Inspection,OP*,,,0:00,Ref: Form No: AS350B3/88
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 2500 Hrs / 6 Yrs OOP Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 5000 Hours / 6 Years Airframe Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 300 Hrs Airframe Inspection,OP*,,,0:00,Note: Schedule Form No: AS350B3/98
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 100 Hrs / 6 M OOP Inspection.,OP*,,,0:00,Note: Schedule Form No: AS350B3/121
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 3000 Hrs/ 6 Yrs OOP Inspection.,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 660 Hrs / 12 M OOP Inspection.,OP*,,,0:00,Note: EASB 05.00.61 R3 EASA AD 2017-0059 DGCA/AS350 Series/117 R2
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 5400 Hrs OOP Inspection,OP*,,,0:00,Schedule Form No: AS350B3/95
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 5000 Hrs / 6 Yrs Inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Carry Out 2250 Hrs Inspection.,ROU*,,,0:00,Note: As per schedule Form No: ASB350B3/80
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 300 Hours/24 Months Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 10 Hours/ 7Days Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Turn Slip Indicator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Carry Out First Aid Kit Re-Certification,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,ELT Self Test,ROU*,,,0:00,Form No:RN-023
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Directional Gyro,ROU*,,,0:00,Bench Check
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,"MSM 05-25-00,63-40",Every 2250 Hrs / 72 Months,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Altimeter Bench Check. ( 24 Months),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 144 Months Airframe Inspection,ROU*,,,0:00,Form No:AS350B3/128
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 2400 Hours Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 1500 Hours/ 48 Months 2T and/or 2A Inspections,ROU*,,,0:00,Form No:AS350B3/127
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 150 Hours Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,"MSM 05-25-00, 65-20,77-00",Every 1500 Hours/ 24 Months Airframe Inspection,ROU*,,,0:00,Form No:AS350B3/136
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 5400 Hrs Inspection,ROU*,,,0:00,Schedule Form No: AS350B3/95
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 150 Hours Engine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Insurance,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 300 Hours Airframe .,ROU*,,,0:00,Note: Schedule Form No: AS350B3/50
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,73,,660 Hrs/ 12 Months,ROU*,,,0:00,"Note: EASB 05.00.61 R4, EASA AD 2023-0187 R1, DGCA/AS350/117 R6"
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Carry out 06 Months Airframe Inspection,ROU*,,,0:00,Form No:AS350B3/131
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 2500 Hrs / 6 Yrs,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 100 Hours Airframe Inspection.,ROU*,,,0:00,Form No: AS350B3/10
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Air COMM Annual Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 50 Hrs Inspection,ROU*,,,0:00,Ref: Form No: AS350B3/88
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,600 Hours Airframe and Engine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,750 Hours/24 Months T AND/OR A Inspections,ROU*,,,0:00,Form No: AS350B3/129
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 1200 Hours Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,"MSM 05-25-00, 60-00,62-30",Every 72 Months Airframe Inspection,ROU*,,,0:00,Form No:AS350B3/130
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,ELT-Annual Inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 3000 Hrs/ 6 Yrs Inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 1200 Hrs / 2 Yrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,"MSM 05-25-00,25-10",Every 2250 Hours Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 1200 Hours / 48 Months Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 600 Hours Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Aeromobile License Renewal.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Aircraft Weighing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Aeromobile Licence,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 01 Month Airframe Inspection,ROU*,,,0:00,Form No:AS350B3/133
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 150 Hours/ 06 Months Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,150 Hours / 12 Months S-Inspection.,ROU*,,,0:00,Form No: AS350B3/51
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,660 Hours/ 12 Months Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,ARC,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Fuel MBT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 03 Months Airframe Inspection,ROU*,,,0:00,Form No: AS350B3/132
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,ELT Battery Replacement.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Transponder Check ( 24 Months),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 150 Hours Airframe/Engine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,600 Hrs/2 Years Routine Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 5400 Hours / 6 Years inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 1200 Hours /48 Months Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,Carry out First Aid Kit Re-certification,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Carry Out 1800 Hrs OOP Inspection.,ROU*,,,0:00,Note: As per schedule Form No: ASB350B3/80
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,5,,Every 1800 Hours Airframe Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,63,,Lower Housing Equipped,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,63,,Equipped Main Housing,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,d88e2641-dd39-4814-9f04-682a3c823bff,,101,,ELT Self Test,SP*,,,0:00,Form No:RN-023

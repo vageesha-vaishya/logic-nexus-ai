@@ -19,9 +19,9 @@ export const AMRO_INTEGRATION_CONTRACTS = {
   rest: {
     specification: 'OpenAPI 3.1',
     endpoints: [
-      '/api/v2/amro/work-packages',
-      '/api/v2/amro/work-packages/{id}',
-      '/api/v2/amro/work-packages/{id}/transitions',
+      '/api/v2/amro/work-orders',
+      '/api/v2/amro/work-orders/{id}',
+      '/api/v2/amro/work-orders/{id}/transitions',
       '/api/v2/amro/schedules',
       '/api/v2/amro/schedules/replan',
       '/api/v2/amro/tasks',
@@ -52,7 +52,7 @@ export const AMRO_INTEGRATION_CONTRACTS = {
   },
   graphql: {
     type: 'subgraph',
-    fields: ['amroWorkPackages', 'amroTask(id)', 'amroComplianceStatus'],
+    fields: ['amroWorkOrders', 'amroTask(id)', 'amroComplianceStatus'],
     schemaPath: AMRO_GRAPHQL_SUBGRAPH_PATH,
   },
   grpc: {
@@ -61,7 +61,7 @@ export const AMRO_INTEGRATION_CONTRACTS = {
   },
   asyncApi: {
     events: [
-      'amro.work_package.created.v1',
+      'amro.work_order.created.v1',
       'amro.task.completed.v1',
       'amro.compliance.gate_decided.v1',
       'amro.certification.decision.submitted.v1',

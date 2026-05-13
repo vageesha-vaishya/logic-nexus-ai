@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { NextFunction, Router, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { asyncHandler } from '../utils/asyncHandler';
@@ -22,6 +22,8 @@ type AirportRecord = {
 
 type MasterEntity =
   | 'aircraft'
+  | 'aircraft_operators'
+  | 'aircraft_owners'
   | 'aircraft_template'
   | 'flight_logs'
   | 'parts_inventory'
@@ -36,7 +38,7 @@ type MasterEntity =
   | 'task_categories'
   | 'regulator_profiles'
   | 'shift_calendars'
-  | 'work_package_templates';
+  | 'work_order_templates';
 
 type EntityConfig = {
   table: string;
@@ -62,42 +64,99 @@ class HttpError extends Error {
 const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
   aircraft: {
     table: 'aircraft',
-    searchableColumns: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'aircraft_model', 'msn'],
+    searchableColumns: [
+      'tail_number',
+      'registration',
+      'serial_number',
+      'assembly_models',
+      'msn',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
+      'aircraft_base_location_id',
+      'owner_name',
+      'base_location',
+    ],
     listColumns:
-      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,configuration_code,maintenance_program,status,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
-    requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model'],
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,configuration_code,maintenance_program,status,operator_code,station_code,base_location,aircraft_operators_id,aircraft_owners_id,aircraft_base_location_id,owner_name,warranty_json,aircraft_weight_and_capacity_json,aircraft_other_details_json,current_flight_hours,current_cycles,current_landings,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+    requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
       'tail_number',
       'serial_number',
-      'aircraft_type',
-      'aircraft_model',
+      'aircraft_template_id',
+      'assembly_models',
       'configuration_code',
       'maintenance_program',
-      'manufacturer',
-      'model',
       'msn',
       'line_number',
       'status',
+      'owner_name',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
+      'aircraft_base_location_id',
       'operator_code',
       'station_code',
       'base_location',
       'engine_type',
+      'manufacturing_date',
+      'defect_count',
+      'first_limit_remaining',
+      'restrictions',
       'current_flight_hours',
       'current_cycles',
+      'current_landings',
       'current_flight_hours_since_new',
       'current_cycles_since_new',
+      'warranty_json',
+      'aircraft_weight_and_capacity_json',
+      'aircraft_other_details_json',
       'engine_install_history',
       'thrust_rating_change_log',
       'on_wing_lifecycle_records',
     ],
     defaultSortColumn: 'updated_at',
   },
+  aircraft_operators: {
+    table: 'aircraft_operators',
+    searchableColumns: ['operator_code', 'operator_name', 'operator_type', 'contact_person', 'contact_email', 'phone_number'],
+    listColumns:
+      'id,tenant_id,franchise_id,operator_code,operator_name,operator_type,contact_person,contact_email,phone_number,address,is_active,created_at,updated_at',
+    requiredCreateFields: ['operator_code', 'operator_name'],
+    writeAllowedFields: [
+      'operator_code',
+      'operator_name',
+      'operator_type',
+      'contact_person',
+      'contact_email',
+      'phone_number',
+      'address',
+      'is_active',
+    ],
+    defaultSortColumn: 'operator_name',
+  },
+  aircraft_owners: {
+    table: 'aircraft_owners',
+    searchableColumns: ['owner_code', 'owner_name', 'owner_type', 'contact_person', 'contact_email', 'phone_number'],
+    listColumns:
+      'id,tenant_id,franchise_id,owner_code,owner_name,owner_type,contact_person,contact_email,phone_number,address,is_active,created_at,updated_at',
+    requiredCreateFields: ['owner_code', 'owner_name'],
+    writeAllowedFields: [
+      'owner_code',
+      'owner_name',
+      'owner_type',
+      'contact_person',
+      'contact_email',
+      'phone_number',
+      'address',
+      'is_active',
+    ],
+    defaultSortColumn: 'owner_name',
+  },
   aircraft_template: {
     table: 'aircraft_template',
     searchableColumns: ['template_name', 'maintenance_program'],
     listColumns:
-      'id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,created_at,updated_at,created_by,updated_by',
+      'id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,model_json,is_active,created_at,updated_at,created_by,updated_by',
     requiredCreateFields: ['template_name'],
     writeAllowedFields: [
       'template_name',
@@ -106,6 +165,8 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'maintenance_program',
       'revision_number',
       'amendment_number',
+      'model_json',
+      'is_active',
     ],
     defaultSortColumn: 'template_name',
   },
@@ -113,7 +174,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     table: 'flight_logs',
     searchableColumns: ['flight_number', 'departure_airport', 'arrival_airport', 'pilot_name', 'regulatory_authority'],
     listColumns:
-      'id,tenant_id,franchise_id,aircraft_id,flight_date,flight_number,departure_airport,arrival_airport,pilot_name,flight_hours,block_hours,flight_cycles,crew_details,fuel_burn_kg,oil_uplift_liters,pirep_discrepancy,regulatory_authority,is_deleted,deleted_at,deleted_by,metadata,created_at,updated_at,created_by,updated_by',
+      'id,tenant_id,franchise_id,aircraft_id,flight_date,flight_number,departure_airport,arrival_airport,pilot_name,flight_hours,block_hours,flight_cycles,landings,crew_details,fuel_burn_kg,oil_uplift_liters,pirep_discrepancy,regulatory_authority,is_deleted,deleted_at,deleted_by,metadata,created_at,updated_at,created_by,updated_by',
     requiredCreateFields: ['aircraft_id', 'flight_date', 'departure_airport', 'arrival_airport'],
     writeAllowedFields: [
       'aircraft_id',
@@ -125,6 +186,7 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
       'flight_hours',
       'block_hours',
       'flight_cycles',
+      'landings',
       'crew_details',
       'fuel_burn_kg',
       'oil_uplift_liters',
@@ -297,8 +359,8 @@ const ENTITY_CONFIG: Record<MasterEntity, EntityConfig> = {
     ],
     defaultSortColumn: 'updated_at',
   },
-  work_package_templates: {
-    table: 'work_package_templates',
+  work_order_templates: {
+    table: 'work_order_templates',
     searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'assembly_models_id'],
     listColumns:
       'id,tenant_id,franchise_id,assembly_models_id,template_code,version,active,template_name,maintenance_type,assembly_models,scope_json,tasks_json,materials_json,tooling_json,compliance_requirements_json,policy_snapshot_id,created_at,updated_at',
@@ -400,6 +462,69 @@ function asDateString(value: unknown): string | null {
   return normalized;
 }
 
+type WarrantySnapshot = {
+  is_under_warranty: boolean;
+  warranty_start_date: string | null;
+  warranty_end_date: string | null;
+};
+
+function resolveWarrantySnapshot(payload: JsonRecord, options: { strictObject?: boolean } = {}): WarrantySnapshot {
+  const strictObject = options.strictObject ?? false;
+  const hasWarrantyJson = Object.prototype.hasOwnProperty.call(payload, 'warranty_json');
+  const rawWarrantyJson = payload.warranty_json;
+  let warrantySource: JsonRecord = {};
+
+  if (rawWarrantyJson === null || rawWarrantyJson === undefined || rawWarrantyJson === '') {
+    warrantySource = {};
+  } else if (typeof rawWarrantyJson === 'object' && !Array.isArray(rawWarrantyJson)) {
+    warrantySource = rawWarrantyJson as JsonRecord;
+  } else if (strictObject || hasWarrantyJson) {
+    throw new HttpError('warranty_json must be an object', 400);
+  }
+
+  return {
+    is_under_warranty: asBoolean(warrantySource.is_under_warranty ?? payload.is_under_warranty, false),
+    warranty_start_date: asDateString(warrantySource.warranty_start_date ?? payload.warranty_start_date),
+    warranty_end_date: asDateString(warrantySource.warranty_end_date ?? payload.warranty_end_date),
+  };
+}
+
+function enrichAircraftWarrantyFields(record: JsonRecord): JsonRecord {
+  let snapshot: WarrantySnapshot;
+  try {
+    snapshot = resolveWarrantySnapshot(record);
+  } catch {
+    logger.warn('[AMRO Master Data] malformed aircraft warranty_json in record payload', {
+      aircraftId: String(record.id || ''),
+      tenantId: String(record.tenant_id || ''),
+    });
+    snapshot = {
+      is_under_warranty: false,
+      warranty_start_date: null,
+      warranty_end_date: null,
+    };
+  }
+
+  const resolveNumericOutput = (value: unknown, fallbackValue: unknown): number => {
+    const direct = Number(value);
+    if (Number.isFinite(direct)) return direct;
+    const fallback = Number(fallbackValue);
+    if (Number.isFinite(fallback)) return fallback;
+    return 0;
+  };
+  const currentFlightHours = resolveNumericOutput(record.current_flight_hours, record.current_flight_hours_since_new);
+  const currentLandings = resolveNumericOutput(record.current_landings, record.current_cycles);
+
+  return {
+    ...record,
+    current_flight_hours: currentFlightHours,
+    current_landings: currentLandings,
+    is_under_warranty: snapshot.is_under_warranty,
+    warranty_start_date: snapshot.warranty_start_date,
+    warranty_end_date: snapshot.warranty_end_date,
+  };
+}
+
 function firstQueryValue(value: unknown): string {
   if (Array.isArray(value)) {
     return String(value[0] || '').trim();
@@ -408,9 +533,10 @@ function firstQueryValue(value: unknown): string {
 }
 
 function resolveEntity(rawEntity: unknown): MasterEntity {
-  const entity = asString(rawEntity)
+  const normalizedEntity = asString(rawEntity)
     .toLowerCase()
-    .replace(/[-\s]+/g, '_') as MasterEntity;
+    .replace(/[-\s]+/g, '_');
+  const entity = (normalizedEntity === 'work_order_templates' ? 'work_order_templates' : normalizedEntity) as MasterEntity;
   if (!ENTITY_CONFIG[entity]) {
     throw new HttpError('Unsupported master data entity', 404);
   }
@@ -603,6 +729,10 @@ function isMissingTableError(errorMessage: string): boolean {
 
 function resolveSortColumn(entity: MasterEntity, requestedSortBy: string): string {
   const columns = getActiveColumns(entity);
+  if (entity === 'assembly_models' && (requestedSortBy === 'planning_capability' || requestedSortBy === 'directive_capability')) {
+    // Computed capability columns are enriched after list retrieval.
+    return columns.includes('updated_at') ? 'updated_at' : columns[0] || 'updated_at';
+  }
   if (!columns.length) {
     return requestedSortBy || 'updated_at';
   }
@@ -618,32 +748,200 @@ function resolveSortColumn(entity: MasterEntity, requestedSortBy: string): strin
   return columns[0];
 }
 
+function isMissingColumnErrorMessage(errorMessage: string, column: string): boolean {
+  const normalizedMessage = errorMessage.toLowerCase();
+  const normalizedColumn = column.toLowerCase();
+  return normalizedMessage.includes(normalizedColumn) && normalizedMessage.includes('column');
+}
+
+type AggregateCountAttemptResult =
+  | { status: 'ok'; counts: Map<string, number> }
+  | { status: 'missing_model_column' }
+  | { status: 'missing_table' }
+  | { status: 'error'; message: string };
+
+async function queryAggregateCountsByModelColumn(params: {
+  supabase: SupabaseClient;
+  table: 'task_templates' | 'directives';
+  modelColumn: string;
+  modelIds: string[];
+  tenantId: string;
+  franchiseId: string | null;
+}): Promise<AggregateCountAttemptResult> {
+  const counts = new Map<string, number>();
+  let applyFranchiseScope = Boolean(params.franchiseId);
+
+  for (const modelId of params.modelIds) {
+    const runCount = async (withFranchiseScope: boolean) => {
+      let query = params.supabase
+        .from(params.table)
+        .select('id', { count: 'exact', head: true })
+        .eq('tenant_id', params.tenantId)
+        .eq(params.modelColumn, modelId);
+      if (withFranchiseScope && params.franchiseId) {
+        query = query.or(`franchise_id.is.null,franchise_id.eq.${params.franchiseId}`);
+      }
+      return query;
+    };
+
+    let { count, error } = await runCount(applyFranchiseScope);
+
+    if (error && applyFranchiseScope && isMissingColumnErrorMessage(String(error.message || ''), 'franchise_id')) {
+      applyFranchiseScope = false;
+      ({ count, error } = await runCount(false));
+    }
+
+    if (error) {
+      const message = String(error.message || '');
+      if (isMissingTableError(message)) {
+        return { status: 'missing_table' };
+      }
+      if (isMissingColumnErrorMessage(message, params.modelColumn)) {
+        return { status: 'missing_model_column' };
+      }
+      return { status: 'error', message };
+    }
+    counts.set(modelId, Number(count || 0));
+  }
+
+  return { status: 'ok', counts };
+}
+
+async function resolveAggregateCountsByModel(params: {
+  supabase: SupabaseClient;
+  table: 'task_templates' | 'directives';
+  modelIds: string[];
+  tenantId: string;
+  franchiseId: string | null;
+  modelColumnCandidates: string[];
+  correlationId: string;
+}): Promise<Map<string, number>> {
+  if (params.modelIds.length === 0) {
+    return new Map<string, number>();
+  }
+
+  for (const modelColumn of params.modelColumnCandidates) {
+    const result = await queryAggregateCountsByModelColumn({
+      supabase: params.supabase,
+      table: params.table,
+      modelColumn,
+      modelIds: params.modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+    });
+
+    if (result.status === 'ok') {
+      return result.counts;
+    }
+    if (result.status === 'missing_model_column') {
+      continue;
+    }
+    if (result.status === 'missing_table') {
+      return new Map<string, number>();
+    }
+
+    logger.warn('[AMRO Master Data] failed to resolve aggregate model counts', {
+      correlationId: params.correlationId,
+      table: params.table,
+      message: result.message,
+    });
+    return new Map<string, number>();
+  }
+
+  return new Map<string, number>();
+}
+
+async function enrichAssemblyModelRowsWithCapabilityCounts(params: {
+  supabase: SupabaseClient;
+  rows: JsonRecord[];
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+}): Promise<JsonRecord[]> {
+  const modelIds = Array.from(
+    new Set(
+      params.rows
+        .map((row) => asNullableString(row.id))
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+
+  if (modelIds.length === 0) {
+    return params.rows.map((row) => ({
+      ...row,
+      planning_capability: 0,
+      directive_capability: 0,
+    }));
+  }
+
+  const [planningCounts, directiveCounts] = await Promise.all([
+    resolveAggregateCountsByModel({
+      supabase: params.supabase,
+      table: 'task_templates',
+      modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+      modelColumnCandidates: ['assembly_models', 'model_id'],
+      correlationId: params.correlationId,
+    }),
+    resolveAggregateCountsByModel({
+      supabase: params.supabase,
+      table: 'directives',
+      modelIds,
+      tenantId: params.tenantId,
+      franchiseId: params.franchiseId,
+      modelColumnCandidates: ['assembly_models', 'assembly_model_id', 'model_id'],
+      correlationId: params.correlationId,
+    }),
+  ]);
+
+  return params.rows.map((row) => {
+    const modelId = asNullableString(row.id);
+    const planningCapability = modelId ? Number(planningCounts.get(modelId) || 0) : 0;
+    const directiveCapability = modelId ? Number(directiveCounts.get(modelId) || 0) : 0;
+    return {
+      ...row,
+      planning_capability: planningCapability,
+      directive_capability: directiveCapability,
+    };
+  });
+}
+
 function normalizeAircraft(payload: JsonRecord): JsonRecord {
   const tailNumber = asString(payload.tail_number || payload.registration);
   const serialNumber = asString(payload.serial_number || payload.msn);
-  const aircraftType = asString(payload.aircraft_type || payload.engine_type);
-  const aircraftModel = asString(payload.aircraft_model || payload.model);
+  const assemblyModel = asNullableString(payload.assembly_models || payload.assembly_model_id || payload.aircraft_model);
+  const normalizedWarranty = resolveWarrantySnapshot(payload, { strictObject: true });
   return {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
     serial_number: serialNumber,
-    aircraft_type: aircraftType,
-    aircraft_model: aircraftModel,
+    aircraft_template_id: asNullableString(payload.aircraft_template_id || payload.aircraft_template),
+    assembly_models: assemblyModel,
     configuration_code: asNullableString(payload.configuration_code),
     maintenance_program: asNullableString(payload.maintenance_program),
-    manufacturer: asNullableString(payload.manufacturer),
-    model: asNullableString(payload.model),
     msn: asNullableString(payload.msn),
     line_number: asNullableString(payload.line_number),
     status: asString(payload.status) || 'active',
+    owner_name: asNullableString(payload.owner_name),
+    aircraft_operators_id: asNullableString(payload.aircraft_operators_id),
+    aircraft_owners_id: asNullableString(payload.aircraft_owners_id),
+    aircraft_base_location_id: asNullableString(payload.aircraft_base_location_id),
     operator_code: asNullableString(payload.operator_code),
     station_code: asNullableString(payload.station_code),
     base_location: asNullableString(payload.base_location),
     engine_type: asNullableString(payload.engine_type),
+    manufacturing_date: asNullableString(asDateString(payload.manufacturing_date)),
+    defect_count: asNumber(payload.defect_count),
+    first_limit_remaining: asNumber(payload.first_limit_remaining),
+    restrictions: asNullableString(payload.restrictions),
     current_flight_hours: asNumber(payload.current_flight_hours) ?? 0,
     current_cycles: asNumber(payload.current_cycles) ?? 0,
     current_flight_hours_since_new: asNumber(payload.current_flight_hours_since_new) ?? 0,
     current_cycles_since_new: asNumber(payload.current_cycles_since_new) ?? 0,
+    warranty_json: normalizedWarranty,
+    aircraft_weight_and_capacity_json: asJsonObject(payload.aircraft_weight_and_capacity_json),
+    aircraft_other_details_json: asJsonObject(payload.aircraft_other_details_json),
     engine_install_history: asJsonArray(payload.engine_install_history),
     thrust_rating_change_log: asJsonArray(payload.thrust_rating_change_log),
     on_wing_lifecycle_records: asJsonArray(payload.on_wing_lifecycle_records),
@@ -684,6 +982,7 @@ function normalizeFlightLog(payload: JsonRecord): JsonRecord {
     flight_hours: asNumber(payload.flight_hours) ?? 0,
     block_hours: asNumber(payload.block_hours) ?? 0,
     flight_cycles: asNumber(payload.flight_cycles) ?? 0,
+    landings: asNumber(payload.landings) ?? 0,
     crew_details: asNullableString(payload.crew_details),
     fuel_burn_kg: asNumber(payload.fuel_burn_kg) ?? 0,
     oil_uplift_liters: asNumber(payload.oil_uplift_liters) ?? 0,
@@ -691,6 +990,88 @@ function normalizeFlightLog(payload: JsonRecord): JsonRecord {
     regulatory_authority: asNullableString(payload.regulatory_authority),
     metadata: asJsonObject(payload.metadata),
   };
+}
+
+async function applyFlightLogAircraftCounters(params: {
+  supabase: SupabaseClient;
+  tenantId: string;
+  requestId: string;
+  aircraftId: string;
+  franchiseId: string | null;
+  updatedBy: string;
+  flightHoursDelta: number;
+  landingsDelta: number;
+}): Promise<void> {
+  const {
+    supabase,
+    tenantId,
+    requestId,
+    aircraftId,
+    franchiseId,
+    updatedBy,
+    flightHoursDelta,
+    landingsDelta,
+  } = params;
+  const normalizedHoursDelta = Math.max(flightHoursDelta, 0);
+  const normalizedLandingsDelta = Math.max(landingsDelta, 0);
+  const { data: existingAircraft, error: loadError } = await executeWithResilience(
+    {
+      dependency: 'supabase',
+      operation: 'master-data.flight_logs.aircraft_counters.load',
+      requestId,
+      tenantId,
+    },
+    async () => {
+      let queryBuilder = supabase
+        .from('aircraft')
+        .select('id,current_flight_hours,current_flight_hours_since_new,current_landings,current_landings_since_new')
+        .eq('id', aircraftId)
+        .eq('tenant_id', tenantId);
+      if (franchiseId) {
+        queryBuilder = queryBuilder.eq('franchise_id', franchiseId);
+      }
+      return await queryBuilder.limit(1).maybeSingle();
+    },
+  );
+  if (loadError) {
+    throw new HttpError(loadError.message, 400);
+  }
+  const aircraftRecord = (existingAircraft || null) as JsonRecord | null;
+  if (!aircraftRecord) {
+    throw new HttpError('Aircraft record was not found while applying flight-log usage counters', 404);
+  }
+  const nextCurrentFlightHours = (asNumber(aircraftRecord.current_flight_hours) ?? 0) + normalizedHoursDelta;
+  const nextCurrentFlightHoursSinceNew = (asNumber(aircraftRecord.current_flight_hours_since_new) ?? 0) + normalizedHoursDelta;
+  const nextCurrentLandings = (asNumber(aircraftRecord.current_landings) ?? 0) + normalizedLandingsDelta;
+  const nextCurrentLandingsSinceNew = (asNumber(aircraftRecord.current_landings_since_new) ?? 0) + normalizedLandingsDelta;
+  const { error: updateError } = await executeWithResilience(
+    {
+      dependency: 'supabase',
+      operation: 'master-data.flight_logs.aircraft_counters.update',
+      requestId,
+      tenantId,
+    },
+    async () => {
+      let queryBuilder = supabase
+        .from('aircraft')
+        .update({
+          current_flight_hours: nextCurrentFlightHours,
+          current_flight_hours_since_new: nextCurrentFlightHoursSinceNew,
+          current_landings: nextCurrentLandings,
+          current_landings_since_new: nextCurrentLandingsSinceNew,
+          updated_by: updatedBy,
+        })
+        .eq('id', aircraftId)
+        .eq('tenant_id', tenantId);
+      if (franchiseId) {
+        queryBuilder = queryBuilder.eq('franchise_id', franchiseId);
+      }
+      return await queryBuilder.select('id').limit(1).maybeSingle();
+    },
+  );
+  if (updateError) {
+    throw new HttpError(updateError.message, 400);
+  }
 }
 
 function normalizeSupplier(payload: JsonRecord): JsonRecord {
@@ -819,7 +1200,7 @@ function normalizeShiftCalendar(payload: JsonRecord): JsonRecord {
   };
 }
 
-function normalizeWorkPackageTemplate(payload: JsonRecord): JsonRecord {
+function normalizeWorkOrderTemplate(payload: JsonRecord): JsonRecord {
   return {
     assembly_models_id: asString(payload.assembly_models_id),
     template_code: asString(payload.template_code),
@@ -845,6 +1226,8 @@ function normalizeAircraftTemplate(payload: JsonRecord): JsonRecord {
     maintenance_program: asNullableString(payload.maintenance_program),
     revision_number: asNullableString(payload.revision_number),
     amendment_number: asNullableString(payload.amendment_number),
+    model_json: asJsonArray(payload.model_json),
+    is_active: asBoolean(payload.is_active, true),
   };
 }
 
@@ -863,7 +1246,7 @@ function normalizePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord
   if (entity === 'task_categories') return normalizeTaskCategory(payload);
   if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
   if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
-  return normalizeWorkPackageTemplate(payload);
+  return normalizeWorkOrderTemplate(payload);
 }
 
 function sanitizeWritePayload(entity: MasterEntity, payload: JsonRecord): JsonRecord {
@@ -1234,7 +1617,19 @@ router.get(
       throw toHttpError(error);
     }
     const rawRows = Array.isArray(finalData) ? (finalData as unknown as JsonRecord[]) : [];
-    const enrichedRows = entity === 'flight_logs' ? enrichFlightLogRows(rawRows) : rawRows;
+    const enrichedRows = entity === 'flight_logs'
+      ? enrichFlightLogRows(rawRows)
+      : entity === 'assembly_models'
+        ? await enrichAssemblyModelRowsWithCapabilityCounts({
+            supabase,
+            rows: rawRows,
+            tenantId: String(req.tenantId || ''),
+            franchiseId: queryFranchiseId || franchiseId,
+            correlationId,
+          })
+      : entity === 'aircraft'
+        ? rawRows.map((row) => enrichAircraftWarrantyFields(row))
+        : rawRows;
     const activeSearchableColumns = getActiveSearchableColumns(entity);
     const rows = franchiseId && search ? enrichedRows.filter((row) => matchesSearch(row, activeSearchableColumns, search)) : enrichedRows;
 
@@ -1279,9 +1674,12 @@ router.post(
     const entityConfig = ENTITY_CONFIG[entity];
     const body = req.body && typeof req.body === 'object' ? (req.body as JsonRecord) : {};
     const { isBulkImport, records } = parseBulkOperation(body);
-    const franchiseId = extractFranchiseId(req);
+    const requestFranchiseId = extractFranchiseId(req);
     const supabase = getSupabaseAdminClient();
-    const scopePayload = { tenant_id: req.tenantId, franchise_id: franchiseId };
+    const resolveFranchiseScope = (record: JsonRecord): string | null => {
+      if (requestFranchiseId) return requestFranchiseId;
+      return asNullableString(record.franchise_id);
+    };
    logger.info('[AMRO Master Data] POST Method received for entity002', {
       correlationId,
       entity: req.params.entity,
@@ -1295,11 +1693,12 @@ router.post(
       }
       const prepared = records.map((record) => ({
         ...sanitizeWritePayload(entity, record),
-        ...scopePayload,
+        tenant_id: req.tenantId,
+        franchise_id: resolveFranchiseScope(record),
         updated_by: req.userId,
       }));
       if (entity === 'assembly_models') {
-        const issues = await validateAssemblyModelReferences(supabase, req.tenantId, franchiseId, prepared);
+        const issues = await validateAssemblyModelReferences(supabase, req.tenantId, requestFranchiseId, prepared);
         if (issues.size > 0) {
           throw new HttpError('Invalid assembly model references', 422);
         }
@@ -1318,7 +1717,7 @@ router.post(
       }
       await writeAuditRecord({
         tenantId: req.tenantId,
-        franchiseId,
+        franchiseId: requestFranchiseId,
         userId: req.userId,
         entity,
         action: 'bulk_import',
@@ -1330,7 +1729,9 @@ router.post(
         output: {
           entity,
           imported_count: prepared.length,
-          records: data || [],
+          records: entity === 'aircraft'
+            ? (Array.isArray(data) ? data.map((row) => enrichAircraftWarrantyFields(row as unknown as JsonRecord)) : [])
+            : (data || []),
         },
       });
       return;
@@ -1338,7 +1739,7 @@ router.post(
     logger.debug('[CREATE WORK PACKAGE TEMPLATE TASK STEP -001] ', {function: 'insertPayload'});
     
     // DEBUG: Log what we received
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       logger.info('[WPT DEBUG] Received body keys:', Object.keys(body));
       logger.info('[WPT DEBUG] materials_json present:', 'materials_json' in body);
       logger.info('[WPT DEBUG] materials_json value:', body.materials_json);
@@ -1348,11 +1749,12 @@ router.post(
       logger.info('[WPT DEBUG] compliance_requirements_json value:', body.compliance_requirements_json);
     }
     
-    const hydratedBody = entity === 'aircraft' ? await hydrateAircraftPayload(supabase, req.tenantId, franchiseId, body) : body;
+    const hydratedBody = entity === 'aircraft' ? await hydrateAircraftPayload(supabase, req.tenantId, requestFranchiseId, body) : body;
+    const franchiseId = resolveFranchiseScope(hydratedBody);
     const payload = sanitizeWritePayload(entity, hydratedBody);
     
     // DEBUG: Log what passed through sanitization
-    if (entity === 'work_package_templates') {
+    if (entity === 'work_order_templates') {
       logger.info('[WPT DEBUG] After sanitizeWritePayload keys:', Object.keys(payload));
       logger.info('[WPT DEBUG] payload.materials_json:', payload.materials_json);
       logger.info('[WPT DEBUG] payload.tooling_json:', payload.tooling_json);
@@ -1364,9 +1766,10 @@ router.post(
         throw new HttpError('Invalid assembly model references', 422);
       }
     }
-    const insertPayload = {
+    const insertPayload: JsonRecord = {
       ...payload,
-      ...scopePayload,
+      tenant_id: req.tenantId,
+      franchise_id: franchiseId,
       created_by: req.userId,
       updated_by: req.userId,
     };
@@ -1387,7 +1790,24 @@ router.post(
     if (error) {
       throw new HttpError(error.message, 400);
     }
-    const createdRecord = (data || null) as JsonRecord | null;
+    const createdRecordBase = (data || null) as JsonRecord | null;
+    const createdRecord = createdRecordBase && entity === 'aircraft'
+      ? enrichAircraftWarrantyFields(createdRecordBase)
+      : createdRecordBase;
+    if (entity === 'flight_logs') {
+      const flightHoursDelta = Math.max(asNumber(insertPayload.flight_hours) ?? 0, 0);
+      const landingsDelta = Math.max(asNumber(insertPayload.landings) ?? 0, 0);
+      await applyFlightLogAircraftCounters({
+        supabase,
+        tenantId: req.tenantId,
+        requestId: correlationId,
+        aircraftId: asString(insertPayload.aircraft_id),
+        franchiseId,
+        updatedBy: req.userId,
+        flightHoursDelta,
+        landingsDelta,
+      });
+    }
     await writeAuditRecord({
       tenantId: req.tenantId,
       franchiseId,
@@ -1450,7 +1870,8 @@ router.get(
     if (!data) {
       throw new HttpError('Record not found', 404);
     }
-    const record = data as unknown as JsonRecord;
+    const recordBase = data as unknown as JsonRecord;
+    const record = entity === 'aircraft' ? enrichAircraftWarrantyFields(recordBase) : recordBase;
     const recordFranchise = asString(record.franchise_id);
     if (franchiseId && recordFranchise && recordFranchise !== franchiseId) {
       throw new HttpError('Forbidden', 403);
@@ -1559,14 +1980,14 @@ router.patch(
       action: 'update',
       entityId: id,
       beforeData: existingRecord,
-      afterData: data,
+      afterData: entity === 'aircraft' && data ? enrichAircraftWarrantyFields(data as unknown as JsonRecord) : data,
     });
     res.status(200).json({
       version: 'v2',
       correlationId,
       output: {
         entity,
-        record: data || null,
+        record: entity === 'aircraft' && data ? enrichAircraftWarrantyFields(data as unknown as JsonRecord) : (data || null),
       },
     });
   }),
@@ -1655,7 +2076,7 @@ router.delete(
   }),
 );
 
-router.use((error: unknown, req: AuthRequest, res: { status: (code: number) => { json: (body: unknown) => void } }, _next: unknown) => {
+router.use((error: unknown, req: AuthRequest, res: Response, next: NextFunction) => {
   const correlationId = req.header('x-request-id') || crypto.randomUUID();
   const resolved = toHttpError(error);
   logger.error('[AMRO Master Data] request failed', {
@@ -1665,6 +2086,9 @@ router.use((error: unknown, req: AuthRequest, res: { status: (code: number) => {
     statusCode: resolved.statusCode,
     message: resolved.message,
   });
+  if (res.headersSent) {
+    return next(error);
+  }
   res.status(resolved.statusCode).json({
     error: resolved.message,
     version: 'v2',

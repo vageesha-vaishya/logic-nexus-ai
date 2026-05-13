@@ -32,17 +32,17 @@ Created operational database schema with 7 core tables, 46 optimized indexes, 14
 - **Lifecycle:** Tracks installation/removal events with timestamps
 - **Domain Type:** component_status
 
-### 3. work_packages
+### 3. work_orders
 - **Purpose:** Maintenance work orders (corrective, preventive, regulatory)
 - **Key Columns:** id, tenant_id, aircraft_id, work_type, source, source_id, title, priority, status, created_by, assigned_to, estimated_labor_hours, estimated_downtime_minutes, maintenance_type
 - **Indexes:** (tenant_id, status), aircraft_id
 - **Status Values:** planning, approved, scheduled, in_progress, on_hold, completed, closed, cancelled
-- **Domain Types:** work_package_status, maintenance_type (line/base segregation)
+- **Domain Types:** work_order_status, maintenance_type (line/base segregation)
 
 ### 4. tasks
 - **Purpose:** Individual maintenance actions within work packages
-- **Key Columns:** id, tenant_id, work_package_id, sequence, procedure_reference, steps (JSONB), assigned_technician_id, qualifications (JSONB), status, evidence_fields (JSONB)
-- **Indexes:** work_package_id
+- **Key Columns:** id, tenant_id, work_order_id, sequence, procedure_reference, steps (JSONB), assigned_technician_id, qualifications (JSONB), status, evidence_fields (JSONB)
+- **Indexes:** work_order_id
 - **Evidence Fields:** Photos, inspection checklists, notes
 - **Domain Type:** task_status
 
@@ -58,20 +58,20 @@ Created operational database schema with 7 core tables, 46 optimized indexes, 14
 - **Indexes:** task_id, created_at DESC
 - **Domain Type:** signature_method
 
-### 7. work_package_materials
+### 7. amro_work_order_materials
 - **Purpose:** Parts procurement and allocation for work packages
-- **Key Columns:** id, tenant_id, work_package_id, component_id, action (install/remove/inspect/repair), required_quantity, allocated_quantity, status, warehouse_location, supplier_id, supplier_eta
-- **Indexes:** work_package_id
+- **Key Columns:** id, tenant_id, work_order_id, component_id, action (install/remove/inspect/repair), required_quantity, allocated_quantity, status, warehouse_location, supplier_id, supplier_eta
+- **Indexes:** work_order_id
 - **Domain Type:** material_action, material_status
 
 ## Domain Types Created
 
 | Domain Type | Values | Purpose |
 |---|---|---|
-| aircraft_status | active, maintenance, grounded, retired, storage | Aircraft operational status |
+| aircraft_status | pending, active, maintenance, grounded, retired, storage | Aircraft operational status |
 | component_status | installed, removed, repair_queue, under_repair, awaiting_installation, condemned, obsolete | Part lifecycle state |
 | maintenance_type | line, base, component, inspection, overhaul, repair, upgrade, modification | Maintenance classification |
-| work_package_status | planning, approved, scheduled, in_progress, on_hold, completed, closed, cancelled | Work order status |
+| work_order_status | planning, approved, scheduled, in_progress, on_hold, completed, closed, cancelled | Work order status |
 | task_status | pending, not_started, in_progress, on_hold, completed, rework_required, cancelled | Task execution status |
 | material_status | pending, ordered, received, installed, cancelled, returned | Parts procurement status |
 | material_action | install, remove, inspect, repair | Material action type |
@@ -183,7 +183,7 @@ Created separate Node.js/Express backend service at `/services/amro-api/` with J
 
 ### src/types/amro.types.ts
 - `Aircraft` interface (all fields from M0-1)
-- `WorkPackage` interface (all fields from M0-1)
+- `WorkOrder` interface (all fields from M0-1)
 - `Task` interface (all fields from M0-1)
 - `StaffQualifications` interface
 - Request/Response types
@@ -196,19 +196,19 @@ Created separate Node.js/Express backend service at `/services/amro-api/` with J
 - Return 401 for invalid/missing tokens
 
 ### src/services/work-orders.service.ts
-- `createWorkPackage(tenantId, data)` → WorkPackage
-- `getWorkPackage(tenantId, id)` → WorkPackage | 404
-- `listWorkPackages(tenantId, status?)` → WorkPackage[]
-- `updateWorkPackage(tenantId, id, updates)` → WorkPackage
-- `deleteWorkPackage(tenantId, id)` → void
+- `createWorkOrder(tenantId, data)` → WorkOrder
+- `getWorkOrder(tenantId, id)` → WorkOrder | 404
+- `listWorkOrders(tenantId, status?)` → WorkOrder[]
+- `updateWorkOrder(tenantId, id, updates)` → WorkOrder
+- `deleteWorkOrder(tenantId, id)` → void
 - **All queries explicitly filter by tenant_id** (belt and suspenders)
 
 ### src/routes/work-orders.routes.ts
-- POST `/api/v1/work-packages` → create (201)
-- GET `/api/v1/work-packages` → list
-- GET `/api/v1/work-packages/:id` → getOne
-- PATCH `/api/v1/work-packages/:id` → update
-- DELETE `/api/v1/work-packages/:id` → delete
+- POST `/api/v1/work-orders` → create (201)
+- GET `/api/v1/work-orders` → list
+- GET `/api/v1/work-orders/:id` → getOne
+- PATCH `/api/v1/work-orders/:id` → update
+- DELETE `/api/v1/work-orders/:id` → delete
 - Plus similar routes for tasks
 
 ### src/utils/logger.ts
@@ -243,15 +243,15 @@ Server entry point:
 ## API Endpoints
 
 **Work Packages:**
-- `POST /api/v1/work-packages` - Create work package (201)
-- `GET /api/v1/work-packages` - List with optional status filter
-- `GET /api/v1/work-packages/:id` - Get one (200 or 404)
-- `PATCH /api/v1/work-packages/:id` - Update
-- `DELETE /api/v1/work-packages/:id` - Delete (204)
+- `POST /api/v1/work-orders` - Create work package (201)
+- `GET /api/v1/work-orders` - List with optional status filter
+- `GET /api/v1/work-orders/:id` - Get one (200 or 404)
+- `PATCH /api/v1/work-orders/:id` - Update
+- `DELETE /api/v1/work-orders/:id` - Delete (204)
 
 **Tasks:**
-- `POST /api/v1/work-packages/:id/tasks` - Create task
-- `GET /api/v1/work-packages/:id/tasks` - List tasks
+- `POST /api/v1/work-orders/:id/tasks` - Create task
+- `GET /api/v1/work-orders/:id/tasks` - List tasks
 - `GET /api/v1/tasks/:id` - Get task
 - `PATCH /api/v1/tasks/:id` - Update task
 - `DELETE /api/v1/tasks/:id` - Delete task
@@ -445,23 +445,23 @@ class AmroEventsProducer {
 **Fire-and-Forget Integration in Service:**
 ```typescript
 // In work-orders.service.ts
-async createWorkPackage(tenantId: string, data: any) {
-  const workPackage = await this.supabase.from('work_packages').insert({...}).select().single();
+async createWorkOrder(tenantId: string, data: any) {
+  const workOrder = await this.supabase.from('work_orders').insert({...}).select().single();
 
   // Fire-and-forget event publishing
   this.eventsProducer.publishWorkOrderEvent({
     event_type: AmroEventType.WORK_ORDER_CREATED,
     tenant_id: tenantId,
-    work_order_id: workPackage.id,
-    aircraft_id: workPackage.aircraft_id,
-    data: workPackage,
+    work_order_id: workOrder.id,
+    aircraft_id: workOrder.aircraft_id,
+    data: workOrder,
     timestamp: new Date(),
     idempotency_key: crypto.randomUUID(),
   }).catch(err => {
     logger.error('Failed to publish event', { error: err.message, event_type: 'WORK_ORDER_CREATED' });
   });
 
-  return workPackage;
+  return workOrder;
 }
 ```
 
@@ -593,14 +593,14 @@ this.eventsProducer.publishEvent(event)
 
 | Integration Point | Method + Endpoint | Auth | Request Shape | Response Shape | Error Handling |
 |---|---|---|---|---|---|
-| Template registry list | `GET /api/v2/amro/master-data/work_package_templates?page=1&page_size=100&sort_by=updated_at&sort_dir=desc` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | Query params only | `{ output: { records: WorkPackageTemplateRegistryRecord[] } }` | Network failures map to `Network error. Verify connectivity and try again.`; aborted requests map to `Request timed out. Please check your connection and retry.` |
-| Create work package from selected template | `POST /api/v2/amro/work-packages?interface=create-work-package` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | `AircraftWorkPackageCreateRequest` (includes `template_id`) | `{ output: { work_package_id?: string, id?: string } }` | `>=500` maps to `Work package service is temporarily unavailable. Try again shortly.`; other failures return API `error` payload text |
-| Rollback after partial create failure | `DELETE /api/v2/amro/work-packages/{workPackageId}?rollback=1` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | `{ transaction_id: string, rollback_reason: string }` | Best-effort operation | Failure tracked through telemetry event `rollback_failed`; user keeps local draft |
+| Template registry list | `GET /api/v2/amro/master-data/work_order_templates?page=1&page_size=100&sort_by=updated_at&sort_dir=desc` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | Query params only | `{ output: { records: WorkOrderTemplateRegistryRecord[] } }` | Network failures map to `Network error. Verify connectivity and try again.`; aborted requests map to `Request timed out. Please check your connection and retry.` |
+| Create work package from selected template | `POST /api/v2/amro/work-orders?interface=create-work-order` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | `AircraftWorkOrderCreateRequest` (includes `template_id`) | `{ output: { work_order_id?: string, id?: string } }` | `>=500` maps to `Work package service is temporarily unavailable. Try again shortly.`; other failures return API `error` payload text |
+| Rollback after partial create failure | `DELETE /api/v2/amro/work-orders/{workOrderId}?rollback=1` | `Authorization: Bearer <access_token>` from `buildApiHeaders` | `{ transaction_id: string, rollback_reason: string }` | Best-effort operation | Failure tracked through telemetry event `rollback_failed`; user keeps local draft |
 
 ## TypeScript Contract Reference
 
 ```typescript
-type WorkPackageTemplateRegistryItem = {
+type WorkOrderTemplateRegistryItem = {
   id: string;
   templateCode: string;
   templateName: string;
@@ -619,7 +619,7 @@ type WorkPackageTemplateRegistryItem = {
   }>;
 };
 
-type AircraftWorkPackageCreateRequest = {
+type AircraftWorkOrderCreateRequest = {
   aircraft_id: string;
   work_order_number: string;
   title: string;
@@ -661,14 +661,14 @@ type AircraftWorkPackageCreateRequest = {
 ## Component Integration Guidelines
 
 - New WP flow loads registry on dialog open and renders template options as `Template Name · vVersion · Description`.
-- `Create New Work Package` remains disabled until `selectedWorkPackageTemplateId` is populated.
+- `Create New Work Package` remains disabled until `selectedWorkOrderTemplateId` is populated.
 - Form validation blocks submission if template is missing, even after switching tabs.
 - Empty registry state displays `No templates available. Add templates in Template Registry and refresh.`
 - Async states:
   - Registry loading: `Loading template registry…`
   - Create submit loading: button label switches to `Creating…`
 - Success feedback uses toast `Aircraft work package created`.
-- Failure feedback uses normalized error mapping from `resolveWorkPackageApiErrorMessage`.
+- Failure feedback uses normalized error mapping from `resolveWorkOrderApiErrorMessage`.
 
 ## Error Code and Message Mapping
 

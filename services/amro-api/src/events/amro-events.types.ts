@@ -40,8 +40,8 @@ export interface AmroWorkOrderEvent extends AmroEventPayload {
     | AmroEventType.WORK_ORDER_UPDATED
     | AmroEventType.WORK_ORDER_DELETED;
   data: {
-    work_package_id: string;
-    work_package_number: string;
+    work_order_id: string;
+    work_order_number: string;
     aircraft_id: string;
     title: string;
     status?: string;
@@ -64,10 +64,10 @@ export interface AmroTaskEvent extends AmroEventPayload {
   data: {
     task_id: string;
     task_number: string;
-    work_package_id: string;
+    work_order_id: string;
     title: string;
     status?: string;
-    assigned_to?: string;
+    assigned_technician_id?: string;
     [key: string]: any;
   };
 }
@@ -80,7 +80,7 @@ export interface AmroMaintenanceEvent extends AmroEventPayload {
   data: {
     task_id: string;
     task_number: string;
-    work_package_id: string;
+    work_order_id: string;
     executed_by: string;
     evidence_captured: boolean;
     event_type?: string;

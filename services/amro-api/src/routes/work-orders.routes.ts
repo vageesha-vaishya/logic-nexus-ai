@@ -7,15 +7,15 @@ import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware';
 import { WorkOrdersService } from '../services/work-orders.service';
 import {
-  CreateWorkPackageRequest,
-  UpdateWorkPackageRequest,
+  CreateWorkOrderRequest,
+  UpdateWorkOrderRequest,
   CreateTaskRequest,
   UpdateTaskRequest,
   ErrorResponse,
   MaintenanceType,
 } from '../types/amro.types';
 import { asyncHandler } from '../utils/asyncHandler';
-import { workPackagesStream } from '../realtime/work-packages-stream';
+import { workOrdersStream } from '../realtime/work-orders-stream';
 
 const router = Router();
 const workOrdersService = new WorkOrdersService();
@@ -27,11 +27,11 @@ function getFranchiseId(req: AuthRequest): string | null {
   return fromUser || null;
 }
 
-type V2CreateWorkPackageRequest = {
+type V2CreateWorkOrderRequest = {
   aircraft_id?: string;
   title?: string;
-  work_package_title_id?: string;
-  work_package_template_id?: string;
+  work_order_title_id?: string;
+  work_order_template_id?: string;
   maintenance_type?: string;
   planned_window?: string;
   planned_start_date?: string;
@@ -41,7 +41,7 @@ type V2CreateWorkPackageRequest = {
   scope_items?: string[];
 };
 
-function mapV2CreatePayloadToV1Request(request: V2CreateWorkPackageRequest): CreateWorkPackageRequest {
+function mapV2CreatePayloadToV1Request(request: V2CreateWorkOrderRequest): CreateWorkOrderRequest {
   const normalizedMaintenanceType = String(request.maintenance_type || '').trim().toLowerCase();
   const maintenanceType: MaintenanceType =
     normalizedMaintenanceType === 'base' ||
@@ -66,8 +66,8 @@ function mapV2CreatePayloadToV1Request(request: V2CreateWorkPackageRequest): Cre
   return {
     aircraft_id: String(request.aircraft_id || '').trim(),
     title: String(request.title || title || '').trim() || undefined,
-    work_package_title_id: String(request.work_package_title_id || '').trim() || undefined,
-    work_package_template_id: String(request.work_package_template_id || '').trim() || undefined,
+    work_order_title_id: String(request.work_order_title_id || '').trim() || undefined,
+    work_order_template_id: String(request.work_order_template_id || '').trim() || undefined,
     description: scopeItems.length > 1 ? scopeItems.join('; ') : undefined,
     maintenance_type: maintenanceType,
     work_type: maintenanceType,
@@ -81,11 +81,11 @@ function mapV2CreatePayloadToV1Request(request: V2CreateWorkPackageRequest): Cre
 // ============================================================================
 
 /**
- * GET /api/v1/work-packages
+ * GET /api/v1/work-orders
  * Get all work packages for the tenant
  */
 router.get(
-  '/amro/work-package-titles',
+  '/amro/work-order-titles',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const franchiseId = getFranchiseId(req);
@@ -98,10 +98,10 @@ router.get(
       return;
     }
 
-    const items = await workOrdersService.getWorkPackageTitles(tenantId, franchiseId);
+    const items = await workOrdersService.getWorkOrderTitles(tenantId, franchiseId);
     res.status(200).json({
       version: 'v2',
-      interface: 'list-work-package-titles',
+      interface: 'list-work-order-titles',
       output: {
         items,
         total: items.length,
@@ -112,7 +112,7 @@ router.get(
 );
 
 router.get(
-  '/work-packages',
+  '/work-orders',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     if (!tenantId) {
@@ -124,21 +124,21 @@ router.get(
       return;
     }
 
-    const workPackages = await workOrdersService.getWorkPackages(tenantId);
+    const workOrders = await workOrdersService.getWorkOrders(tenantId);
     res.json({
-      data: workPackages,
-      count: workPackages.length,
+      data: workOrders,
+      count: workOrders.length,
     });
     return;
   }),
 );
 
 /**
- * GET /api/v2/amro/work-packages
- * Alias for /work-packages to support /api/v2/amro/* path prefix
+ * GET /api/v2/amro/work-orders
+ * Alias for /work-orders to support /api/v2/amro/* path prefix
  */
 router.get(
-  '/amro/work-packages',
+  '/amro/work-orders',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     if (!tenantId) {
@@ -151,16 +151,16 @@ router.get(
     }
 
     try {
-      const workPackages = await workOrdersService.getWorkPackages(tenantId);
+      const workOrders = await workOrdersService.getWorkOrders(tenantId);
       res.json({
-        items: workPackages,
+        items: workOrders,
         pagination: {
           page: 1,
-          page_size: workPackages.length,
-          total_items: workPackages.length,
+          page_size: workOrders.length,
+          total_items: workOrders.length,
           total_pages: 1,
         },
-        count: workPackages.length,
+        count: workOrders.length,
       });
     } catch (error) {
       console.error('[AMRO API] Failed to fetch work packages:', error);
@@ -174,7 +174,7 @@ router.get(
   }),
 );
 
-router.get('/work-packages/stream', (req: AuthRequest, res: Response): void => {
+router.get('/work-orders/stream', (req: AuthRequest, res: Response): void => {
   const tenantId = req.tenantId;
   if (!tenantId) {
     res.status(401).json({
@@ -197,11 +197,11 @@ router.get('/work-packages/stream', (req: AuthRequest, res: Response): void => {
 
   writeEvent('connected', { ok: true, at: new Date().toISOString() });
 
-  const unsubscribe = workPackagesStream.subscribe((event) => {
+  const unsubscribe = workOrdersStream.subscribe((event) => {
     if (event.tenantId !== tenantId) {
       return;
     }
-    writeEvent('work-package-change', event);
+    writeEvent('work-order-change', event);
   });
 
   const heartbeat = setInterval(() => {
@@ -215,11 +215,11 @@ router.get('/work-packages/stream', (req: AuthRequest, res: Response): void => {
 });
 
 /**
- * GET /api/v1/work-packages/:id
+ * GET /api/v1/work-orders/:id
  * Get a specific work package
  */
 router.get(
-  '/work-packages/:id',
+  '/work-orders/:id',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const { id } = req.params;
@@ -233,18 +233,18 @@ router.get(
       return;
     }
 
-    const workPackage = await workOrdersService.getWorkPackage(tenantId, id);
-    res.json({ data: workPackage });
+    const workOrder = await workOrdersService.getWorkOrder(tenantId, id);
+    res.json({ data: workOrder });
     return;
   }),
 );
 
 /**
- * GET /api/v2/amro/work-packages/:id
- * Alias for /work-packages/:id to support /api/v2/amro/* path prefix
+ * GET /api/v2/amro/work-orders/:id
+ * Alias for /work-orders/:id to support /api/v2/amro/* path prefix
  */
 router.get(
-  '/amro/work-packages/:id',
+  '/amro/work-orders/:id',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const { id } = req.params;
@@ -258,8 +258,8 @@ router.get(
       return;
     }
 
-    const workPackage = await workOrdersService.getWorkPackage(tenantId, id);
-    if (!workPackage) {
+    const workOrder = await workOrdersService.getWorkOrder(tenantId, id);
+    if (!workOrder) {
       res.status(404).json({
         error: 'Work package not found',
         code: 'NOT_FOUND',
@@ -270,7 +270,7 @@ router.get(
     // Wrap in the format expected by the frontend
     res.json({
       data: {
-        work_package: workPackage,
+        work_order: workOrder,
       },
     });
     return;
@@ -278,11 +278,11 @@ router.get(
 );
 
 /**
- * POST /api/v1/work-packages
+ * POST /api/v1/work-orders
  * Create a new work package
  */
 router.post(
-  '/work-packages',
+  '/work-orders',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
@@ -296,19 +296,19 @@ router.post(
       return;
     }
 
-    const request: CreateWorkPackageRequest = req.body;
+    const request: CreateWorkOrderRequest = req.body;
 
-    if (!request.aircraft_id || (!request.title && !request.work_package_title_id) || !request.maintenance_type) {
+    if (!request.aircraft_id || (!request.title && !request.work_order_title_id) || !request.maintenance_type) {
       res.status(400).json({
-        error: 'Missing required fields: aircraft_id, (title or work_package_title_id), maintenance_type',
+        error: 'Missing required fields: aircraft_id, (title or work_order_title_id), maintenance_type',
         code: 'VALIDATION_ERROR',
         statusCode: 400,
       } as ErrorResponse);
       return;
     }
 
-    const workPackage = await workOrdersService.createWorkPackage(tenantId, userId, request, getFranchiseId(req));
-    res.status(201).json({ data: workPackage });
+    const workOrder = await workOrdersService.createWorkOrder(tenantId, userId, request, getFranchiseId(req));
+    res.status(201).json({ data: workOrder });
     return;
   }),
 );
@@ -328,26 +328,26 @@ router.post(
       return;
     }
 
-    const request = req.body as CreateWorkPackageRequest;
-    if (!request.aircraft_id || (!request.title && !request.work_package_title_id) || !request.maintenance_type) {
+    const request = req.body as CreateWorkOrderRequest;
+    if (!request.aircraft_id || (!request.title && !request.work_order_title_id) || !request.maintenance_type) {
       res.status(400).json({
-        error: 'Missing required fields: aircraft_id, (title or work_package_title_id), maintenance_type',
+        error: 'Missing required fields: aircraft_id, (title or work_order_title_id), maintenance_type',
         code: 'VALIDATION_ERROR',
         statusCode: 400,
       } as ErrorResponse);
       return;
     }
 
-    const workPackage = await workOrdersService.createWorkPackage(tenantId, userId, request, getFranchiseId(req));
+    const workOrder = await workOrdersService.createWorkOrder(tenantId, userId, request, getFranchiseId(req));
     res.status(201).json({
       version: 'v2',
       interface: 'create-work-order',
       output: {
-        id: workPackage.id,
-        work_order_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
-        work_package_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
-        status: workPackage.status,
-        generated_tasks_count: Number(workPackage.generated_tasks_count || 0),
+        id: workOrder.id,
+        work_order_number: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
+        work_order_number: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
+        status: workOrder.status,
+        generated_tasks_count: Number(workOrder.generated_tasks_count || 0),
       },
     });
     return;
@@ -368,16 +368,16 @@ router.patch(
       } as ErrorResponse);
       return;
     }
-    const request: UpdateWorkPackageRequest = req.body;
-    const workPackage = await workOrdersService.updateWorkPackage(tenantId, id, userId, request);
+    const request: UpdateWorkOrderRequest = req.body;
+    const workOrder = await workOrdersService.updateWorkOrder(tenantId, id, userId, request);
     res.status(200).json({
       version: 'v2',
       interface: 'update-work-order',
       output: {
-        id: workPackage.id,
-        work_order_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
-        work_package_number: workPackage.work_package_number || workPackage.work_order_number || workPackage.id,
-        status: workPackage.status,
+        id: workOrder.id,
+        work_order_number: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
+        work_order_number: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
+        status: workOrder.status,
       },
     });
     return;
@@ -398,7 +398,7 @@ router.delete(
       } as ErrorResponse);
       return;
     }
-    await workOrdersService.deleteWorkPackage(tenantId, id, userId);
+    await workOrdersService.deleteWorkOrder(tenantId, id, userId);
     res.status(204).send();
     return;
   }),
@@ -417,12 +417,12 @@ router.get(
       } as ErrorResponse);
       return;
     }
-    const workPackage = await workOrdersService.getWorkPackage(tenantId, id);
+    const workOrder = await workOrdersService.getWorkOrder(tenantId, id);
     res.status(200).json({
       version: 'v2',
       interface: 'get-work-order',
       output: {
-        work_package: workPackage,
+        work_order: workOrder,
       },
     });
     return;
@@ -442,11 +442,11 @@ router.get(
       return;
     }
 
-    const workPackages = await workOrdersService.getWorkPackages(tenantId);
-    const records = workPackages.map((row) => ({
+    const workOrders = await workOrdersService.getWorkOrders(tenantId);
+    const records = workOrders.map((row) => ({
       id: row.id,
-      work_order_number: row.work_package_number || row.work_order_number || row.id,
-      work_package_number: row.work_package_number || row.work_order_number || row.id,
+      work_order_number: row.work_order_number || row.work_order_number || row.id,
+      work_order_number: row.work_order_number || row.work_order_number || row.id,
       title: row.title,
       aircraft_id: row.aircraft_id,
       status: row.status,
@@ -474,7 +474,7 @@ router.get(
 );
 
 router.post(
-  '/amro/work-packages',
+  '/amro/work-orders',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
@@ -488,11 +488,11 @@ router.post(
       return;
     }
 
-    const v2Request = req.body as V2CreateWorkPackageRequest;
+    const v2Request = req.body as V2CreateWorkOrderRequest;
     const interfaceName = String(req.query.interface || '').trim().toLowerCase();
-    if (interfaceName === 'create-work-package-template') {
+    if (interfaceName === 'create-work-order-template') {
       res.status(404).json({
-        error: 'Interface create-work-package-template is handled by work-package-template routes',
+        error: 'Interface create-work-order-template is handled by work-order-template routes',
         code: 'NOT_FOUND',
         statusCode: 404,
       } as ErrorResponse);
@@ -509,13 +509,13 @@ router.post(
       return;
     }
 
-    const workPackage = await workOrdersService.createWorkPackage(tenantId, userId, request, getFranchiseId(req));
+    const workOrder = await workOrdersService.createWorkOrder(tenantId, userId, request, getFranchiseId(req));
     res.status(201).json({
       data: {
-        id: workPackage.id,
-        code: workPackage.work_order_number || workPackage.work_package_number || workPackage.id,
-        status: workPackage.status,
-        generated_tasks_count: Number(workPackage.generated_tasks_count || 0),
+        id: workOrder.id,
+        code: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
+        status: workOrder.status,
+        generated_tasks_count: Number(workOrder.generated_tasks_count || 0),
       },
     });
     return;
@@ -523,11 +523,11 @@ router.post(
 );
 
 /**
- * PATCH /api/v1/work-packages/:id
+ * PATCH /api/v1/work-orders/:id
  * Update a work package
  */
 router.patch(
-  '/work-packages/:id',
+  '/work-orders/:id',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
@@ -542,19 +542,19 @@ router.patch(
       return;
     }
 
-    const request: UpdateWorkPackageRequest = req.body;
-    const workPackage = await workOrdersService.updateWorkPackage(tenantId, id, userId, request);
-    res.json({ data: workPackage });
+    const request: UpdateWorkOrderRequest = req.body;
+    const workOrder = await workOrdersService.updateWorkOrder(tenantId, id, userId, request);
+    res.json({ data: workOrder });
     return;
   }),
 );
 
 /**
- * DELETE /api/v1/work-packages/:id
+ * DELETE /api/v1/work-orders/:id
  * Delete a work package
  */
 router.delete(
-  '/work-packages/:id',
+  '/work-orders/:id',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
@@ -569,7 +569,7 @@ router.delete(
       return;
     }
 
-    await workOrdersService.deleteWorkPackage(tenantId, id, userId);
+    await workOrdersService.deleteWorkOrder(tenantId, id, userId);
     res.status(204).send();
     return;
   }),
@@ -580,14 +580,14 @@ router.delete(
 // ============================================================================
 
 /**
- * GET /api/v1/work-packages/:workPackageId/tasks
+ * GET /api/v1/work-orders/:workOrderId/tasks
  * Get all tasks for a work package
  */
 router.get(
-  '/work-packages/:workPackageId/tasks',
+  '/work-orders/:workOrderId/tasks',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
-    const { workPackageId } = req.params;
+    const { workOrderId } = req.params;
 
     if (!tenantId) {
       res.status(401).json({
@@ -598,7 +598,7 @@ router.get(
       return;
     }
 
-    const tasks = await workOrdersService.getTasks(tenantId, workPackageId);
+    const tasks = await workOrdersService.getTasks(tenantId, workOrderId);
     res.json({
       data: tasks,
       count: tasks.length,
@@ -633,15 +633,15 @@ router.get(
 );
 
 /**
- * POST /api/v1/work-packages/:workPackageId/tasks
+ * POST /api/v1/work-orders/:workOrderId/tasks
  * Create a new task
  */
 router.post(
-  '/work-packages/:workPackageId/tasks',
+  '/work-orders/:workOrderId/tasks',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const userId = req.userId;
-    const { workPackageId } = req.params;
+    const { workOrderId } = req.params;
 
     if (!tenantId || !userId) {
       res.status(401).json({
@@ -654,7 +654,8 @@ router.post(
 
     const request: CreateTaskRequest = {
       ...req.body,
-      work_package_id: req.body?.work_package_id || workPackageId,
+      work_order_id: req.body?.work_order_id || req.body?.work_order_id || workOrderId,
+      work_order_id: req.body?.work_order_id || workOrderId,
     };
     const sequenceOrder = request.sequence_order ?? request.sequence_number;
 
@@ -727,10 +728,10 @@ router.delete(
 );
 
 router.get(
-  '/work-packages/:workPackageId/materials',
+  '/work-orders/:workOrderId/materials',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
-    const { workPackageId } = req.params;
+    const { workOrderId } = req.params;
 
     if (!tenantId) {
       res.status(401).json({
@@ -741,7 +742,7 @@ router.get(
       return;
     }
 
-    const materials = await workOrdersService.getMaterials(tenantId, workPackageId);
+    const materials = await workOrdersService.getMaterials(tenantId, workOrderId);
     res.json({
       data: materials,
       count: materials.length,

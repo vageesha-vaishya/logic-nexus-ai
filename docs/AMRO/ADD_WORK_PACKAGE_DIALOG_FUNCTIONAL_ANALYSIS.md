@@ -2,7 +2,7 @@
 
 ## Scope
 - Feature analyzed: **Add work package** dialog from `/dashboard/amro/aircraft`.
-- Primary UI component: [AircraftWorkPackageCreateDialog.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx#L140-L797)
+- Primary UI component: [AircraftWorkOrderCreateDialog.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx#L140-L797)
 - Orchestration and data loading: [AmroSettingsMasterDataPage.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L4508-L5383)
 
 ---
@@ -38,7 +38,7 @@
   - Code references:
     - Load registry: [AmroSettingsMasterDataPage.tsx#L4508-L4588](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L4508-L4588)
     - Template select handler: [AmroSettingsMasterDataPage.tsx#L4782-L4815](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L4782-L4815)
-    - New WP tab UI: [AircraftWorkPackageCreateDialog.tsx#L585-L645](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx#L585-L645)
+    - New WP tab UI: [AircraftWorkOrderCreateDialog.tsx#L585-L645](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx#L585-L645)
 
 **Mockup (New WP)**
 ```text
@@ -66,7 +66,7 @@
   - Code references:
     - Existing WP load: [AmroSettingsMasterDataPage.tsx#L4618-L4664](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L4618-L4664)
     - Apply handler: [AmroSettingsMasterDataPage.tsx#L5340-L5379](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L5340-L5379)
-    - Existing WP tab UI: [AircraftWorkPackageCreateDialog.tsx#L646-L705](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx#L646-L705)
+    - Existing WP tab UI: [AircraftWorkOrderCreateDialog.tsx#L646-L705](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx#L646-L705)
 
 **Mockup (Existing WP)**
 ```text
@@ -90,7 +90,7 @@
   - Selected rows update global selected task IDs and selected-task header fields.
   - Code references:
     - Non-performed list derivation: [AmroSettingsMasterDataPage.tsx#L5221-L5227](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L5221-L5227)
-    - Tab UI: [AircraftWorkPackageCreateDialog.tsx#L706-L742](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx#L706-L742)
+    - Tab UI: [AircraftWorkOrderCreateDialog.tsx#L706-L742](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx#L706-L742)
 
 **Mockup (Non performed tasks)**
 ```text
@@ -110,14 +110,14 @@
 - **Business logic**
   - Task table uses paged/sorted selected tasks.
   - Checking a task updates:
-    - `aircraftWorkPackageSelectedTaskIds`
+    - `aircraftWorkOrderSelectedTaskIds`
     - selected-task quick fields (`selectedTaskNumber`, ATA, etc.) on check.
   - Validation errors surfaced inline in this tab.
   - Code references:
     - Selected task assembly: [AmroSettingsMasterDataPage.tsx#L5123-L5166](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L5123-L5166)
     - Filtering/sorting/paging: [AmroSettingsMasterDataPage.tsx#L5168-L5203](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L5168-L5203)
     - Selection handler: [AmroSettingsMasterDataPage.tsx#L5317-L5338](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L5317-L5338)
-    - Selected task tab UI: [AircraftWorkPackageCreateDialog.tsx#L196-L584](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx#L196-L584)
+    - Selected task tab UI: [AircraftWorkOrderCreateDialog.tsx#L196-L584](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx#L196-L584)
 
 **Mockup (Selected task)**
 ```text
@@ -142,7 +142,7 @@
   - Checkbox interactions use same global selected-task state.
   - Code references:
     - All tasks merge: [AmroSettingsMasterDataPage.tsx#L5228-L5269](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L5228-L5269)
-    - Tab UI: [AircraftWorkPackageCreateDialog.tsx#L743-L779](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx#L743-L779)
+    - Tab UI: [AircraftWorkOrderCreateDialog.tsx#L743-L779](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx#L743-L779)
 
 **Mockup (All Tasks)**
 ```text
@@ -164,12 +164,12 @@
 - Global state variables are shared across tabs via parent page component state.
 
 ## Create New Work Package Click Flow
-1. User opens dialog (`openAircraftWorkPackageDialog`).
+1. User opens dialog (`openAircraftWorkOrderDialog`).
 2. User optionally picks template / existing WP / task rows in tabs.
 3. User clicks `Create New Work Package` button.
 4. Client validates required fields and constraints.
 5. Client builds payload with task IDs + scope + trigger metadata.
-6. Client POSTs `/api/v2/amro/work-packages?interface=create-work-package`.
+6. Client POSTs `/api/v2/amro/work-orders?interface=create-work-order`.
 7. On success:
    - toast success
    - close dialog
@@ -187,21 +187,21 @@ Code reference for submit path: [AmroSettingsMasterDataPage.tsx#L4835-L5119](fil
 ## Data Models
 
 ## UI/Form Models
-- `AircraftWorkPackageFormValues`:
+- `AircraftWorkOrderFormValues`:
   - source, maintenanceType, priority, status, validationState
   - WP metadata (number/topic/revision/date fields)
   - selected task “header” fields
   - scope text
-- `WorkPackageTemplateRegistryItem`:
+- `WorkOrderTemplateRegistryItem`:
   - template id/code/name/type/version
   - scope items array
   - taskRows array
-- `AircraftWorkPackageTaskListItem`:
+- `AircraftWorkOrderTaskListItem`:
   - task identity + ATA + status + source + parent wp
-- `AircraftWorkPackageRecordSummary`:
+- `AircraftWorkOrderRecordSummary`:
   - existing WP summary + tasks list
 
-Type definitions: [AircraftWorkPackageCreateDialog.tsx#L15-L138](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx#L15-L138)
+Type definitions: [AircraftWorkOrderCreateDialog.tsx#L15-L138](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx#L15-L138)
 
 ## Submit Payload (core fields)
 - `aircraft_id`
@@ -222,20 +222,20 @@ Payload build: [AmroSettingsMasterDataPage.tsx#L4954-L4992](file:///Users/vims/D
 ## API Endpoints Involved
 
 - **Load template registry**
-  - `GET /api/v2/amro/master-data/work_package_templates?page=1&page_size=100&sort_by=updated_at&sort_dir=desc`
+  - `GET /api/v2/amro/master-data/work_order_templates?page=1&page_size=100&sort_by=updated_at&sort_dir=desc`
   - Reference: [AmroSettingsMasterDataPage.tsx#L4508-L4588](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L4508-L4588)
 
 - **Load existing aircraft work packages**
-  - `GET /api/v2/amro/work-packages?aircraft_id=<id>&page=1&page_size=100`
+  - `GET /api/v2/amro/work-orders?aircraft_id=<id>&page=1&page_size=100`
   - Reference: [AmroSettingsMasterDataPage.tsx#L4618-L4664](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L4618-L4664)
 
 - **Create work package**
-  - `POST /api/v2/amro/work-packages?interface=create-work-package`
+  - `POST /api/v2/amro/work-orders?interface=create-work-order`
   - Reference: [AmroSettingsMasterDataPage.tsx#L5011-L5054](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L5011-L5054)
   - Contract doc: [openapi-3.1.yaml](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/pages/api/v2/amro/contracts/openapi-3.1.yaml)
 
 - **Compensating rollback (on partial failure)**
-  - `DELETE /api/v2/amro/work-packages/{id}?rollback=1`
+  - `DELETE /api/v2/amro/work-orders/{id}?rollback=1`
   - Reference: [AmroSettingsMasterDataPage.tsx#L5080-L5095](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L5080-L5095)
 
 ---
@@ -244,7 +244,7 @@ Payload build: [AmroSettingsMasterDataPage.tsx#L4954-L4992](file:///Users/vims/D
 
 ## Required fields
 - templateRegistry
-- workPackageNumber
+- workOrderNumber
 - topic
 - openingDate
 - revisionNumber
@@ -267,13 +267,13 @@ Validation logic: [AmroSettingsMasterDataPage.tsx#L4855-L4943](file:///Users/vim
 - source must be one of: `schedule_due|defect|campaign|predictive_alert`
 
 ## Permission constraints
-- creation blocked if `canCreateWorkPackage` false
-- schedule action blocked if `canScheduleWorkPackage` false
+- creation blocked if `canCreateWorkOrder` false
+- schedule action blocked if `canScheduleWorkOrder` false
 
 ## UI action constraints
-- “Create New Work Package” button enabled only when user can create and a template is selected (`canCreateWorkPackageFromTemplate`).
+- “Create New Work Package” button enabled only when user can create and a template is selected (`canCreateWorkOrderFromTemplate`).
   - [AmroSettingsMasterDataPage.tsx#L3310-L3313](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/AmroSettingsMasterDataPage.tsx#L3310-L3313)
-  - [AircraftWorkPackageCreateDialog.tsx#L785-L789](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkPackageCreateDialog.tsx#L785-L789)
+  - [AircraftWorkOrderCreateDialog.tsx#L785-L789](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/settings/pages/amro-settings-master-data/components/AircraftWorkOrderCreateDialog.tsx#L785-L789)
 
 ---
 
@@ -292,7 +292,7 @@ Validation logic: [AmroSettingsMasterDataPage.tsx#L4855-L4943](file:///Users/vim
 6. User completes required metadata.
 7. User clicks **Create New Work Package**.
 8. System validates client-side.
-9. System posts create-work-package payload.
+9. System posts create-work-order payload.
 10. On success:
    - dialog closes,
    - success toast,

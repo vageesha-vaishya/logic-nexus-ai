@@ -71,7 +71,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     applyCompatibilityResponseHeaders(res, compatDecision, ctx.correlationId);
     const scope = createAmroIsolationScope(tenantId, franchiseId);
     const serviceBoundaries = buildAmroServiceBoundaryEnvelope({
-      capability: 'work-packages',
+      capability: 'work-orders',
       scope,
       subscriptionStatus: 'public',
       validatedAt: new Date().toISOString(),
@@ -85,10 +85,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const complianceObservedTimeoutRate = parseNumber(process.env.AMRO_SLO_COMPLIANCE_TIMEOUT_PERCENT, 0.1);
     const mobileSyncObservedAvailability = parseNumber(process.env.AMRO_SLO_MOBILE_SYNC_AVAILABILITY, 99.93);
     const mobileSyncObservedBacklogAgeMinutes = parseNumber(process.env.AMRO_SLO_MOBILE_SYNC_BACKLOG_MINUTES, 3);
-    const concurrentWorkPackagesPerRegion = parseNumber(process.env.AMRO_CAPACITY_CONCURRENT_WORK_PACKAGES_PER_REGION, 14320);
-    const capacityTargetConcurrentWorkPackagesPerRegion = 25000;
-    const utilizationPercent = Number(((concurrentWorkPackagesPerRegion / capacityTargetConcurrentWorkPackagesPerRegion) * 100).toFixed(2));
-    const capacityStatus = concurrentWorkPackagesPerRegion <= capacityTargetConcurrentWorkPackagesPerRegion ? 'within_capacity' : 'capacity_risk';
+    const concurrentWorkOrdersPerRegion = parseNumber(process.env.AMRO_CAPACITY_CONCURRENT_WORK_PACKAGES_PER_REGION, 14320);
+    const capacityTargetConcurrentWorkOrdersPerRegion = 25000;
+    const utilizationPercent = Number(((concurrentWorkOrdersPerRegion / capacityTargetConcurrentWorkOrdersPerRegion) * 100).toFixed(2));
+    const capacityStatus = concurrentWorkOrdersPerRegion <= capacityTargetConcurrentWorkOrdersPerRegion ? 'within_capacity' : 'capacity_risk';
 
     return res.status(200).json({
       version: 'v2',
@@ -153,8 +153,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
             },
           },
           capacity_planning: {
-            target_concurrent_work_packages_per_region: capacityTargetConcurrentWorkPackagesPerRegion,
-            observed_concurrent_work_packages_per_region: concurrentWorkPackagesPerRegion,
+            target_concurrent_work_orders_per_region: capacityTargetConcurrentWorkOrdersPerRegion,
+            observed_concurrent_work_orders_per_region: concurrentWorkOrdersPerRegion,
             utilization_percent: utilizationPercent,
             status: capacityStatus,
           },

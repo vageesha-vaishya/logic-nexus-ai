@@ -5,7 +5,7 @@
 - Status: `Architecture + UX Reference`
 - Owner: `AMRO Product + FE Architecture`
 - Last Updated: `2026-04-06`
-- Scope: Existing `work_package_templates` module analysis and enterprise Storybook reference design
+- Scope: Existing `work_order_templates` module analysis and enterprise Storybook reference design
 
 ## Executive Summary
 The current AMRO Work Package Templates module is functionally strong and data-rich, with complete CRUD support, task-template selection, sorting/filtering, scope/task JSON editing, and model-aware behavior. The key challenge is UI complexity and maintainability as the module scales. The recommended direction is adapter-first standardization via `AmroStandardFormTemplate`, preserving legacy handlers while progressively migrating presentation blocks and interaction patterns.
@@ -92,16 +92,16 @@ The current AMRO Work Package Templates module is functionally strong and data-r
   - slot-based extension (`formBodySlot`, `listSlot`, `sidePanelSlot`, `footerSlot`)
 
 ### Adapter Pattern
-- `AmroWorkPackageTemplateAdapter` wraps legacy section logic and injects standardized fields.
+- `AmroWorkOrderTemplateAdapter` wraps legacy section logic and injects standardized fields.
 - Feature flag controls rollout:
   - `VITE_AMRO_WPT_STANDARD_TEMPLATE`
 
 ## Storybook Reference Coverage
 ### Existing WPT Parity Stories
-- `WorkPackageTemplates_ProductionParity`
-- `WorkPackageTemplates_ProductionParity_ValidationError`
-- `WorkPackageTemplates_ProductionParity_Loading`
-- `WorkPackageTemplates_ProductionParity_FeatureFlagOffFallback`
+- `WorkOrderTemplates_ProductionParity`
+- `WorkOrderTemplates_ProductionParity_ValidationError`
+- `WorkOrderTemplates_ProductionParity_Loading`
+- `WorkOrderTemplates_ProductionParity_FeatureFlagOffFallback`
 
 ### New Enterprise Option Stories
 - `DesktopOperations`
@@ -112,7 +112,7 @@ The current AMRO Work Package Templates module is functionally strong and data-r
 - `ApprovalWorkflowAndAudit`
 
 File:
-- [AmroWorkPackageTemplatesEnterprise.stories.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/components/templates/AmroWorkPackageTemplatesEnterprise.stories.tsx)
+- [AmroWorkOrderTemplatesEnterprise.stories.tsx](file:///Users/vims/Downloads/Development%20Projects/Trae/SOS%20Logistics%20Pro/logic-nexus-ai/src/features/module-amro/components/templates/AmroWorkOrderTemplatesEnterprise.stories.tsx)
 
 ## Implementation Guidelines
 ### Component Variations
@@ -123,7 +123,7 @@ File:
 ### Usage Example (Adapter-First)
 ```tsx
 <AmroStandardFormTemplate
-  moduleKey="work_package_templates"
+  moduleKey="work_order_templates"
   title="Work Package Templates"
   mode="edit"
   state="ready"

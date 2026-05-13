@@ -1024,7 +1024,7 @@ function WizardFormShowcase() {
         <h3 className="text-base font-semibold">Work Package Wizard (4-Step)</h3>
         <p className="text-xs text-muted-foreground mt-1">
           Multi-step wizard for creating Work Packages. Used in Create Work Package workflow.
-          Based on AmroWorkPackageCreateWizard pattern.
+          Based on AmroWorkOrderCreateWizard pattern.
         </p>
       </div>
 

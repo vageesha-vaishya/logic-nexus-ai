@@ -36,6 +36,38 @@ export type AircraftTemplateRecord = {
   updated_at?: string;
 };
 
+const WORK_ORDER_STYLE_TEMPLATE_PREFIX = /^(wp|wt)[\s_-]?\d+/i;
+
+const resolveModelJsonAssemblyModelId = (source: unknown): string => {
+  let parsed: unknown = source;
+  if (typeof parsed === 'string') {
+    try {
+      parsed = JSON.parse(parsed);
+    } catch {
+      return '';
+    }
+  }
+  const payload = Array.isArray(parsed) ? parsed[0] : parsed;
+  if (!payload || typeof payload !== 'object') {
+    return '';
+  }
+  const record = payload as Record<string, unknown>;
+  return String(record.assembly_model_id || record.assembly_models || record.assemblyModelId || '').trim();
+};
+
+export function isAircraftTemplateRecordEligible(record: Record<string, unknown>): boolean {
+  const templateName = String(record.template_name || '').trim();
+  if (!templateName || WORK_ORDER_STYLE_TEMPLATE_PREFIX.test(templateName)) {
+    return false;
+  }
+  const activeToken = String(record.is_active ?? '').trim().toLowerCase();
+  if (activeToken && ['false', '0', 'no', 'off', 'inactive', 'f', 'n'].includes(activeToken)) {
+    return false;
+  }
+  const assemblyModelId = String(record.assembly_models || '').trim() || resolveModelJsonAssemblyModelId(record.model_json);
+  return Boolean(assemblyModelId);
+}
+
 export function filterManufacturersByTenant<T extends { tenantId?: string }>(records: T[], tenantId: string): T[] {
   const scopedTenantId = String(tenantId || '').trim();
   if (!scopedTenantId) {
@@ -281,6 +313,7 @@ export async function listAircraftTemplates(
     throw new Error(String(payload.error || 'Failed to load aircraft templates'));
   }
   return getPayloadRecords(payload)
+    .filter((record) => isAircraftTemplateRecordEligible(record))
     .map(normalizeAircraftTemplateRecord)
     .filter((record): record is AircraftTemplateRecord => Boolean(record));
 }

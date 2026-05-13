@@ -100,7 +100,7 @@ export const AMRO_PHASE_PLAN_MATRIX: ReadonlyArray<AmroPhasePlanRow> = [
     label: 'P1 Core Workflows',
     backendBuildScope: 'Implement work package lifecycle APIs (create/transition/clone), task step update APIs, parts reserve/shortage APIs',
     frontendBuildScope: 'Implement SCR-AMRO-001/002/003/004/005/006/007 baseline views and forms',
-    dataAndSecurityScope: 'Implement schema for work_packages, tasks, reservations, stock movements with policy-safe transitions',
+    dataAndSecurityScope: 'Implement schema for work_orders, tasks, reservations, stock movements with policy-safe transitions',
     testScope: 'Add integration tests for plan-to-execute flow and API validation rules',
     deliverables: 'End-to-end flow: create WP -> schedule -> execute task -> reserve parts',
   },
@@ -441,9 +441,9 @@ const AMRO_SEQUENTIAL_COMPONENT_SCOPE: Readonly<Record<AmroSequentialMilestoneId
 } as const;
 
 const AMRO_WORK_PACKAGE_INTERFACE_MILESTONES: Readonly<Record<string, AmroSequentialMilestoneId>> = {
-  'create-work-package': 'M2',
-  'transition-work-package': 'M2',
-  'save-work-package-view': 'M2',
+  'create-work-order': 'M2',
+  'transition-work-order': 'M2',
+  'save-work-order-view': 'M2',
   'clone-template': 'M2',
   'assign-maintenance-slot': 'M3',
   'acknowledge-schedule-update': 'M2',
@@ -675,7 +675,7 @@ export function buildAmroGaReadinessEnvelope() {
   };
 }
 
-export function enforceAmroSequentialMilestoneForWorkPackageInterface(interfaceName: string): void {
+export function enforceAmroSequentialMilestoneForWorkOrderInterface(interfaceName: string): void {
   const milestone = AMRO_WORK_PACKAGE_INTERFACE_MILESTONES[String(interfaceName || '').trim().toLowerCase()];
   if (!milestone) return;
   enforceAmroSequentialMilestone(milestone, interfaceName);

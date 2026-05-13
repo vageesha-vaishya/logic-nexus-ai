@@ -73,6 +73,24 @@ describe('master-data.routes', () => {
           error: null,
         };
       }
+      if (operation.endsWith('.aircraft_counters.load')) {
+        return {
+          data: {
+            id: 'aircraft-1',
+            current_flight_hours: 100,
+            current_flight_hours_since_new: 100,
+            current_landings: 30,
+            current_landings_since_new: 30,
+          },
+          error: null,
+        };
+      }
+      if (operation.endsWith('.aircraft_counters.update')) {
+        return {
+          data: { id: 'aircraft-1' },
+          error: null,
+        };
+      }
       if (operation.endsWith('.update.load') || operation.endsWith('.delete.load')) {
         return {
           data: { id: 'aircraft-1', tail_number: 'N101AA', tenant_id: 'tenant-1', franchise_id: null },
@@ -126,6 +144,21 @@ describe('master-data.routes', () => {
     expect(mockExecuteWithResilience).toHaveBeenCalled();
   });
 
+  it('always exposes aircraft usage counters in list response', async () => {
+    mockExecuteWithResilience.mockImplementationOnce(async () => ({
+      data: [{ id: 'aircraft-1', tail_number: 'N101AA', tenant_id: 'tenant-1', franchise_id: null, current_cycles: 12 }],
+      count: 1,
+      error: null,
+    }));
+    const app = await createTestApp();
+    const response = await request(app)
+      .get('/api/v2/amro/master-data/aircraft?page=1&page_size=25&sort_by=updated_at&sort_dir=desc')
+      .expect(200);
+    const first = response.body.output.records[0];
+    expect(first.current_flight_hours).toBe(0);
+    expect(first.current_landings).toBe(12);
+  });
+
   it('accepts hyphenated flight logs entity route', async () => {
     const app = await createTestApp();
     const response = await request(app)
@@ -162,6 +195,13 @@ describe('master-data.routes', () => {
   });
 
   it('creates master data records', async () => {
+    mockExecuteWithResilience.mockImplementationOnce(async (_context: unknown, operation: () => Promise<unknown>) => {
+      await operation();
+      return {
+        data: { id: 'aircraft-2', tail_number: 'N202AA' },
+        error: null,
+      };
+    });
     const app = await createTestApp();
     const response = await request(app)
       .post('/api/v2/amro/master-data/aircraft')
@@ -171,12 +211,50 @@ describe('master-data.routes', () => {
         aircraft_type: 'A320',
         aircraft_model: 'A320-200',
         status: 'active',
+        aircraft_operators_id: '157b8d12-c115-446e-a4dc-d12077751fe2',
+        aircraft_owners_id: '257b8d12-c115-446e-a4dc-d12077751fe2',
+        aircraft_base_location_id: '357b8d12-c115-446e-a4dc-d12077751fe2',
       })
       .expect(201);
     expect(response.body.output.entity).toBe('aircraft');
     expect(response.body.output.record.id).toBe('aircraft-2');
     expect(mockExecuteWithResilience).toHaveBeenCalledWith(
       expect.objectContaining({ operation: 'master-data.aircraft.create' }),
+      expect.any(Function),
+    );
+    expect(lastFromTable).toBe('aircraft');
+    expect(lastQueryBuilder.insert).toHaveBeenCalledWith(
+      expect.objectContaining({
+        aircraft_operators_id: '157b8d12-c115-446e-a4dc-d12077751fe2',
+        aircraft_owners_id: '257b8d12-c115-446e-a4dc-d12077751fe2',
+        aircraft_base_location_id: '357b8d12-c115-446e-a4dc-d12077751fe2',
+      }),
+    );
+  });
+
+  it('increments aircraft counters when creating flight logs', async () => {
+    const app = await createTestApp();
+    await request(app)
+      .post('/api/v2/amro/master-data/flight_logs')
+      .send({
+        aircraft_id: 'aircraft-1',
+        flight_date: '2026-05-02',
+        departure_airport: 'a1807454-4233-4c96-90af-d5f42f96df66',
+        arrival_airport: 'e5f20b57-ec4f-4a02-9f6e-19f3c0be3f48',
+        flight_hours: 2.5,
+        landings: 1,
+      })
+      .expect(201);
+    expect(mockExecuteWithResilience).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'master-data.flight_logs.create' }),
+      expect.any(Function),
+    );
+    expect(mockExecuteWithResilience).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'master-data.flight_logs.aircraft_counters.load' }),
+      expect.any(Function),
+    );
+    expect(mockExecuteWithResilience).toHaveBeenCalledWith(
+      expect.objectContaining({ operation: 'master-data.flight_logs.aircraft_counters.update' }),
       expect.any(Function),
     );
   });
@@ -223,13 +301,19 @@ describe('master-data.routes', () => {
   it('bulk imports master data records', async () => {
     const app = await createTestApp();
     const response = await request(app)
-      .post('/api/v2/amro/master-data/work_package_templates')
+      .post('/api/v2/amro/master-data/work_order_templates')
       .send({
         operation: 'bulk_import',
-        records: [{ template_code: 'TMP-1', template_name: 'Template 1', maintenance_type: 'line', version: 1 }],
+        records: [{
+          assembly_models_id: 'asm-1',
+          template_code: 'TMP-1',
+          template_name: 'Template 1',
+          maintenance_type: 'line',
+          version: 1,
+        }],
       })
       .expect(200);
-    expect(response.body.output.entity).toBe('work_package_templates');
+    expect(response.body.output.entity).toBe('work_order_templates');
     expect(response.body.output.imported_count).toBe(1);
     expect(Array.isArray(response.body.output.records)).toBe(true);
   });

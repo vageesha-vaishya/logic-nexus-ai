@@ -38,7 +38,7 @@ vi.mock('../../_utils/supabaseAdmin', () => ({
 }));
 
 vi.mock('./anti-corruption-adapter', () => ({
-  buildAmroServiceBoundaryEnvelope: vi.fn(() => ({ capability: 'work-packages' })),
+  buildAmroServiceBoundaryEnvelope: vi.fn(() => ({ capability: 'work-orders' })),
   createAmroIsolationScope: vi.fn(() => ({ tenantId: 'tenant-1', franchiseId: 'fr-1' })),
 }));
 
@@ -110,7 +110,7 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
     vi.mocked(resolveAndApplyAccessContext).mockResolvedValue({ tenantId: 'tenant-1', franchiseId: 'fr-1' } as any);
     vi.mocked(enforceAmroDomainAccess).mockResolvedValue({ subscriptionStatus: 'active', source: 'database', validatedAt: '2026-03-27T00:00:00.000Z' } as any);
     vi.mocked(enforceAnyPermission).mockImplementation(() => undefined);
-    vi.mocked(buildAmroServiceBoundaryEnvelope).mockReturnValue({ capability: 'work-packages' } as any);
+    vi.mocked(buildAmroServiceBoundaryEnvelope).mockReturnValue({ capability: 'work-orders' } as any);
   });
 
   it('returns dashboard payload with KPI and trend data', async () => {
@@ -134,9 +134,9 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
             },
           ]);
         }
-        if (table === 'work_packages') {
+        if (table === 'work_orders') {
           return createQueryChain([
-            { id: 'wp-1', aircraft_id: 'ac-1', work_package_number: 'WP-001', title: 'A-Check', status: 'open', priority: 'high', due_at: '2026-04-01T00:00:00.000Z', compliance_state: 'ready', updated_at: '2026-03-27T10:00:00.000Z' },
+            { id: 'wp-1', aircraft_id: 'ac-1', work_order_number: 'WP-001', title: 'A-Check', status: 'open', priority: 'high', due_at: '2026-04-01T00:00:00.000Z', compliance_state: 'ready', updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
         if (table === 'flight_logs') {
@@ -174,7 +174,7 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.output?.kpis?.open_work_packages).toBe(1);
+    expect((res.jsonBody as any)?.output?.kpis?.open_work_orders).toBe(1);
     expect((res.jsonBody as any)?.output?.aircraft_status?.[0]?.model_id).toBe('model-a320');
     expect((res.jsonBody as any)?.output?.aircraft_status?.[0]?.aircraft_model).toBe('A320-200-157');
     expect((res.jsonBody as any)?.output?.aircraft_status?.[0]?.assembly_models).toBe('3fd79fc0-58f1-4f24-9ca0-5f0e45f410d7');
@@ -223,9 +223,9 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
     } as any);
     const supabaseMock = {
       from: vi.fn((table: string) => {
-        if (table === 'work_packages') {
+        if (table === 'work_orders') {
           return createQueryChain([
-            { id: 'wp-2', aircraft_id: 'ac-2', work_package_number: 'WP-002', title: 'B-Check', status: 'scheduled', priority: 'medium', due_at: '2026-04-02T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
+            { id: 'wp-2', aircraft_id: 'ac-2', work_order_number: 'WP-002', title: 'B-Check', status: 'scheduled', priority: 'medium', due_at: '2026-04-02T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
         if (table === 'flight_logs') {
@@ -279,9 +279,9 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
             },
           ]);
         }
-        if (table === 'work_packages') {
+        if (table === 'work_orders') {
           return createQueryChain([
-            { id: 'wp-4', aircraft_id: 'ac-4', work_package_number: 'WP-004', title: 'Engine borescope', status: 'open', priority: 'high', due_at: '2026-04-08T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
+            { id: 'wp-4', aircraft_id: 'ac-4', work_order_number: 'WP-004', title: 'Engine borescope', status: 'open', priority: 'high', due_at: '2026-04-08T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
         if (table === 'flight_logs') {
@@ -498,12 +498,12 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
             { id: 'ac-other', registration: 'A6-OTHER', status: 'active', defect_count: 2, current_flight_hours: 99, current_cycles: 44, updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
-        if (table === 'work_packages') {
-          return createErrorQueryChain('work_packages missing');
+        if (table === 'work_orders') {
+          return createErrorQueryChain('work_orders missing');
         }
-        if (table === 'work_package_master') {
+        if (table === 'work_order_master') {
           return createQueryChain([
-            { id: 'wp-fallback-1', aircraft_id: 'ac-filter', work_package_number: 'WP-FB-001', title: 'Borescope inspection', status: 'open', priority: 'high', due_at: '2026-04-05T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
+            { id: 'wp-fallback-1', aircraft_id: 'ac-filter', work_order_number: 'WP-FB-001', title: 'Borescope inspection', status: 'open', priority: 'high', due_at: '2026-04-05T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
         if (table === 'flight_logs') {
@@ -547,7 +547,7 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.output?.metadata?.sources?.maintenance).toBe('work_package_master');
+    expect((res.jsonBody as any)?.output?.metadata?.sources?.maintenance).toBe('work_order_master');
     expect((res.jsonBody as any)?.output?.metadata?.sources?.iot_signals).toBe('forecast_outputs');
     expect((res.jsonBody as any)?.output?.aircraft_leads?.length).toBe(1);
     expect((res.jsonBody as any)?.output?.aircraft_leads?.[0]?.title).toContain('Engine retrofit');
@@ -567,9 +567,9 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
             { id: 'ac-tech-1', registration: 'A6-T1', status: 'active', defect_count: 1, current_flight_hours: 200, current_cycles: 90, updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
-        if (table === 'work_packages') {
+        if (table === 'work_orders') {
           return createQueryChain([
-            { id: 'wp-tech-1', aircraft_id: 'ac-tech-1', work_package_number: 'WP-T-001', title: 'Line maintenance', status: 'scheduled', priority: 'medium', due_at: '2026-04-09T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
+            { id: 'wp-tech-1', aircraft_id: 'ac-tech-1', work_order_number: 'WP-T-001', title: 'Line maintenance', status: 'scheduled', priority: 'medium', due_at: '2026-04-09T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
         if (table === 'flight_logs') {
@@ -658,9 +658,9 @@ describe('/api/v2/amro/aircraft-dashboard', () => {
             { id: 'ac-perf-1', registration: 'A6-PERF', status: 'active', defect_count: 1, current_flight_hours: 1200, current_cycles: 430, updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
-        if (table === 'work_packages') {
+        if (table === 'work_orders') {
           return createQueryChain([
-            { id: 'wp-perf-1', aircraft_id: 'ac-perf-1', work_package_number: 'WP-PERF-001', title: 'Engine health review', status: 'open', priority: 'high', due_at: '2026-04-01T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
+            { id: 'wp-perf-1', aircraft_id: 'ac-perf-1', work_order_number: 'WP-PERF-001', title: 'Engine health review', status: 'open', priority: 'high', due_at: '2026-04-01T00:00:00.000Z', compliance_state: 'pending', updated_at: '2026-03-27T10:00:00.000Z' },
           ]);
         }
         if (table === 'flight_logs') {

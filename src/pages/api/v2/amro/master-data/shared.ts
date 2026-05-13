@@ -4,6 +4,8 @@ import { getSupabaseAdminClient } from '../../../_utils/supabaseAdmin';
 
 export type AmroMasterDataEntity =
   | 'aircraft'
+  | 'aircraft_operators'
+  | 'aircraft_owners'
   | 'aircraft_template'
   | 'ata_codes'
   | 'flight_logs'
@@ -17,7 +19,7 @@ export type AmroMasterDataEntity =
   | 'assembly_models'
   | 'regulator_profiles'
   | 'shift_calendars'
-  | 'work_package_templates';
+  | 'work_order_templates';
 
 type EntityConfig = {
   table: string;
@@ -28,7 +30,7 @@ type EntityConfig = {
   defaultSortColumn: string;
 };
 
-const AIRCRAFT_ALLOWED_STATUSES = new Set(['active', 'maintenance', 'grounded', 'retired', 'storage']);
+const AIRCRAFT_ALLOWED_STATUSES = new Set(['pending', 'active', 'maintenance', 'grounded', 'retired', 'storage']);
 const AIRCRAFT_STATUS_ALIASES: Record<string, string> = {
   inactive: 'retired',
 };
@@ -49,36 +51,37 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'tail_number',
       'registration',
       'serial_number',
-      'aircraft_type',
-      'aircraft_model',
+      'assembly_models',
       'msn',
-      'manufacturer',
-      'model',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
+      'aircraft_base_location_id',
       'owner_name',
       'base_location',
       'restrictions',
     ],
     listColumns:
-      'id,tenant_id,franchise_id,registration,tail_number,serial_number,aircraft_type,aircraft_model,manufacturer,manufacturer_id,model,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,owner_name,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
-    requiredCreateFields: ['tail_number', 'serial_number', 'aircraft_type', 'aircraft_model', 'manufacturer_id'],
+      'id,tenant_id,franchise_id,aircraft_template_id,registration,tail_number,serial_number,assembly_models,msn,line_number,configuration_code,maintenance_program,status,operator_code,station_code,engine_type,manufacturing_date,base_location,aircraft_operators_id,aircraft_owners_id,aircraft_base_location_id,owner_name,warranty_json,defect_count,first_limit_remaining,restrictions,current_flight_hours,current_cycles,current_landings,current_flight_hours_since_new,current_cycles_since_new,engine_install_history,thrust_rating_change_log,on_wing_lifecycle_records,created_at,updated_at',
+    requiredCreateFields: ['tail_number', 'serial_number'],
     writeAllowedFields: [
       'registration',
       'tail_number',
       'serial_number',
-      'aircraft_type',
-      'aircraft_model',
+      'aircraft_template_id',
+      'assembly_models',
       'configuration_code',
       'maintenance_program',
-      'manufacturer',
-      'manufacturer_id',
-      'model',
       'msn',
       'line_number',
       'status',
       'operator_code',
       'station_code',
       'base_location',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
+      'aircraft_base_location_id',
       'owner_name',
+      'warranty_json',
       'manufacturing_date',
       'defect_count',
       'first_limit_remaining',
@@ -86,6 +89,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'engine_type',
       'current_flight_hours',
       'current_cycles',
+      'current_landings',
       'current_flight_hours_since_new',
       'current_cycles_since_new',
       'engine_install_history',
@@ -93,6 +97,42 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'on_wing_lifecycle_records',
     ],
     defaultSortColumn: 'updated_at',
+  },
+  aircraft_operators: {
+    table: 'aircraft_operators',
+    searchableColumns: ['operator_code', 'operator_name', 'operator_type', 'contact_person', 'contact_email', 'phone_number'],
+    listColumns:
+      'id,tenant_id,franchise_id,operator_code,operator_name,operator_type,contact_person,contact_email,phone_number,address,is_active,created_at,updated_at',
+    requiredCreateFields: ['operator_code', 'operator_name'],
+    writeAllowedFields: [
+      'operator_code',
+      'operator_name',
+      'operator_type',
+      'contact_person',
+      'contact_email',
+      'phone_number',
+      'address',
+      'is_active',
+    ],
+    defaultSortColumn: 'operator_name',
+  },
+  aircraft_owners: {
+    table: 'aircraft_owners',
+    searchableColumns: ['owner_code', 'owner_name', 'owner_type', 'contact_person', 'contact_email', 'phone_number'],
+    listColumns:
+      'id,tenant_id,franchise_id,owner_code,owner_name,owner_type,contact_person,contact_email,phone_number,address,is_active,created_at,updated_at',
+    requiredCreateFields: ['owner_code', 'owner_name'],
+    writeAllowedFields: [
+      'owner_code',
+      'owner_name',
+      'owner_type',
+      'contact_person',
+      'contact_email',
+      'phone_number',
+      'address',
+      'is_active',
+    ],
+    defaultSortColumn: 'owner_name',
   },
   flight_logs: {
     table: 'flight_logs',
@@ -291,8 +331,8 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
     ],
     defaultSortColumn: 'updated_at',
   },
-  work_package_templates: {
-    table: 'work_package_templates',
+  work_order_templates: {
+    table: 'work_order_templates',
     searchableColumns: ['template_code', 'template_name', 'maintenance_type', 'aircraft_model', 'assembly_models_id'],
     listColumns:
       'id,tenant_id,franchise_id,template_code,version,active,template_name,maintenance_type,assembly_models_id,aircraft_model,assembly_models,scope_json,tasks_json,policy_snapshot_id,created_at,updated_at',
@@ -316,7 +356,7 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
     table: 'aircraft_template',
     searchableColumns: ['template_name', 'maintenance_program'],
     listColumns:
-      'id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,created_at,updated_at',
+      'id,tenant_id,franchise_id,template_name,assembly_models,maintenance_program,revision_number,amendment_number,model_json,is_active,created_at,updated_at',
     requiredCreateFields: ['template_name'],
     writeAllowedFields: [
       'template_name',
@@ -325,6 +365,8 @@ const ENTITY_CONFIG: Record<AmroMasterDataEntity, EntityConfig> = {
       'maintenance_program',
       'revision_number',
       'amendment_number',
+      'model_json',
+      'is_active',
     ],
     defaultSortColumn: 'updated_at',
   },
@@ -407,7 +449,8 @@ function parseTimeToSeconds(value: string | null): number | null {
 }
 
 export function resolveEntity(rawEntity: unknown): AmroMasterDataEntity {
-  const entity = asString(rawEntity).toLowerCase().replace(/-/g, '_') as AmroMasterDataEntity;
+  const normalizedEntity = asString(rawEntity).toLowerCase().replace(/-/g, '_');
+  const entity = (normalizedEntity === 'work_order_templates' ? 'work_order_templates' : normalizedEntity) as AmroMasterDataEntity;
   if (!ENTITY_CONFIG[entity]) {
     throw new HttpError('Unsupported master data entity', 404);
   }
@@ -463,21 +506,35 @@ function normalizeAircraft(payload: Record<string, unknown>) {
   const serialNumber = requiresSyntheticSerial
     ? `NSN-${serialFallbackToken || 'UNSPECIFIED'}`
     : serialSource;
-  const aircraftType = asString(payload.aircraft_type || payload.engine_type);
-  const aircraftModel = asString(payload.aircraft_model || payload.model);
+  const assemblyModel = asNullableString(payload.assembly_models || payload.assembly_model_id || payload.aircraft_model);
   const normalizedStatusToken = asString(payload.status).toLowerCase();
-  const normalizedStatus = AIRCRAFT_STATUS_ALIASES[normalizedStatusToken] || normalizedStatusToken || 'active';
+  const normalizedStatus = AIRCRAFT_STATUS_ALIASES[normalizedStatusToken] || normalizedStatusToken || 'pending';
+  const hasWarrantyJson = Object.prototype.hasOwnProperty.call(payload, 'warranty_json');
+  const rawWarrantyJson = payload.warranty_json;
+  if (hasWarrantyJson && rawWarrantyJson !== null && rawWarrantyJson !== undefined && rawWarrantyJson !== '' && (typeof rawWarrantyJson !== 'object' || Array.isArray(rawWarrantyJson))) {
+    throw new HttpError('warranty_json must be an object', 400);
+  }
+  const warrantyJsonRecord = (asJsonObject(rawWarrantyJson) ?? {}) as Record<string, unknown>;
+  const normalizedWarranty = {
+    is_under_warranty: asBoolean(
+      warrantyJsonRecord.is_under_warranty ?? payload.is_under_warranty,
+      false,
+    ),
+    warranty_start_date: asDateString(
+      warrantyJsonRecord.warranty_start_date ?? payload.warranty_start_date,
+    ),
+    warranty_end_date: asDateString(
+      warrantyJsonRecord.warranty_end_date ?? payload.warranty_end_date,
+    ),
+  };
   return {
     registration: asString(payload.registration) || tailNumber,
     tail_number: tailNumber,
     serial_number: serialNumber,
-    aircraft_type: aircraftType,
-    aircraft_model: aircraftModel,
+    aircraft_template_id: asNullableString(payload.aircraft_template_id || payload.aircraft_template),
+    assembly_models: assemblyModel,
     configuration_code: asNullableString(payload.configuration_code),
     maintenance_program: asNullableString(payload.maintenance_program),
-    manufacturer: asNullableString(payload.manufacturer),
-    manufacturer_id: asNullableString(payload.manufacturer_id),
-    model: asString(payload.model || aircraftModel) || null,
     msn: asNullableString(payload.msn),
     line_number: asNullableString(payload.line_number),
     status: normalizedStatus,
@@ -485,6 +542,9 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     station_code: asNullableString(payload.station_code),
     base_location: asNullableString(payload.base_location),
     owner_name: asNullableString(payload.owner_name),
+    aircraft_operators_id: asNullableString(payload.aircraft_operators_id),
+    aircraft_owners_id: asNullableString(payload.aircraft_owners_id),
+    aircraft_base_location_id: asNullableString(payload.aircraft_base_location_id),
     manufacturing_date: asNullableString(payload.manufacturing_date),
     defect_count: asNumber(payload.defect_count) ?? 0,
     first_limit_remaining: asNumber(payload.first_limit_remaining),
@@ -494,6 +554,7 @@ function normalizeAircraft(payload: Record<string, unknown>) {
     current_cycles: asNumber(payload.current_cycles) ?? 0,
     current_flight_hours_since_new: asNumber(payload.current_flight_hours_since_new) ?? 0,
     current_cycles_since_new: asNumber(payload.current_cycles_since_new) ?? 0,
+    warranty_json: normalizedWarranty,
     engine_install_history: asJsonArray(payload.engine_install_history),
     thrust_rating_change_log: asJsonArray(payload.thrust_rating_change_log),
     on_wing_lifecycle_records: asJsonArray(payload.on_wing_lifecycle_records),
@@ -660,7 +721,7 @@ function normalizeShiftCalendar(payload: Record<string, unknown>) {
   };
 }
 
-function normalizeWorkPackageTemplate(payload: Record<string, unknown>) {
+function normalizeWorkOrderTemplate(payload: Record<string, unknown>) {
   return {
     template_code: asString(payload.template_code),
     version: asNumber(payload.version),
@@ -683,6 +744,8 @@ function normalizeAircraftTemplate(payload: Record<string, unknown>) {
     maintenance_program: asNullableString(payload.maintenance_program),
     revision_number: asNullableString(payload.revision_number),
     amendment_number: asNullableString(payload.amendment_number),
+    model_json: asJsonArray(payload.model_json),
+    is_active: asBoolean(payload.is_active, true),
   };
 }
 
@@ -715,7 +778,7 @@ export function normalizePayload(entity: AmroMasterDataEntity, payload: Record<s
   if (entity === 'regulator_profiles') return normalizeRegulatorProfile(payload);
   if (entity === 'shift_calendars') return normalizeShiftCalendar(payload);
   if (entity === 'aircraft_template') return normalizeAircraftTemplate(payload);
-  return normalizeWorkPackageTemplate(payload);
+  return normalizeWorkOrderTemplate(payload);
 }
 
 export type MasterDataValidationIssue = {
@@ -754,7 +817,7 @@ export function validatePayload(entity: AmroMasterDataEntity, payload: Record<st
     if (statusRaw && !AIRCRAFT_ALLOWED_STATUSES.has(normalizedStatus)) {
       issues.push({
         field: 'status',
-        message: 'status must be one of active, maintenance, grounded, retired, or storage',
+        message: 'status must be one of pending, active, maintenance, grounded, retired, or storage',
       });
     }
     if (payload.defect_count !== undefined) {
@@ -907,7 +970,7 @@ export function validatePayload(entity: AmroMasterDataEntity, payload: Record<st
       });
     }
   }
-  if (entity === 'work_package_templates') {
+  if (entity === 'work_order_templates') {
     const version = Number(payload.version ?? 0);
     if (!(version > 0)) {
       issues.push({
@@ -960,13 +1023,10 @@ export function sanitizeWritePayload(
       if ((field === 'serial_number' || field === 'msn') && (providedKeys.has('serial_number') || providedKeys.has('msn'))) {
         return true;
       }
-      if (field === 'aircraft_type' && (providedKeys.has('aircraft_type') || providedKeys.has('engine_type'))) {
+      if (field === 'aircraft_template_id' && (providedKeys.has('aircraft_template_id') || providedKeys.has('aircraft_template'))) {
         return true;
       }
-      if ((field === 'aircraft_model' || field === 'model') && (providedKeys.has('aircraft_model') || providedKeys.has('model'))) {
-        return true;
-      }
-      if ((field === 'manufacturer_id' || field === 'manufacturer') && (providedKeys.has('manufacturer_id') || providedKeys.has('manufacturer') || providedKeys.has('manufacturer_code'))) {
+      if (field === 'assembly_models' && (providedKeys.has('assembly_models') || providedKeys.has('assembly_model_id') || providedKeys.has('aircraft_model') || providedKeys.has('model'))){
         return true;
       }
     }

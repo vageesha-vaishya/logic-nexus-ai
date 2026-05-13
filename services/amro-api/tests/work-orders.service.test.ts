@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 import { WorkOrdersService } from '../src/services/work-orders.service';
 import { amroEventsProducer } from '../src/events/amro-events.producer';
-import { workPackagesStream } from '../src/realtime/work-packages-stream';
+import { workOrdersStream } from '../src/realtime/work-orders-stream';
 import { logger } from '../src/utils/logger';
 
 jest.mock('@supabase/supabase-js', () => ({
@@ -20,8 +20,8 @@ jest.mock('../src/events/amro-events.producer', () => ({
   },
 }));
 
-jest.mock('../src/realtime/work-packages-stream', () => ({
-  workPackagesStream: {
+jest.mock('../src/realtime/work-orders-stream', () => ({
+  workOrdersStream: {
     publish: jest.fn(),
     subscribe: jest.fn(),
   },
@@ -97,7 +97,7 @@ describe('WorkOrdersService', () => {
       error: null,
     });
 
-    const result = await service.getWorkPackages('tenant-1');
+    const result = await service.getWorkOrders('tenant-1');
 
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('wp-1');
@@ -121,31 +121,30 @@ describe('WorkOrdersService', () => {
           estimated_cost: 3000,
           estimated_labor_hours: 12,
           work_order_number: 'WP-9',
-          work_package_number: 'WP-9',
         },
         error: null,
       },
     );
 
-    const created = await service.createWorkPackage('tenant-1', 'user-1', {
+    const created = await service.createWorkOrder('tenant-1', 'user-1', {
       aircraft_id: 'ac-1',
       title: 'Line Check',
       maintenance_type: 'line',
     });
 
     expect(created.id).toBe('wp-9');
-    const workPackageInsertBuilder = mockFrom.mock.results[4]?.value;
-    const insertPayload = workPackageInsertBuilder?.insert?.mock.calls?.[0]?.[0];
+    const workOrderInsertBuilder = mockFrom.mock.results[4]?.value;
+    const insertPayload = workOrderInsertBuilder?.insert?.mock.calls?.[0]?.[0];
     expect(insertPayload).toEqual(
       expect.objectContaining({
-        work_package_number: expect.stringMatching(/^WP-/),
+        work_order_number: expect.stringMatching(/^WP-/),
       }),
     );
     expect(amroEventsProducer.publishWorkOrderEvent).toHaveBeenCalledTimes(1);
-    expect(workPackagesStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'created' }));
+    expect(workOrdersStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'created' }));
   });
 
-  it('creates template tasks when work_package_template_id is provided', async () => {
+  it('creates template tasks when work_order_template_id is provided', async () => {
     const service = new WorkOrdersService();
     queuedResults.push(
       { data: [{ id: 'ac-1', status: 'active' }], error: null },
@@ -160,7 +159,7 @@ describe('WorkOrdersService', () => {
           description: 'From template',
           maintenance_type: 'line',
           status: 'planning',
-          work_package_number: 'WP-VT-DCN-2026-0001-TEST',
+          work_order_number: 'WP-VT-DCN-2026-0001-TEST',
         },
         error: null,
       },
@@ -183,11 +182,11 @@ describe('WorkOrdersService', () => {
       { data: null, error: null },
     );
 
-    const created = await service.createWorkPackage('tenant-1', 'user-1', {
+    const created = await service.createWorkOrder('tenant-1', 'user-1', {
       aircraft_id: 'ac-1',
       title: 'Template Run',
       maintenance_type: 'line',
-      work_package_template_id: 'tpl-1',
+      work_order_template_id: 'tpl-1',
     });
 
     expect(created.id).toBe('wp-tpl-1');
@@ -198,7 +197,7 @@ describe('WorkOrdersService', () => {
     expect(Array.isArray(tasksInsertPayload)).toBe(true);
     expect(tasksInsertPayload[0]).toEqual(
       expect.objectContaining({
-        work_package_id: 'wp-tpl-1',
+        work_order_id: 'wp-tpl-1',
         task_category: 'OP*',
         title: 'Vapor Cycle compressor motor drive belt',
       }),
@@ -223,16 +222,16 @@ describe('WorkOrdersService', () => {
       { data: null, error: null },
     );
 
-    const updated = await service.updateWorkPackage('tenant-1', 'wp-1', 'user-1', {
+    const updated = await service.updateWorkOrder('tenant-1', 'wp-1', 'user-1', {
       title: 'New',
       status: 'in_progress',
     });
-    await service.deleteWorkPackage('tenant-1', 'wp-1', 'user-1');
+    await service.deleteWorkOrder('tenant-1', 'wp-1', 'user-1');
 
     expect(updated.title).toBe('New');
     expect(amroEventsProducer.publishWorkOrderEvent).toHaveBeenCalledTimes(2);
-    expect(workPackagesStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'updated' }));
-    expect(workPackagesStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'deleted' }));
+    expect(workOrdersStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'updated' }));
+    expect(workOrdersStream.publish).toHaveBeenCalledWith(expect.objectContaining({ type: 'deleted' }));
   });
 
   it('creates, updates and deletes tasks with lifecycle events', async () => {
@@ -242,29 +241,29 @@ describe('WorkOrdersService', () => {
         data: {
           id: 'task-1',
           task_number: 'TASK-1',
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           title: 'Inspect',
           status: 'pending',
         },
         error: null,
       },
       {
-        data: { id: 'task-1', task_number: 'TASK-1', work_package_id: 'wp-1', status: 'pending' },
+        data: { id: 'task-1', task_number: 'TASK-1', work_order_id: 'wp-1', status: 'pending' },
         error: null,
       },
       {
-        data: { id: 'task-1', task_number: 'TASK-1', work_package_id: 'wp-1', status: 'in_progress' },
+        data: { id: 'task-1', task_number: 'TASK-1', work_order_id: 'wp-1', status: 'in_progress' },
         error: null,
       },
       {
-        data: { id: 'task-1', task_number: 'TASK-1', work_package_id: 'wp-1', status: 'in_progress' },
+        data: { id: 'task-1', task_number: 'TASK-1', work_order_id: 'wp-1', status: 'in_progress' },
         error: null,
       },
       { data: null, error: null },
     );
 
     await service.createTask('tenant-1', 'user-1', {
-      work_package_id: 'wp-1',
+      work_order_id: 'wp-1',
       title: 'Inspect',
     });
     await service.updateTask('tenant-1', 'task-1', 'user-1', { status: 'in_progress' });
@@ -279,11 +278,11 @@ describe('WorkOrdersService', () => {
     );
   });
 
-  it('throws on createTask without work_package_id', async () => {
+  it('throws on createTask without work_order_id', async () => {
     const service = new WorkOrdersService();
 
     await expect(service.createTask('tenant-1', 'user-1', { title: 'No WP' }))
-      .rejects.toThrow('work_package_id is required');
+      .rejects.toThrow('work_order_id is required');
   });
 
   it('records maintenance event and logs publish failures', async () => {
@@ -292,7 +291,7 @@ describe('WorkOrdersService', () => {
       data: {
         id: 'task-2',
         task_number: 'TASK-2',
-        work_package_id: 'wp-2',
+        work_order_id: 'wp-2',
         status: 'completed',
       },
       error: null,
@@ -316,11 +315,11 @@ describe('WorkOrdersService', () => {
     const service = new WorkOrdersService();
     queuedResults.push(
       {
-        data: [{ id: 'mat-1', work_package_id: 'wp-1', tenant_id: 'tenant-1' }],
+        data: [{ id: 'mat-1', work_order_id: 'wp-1', tenant_id: 'tenant-1' }],
         error: null,
       },
       {
-        data: { id: 'mat-2', work_package_id: 'wp-1', tenant_id: 'tenant-1' },
+        data: { id: 'mat-2', work_order_id: 'wp-1', tenant_id: 'tenant-1' },
         error: null,
       },
     );

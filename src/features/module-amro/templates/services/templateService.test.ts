@@ -61,7 +61,7 @@ describe('Template Service', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v2/amro/master-data/work_package_templates'),
+        expect.stringContaining('/api/v2/amro/master-data/work_order_templates'),
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
@@ -170,7 +170,7 @@ describe('Template Service', () => {
       });
 
       expect(mockFetch).toHaveBeenCalledWith(
-        expect.stringContaining('/api/v2/amro/master-data/work_package_templates'),
+        expect.stringContaining('/api/v2/amro/master-data/work_order_templates'),
         expect.objectContaining({
           method: 'POST',
           body: JSON.stringify({

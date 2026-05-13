@@ -209,7 +209,7 @@ Edit Dialog: "Edit Work Package" ✅ (Correct)
 #### Evidence from Codebase
 ```typescript
 // ❌ INCORRECT: Using "Work Order"
-// File: AmroWorkPackageDetailPage.tsx
+// File: AmroWorkOrderDetailPage.tsx
 <AmroModuleSurface
   title="Work Orders"  // ← Should be "Work Packages"
   subtitle="Manage and track aircraft maintenance work orders."
@@ -226,7 +226,7 @@ Edit Dialog: "Edit Work Package" ✅ (Correct)
 ```typescript
 // ❌ INCONSISTENT
 // File: navigation.ts
-{ name: 'Work Packages', path: '/dashboard/amro/work-packages' }
+{ name: 'Work Packages', path: '/dashboard/amro/work-orders' }
 
 // File: AmroWorkOrdersListPage.tsx
 title="Work Orders"  // ← Should match navigation
@@ -238,29 +238,29 @@ title="Work Orders"  // ← Should match navigation
 
 | File | Occurrences | Line Numbers |
 |------|------------|--------------|
-| `AmroWorkPackageDetailPage.tsx` | ~15 | Throughout |
+| `AmroWorkOrderDetailPage.tsx` | ~15 | Throughout |
 | `AmroWorkOrdersListPage.tsx` | ~8 | Throughout |
 | `navigation.ts` | ~3 | Lines 111-112 |
-| `useWorkPackageState.ts` | ~5 | Throughout |
+| `useWorkOrderState.ts` | ~5 | Throughout |
 | Various components | ~20 | Throughout |
 
 #### Database Schema
 ```sql
--- ✅ CORRECT: Uses "work_packages"
-CREATE TABLE work_packages (
+-- ✅ CORRECT: Uses "work_orders"
+CREATE TABLE work_orders (
   id UUID PRIMARY KEY,
-  work_package_number VARCHAR(50),
+  work_order_number VARCHAR(50),
   ...
 );
 
 -- Note: Some code references "work_order_number" field
--- This should be deprecated in favor of "work_package_number"
+-- This should be deprecated in favor of "work_order_number"
 ```
 
 #### API Endpoints
 ```
-✅ /api/v2/amro/work-packages              (Correct)
-✅ /api/v2/amro/work-packages/:id          (Correct)
+✅ /api/v2/amro/work-orders              (Correct)
+✅ /api/v2/amro/work-orders/:id          (Correct)
 ⚠️  Field: work_order_number (Legacy, kept for backward compatibility)
 ```
 
@@ -312,7 +312,7 @@ In aviation maintenance (AMRO - Aviation Maintenance Repair & Operations):
 
 **Files to Update:**
 
-1. **AmroWorkPackageDetailPage.tsx**
+1. **AmroWorkOrderDetailPage.tsx**
 ```typescript
 // BEFORE
 <AmroModuleSurface
@@ -351,10 +351,10 @@ subtitle="Manage and track aircraft maintenance work packages."
 3. **Breadcrumb Navigation**
 ```typescript
 // BEFORE
-<Link to="/dashboard/amro/work-packages">Work Orders</Link>
+<Link to="/dashboard/amro/work-orders">Work Orders</Link>
 
 // AFTER
-<Link to="/dashboard/amro/work-packages">Work Packages</Link>
+<Link to="/dashboard/amro/work-orders">Work Packages</Link>
 ```
 
 4. **Dialog Titles and Messages**
@@ -373,9 +373,9 @@ toast.success('Work package deleted successfully');
 #### 4.2 Variable and Function Naming
 
 **Keep:**
-- `work_package_number` ✅ (Correct)
-- `work_packages` table ✅ (Correct)
-- `/work-packages` routes ✅ (Correct)
+- `work_order_number` ✅ (Correct)
+- `work_orders` table ✅ (Correct)
+- `/work-orders` routes ✅ (Correct)
 
 **Maintain for Compatibility:**
 - `work_order_number` field ⚠️ (Keep as legacy alias)
@@ -384,11 +384,11 @@ toast.success('Work package deleted successfully');
 
 ```typescript
 // ✅ Already correct
-type WorkPackageStatus = 'planning' | 'approved' | ...;
-type WorkPackageDetail = { ... };
-type WorkPackageListItem = { ... };
+type WorkOrderStatus = 'planning' | 'approved' | ...;
+type WorkOrderDetail = { ... };
+type WorkOrderListItem = { ... };
 
-// No changes needed - already uses "WorkPackage"
+// No changes needed - already uses "WorkOrder"
 ```
 
 ### Phase 3: Documentation Standardization (Priority: HIGH)
@@ -435,9 +435,9 @@ expect(screen.getByText(/work package details/i)).toBeInTheDocument();
 -- KEEP work_order_number for backward compatibility
 -- Add comment explaining the relationship
 
-COMMENT ON COLUMN work_packages.work_order_number IS 
+COMMENT ON COLUMN work_orders.work_order_number IS 
 'Legacy field maintained for backward compatibility. 
-Use work_package_number for all new development.';
+Use work_order_number for all new development.';
 ```
 
 ### 5.2 API Compatibility
@@ -445,7 +445,7 @@ Use work_package_number for all new development.';
 ```typescript
 // Response includes both fields during transition period
 {
-  "work_package_number": "WP-2024-001",  // Primary identifier
+  "work_order_number": "WP-2024-001",  // Primary identifier
   "work_order_number": "WO-2024-001",    // Legacy, deprecated
   ...
 }
@@ -509,7 +509,7 @@ Phase 5 (18 months): Full removal (breaking change, versioned API)
 ## 7. Implementation Checklist
 
 ### Phase 1: UI Standardization
-- [ ] Update AmroWorkPackageDetailPage.tsx (15 occurrences)
+- [ ] Update AmroWorkOrderDetailPage.tsx (15 occurrences)
 - [ ] Update AmroWorkOrdersListPage.tsx (8 occurrences)
 - [ ] Update navigation.ts (3 occurrences)
 - [ ] Update breadcrumb navigation

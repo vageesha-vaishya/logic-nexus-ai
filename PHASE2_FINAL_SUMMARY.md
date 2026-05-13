@@ -20,8 +20,8 @@
 | 8 | **Regulator Profiles** | `/dashboard/amro/settings/master-data/regulator-profiles` | `RegulatorProfilesPage.tsx` | Medium | ~450 | ✅ Complete |
 | 9 | **Aircraft** | `/dashboard/amro/settings/master-data/aircraft` | `AircraftPage.tsx` | High | ~550 | ✅ Complete |
 | 10 | **Parts Inventory** | `/dashboard/amro/settings/master-data/parts-inventory` | `PartsInventoryPage.tsx` | High | ~550 | ✅ Complete |
-| 11 | **Work Packages** | `/dashboard/amro/settings/master-data/work-packages` | `WorkPackagesPage.tsx` | High | ~550 | ✅ Complete |
-| 12 | **Work Package Templates** | `/dashboard/amro/settings/master-data/work-package-templates` | `WorkPackageTemplatesSettingsPage.tsx` | High | ~550 | ✅ Complete |
+| 11 | **Work Packages** | `/dashboard/amro/settings/master-data/work-orders` | `WorkOrdersPage.tsx` | High | ~550 | ✅ Complete |
+| 12 | **Work Package Templates** | `/dashboard/amro/settings/master-data/work-order-templates` | `WorkOrderTemplatesSettingsPage.tsx` | High | ~550 | ✅ Complete |
 
 **Total Lines Written:** ~5,700 lines of clean, maintainable code  
 **TypeScript Compilation:** ✅ 0 Errors
@@ -206,8 +206,8 @@ All 12 modules pass:
 13. `src/features/module-amro/settings/pages/RegulatorProfilesPage.tsx`
 14. `src/features/module-amro/settings/pages/AircraftPage.tsx`
 15. `src/features/module-amro/settings/pages/PartsInventoryPage.tsx`
-16. `src/features/module-amro/settings/pages/WorkPackagesPage.tsx`
-17. `src/features/module-amro/settings/pages/WorkPackageTemplatesSettingsPage.tsx`
+16. `src/features/module-amro/settings/pages/WorkOrdersPage.tsx`
+17. `src/features/module-amro/settings/pages/WorkOrderTemplatesSettingsPage.tsx`
 
 **Documentation (7 files):**
 18. `PHASE1_FOUNDATION_SUMMARY.md`

@@ -19,7 +19,7 @@ Successfully completed comprehensive analysis and redesign of the AMRO Work Pack
 
 **Problem:** When users clicked on a work package record (View link), the side navigation menu became invisible/inaccessible on the detail page.
 
-**Root Cause:** `AmroWorkPackageDetailPage` was NOT wrapped with `<DashboardLayout>`, breaking the navigation system.
+**Root Cause:** `AmroWorkOrderDetailPage` was NOT wrapped with `<DashboardLayout>`, breaking the navigation system.
 
 **Solution Implemented:**
 - Wrapped entire component with `<DashboardLayout>`
@@ -28,7 +28,7 @@ Successfully completed comprehensive analysis and redesign of the AMRO Work Pack
 - Ensured responsive sidebar behavior (toggleable on mobile, persistent on desktop)
 
 **Files Modified:**
-- `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`
+- `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`
 
 **Code Changes:**
 ```typescript
@@ -80,10 +80,10 @@ return (
 **New Features:**
 ```typescript
 // Inline Edit Dialog Component
-function EditWorkPackageDialog({
+function EditWorkOrderDialog({
   open,
   onOpenChange,
-  workPackage,
+  workOrder,
   onSuccess,
 })
 ```
@@ -198,7 +198,7 @@ AFTER:  Detail → Edit button → Dialog → Save → Stay on detail ✅
 ## 📁 Deliverables
 
 ### Modified Files
-1. **`AmroWorkPackageDetailPage.tsx`** (Main component)
+1. **`AmroWorkOrderDetailPage.tsx`** (Main component)
    - Added DashboardLayout wrapper
    - Added breadcrumb navigation
    - Implemented inline edit dialog
@@ -214,12 +214,12 @@ AFTER:  Detail → Edit button → Dialog → Save → Stay on detail ✅
    - Implementation plan
    - Risk assessment
 
-2. **`AmroWorkPackageDetailPage.test.tsx`**
+2. **`AmroWorkOrderDetailPage.test.tsx`**
    - 36 unit tests
    - 80%+ coverage target
    - All critical paths tested
 
-3. **`AmroWorkPackageDetailPage.integration.test.tsx`**
+3. **`AmroWorkOrderDetailPage.integration.test.tsx`**
    - 24 integration tests
    - Critical user flows documented
    - Performance benchmarks
@@ -279,17 +279,17 @@ AFTER:  Detail → Edit button → Dialog → Save → Stay on detail ✅
 ## 📋 API Specifications Documented
 
 ### Endpoints Covered
-1. **GET** `/api/v2/amro/work-packages/:id`
+1. **GET** `/api/v2/amro/work-orders/:id`
    - Detailed response schema
    - Error responses documented
    - Authentication requirements
 
-2. **PATCH** `/api/v2/amro/work-packages/:id`
+2. **PATCH** `/api/v2/amro/work-orders/:id`
    - Request body schema
    - Validation rules
    - Response format
 
-3. **POST** `/api/v2/amro/work-packages/:id/transitions`
+3. **POST** `/api/v2/amro/work-orders/:id/transitions`
    - Valid transitions matrix
    - Permission requirements
    - Response format

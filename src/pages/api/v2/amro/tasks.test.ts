@@ -147,7 +147,7 @@ describe('/api/v2/amro/tasks', () => {
 
   it('returns 404 when task capability is outside endpoint rollout cohort', async () => {
     process.env.AMRO_TASKS_V2_ENABLED = 'true';
-    process.env.AMRO_V2_CANARY_CAPABILITIES = 'work-packages';
+    process.env.AMRO_V2_CANARY_CAPABILITIES = 'work-orders';
     const req: ApiRequest = { method: 'GET', query: {}, headers: {} };
     const res = createResponse();
 
@@ -163,7 +163,7 @@ describe('/api/v2/amro/tasks', () => {
     process.env.AMRO_TASKS_V2_ENABLED = 'true';
     process.env.AMRO_TASKS_DUAL_RUN = 'true';
     vi.mocked(sanitizeQueryId).mockReturnValue('WP-001');
-    const req: ApiRequest = { method: 'GET', query: { workPackageId: 'WP-001' }, headers: {} };
+    const req: ApiRequest = { method: 'GET', query: { workOrderId: 'WP-001' }, headers: {} };
     const res = createResponse();
 
     await handler(req, res);
@@ -173,10 +173,10 @@ describe('/api/v2/amro/tasks', () => {
     expect(enforceRateLimit).toHaveBeenCalledWith(req);
     expect(enforceAmroDomainAccess).toHaveBeenCalled();
     expect(applyCompatibilityResponseHeaders).toHaveBeenCalled();
-    expect(sanitizeQueryId).toHaveBeenCalledWith('WP-001', 'workPackageId');
+    expect(sanitizeQueryId).toHaveBeenCalledWith('WP-001', 'workOrderId');
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.mode).toBe('dual-run');
-    expect((res.jsonBody as any)?.filters?.workPackageId).toBe('WP-001');
+    expect((res.jsonBody as any)?.filters?.workOrderId).toBe('WP-001');
     expect((res.jsonBody as any)?.data?.tasks?.length).toBe(2);
     expect((res.jsonBody as any)?.serviceBoundaries?.services?.map((item: any) => item.service)).toEqual(
       expect.arrayContaining(['amro-work-order-service', 'amro-scheduling-service', 'amro-materials-service'])
@@ -195,7 +195,7 @@ describe('/api/v2/amro/tasks', () => {
     process.env.AMRO_TASKS_DUAL_RUN = 'true';
     process.env.AMRO_V2_LEGACY_FALLBACK_ENABLED = 'true';
     vi.mocked(sanitizeQueryId).mockReturnValue('WP-001');
-    const req: ApiRequest = { method: 'GET', query: { workPackageId: 'WP-001' }, headers: {} };
+    const req: ApiRequest = { method: 'GET', query: { workOrderId: 'WP-001' }, headers: {} };
     const res = createResponse();
 
     await handler(req, res);
@@ -212,7 +212,7 @@ describe('/api/v2/amro/tasks', () => {
     process.env.AMRO_TASKS_DUAL_RUN = 'true';
     process.env.AMRO_AUDIT_LEDGER_CANARY_TENANTS = 'tenant-canary';
     vi.mocked(sanitizeQueryId).mockReturnValue('WP-001');
-    const req: ApiRequest = { method: 'GET', query: { workPackageId: 'WP-001' }, headers: {} };
+    const req: ApiRequest = { method: 'GET', query: { workOrderId: 'WP-001' }, headers: {} };
     const res = createResponse();
 
     await handler(req, res);
@@ -225,9 +225,9 @@ describe('/api/v2/amro/tasks', () => {
   it('skips audit append when capability is outside canary allowlist', async () => {
     process.env.AMRO_TASKS_V2_ENABLED = 'true';
     process.env.AMRO_TASKS_DUAL_RUN = 'true';
-    process.env.AMRO_AUDIT_LEDGER_CANARY_CAPABILITIES = 'work-packages';
+    process.env.AMRO_AUDIT_LEDGER_CANARY_CAPABILITIES = 'work-orders';
     vi.mocked(sanitizeQueryId).mockReturnValue('WP-001');
-    const req: ApiRequest = { method: 'GET', query: { workPackageId: 'WP-001' }, headers: {} };
+    const req: ApiRequest = { method: 'GET', query: { workOrderId: 'WP-001' }, headers: {} };
     const res = createResponse();
 
     await handler(req, res);

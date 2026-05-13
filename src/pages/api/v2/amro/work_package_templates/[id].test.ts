@@ -63,7 +63,7 @@ function createSupabaseClientMock(options?: {
 }) {
   return {
     from: vi.fn((table: string) => {
-      if (table === 'work_package_templates') {
+      if (table === 'work_order_templates') {
         const chain: any = {
           select: vi.fn(() => chain),
           eq: vi.fn(() => chain),
@@ -99,7 +99,7 @@ function createSupabaseClientMock(options?: {
   };
 }
 
-describe('/api/v2/amro/work_package_templates/[id]', () => {
+describe('/api/v2/amro/work_order_templates/[id]', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(handlePreflight).mockReturnValue(false);
@@ -140,7 +140,7 @@ describe('/api/v2/amro/work_package_templates/[id]', () => {
 
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.record?.id).toBe('210210d3-7ebc-4cfe-b6c9-bd873afbdb30');
-    expect((supabase.rpc as any).mock.calls[0][0]).toBe('amro_update_work_package_template_atomic');
+    expect((supabase.rpc as any).mock.calls[0][0]).toBe('amro_update_work_order_template_atomic');
     expect((supabase.rpc as any).mock.calls[0][1]?.p_payload?.tasks_json?.[0]?.sequence_order).toBe(1);
     expect((supabase.rpc as any).mock.calls[0][1]?.p_payload?.task_templates).toBeUndefined();
   });

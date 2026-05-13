@@ -16,6 +16,10 @@ export type MpdRecord = {
   interval_hours: number | null;
   interval_cycles: number | null;
   interval_months: number | null;
+  calendar_unit: string | null;
+  threshold_landings: number | null;
+  threshold_rins: number | null;
+  threshold_hobbs: number | null;
   threshold_cycles: number | null;
   is_mandatory: boolean;
   assembly_model_id: string | null;
@@ -38,6 +42,8 @@ export type MpdUpsertInput = {
   interval_hours?: number | null;
   interval_cycles?: number | null;
   interval_months?: number | null;
+  threshold_rins?: number | null;
+  threshold_hobbs?: number | null;
   threshold_cycles?: number | null;
   is_mandatory?: boolean;
   assembly_model_id?: string | null;
@@ -117,6 +123,10 @@ export function mapApiRecordToMpdRecord(record: Record<string, unknown>): MpdRec
     interval_hours: normalizeNumber(record.interval_hours),
     interval_cycles: normalizeNumber(record.interval_cycles),
     interval_months: normalizeNumber(record.interval_months),
+    calendar_unit: normalizeString(record.calendar_unit),
+    threshold_landings: normalizeNumber(record.threshold_landings),
+    threshold_rins: normalizeNumber(record.threshold_rins),
+    threshold_hobbs: normalizeNumber(record.threshold_hobbs),
     threshold_cycles: normalizeNumber(record.threshold_cycles),
     is_mandatory: normalizeBoolean(record.is_mandatory, true),
     assembly_model_id: normalizeString(record.assembly_model_id),
@@ -141,6 +151,8 @@ export function mapMpdInputToApiPayload(input: MpdUpsertInput): Record<string, u
     interval_hours: normalizeNumber(input.interval_hours),
     interval_cycles: normalizeNumber(input.interval_cycles),
     interval_months: normalizeNumber(input.interval_months),
+    threshold_rins: normalizeNumber(input.threshold_rins),
+    threshold_hobbs: normalizeNumber(input.threshold_hobbs),
     threshold_cycles: normalizeNumber(input.threshold_cycles),
     is_mandatory: normalizeBoolean(input.is_mandatory, true),
     assembly_model_id: normalizeString(input.assembly_model_id),

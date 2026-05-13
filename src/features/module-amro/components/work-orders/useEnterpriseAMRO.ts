@@ -104,8 +104,8 @@ export function useReserveMaterial() {
     mutationFn: async (data: {
       materialId: string;
       quantity: number;
-      work_package_template_id?: string;
-      work_package_id?: string;
+      work_order_template_id?: string;
+      work_order_id?: string;
       expected_issue_date?: string;
       notes?: string;
     }) => {
@@ -116,8 +116,8 @@ export function useReserveMaterial() {
         headers,
         body: JSON.stringify({
           quantity: data.quantity,
-          work_package_template_id: data.work_package_template_id,
-          work_package_id: data.work_package_id,
+          work_order_template_id: data.work_order_template_id,
+          work_order_id: data.work_order_id,
           expected_issue_date: data.expected_issue_date,
           notes: data.notes,
         }),
@@ -150,8 +150,8 @@ export function usePurchaseOrder() {
         quantity: number;
         supplier_id?: string;
       }>;
-      work_package_template_id?: string;
-      work_package_id?: string;
+      work_order_template_id?: string;
+      work_order_id?: string;
       priority?: 'standard' | 'urgent' | 'aog';
       notes?: string;
     }) => {
@@ -305,8 +305,8 @@ export function useReserveTool() {
       toolId: string;
       tool_instance_id?: string;
       quantity?: number;
-      work_package_template_id?: string;
-      work_package_id?: string;
+      work_order_template_id?: string;
+      work_order_id?: string;
       reservation_date: string;
       return_date: string;
       notes?: string;
@@ -319,8 +319,8 @@ export function useReserveTool() {
         body: JSON.stringify({
           tool_instance_id: data.tool_instance_id,
           quantity: data.quantity,
-          work_package_template_id: data.work_package_template_id,
-          work_package_id: data.work_package_id,
+          work_order_template_id: data.work_order_template_id,
+          work_order_id: data.work_order_id,
           reservation_date: data.reservation_date,
           return_date: data.return_date,
           notes: data.notes,

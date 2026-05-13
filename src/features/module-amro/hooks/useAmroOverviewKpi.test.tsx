@@ -57,7 +57,7 @@ describe('useAmroOverviewKpi', () => {
         ok: true,
         json: async () => ({
           output: {
-            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+6%' }],
+            kpi_cards: [{ key: 'open_work_orders', label: 'Open Work Packages', value: 42, trend: '+6%' }],
             risk_heatmap: { cells: [] },
             trend_lines: [],
             anomaly_flags: [],
@@ -116,7 +116,7 @@ describe('useAmroOverviewKpi', () => {
         ok: true,
         json: async () => ({
           output: {
-            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 14, trend: '+2%' }],
+            kpi_cards: [{ key: 'open_work_orders', label: 'Open Work Packages', value: 14, trend: '+2%' }],
             risk_heatmap: { cells: [] },
             trend_lines: [],
             anomaly_flags: [],
@@ -214,7 +214,7 @@ describe('useAmroOverviewKpi', () => {
         ok: true,
         json: async () => ({
           output: {
-            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+6%' }],
+            kpi_cards: [{ key: 'open_work_orders', label: 'Open Work Packages', value: 42, trend: '+6%' }],
             risk_heatmap: { cells: [] },
             trend_lines: [],
             anomaly_flags: [],
@@ -253,7 +253,7 @@ describe('useAmroOverviewKpi', () => {
         ok: true,
         json: async () => ({
           output: {
-            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+6%' }],
+            kpi_cards: [{ key: 'open_work_orders', label: 'Open Work Packages', value: 42, trend: '+6%' }],
             risk_heatmap: { cells: [] },
             trend_lines: [],
             anomaly_flags: [],
@@ -302,7 +302,7 @@ describe('useAmroOverviewKpi', () => {
         ok: true,
         json: async () => ({
           output: {
-            kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+6%' }],
+            kpi_cards: [{ key: 'open_work_orders', label: 'Open Work Packages', value: 42, trend: '+6%' }],
             risk_heatmap: { cells: [] },
             trend_lines: [],
             anomaly_flags: [],
@@ -406,7 +406,7 @@ describe('useAmroOverviewKpi', () => {
           ok: true,
           json: async () => ({
             output: {
-              kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 33, trend: '+5%' }],
+              kpi_cards: [{ key: 'open_work_orders', label: 'Open Work Packages', value: 33, trend: '+5%' }],
               risk_heatmap: { cells: [] },
               trend_lines: [],
               anomaly_flags: [],
@@ -526,7 +526,7 @@ describe('useAmroOverviewKpi', () => {
           status: 200,
           json: async () => ({
             output: {
-              kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 5, trend: '+1%' }],
+              kpi_cards: [{ key: 'open_work_orders', label: 'Open Work Packages', value: 5, trend: '+1%' }],
               risk_heatmap: { cells: [] },
               trend_lines: [],
               anomaly_flags: [],
@@ -619,7 +619,7 @@ describe('useAmroOverviewKpi', () => {
           status: 200,
           json: async () => ({
             output: {
-              kpi_cards: [{ key: 'open_work_packages', label: 'Open Work Packages', value: 4, trend: '+1%' }],
+              kpi_cards: [{ key: 'open_work_orders', label: 'Open Work Packages', value: 4, trend: '+1%' }],
               risk_heatmap: { cells: [] },
               trend_lines: [],
               anomaly_flags: [],

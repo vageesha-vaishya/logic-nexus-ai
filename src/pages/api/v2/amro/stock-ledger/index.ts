@@ -19,7 +19,7 @@ const SOURCE_ENTITY_TABLES: Record<string, string[]> = {
   procurement: ['amro_purchase_orders', 'amro_procurement_orders', 'purchase_orders'],
   sales: ['amro_sales_orders', 'sales_orders'],
   warehouse: ['amro_warehouse_transactions', 'warehouse_transactions'],
-  maintenance: ['amro_work_orders', 'maintenance_work_orders', 'work_orders', 'work_packages'],
+  maintenance: ['amro_work_orders', 'maintenance_work_orders', 'work_orders'],
   inventory_adjustment: ['amro_inventory_adjustments', 'inventory_adjustments'],
 };
 
@@ -30,7 +30,7 @@ const SOURCE_ENTITY_COLUMNS = [
   'order_number',
   'document_number',
   'transaction_number',
-  'work_package_number',
+  'work_order_number',
 ];
 
 async function validateSourceReferenceEntity(

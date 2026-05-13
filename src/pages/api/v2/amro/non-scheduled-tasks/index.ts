@@ -4,7 +4,7 @@
  * DATABASE SCHEMA ANALYSIS:
  * - Uses existing table: amro_non_scheduled_tasks (created 2026-04-12)
  * - Uses existing table: aircraft (for validation)
- * - Uses existing table: work_packages (for conversion)
+ * - Uses existing table: work_orders (for conversion)
  * - NO NEW TABLES REQUIRED
  * 
  * ENDPOINTS:

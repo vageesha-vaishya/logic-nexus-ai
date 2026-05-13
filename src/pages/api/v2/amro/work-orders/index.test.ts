@@ -84,7 +84,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
               tenant_id: 'tenant-1',
               franchise_id: 'fr-1',
               aircraft_id: 'ac-1',
-              work_package_number: 'WP-20260411-ABC',
+              work_order_number: 'WP-20260411-ABC',
               work_order_number: 'WP-20260411-ABC',
               title: '500hr Inspection',
               description: null,
@@ -180,7 +180,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         ilike: vi.fn().mockResolvedValue({
-          data: [{ work_package_number: 'WP-VT-DCN-2026-0004-HOTSEC' }],
+          data: [{ work_order_number: 'WP-VT-DCN-2026-0004-HOTSEC' }],
           error: null,
         }),
       };
@@ -193,7 +193,7 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
             tenant_id: 'tenant-1',
             franchise_id: 'fr-1',
             aircraft_id: 'ac-1',
-            work_package_number: 'WP-VT-DCN-2026-0005-STARTER',
+            work_order_number: 'WP-VT-DCN-2026-0005-STARTER',
             title: 'Starter Work Package',
             description: null,
             work_type: null,
@@ -216,8 +216,8 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
             external_reference: null,
             created_at: '2026-04-11T00:00:00Z',
             updated_at: '2026-04-11T00:00:00Z',
-            work_package_template_id: 'tpl-1',
-            work_package_title_id: 'ttl-1',
+            work_order_template_id: 'tpl-1',
+            work_order_title_id: 'ttl-1',
           },
           error: null,
         }),
@@ -253,19 +253,19 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
       const tasksInsertChain: any = {
         insert: vi.fn().mockResolvedValue({ error: null }),
       };
-      let workPackagesCallCount = 0;
+      let workOrdersCallCount = 0;
       vi.mocked(getSupabaseAdminClient).mockReturnValue({
         from: (table: string) => {
-          if (table === 'work_packages_title') return titleLookupChain;
+          if (table === 'work_orders_title') return titleLookupChain;
           if (table === 'aircraft') return aircraftLookupChain;
-          if (table === 'work_package_templates') return templateLookupChain;
+          if (table === 'work_order_templates') return templateLookupChain;
           if (table === 'tasks') {
             // first tasks call = duplicate guard (select), second call = insert
             return (tasksCountChain.select.mock.calls.length === 0) ? tasksCountChain : tasksInsertChain;
           }
-          if (table === 'work_packages') {
-            workPackagesCallCount += 1;
-            return workPackagesCallCount === 1 ? sequenceLookupChain : insertChain;
+          if (table === 'work_orders') {
+            workOrdersCallCount += 1;
+            return workOrdersCallCount === 1 ? sequenceLookupChain : insertChain;
           }
           return insertChain;
         },
@@ -276,12 +276,12 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
         query: {},
         headers: {},
         body: {
-          work_package_title_id: 'ttl-1',
+          work_order_title_id: 'ttl-1',
           maintenance_type: 'overhaul',
           priority: 1,
           notes: 'Urgent',
           aircraft_id: 'ac-1',
-          work_package_template_id: 'tpl-1',
+          work_order_template_id: 'tpl-1',
           planned_start_date: '2026-05-01',
           planned_end_date: '2026-05-15',
           estimated_labor_hours: 120,
@@ -297,8 +297,8 @@ describe('/api/v2/amro/work-orders/index (list/create)', () => {
       expect(body.output.work_order_number).toBe('WP-VT-DCN-2026-0005-STARTER');
       expect(body.output.status).toBe('planning');
       expect(insertChain.insert).toHaveBeenCalledWith(expect.objectContaining({
-        work_package_template_id: 'tpl-1',
-        work_package_title_id: 'ttl-1',
+        work_order_template_id: 'tpl-1',
+        work_order_title_id: 'ttl-1',
       }));
     });
 

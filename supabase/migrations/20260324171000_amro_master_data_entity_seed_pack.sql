@@ -223,7 +223,7 @@ BEGIN
         AND existing.deleted_at IS NULL
     );
 
-    INSERT INTO public.work_package_templates (
+    INSERT INTO public.work_order_templates (
       tenant_id,
       franchise_id,
       template_code,
@@ -298,7 +298,7 @@ BEGIN
     ) AS wpt(template_code, version, active, template_name, maintenance_type, scope_json, tasks_json)
     WHERE NOT EXISTS (
       SELECT 1
-      FROM public.work_package_templates existing
+      FROM public.work_order_templates existing
       WHERE existing.tenant_id = t.id
         AND COALESCE(existing.franchise_id, '00000000-0000-0000-0000-000000000000'::uuid) =
             COALESCE(selected_franchise_id, '00000000-0000-0000-0000-000000000000'::uuid)

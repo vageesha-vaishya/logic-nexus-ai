@@ -90,7 +90,7 @@ describe('/api/v2/amro/compliance/gates/evaluate', () => {
       method: 'POST',
       query: {},
       body: {
-        entity_type: 'work_package',
+        entity_type: 'work_order',
         entity_id: 'tenant-1:wp-1',
         regulator_profile: 'FAA',
         evaluation_context: {
@@ -151,7 +151,7 @@ describe('/api/v2/amro/compliance/gates/evaluate', () => {
       method: 'POST',
       query: {},
       body: {
-        entity_type: 'work_package',
+        entity_type: 'work_order',
         entity_id: 'tenant-1:wp-2',
         regulator_profile: 'FAA',
         evaluation_context: {
@@ -177,7 +177,7 @@ describe('/api/v2/amro/compliance/gates/evaluate', () => {
       method: 'POST',
       query: {},
       body: {
-        entity_type: 'work_package',
+        entity_type: 'work_order',
         entity_id: 'tenant-1:wp-3',
         regulator_profile: 'FAA',
         evaluation_context: {

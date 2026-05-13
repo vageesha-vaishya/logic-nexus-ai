@@ -48,7 +48,7 @@
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/work-orders';
+import { AmroWorkOrderCreateWizard } from '@/features/module-amro/components/work-orders';
 import { toast } from 'sonner';
 
 function MyAircraftComponent({ aircraftId }: { aircraftId: string }) {
@@ -61,7 +61,7 @@ function MyAircraftComponent({ aircraftId }: { aircraftId: string }) {
         Create Work Package
       </Button>
 
-      <AmroWorkPackageCreateWizard
+      <AmroWorkOrderCreateWizard
         open={wizardOpen}
         onOpenChange={setWizardOpen}
         preselectedAircraftId={aircraftId} // Pre-select this aircraft
@@ -81,23 +81,23 @@ function MyAircraftComponent({ aircraftId }: { aircraftId: string }) {
 
 **Current Code (Line ~9244):**
 ```typescript
-<AddWorkPackageDialog
-  aircraftWorkPackageDialogOpen={aircraftWorkPackageDialogOpen}
-  setAircraftWorkPackageDialogOpen={setAircraftWorkPackageDialogOpen}
+<AddWorkOrderDialog
+  aircraftWorkOrderDialogOpen={aircraftWorkOrderDialogOpen}
+  setAircraftWorkOrderDialogOpen={setAircraftWorkOrderDialogOpen}
   // ... 30+ props
 />
 ```
 
 **Replace With:**
 ```typescript
-<AmroWorkPackageCreateWizard
-  open={aircraftWorkPackageDialogOpen}
+<AmroWorkOrderCreateWizard
+  open={aircraftWorkOrderDialogOpen}
   onOpenChange={(isOpen) => {
-    setAircraftWorkPackageDialogOpen(isOpen);
+    setAircraftWorkOrderDialogOpen(isOpen);
   }}
   onSuccess={() => {
     // Refresh aircraft work package list
-    loadWorkPackageTemplateRegistry();
+    loadWorkOrderTemplateRegistry();
     toast.success('Work package created successfully');
   }}
   preselectedAircraftId={selectedAircraft?.id} // If aircraft is selected
@@ -105,7 +105,7 @@ function MyAircraftComponent({ aircraftId }: { aircraftId: string }) {
 ```
 
 **Then Remove:**
-- All 30+ props passed to `AddWorkPackageDialog`
+- All 30+ props passed to `AddWorkOrderDialog`
 - Old form state management (20+ state variables)
 - Old handler functions
 
@@ -163,7 +163,7 @@ const { aircraft, isLoading } = useAircraftById('uuid');
 
 ```bash
 # Run wizard tests only
-npm run test -- AmroWorkPackageCreateWizard.test.ts
+npm run test -- AmroWorkOrderCreateWizard.test.ts
 
 # Run all work order tests
 npm run test:amro -- components/work-orders
@@ -182,21 +182,21 @@ npm run test:amro:coverage
 const useNewWizard = process.env.VITE_AMRO_WP_WIZARD_ENABLED === 'true';
 
 {useNewWizard ? (
-  <AmroWorkPackageCreateWizard
+  <AmroWorkOrderCreateWizard
     open={dialogOpen}
     onOpenChange={setDialogOpen}
     preselectedAircraftId={selectedAircraft?.id}
     onSuccess={handleSuccess}
   />
 ) : (
-  <AddWorkPackageDialog {...oldProps} />
+  <AddWorkOrderDialog {...oldProps} />
 )}
 ```
 
 ### Phase 2: Make Default (Next Week)
 ```typescript
 // Default to new wizard
-<AmroWorkPackageCreateWizard
+<AmroWorkOrderCreateWizard
   open={dialogOpen}
   onOpenChange={setDialogOpen}
   preselectedAircraftId={selectedAircraft?.id}
@@ -205,8 +205,8 @@ const useNewWizard = process.env.VITE_AMRO_WP_WIZARD_ENABLED === 'true';
 ```
 
 ### Phase 3: Remove Old Code (Week 3)
-- Delete `AircraftWorkPackageCreateDialog.tsx`
-- Delete `AddWorkPackageDialog.tsx`
+- Delete `AircraftWorkOrderCreateDialog.tsx`
+- Delete `AddWorkOrderDialog.tsx`
 - Remove 20+ unused state variables
 - Remove old handler functions
 
@@ -216,11 +216,11 @@ const useNewWizard = process.env.VITE_AMRO_WP_WIZARD_ENABLED === 'true';
 
 ### New Files Created
 1. `useAircraftState.ts` - Aircraft API hooks (110 lines)
-2. `AmroWorkPackageCreateWizard.test.ts` - Unit tests (320 lines)
+2. `AmroWorkOrderCreateWizard.test.ts` - Unit tests (320 lines)
 3. `AMRO_WIZARD_INTEGRATION_COMPLETE.md` - This document
 
 ### Files Modified
-1. `AmroWorkPackageCreateWizard.tsx` - Added real API integration
+1. `AmroWorkOrderCreateWizard.tsx` - Added real API integration
    - Added `preselectedAircraftId` prop
    - Replaced mock data with `useAircraftOptions()`
    - Added loading/error states
@@ -241,18 +241,18 @@ import { useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Plus, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
-import { AmroWorkPackageCreateWizard } from '@/features/module-amro/components/work-orders';
-import { useListWorkPackages } from '@/features/module-amro/components/work-orders/useWorkPackageState';
+import { AmroWorkOrderCreateWizard } from '@/features/module-amro/components/work-orders';
+import { useListWorkOrders } from '@/features/module-amro/components/work-orders/useWorkOrderState';
 
 function AircraftDetailPage() {
   const { aircraftId } = useParams<{ aircraftId: string }>();
   const [wizardOpen, setWizardOpen] = useState(false);
-  const { refetch: refetchWorkPackages } = useListWorkPackages({
+  const { refetch: refetchWorkOrders } = useListWorkOrders({
     aircraftId,
   });
 
   const handleWizardSuccess = () => {
-    refetchWorkPackages();
+    refetchWorkOrders();
     toast.success('Work package created successfully');
   };
 
@@ -262,7 +262,7 @@ function AircraftDetailPage() {
       <div className="flex items-center justify-between">
         <h1>Aircraft Details</h1>
         <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => refetchWorkPackages()}>
+          <Button variant="outline" onClick={() => refetchWorkOrders()}>
             <RefreshCw className="mr-2 h-4 w-4" />
             Refresh
           </Button>
@@ -277,7 +277,7 @@ function AircraftDetailPage() {
       {/* ... your work packages list component ... */}
 
       {/* Work Package Creation Wizard */}
-      <AmroWorkPackageCreateWizard
+      <AmroWorkOrderCreateWizard
         open={wizardOpen}
         onOpenChange={setWizardOpen}
         preselectedAircraftId={aircraftId}
@@ -402,7 +402,7 @@ VITE_AMRO_AIRCRAFT_CACHE_TTL_MS=60000
 npm run test -- --clearCache
 
 # Run with verbose output
-npm run test -- AmroWorkPackageCreateWizard.test.ts --reporter=verbose
+npm run test -- AmroWorkOrderCreateWizard.test.ts --reporter=verbose
 ```
 
 ---

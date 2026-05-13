@@ -19,13 +19,16 @@ export const ENTITY_LABEL: Record<MasterEntity, string> = {
   assembly_models: 'Model',
   regulator_profiles: 'Regulator Profiles',
   shift_calendars: 'Shift Calendars',
-  work_package_templates: 'Work Package Templates',
+  work_order_templates: 'Work Package Templates',
 };
 
 export const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   aircraft: [
     'registration',
     'serial_number',
+    'aircraft_operators_id',
+    'aircraft_owners_id',
+    'aircraft_base_location_id',
     'owner_name',
     'base_location',
     'defect_count',
@@ -49,7 +52,7 @@ export const ENTITY_TABLE_COLUMNS: Record<MasterEntity, string[]> = {
   assembly_models: ['id', 'model_code', 'name', 'manufacturer_id', 'assembly_type_id', 'is_active', 'updated_at'],
   regulator_profiles: ['id', 'regulator_code', 'regulator_name', 'jurisdiction', 'policy_version', 'effective_from', 'is_active', 'updated_at'],
   shift_calendars: ['id', 'station_code', 'shift_name', 'shift_start_time', 'shift_end_time', 'capacity', 'is_active', 'updated_at'],
-  work_package_templates: ['id', 'template_code', 'template_name', 'model_id', 'maintenance_type', 'version', 'active', 'updated_at'],
+  work_order_templates: ['id', 'template_code', 'template_name', 'model_id', 'maintenance_type', 'version', 'active', 'updated_at'],
 };
 
 export const ENTITY_HIDDEN_COLUMNS: Partial<Record<MasterEntity, string[]>> = {
@@ -68,6 +71,9 @@ export const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
   warehouse_location: 'Storage Location',
   tail_number: 'Tail Number',
   serial_number: 'Serial Number',
+  aircraft_operators_id: 'Operator Owner',
+  aircraft_owners_id: 'Aircraft Owner',
+  aircraft_base_location_id: 'Base Location',
   owner_name: 'Owner',
   base_location: 'Base',
   defect_count: 'Defect',
@@ -93,7 +99,7 @@ export const COLUMN_LABEL_OVERRIDES: Record<string, string> = {
 
 export const AIRCRAFT_NAV_RAIL = [
   { label: 'Overview', path: '/dashboard/amro/overview' },
-  { label: 'Work Packages', path: '/dashboard/amro/work-packages' },
+  { label: 'Work Orders', path: '/dashboard/amro/work-orders' },
   { label: 'Scheduling', path: '/dashboard/amro/scheduling' },
   { label: 'Compliance', path: '/dashboard/amro/compliance' },
   { label: 'Task Execution', path: '/dashboard/amro/task-execution' },
@@ -107,7 +113,7 @@ export const MANUFACTURER_SEED_NAMES = [
 ];
 
 export const AIRCRAFT_TYPE_OPTIONS = ['NarrowBody', 'RegionalJet', 'Turboprop', 'WideBody', 'auto_seeded'];
-export const AIRCRAFT_STATUS_OPTIONS = ['active', 'maintenance', 'grounded', 'retired', 'storage'] as const;
+export const AIRCRAFT_STATUS_OPTIONS = ['active', 'pending', 'maintenance', 'grounded', 'retired', 'storage'] as const;
 export const AIRCRAFT_FORM_SECTION_FIELD_KEYS: Record<FormSectionKey, string[]> = {
   basic: ['tail_number', 'registration', 'serial_number', 'aircraft_type', 'engine_type', 'manufacturer_id'],
   configuration: ['aircraft_model', 'configuration_code', 'maintenance_program', 'status'],
@@ -139,7 +145,8 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'registration', label: 'Registration', type: 'text' },
     { key: 'tail_number', label: 'Tail Number', type: 'text', required: true },
     { key: 'serial_number', label: 'Serial Number', type: 'text', required: true },
-    { key: 'aircraft_type', label: 'Aircraft Type', type: 'select', required: true, options: AIRCRAFT_TYPE_OPTIONS },
+    // Aircraft type is derived from template/model metadata in the aircraft create flow.
+    { key: 'aircraft_type', label: 'Aircraft Type', type: 'select', required: false, options: AIRCRAFT_TYPE_OPTIONS },
     { key: 'engine_type', label: 'Engine Type', type: 'text' },
     { key: 'aircraft_template', label: 'Aircraft Template', type: 'select', required: true },
     { key: 'aircraft_model', label: 'Aircraft Model', type: 'text' }, // Populated from template's assembly_models
@@ -149,7 +156,7 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'engine_install_history', label: 'Engine Install History', type: 'json' },
     { key: 'thrust_rating_change_log', label: 'Thrust Rating Change Log', type: 'json' },
     { key: 'on_wing_lifecycle_records', label: 'On-Wing Lifecycle Records', type: 'json' },
-    { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'maintenance', 'grounded', 'retired', 'storage'] },
+    { key: 'status', label: 'Status', type: 'select', required: true, options: ['active', 'pending', 'maintenance', 'grounded', 'retired', 'storage'] },
   ],
   ata_codes: [
     { key: 'code', label: 'Code', type: 'text', required: true },
@@ -268,7 +275,7 @@ export const ENTITY_FORM_FIELDS: Record<MasterEntity, EntityFormField[]> = {
     { key: 'effective_to', label: 'Effective To', type: 'date' },
     { key: 'is_active', label: 'Active', type: 'boolean' },
   ],
-  work_package_templates: [
+  work_order_templates: [
     { key: 'template_code', label: 'Template Code', type: 'text', required: true },
     { key: 'template_name', label: 'Template Name', type: 'text', required: true },
     { key: 'model_id', label: 'Model ID', type: 'text', required: true },
@@ -297,7 +304,7 @@ export const ENTITY_ROUTE_SEGMENT: Record<MasterEntity, string> = {
   assembly_models: 'model',
   regulator_profiles: 'regulator-profiles',
   shift_calendars: 'shift-calendars',
-  work_package_templates: 'work-package-templates',
+  work_order_templates: 'work-order-templates',
 };
 
 export const ROUTE_SEGMENT_ENTITY: Record<string, MasterEntity> = Object.entries(ENTITY_ROUTE_SEGMENT).reduce(
@@ -317,6 +324,9 @@ export const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
     engine_type: '',
     aircraft_model: '',
     manufacturer_id: '',
+    aircraft_operators_id: '',
+    aircraft_owners_id: '',
+    aircraft_base_location_id: '',
     configuration_code: '',
     maintenance_program: '',
     engine_install_history: '[]',
@@ -335,5 +345,5 @@ export const ENTITY_DEFAULT_VALUES: Record<MasterEntity, FormValues> = {
   assembly_models: { manufacturer_id: '', assembly_type_id: '', model_code: '', name: '', primary_model: '', description: '', is_active: true, metadata: '{}' },
   regulator_profiles: { regulator_code: '', regulator_name: '', jurisdiction: '', policy_version: '', effective_from: new Date().toISOString().slice(0, 10), effective_to: '', is_active: true, metadata: '{}' },
   shift_calendars: { station_code: '', shift_name: '', shift_start_time: '08:00:00', shift_end_time: '16:00:00', capacity: 1, effective_from: new Date().toISOString().slice(0, 10), effective_to: '', is_active: true },
-  work_package_templates: { template_code: '', template_name: '', model_id: '', aircraft_model: '', maintenance_type: 'line', version: 1, active: true, policy_snapshot_id: '', scope_json: '[]', tasks_json: '[]' },
+  work_order_templates: { template_code: '', template_name: '', model_id: '', aircraft_model: '', maintenance_type: 'line', version: 1, active: true, policy_snapshot_id: '', scope_json: '[]', tasks_json: '[]' },
 };

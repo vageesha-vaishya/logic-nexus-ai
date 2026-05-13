@@ -30,34 +30,34 @@ CREATE INDEX IF NOT EXISTS idx_aircraft_tenant_status ON public.aircraft(tenant_
 CREATE INDEX IF NOT EXISTS idx_aircraft_tenant_station_code ON public.aircraft(tenant_id, station_code);
 CREATE INDEX IF NOT EXISTS idx_aircraft_tenant_updated_at_desc ON public.aircraft(tenant_id, updated_at DESC);
 
-ALTER TABLE public.work_packages
-  ADD COLUMN IF NOT EXISTS work_package_number text,
+ALTER TABLE public.work_orders
+  ADD COLUMN IF NOT EXISTS work_order_number text,
   ADD COLUMN IF NOT EXISTS planned_start timestamptz,
   ADD COLUMN IF NOT EXISTS planned_end timestamptz,
   ADD COLUMN IF NOT EXISTS estimated_downtime_minutes integer,
   ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 
-UPDATE public.work_packages
+UPDATE public.work_orders
 SET
-  work_package_number = COALESCE(work_package_number, work_order_number),
+  work_order_number = COALESCE(work_order_number, work_order_number),
   planned_start = COALESCE(planned_start, planned_start_date),
   planned_end = COALESCE(planned_end, planned_end_date)
-WHERE work_package_number IS NULL
+WHERE work_order_number IS NULL
    OR planned_start IS NULL
    OR planned_end IS NULL;
 
-ALTER TABLE public.work_packages
-  ALTER COLUMN work_package_number SET NOT NULL;
+ALTER TABLE public.work_orders
+  ALTER COLUMN work_order_number SET NOT NULL;
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_work_packages_tenant_number_active
-  ON public.work_packages(tenant_id, work_package_number)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_work_orders_tenant_number_active
+  ON public.work_orders(tenant_id, work_order_number)
   WHERE deleted_at IS NULL;
-CREATE INDEX IF NOT EXISTS idx_work_packages_tenant_status_planned_start
-  ON public.work_packages(tenant_id, status, planned_start);
-CREATE INDEX IF NOT EXISTS idx_work_packages_tenant_aircraft
-  ON public.work_packages(tenant_id, aircraft_id);
-CREATE INDEX IF NOT EXISTS idx_work_packages_active_statuses
-  ON public.work_packages(tenant_id, planned_start)
+CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_status_planned_start
+  ON public.work_orders(tenant_id, status, planned_start);
+CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_aircraft
+  ON public.work_orders(tenant_id, aircraft_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_active_statuses
+  ON public.work_orders(tenant_id, planned_start)
   WHERE deleted_at IS NULL AND status IN ('planning', 'approved', 'in_progress');
 
 ALTER TABLE public.tasks
@@ -84,11 +84,11 @@ ALTER TABLE public.tasks
   ADD CONSTRAINT ck_tasks_qualifications_json_object
     CHECK (qualifications_json IS NULL OR jsonb_typeof(qualifications_json) = 'object');
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_tasks_work_package_sequence_active
-  ON public.tasks(work_package_id, sequence)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tasks_work_order_sequence_active
+  ON public.tasks(work_order_id, sequence)
   WHERE deleted_at IS NULL AND sequence IS NOT NULL;
-CREATE INDEX IF NOT EXISTS idx_tasks_tenant_work_package_status
-  ON public.tasks(tenant_id, work_package_id, status);
+CREATE INDEX IF NOT EXISTS idx_tasks_tenant_work_order_status
+  ON public.tasks(tenant_id, work_order_id, status);
 CREATE INDEX IF NOT EXISTS idx_tasks_steps_json_gin
   ON public.tasks USING GIN (steps_json jsonb_path_ops);
 
@@ -141,7 +141,7 @@ CREATE INDEX IF NOT EXISTS idx_compliance_obligations_tenant_aircraft_type
   ON public.compliance_obligations(tenant_id, aircraft_id, obligation_type);
 
 ALTER TABLE public.compliance_records
-  ADD COLUMN IF NOT EXISTS work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS approving_authority uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS approving_authority_profile_id uuid REFERENCES public.regulator_profiles(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -155,8 +155,8 @@ ALTER TABLE public.compliance_records
       OR approving_authority_profile_id IS NOT NULL
     );
 
-CREATE INDEX IF NOT EXISTS idx_compliance_records_tenant_work_package
-  ON public.compliance_records(tenant_id, work_package_id);
+CREATE INDEX IF NOT EXISTS idx_compliance_records_tenant_work_order
+  ON public.compliance_records(tenant_id, work_order_id);
 
 ALTER TABLE public.staff_qualifications
   ADD COLUMN IF NOT EXISTS technician_id uuid REFERENCES auth.users(id) ON DELETE CASCADE,
@@ -225,7 +225,7 @@ CREATE INDEX IF NOT EXISTS idx_maintenance_events_tenant_task_created_desc
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_tenant_event_type_created
   ON public.maintenance_events(tenant_id, event_type, created_at);
 
-ALTER TABLE public.work_package_materials
+ALTER TABLE public.work_order_materials
   ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 
 ALTER TABLE public.component_positions
@@ -379,11 +379,11 @@ DECLARE
   target_tables text[] := ARRAY[
     'aircraft',
     'components',
-    'work_packages',
+    'work_orders',
     'tasks',
     'staff_qualifications',
     'maintenance_events',
-    'work_package_materials',
+    'work_order_materials',
     'component_positions',
     'schedules',
     'schedule_constraints',

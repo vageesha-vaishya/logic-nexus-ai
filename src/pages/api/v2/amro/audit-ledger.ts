@@ -7,7 +7,7 @@ export type AmroAuditLedgerEventType =
   | 'amro.integration.payload.ingested.v1'
   | 'amro.forecast.risk.scored.v1';
 export type AmroAuditLedgerCapability =
-  | 'work-packages'
+  | 'work-orders'
   | 'schedules'
   | 'tasks'
   | 'compliance-gates'
@@ -24,7 +24,7 @@ export type AmroAuditLedgerRecord = {
   capability: AmroAuditLedgerCapability;
   eventType: AmroAuditLedgerEventType;
   entityType:
-    | 'work-package'
+    | 'work-order'
     | 'task'
     | 'compliance-gate'
     | 'certification-action'
@@ -49,7 +49,7 @@ type AmroAuditLedgerInput = {
   capability: AmroAuditLedgerCapability;
   eventType: AmroAuditLedgerEventType;
   entityType:
-    | 'work-package'
+    | 'work-order'
     | 'task'
     | 'compliance-gate'
     | 'certification-action'

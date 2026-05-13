@@ -43,7 +43,7 @@ function createResponse(): ApiResponse & { statusCode?: number; jsonBody?: unkno
   return res;
 }
 
-const mockWorkPackage = {
+const mockWorkOrder = {
   id: 'wp-1',
   tenant_id: 'tenant-1',
   franchise_id: 'fr-1',
@@ -141,7 +141,7 @@ describe('/api/v2/amro/work-orders/[id] (get/patch/delete)', () => {
 
   describe('DELETE', () => {
     it('rejects deletion of completed work order', async () => {
-      const completedWp = { ...mockWorkPackage, status: 'completed' };
+      const completedWp = { ...mockWorkOrder, status: 'completed' };
       const chain: any = {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),

@@ -222,7 +222,7 @@ validate: (value: any) => string | null  // Custom validation
 ```
 src/features/module-amro/templates/
 ├── components/
-│   ├── WorkPackageTemplatesGrid.tsx (400 lines) ✅ Phase 1
+│   ├── WorkOrderTemplatesGrid.tsx (400 lines) ✅ Phase 1
 │   ├── TemplateRow.tsx (300 lines) ✅ Phase 1
 │   ├── GridToolbar.tsx (350 lines) ✅ Phase 1
 │   ├── GridPagination.tsx (250 lines) ✅ Phase 1

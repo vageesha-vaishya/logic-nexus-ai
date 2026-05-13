@@ -75,7 +75,7 @@
 | File | Lines | Purpose | Status |
 |------|-------|---------|--------|
 | `components/GridToolbar.tsx` | 350+ | Search, filters, actions, view controls | ✅ Complete |
-| `components/WorkPackageTemplatesGrid.tsx` | 400+ | Main grid with virtual scrolling | ✅ Complete |
+| `components/WorkOrderTemplatesGrid.tsx` | 400+ | Main grid with virtual scrolling | ✅ Complete |
 | `components/TemplateRow.tsx` | 300+ | Individual row rendering | ✅ Complete |
 | `components/GridPagination.tsx` | 250+ | Pagination controls | ✅ Complete |
 | `components/index.ts` | 10+ | Barrel exports | ✅ Complete |
@@ -261,7 +261,7 @@
 src/features/module-amro/templates/
 ├── components/
 │   ├── GridToolbar.tsx (350 lines) ✅
-│   ├── WorkPackageTemplatesGrid.tsx (400 lines) ✅
+│   ├── WorkOrderTemplatesGrid.tsx (400 lines) ✅
 │   ├── TemplateRow.tsx (300 lines) ✅
 │   ├── GridPagination.tsx (250 lines) ✅
 │   └── index.ts ✅
@@ -276,7 +276,7 @@ src/features/module-amro/templates/
 ├── hooks/
 │   ├── useTemplateQueries.ts (300 lines) ✅
 │   └── index.ts ✅
-├── AmroWorkPackageTemplatesPage.tsx (existing)
+├── AmroWorkOrderTemplatesPage.tsx (existing)
 ├── TemplateCreateEditDialog.tsx (existing)
 ├── TemplatePreviewDialog.tsx (existing)
 ├── TemplateCloneDialog.tsx (existing)
@@ -298,7 +298,7 @@ WORK_PACKAGE_TEMPLATES_GRID_PHASE1_COMPLETION.md (this file)
 ### Integration with Existing Page
 
 ```typescript
-import { WorkPackageTemplatesGrid, GridToolbar } from './components';
+import { WorkOrderTemplatesGrid, GridToolbar } from './components';
 import { useTemplateList, useAircraftModels } from './hooks';
 import { useTemplateGridStore } from './store';
 
@@ -338,7 +338,7 @@ function EnhancedTemplatesPage() {
       />
       
       {/* Grid */}
-      <WorkPackageTemplatesGrid
+      <WorkOrderTemplatesGrid
         templates={data?.templates || []}
         totalCount={data?.total || 0}
         isLoading={isLoading}

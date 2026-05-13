@@ -8,7 +8,7 @@
 
 ## Root Cause
 
-The AMRO API endpoint `/api/v2/amro/work-packages` was returning data in the wrong format:
+The AMRO API endpoint `/api/v2/amro/work-orders` was returning data in the wrong format:
 
 **Before (WRONG):**
 ```json
@@ -32,9 +32,9 @@ The AMRO API endpoint `/api/v2/amro/work-packages` was returning data in the wro
 }
 ```
 
-The frontend's `fetchWorkPackages()` function at `useWorkPackageState.ts` line 149 expects:
+The frontend's `fetchWorkOrders()` function at `useWorkOrderState.ts` line 149 expects:
 ```typescript
-const rawItems = json.items || json.data?.workPackages || json.output?.records || json.output?.items || json.data || [];
+const rawItems = json.items || json.data?.workOrders || json.output?.records || json.output?.items || json.data || [];
 ```
 
 It prioritizes `json.items` first, which is the standard pagination format used throughout the application.
@@ -46,7 +46,7 @@ It prioritizes `json.items` first, which is the standard pagination format used 
 ### File Modified
 **`services/amro-api/src/routes/work-orders.routes.ts`** (lines 96-120)
 
-Updated the GET `/amro/work-packages` route to return the proper response format with:
+Updated the GET `/amro/work-orders` route to return the proper response format with:
 - ✅ `items` array (instead of `data`)
 - ✅ `pagination` object with page metadata
 - ✅ `count` field for total items
@@ -63,17 +63,17 @@ User opens Work Orders page
   ↓
 AmroWorkOrdersListPage.tsx renders
   ↓
-useListWorkPackages() hook fires
+useListWorkOrders() hook fires
   ↓
-fetchWorkPackages() calls GET /api/v2/amro/work-packages
+fetchWorkOrders() calls GET /api/v2/amro/work-orders
   ↓
-Vite proxies to http://localhost:3001/api/v2/amro/work-packages
+Vite proxies to http://localhost:3001/api/v2/amro/work-orders
   ↓
 AMRO API auth middleware validates JWT token
   ↓
 AMRO API extracts tenant_id from token (Deccan tenant)
   ↓
-workOrdersService.getWorkPackages(tenantId) queries Supabase
+workOrdersService.getWorkOrders(tenantId) queries Supabase
   ↓
 Returns { items: [...], pagination: {...}, count: N }
   ↓
@@ -96,7 +96,7 @@ UI displays work orders successfully ✅
 
 ```bash
 # With a valid auth token (get from browser dev tools):
-curl -X GET "http://localhost:3001/api/v2/amro/work-packages?page=1&page_size=20" \
+curl -X GET "http://localhost:3001/api/v2/amro/work-orders?page=1&page_size=20" \
   -H "Authorization: Bearer YOUR_TOKEN_HERE" \
   -H "Content-Type: application/json"
 ```
@@ -128,7 +128,7 @@ Expected response:
 ### Work Packages Table
 The work packages are queried from Supabase:
 ```sql
-SELECT * FROM work_packages 
+SELECT * FROM work_orders 
 WHERE tenant_id = 'e42ec6fd-6b88-4721-befe-4443d9743120'
 ORDER BY created_at DESC;
 ```
@@ -152,13 +152,13 @@ If this returns rows, they will display in the UI. If it returns empty, the UI w
    - Try logging out and back in
 
 3. **Check the API response:**
-   - In Network tab, find the `work-packages` request
+   - In Network tab, find the `work-orders` request
    - Check the response format
    - Should have `items`, `pagination`, and `count` fields
 
 4. **Verify database has work packages:**
    ```sql
-   SELECT COUNT(*) FROM work_packages 
+   SELECT COUNT(*) FROM work_orders 
    WHERE tenant_id = 'e42ec6fd-6b88-4721-befe-4443d9743120';
    ```
 
@@ -171,7 +171,7 @@ If this returns rows, they will display in the UI. If it returns empty, the UI w
 ## Files Modified
 
 1. ✅ `services/amro-api/src/routes/work-orders.routes.ts` - Fixed response format
-2. ✅ `src/features/module-amro/components/work-orders/useWorkPackageState.ts` - Fixed response mapping (from previous fix)
+2. ✅ `src/features/module-amro/components/work-orders/useWorkOrderState.ts` - Fixed response mapping (from previous fix)
 
 ---
 

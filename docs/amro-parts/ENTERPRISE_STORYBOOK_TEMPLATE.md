@@ -15,8 +15,8 @@ This template defines the production-ready standard for AMRO->Parts Storybook st
   - `src/features/module-amro/components/templates/AmroInventoryModuleTemplates.stories.tsx`
   - `src/features/module-amro/components/templates/AmroModuleLayoutV23Prototypes.stories.tsx`
   - `src/features/module-amro/components/templates/AmroStandardFormTemplate.stories.tsx`
-  - `src/features/module-amro/components/templates/AmroWorkPackageTemplateAdapter.stories.tsx`
-  - `src/features/module-amro/components/templates/AmroWorkPackageTemplatesEnterprise.stories.tsx`
+  - `src/features/module-amro/components/templates/AmroWorkOrderTemplateAdapter.stories.tsx`
+  - `src/features/module-amro/components/templates/AmroWorkOrderTemplatesEnterprise.stories.tsx`
 
 ## Required Governance Metadata
 Each production story must declare:

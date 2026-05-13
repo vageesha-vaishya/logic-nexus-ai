@@ -25,7 +25,7 @@ This document provides a complete implementation roadmap for transforming the AM
 | Technical Audit Report | Agent research results | ✅ Complete |
 | Industry Analysis | `MRO_WORK_PACKAGE_PLATFORMS_ANALYSIS.md` | ✅ Complete |
 | Enhancement Strategy | `AMRO_WORK_PACKAGE_ENHANCEMENT_STRATEGY.md` | ✅ Complete |
-| Database Schema Migration | `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql` | ✅ Complete |
+| Database Schema Migration | `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql` | ✅ Complete |
 | Implementation Roadmap | This document | ✅ Complete |
 
 ---
@@ -54,24 +54,24 @@ This document provides a complete implementation roadmap for transforming the AM
 │                   API GATEWAY LAYER                          │
 ├─────────────────────────────────────────────────────────────┤
 │  Enhanced Endpoints (NEW):                                  │
-│  ├─ /work-package-templates/:id/versions       (CRUD)      │
-│  ├─ /work-packages/emergency                     (CREATE)   │
+│  ├─ /work-order-templates/:id/versions       (CRUD)      │
+│  ├─ /work-orders/emergency                     (CREATE)   │
 │  ├─ /non-scheduled-tasks                       (CRUD)      │
 │  ├─ /non-scheduled-tasks/:id/convert-to-wp     (POST)      │
 │  ├─ /compliance/directives                     (CRUD)      │
-│  ├─ /work-packages/:id/compliance-records      (CRUD)      │
-│  ├─ /work-packages/:id/certificates            (CRUD)      │
-│  ├─ /work-packages/:id/tasks/dependencies      (CRUD)      │
-│  ├─ /work-packages/:id/tasks/:id/time-logs     (CRUD)      │
+│  ├─ /work-orders/:id/compliance-records      (CRUD)      │
+│  ├─ /work-orders/:id/certificates            (CRUD)      │
+│  ├─ /work-orders/:id/tasks/dependencies      (CRUD)      │
+│  ├─ /work-orders/:id/tasks/:id/time-logs     (CRUD)      │
 │  ├─ /resources/availability                    (QUERY)     │
-│  ├─ /work-packages/:id/resource-assignments    (CRUD)      │
+│  ├─ /work-orders/:id/resource-assignments    (CRUD)      │
 │  ├─ /maintenance-triggers                      (CRUD)      │
 │  ├─ /predictive/recommendations                (QUERY)     │
-│  └─ /work-packages/:id/audit-log               (READ)      │
+│  └─ /work-orders/:id/audit-log               (READ)      │
 │                                                             │
 │  Existing Endpoints (ENHANCED):                            │
-│  ├─ /work-packages (add creation_path, emergency fields)   │
-│  ├─ /work-package-templates (add version support)          │
+│  ├─ /work-orders (add creation_path, emergency fields)   │
+│  ├─ /work-order-templates (add version support)          │
 │  └─ /tasks (add dependency tracking, time logging)         │
 └────────────────────────┬────────────────────────────────────┘
                          │
@@ -97,23 +97,23 @@ This document provides a complete implementation roadmap for transforming the AM
 │                    DATABASE LAYER                            │
 ├─────────────────────────────────────────────────────────────┤
 │  Enhanced Schema (14 NEW tables):                           │
-│  ├─ amro_work_package_template_versions                     │
-│  ├─ amro_work_package_template_categories                   │
+│  ├─ amro_work_order_template_versions                       │
+│  ├─ amro_work_order_template_categories                     │
 │  ├─ amro_task_dependencies                                  │
 │  ├─ amro_task_time_logs                                    │
 │  ├─ amro_compliance_directives                              │
-│  ├─ amro_work_package_compliance_records                    │
+│  ├─ amro_work_order_compliance_records                      │
 │  ├─ amro_certificates_release_service                       │
 │  ├─ amro_predictive_maintenance_recommendations            │
 │  ├─ amro_resource_pools                                     │
-│  ├─ amro_work_package_resource_assignments                  │
-│  ├─ amro_emergency_work_packages                            │
+│  ├─ amro_work_order_resource_assignments                    │
+│  ├─ amro_emergency_work_orders                            │
 │  ├─ amro_maintenance_triggers                               │
 │  ├─ amro_non_scheduled_tasks                                │
-│  └─ amro_work_package_audit_log                             │
+│  └─ amro_work_order_audit_log                               │
 │                                                             │
 │  Enhanced Existing Tables:                                  │
-│  ├─ amro_work_packages (add fields)                         │
+│  ├─ amro_work_orders (add fields)                         │
 │  └─ amro_tasks (add fields)                                 │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -131,7 +131,7 @@ This document provides a complete implementation roadmap for transforming the AM
 - ✅ Audit trail infrastructure
 - ✅ Triggers and constraints
 
-**Migration File:** `20260412100000_amro_work_package_enhanced_schema.sql`
+**Migration File:** `20260412100000_amro_work_order_enhanced_schema.sql`
 
 **Next Step:** Apply migration to database
 ```bash
@@ -149,51 +149,51 @@ supabase migration up
 
 #### 2.1 Template Version Management
 
-**File:** `src/pages/api/v2/amro/work-package-template-versions/index.ts`
+**File:** `src/pages/api/v2/amro/work-order-template-versions/index.ts`
 
 ```typescript
 /**
- * GET /api/v2/amro/work-package-template-versions
+ * GET /api/v2/amro/work-order-template-versions
  * Query: template_id, status, page, page_size
  * Returns: List of template versions with pagination
  * 
- * POST /api/v2/amro/work-package-template-versions
+ * POST /api/v2/amro/work-order-template-versions
  * Body: { template_id, change_description, change_reason, ... }
  * Returns: Created version (status: 'draft')
  */
 ```
 
-**File:** `src/pages/api/v2/amro/work-package-template-versions/[id]/route.ts`
+**File:** `src/pages/api/v2/amro/work-order-template-versions/[id]/route.ts`
 
 ```typescript
 /**
- * GET /api/v2/amro/work-package-template-versions/:id
+ * GET /api/v2/amro/work-order-template-versions/:id
  * Returns: Single version details
  * 
- * PUT /api/v2/amro/work-package-template-versions/:id
+ * PUT /api/v2/amro/work-order-template-versions/:id
  * Body: { scope_json, tasks_json, ... }
  * Returns: Updated version (only if status='draft')
  * 
- * DELETE /api/v2/amro/work-package-template-versions/:id
+ * DELETE /api/v2/amro/work-order-template-versions/:id
  * Returns: Success (only if status='draft')
  */
 ```
 
-**File:** `src/pages/api/v2/amro/work-package-template-versions/[id]/submit/route.ts`
+**File:** `src/pages/api/v2/amro/work-order-template-versions/[id]/submit/route.ts`
 
 ```typescript
 /**
- * POST /api/v2/amro/work-package-template-versions/:id/submit
+ * POST /api/v2/amro/work-order-template-versions/:id/submit
  * Transitions: draft → pending_review
  * Sets: submitted_by, submitted_at
  */
 ```
 
-**File:** `src/pages/api/v2/amro/work-package-template-versions/[id]/approve/route.ts`
+**File:** `src/pages/api/v2/amro/work-order-template-versions/[id]/approve/route.ts`
 
 ```typescript
 /**
- * POST /api/v2/amro/work-package-template-versions/:id/approve
+ * POST /api/v2/amro/work-order-template-versions/:id/approve
  * Transitions: pending_review → approved (or active)
  * Sets: approved_by, approved_at
  * Requires: Platform admin or template manager role
@@ -202,11 +202,11 @@ supabase migration up
 
 #### 2.2 Emergency Work Package Creation
 
-**File:** `src/pages/api/v2/amro/emergency/work-packages/route.ts`
+**File:** `src/pages/api/v2/amro/emergency/work-orders/route.ts`
 
 ```typescript
 /**
- * POST /api/v2/amro/emergency/work-packages
+ * POST /api/v2/amro/emergency/work-orders
  * Body: {
  *   aircraft_id,
  *   emergency_type: 'aog' | 'unscheduled_removal' | 'flight_delay_risk' | 'safety_issue' | 'technical_fault',
@@ -220,7 +220,7 @@ supabase migration up
  * }
  * 
  * Returns: {
- *   work_package_id,
+ *   work_order_id,
  *   emergency_wp_id,
  *   declared_at,
  *   auto_prioritized: boolean,
@@ -275,7 +275,7 @@ supabase migration up
  * }
  * 
  * Returns: {
- *   work_package_id,
+ *   work_order_id,
  *   converted_from_task_id,
  *   emergency_wp_id?: string,
  *   conversion_timestamp
@@ -315,14 +315,14 @@ supabase migration up
  */
 ```
 
-**File:** `src/pages/api/v2/amro/work-packages/[id]/compliance-records/route.ts`
+**File:** `src/pages/api/v2/amro/work-orders/[id]/compliance-records/route.ts`
 
 ```typescript
 /**
- * GET /api/v2/amro/work-packages/:id/compliance-records
+ * GET /api/v2/amro/work-orders/:id/compliance-records
  * Returns: All compliance records for WP
  * 
- * POST /api/v2/amro/work-packages/:id/compliance-records
+ * POST /api/v2/amro/work-orders/:id/compliance-records
  * Body: {
  *   task_id?,
  *   directive_id?,
@@ -339,11 +339,11 @@ supabase migration up
  */
 ```
 
-**File:** `src/pages/api/v2/amro/work-packages/[id]/certificates/route.ts`
+**File:** `src/pages/api/v2/amro/work-orders/[id]/certificates/route.ts`
 
 ```typescript
 /**
- * POST /api/v2/amro/work-packages/:id/certificates
+ * POST /api/v2/amro/work-orders/:id/certificates
  * Body: {
  *   aircraft_id,
  *   certifying_staff_id,
@@ -372,14 +372,14 @@ supabase migration up
 
 #### 2.5 Task Dependencies
 
-**File:** `src/pages/api/v2/amro/work-packages/[id]/tasks/dependencies/route.ts`
+**File:** `src/pages/api/v2/amro/work-orders/[id]/tasks/dependencies/route.ts`
 
 ```typescript
 /**
- * GET /api/v2/amro/work-packages/:id/tasks/dependencies
+ * GET /api/v2/amro/work-orders/:id/tasks/dependencies
  * Returns: Dependency graph for all tasks in WP
  * 
- * POST /api/v2/amro/work-packages/:id/tasks/dependencies
+ * POST /api/v2/amro/work-orders/:id/tasks/dependencies
  * Body: {
  *   task_id,
  *   depends_on_task_id,
@@ -398,14 +398,14 @@ supabase migration up
 
 #### 2.6 Task Time Logging
 
-**File:** `src/pages/api/v2/amro/work-packages/[id]/tasks/[taskId]/time-logs/route.ts`
+**File:** `src/pages/api/v2/amro/work-orders/[id]/tasks/[taskId]/time-logs/route.ts`
 
 ```typescript
 /**
- * GET /api/v2/amro/work-packages/:id/tasks/:taskId/time-logs
+ * GET /api/v2/amro/work-orders/:id/tasks/:taskId/time-logs
  * Returns: All time logs for task
  * 
- * POST /api/v2/amro/work-packages/:id/tasks/:taskId/time-logs
+ * POST /api/v2/amro/work-orders/:id/tasks/:taskId/time-logs
  * Body: {
  *   technician_id,
  *   log_date,
@@ -448,14 +448,14 @@ supabase migration up
  */
 ```
 
-**File:** `src/pages/api/v2/amro/work-packages/[id]/resource-assignments/route.ts`
+**File:** `src/pages/api/v2/amro/work-orders/[id]/resource-assignments/route.ts`
 
 ```typescript
 /**
- * GET /api/v2/amro/work-packages/:id/resource-assignments
+ * GET /api/v2/amro/work-orders/:id/resource-assignments
  * Returns: All resource assignments for WP
  * 
- * POST /api/v2/amro/work-packages/:id/resource-assignments
+ * POST /api/v2/amro/work-orders/:id/resource-assignments
  * Body: {
  *   task_id?,
  *   resource_id,
@@ -502,11 +502,11 @@ supabase migration up
 
 #### 2.9 Audit Log
 
-**File:** `src/pages/api/v2/amro/work-packages/[id]/audit-log/route.ts`
+**File:** `src/pages/api/v2/amro/work-orders/[id]/audit-log/route.ts`
 
 ```typescript
 /**
- * GET /api/v2/amro/work-packages/:id/audit-log
+ * GET /api/v2/amro/work-orders/:id/audit-log
  * Query: entity_type, action, date_range, page, page_size
  * Returns: Immutable audit trail for WP and related entities
  * 
@@ -530,7 +530,7 @@ supabase migration up
  * 
  * POST /api/v2/amro/predictive/recommendations/:id/convert-to-wp
  * Body: { priority_override?, scheduled_date? }
- * Returns: { work_package_id, recommendation_id }
+ * Returns: { work_order_id, recommendation_id }
  * 
  * Features:
  * - ML model integration (external service)
@@ -565,7 +565,7 @@ supabase migration up
 
 #### 3.2 Dual-Path Creation Wizard
 
-**File:** `src/features/module-amro/components/work-orders/AmroWorkPackageCreationWizard.tsx`
+**File:** `src/features/module-amro/components/work-orders/AmroWorkOrderCreationWizard.tsx`
 
 **Features:**
 - Step 1: Choose creation path (Scheduled / Non-Scheduled)
@@ -741,22 +741,22 @@ supabase migration up
 
 #### 5.1 Data Migration Scripts
 
-**File:** `supabase/migrations/20260412200000_amro_work_package_data_migration.sql`
+**File:** `supabase/migrations/20260412200000_amro_work_order_data_migration.sql`
 
 ```sql
 -- Migration script to enhance existing WPs
 
 -- 1. Add creation_path to existing work packages
-ALTER TABLE amro_work_packages 
+ALTER TABLE amro_work_orders 
 ADD COLUMN IF NOT EXISTS creation_path TEXT DEFAULT 'scheduled' 
 CHECK (creation_path IN ('scheduled', 'non-scheduled'));
 
 -- 2. Add emergency flag
-ALTER TABLE amro_work_packages 
+ALTER TABLE amro_work_orders 
 ADD COLUMN IF NOT EXISTS is_emergency BOOLEAN DEFAULT false;
 
 -- 3. Create initial template versions from existing templates
-INSERT INTO amro_work_package_template_versions (
+INSERT INTO amro_work_order_template_versions (
     tenant_id,
     franchise_id,
     template_id,
@@ -785,14 +785,14 @@ SELECT
     created_at as effective_from,
     created_by,
     updated_by
-FROM amro_work_package_templates
+FROM amro_work_order_templates
 WHERE id NOT IN (
     SELECT DISTINCT template_id 
-    FROM amro_work_package_template_versions
+    FROM amro_work_order_template_versions
 );
 
 -- 4. Create audit log entries for all historical WPs
-INSERT INTO amro_work_package_audit_log (
+INSERT INTO amro_work_order_audit_log (
     tenant_id,
     entity_type,
     entity_id,
@@ -804,14 +804,14 @@ INSERT INTO amro_work_package_audit_log (
 )
 SELECT 
     tenant_id,
-    'work_package' as entity_type,
+    'work_order' as entity_type,
     id as entity_id,
     'created' as action,
-    to_jsonb(amro_work_packages) as new_values,
+    to_jsonb(amro_work_orders) as new_values,
     created_by as performed_by,
     created_at as performed_at,
-    encode(digest('work_package' || id::TEXT || 'created' || COALESCE(created_by::TEXT, '') || created_at::TEXT, 'sha256'), 'hex') as checksum
-FROM amro_work_packages;
+    encode(digest('work_order' || id::TEXT || 'created' || COALESCE(created_by::TEXT, '') || created_at::TEXT, 'sha256'), 'hex') as checksum
+FROM amro_work_orders;
 
 -- 5. Add more migration steps as needed...
 ```
@@ -841,15 +841,15 @@ src/features/module-amro/
 ├── components/
 │   ├── work-orders/
 │   │   ├── AmroWorkOrdersListPage.tsx                  ✅ Complete
-│   │   ├── AmroWorkPackageDetailPage.tsx               ✅ Complete
-│   │   ├── AmroWorkPackageCreationWizard.tsx           ⏳ TODO
+│   │   ├── AmroWorkOrderDetailPage.tsx               ✅ Complete
+│   │   ├── AmroWorkOrderCreationWizard.tsx           ⏳ TODO
 │   │   ├── AmroEmergencyQuickAccessPanel.tsx           ⏳ TODO
 │   │   ├── AmroProgressMonitor.tsx                     ⏳ TODO
-│   │   └── useWorkPackageState.ts                      ✅ Complete
+│   │   └── useWorkOrderState.ts                      ✅ Complete
 │   ├── templates/
-│   │   ├── AmroWorkPackageTemplateAdapter.tsx          ✅ Complete
+│   │   ├── AmroWorkOrderTemplateAdapter.tsx          ✅ Complete
 │   │   ├── AmroTemplateVersionManager.tsx              ⏳ TODO
-│   │   └── AmroWorkPackageTemplateAdapter.test.tsx     ⏳ TODO
+│   │   └── AmroWorkOrderTemplateAdapter.test.tsx     ⏳ TODO
 │   ├── compliance/
 │   │   ├── AmroComplianceDashboard.tsx                 ⏳ TODO
 │   │   └── useComplianceState.ts                       ⏳ TODO
@@ -872,14 +872,14 @@ src/features/module-amro/
     └── complianceService.ts                            ⏳ TODO
 
 src/pages/api/v2/amro/
-├── work-package-template-versions/
+├── work-order-template-versions/
 │   ├── index.ts                                        ⏳ TODO
 │   └── [id]/
 │       ├── route.ts                                    ⏳ TODO
 │       ├── submit/route.ts                             ⏳ TODO
 │       └── approve/route.ts                            ⏳ TODO
 ├── emergency/
-│   └── work-packages/route.ts                          ⏳ TODO
+│   └── work-orders/route.ts                          ⏳ TODO
 ├── non-scheduled-tasks/
 │   ├── index.ts                                        ⏳ TODO
 │   └── [id]/
@@ -888,7 +888,7 @@ src/pages/api/v2/amro/
 ├── compliance/
 │   ├── directives/route.ts                             ⏳ TODO
 │   └── summary/route.ts                                ⏳ TODO
-├── work-packages/
+├── work-orders/
 │   ├── [id]/
 │   │   ├── compliance-records/route.ts                 ⏳ TODO
 │   │   ├── certificates/route.ts                       ⏳ TODO
@@ -908,8 +908,8 @@ src/pages/api/v2/amro/
     └── recommendations/route.ts                        ⏳ TODO
 
 supabase/migrations/
-├── 20260412100000_amro_work_package_enhanced_schema.sql  ✅ Complete
-└── 20260412200000_amro_work_package_data_migration.sql  ⏳ TODO
+├── 20260412100000_amro_work_order_enhanced_schema.sql  ✅ Complete
+└── 20260412200000_amro_work_order_data_migration.sql  ⏳ TODO
 ```
 
 ---
@@ -937,7 +937,7 @@ cat MRO_WORK_PACKAGE_PLATFORMS_ANALYSIS.md
 4. **Start Implementation:**
    - Begin with Phase 2 APIs (priority P0 endpoints)
    - Follow file structure above
-   - Use existing patterns from `work-packages.ts` and `work-package-templates.ts`
+   - Use existing patterns from `work-orders.ts` and `work-order-templates.ts`
 
 ### For Stakeholders
 
@@ -969,7 +969,7 @@ cat MRO_WORK_PACKAGE_PLATFORMS_ANALYSIS.md
 1. **Technical Audit:** Agent research results
 2. **Industry Analysis:** `MRO_WORK_PACKAGE_PLATFORMS_ANALYSIS.md`
 3. **Enhancement Strategy:** `AMRO_WORK_PACKAGE_ENHANCEMENT_STRATEGY.md`
-4. **Database Schema:** `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql`
+4. **Database Schema:** `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql`
 5. **Design System:** `src/features/module-amro/AMRO_DESIGN_SYSTEM.md`
 6. **Unified Implementation:** `AMRO_WORK_ORDERS_UNIFIED_IMPLEMENTATION.md`
 7. **Pattern Alignment:** `AMRO_DESIGN_PATTERN_ALIGNMENT.md`

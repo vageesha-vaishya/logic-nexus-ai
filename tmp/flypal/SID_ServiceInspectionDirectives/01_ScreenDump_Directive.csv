@@ -1,0 +1,212 @@
+code_form_no,ata_code,reference_amp,description,category_code,estimated_man_hours,revision_status,frequency
+ ,27, ,Within 200 to 300 Flying Hours After Control Cable Replacement Carry out Inspection on Rudder and Rudder Trim Control Cables,OP1,0:00, ,300:00 H
+ ,24,OOPI- 240001,Starter/generators,OP*,0:00,Carrying out at every 100 hours,100:00 H
+ ,57,Form No: 900XP/03,"Every 300 Hours Inspection on Wing Outer, Upper and Lower Skins",OP*,0:00,Visually inspect between Ribs 14 and 16 around the fasteners for cracking in the skins,300:00 H
+ ,26, ,Cockpit Portable Fire Extinguisher,OP*,0:00,Visual Inspection (Schedule Form No: 900XP/04),1 Mt
+ ,32,Between 25 to 50 landings from build or after nose landing gear drag stay replacement,Nose landing gear drag stay,OP*,0:00,Check clearances,25 L
+ ,31,AMMA-31-30-20-601,potentiometer sensors,OP*,0:00, ,1600:00 H
+ ,24, ,Every 400 Hours Inspection on Panel GG and terminal block M (OOPI- 240028 ),OP*,0:00,"Do a visual inspection for deformation, displacement, discoloration and heat distress",400:00 H
+ ,32,Lubricate,Main Landing gear side stay shims,OP*,0:00, ,1 Mt
+ ,38,AMMA-38-10-00-201,Galley Water System,OP*,0:00,Clean (Schedule Form No: 900XP/04),30 Dy
+ ,35, ,Every 12 Months Passenger Oxygen Mask,OP*,0:00,Deploy & inspect,12 Mt
+ ,24,Form No: 900XP/01,Every 200 Hours Inspection on Starter/generators (OOPI- 240001),OP*,0:00, ,200:00 H
+ ,34, ,Every 24 Months Inspection on Static plates and Airframe (OOPI-340013),OP*,0:00, ,24 Yr
+ ,24,Form No: 900XP/01,Every 200 Hours Inspection - Cabin Inverter (115 VAC) system (If Fitted ) (OOPI- 240030),OP*,0:00, ,200:00 H
+ ,25,Form No: 900XP/13,Every 1500 Hours or 6 Months inspection- Tia Microwave Oven,OP*,0:00,Check the wave guide moisture cover,"1500:00 H
+6 Mt"
+ ,21, ,Electropneumatic Outflow Valves (OOPI- 210029),OP*,0:00,Do an inspection/check for the smooth operation of the manual electropneumatic outflow valve,15000:00 H
+ ,26,Form No: 900XP/08,Smoke Detection System (OOPI- 260008),OP*,0:00,Functional test,6 Mt
+ ,34,OOPI-340002,Pitot/static drain traps,OP*,0:00, ,24 Mt
+ ,25, ,RE-CERTIFICATION OF LIFE RAFT,OP*,0:00, ,36 Mt
+ ,5,AMMA-31-30-20-601,potentiometer sensor connecting rod,OP*,0:00, ,1600:00 H
+ ,21,00PI-210006,Water separator.(Inspect for satisfactory condition),OP*,0:00, ,400:00 H
+ ,34,OOPI-340006,Pitot/static and stall warning systems,OP*,0:00, ,24 Mt
+ ,34, ,Every 36 Months Compass Systems (OOPI-340012),OP*,0:00,"Do a check compass swing of the compass systems at four headings 90 degrees apart. - Compare deviations, if any are found, with the existing deviation card. - If deviations are found then do a compass swing: (Ref. AMM 34-20-05, 501).",36 Mt
+ ,26, ,Cabin Portable Fire Extinguisher,OP*,0:00,Visual Inspection (Schedule Form No: 900XP/04),1 Mt
+ ,31,AMMA-31-30-20-601,Potentiometer Sensor Couplers,OP*,0:00, ,1600:00 H
+ ,21,OOPI-210007,Water separator,OP*,0:00, ,400:00 H
+ ,23,AMMA-33-50-05-201,Every 3500 Hours Inspection on Emergency Lighting system,OP*,0:00,Lighting Degradation Test,3500:00 H
+ ,24,Form No: 900XP/01,Every 200 Hours Inspection on AC Generator Pad (OOPI- 240031),OP*,0:00, ,200:00 H
+ ,5,Form No:900XP/04.,Carry out every 1 month Inspection.,OP*,0:00, ,1 Mt
+ ,38,AMMA-38-20-05-201,Every 800 Hours insepction on Lavatory Water System,OP*,0:00, ,800:00 H
+ ,38,AMMA-38-20-05-201,Lavatory Water System,OP*,0:00,Clean (Schedule Form No: 900XP/04),30 Dy
+ ,34,"CAR Section-8 , Series ""O"" Part-2 Para 7.3.9.",HMU or GMU Flight,ROU*,0:00,HMU or GMU Flight is moniter as per Hour basis since the calender basis is already over due. Note:Monitoring of Height keeping performance. 24 Months/ 1000 FH Whichever is longer (MAAR Requirements).,"1000:00 H
+24 Mt"
+ ,5,AFMS Chapter 07-001-001,Lubrication Inspection,ROU*,0:00,This task will be done during the removal of an Engine or a Power Plant.,1200:00 H
+ ,5,Form No:900XP/17,"Wing internal structure forward of the center spar including the front and center spars from Ribs 0 to 4, and between and including the front and rear spars from Rib 4 to the wing tip (SI - 570027)",ROU*,0:00,"Access:Wing leading edges W102, W120, W130, W202, W220,W230 removed. Front spar access panels W301, W302, W303, W304, W305, W401, W402, W403, W404, W405 removed. Rear spar access panels W115, W116, W117, W215, W216, W217 removed. Top skin panels W106, W108, W112, W119, W206, W208, W212, W219 removed. Bottom skin panels W306, W308, W309, W310, W312, W313, W329, W330, W406, W408, W409, W410, W412, W413, W429, W430 removed. Detail inspect the internal structure, as visible Inspect for signs of corrosion and microbiological contamination Detail inspect the bottom stringers in the vicinity of the wing skin restraint ties with the aid of a flashlight and mirrors","4800:00 H
+8 Yr"
+ ,5,SI - 570015,Ailerons,ROU*,0:00,"Access: Refer to NTM Technique Detail inspect the hinge brackets with a X 10 magnifier. Comply with instructions in NTM 57-50-107 4800 flying hours or 8 years, whichever is the sooner, then every 2400 flying hours or 4 years.","4800:00 H
+8 Yr"
+ ,5,Form No:900XP/17,Every 8 Year Inspection on Horizontal stabilizer (SI-550009),ROU*,0:00,"Access: Leading edges removed. Elevators removed. Shroud panels T21R, T22L, T23R, T24L, T25R, T26L and T45 removed. Fairing panels T4L, T4R, T5, T6L, T7R, T8L, T9R and T13 removed Detail inspect the front face of the front spar for cracks and signs of corrosion. Detail inspect the rear face of the rear spar for cracks and signs of corrosion Detail inspect the vertical stabilizer to horizontal stabilizer attachment fittings Detail inspect the elevator hinge brackets Apply Corrosion Preventive Compound (Ref. AMM 55-13-00, 301)",8 Yr
+ ,5, ,Every 24000 Hours Inspection on Wing bottom skin centerline joint strap.(SI - 570018),ROU*,0:00,"Access: Keel skid removed Detail inspect for cracks and signs of corrosion 24,000 flying hours and then every 9600 flying hours",24000:00 H
+ ,5,Form No:900XP/17,"Every 4800 Hours or 8 years Wing front spar, forward face.(SI - 570010)",ROU*,0:00,"Access: Wing leading edges removed Detail inspect for cracks, signs of corrosion and distortion, specially between Ribs 1 and 3 Inspect leading edges for cracks, signs of corrosion, damage and integrity of the bolt holes Note:When replacing the leading edges the profiles must be maintained(see SR M 57-41-00).","4800:00 H
+8 Yr"
+ ,5,SI-520008,Main entry door,ROU*,0:00,Access: Refer to NTM Technique Comply with instructions in NTM 52-80-102.,12 Yr
+ ,5, ,"Skin exterior under the dorsal intake, forward of Frame 19.(SI-530001)",ROU*,0:00,"Access: Dorsal intake removed. Detail inspect for cracks, signs of corrosion and deterioration of the protective treatment. Detail inspect for chafing rivets. 8 years, then every 4 years.",8 Yr
+ ,5,Form No:900XP/17,Every 8 Year Inspection on Front face of rear pressure bulkhead (Frame 19).(SI-530012),ROU*,0:00,Inspect right hand side of bulkhead with soundproofing blanket removed Look for signs of corrosion at the boundary angle to frame 19 joints,8 Yr
+ ,5, ,Entry door surround (SI-510009),ROU*,0:00,"Access: Panel F66A, F66B, F66C removed Detail inspect the structure at the lower edge of the surround for signs of corrosion using a borescope probe inserted through the lightening holes in the intercostal. 8 years and then every 4 years.",8 Yr
+ ,5, ,Every 5000 landings or 12 years inspection on Nose landing gear bay sidewalls(SI - 510001),ROU*,0:00,Access: Refer to NTM Technique. Comply with instructions in NTM 53-10-111.,"5000 L
+12 Yr"
+ ,31,"CAR Section 5, Series F ,Part 1",FDR download for Exceedance monitoring.,ROU*,0:00,"Addition in flypal for monitoring,every 3 months.",3 Mt
+ ,5, ,15000 Landings inspection on Horizontal stabilizer top skin 'T' fitting and joint strap at the center line of the stabilizer (SI -550014),ROU*,0:00,"Access: Upper vertical stabilizer removed Detail inspect for cracks and signs of corrosion 15,000 flights and then at every X-Ray inspection of the horizontal stabilizer internal structure (Task No.550013).",15000 L
+ ,55,"Replace any worn bolts. If holes are elongated replace bolts, see SRM 55-10-41. SI -550011","Horizontal stabilizer to vertical stabilizer attachments. Detail inspect the attachment lugs for cracks, signs of corrosion and elongation of the attachment bolt holes.",ROU*,0:00,"16 Years, then every 8 Years",8 Yr
+ ,5, ,"Every 4800 Hours Inspection on Wing bottom skin at attachment to the rear spar, between Rib 1 LH and Rib 1 RH (SI -570025)",ROU*,0:00,"Access: Main landing gear doors open and keel skid fairing in the area of the main landing gear doors removed Detail inspect the skin where it is bolted to the rear spar, between Rib 1 LH and Rib 1 RH.",4800:00 H
+ ,5, ,15 Year Inspection on Horizontal stabilizer (SI -550013),ROU*,0:00,"Access: Refer to relevant NTM Techniques Comply with instructions in: - NTM 55-10-101 - NTM 55-10-102 - NTM 55-10-103 - NTM 55-10-105 Between 15 to 18 years, then every 8 years",15 Yr
+ ,10,"AMM CH 10-10-0, AMP PG 42OF 48",Every 2 Weekly flight ready storage,ROU*,0:00, ,14 Dy
+ ,5,Form No: 900XP/19,"Every 800 Hours Lubrication Inspection - Area --F1,F3,F4,W1/W2,G",ROU*,0:00, ,800:00 H
+ ,28,Form No:900XP/17,Every 4800 Hours or 8 years -Fuel system non-return valves in inner and outer wing:,ROU*,0:00,"Remove and inspect (Ref. AMM 28-20-32, 401) Pay particular attention to the condition of the valve and valve seat.","4800:00 H
+8 Yr"
+ ,5,Form No:900XP/17,Every 8 Year Inspection on Rudder hinge brackets and attachments. (SI-550007),ROU*,0:00,"Access: Rudder and rudder hinge bracket cover plates removed Detail inspect the rudder hinge brackets, using a X 10 magnifier",8 Yr
+ ,5, ,Weight schedule,ROU*,0:00, ,5 Yr
+ ,33,Installation Instructions LSM-500-047 & Installation Instructions LSM-500-042,Nose mounted HID lights & Wing mounted Taxi/ Landing (BOOM BEAM Equipments/ Components),ROU*,0:00,900 hours/1 Year,"900:00 H
+1 Yr"
+ ,5,Form No: 900XP/02,"Every 400 Hours Lubrication Inspection - AreaF1,T1,W1/W2",ROU*,0:00, ,400:00 H
+ ,5, ,15 Year Inspection on Fuselage skin covered by the ventral fuel tank. (If fitted). (SI-530003),ROU*,0:00,"Access: Ventral fuel tank removed. Detail inspect especially for signs of corrosion and deterioration of the protective treatments Detail inspect attachment points and links. Between 15 to 18 years, then every 8 years",15 Yr
+ ,31,"CAR Section-2, Series-I, Part -VI",CVR Annual Inspection,ROU*,0:00, ,12 Mt
+ ,5, ,Every 15 Year Escape hatch (SI -520009),ROU*,0:00,"Access: Trim removed Detail inspect the structure internally and externally for cracks, signs of corrosion and the deterioration of the protective treatment. Between 15 to 18 years, then every 8 years",15 Yr
+ ,5,Form No:900XP/18,Every 4 Year Rudder and Tab inspection (SI - 550004),ROU*,0:00,"Remove (Ref. AMM 27-20-23, 401) Detail inspect. Inspect the bearings for smooth operation and replace as required. Install (Ref. AMM 27-20-23, 401) Every 4 years",4 Yr
+ ,5, ,Every 4 Year Inspection on Rudder (SI-550006),ROU*,0:00,"Access: Refer to NTM Technique. Comply with instructions in NTM 55-40-101. 8 years, then every 4 years.",4 Yr
+ ,5, ,24 Year Inspection on Horizontal stabilizer (SI -550012),ROU*,0:00,"Access: Refer to relevant NTM Techniques Comply with instructions given in one of the methods below: - Fokker Bond Test NTM 55-10-104A - Schlumberger Sonatest NTM 55-10-104B - Staveley Sonic Bondmaster NTM 55-10- 104C. 24 Years, then every 8 Years",24 Yr
+ ,5, ,"Every 4 Year Inspection on Skin exterior under the dorsal intake, forward of Frame 19.(SI-530001)",ROU*,0:00,"Access: Dorsal intake removed. Detail inspect for cracks, signs of corrosion and deterioration of the protective treatment. Detail inspect for chafing rivets. 8 years, then every 4 years.",4 Yr
+ ,5,SI - 570016,Flaps and flap vanes.,ROU*,0:00,"Access: Refer to relevant NTM Technique Inspect hinge brackets for security, freedom from cracks and signs of corrosion Inspect bearings for satisfactory condition and adequate lubrication Comply with instructions in NTM 57-50- 105 and NTM 57-50-106 4800 flying hours or 8 years, whichever is the sooner, then every 2400 flying hours or 4 years","4800:00 H
+8 Yr"
+ ,30,OOPI-300007,Airframe Ice protection,ROU*,0:00,Purge the airplane ice protection system (Schedule Form No: 900XP/04),1 Mt
+ ,5,SI - 570024,"12,000 Hours Inspection on Wing bottom skin at attachment to Rib 1 LH and RH",ROU*,0:00,"Access :As Visible Detail inspect the skin where it is bolted to Rib 1 LH and RH 12,000 flying hours, then every 7200 flying hours",12000:00 H
+ ,101, ,Detailed visual inspection of seat belt and harnesses.,ROU*,0:00, ,6 Mt
+ ,5, ,ELT Annual Inspection,ROU*,0:00, ,12 Mt
+ ,101,Operation circular NO 8 of 2014.,Navigation Database Updates,ROU*,0:00, ,28 Dy
+ ,5, ,15 Year Inspection on Vertical stabilizer.(SI -550010),ROU*,0:00,"Access: Leading edge panels, upper vertical stabilizer and rudder removed Detail inspect the structure rendered visible Detail inspect the rudder hinge brackets for security, cracks and signs of corrosion Comply with instructions in: - NTM 55-30-101 - NTM 55-30-102 - NTM 55-30-103. With the leading edge removed detail inspect the internal structure of the vertical stabilizer for cracks and signs of corrosion using a borescope probe through the access holes in the front spar and through the root rib Between 15 to 18 years, then every 8 years",15 Yr
+ ,5, ,Every 4 Year Inspection on Elevators ( SI-550003 ),ROU*,0:00,"Access: Refer to relevant NTM Technique. Comply with instructions in NTM 55-20- 101 and NTM 55-20-102. If corrosion is found extend the X-Ray coverage until a complete rib bay is found to be free from corrosion. 8 years, then every 4 years.",4 Yr
+ ,24,MMA 24-20-15,"Cabin Inverter (230 VAC) system, Functional Test",ROU*,0:00, ,30 Dy
+ ,5, ,Every 8 Year Inspection on Main Entry Door (SI:520008),ROU*,0:00,"Access: Refer to NTM Technique Comply with instructions in NTM 52-80-102. 12 Years then ,every 8 Years",8 Yr
+ ,57,"OOPI-570029 Ref note 1 & 2 below, 300HRS","Wing Outer, Upper and Lower Skins Visually inspect between Ribs 14 and 16 around the fasteners for cracking in the skins",ROU*,0:00,Note 1: Pay particular attention to those fasteners installed between the front and rear spars Note 2: Applicable to airplanes with BC winglets,300:00 H
+ ,5, ,"15 Year Inspection on Center fuselage structure, above the floor (SI -510010)",ROU*,0:00,"Access: Refer to relevant NTM Techniques Peel back the sound dampening material sufficiently to visually inspect the skin in the vicinity of the fasteners and other attachments. It is not necessary to remove the sound dampening Inspect the skin, as far as is possible, for cracks, signs of corrosion and deterioration of the protective treatment. Comply with instructions in: - NTM 53-10-101. - NTM 53-10-102. - NTM 53-10-103A. - NTM 53-10-104. - NTM 53-10-106. Between 15th to 18th year, of aircraft operation, then every 8 years",15 Yr
+ ,5, ,2400 Hours or 4 year inspection on Ailerons SI - 570015,ROU*,0:00,"Access: Refer to NTM Technique Detail inspect the hinge brackets with a X 10 magnifier. Comply with instructions in NTM 57-50-107 4800 flying hours or 8 years, whichever is the sooner, then every 2400 flying hours or 4 years.","2400:00 H
+4 Yr"
+ ,31,AAC 2 of 2004,Annual FDR READOUT,ROU*,0:00, ,1 Yr
+ ,28, ,Fuel Microbiological test ( MBT ),ROU*,0:00, ,12 Mt
+ ,51,"SI -510007, Access: Refer to NTM Technique. SI -510007 --- Comply with instructions in NTM 53-10-106A.","Center fuselage structure below the floor, frames 8 to 17.",ROU*,0:00,"Between 15 to 18 years, then every 8 years",18 Yr
+ ,5,Routine Inspection - 050370,"3200 Hours D Inspection, D1 to D12 inclusive",ROU*,0:00,Lubrication Inspection - Area F2,3200:00 H
+ ,5,SI-530004,15 Years Inspection on Ventral fuel tank and attachments (If fitted).,ROU*,0:00,"Access: Ventral fuel tank and tank access panels removed 900XP (Ref. AMM 28-10-15) Detail inspect the tank internal structure, skin, access panels, bolts and fasteners, fuel system components and pipelines Pay particular attention to the security of the nylon vent pipes and the integrity of the sealant fillets at the pipe joints Inspect the rubber drain non-return valve in the vent system balance pipe for deterioration and splitting Detail inspect attachment points and links Detail inspect the fuel seal block assembly (P/N: 25- 8PT341-1A) at the ventral tank diaphragm for missing sealer, voids and corrosion Between 15 to 18 years, then every 8 years",18 Yr
+ ,5,SI - 570011,"Wing rear spar, rear face",ROU*,0:00,"Access: Ailerons, aileron shrouds, flaps and airbrakes removed Inspect for cracks, signs of corrosion, distortion and damage Inspect control surface hinge brackets on the rear spar for wear, cracks, signs of corrosion and security Every 4800 flying hours or 8 years, whichever is the sooner, then every 2400 flying hours or 4 years","4800:00 H
+8 Yr"
+ ,5,CAR-M,Airworthiness Review Certificate ( ARC ),ROU*,0:00, ,12 Mt
+ ,5, ,4800 Hours Inspection on Fuselage skin adjacent to cabin window cutouts (SI -530018),ROU*,0:00,"Detail inspect skin. 4800 flying hours,then every 2400 flying hours",4800:00 H
+ ,21,AFMS DOC,"Switches, bleed air over temperature",ROU*,0:00,Kidde Graviner 156D** 53183*,5 Yr
+ ,5, ,Every 4 Year Inspection on Entry door surround (SI-510009),ROU*,0:00,"Access: Panel F66A, F66B, F66C removed Detail inspect the structure at the lower edge of the surround for signs of corrosion using a borescope probe inserted through the lightening holes in the intercostal. 8 years and then every 4 years.",4 Yr
+ ,5,Form No: 900XP/21,"Every 1600 Hours Lubrication Inspection - Area --F1,F2,F3,F4,T1,W1/W2",ROU*,0:00, ,1600:00 H
+ ,34,FAR91.411,ALTIMETER,ROU*,0:00,Functional test,24 Mt
+ ,101,Insurance,Insurance,ROU*,0:00, ,365 Dy
+ ,5, ,Every 4 Year Inspection on Main Landing Gear and sidestay attachment fittings. (SI-570008),ROU*,0:00,"Detail inspect the landing gear pick-up fittings, specially the sidestay pick-up, for cracks, signs of corrosion and signs of movement Make sure the drain holes are unobstructed. Check the tightness of all securing bolts 8 years, then every 4 years.",4 Yr
+ ,25,MMA 25-30-31,Carry out check of Waveguide Moisture Cover. MMA 25-30-31,ROU*,0:00,1500 hours/6 Months (Whichever comes first),"1500:00 H
+6 Mt"
+ ,5,Form No: 900XP/19,Every 800 Hours Inspection B (Consists of Inspection B1 to B12 inclusive),ROU*,0:00, ,800:00 H
+ ,5,Form No:900XP/18,Every 2400 Hours or 4 years Inspection on Ailerons (SI - 570013),ROU*,0:00,"Remove (Ref. AMM 27-10-31, 401) Detail inspect Inspect the bearings for satisfactory condition and make sure there is adequate lubrication (Ref. AMM 125/H-20, 20-09-22, 201). Install (Ref. AMM 27-10-31, 401) Every 2400 flying hours or 4 years, whichever is the sooner.","2400:00 H
+4 Yr"
+ ,5, ,"15 Year Inspection on Center fuselage structure below the floor, nose landing gear bay to Frame 13 and Frames 16 to 19. (SI-510005)",ROU*,0:00,"Access: Refer to relevant NTM Techniques Comply with instructions in: - NTM 53-10-108 - NTM 53-10-107 - NTM 53-10-108B - NTM 53-10-109 Between 15 to 18 years, then every 8 years",15 Yr
+ ,101, ,Insurance,ROU*,0:00, ,1 Yr
+ ,24,"OOPI- 240031,","AC Generator Pad QAD,Inspect AC Generator QAD pad for deformation, cracks or other damage",ROU*,0:00,400 Hrs,400:00 H
+ ,33,Installation Instructions LSM-500-047 & Installation Instructions LSM-500-042,Nose mounted HID lights & Wing mounted Taxi/ Landing (BOOM BEAM Equipments/ Components),ROU*,0:00,1800 hours / 2 year,"1800:00 H
+2 Yr"
+ ,57,"(Ref. SRM 57-41-12, 201)",Carry out Inspection of Wing Leading Edges [570026],ROU*,0:00, ,4 Yr
+ ,25,"Winslow SB-22, AMP Pg 29 of 48",Life raft (Winslow life raft co) Model FA - AV,ROU*,0:00,"Note 1: Life Raft Company model FA-AV (SL), FA-AV (UL), FA-AV (SA), FA-AV (LU) life rafts that are vacuum packed (either new from the factory or items in 1.2 and 1.3, below, retrofitted from an authorized factory service station) must be inspected every three (3) years Note 2: Life Raft Company model FA-AV (), FA-AV(SL), FA-AV(SA) life rafts manufactured after May 1, 2000 must be inspected bi-annually (once every two (2) years) until the fifth (5th) year. At that point hydrostatic testing of the gas cylinder is due. Thereafter, it is necessary to inspect the life raft on a yearly basis - Refer Winslow Life Raft Owner's manual Note 3: Life Raft Company model FA-AV (), FA-AV(SL), FA-AV(SA) life rafts manufactured prior to May 1, 2000 shall be inspected annually to insure its effectiveness, and in order to maintain the life of the products and its contents. Refer Winslow Life Raft Owner's manual",3 Yr
+ ,5, ,Fuselage skin under wing-to-fuselage fairings. (SI-530002),ROU*,0:00,"Access: Panels F124 and F224 removed. Inspect visible areas of skin for cracks and signs of corrosion using flashlight, mirror and borescope probes 8 years, then every 4 years.",8 Yr
+ ,31,"CAR Section-2, Series-I, Part -V",FDR Annual Inspection,ROU*,0:00, ,12 Mt
+ ,5,Form No:900XP/18,Every 4 Year Wing leading edges inspection (SI - 570026),ROU*,0:00,"Access: TKS panels removed (also any material that might interfere with visual inspection). Inspect, specifically rebate area for cracks and signs of corrosion (Ref. SRM 57-41-12, 201). Every 4 Year Inspection",4 Yr
+ ,25,EAM SIL-25-104,"Infant life preserver-01, P/N 0640-101, S/N: 23100380013",ROU*,0:00, ,5 Yr
+ ,34,"CAR Section-8,Series S Part-2 Para 9",HMU or GMU Flight,ROU*,0:00,Monitoring of Height keeping performance,24 Mt
+ ,5,Form No:900XP/18,"Every 2400 Hours or 4 Years inspection on Connecting rods, aileron trim and servo tabs (SI - 570014)",ROU*,0:00,"Lubricate or replace the front and rear rod end bearings, as required (Ref. AMM 125/H-20, 20- 09-22, 201). Apply a coat of silicone lubricant to both exterior surfaces of the bearing at each trim tab connecting rod end (Ref. AMM 27-10-00, 501)","2400:00 H
+4 Yr"
+ ,5,AFMS Chapter 07-001-001,Every 1600 Hours Inspection -Nose landing gear -mechanical indicator system,ROU*,0:00, ,1600:00 H
+ ,5,Form No:900XP/18,Every 4 Year Front face of rear pressure bulkhead inspection (Frame 19). (SI - 530011),ROU*,0:00,Inspect left-hand side of bulkhead with the soundproofing blankets removed. Look for signs of corrosion at the boundary angle to Frame 19 joints Every 4 years,4 Yr
+ ,5,Form No:900XP/18,"Every 4 Year Connecting rods, rudder trim tab and anti-servo tab inspection (SI- 550005)",ROU*,0:00,Inspect the rod end bearings for smooth operation and replace as required. Every 4 years Inspection,4 Yr
+ ,5,"CAR Section-2, Series-X, Part -III",FIRST AID KIT CERTIFICATION,ROU*,0:00, ,12 Mt
+ ,25, ,Every 12 Months Visual IInspection of Life Raft,ROU*,0:00, ,12 Mt
+ ,5, ,"Every 8 Year Inspection on Wing to fuselage attachment links, brackets and bolts. (SI-530007)",ROU*,0:00,"Access: Panels F124, F224, W501 removed. Detail inspect links, brackets and bolts for cracks, signs of corrosion, fretting and wear 12 Years then,every 8 Years",8 Yr
+ ,51,"SI-510005, Comply with instructions in: - NTM 53-10-108 - NTM 53-10-107 - NTM 53-10-108B - NTM 53-10-109.","Center fuselage structure below the floor, nose landing gear bay to Frame 13 and Frames 16 to 19.",ROU*,0:00, ,18 Yr
+ ,5, ,Every 4 Year Inspection on Main landing gear fairing strut. (SI-320028),ROU*,0:00,"strut. Comply with instructions in NTM 32-10-103 8 years, then every 4 years.",4 Yr
+ ,5, ,"Every 4 Year Inspection on Wing bottom skins and stringers between the front and rear spars, Rib 0 to Rib 1 and between the center spar and rear spar from Rib 1 to Rib 4. (SI-570007)",ROU*,0:00,"Access: Refer to NTM Technique Comply with instructions in NTM 57-30-101 Detail inspect the bottom stringers in the vicinity of the wing skin restraint ties with the aid of a flashlight and mirrors 8 years, then every 4 years.",4 Yr
+ ,5,Form No: 900XP/22,Every 3200 Hours Lubrication Inspection - Area F2,ROU*,0:00, ,3200:00 H
+ ,101,Insurance,Insurance,ROU*,0:00, ,1 Yr
+ ,5, ,Every 4 Year Inspection on Main Landing Gear and sidestay attachment fittings.(SI-570008),ROU*,0:00,"Detail inspect the landing gear pick-up fittings, specially the sidestay pick-up, for cracks, signs of corrosion and signs of movement Make sure the drain holes are unobstructed. Check the tightness of all securing bolts 8 years, then every 4 years.",4 Yr
+ ,31,"CAR Section-2, Series-I, Part -V",Sensor calibration of FDR,ROU*,0:00, ,5 Yr
+ ,31,"CAR section 5 , Series F -Part I, App. D",Every 3 Months CVR READOUT,ROU*,0:00, ,3 Mt
+ ,51,Comply with instructions in: - NTM 53-10-101.- NTM 53-10-102. - NTM 53-10-103A.- NTM 53-10-104. - NTM 53-10-106.SI -510010,"Center fuselage structure, above the floor.Access: Refer to relevant NTM Techniques. SI -510010 --- Peel back the sound dampening material sufficiently to visually inspect the skin in the vicinity of the fasteners and other attachments. It is not necessary to remove the sound dampening Inspect the skin, as far as is possible, for cracks, signs of corrosion and deterioration of the protective treatment.",ROU*,0:00,"Between 15th to 18th year, of aircraft operation, then every 8 years",18 Yr
+ ,5, ,Every 20000 landings inspection on Upper canopy rail at intersection with the canopy posts.(SI -510004),ROU*,0:00,Access: Trim and insulation removed Detail inspect,20000 L
+ ,25,EAM SIL-25-104,"Infant life preserver-02, P/N 0640-101, S/N: 23100380014",ROU*,0:00,5 Years,5 Yr
+ ,5, ,16 Year Inspection on Horizontal stabilizer to vertical stabilizer attachments. (SI -550011),ROU*,0:00,"Access: Horizontal stabilizer removed Detail inspect the attachment lugs for cracks, signs of corrosion and elongation of the attachment bolt holes Inspect the bolts for signs of wear or corrosion. Replace any worn bolts. If holes are elongated replace bolts, see SRM 55-10-41. 16 Years, then every 8 Years",16 Yr
+ ,5,SI-320028,Main landing gear fairing strut.,ROU*,0:00,"strut. Comply with instructions in NTM 32-10-103 8 years, then every 4 years.",8 Yr
+ ,5, ,24000 Hours Inspection on Upper surface of the wing bottom skin at the attachment to the centerline joint adjacent to Rib 0. (SI - 570019),ROU*,0:00,"24,000 flying hours and then every 9600 flying hours",24000:00 H
+ ,51,SI-510006,"Structure below escape hatch, Frames 13 to 14. Access: Escape hatch removed, leaded vinyl sleeve peeled back from lower corners of the escape hatch surround to expose the apertures in the surround., Detail inspect Frames 13 and 14, as far as is possible, for signs of corrosion using a borescope probe.",ROU*,0:00,"Between 15 to 18 years, then every 8 years",18 Yr
+ ,5, ,"24000 Hours Inspection on Wing bottom skin at attachment to front spar, between Ribs 1 and 7.(SI-570017)",ROU*,0:00,"Access: As visible. Detail inspect for cracks and signs of corrosion 24,000 flying hours and then every 4800 flying hours",24000:00 H
+ ,5,Form No:900XP/05,Every 2 Year Elevator Inspection (SI - 550015),ROU*,0:00,"Remove and inspect mass balance weight side plates, look for signs of corrosion (Ref. AMM 27-30-91, 601) Remove and inspect mass balance weights, spigots and installation, look for signs of corrosion (Ref. AMM 27-30-91, 601) Assemble the spigots and mass balance weights (Ref. AMM 27-30-91, 601) Apply corrosion preventive compound LPS 3 (AMM 125/H-20, 20-95-11, Item No. 089) or ACF 50 (Ref. AMM 125/H-20, 20-95-11, Item No. 090) (Ref. AMM 27-30-91, 601, Install the side plate assembly (Ref. AMM 27-30-91, 601)",2 Yr
+ ,5, ,"Every 15 Year Inspection on Center fuselage structure below the floor, Frames 13 to 16.(SI -510008)",ROU*,0:00,"Access: Refer to NTM Technique Comply with instructions in NTM 53-10-108A Between 15 to 18 years, then every 8 years",15 Yr
+ ,5,SI-570007,"Wing bottom skins and stringers between the front and rear spars, Rib 0 to Rib 1 and between the center spar and rear spar from Rib 1 to Rib 4.",ROU*,0:00,"Access: Refer to NTM Technique Comply with instructions in NTM 57-30-101 Detail inspect the bottom stringers in the vicinity of the wing skin restraint ties with the aid of a flashlight and mirrors 8 years, then every 4 years.",8 Yr
+ ,34,OOPI-340013,Static Plates and Airframe,ROU*,0:00, ,24 Mt
+ ,49, ,Every 10000 Landings Inspection on Exhaust and inlet doubler frames and stringers (SI-530025),ROU*,0:00,Detail inspect internally and externally for minute cracking conditions or other defects particularly near the exhaust.,10000 L
+ ,101,FAR 91.413,ATC Transponder,ROU*,0:00,Inspection.,24 Mt
+ ,5, ,"1600 Hours C Inspection, C1 to C12 inclusive",ROU*,0:00,"Lubrication Inspection - Area F1,F2,F3,F4,T1,W1/W2",1600:00 H
+ ,5,Form No:900XP/18,Every 4 Year Elevators and Tabs inspection (SI -550001),ROU*,0:00,"Remove elevator (Ref. AMM 27-30-22, 401,) Detail inspect. Inspect the bearings for smooth operation and replace as required Detail inspect the hinge brackets for security and cracks with a X 10 magnifier. Look for signs of corrosion. Install elevator (Ref. AMM 27-30-22, 401,) Every 4 Year Inspection",4 Yr
+ ,55,"Access: Refer to relevant NTM Techniques Comply with instructions in: - NTM 55-10-101 - NTM 55-10-102 - NTM 55-10-103 - NTM 55-10-105 Between 15 years, then every 8 years","Horizontal stabilizer., Access: Refer to relevant NTM Techniques., SI -550013",ROU*,0:00,"Between 15 years, then every 8 years",8 Yr
+ ,5,Form No: 900XP/07,"Every 24 Monhs Lubrication Inspection - Area F1,F2, G",ROU*,0:00, ,24 Mt
+ ,5,Form No:900XP/18,"Every 4 Year Elevator trim tabs, connecting rods inspection (SI - 550002)",ROU*,0:00,"Inspect the rod end bearings for smooth operation and replace as required. Apply a coat of silicone lubricant to both exterior surfaces of the bearing at each connecting rod end (Ref. AMM 27-30-00, 301) Every 4 years",4 Yr
+ ,10, ,2 & 4 Weekly Flight Ready Storage.,ROU*,0:00, ,28 Dy
+ ,5, ,Flight compartment skin and window structure above windshields. (SI-510003),ROU*,0:00,Access: Refer to NTM Technique Comply with instructions in NTM 53-10-105A 12 Years then every 4 Years,12 Yr
+ ,55, ,Every 4 Year inspection on Rudder (SI-550006),ROU*,0:00,"Access: Refer to NTM Technique. Comply with instructions in NTM 55-40-101. 8 years, then every 4 years.",4 Yr
+ ,5,Form No: 900XP/22,Every 3200 Hours Inspection D (Consists of Inspection D1 to D12 inclusive),ROU*,0:00, ,3200:00 H
+ ,5,SI-550003,Elevators.,ROU*,0:00,"Access: Refer to relevant NTM Technique. Comply with instructions in NTM 55-20- 101 and NTM 55-20-102. If corrosion is found extend the X-Ray coverage until a complete rib bay is found to be free from corrosion. 8 years, then every 4 years.",8 Yr
+ ,5, ,Every 2400 Hours 4 Year Inspection on Airbrakes (SI - 570012),ROU*,0:00,"Access: Airbrakes removed. Detail inspect. Inspect the hinges for security. Every 4800 flying hours or 8 years, whichever is the sooner, then every 2400 flying hours or 4 years","2400:00 H
+4 Yr"
+ ,5, ,"2400 Hours or 4 Year inspection on Wing rear spar, rear face (SI - 570011)",ROU*,0:00,"Access: Ailerons, aileron shrouds, flaps and airbrakes removed Inspect for cracks, signs of corrosion, distortion and damage Inspect control surface hinge brackets on the rear spar for wear, cracks, signs of corrosion and security Every 4800 flying hours or 8 years, whichever is the sooner, then every 2400 flying hours or 4 years","2400:00 H
+4 Yr"
+ ,5, ,2400 Hours or 4 Year inspection on Flaps and flap vanes (SI - 570016),ROU*,0:00,"Access: Refer to relevant NTM Technique Inspect hinge brackets for security, freedom from cracks and signs of corrosion Inspect bearings for satisfactory condition and adequate lubrication Comply with instructions in NTM 57-50- 105 and NTM 57-50-106 4800 flying hours or 8 years, whichever is the sooner, then every 2400 flying hours or 4 years","2400:00 H
+4 Yr"
+ ,5, ,Every 4 Year Inspection on Flight compartment skin and window structure above windshields. (SI-510003),ROU*,0:00,Access: Refer to NTM Technique Comply with instructions in NTM 53-10-105A 12 Years then every 4 Years,4 Yr
+ ,5, ,Aeromobile License,ROU*,0:00, ,12 Mt
+ ,101,Insurance,Insurance,ROU*,0:00, ,1 Yr
+ ,5,Form No: 900XP/02,Every 400 Hours Detailed walk-around inspection,ROU*,0:00, ,400:00 H
+ ,5, ,24000 Hours Inspection on Wing bottom skin centerline butt strap and center section beams (24 positions).(SI - 570020),ROU*,0:00,"Access: Refer to NTM Technique. Comply with instructions in NTM 57-00-102. 24,000 flying hours and then every 12,000 flying hours",24000:00 H
+ ,5, ,4800 Hours Inspection on Wing bottom skin (LH and RH) adjacent to flap outboard hinge at Rib 8.(SI -570009),ROU*,0:00,"Access: Hinge fairings, panels W314 and W414, removed Detail inspect for cracks and signs of corrosion 4800 flying hours, then every 1200 flying hours",4800:00 H
+ ,5,AFMS Chapter 07-001-001,Nose landing gear -mechanical indicator system,ROU*,0:00, ,1600:00 H
+ ,5,SI - 570012,Detail inspect Airbrakes,ROU*,0:00,"Access: Airbrakes removed. Detail inspect. Inspect the hinges for security. Every 4800 flying hours or 8 years, whichever is the sooner, then every 2400 flying hours or 4 years","4800:00 H
+8 Yr"
+ ,5, ,Every 10000 Hours Inspection on Engine beam (SI -530016),ROU*,0:00,"Access: Engines and engine main mounting attachment fittings removed (Ref. AMM 71-20-00, 401, 900XP). Detail inspect the multi-layer ends of the beam forming pick-ups for damage, cracks and signs of corrosion using X 10 magnification.",10000:00 H
+ ,5, ,"15 Year Inspection on Structure below escape hatch, Frames 13 to 14. (SI-510006)",ROU*,0:00,"Access: Escape hatch removed, leaded vinyl sleeve peeled back from lower corners of the escape hatch surround to expose the apertures in the surround Detail inspect Frames 13 and 14, as far as is possible, for signs of corrosion using a borescope probe. Between 15 to 18 years, then every 8 years",15 Yr
+ ,101,DGCA/NEW-MISC/03 R1 (FAA AD 74-08-09 R3),Carry out No Smoking placard installation on lavatory door to prevent fires from smoking.,ROU*,0:00, ,1000:00 H
+ ,25, ,"Every 24 months Inspection on Microwave oven Wiring, Chassis, Facia and Door",ROU*,0:00, ,24 Mt
+ ,53,"Between 15 to 18 years, then every 8 years",Inspect Fuselage Skin Covered by the Ventral Fuel Tank or Baggage pannier /EBU (if fitted) [530003],ROU*,0:00,Detail inspect especially for signs of corrosion and deterioration of the protective treatments Detail inspect attachment points and links.,18 Yr
+ ,101,Operation circular NO 8 of 2014,Navigation database updation,ROU*,0:00, ,28 Dy
+ ,5,AFMS Chapter 07-001-001,Lubrication Inspection,ROU*,0:00,This task will be done during the removal of an Engine or a Power Plant.,1200:00 H
+ ,5, ,Every 4 Year Inspection on Main Landing Gear and sidestay attachment fittings.(SI-570008),ROU*,0:00,"Detail inspect the landing gear pick-up fittings, specially the sidestay pick-up, for cracks, signs of corrosion and signs of movement Make sure the drain holes are unobstructed. Check the tightness of all securing bolts 8 years, then every 4 years.",4 Yr
+ ,103, ,AIRCRAFT WEIGHING,ROU*,0:00, ,5 Yr
+ ,23, ,"ELT Monthly Test, (P/N 453-5060)",ROU*,0:00, ,1 Mt
+ ,23,Technical Manual ARTEX 406-N/DGCA,Emergency Locator Transmitter,ROU*,0:00,Functional test,1 Mt
+ ,5, ,"27,000 Landings inspection on Fuselage lap joints (SI -530009)",ROU*,0:00,"Access: Refer to NTM Technique. Comply with instructions in NTM 53-10-104 27,000 flights and then,every 4500 flights",27000 L
+ ,5,SI-530007,"Wing to fuselage attachment links, brackets and bolts.",ROU*,0:00,"Access: Panels F124, F224, W501 removed. Detail inspect links, brackets and bolts for cracks, signs of corrosion, fretting and wear",12 Yr
+ ,53,SI - 530011,Carry out Inspection of Front Face of Rear Pressure Bulkhead (Frame 19). [530011].,ROU*,0:00, ,4 Yr
+ ,34,"CAR Section-8 , Series ""O"" Part-2 Para 7.3.9.",HMU or GMU Flight,ROU*,0:00,HMU or GMU Flight is moniter as per Hour basis since the calender basis is already over due. Note:Monitoring of Height keeping performance. 24 Months/ 1000 FH Whichever is longer (MAAR Requirements).,"1000:00 H
+24 Mt"
+ ,34, ,Nav Data Updation,ROU*,0:00, ,28 Dy
+ ,5,Form no: 900XP/01,Every 200 Hrs Lubrication Inspection- Area G,ROU*,0:00, ,200:00 H
+ ,55,"SI -550010, Comply with instructions in: - NTM 55-30-101 - NTM 55-30-102 - NTM 55-30-103.","Vertical stabilizer. Access: Leading edge panels, upper vertical stabilizer and rudder removed. SI -550010 --- Detail inspect the structure rendered visible. Detail inspect the rudder hinge brackets for security, cracks and signs of corrosion.",ROU*,0:00,"Between 15 years, then every 8 years",8 Yr
+ ,25,Winslow SB-22,Remove Life Raft for recertification and Install serviceable one.LIFE RAFT FWD,ROU*,0:00,"Note 1: Life Raft Company model FA-AV (SL), FA-AV (UL), FA-AV (SA), FA-AV (LU) life rafts that are vacuum packed (either new from the factory or items in 1.2 and 1.3, below, retrofitted from an authorized factory service station) must be inspected every three (3) years Note 2: Life Raft Company model FA-AV (), FA-AV(SL), FA-AV(SA) life rafts manufactured after May 1, 2000 must be inspected bi-annually (once every two (2) years) until the fifth (5th) year. At that point hydrostatic testing of the gas cylinder is due. Thereafter, it is necessary to inspect the life raft on a yearly basis - Refer Winslow Life Raft Owner's manual Note 3: Life Raft Company model FA-AV (), FA-AV(SL), FA-AV(SA) life rafts manufactured prior to May 1, 2000 shall be inspected annually to insure its effectiveness, and in order to maintain the life of the products and its contents. Refer Winslow Life Raft Owner's manual",3 Yr
+ ,5, ,Every 20000 Hours inspection on Rear engine mount fittings.(SI - 530014),ROU*,0:00,Access: Refer to NTM Technique Comply with instructions in NTM 53-10-110A,20000:00 H
+ ,5,Minor Inspection - 050771,y 400 Hour Detailed walk-around inspection,ROU*,0:00, ,400:00 H
+ ,52,"SI-520009,","Escape hatch, Detail inspect the structure internally and externally for cracks, signs of corrosion and the deterioration of the protective treatment., Access: Trim removed.",ROU*,0:00,"Between 15 to 18 years, then every 8 years",18 Yr
+ ,5, ,Every 10000 Hours Inspection on Pylon engine main mounting attachment fittings.(SI -530013),ROU*,0:00,Access: Refer to NTM Technique Comply with instructions in NTM 53-10-110.,10000:00 H
+ ,5, ,Main Landing Gear and sidestay attachment fittings. (SI-570008),ROU*,0:00,"Detail inspect the landing gear pick-up fittings, specially the sidestay pick-up, for cracks, signs of corrosion and signs of movement Make sure the drain holes are unobstructed. Check the tightness of all securing bolts 8 years, then every 4 years.",8 Yr
+ ,5,Form No: 900XP/07,Every 24 Months Inspection F (Consists of Inspection F1 to F12 inclusive),ROU*,0:00, ,24 Mt
+ ,5, ,5000 Landings Inspection on Front pressure bulkhead (SI - 510002),ROU*,0:00,"Access: Sound-proofing blankets removed Detail inspect the upper sidewall beams and the rudder pedal clearance pressings for cracks (Ref. SRM 53-10-11, Front Pressure Bulkhead Pre-Mod. 253090C and Front Pressure Bulkhead Mod. 253090C). Pay special attention to the area in the vicinity of the joint with the canopy center post 5000 flights then every 1000 flights",5000 L
+ ,55,SI -550001,Carry out Inspection of Elevators & Tabs.[550001],ROU*,0:00, ,4 Yr
+ ,5, ,Every 4 Year Inspection on Fuselage skin under wing-to-fuselage fairings.(SI-530002),ROU*,0:00,"Access: Panels F124 and F224 removed. Inspect visible areas of skin for cracks and signs of corrosion using flashlight, mirror and borescope probes 8 years, then every 4 years.",4 Yr
+ ,5, ,Every 8 Years Rudder inspection (SI-550006),ROU*,0:00,"Access: Refer to NTM Technique. Comply with instructions in NTM 55-40-101. 8 years, then every 4 years.",8 Yr
+ ,5, ,Every 30000 Hours Inspection on Vertical stabilizer root attachment to fuselage.(SI - 530015),ROU*,0:00,Access: Refer to NTM Technique. Comply with instructions in NTM 55-30-104.,30000:00 H
+ ,33, ,Inspect Strobe light,ROU*,0:00,Inspect every 400 Hrs/Replace if required.,400:00 H
+ ,5,Form No: 900XP/25,Every 48 Months Inspection G,ROU*,0:00, ,48 Mt
+ ,5, ,"Every 4800 Hours Inspection on Rear spar, rear face between Rib 1 LH and Rib 1 RH.(SI -570022)",ROU*,0:00,"Access: Main landing gear doors and panels W325, W425, W507 and W508 removed Detail inspect the rear face of the rear spar",4800:00 H
+ ,51,"Access: Refer to NTM Technique. SI -510008, Comply with instructions in NTM 53-10-108A","Center fuselage structure below the floor, Frames 13 to 16.",ROU*,0:00, ,18 Yr
+ ,5, ,"Every 15 Year Inspection on ,Center fuselage structure below the floor, frames 8 to 17.(SI -510007)",ROU*,0:00,"Access: Refer to NTM Technique Comply with instructions in NTM 53-10-106A Between 15 to 18 years, then every 8 years",15 Yr
+ ,5,Form No: 900XP/06,Every 12 Months Inspection E (Consists of Inspection E1 to E12 inclusive),ROU*,0:00, ,12 Mt
+ ,5,Form No: 900XP/21,Every 1600 Hours Inspection C (Consists of Inspection C1 to C12 inclusive),ROU*,0:00, ,1600:00 H
+ ,79, ,Within 25 and 30 hours after de-preservation of engine carry out inspection on chip detector and SOAP test,SP1,0:00, ,30:00 H
+ ,32,"AMM 32-20-21, 601",Check clearances of Nose landing gear drag stay OOPI-320029,SP1,0:00,Between 25 to 50 landings from build or after nose landing gear drag stay replacement,50 L

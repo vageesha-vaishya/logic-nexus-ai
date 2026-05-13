@@ -12,11 +12,11 @@ import {
 } from '../../../_utils/http';
 import { sendErrorResponse } from '../../../_utils/errorHandler';
 import {
-  fetchWorkPackageDetail,
-  persistUpdateWorkPackage,
-  persistDeleteWorkPackage,
+  fetchWorkOrderDetail,
+  persistUpdateWorkOrder,
+  persistDeleteWorkOrder,
   type MaintenanceType,
-} from '../work-package-persistence-db';
+} from '../work-order-persistence-db';
 
 function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   const normalized = String(value || '').trim().toLowerCase();
@@ -70,13 +70,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // ── GET: single work order with tasks, materials, events ────────────────
     if (req.method === 'GET') {
-      const detail = await fetchWorkPackageDetail({ id: wpId, tenantId });
+      const detail = await fetchWorkOrderDetail({ id: wpId, tenantId });
       if (!detail) {
         res.status(404).json({ error: 'Work order not found', version: 'v2', correlationId: ctx.correlationId });
         return;
       }
 
-      const wp = detail.workPackage;
+      const wp = detail.workOrder;
 
       res.status(200).json({
         version: 'v2',
@@ -84,7 +84,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           id: wp.id,
-          work_order_number: wp.work_package_number,
+          work_order_number: wp.work_order_number || wp.work_order_number,
           title: wp.title,
           aircraft_id: wp.aircraft_id,
           description: wp.description,
@@ -174,7 +174,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         throw new Error('No valid fields to update');
       }
 
-      const updated = await persistUpdateWorkPackage({
+      const updated = await persistUpdateWorkOrder({
         id: wpId,
         tenantId,
         userId: authUser.userId,
@@ -187,7 +187,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           id: updated.id,
-          work_order_number: updated.work_package_number,
+          work_order_number: updated.work_order_number || updated.work_order_number,
           status: updated.status,
           updated_at: updated.updated_at,
         },
@@ -198,18 +198,18 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     // ── DELETE: delete work order ───────────────────────────────────────────
     if (req.method === 'DELETE') {
       // Verify exists first
-      const detail = await fetchWorkPackageDetail({ id: wpId, tenantId });
+      const detail = await fetchWorkOrderDetail({ id: wpId, tenantId });
       if (!detail) {
         res.status(404).json({ error: 'Work order not found', version: 'v2', correlationId: ctx.correlationId });
         return;
       }
 
       // Prevent deletion of completed/closed work orders
-      if (['completed', 'closed'].includes(detail.workPackage.status)) {
+      if (['completed', 'closed'].includes(detail.workOrder.status)) {
         throw new Error('Cannot delete a completed or closed work order');
       }
 
-      await persistDeleteWorkPackage({ id: wpId, tenantId });
+      await persistDeleteWorkOrder({ id: wpId, tenantId });
 
       res.status(200).json({
         version: 'v2',

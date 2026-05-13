@@ -168,18 +168,18 @@
 src/features/module-amro/components/
 ├── work-orders/
 │   ├── AmroWorkOrdersListPage.tsx              ✅ Existing
-│   ├── AmroWorkPackageDetailPage.tsx            ✅ Existing
+│   ├── AmroWorkOrderDetailPage.tsx            ✅ Existing
 │   ├── AmroEmergencyQuickAccessPanel.tsx        ✅ NEW
 │   ├── AmroNonScheduledTaskPanel.tsx            ✅ NEW
 │   ├── AmroComplianceDashboard.tsx              ✅ NEW
-│   ├── useWorkPackageState.ts                   ✅ Existing
+│   ├── useWorkOrderState.ts                   ✅ Existing
 │   ├── useTemplateVersionState.ts               ✅ NEW
 │   ├── useEmergencyWPState.ts                   ✅ NEW
 │   ├── useNonScheduledTaskState.ts              ✅ NEW
 │   ├── useComplianceState.ts                    ✅ NEW
 │   └── index.ts                                 ✅ UPDATED
 └── templates/
-    ├── AmroWorkPackageTemplateAdapter.tsx       ✅ Existing
+    ├── AmroWorkOrderTemplateAdapter.tsx       ✅ Existing
     ├── AmroTemplateVersionManager.tsx           ✅ NEW
     └── index.ts                                 ✅ NEW
 ```
@@ -272,7 +272,7 @@ import { AmroNonScheduledTaskPanel } from '@/features/module-amro/components/wor
 import { AmroComplianceDashboard } from '@/features/module-amro/components/work-orders';
 
 // In work package detail page
-<AmroComplianceDashboard workPackageId="uuid" />
+<AmroComplianceDashboard workOrderId="uuid" />
 ```
 
 ---

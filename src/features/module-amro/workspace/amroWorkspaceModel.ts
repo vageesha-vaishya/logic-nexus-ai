@@ -1,6 +1,6 @@
 export type AmroAssetType = 'aircraft' | 'engine' | 'serialized_component' | 'heavy_asset';
 
-export type AmroWorkPackageLifecycleStage = 'create' | 'plan' | 'schedule' | 'execute' | 'blocked' | 'close';
+export type AmroWorkOrderLifecycleStage = 'create' | 'plan' | 'schedule' | 'execute' | 'blocked' | 'close';
 
 export type AmroAuthorityLevel = 'technician' | 'supervisor' | 'engineering' | 'qa' | 'compliance';
 
@@ -18,17 +18,17 @@ export type AmroAssetRegistryRecord = {
 
 export type AmroTask = {
   id: string;
-  workPackageId: string;
+  workOrderId: string;
   title: string;
-  lifecycleStage: AmroWorkPackageLifecycleStage;
+  lifecycleStage: AmroWorkOrderLifecycleStage;
   assignedRole: 'planner' | 'technician' | 'inspector';
   completed: boolean;
 };
 
-export type AmroWorkPackage = {
+export type AmroWorkOrder = {
   id: string;
   packageNumber: string;
-  lifecycleStage: AmroWorkPackageLifecycleStage;
+  lifecycleStage: AmroWorkOrderLifecycleStage;
   assetId: string;
   tasks: AmroTask[];
 };
@@ -51,7 +51,7 @@ export type AmroComplianceRulePack = {
 
 export type AmroEvidenceRecord = {
   id: string;
-  entityType: 'work_package' | 'task' | 'inspection' | 'release';
+  entityType: 'work_order' | 'task' | 'inspection' | 'release';
   entityId: string;
   hash: string;
   immutable: boolean;
@@ -79,11 +79,11 @@ export type AmroPredictiveRecommendation = {
   recommendation: string;
 };
 
-const lifecycleOrder: AmroWorkPackageLifecycleStage[] = ['create', 'plan', 'schedule', 'execute', 'close'];
+const lifecycleOrder: AmroWorkOrderLifecycleStage[] = ['create', 'plan', 'schedule', 'execute', 'close'];
 
-export function canTransitionWorkPackageLifecycle(
-  current: AmroWorkPackageLifecycleStage,
-  next: AmroWorkPackageLifecycleStage
+export function canTransitionWorkOrderLifecycle(
+  current: AmroWorkOrderLifecycleStage,
+  next: AmroWorkOrderLifecycleStage
 ): boolean {
   if (next === 'blocked') {
     return current !== 'close';
@@ -97,9 +97,9 @@ export function canTransitionWorkPackageLifecycle(
   return nextIndex === currentIndex || nextIndex === currentIndex + 1;
 }
 
-export function getNextWorkPackageLifecycleStage(
-  current: AmroWorkPackageLifecycleStage
-): AmroWorkPackageLifecycleStage {
+export function getNextWorkOrderLifecycleStage(
+  current: AmroWorkOrderLifecycleStage
+): AmroWorkOrderLifecycleStage {
   if (current === 'blocked') return 'execute';
   const currentIndex = lifecycleOrder.indexOf(current);
   if (currentIndex < 0 || currentIndex === lifecycleOrder.length - 1) return 'close';

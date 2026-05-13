@@ -11,10 +11,13 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { authMiddleware, AuthRequest, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware';
 import masterDataRoutes from './routes/master-data.routes';
 import workOrdersRoutes from './routes/work-orders.routes';
-import workPackageTemplateRoutes from './routes/work-package-template.routes';
+import workOrderTemplateRoutes from './routes/work-order-template.routes';
 import partsRoutes from './routes/parts.routes';
 import itemMasterRoutes from './routes/item-master.routes';
 import mpdRoutes from './routes/mpd.routes';
+import directivesRoutes from './routes/directives.routes';
+import configureMpdRoutes from './routes/configure-mpd.routes';
+import configureDirectivesRoutes from './routes/configure-directives.routes';
 import stockLedgerRoutes from './routes/stock-ledger.routes';
 import enterpriseRoutes from './routes/enterprise.routes';
 import { ErrorResponse } from './types/amro.types';
@@ -24,6 +27,17 @@ import { executeWithResilience, getResilienceStatus } from './utils/resilience';
 
 const app: Express = express();
 type JsonRecord = Record<string, unknown>;
+type PilotLookupRow = {
+  user_id: string;
+  display_name: string;
+  email: string;
+};
+type AirportLookupRow = {
+  id: string;
+  name: string;
+  icao_code: string;
+  iata_code?: string | null;
+};
 
 function resolveContractsDir(): string {
   const candidates = [
@@ -39,8 +53,8 @@ function resolveContractsDir(): string {
 }
 
 const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
-  work_package_master: ['work_packages'],
-  materials_inventory: ['parts_inventory', 'work_package_materials'],
+  work_order_master: ['work_orders'],
+  materials_inventory: ['parts_inventory', 'amro_work_order_materials', 'work_order_materials'],
   compliance_gates: ['compliance_records', 'compliance_obligations'],
   integration_logs: ['integration_jobs', 'webhook_outbox'],
   forecast_recommendations: ['forecast_outputs', 'forecast_decisions'],
@@ -655,15 +669,15 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
     if (req.method === 'GET' && interfaceName === 'load-kpi-dashboard') {
       const dateRange = parseDateRange(req.query.date_range);
       const dataIssues: string[] = [];
-      const [workPackageRows, materialsRows, complianceRows, integrationRows, forecastRows] = await Promise.all([
-        fetchScopedRows('work_package_master', tenantId, 200, dataIssues),
+      const [workOrderRows, materialsRows, complianceRows, integrationRows, forecastRows] = await Promise.all([
+        fetchScopedRows('work_order_master', tenantId, 200, dataIssues),
         fetchScopedRows('materials_inventory', tenantId, 200, dataIssues),
         fetchScopedRows('compliance_gates', tenantId, 200, dataIssues),
         fetchScopedRows('integration_logs', tenantId, 200, dataIssues),
         fetchScopedRows('forecast_recommendations', tenantId, 200, dataIssues),
       ]);
 
-      const filteredWorkPackages = workPackageRows.filter((row) => {
+      const filteredWorkOrders = workOrderRows.filter((row) => {
         const planner = getStringValue(row, ['planner_id', 'assigned_planner_id', 'assigned_to']);
         const engineer = getStringValue(row, ['engineer_id', 'assigned_engineer_id', 'lead_engineer_id']);
         const plannerPass = !plannerId || planner === plannerId;
@@ -671,8 +685,8 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
         return plannerPass && engineerPass;
       });
       const now = Date.now();
-      const activeWorkPackages = filteredWorkPackages.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
-      const overdueTasks = filteredWorkPackages.filter((row) => {
+      const activeWorkOrders = filteredWorkOrders.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
+      const overdueTasks = filteredWorkOrders.filter((row) => {
         const dueMs = parseDateMs(getStringValue(row, ['due_at', 'planned_end_at', 'target_end_at', 'planned_end', 'scheduled_end_at']));
         return Number.isFinite(dueMs) && dueMs < now && !isResolvedStatus(resolveStatus(row));
       }).length;
@@ -681,7 +695,7 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
       const forecastRecommendations = forecastRows
         .map((row) => ({
           recommendation_id: getStringValue(row, ['id', 'recommendation_id'], 'forecast'),
-          work_package_id: getStringValue(row, ['work_package_id', 'package_id'], 'unknown-work-package'),
+          work_order_id: getStringValue(row, ['work_order_id', 'package_id'], 'unknown-work-order'),
           recommendation: getStringValue(row, ['recommendation', 'action', 'suggested_action'], 'Review intervention plan'),
           confidence_pct: Math.round(normalizePercent(getNumericValue(row, ['confidence_pct', 'confidence_score'], 0)) * 10) / 10,
           risk_score: Math.round(normalizePercent(getNumericValue(row, ['risk_score', 'risk_pct'], 0)) * 10) / 10,
@@ -692,9 +706,9 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
       const forecastAccuracy = forecastRecommendations.length
         ? forecastRecommendations.reduce((sum, item) => sum + item.confidence_pct, 0) / forecastRecommendations.length
         : 0;
-      const workPackageOverview = filteredWorkPackages.slice(0, 15).map((row) => ({
-        work_package_id: getStringValue(row, ['id', 'work_package_id', 'code', 'work_package_number'], 'unknown-work-package'),
-        title: getStringValue(row, ['title', 'name', 'description', 'work_package_number'], 'Untitled work package'),
+      const workOrderOverview = filteredWorkOrders.slice(0, 15).map((row) => ({
+        work_order_id: getStringValue(row, ['id', 'work_order_id', 'code', 'work_order_number', 'work_order_number'], 'unknown-work-order'),
+        title: getStringValue(row, ['title', 'name', 'description', 'work_order_number', 'work_order_number'], 'Untitled work package'),
         status: resolveStatus(row) || 'unknown',
         planner_id: getStringValue(row, ['planner_id', 'assigned_planner_id', 'assigned_to'], 'unassigned'),
         engineer_id: getStringValue(row, ['engineer_id', 'assigned_engineer_id', 'lead_engineer_id'], 'unassigned'),
@@ -759,20 +773,20 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
         },
         output: {
           executive_summary: {
-            active_work_packages: activeWorkPackages,
+            active_work_orders: activeWorkOrders,
             overdue_tasks: overdueTasks,
             compliance_status_pct: Math.round(compliancePct * 10) / 10,
             forecast_accuracy_pct: Math.round(forecastAccuracy * 10) / 10,
           },
           kpi_cards: [
-            { key: 'open_work_packages', label: 'Open Work Packages', value: activeWorkPackages, trend: activeWorkPackages > 0 ? '+2%' : '0%' },
+            { key: 'open_work_orders', label: 'Open Work Packages', value: activeWorkOrders, trend: activeWorkOrders > 0 ? '+2%' : '0%' },
             { key: 'overdue_tasks', label: 'Overdue Tasks', value: overdueTasks, trend: overdueTasks > 0 ? '+1%' : '0%' },
             { key: 'compliance_status_pct', label: 'Compliance Status %', value: Math.round(compliancePct * 10) / 10, trend: compliancePct >= 95 ? '+0.5%' : '-0.8%' },
             { key: 'forecast_accuracy_pct', label: 'Forecast Accuracy %', value: Math.round(forecastAccuracy * 10) / 10, trend: forecastAccuracy >= 90 ? '+1.2%' : '-0.4%' },
           ],
           risk_heatmap: {
             cells: complianceAttention.slice(0, 8).map((item, index) => ({
-              station: workPackageOverview[index]?.planner_id || stationIds[index] || `${tenantId}:station-${index + 1}`,
+              station: workOrderOverview[index]?.planner_id || stationIds[index] || `${tenantId}:station-${index + 1}`,
               severity: item.status === 'failed' ? 'high' : item.status === 'blocked' ? 'medium' : 'low',
               score: item.status === 'failed' ? 90 : item.status === 'blocked' ? 65 : 30,
             })),
@@ -784,7 +798,7 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
             severity: failure.status === 'timeout' ? 'medium' : 'high',
             message: failure.error_message || `Integration ${failure.integration_id} reported ${failure.status}`,
           })),
-          work_package_overview: workPackageOverview,
+          work_order_overview: workOrderOverview,
           materials_reservation_alerts: materialsAlerts,
           compliance_gate_status: complianceAttention,
           integration_monitor: {
@@ -856,7 +870,7 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
       const certificationQueue = certificationRows
         .map((row) => ({
           certification_id: getStringValue(row, ['id', 'certification_id'], 'unknown-certification'),
-          work_package_id: getStringValue(row, ['work_package_id', 'package_id'], 'unknown-work-package'),
+          work_order_id: getStringValue(row, ['work_order_id', 'package_id'], 'unknown-work-order'),
           authority: getStringValue(row, ['authority', 'certifying_authority', 'regulator'], 'unspecified'),
           status: resolveStatus(row) || 'unknown',
           submitted_at: getStringValue(row, ['submitted_at', 'created_at'], ''),
@@ -876,7 +890,7 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
       const forecastRecommendations = forecastRows
         .map((row) => ({
           recommendation_id: getStringValue(row, ['id', 'recommendation_id'], 'forecast'),
-          work_package_id: getStringValue(row, ['work_package_id', 'package_id'], 'unknown-work-package'),
+          work_order_id: getStringValue(row, ['work_order_id', 'package_id'], 'unknown-work-order'),
           recommendation: getStringValue(row, ['recommendation', 'action', 'suggested_action'], 'Review intervention plan'),
           confidence_pct: Math.round(normalizePercent(getNumericValue(row, ['confidence_pct', 'confidence_score'], 0)) * 10) / 10,
           risk_score: Math.round(normalizePercent(getNumericValue(row, ['risk_score', 'risk_pct'], 0)) * 10) / 10,
@@ -967,8 +981,8 @@ app.all('/api/v2/amro/overview-kpi', authMiddleware as any, async (req: AuthRequ
   }
 });
 
-// GET /api/v2/amro/work-package-template-versions?template_id=uuid
-app.get('/api/v2/amro/work-package-template-versions', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+// GET /api/v2/amro/work-order-template-versions?template_id=uuid
+app.get('/api/v2/amro/work-order-template-versions', authMiddleware as any, async (req: AuthRequest, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
   if (!tenantId) {
@@ -991,7 +1005,7 @@ app.get('/api/v2/amro/work-package-template-versions', authMiddleware as any, as
 
     // Query template versions from database
     const { data: versions, error, count } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('*', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .eq('template_id', templateId)
@@ -1032,7 +1046,7 @@ app.get('/api/v2/amro/work-package-template-versions', authMiddleware as any, as
       },
     });
   } catch (error) {
-    logger.error('work-package-template-versions route error', {
+    logger.error('work-order-template-versions route error', {
       requestId,
       message: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
@@ -1048,8 +1062,8 @@ app.get('/api/v2/amro/work-package-template-versions', authMiddleware as any, as
   }
 });
 
-// POST /api/v2/amro/work-package-template-versions
-app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+// POST /api/v2/amro/work-order-template-versions
+app.post('/api/v2/amro/work-order-template-versions', authMiddleware as any, async (req: AuthRequest, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
   const userId = String(req.userId || req.header('x-user-id') || '').trim();
@@ -1086,7 +1100,7 @@ app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, a
 
     // Verify template exists
     const { data: template, error: templateError } = await supabase
-      .from('work_package_templates')
+      .from('work_order_templates')
       .select('id, tenant_id, franchise_id')
       .eq('id', template_id)
       .eq('tenant_id', tenantId)
@@ -1099,7 +1113,7 @@ app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, a
 
     // Get next version number
     const { data: maxVersion } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('version_number')
       .eq('template_id', template_id)
       .eq('tenant_id', tenantId)
@@ -1138,7 +1152,7 @@ app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, a
     };
 
     const { data: created, error: createError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .insert(versionData)
       .select()
       .single();
@@ -1152,7 +1166,7 @@ app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, a
 
     res.status(201).json({ version: 'v2', correlationId: requestId, output: created });
   } catch (error) {
-    logger.error('work-package-template-version creation error', {
+    logger.error('work-order-template-version creation error', {
       requestId,
       message: error instanceof Error ? error.message : 'Unknown error',
     });
@@ -1160,8 +1174,8 @@ app.post('/api/v2/amro/work-package-template-versions', authMiddleware as any, a
   }
 });
 
-// PUT /api/v2/amro/work-package-template-versions/:id
-app.put('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+// PUT /api/v2/amro/work-order-template-versions/:id
+app.put('/api/v2/amro/work-order-template-versions/:id', authMiddleware as any, async (req: AuthRequest, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
   const userId = String(req.userId || req.header('x-user-id') || '').trim();
@@ -1176,7 +1190,7 @@ app.put('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any
     const supabase = getSupabaseAdminClient();
 
     const { data: existing, error: fetchError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .select('*')
       .eq('id', id)
       .eq('tenant_id', tenantId)
@@ -1199,7 +1213,7 @@ app.put('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any
     }
 
     const { data: updated, error: updateError } = await supabase
-      .from('amro_work_package_template_versions')
+      .from('amro_work_order_template_versions')
       .update(updateData)
       .eq('id', id)
       .eq('tenant_id', tenantId)
@@ -1217,8 +1231,8 @@ app.put('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any
   }
 });
 
-// POST /api/v2/amro/work-package-template-versions/:id/submit
-app.post('/api/v2/amro/work-package-template-versions/:id/submit', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+// POST /api/v2/amro/work-order-template-versions/:id/submit
+app.post('/api/v2/amro/work-order-template-versions/:id/submit', authMiddleware as any, async (req: AuthRequest, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
   const userId = String(req.userId || req.header('x-user-id') || '').trim();
@@ -1232,7 +1246,7 @@ app.post('/api/v2/amro/work-package-template-versions/:id/submit', authMiddlewar
   try {
     const supabase = getSupabaseAdminClient();
 
-    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
+    const { data: existing } = await supabase.from('amro_work_order_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
     if (!existing) {
       res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
       return;
@@ -1242,7 +1256,7 @@ app.post('/api/v2/amro/work-package-template-versions/:id/submit', authMiddlewar
       return;
     }
 
-    const { data: updated } = await supabase.from('amro_work_package_template_versions').update({ status: 'pending_review', submitted_by: userId, submitted_at: new Date().toISOString(), updated_by: userId }).eq('id', id).eq('tenant_id', tenantId).select().single();
+    const { data: updated } = await supabase.from('amro_work_order_template_versions').update({ status: 'pending_review', submitted_by: userId, submitted_at: new Date().toISOString(), updated_by: userId }).eq('id', id).eq('tenant_id', tenantId).select().single();
 
     res.json({ version: 'v2', correlationId: requestId, output: updated });
   } catch (error) {
@@ -1250,8 +1264,8 @@ app.post('/api/v2/amro/work-package-template-versions/:id/submit', authMiddlewar
   }
 });
 
-// POST /api/v2/amro/work-package-template-versions/:id/approve
-app.post('/api/v2/amro/work-package-template-versions/:id/approve', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+// POST /api/v2/amro/work-order-template-versions/:id/approve
+app.post('/api/v2/amro/work-order-template-versions/:id/approve', authMiddleware as any, async (req: AuthRequest, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
   const userId = String(req.userId || req.header('x-user-id') || '').trim();
@@ -1270,7 +1284,7 @@ app.post('/api/v2/amro/work-package-template-versions/:id/approve', authMiddlewa
   try {
     const supabase = getSupabaseAdminClient();
 
-    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
+    const { data: existing } = await supabase.from('amro_work_order_template_versions').select('*').eq('id', id).eq('tenant_id', tenantId).single();
     if (!existing) {
       res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
       return;
@@ -1291,15 +1305,15 @@ app.post('/api/v2/amro/work-package-template-versions/:id/approve', authMiddlewa
       updateData.approved_at = new Date().toISOString();
     }
 
-    const { data: updated } = await supabase.from('amro_work_package_template_versions').update(updateData).eq('id', id).eq('tenant_id', tenantId).select().single();
+    const { data: updated } = await supabase.from('amro_work_order_template_versions').update(updateData).eq('id', id).eq('tenant_id', tenantId).select().single();
     res.json({ version: 'v2', correlationId: requestId, output: updated });
   } catch (error) {
     res.status(500).json({ error: 'Failed to review', statusCode: 500, requestId, version: 'v2' });
   }
 });
 
-// DELETE /api/v2/amro/work-package-template-versions/:id
-app.delete('/api/v2/amro/work-package-template-versions/:id', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+// DELETE /api/v2/amro/work-order-template-versions/:id
+app.delete('/api/v2/amro/work-order-template-versions/:id', authMiddleware as any, async (req: AuthRequest, res: Response) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
   const { id } = req.params;
@@ -1312,7 +1326,7 @@ app.delete('/api/v2/amro/work-package-template-versions/:id', authMiddleware as 
   try {
     const supabase = getSupabaseAdminClient();
 
-    const { data: existing } = await supabase.from('amro_work_package_template_versions').select('id, status').eq('id', id).eq('tenant_id', tenantId).single();
+    const { data: existing } = await supabase.from('amro_work_order_template_versions').select('id, status').eq('id', id).eq('tenant_id', tenantId).single();
     if (!existing) {
       res.status(404).json({ error: 'Version not found', statusCode: 404, requestId, version: 'v2' });
       return;
@@ -1322,7 +1336,7 @@ app.delete('/api/v2/amro/work-package-template-versions/:id', authMiddleware as 
       return;
     }
 
-    await supabase.from('amro_work_package_template_versions').delete().eq('id', id).eq('tenant_id', tenantId);
+    await supabase.from('amro_work_order_template_versions').delete().eq('id', id).eq('tenant_id', tenantId);
     res.json({ version: 'v2', correlationId: requestId, output: { deleted: true, id } });
   } catch (error) {
     res.status(500).json({ error: 'Failed to delete', statusCode: 500, requestId, version: 'v2' });
@@ -1380,9 +1394,9 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
     const rowLimit = parsePositiveInteger(req.query.limit, 120, 10, 250);
     const dataIssues: string[] = [];
 
-    const [aircraftRows, workPackageRowsRaw, flightLogRowsRaw, maintenanceEventRows, materialsRows] = await Promise.all([
+    const [aircraftRows, workOrderRowsRaw, flightLogRowsRaw, maintenanceEventRows, materialsRows] = await Promise.all([
       fetchScopedRows('aircraft', tenantId, rowLimit, dataIssues),
-      fetchScopedRows('work_package_master', tenantId, rowLimit, dataIssues),
+      fetchScopedRows('work_order_master', tenantId, rowLimit, dataIssues),
       fetchScopedRows('flight_logs', tenantId, rowLimit, dataIssues),
       fetchScopedRows('maintenance_events', tenantId, rowLimit, dataIssues),
       fetchScopedRows('materials_inventory', tenantId, rowLimit, dataIssues),
@@ -1400,7 +1414,7 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
       return getStringValue(row, ['aircraft_id']).toLowerCase().includes(aircraftFilter);
     });
 
-    const filteredWorkPackageRows = workPackageRowsRaw.filter((row) => {
+    const filteredWorkOrderRows = workOrderRowsRaw.filter((row) => {
       if (aircraftFilter && !getStringValue(row, ['aircraft_id']).toLowerCase().includes(aircraftFilter)) {
         return false;
       }
@@ -1412,14 +1426,14 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
       return isWithinDueWindow(dueSource, dueWithinDays);
     });
 
-    const mappedMaintenanceSchedule = filteredWorkPackageRows.map((row) => {
+    const mappedMaintenanceSchedule = filteredWorkOrderRows.map((row) => {
       const dueDate = getStringValue(row, ['due_at', 'planned_end', 'planned_start']);
       const status = resolveStatus(row) || 'open';
       return {
-        work_package_id: getStringValue(row, ['id']),
+        work_order_id: getStringValue(row, ['id']),
         aircraft_id: getStringValue(row, ['aircraft_id']),
-        work_package_number: getStringValue(row, ['work_package_number', 'id']),
-        title: getStringValue(row, ['title', 'work_package_number'], 'Maintenance package'),
+        work_order_number: getStringValue(row, ['work_order_number', 'work_order_number', 'id']),
+        title: getStringValue(row, ['title', 'work_order_number', 'work_order_number'], 'Maintenance package'),
         status,
         priority: getStringValue(row, ['priority'], 'medium'),
         due_at: dueDate,
@@ -1464,14 +1478,14 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
     }));
 
     const nowMs = Date.now();
-    const openWorkPackages = filteredWorkPackageRows.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
-    const overdueWorkPackages = filteredWorkPackageRows.filter((row) => {
+    const openWorkOrders = filteredWorkOrderRows.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
+    const overdueWorkOrders = filteredWorkOrderRows.filter((row) => {
       const status = resolveStatus(row);
       if (isResolvedStatus(status)) return false;
       const dueMs = parseDateMs(row.due_at || row.planned_end || row.planned_start);
       return Number.isFinite(dueMs) && dueMs < nowMs;
     }).length;
-    const dueWithinWindow = filteredWorkPackageRows.filter((row) => {
+    const dueWithinWindow = filteredWorkOrderRows.filter((row) => {
       const dueMs = parseDateMs(row.due_at || row.planned_end || row.planned_start);
       if (!Number.isFinite(dueMs)) return false;
       const diffDays = Math.round((dueMs - nowMs) / (24 * 60 * 60 * 1000));
@@ -1483,9 +1497,9 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
     );
     const totalCycles = Math.round(mappedFlightLogs.reduce((sum, row) => sum + Number(row.flight_cycles || 0), 0));
     const complianceReadyPct = normalizePercent(
-      filteredWorkPackageRows.length === 0
+      filteredWorkOrderRows.length === 0
         ? 1
-        : (filteredWorkPackageRows.length - overdueWorkPackages) / filteredWorkPackageRows.length,
+        : (filteredWorkOrderRows.length - overdueWorkOrders) / filteredWorkOrderRows.length,
     );
 
     const flightHoursTrend = buildTrendSeries(filteredFlightLogRows, trendDays <= 7 ? '7d' : trendDays >= 90 ? '90d' : '30d')
@@ -1500,20 +1514,20 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
       }));
 
     const workOrderTotals = {
-      open: filteredWorkPackageRows.filter((row) => resolveStatus(row) === 'open').length,
-      in_progress: filteredWorkPackageRows.filter((row) => resolveStatus(row) === 'in_progress').length,
-      blocked: filteredWorkPackageRows.filter((row) => resolveStatus(row) === 'blocked').length,
-      completed: filteredWorkPackageRows.filter((row) => isResolvedStatus(resolveStatus(row))).length,
+      open: filteredWorkOrderRows.filter((row) => resolveStatus(row) === 'open').length,
+      in_progress: filteredWorkOrderRows.filter((row) => resolveStatus(row) === 'in_progress').length,
+      blocked: filteredWorkOrderRows.filter((row) => resolveStatus(row) === 'blocked').length,
+      completed: filteredWorkOrderRows.filter((row) => isResolvedStatus(resolveStatus(row))).length,
     };
 
     const engineAlerts = [
-      ...(overdueWorkPackages > 0
+      ...(overdueWorkOrders > 0
         ? [
             {
               module: 'engine',
               code: 'ENGINE_OVERDUE_WORK_PACKAGES',
               severity: 'warning',
-              message: `${overdueWorkPackages} engine work packages are overdue`,
+              message: `${overdueWorkOrders} engine work packages are overdue`,
             },
           ]
         : []),
@@ -1595,9 +1609,9 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
       },
       kpis: {
         fleet_size: filteredAircraftRows.length,
-        open_work_packages: openWorkPackages,
+        open_work_orders: openWorkOrders,
         due_within_window: dueWithinWindow,
-        overdue_work_packages: overdueWorkPackages,
+        overdue_work_orders: overdueWorkOrders,
         open_defects: mappedDefectRows.length,
         total_flight_hours: totalFlightHours,
         total_cycles: totalCycles,
@@ -1632,15 +1646,15 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
       flight_logs: mappedFlightLogs.slice(0, 20),
       defect_tracking: mappedDefectRows.slice(0, 20),
       compliance_status: {
-        ready_count: Math.max(0, filteredWorkPackageRows.length - overdueWorkPackages),
-        pending_count: openWorkPackages,
-        overdue_count: overdueWorkPackages,
+        ready_count: Math.max(0, filteredWorkOrderRows.length - overdueWorkOrders),
+        pending_count: openWorkOrders,
+        overdue_count: overdueWorkOrders,
         compliance_pct: Number(complianceReadyPct.toFixed(2)),
       },
       performance_metrics: {
         flight_hours_trend: flightHoursTrend,
         defect_trend: defectTrend,
-        signal_severity_index: Math.min(100, Math.max(0, mappedDefectRows.length * 8 + overdueWorkPackages * 12)),
+        signal_severity_index: Math.min(100, Math.max(0, mappedDefectRows.length * 8 + overdueWorkOrders * 12)),
       },
       alerts: [...engineAlerts, ...componentsAlerts],
       engine_module: moduleSelection === 'engine' || moduleSelection === 'all'
@@ -1650,15 +1664,15 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
               tbo_remaining_hours: Math.max(0, 4200 - totalFlightHours),
               llp_avg_remaining_cycles: Math.max(0, 3000 - totalCycles),
               oil_consumption_lph: Number((0.2 + mappedDefectRows.length * 0.01).toFixed(3)),
-              vibration_ips: Number((0.18 + overdueWorkPackages * 0.02).toFixed(3)),
+              vibration_ips: Number((0.18 + overdueWorkOrders * 0.02).toFixed(3)),
               total_engine_hours: totalFlightHours,
               total_engine_cycles: totalCycles,
             },
             statuses: {
-              tbo: overdueWorkPackages > 0 ? 'warning' : 'normal',
+              tbo: overdueWorkOrders > 0 ? 'warning' : 'normal',
               llp: mappedDefectRows.length > 4 ? 'warning' : 'normal',
               oil_consumption: mappedDefectRows.length > 6 ? 'warning' : 'normal',
-              vibration: overdueWorkPackages > 2 ? 'critical' : 'normal',
+              vibration: overdueWorkOrders > 2 ? 'critical' : 'normal',
             },
             trend: flightHoursTrend,
             lifecycle_management: mappedMaintenanceSchedule.slice(0, 8),
@@ -1670,7 +1684,7 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
               resolution_actions: [],
               resource_allocation: mappedMaintenanceSchedule.slice(0, 4).map((row, index) => ({
                 slot: `SLOT-${index + 1}`,
-                work_package_number: row.work_package_number,
+                work_order_number: row.work_order_number,
                 status: row.status,
               })),
             },
@@ -1678,8 +1692,8 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
             component_monitoring: {
               statuses: {
                 oil: mappedDefectRows.length > 5 ? 'warning' : 'normal',
-                vibration: overdueWorkPackages > 1 ? 'warning' : 'normal',
-                egt_margin: openWorkPackages > 10 ? 'warning' : 'normal',
+                vibration: overdueWorkOrders > 1 ? 'warning' : 'normal',
+                egt_margin: openWorkOrders > 10 ? 'warning' : 'normal',
               },
               realtime_updated_at: new Date().toISOString(),
               source: 'amro-api',
@@ -1692,9 +1706,9 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
               totals: workOrderTotals,
               recent: mappedMaintenanceSchedule.slice(0, 8),
               digital_signature_workflow: {
-                total_required: filteredWorkPackageRows.length,
+                total_required: filteredWorkOrderRows.length,
                 completed: workOrderTotals.completed,
-                pending: Math.max(0, filteredWorkPackageRows.length - workOrderTotals.completed),
+                pending: Math.max(0, filteredWorkOrderRows.length - workOrderTotals.completed),
               },
               parts_tracking: materialsRows.slice(0, 4).map((row) => ({
                 part_number: getStringValue(row, ['part_number']),
@@ -1704,9 +1718,9 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
               })),
             },
             compliance_tracking: {
-              ready_count: Math.max(0, filteredWorkPackageRows.length - overdueWorkPackages),
-              pending_count: openWorkPackages,
-              overdue_count: overdueWorkPackages,
+              ready_count: Math.max(0, filteredWorkOrderRows.length - overdueWorkOrders),
+              pending_count: openWorkOrders,
+              overdue_count: overdueWorkOrders,
               compliance_pct: Number(complianceReadyPct.toFixed(2)),
               ad_sb_tracking: {
                 pending_actions: mappedDefectRows.length,
@@ -1718,12 +1732,12 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
               standards: ['ICAO', 'EASA', 'FAA'],
             },
             performance_analytics: {
-              utilization_pct: Number(Math.min(100, Math.max(0, openWorkPackages * 4.5)).toFixed(2)),
+              utilization_pct: Number(Math.min(100, Math.max(0, openWorkOrders * 4.5)).toFixed(2)),
               anomaly_index: Math.min(100, mappedDefectRows.length * 10),
-              forecast_risk: overdueWorkPackages > 0 ? 'elevated' : 'stable',
+              forecast_risk: overdueWorkOrders > 0 ? 'elevated' : 'stable',
               trend_summary: flightHoursTrend.slice(-6),
               failure_prediction: {
-                risk_band: overdueWorkPackages > 2 ? 'high' : overdueWorkPackages > 0 ? 'medium' : 'low',
+                risk_band: overdueWorkOrders > 2 ? 'high' : overdueWorkOrders > 0 ? 'medium' : 'low',
                 confidence: Number((0.66 + Math.min(0.29, mappedDefectRows.length * 0.02)).toFixed(2)),
               },
             },
@@ -1756,7 +1770,7 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
             },
             statuses: {
               inventory: materialsRows.length > 0 ? 'normal' : 'warning',
-              compliance: overdueWorkPackages > 0 ? 'warning' : 'normal',
+              compliance: overdueWorkOrders > 0 ? 'warning' : 'normal',
             },
             lifecycle_tracking: mappedMaintenanceSchedule.slice(0, 10),
             replacement_history: materialsRows.slice(0, 10).map((row) => ({
@@ -1795,6 +1809,208 @@ app.get('/api/v2/amro/aircraft-dashboard', authMiddleware as any, async (req: Au
   }
 });
 
+app.get('/api/v2/amro/pilot-users', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = String(req.header('x-request-id') || crypto.randomUUID());
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+
+  if (!tenantId) {
+    return res.status(400).json({
+      error: 'Tenant context is required',
+      statusCode: 400,
+      requestId,
+      version: 'v2',
+    });
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+    const { data: customRoleRows, error: customRoleError } = await supabase
+      .from('custom_roles')
+      .select('id, tenant_id, name, is_active')
+      .eq('tenant_id', tenantId);
+    if (customRoleError) {
+      throw new Error(customRoleError.message || 'Failed to load custom crew roles');
+    }
+
+    const activeRoleRows = (customRoleRows || [])
+      .filter((row) => String((row as Record<string, unknown>).tenant_id || '').trim() === tenantId)
+      .filter((row) => (row as Record<string, unknown>).is_active !== false);
+    const pilotRoleIds = activeRoleRows
+      .filter((row) => String((row as Record<string, unknown>).name || '').trim().toLowerCase() === 'pilot')
+      .map((row) => String((row as Record<string, unknown>).id || '').trim())
+      .filter(Boolean);
+    const coPilotRoleIds = activeRoleRows
+      .filter((row) => String((row as Record<string, unknown>).name || '').trim().toLowerCase() === 'co-pilot')
+      .map((row) => String((row as Record<string, unknown>).id || '').trim())
+      .filter(Boolean);
+    const targetRoleIds = Array.from(new Set([...pilotRoleIds, ...coPilotRoleIds]));
+
+    if (!targetRoleIds.length) {
+      return res.status(200).json({
+        version: 'v2',
+        requestId,
+        output: { records: [] as PilotLookupRow[], co_pilot_records: [] as PilotLookupRow[] },
+      });
+    }
+
+    const { data: assignmentRows, error: assignmentError } = await supabase
+      .from('user_custom_roles')
+      .select('user_id, role_id, tenant_id')
+      .eq('tenant_id', tenantId)
+      .in('role_id', targetRoleIds);
+    if (assignmentError) {
+      throw new Error(assignmentError.message || 'Failed to load crew role assignments');
+    }
+
+    const pickUserIdsByRole = (roleIds: string[]) => Array.from(
+      new Set(
+        (assignmentRows || [])
+          .filter((row) => String((row as Record<string, unknown>).tenant_id || '').trim() === tenantId)
+          .filter((row) => roleIds.includes(String((row as Record<string, unknown>).role_id || '').trim()))
+          .map((row) => String((row as Record<string, unknown>).user_id || '').trim())
+          .filter(Boolean),
+      ),
+    );
+    const pilotUserIds = pickUserIdsByRole(pilotRoleIds);
+    const coPilotUserIds = pickUserIdsByRole(coPilotRoleIds);
+    const targetUserIds = Array.from(new Set([...pilotUserIds, ...coPilotUserIds]));
+    if (!targetUserIds.length) {
+      return res.status(200).json({
+        version: 'v2',
+        requestId,
+        output: { records: [] as PilotLookupRow[], co_pilot_records: [] as PilotLookupRow[] },
+      });
+    }
+
+    const { data: profileRows, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, email, is_active')
+      .in('id', targetUserIds);
+    if (profileError) {
+      throw new Error(profileError.message || 'Failed to load crew user profiles');
+    }
+
+    const allCrewRecords: PilotLookupRow[] = (profileRows || [])
+      .filter((row) => (row as Record<string, unknown>).is_active !== false)
+      .map((row) => {
+        const record = row as Record<string, unknown>;
+        const firstName = String(record.first_name || '').trim();
+        const lastName = String(record.last_name || '').trim();
+        const email = String(record.email || '').trim();
+        return {
+          user_id: String(record.id || '').trim(),
+          display_name: `${firstName} ${lastName}`.trim() || email,
+          email,
+        };
+      })
+      .filter((row) => Boolean(row.user_id) && Boolean(row.display_name))
+      .sort((left, right) => left.display_name.localeCompare(right.display_name, undefined, { sensitivity: 'base' }));
+    const pilotRecordSet = new Set(pilotUserIds);
+    const coPilotRecordSet = new Set(coPilotUserIds);
+    const pilotRecords = allCrewRecords.filter((row) => pilotRecordSet.has(row.user_id));
+    const coPilotRecords = allCrewRecords.filter((row) => coPilotRecordSet.has(row.user_id));
+
+    return res.status(200).json({
+      version: 'v2',
+      requestId,
+      output: {
+        records: pilotRecords,
+        co_pilot_records: coPilotRecords,
+      },
+    });
+  } catch (error) {
+    logger.error('pilot-users route error', {
+      requestId,
+      tenantId,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unexpected error',
+      statusCode: 500,
+      requestId,
+      version: 'v2',
+    });
+  }
+});
+
+app.get('/api/v2/amro/airports', authMiddleware as any, async (req: AuthRequest, res: Response) => {
+  const requestId = String(req.header('x-request-id') || crypto.randomUUID());
+  const tenantId = String(req.tenantId || req.header('x-tenant-id') || '').trim();
+  const franchiseId = String(req.header('x-franchise-id') || '').trim();
+  const requestedLimit = Number.parseInt(String(req.query.limit || '500'), 10);
+  const limit = Number.isInteger(requestedLimit) ? Math.min(Math.max(requestedLimit, 1), 500) : 500;
+
+  if (!tenantId) {
+    return res.status(400).json({
+      error: 'Tenant context is required',
+      statusCode: 400,
+      requestId,
+      version: 'v2',
+    });
+  }
+
+  try {
+    const supabase = getSupabaseAdminClient();
+    const normalizeAirportRows = (rows: Record<string, unknown>[]): AirportLookupRow[] =>
+      rows
+        .map((row) => ({
+          id: String(row.id || '').trim(),
+          name: String(row.name || '').trim(),
+          icao_code: String(row.icao_code || '').trim().toUpperCase(),
+          iata_code: String(row.iata_code || '').trim().toUpperCase() || null,
+        }))
+        .filter((row) => Boolean(row.id) && Boolean(row.icao_code));
+
+    let queryBuilder = supabase
+      .from('airports')
+      .select('id,name,icao_code,iata_code')
+      .eq('tenant_id', tenantId);
+    if (franchiseId) {
+      queryBuilder = queryBuilder.or(`franchise_id.is.null,franchise_id.eq.${franchiseId}`);
+    }
+    const { data, error } = await queryBuilder.order('name', { ascending: true }).limit(limit);
+    if (error) {
+      throw new Error(error.message || 'Failed to load airports');
+    }
+    let records = normalizeAirportRows(((data || []) as Record<string, unknown>[]));
+
+    if (!records.length) {
+      logger.warn('No tenant-scoped airports found, falling back to shared airport catalog', {
+        requestId,
+        tenantId,
+      });
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('airports')
+        .select('id,name,icao_code,iata_code')
+        .is('franchise_id', null)
+        .order('name', { ascending: true })
+        .limit(limit);
+      if (fallbackError) {
+        throw new Error(fallbackError.message || 'Failed to load fallback airports');
+      }
+      records = normalizeAirportRows((fallbackData || []) as Record<string, unknown>[]);
+    }
+
+    return res.status(200).json({
+      version: 'v2',
+      requestId,
+      output: { records },
+    });
+  } catch (error) {
+    logger.error('airports route error', {
+      requestId,
+      tenantId,
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+    return res.status(500).json({
+      error: error instanceof Error ? error.message : 'Unexpected error',
+      statusCode: 500,
+      requestId,
+      version: 'v2',
+    });
+  }
+});
+
 // ============================================================================
 // PROTECTED API ROUTES
 // ============================================================================
@@ -1805,13 +2021,16 @@ app.use('/api/v2/amro', authMiddleware);
 
 // Mount work orders routes
 app.use('/api/v1', workOrdersRoutes);
-app.use('/api/v2', workPackageTemplateRoutes);
-app.use('/api/v2/amro', workPackageTemplateRoutes); // Alias for /api/v2/amro/* path prefix
+app.use('/api/v2', workOrderTemplateRoutes);
+app.use('/api/v2/amro', workOrderTemplateRoutes); // Alias for /api/v2/amro/* path prefix
 app.use('/api/v2', workOrdersRoutes);
 app.use('/api/v2', masterDataRoutes);
 app.use('/api/v2', partsRoutes);
 app.use('/api/v2', itemMasterRoutes);
 app.use('/api/v2', mpdRoutes);
+app.use('/api/v2', directivesRoutes);
+app.use('/api/v2', configureMpdRoutes);
+app.use('/api/v2', configureDirectivesRoutes);
 app.use('/api/v2', stockLedgerRoutes);
 
 // Mount enterprise routes
@@ -1836,7 +2055,7 @@ app.use((req: Request, res: Response) => {
 /**
  * Global Error Handler
  */
-app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
+app.use((err: any, req: Request, res: Response, next: NextFunction) => {
   const requestId = req.header('x-request-id') || crypto.randomUUID();
   logger.error('Unhandled error', {
     requestId,
@@ -1849,6 +2068,9 @@ app.use((err: any, req: Request, res: Response, _next: NextFunction) => {
   const statusCode = err.statusCode || 500;
   const code = err.code || 'INTERNAL_SERVER_ERROR';
   const message = err.message || 'An unexpected error occurred';
+  if (res.headersSent) {
+    return next(err);
+  }
 
   res.status(statusCode).json({
     error: message,

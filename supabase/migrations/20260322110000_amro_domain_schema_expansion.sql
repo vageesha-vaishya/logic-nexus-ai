@@ -12,8 +12,8 @@ CREATE TABLE IF NOT EXISTS public.component_positions (
   station_code text,
   installed_at timestamptz NOT NULL DEFAULT now(),
   removed_at timestamptz,
-  installation_work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
-  removal_work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  installation_work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
+  removal_work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   notes text,
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS public.schedules (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
-  work_package_id uuid NOT NULL REFERENCES public.work_packages(id) ON DELETE CASCADE,
+  work_order_id uuid NOT NULL REFERENCES public.work_orders(id) ON DELETE CASCADE,
   aircraft_id uuid REFERENCES public.aircraft(id) ON DELETE SET NULL,
   shift_calendar_id uuid REFERENCES public.shift_calendars(id) ON DELETE SET NULL,
   station_code text NOT NULL,
@@ -67,10 +67,10 @@ CREATE TABLE IF NOT EXISTS public.schedules (
   CONSTRAINT ck_schedules_slot_window CHECK (slot_end > slot_start)
 );
 
-CREATE UNIQUE INDEX IF NOT EXISTS uq_schedules_work_package_slot
-  ON public.schedules(tenant_id, work_package_id, slot_start);
+CREATE UNIQUE INDEX IF NOT EXISTS uq_schedules_work_order_slot
+  ON public.schedules(tenant_id, work_order_id, slot_start);
 CREATE INDEX IF NOT EXISTS idx_schedules_tenant_id ON public.schedules(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_schedules_work_package_id ON public.schedules(work_package_id);
+CREATE INDEX IF NOT EXISTS idx_schedules_work_order_id ON public.schedules(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_schedules_slot_window ON public.schedules(slot_start, slot_end);
 
 CREATE TABLE IF NOT EXISTS public.schedule_constraints (
@@ -172,7 +172,7 @@ CREATE TABLE IF NOT EXISTS public.reservations (
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
   inventory_id uuid NOT NULL REFERENCES public.parts_inventory(id) ON DELETE CASCADE,
-  work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
   reserved_quantity integer NOT NULL CHECK (reserved_quantity > 0),
   status text NOT NULL DEFAULT 'active' CHECK (status IN ('active', 'fulfilled', 'released', 'expired', 'cancelled')),
@@ -185,7 +185,7 @@ CREATE TABLE IF NOT EXISTS public.reservations (
 
 CREATE INDEX IF NOT EXISTS idx_reservations_tenant_id ON public.reservations(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_inventory_id ON public.reservations(inventory_id);
-CREATE INDEX IF NOT EXISTS idx_reservations_work_package_id ON public.reservations(work_package_id);
+CREATE INDEX IF NOT EXISTS idx_reservations_work_order_id ON public.reservations(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_reservations_status ON public.reservations(status);
 
 CREATE TABLE IF NOT EXISTS public.regulator_profiles (
@@ -215,7 +215,7 @@ CREATE TABLE IF NOT EXISTS public.compliance_obligations (
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
   regulator_profile_id uuid REFERENCES public.regulator_profiles(id) ON DELETE SET NULL,
   aircraft_id uuid REFERENCES public.aircraft(id) ON DELETE SET NULL,
-  work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   obligation_code text NOT NULL,
   obligation_type text NOT NULL,
   title text NOT NULL,
@@ -259,7 +259,7 @@ CREATE TABLE IF NOT EXISTS public.certification_actions (
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
   staff_qualification_id uuid NOT NULL REFERENCES public.staff_qualifications(id) ON DELETE CASCADE,
-  work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
   action_type text NOT NULL CHECK (action_type IN ('approve', 'reject', 'defer', 'revoke', 'suspend', 'reinstate')),
   action_status text NOT NULL DEFAULT 'pending' CHECK (action_status IN ('pending', 'executed', 'cancelled')),

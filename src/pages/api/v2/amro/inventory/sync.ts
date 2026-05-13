@@ -285,7 +285,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
           referenced_record_id: referencedRecordId,
           metadata: {
             source_module: 'AMRO',
-            work_package_id: normalized.work_package_id || null,
+            work_order_id: normalized.work_order_id || null,
             external_reference: normalized.referenced_record_id || null,
           },
           created_by: auth.userId,

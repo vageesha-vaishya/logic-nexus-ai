@@ -20,21 +20,21 @@ This document provides a comprehensive analysis and redesign plan for the AMRO W
 
 ### 1.1 Problem Statement
 
-When users click on a work package record from the Work Orders list (via the "View" action), they are navigated to the work package detail page at `/dashboard/amro/work-packages/:id`. On this page, the side navigation menu becomes invisible/inaccessible, breaking the navigation flow and violating responsive design principles.
+When users click on a work package record from the Work Orders list (via the "View" action), they are navigated to the work package detail page at `/dashboard/amro/work-orders/:id`. On this page, the side navigation menu becomes invisible/inaccessible, breaking the navigation flow and violating responsive design principles.
 
 ### 1.2 Root Cause Analysis
 
 After thorough investigation, the following issues were identified:
 
 #### Issue A: Missing DashboardLayout Wrapper
-**File:** `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`
+**File:** `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`
 
-**Problem:** The `AmroWorkPackageDetailPage` component does NOT wrap its content with `<DashboardLayout>`, unlike all other pages in the application.
+**Problem:** The `AmroWorkOrderDetailPage` component does NOT wrap its content with `<DashboardLayout>`, unlike all other pages in the application.
 
 **Evidence:**
 ```typescript
-// AmroWorkPackageDetailPage.tsx - Line 406+
-export function AmroWorkPackageDetailPage() {
+// AmroWorkOrderDetailPage.tsx - Line 406+
+export function AmroWorkOrderDetailPage() {
   // ... component logic
   
   return (
@@ -51,10 +51,10 @@ export function AmroWorkPackageDetailPage() {
 ```typescript
 // AmroWorkOrdersListPage.tsx (via AmroHubVerticalPage)
 <DashboardLayout>
-  <AmroHubVerticalPage moduleKey="work-packages" />
+  <AmroHubVerticalPage moduleKey="work-orders" />
 </DashboardLayout>
 
-// WorkPackagesPage.tsx (Settings)
+// WorkOrdersPage.tsx (Settings)
 <AmroUnifiedPageLayout ...>  // ← Internally uses proper layout structure
 ```
 
@@ -83,7 +83,7 @@ The detail page uses a standalone layout pattern that doesn't integrate with the
 
 ### 1.4 Solution Architecture
 
-**Approach:** Wrap `AmroWorkPackageDetailPage` with `DashboardLayout` and implement persistent sidebar pattern
+**Approach:** Wrap `AmroWorkOrderDetailPage` with `DashboardLayout` and implement persistent sidebar pattern
 
 **Implementation Strategy:**
 1. Add `<DashboardLayout>` wrapper to detail page
@@ -98,11 +98,11 @@ The detail page uses a standalone layout pattern that doesn't integrate with the
 
 ### 2.1 Current Implementation Analysis
 
-**File:** `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`  
+**File:** `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`  
 **Lines:** 484-491
 
 ```typescript
-<Button variant="outline" size="sm" onClick={() => navigate('/dashboard/amro/settings/master-data/work-packages')}>
+<Button variant="outline" size="sm" onClick={() => navigate('/dashboard/amro/settings/master-data/work-orders')}>
   <Pencil className="mr-2 h-4 w-4" />
   Edit (Settings)
 </Button>
@@ -178,8 +178,8 @@ This creates:
 
 1. **Layout Patterns:**
    - ✅ `AmroWorkOrdersListPage` - Uses `AmroModuleSurface`, `AmroStandardToolbar`
-   - ❌ `AmroWorkPackageDetailPage` - Uses custom layout without `DashboardLayout`
-   - ✅ `WorkPackagesPage` (Settings) - Uses `AmroUnifiedPageLayout`
+   - ❌ `AmroWorkOrderDetailPage` - Uses custom layout without `DashboardLayout`
+   - ✅ `WorkOrdersPage` (Settings) - Uses `AmroUnifiedPageLayout`
 
 2. **Component Architecture:**
    - Mixed usage of shadcn/ui components directly vs. AMRO unified wrappers
@@ -283,7 +283,7 @@ xl: 1280px  - Desktop
 ### Phase 1: Critical Fix - Side Menu Visibility (Priority: CRITICAL)
 
 **Files to Modify:**
-1. `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`
+1. `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`
 
 **Changes:**
 - Wrap with `<DashboardLayout>`
@@ -297,8 +297,8 @@ xl: 1280px  - Desktop
 ### Phase 2: Edit Functionality Redesign (Priority: HIGH)
 
 **Files to Modify:**
-1. `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`
-2. `src/features/module-amro/components/work-orders/AmroWorkPackageEditDialog.tsx` (NEW)
+1. `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`
+2. `src/features/module-amro/components/work-orders/AmroWorkOrderEditDialog.tsx` (NEW)
 
 **Changes:**
 - Create inline edit dialog component
@@ -380,18 +380,18 @@ xl: 1280px  - Desktop
 
 ### Work Package Endpoints
 
-#### GET /api/v2/amro/work-packages/:id
+#### GET /api/v2/amro/work-orders/:id
 **Response:**
 ```typescript
 {
   id: string;
-  work_package_number: string;
+  work_order_number: string;
   work_order_number?: string;
   title: string;
   description: string | null;
   aircraft_registration: string | null;
-  status: WorkPackageStatus;
-  priority: WorkPackagePriority;
+  status: WorkOrderStatus;
+  priority: WorkOrderPriority;
   maintenance_type: MaintenanceType;
   assigned_to: string | null;
   planned_start_date: string | null;
@@ -400,21 +400,21 @@ xl: 1280px  - Desktop
   actual_cost: number | null;
   estimated_labor_hours: number | null;
   actual_labor_hours: number | null;
-  tasks: WorkPackageTask[];
-  materials: WorkPackageMaterial[];
+  tasks: WorkOrderTask[];
+  materials: WorkOrderMaterial[];
   maintenance_events: MaintenanceEvent[];
   created_at: string;
   updated_at: string;
 }
 ```
 
-#### PATCH /api/v2/amro/work-packages/:id
+#### PATCH /api/v2/amro/work-orders/:id
 **Request Body:**
 ```typescript
 {
   title?: string;
   description?: string;
-  priority?: WorkPackagePriority;
+  priority?: WorkOrderPriority;
   assigned_to?: string;
   planned_start_date?: string;
   planned_end_date?: string;

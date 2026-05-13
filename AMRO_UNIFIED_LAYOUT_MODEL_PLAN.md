@@ -26,7 +26,7 @@
 |--------|------|----------------|----------------|
 | Aircraft | `/dashboard/amro/aircraft` | `AmroAircraftPage` | Table + Detail Panel |
 | Work Packages Templates | `/dashboard/amro/templates` | `AmroTemplateCatalogPage` | Table + Dropdown Actions |
-| Work Packages | `/dashboard/amro/work-packages` | `AmroWorkOrdersListPage` | Table + Detail Panel |
+| Work Packages | `/dashboard/amro/work-orders` | `AmroWorkOrdersListPage` | Table + Detail Panel |
 | Settings → Aircraft | `/dashboard/amro/settings/master-data/aircraft` | `AmroSettingsMasterDataPage` | Master Data Grid |
 | Settings → Flight Logs | `/dashboard/amro/settings/master-data/flight_logs` | `AmroSettingsMasterDataPage` | Master Data Grid |
 | Settings → Parts Inventory | `/dashboard/amro/settings/master-data/parts_inventory` | `AmroSettingsMasterDataPage` | Master Data Grid |
@@ -38,7 +38,7 @@
 | Settings → Model | `/dashboard/amro/settings/master-data/model` | `AmroSettingsMasterDataPage` | Master Data Grid |
 | Settings → Regulator Profiles | `/dashboard/amro/settings/master-data/regulator_profiles` | `AmroSettingsMasterDataPage` | Master Data Grid |
 | Settings → Shift Calendars | `/dashboard/amro/settings/master-data/shift_calendars` | `AmroSettingsMasterDataPage` | Master Data Grid |
-| Settings → Work Package Templates | `/dashboard/amro/settings/master-data/work_package_templates` | `AmroSettingsMasterDataPage` | Master Data Grid |
+| Settings → Work Package Templates | `/dashboard/amro/settings/master-data/work_order_templates` | `AmroSettingsMasterDataPage` | Master Data Grid |
 
 ---
 
@@ -343,7 +343,7 @@
    - Ensure consistency with new standards
    - Update to use `AmroUnifiedTable`
 
-3. **Work Packages** (`/dashboard/amro/work-packages`)
+3. **Work Packages** (`/dashboard/amro/work-orders`)
    - Keep existing `AmroWorkOrdersListPage`
    - Replace table with `AmroUnifiedTable`
    - Replace actions with `AmroUnifiedActions`

@@ -3,16 +3,16 @@ schema {
 }
 
 type Query {
-  amroWorkPackages: [AmroWorkPackage!]!
+  amroWorkOrders: [AmroWorkOrder!]!
   amroTask(id: ID!): AmroTask
   amroComplianceStatus: AmroComplianceStatus!
 }
 
-type AmroWorkPackage {
+type AmroWorkOrder {
   id: ID!
   code: String!
   title: String!
-  status: AmroWorkPackageStatus!
+  status: AmroWorkOrderStatus!
   tenantId: String!
   franchiseId: String
   domainId: String!
@@ -21,7 +21,7 @@ type AmroWorkPackage {
 
 type AmroTask {
   id: ID!
-  workPackageId: String!
+  workOrderId: String!
   taskCode: String!
   title: String!
   status: AmroTaskStatus!
@@ -42,7 +42,7 @@ type AmroComplianceStatus {
   lastUpdatedAt: String!
 }
 
-enum AmroWorkPackageStatus {
+enum AmroWorkOrderStatus {
   planned
   in_progress
   completed

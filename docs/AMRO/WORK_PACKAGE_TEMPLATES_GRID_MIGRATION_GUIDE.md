@@ -9,7 +9,7 @@
 
 ## Executive Summary
 
-This guide covers the migration from the legacy `AmroWorkPackageTemplatesPage` to the new Enterprise Grid implementation. The migration is designed to be **zero-downtime** with a **feature flag** for gradual rollout.
+This guide covers the migration from the legacy `AmroWorkOrderTemplatesPage` to the new Enterprise Grid implementation. The migration is designed to be **zero-downtime** with a **feature flag** for gradual rollout.
 
 ---
 
@@ -19,7 +19,7 @@ This guide covers the migration from the legacy `AmroWorkPackageTemplatesPage` t
 
 ```
 Legacy Implementation:
-├── AmroWorkPackageTemplatesPage.tsx (776 lines)
+├── AmroWorkOrderTemplatesPage.tsx (776 lines)
 │   ├── Basic table with shadcn Table component
 │   ├── Client-side pagination (20 per page)
 │   ├── Single-column sorting
@@ -139,34 +139,34 @@ function hashCode(str: string): number {
 
 ```typescript
 // src/router/amro-routes.tsx
-import { AmroWorkPackageTemplatesPage } from '@/features/module-amro/templates/AmroWorkPackageTemplatesPage';
-import { AmroWorkPackageTemplatesPageV2 } from '@/features/module-amro/templates/AmroWorkPackageTemplatesPageV2';
+import { AmroWorkOrderTemplatesPage } from '@/features/module-amro/templates/AmroWorkOrderTemplatesPage';
+import { AmroWorkOrderTemplatesPageV2 } from '@/features/module-amro/templates/AmroWorkOrderTemplatesPageV2';
 import { useTemplateGridV2 } from '@/features/feature-flags/template-grid';
 
-function WorkPackageTemplatesRoute() {
+function WorkOrderTemplatesRoute() {
   const useV2 = useTemplateGridV2();
   
-  return useV2 ? <AmroWorkPackageTemplatesPageV2 /> : <AmroWorkPackageTemplatesPage />;
+  return useV2 ? <AmroWorkOrderTemplatesPageV2 /> : <AmroWorkOrderTemplatesPage />;
 }
 
 // Route definition
 {
-  path: 'work-package-templates',
-  element: <WorkPackageTemplatesRoute />,
+  path: 'work-order-templates',
+  element: <WorkOrderTemplatesRoute />,
 }
 ```
 
 ### 3.3 Create V2 Page Component
 
 ```typescript
-// src/features/module-amro/templates/AmroWorkPackageTemplatesPageV2.tsx
+// src/features/module-amro/templates/AmroWorkOrderTemplatesPageV2.tsx
 import { useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AmroModuleSurface } from '@/features/module-amro/components/AmroModuleSurface';
 import {
-  WorkPackageTemplatesGrid,
+  WorkOrderTemplatesGrid,
   GridToolbar,
   TemplateCreateEditDialog,
   TemplatePreviewDialog,
@@ -191,7 +191,7 @@ import {
 } from './hooks';
 import { useTemplateGridStore } from './store';
 
-export function AmroWorkPackageTemplatesPageV2() {
+export function AmroWorkOrderTemplatesPageV2() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const accessToken = session?.access_token || '';
@@ -330,7 +330,7 @@ export function AmroWorkPackageTemplatesPageV2() {
         subtitle="Manage and track maintenance templates"
         breadcrumbs={[
           { label: 'AMRO', href: '/dashboard/amro' },
-          { label: 'Templates', href: '/dashboard/amro/work-package-templates' },
+          { label: 'Templates', href: '/dashboard/amro/work-order-templates' },
         ]}
         actions={
           <div className="flex items-center gap-2">
@@ -383,7 +383,7 @@ export function AmroWorkPackageTemplatesPageV2() {
             ))}
           </div>
         ) : (
-          <WorkPackageTemplatesGrid
+          <WorkOrderTemplatesGrid
             templates={data?.templates || []}
             totalCount={data?.total || 0}
             isLoading={isLoading}
@@ -549,7 +549,7 @@ VITE_TEMPLATE_GRID_V2_ROLLOUT=100
 ### 4.4 Week 4: Cleanup
 
 **Actions**:
-- Remove legacy `AmroWorkPackageTemplatesPage.tsx`
+- Remove legacy `AmroWorkOrderTemplatesPage.tsx`
 - Remove feature flag code
 - Remove environment variable
 - Update documentation
@@ -561,7 +561,7 @@ git tag legacy-template-grid-v1
 git push origin legacy-template-grid-v1
 
 # Remove legacy files
-rm src/features/module-amro/templates/AmroWorkPackageTemplatesPage.tsx
+rm src/features/module-amro/templates/AmroWorkOrderTemplatesPage.tsx
 ```
 
 ---

@@ -13,17 +13,17 @@ import {
 import { sendErrorResponse } from '../../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../../_utils/compatibility-facade';
 import {
-  getRuntimeWorkPackage,
-  isRuntimeWorkPackageDeleted,
-  markRuntimeWorkPackageDeleted,
-  patchRuntimeWorkPackage,
-  upsertRuntimeWorkPackage,
-} from '../work-package-runtime-store';
+  getRuntimeWorkOrder,
+  isRuntimeWorkOrderDeleted,
+  markRuntimeWorkOrderDeleted,
+  patchRuntimeWorkOrder,
+  upsertRuntimeWorkOrder,
+} from '../work-order-runtime-store';
 
-type WorkPackageStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+type WorkOrderStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 
 const ALLOWED_PATCH_FIELDS = new Set(['title', 'priority', 'maintenance_type', 'planned_start', 'planned_end', 'status']);
-const ALLOWED_TRANSITIONS: Record<WorkPackageStatus, ReadonlyArray<WorkPackageStatus>> = {
+const ALLOWED_TRANSITIONS: Record<WorkOrderStatus, ReadonlyArray<WorkOrderStatus>> = {
   planning: ['scheduled', 'blocked', 'cancelled'],
   scheduled: ['in_progress', 'blocked', 'cancelled'],
   in_progress: ['completed', 'blocked', 'cancelled'],
@@ -103,7 +103,7 @@ function parseScopeContext(
   };
 }
 
-function enforceWorkPackageMutationAccess(permissions: string[], role: string): void {
+function enforceWorkOrderMutationAccess(permissions: string[], role: string): void {
   try {
     enforceAnyPermission(permissions || [], ['dashboards.manage', 'reports.manage']);
     return;
@@ -127,7 +127,7 @@ function assertAllowedPatchFields(payload: Record<string, unknown>) {
   }
 }
 
-function parseStatus(value: unknown, fieldName: string): WorkPackageStatus {
+function parseStatus(value: unknown, fieldName: string): WorkOrderStatus {
   const normalized = String(value || '').trim().toLowerCase();
   if (
     normalized === 'planning'
@@ -142,7 +142,7 @@ function parseStatus(value: unknown, fieldName: string): WorkPackageStatus {
   throw new Error(`${fieldName} must be a valid status`);
 }
 
-function buildWorkPackageDetail(id: string, tenantId: string, franchiseId: string | null, userId: string) {
+function buildWorkOrderDetail(id: string, tenantId: string, franchiseId: string | null, userId: string) {
   const nowIso = new Date().toISOString();
   return {
     id,
@@ -197,25 +197,25 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const domainAccess = await enforceAmroDomainAccess(scopedAccess, { correlationId: ctx.correlationId });
     const id = parsePathId(req);
     const scope = { tenantId: scopedAccess.tenantId, franchiseId: scopedAccess.franchiseId };
-    if (isRuntimeWorkPackageDeleted(scope, id) && req.method === 'GET') {
+    if (isRuntimeWorkOrderDeleted(scope, id) && req.method === 'GET') {
       res.status(404).json({
         version: 'v2',
-        interface: 'detail-work-package',
+        interface: 'detail-work-order',
         correlationId: ctx.correlationId,
         error: 'work package not found',
       });
       return;
     }
-    const runtimeRecord = getRuntimeWorkPackage(scope, id);
+    const runtimeRecord = getRuntimeWorkOrder(scope, id);
 
     if (req.method === 'GET') {
-      const detail = runtimeRecord || buildWorkPackageDetail(id, scopedAccess.tenantId, scopedAccess.franchiseId, scopedAccess.userId);
+      const detail = runtimeRecord || buildWorkOrderDetail(id, scopedAccess.tenantId, scopedAccess.franchiseId, scopedAccess.userId);
       res.status(200).json({
         version: 'v2',
-        interface: 'detail-work-package',
+        interface: 'detail-work-order',
         correlationId: ctx.correlationId,
         data: {
-          work_package: detail,
+          work_order: detail,
           domainAccess,
         },
       });
@@ -223,17 +223,17 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     if (req.method === 'DELETE') {
-      enforceWorkPackageMutationAccess(authUser.permissions, authUser.role);
+      enforceWorkOrderMutationAccess(authUser.permissions, authUser.role);
       const payload = parseBody(req.body);
-      const idempotencyKey = parseIdempotencyKey(req, payload, `delete-work-package:${ctx.correlationId}`);
+      const idempotencyKey = parseIdempotencyKey(req, payload, `delete-work-order:${ctx.correlationId}`);
       const scopeContext = parseScopeContext(payload, scopedAccess.tenantId, scopedAccess.franchiseId, authUser.role);
-      markRuntimeWorkPackageDeleted(scope, id);
+      markRuntimeWorkOrderDeleted(scope, id);
       res.status(200).json({
         version: 'v2',
-        interface: 'delete-work-package',
+        interface: 'delete-work-order',
         correlationId: ctx.correlationId,
         data: {
-          work_package_id: id,
+          work_order_id: id,
           deleted: true,
           idempotency_key: idempotencyKey,
           scope_context: scopeContext,
@@ -245,7 +245,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     const payload = parseBody(req.body);
-    const idempotencyKey = parseIdempotencyKey(req, payload, `update-work-package:${ctx.correlationId}`);
+    const idempotencyKey = parseIdempotencyKey(req, payload, `update-work-order:${ctx.correlationId}`);
     const decisionTraceId = String(payload.decision_trace_id || `decision-${ctx.correlationId}`).trim();
     const scopeContext = parseScopeContext(payload, scopedAccess.tenantId, scopedAccess.franchiseId, authUser.role);
     assertAllowedPatchFields(payload);
@@ -256,11 +256,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     }
 
     const { current_status: _currentStatus, ...patchFields } = payload;
-    const ensured = runtimeRecord || upsertRuntimeWorkPackage({
-      ...buildWorkPackageDetail(id, scopedAccess.tenantId, scopedAccess.franchiseId, scopedAccess.userId),
+    const ensured = runtimeRecord || upsertRuntimeWorkOrder({
+      ...buildWorkOrderDetail(id, scopedAccess.tenantId, scopedAccess.franchiseId, scopedAccess.userId),
       status: fromStatus,
     });
-    const patched = patchRuntimeWorkPackage(
+    const patched = patchRuntimeWorkOrder(
       scope,
       id,
       {
@@ -272,10 +272,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     res.status(200).json({
       version: 'v2',
-      interface: 'update-work-package',
+      interface: 'update-work-order',
       correlationId: ctx.correlationId,
       data: {
-        work_package: patched,
+        work_order: patched,
         from_status: fromStatus,
         to_status: toStatus,
         idempotency_key: idempotencyKey,

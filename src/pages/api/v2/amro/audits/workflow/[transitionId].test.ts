@@ -60,8 +60,8 @@ describe('/api/v2/amro/audits/workflow/{transitionId}', () => {
     vi.mocked(fetchWorkflowTransactionLogByTransitionId).mockResolvedValue({
       tx_id: 'wf-tx-1',
       transition_id: 'tx-100',
-      gate_name: 'work-package-transition',
-      input_payload: { work_package_id: 'wp-1' },
+      gate_name: 'work-order-transition',
+      input_payload: { work_order_id: 'wp-1' },
       output_payload: { updated_status: 'completed' },
       tx_timestamp: '2026-03-24T00:00:00.000Z',
       user_ctx: { user_id: 'user-1' },

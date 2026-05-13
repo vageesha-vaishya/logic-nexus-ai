@@ -43,8 +43,8 @@
 | 7 | Model | `/dashboard/amro/settings/master-data/model` | P1 | Medium |
 | 8 | Regulator Profiles | `/dashboard/amro/settings/master-data/regulator-profiles` | P2 | Medium |
 | 9 | Shift Calendars | `/dashboard/amro/settings/master-data/shift-calendars` | P2 | Low |
-| 10 | Work Packages | `/dashboard/amro/settings/master-data/work-packages` | P2 | High |
-| 11 | Work Package Templates | `/dashboard/amro/settings/master-data/work-package_templates` | P2 | High |
+| 10 | Work Packages | `/dashboard/amro/settings/master-data/work-orders` | P2 | High |
+| 11 | Work Package Templates | `/dashboard/amro/settings/master-data/work-order_templates` | P2 | High |
 
 ---
 

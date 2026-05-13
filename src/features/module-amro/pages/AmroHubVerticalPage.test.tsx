@@ -25,21 +25,21 @@ vi.mock('../hooks/useAmroOverviewKpi', () => ({
   useAmroOverviewKpi: () => ({
     dashboard: {
       executive_summary: {
-        active_work_packages: 42,
+        active_work_orders: 42,
         overdue_tasks: 4,
         compliance_status_pct: 97.2,
         forecast_accuracy_pct: 92.4,
       },
       kpi_cards: [
-        { key: 'open_work_packages', label: 'Open Work Packages', value: 42, trend: '+2%' },
+        { key: 'open_work_orders', label: 'Open Work Packages', value: 42, trend: '+2%' },
         { key: 'compliance_risk', label: 'Compliance Risk', value: 1, trend: '-8%' },
       ],
       risk_heatmap: { cells: [] },
       trend_lines: [],
       anomaly_flags: [{ id: 'an-1', metric_key: 'aog_count', severity: 'high', message: 'AOG spike above baseline' }],
-      work_package_overview: [
+      work_order_overview: [
         {
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           title: 'A Check',
           status: 'in_progress',
           planner_id: 'planner-1',
@@ -133,7 +133,7 @@ describe('AmroHubVerticalPage', () => {
       isPlatformAdmin: vi.fn().mockReturnValue(false),
     });
 
-    render(<AmroHubVerticalPage moduleKey="work-packages" />);
+    render(<AmroHubVerticalPage moduleKey="work-orders" />);
 
     expect(screen.getByTestId('amro-owned-workspace')).toBeTruthy();
     expect(screen.queryByText('KPI Deck')).toBeNull();
@@ -144,14 +144,14 @@ describe('AmroHubVerticalPage', () => {
     expect(screen.queryByText('Export KPI Snapshot')).toBeNull();
   });
 
-  it('removes non-work-package operational sections for user persona', () => {
+  it('removes non-work-order operational sections for user persona', () => {
     mockUseDomain.mockReturnValue({ currentDomain: { code: 'AMRO' } });
     mockUseAuth.mockReturnValue({
       hasRole: vi.fn().mockReturnValue(false),
       isPlatformAdmin: vi.fn().mockReturnValue(false),
     });
 
-    render(<AmroHubVerticalPage moduleKey="work-packages" />);
+    render(<AmroHubVerticalPage moduleKey="work-orders" />);
 
     expect(screen.getByTestId('amro-owned-workspace')).toBeTruthy();
     expect(screen.queryByText('Role Controls: anomaly intelligence is hidden for user persona.')).toBeNull();
@@ -165,7 +165,7 @@ describe('AmroHubVerticalPage', () => {
       isPlatformAdmin: vi.fn().mockReturnValue(false),
     });
 
-    render(<AmroHubVerticalPage moduleKey="work-packages" />);
+    render(<AmroHubVerticalPage moduleKey="work-orders" />);
 
     expect(screen.queryByPlaceholderText('planner_id')).toBeNull();
     expect(screen.queryByPlaceholderText('engineer_id')).toBeNull();

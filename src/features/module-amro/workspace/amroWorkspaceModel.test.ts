@@ -4,21 +4,21 @@ import {
   buildMaterialsPlanningSummary,
   buildPredictiveMaintenanceSummary,
   canPerformAuthoritySignOff,
-  canTransitionWorkPackageLifecycle,
-  getNextWorkPackageLifecycleStage,
+  canTransitionWorkOrderLifecycle,
+  getNextWorkOrderLifecycleStage,
 } from './amroWorkspaceModel';
 
 describe('amroWorkspaceModel', () => {
   it('transitions lifecycle only to same or next stage', () => {
-    expect(canTransitionWorkPackageLifecycle('create', 'plan')).toBe(true);
-    expect(canTransitionWorkPackageLifecycle('plan', 'execute')).toBe(false);
-    expect(canTransitionWorkPackageLifecycle('close', 'close')).toBe(true);
+    expect(canTransitionWorkOrderLifecycle('create', 'plan')).toBe(true);
+    expect(canTransitionWorkOrderLifecycle('plan', 'execute')).toBe(false);
+    expect(canTransitionWorkOrderLifecycle('close', 'close')).toBe(true);
   });
 
   it('computes next lifecycle stage', () => {
-    expect(getNextWorkPackageLifecycleStage('create')).toBe('plan');
-    expect(getNextWorkPackageLifecycleStage('schedule')).toBe('execute');
-    expect(getNextWorkPackageLifecycleStage('close')).toBe('close');
+    expect(getNextWorkOrderLifecycleStage('create')).toBe('plan');
+    expect(getNextWorkOrderLifecycleStage('schedule')).toBe('execute');
+    expect(getNextWorkOrderLifecycleStage('close')).toBe('close');
   });
 
   it('validates authority sign-off rules', () => {

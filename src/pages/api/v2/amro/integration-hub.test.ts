@@ -220,7 +220,7 @@ describe('/api/v2/amro/integration-hub', () => {
       body: {
         source_system: 'sap-pm',
         adapter_version: '2.4.1',
-        work_package_id: 'wp-1',
+        work_order_id: 'wp-1',
         financial_posting: { currency: 'USD', amount: 2500 },
       },
       headers: {},
@@ -474,7 +474,7 @@ describe('/api/v2/amro/integration-hub', () => {
       body: {
         source_system: 'sap-pm',
         adapter_version: '2.4.1',
-        work_package_id: 'wp-1',
+        work_order_id: 'wp-1',
         financial_posting: { currency: 'USD', amount: 1200 },
         requested_capabilities: ['cost-posting-v2'],
         partner_capabilities: ['legacy-posting-v1'],
@@ -553,7 +553,7 @@ describe('/api/v2/amro/integration-hub', () => {
         body: {
           source_system: 'sap-pm',
           adapter_version: '2.4.1',
-          work_package_id: 'wp-fixture-fin',
+          work_order_id: 'wp-fixture-fin',
           financial_posting: { currency: 'USD', amount: 3000 },
           schema_version_tag: 'finance.posting.v1',
           requested_capabilities: ['core-sync'],

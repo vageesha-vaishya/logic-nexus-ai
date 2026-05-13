@@ -25,15 +25,15 @@ This caused partial/empty option sets and forced UI fallback to a synthetic "cur
 
 ## Resolution Strategy
 Implemented a dedicated API endpoint as the single source of truth for WPT model options:
-- `GET /api/v2/amro/work-package-templates/model-options`
+- `GET /api/v2/amro/work-order-templates/model-options`
 
 Both runtime paths now consume this endpoint:
-- `AmroWorkPackageTemplateAdapter`
-- `WorkPackageTemplateCreateSection`
+- `AmroWorkOrderTemplateAdapter`
+- `WorkOrderTemplateCreateSection`
 
 ## Implementation Details
 - Added endpoint:
-  - `src/pages/api/v2/amro/work-package-templates/model-options.ts`
+  - `src/pages/api/v2/amro/work-order-templates/model-options.ts`
 - Added:
   - authentication and AMRO domain access checks
   - permission checks

@@ -30,7 +30,7 @@ BEGIN
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'work_package_template_task_templates'
+      AND table_name = 'work_order_template_task_templates'
       AND column_name = 'franchise_id'
   ) INTO v_has_rel_franchise_column;
 
@@ -84,7 +84,7 @@ BEGIN
   END IF;
 
   -- Force-align ALL Deccan tenant WPT records to Deccan Fly scope.
-  UPDATE public.work_package_templates w
+  UPDATE public.work_order_templates w
   SET franchise_id = v_franchise_id
   WHERE w.tenant_id = v_tenant_id
     AND w.deleted_at IS NULL
@@ -92,7 +92,7 @@ BEGIN
 
   -- Force-align relation rows too (if franchise_id exists there).
   IF v_has_rel_franchise_column THEN
-    UPDATE public.work_package_template_task_templates r
+    UPDATE public.work_order_template_task_templates r
     SET franchise_id = v_franchise_id
     WHERE r.tenant_id = v_tenant_id
       AND r.franchise_id IS DISTINCT FROM v_franchise_id;
@@ -103,9 +103,9 @@ BEGIN
     SELECT DISTINCT
       w.id AS template_id,
       r.task_template_id::text AS task_template_id
-    FROM public.work_package_templates w
-    JOIN public.work_package_template_task_templates r
-      ON r.work_package_template_id = w.id
+    FROM public.work_order_templates w
+    JOIN public.work_order_template_task_templates r
+      ON r.work_order_template_id = w.id
      AND r.tenant_id = w.tenant_id
     WHERE w.tenant_id = v_tenant_id
       AND w.deleted_at IS NULL
@@ -126,7 +126,7 @@ BEGIN
         ),
         ''
       ) AS task_template_id
-    FROM public.work_package_templates w
+    FROM public.work_order_templates w
     CROSS JOIN LATERAL jsonb_array_elements(coalesce(w.tasks_json, '[]'::jsonb)) elem
     WHERE w.tenant_id = v_tenant_id
       AND w.deleted_at IS NULL
@@ -157,7 +157,7 @@ BEGIN
     FROM resolved_models
     WHERE model_count = 1
   )
-  UPDATE public.work_package_templates w
+  UPDATE public.work_order_templates w
   SET model_id = s.resolved_model_id,
       updated_at = now()
   FROM single_model_templates s
@@ -167,11 +167,11 @@ BEGIN
     AND w.model_id IS DISTINCT FROM s.resolved_model_id;
 
   -- Keep relation model_id aligned with template model_id.
-  UPDATE public.work_package_template_task_templates r
+  UPDATE public.work_order_template_task_templates r
   SET model_id = w.model_id,
       updated_at = now()
-  FROM public.work_package_templates w
-  WHERE r.work_package_template_id = w.id
+  FROM public.work_order_templates w
+  WHERE r.work_order_template_id = w.id
     AND r.tenant_id = v_tenant_id
     AND w.tenant_id = v_tenant_id
     AND w.franchise_id = v_franchise_id

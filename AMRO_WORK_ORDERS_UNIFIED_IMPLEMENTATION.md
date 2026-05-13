@@ -35,7 +35,7 @@ Implement a unified look and feel for the AMRO → Work Package → Work Order m
 - Shared dialog patterns and form layouts
 
 ### 2. Unified Work Package Detail Page
-**File:** `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`
+**File:** `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`
 
 **Key Features:**
 - ✅ AmroModuleSurface for header section with title, subtitle, and navigation
@@ -57,27 +57,27 @@ Implement a unified look and feel for the AMRO → Work Package → Work Order m
 - Shared color coding for costs and statuses
 
 ### 3. React Query Hooks
-**File:** `src/features/module-amro/components/work-orders/useWorkPackageState.ts`
+**File:** `src/features/module-amro/components/work-orders/useWorkOrderState.ts`
 
 **Status:** ✅ Already aligned with Item Master pattern
 
 **Available Hooks:**
-- `useListWorkPackages()` - List with pagination and filtering
-- `useWorkPackage(id)` - Single item detail
-- `useCreateWorkPackage()` - Create mutation
-- `useUpdateWorkPackage()` - Update mutation
-- `useTransitionWorkPackage()` - Status transition mutation
-- `useDeleteWorkPackage()` - Delete mutation
-- `useWorkPackageActions()` - Cache invalidation helper
+- `useListWorkOrders()` - List with pagination and filtering
+- `useWorkOrder(id)` - Single item detail
+- `useCreateWorkOrder()` - Create mutation
+- `useUpdateWorkOrder()` - Update mutation
+- `useTransitionWorkOrder()` - Status transition mutation
+- `useDeleteWorkOrder()` - Delete mutation
+- `useWorkOrderActions()` - Cache invalidation helper
 
 **TypeScript Types:**
-- `WorkPackageListItem` - List view data
-- `WorkPackageDetail` - Full detail with tasks, materials, events
-- `WorkPackageTask` - Task data structure
-- `WorkPackageMaterial` - Material data structure
+- `WorkOrderListItem` - List view data
+- `WorkOrderDetail` - Full detail with tasks, materials, events
+- `WorkOrderTask` - Task data structure
+- `WorkOrderMaterial` - Material data structure
 - `MaintenanceEvent` - Event timeline data
-- `WorkPackageStatus` - Status enum (8 states)
-- `WorkPackagePriority` - Priority enum (P1-P5)
+- `WorkOrderStatus` - Status enum (8 states)
+- `WorkOrderPriority` - Priority enum (P1-P5)
 - `MaintenanceType` - Type enum (8 types)
 
 ### 4. Barrel Exports
@@ -199,7 +199,7 @@ Exports all components, hooks, and types for external use.
    - Full React Query integration
    - Grid-detail pattern implementation
 
-2. `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`
+2. `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`
    - Refactored to use AmroModuleSurface
    - Enhanced error and loading states
    - Consistent card layouts
@@ -213,7 +213,7 @@ Exports all components, hooks, and types for external use.
    - Testing checklist
 
 ### Unchanged (Already Aligned)
-1. `src/features/module-amro/components/work-orders/useWorkPackageState.ts`
+1. `src/features/module-amro/components/work-orders/useWorkOrderState.ts`
    - React Query hooks already match Item Master pattern
    
 2. `src/features/module-amro/components/work-orders/index.ts`
@@ -260,27 +260,27 @@ import { AmroWorkOrdersListPage } from '@/features/module-amro/components/work-o
 
 ### Import Work Package Detail Page
 ```typescript
-import { AmroWorkPackageDetailPage } from '@/features/module-amro/components/work-orders';
+import { AmroWorkOrderDetailPage } from '@/features/module-amro/components/work-orders';
 ```
 
 ### Use React Query Hooks
 ```typescript
 import {
-  useListWorkPackages,
-  useWorkPackage,
-  useCreateWorkPackage,
-  useDeleteWorkPackage,
-  useWorkPackageActions,
+  useListWorkOrders,
+  useWorkOrder,
+  useCreateWorkOrder,
+  useDeleteWorkOrder,
+  useWorkOrderActions,
 } from '@/features/module-amro/components/work-orders';
 ```
 
 ### Use TypeScript Types
 ```typescript
 import type {
-  WorkPackageListItem,
-  WorkPackageDetail,
-  WorkPackageStatus,
-  WorkPackagePriority,
+  WorkOrderListItem,
+  WorkOrderDetail,
+  WorkOrderStatus,
+  WorkOrderPriority,
   MaintenanceType,
 } from '@/features/module-amro/components/work-orders';
 ```

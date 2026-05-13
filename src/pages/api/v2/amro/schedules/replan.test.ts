@@ -209,9 +209,9 @@ describe('/api/v2/amro/schedules/replan', () => {
         selected_option_id: 'tenant-1-fr-1-replan-opt-1',
         approver_id: 'planner-1',
         reason: 'weather disruption',
-        affected_work_packages: [
-          { work_package_id: 'wp-001', current_state: 'planning' },
-          { work_package_id: 'wp-002', current_state: 'scheduled' },
+        affected_work_orders: [
+          { work_order_id: 'wp-001', current_state: 'planning' },
+          { work_order_id: 'wp-002', current_state: 'scheduled' },
         ],
       },
     };
@@ -221,7 +221,7 @@ describe('/api/v2/amro/schedules/replan', () => {
 
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.interface).toBe('confirm-replan');
-    expect((res.jsonBody as any)?.output?.affected_work_packages?.length).toBe(2);
+    expect((res.jsonBody as any)?.output?.affected_work_orders?.length).toBe(2);
   });
 
   it('rejects replan confirmation for non-approver role', async () => {
@@ -238,7 +238,7 @@ describe('/api/v2/amro/schedules/replan', () => {
         selected_option_id: 'tenant-1-fr-1-replan-opt-2',
         approver_id: 'tech-1',
         reason: 'manual override',
-        affected_work_packages: [{ work_package_id: 'wp-001', current_state: 'planning' }],
+        affected_work_orders: [{ work_order_id: 'wp-001', current_state: 'planning' }],
       },
     };
     const res = createResponse();

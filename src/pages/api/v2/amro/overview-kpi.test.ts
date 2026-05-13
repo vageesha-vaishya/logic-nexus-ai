@@ -178,7 +178,7 @@ describe('/api/v2/amro/overview-kpi', () => {
       validatedAt: '2026-03-21T00:00:00.000Z',
     } as any);
     const tableRows: Record<string, unknown[]> = {
-      work_package_master: [
+      work_order_master: [
         {
           id: 'wp-1',
           title: 'A Check WP',
@@ -228,7 +228,7 @@ describe('/api/v2/amro/overview-kpi', () => {
           confidence_pct: 94,
           risk_score: 88,
           reason: 'Anomaly cluster increased',
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           tenant_id: 'tenant-1',
         },
       ],
@@ -257,7 +257,7 @@ describe('/api/v2/amro/overview-kpi', () => {
       certification_records: [
         {
           id: 'cert-1',
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           authority: 'FAA',
           status: 'pending',
           submitted_at: '2026-03-21T11:00:00.000Z',
@@ -310,7 +310,7 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect((res.jsonBody as any)?.input?.station_ids).toEqual(['tenant-1:station-a', 'tenant-1:station-b']);
     expect((res.jsonBody as any)?.input?.fleet_ids).toEqual(['tenant-1:fleet-a']);
     expect((res.jsonBody as any)?.output).toHaveProperty('executive_summary');
-    expect((res.jsonBody as any)?.output).toHaveProperty('work_package_overview');
+    expect((res.jsonBody as any)?.output).toHaveProperty('work_order_overview');
     expect((res.jsonBody as any)?.output).toHaveProperty('materials_reservation_alerts');
     expect((res.jsonBody as any)?.output).toHaveProperty('compliance_gate_status');
     expect((res.jsonBody as any)?.output).toHaveProperty('integration_monitor');
@@ -355,7 +355,7 @@ describe('/api/v2/amro/overview-kpi', () => {
           date_range_start: '2026-03-01',
           date_range_end: '2026-03-21',
           snapshot_at: '2026-03-21T00:00:00.000Z',
-          open_work_packages: 38,
+          open_work_orders: 38,
           in_progress_tasks: 246,
           deferred_items: 12,
           compliance_alerts: 19,
@@ -389,7 +389,7 @@ describe('/api/v2/amro/overview-kpi', () => {
     await handler(req, res);
 
     expect(res.statusCode).toBe(200);
-    expect((res.jsonBody as any)?.output?.executive_summary?.active_work_packages).toBe(38);
+    expect((res.jsonBody as any)?.output?.executive_summary?.active_work_orders).toBe(38);
     expect((res.jsonBody as any)?.output?.executive_summary?.overdue_tasks).toBe(7);
     expect((res.jsonBody as any)?.output?.risk_heatmap?.cells?.[0]?.station).toContain('tenant-1:station_blr');
     expect((res.jsonBody as any)?.output?.trend_lines?.[0]?.metric_key).toBe('task_completion');
@@ -473,7 +473,7 @@ describe('/api/v2/amro/overview-kpi', () => {
     } as any);
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: createSupabaseFromMock(async (tableName, state) => {
-        if (tableName === 'work_package_master' || tableName === 'work_packages') {
+        if (tableName === 'work_order_master' || tableName === 'work_orders') {
           const hasTenantFilter = state.eqCalls.some((call) => call.column === 'tenant_id');
           if (hasTenantFilter) {
             return {
@@ -520,19 +520,19 @@ describe('/api/v2/amro/overview-kpi', () => {
     expect(res.statusCode).toBe(200);
     const scopeTenantId = (res.jsonBody as any)?.scope?.tenantId || (res.jsonBody as any)?.scope?.tenant_id;
     expect(scopeTenantId).toBe('tenant-dev-local');
-    expect((res.jsonBody as any)?.output?.work_package_overview?.[0]?.work_package_id).toBe('wp-dev-1');
+    expect((res.jsonBody as any)?.output?.work_order_overview?.[0]?.work_order_id).toBe('wp-dev-1');
     expect((res.jsonBody as any)?.output?.data_issues).toContain(
-      'work_package_master: tenant scope fallback applied for non-UUID tenant_id in development'
+      'work_order_master: tenant scope fallback applied for non-UUID tenant_id in development'
     );
   });
 
   it('uses fallback AMRO tables when overview aliases are missing from schema cache', async () => {
     process.env.AMRO_OVERVIEW_KPI_V2_ENABLED = 'true';
     const fallbackRows: Record<string, unknown[]> = {
-      work_packages: [
+      work_orders: [
         {
           id: 'wp-9',
-          work_package_number: 'WP-009',
+          work_order_number: 'WP-009',
           status: 'in_progress',
           due_at: '2026-03-20T05:00:00.000Z',
           planned_end: '2026-03-22T05:00:00.000Z',
@@ -577,14 +577,14 @@ describe('/api/v2/amro/overview-kpi', () => {
           confidence_pct: 91,
           risk_score: 75,
           reason: 'Utilization drift',
-          work_package_id: 'wp-9',
+          work_order_id: 'wp-9',
           tenant_id: 'tenant-1',
         },
       ],
     };
     vi.mocked(getSupabaseAdminClient).mockReturnValue({
       from: createSupabaseFromMock(async (tableName) => {
-        if (['work_package_master', 'materials_inventory', 'compliance_gates', 'integration_logs', 'forecast_recommendations'].includes(tableName)) {
+        if (['work_order_master', 'materials_inventory', 'compliance_gates', 'integration_logs', 'forecast_recommendations'].includes(tableName)) {
           return {
             data: null,
             error: {
@@ -614,7 +614,7 @@ describe('/api/v2/amro/overview-kpi', () => {
 
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.output?.data_issues).toEqual([]);
-    expect((res.jsonBody as any)?.output?.work_package_overview?.[0]?.work_package_id).toBe('wp-9');
+    expect((res.jsonBody as any)?.output?.work_order_overview?.[0]?.work_order_id).toBe('wp-9');
   });
 
   it('returns freshness warning when dashboard cache exceeds stale threshold', async () => {
@@ -724,13 +724,13 @@ describe('/api/v2/amro/overview-kpi', () => {
           id: 'tel-1',
           tenant_id: 'tenant-1',
           recorded_at: new Date().toISOString(),
-          active_work_packages: 21,
+          active_work_orders: 21,
         },
         {
           id: 'tel-2',
           tenant_id: 'tenant-1',
           recorded_at: 'not-a-date',
-          active_work_packages: 11,
+          active_work_orders: 11,
         },
       ],
     };
@@ -744,7 +744,7 @@ describe('/api/v2/amro/overview-kpi', () => {
       method: 'GET',
       query: {
         interface: 'load-operational-trends',
-        metric_key: 'open_work_packages',
+        metric_key: 'open_work_orders',
         window: '7d',
         compare_window: '30d',
       },
@@ -838,7 +838,7 @@ describe('/api/v2/amro/overview-kpi', () => {
       certification_actions: [
         {
           id: 'cert-a',
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           authority: 'FAA',
           certification_status: 'pending',
           submitted_at: '2026-03-21T11:00:00.000Z',
@@ -862,7 +862,7 @@ describe('/api/v2/amro/overview-kpi', () => {
           confidence_pct: 87,
           risk_score: 70,
           reason: 'Lead-time risk',
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           tenant_id: 'tenant-1',
         },
       ],

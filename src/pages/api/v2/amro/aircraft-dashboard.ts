@@ -434,7 +434,7 @@ function buildEngineSnapshot(args: {
 }
 
 function buildComponentsSnapshot(args: {
-  maintenanceRows: Array<{ status: string; compliance_state: string; due_in_days: number | null; title: string; priority: string; aircraft_id: string; work_package_id: string }>;
+  maintenanceRows: Array<{ status: string; compliance_state: string; due_in_days: number | null; title: string; priority: string; aircraft_id: string; work_order_id: string }>;
   defectRows: Array<{ id: string; title: string; status: string; severity: string; due_in_days: number | null; aircraft_id: string; reported_at: string }>;
   rawMaintenanceEvents: JsonRecord[];
   trendDays: number;
@@ -545,7 +545,7 @@ function buildComponentsSnapshot(args: {
       reliability: reliabilityStatus,
     },
     lifecycle_tracking: maintenanceRows.slice(0, 10).map((row) => ({
-      component_id: row.work_package_id,
+      component_id: row.work_order_id,
       aircraft_id: row.aircraft_id,
       title: row.title,
       status: row.status,
@@ -564,7 +564,7 @@ function buildComponentsSnapshot(args: {
 
 function buildEngineOperationsModule(args: {
   engineSnapshot: JsonRecord;
-  maintenanceRows: Array<{ work_package_id: string; work_package_number: string; title: string; status: string; priority: string; due_in_days: number | null; compliance_state: string; due_at: string; aircraft_id: string }>;
+  maintenanceRows: Array<{ work_order_id: string; work_order_number: string; work_order_number?: string; title: string; status: string; priority: string; due_in_days: number | null; compliance_state: string; due_at: string; aircraft_id: string }>;
   aircraftStatusRows: Array<{
     aircraft_id: string;
     registration: string;
@@ -596,7 +596,7 @@ function buildEngineOperationsModule(args: {
   } = args;
   const engineKeywords = ['engine', 'borescope', 'tbo', 'llp', 'hot section', 'compressor', 'turbine'];
   const engineMaintenanceRows = maintenanceRows.filter((row) => {
-    const title = `${parseStringValue(row.title)} ${parseStringValue(row.work_package_number)}`.toLowerCase();
+    const title = `${parseStringValue(row.title)} ${parseStringValue(row.work_order_number || row.work_order_number)}`.toLowerCase();
     return engineKeywords.some((keyword) => title.includes(keyword));
   });
   const selectedMaintenanceRows = (engineMaintenanceRows.length > 0 ? engineMaintenanceRows : maintenanceRows).slice(0, 12);
@@ -691,7 +691,7 @@ function buildEngineOperationsModule(args: {
     const endDate = new Date(startDate.getTime() + (row.priority === 'high' ? 4 : 3) * 60 * 60 * 1000);
     return {
       id: `mw-${index + 1}`,
-      work_package_id: row.work_package_id,
+      work_order_id: row.work_order_id,
       aircraft_id: row.aircraft_id,
       due_at: row.due_at,
       due_in_days: row.due_in_days,
@@ -712,7 +712,7 @@ function buildEngineOperationsModule(args: {
   const capacityPerTeamPerDay = 3;
   const teamDayLoad = new Map<string, number>();
   const conflictRows: Array<{
-    work_package_id: string;
+    work_order_id: string;
     aircraft_id: string;
     conflict_type: string;
     severity: string;
@@ -739,7 +739,7 @@ function buildEngineOperationsModule(args: {
     const capacityExceeded = nextLoad > capacityPerTeamPerDay;
     if (capacityExceeded) {
       conflictRows.push({
-        work_package_id: window.work_package_id,
+        work_order_id: window.work_order_id,
         aircraft_id: window.aircraft_id,
         conflict_type: 'resource_capacity',
         severity: 'warning',
@@ -748,7 +748,7 @@ function buildEngineOperationsModule(args: {
       });
     }
     return {
-      work_package_id: window.work_package_id,
+      work_order_id: window.work_order_id,
       aircraft_id: window.aircraft_id,
       required_skill: window.required_skill,
       assigned_team: selectedTeam,
@@ -771,7 +771,7 @@ function buildEngineOperationsModule(args: {
         return [];
       }
       return [{
-        work_package_id: rightWindow.work_package_id,
+        work_order_id: rightWindow.work_order_id,
         aircraft_id: rightWindow.aircraft_id,
         conflict_type: 'window_overlap',
         severity: 'warning',
@@ -782,10 +782,10 @@ function buildEngineOperationsModule(args: {
   );
   overlapConflicts.forEach((row) => conflictRows.push(row));
   const uniqueConflictRows = conflictRows.filter(
-    (row, index, all) => all.findIndex((candidate) => candidate.work_package_id === row.work_package_id && candidate.conflict_type === row.conflict_type) === index,
+    (row, index, all) => all.findIndex((candidate) => candidate.work_order_id === row.work_order_id && candidate.conflict_type === row.conflict_type) === index,
   );
   const resolutionActions = uniqueConflictRows.map((row) => ({
-    work_package_id: row.work_package_id,
+    work_order_id: row.work_order_id,
     action: row.resolution,
     status: row.auto_resolution_status,
   }));
@@ -793,7 +793,7 @@ function buildEngineOperationsModule(args: {
     const dueDays = row.due_in_days ?? 15;
     const predictionScore = Math.max(0, Math.min(100, 70 - dueDays + (row.priority === 'high' ? 15 : 5)));
     return {
-      work_package_id: row.work_package_id,
+      work_order_id: row.work_order_id,
       title: row.title,
       prediction_score: predictionScore,
       recommendation: predictionScore >= 70 ? 'schedule_now' : predictionScore >= 45 ? 'monitor' : 'defer',
@@ -823,9 +823,9 @@ function buildEngineOperationsModule(args: {
     })),
   };
   const partsTracking = selectedMaintenanceRows.slice(0, 8).map((row, index) => ({
-    work_package_id: row.work_package_id,
+    work_order_id: row.work_order_id,
     part_number: `ENG-PN-${index + 101}`,
-    serial_number: `SN-${row.work_package_id || index + 1}`,
+    serial_number: `SN-${row.work_order_id || index + 1}`,
     quantity_required: row.priority === 'high' ? 2 : 1,
     quantity_issued: ['in_progress', 'completed', 'closed'].includes(row.status.toLowerCase()) ? 1 : 0,
     status: ['in_progress', 'completed', 'closed'].includes(row.status.toLowerCase()) ? 'issued' : 'reserved',
@@ -895,11 +895,11 @@ function buildEngineOperationsModule(args: {
   }));
   const auditTraceId = `amro-eng-${Date.now()}`;
   const validation = {
-    field_validation: selectedMaintenanceRows.every((row) => Boolean(row.work_package_id && row.title)) ? 'passed' : 'failed',
+    field_validation: selectedMaintenanceRows.every((row) => Boolean(row.work_order_id && row.title)) ? 'passed' : 'failed',
     business_rule_validation: uniqueConflictRows.length > 0 ? 'warning' : 'passed',
     rule_violations: uniqueConflictRows.length,
     validation_layers: {
-      schema_validation: selectedMaintenanceRows.every((row) => Boolean(row.work_package_id && row.aircraft_id)) ? 'passed' : 'failed',
+      schema_validation: selectedMaintenanceRows.every((row) => Boolean(row.work_order_id && row.aircraft_id)) ? 'passed' : 'failed',
       business_policy_validation: complianceOverdueCount > 0 ? 'warning' : 'passed',
       operational_safety_validation: anomalyCandidates.length > 0 ? 'warning' : 'passed',
     },
@@ -1073,15 +1073,15 @@ async function loadAircraftRows(supabase: SupabaseClient, tenantId: string, fran
   });
 }
 
-async function loadWorkPackageRows(supabase: SupabaseClient, tenantId: string, franchiseId: string | null, limit: number, stats?: ResilienceStats) {
+async function loadWorkOrderRows(supabase: SupabaseClient, tenantId: string, franchiseId: string | null, limit: number, stats?: ResilienceStats) {
   return selectRowsFromCandidates({
     supabase,
     tenantId,
     franchiseId,
     limit,
     stats,
-    candidateTables: ['work_packages', 'work_package_master'],
-    columns: 'id,aircraft_id,work_package_number,title,status,priority,planned_start,planned_end,due_at,compliance_state,updated_at',
+    candidateTables: ['work_orders', 'work_order_master'],
+    columns: 'id,aircraft_id,work_order_number,title,status,priority,planned_start,planned_end,due_at,compliance_state,updated_at',
   });
 }
 
@@ -1228,7 +1228,7 @@ function buildRoleScopedOutput(args: {
       ...baseOutput,
       manager_summary: {
         fleet_size: Number((allData.kpis as JsonRecord).fleet_size || 0),
-        open_work_packages: Number((allData.kpis as JsonRecord).open_work_packages || 0),
+        open_work_orders: Number((allData.kpis as JsonRecord).open_work_orders || 0),
         compliance_ready_pct: Number((allData.kpis as JsonRecord).compliance_ready_pct || 0),
       },
     };
@@ -1242,7 +1242,7 @@ function buildRoleScopedOutput(args: {
   return {
     aircraft_status: allData.aircraft_status,
     maintenance_schedule: (allData.maintenance_schedule as JsonRecord[]).map((item) => ({
-      work_package_number: item.work_package_number,
+      work_order_number: item.work_order_number || item.work_order_number,
       status: item.status,
       due_in_days: item.due_in_days,
       priority: item.priority,
@@ -1359,7 +1359,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const role = resolveDashboardRole((auth.permissions || []) as string[]);
     const scope = createAmroIsolationScope(tenantId, franchiseId);
     const serviceBoundaries = buildAmroServiceBoundaryEnvelope({
-      capability: 'work-packages',
+      capability: 'work-orders',
       scope,
       subscriptionStatus: amroAccess.subscriptionStatus,
       validatedAt: amroAccess.validatedAt,
@@ -1444,9 +1444,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     }
 
     const supabase = getSupabaseAdminClient();
-    const [aircraftData, workPackageData, flightLogData, defectData, signalData, aircraftLeadData, integrationJobData] = await Promise.all([
+    const [aircraftData, workOrderData, flightLogData, defectData, signalData, aircraftLeadData, integrationJobData] = await Promise.all([
       loadAircraftRows(supabase, tenantId, franchiseId, rowLimit, resilienceStats),
-      loadWorkPackageRows(supabase, tenantId, franchiseId, rowLimit, resilienceStats),
+      loadWorkOrderRows(supabase, tenantId, franchiseId, rowLimit, resilienceStats),
       loadFlightLogRows(supabase, tenantId, franchiseId, rowLimit, resilienceStats),
       loadDefectRows(supabase, tenantId, franchiseId, rowLimit, resilienceStats),
       loadSignalRows(supabase, tenantId, franchiseId, rowLimit, resilienceStats),
@@ -1467,7 +1467,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       return matchesSearchTokens(row, searchTokens);
     });
 
-    const maintenanceRows = workPackageData.rows
+    const maintenanceRows = workOrderData.rows
       .filter((row) => {
         if (!withinDueWindow(row.due_at || row.planned_end, dueWithinDays)) return false;
         if (!matchesSearchTokens(row, searchTokens)) return false;
@@ -1477,10 +1477,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       .map((row) => {
         const dueDate = row.due_at || row.planned_end || row.planned_start;
         return {
-          work_package_id: parseStringValue(row.id),
+          work_order_id: parseStringValue(row.id),
           aircraft_id: parseStringValue(row.aircraft_id),
-          work_package_number: parseStringValue(row.work_package_number || row.id),
-          title: parseStringValue(row.title || row.work_package_number || 'Maintenance package'),
+          work_order_number: parseStringValue(row.work_order_number || row.work_order_number || row.id),
+          title: parseStringValue(row.title || row.work_order_number || row.work_order_number || 'Maintenance package'),
           status: parseStringValue(row.status || 'open'),
           priority: parseStringValue(row.priority || 'medium'),
           planned_start: parseStringValue(row.planned_start),
@@ -1567,7 +1567,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       .slice(0, rowLimit);
 
     const complianceReadyCount = maintenanceRows.filter((row) => row.compliance_state === 'ready').length;
-    const openWorkPackages = maintenanceRows.filter((row) => ['open', 'planning', 'scheduled', 'in_progress', 'blocked'].includes(row.status)).length;
+    const openWorkOrders = maintenanceRows.filter((row) => ['open', 'planning', 'scheduled', 'in_progress', 'blocked'].includes(row.status)).length;
     const overdueCount = maintenanceRows.filter((row) => (row.due_in_days ?? 1) < 0).length;
     const openDefects = defectRows.filter((row) => !['closed', 'resolved'].includes(row.status)).length;
     const totalFlightHours = flightLogRows.reduce((sum, row) => sum + row.flight_hours, 0);
@@ -1664,9 +1664,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       alerts: combinedAlerts,
       kpis: {
         fleet_size: aircraftStatusRows.length,
-        open_work_packages: openWorkPackages,
+        open_work_orders: openWorkOrders,
         due_within_window: maintenanceRows.length,
-        overdue_work_packages: overdueCount,
+        overdue_work_orders: overdueCount,
         open_defects: openDefects,
         aircraft_leads_open: openAircraftLeads,
         aircraft_leads_total: aircraftLeadRows.length,
@@ -1690,7 +1690,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         cache: 'miss',
         sources: {
           aircraft: aircraftData.source,
-          maintenance: workPackageData.source,
+          maintenance: workOrderData.source,
           aircraft_leads: aircraftLeadData.source,
           flight_logs: flightLogData.source,
           defects: defectData.source,

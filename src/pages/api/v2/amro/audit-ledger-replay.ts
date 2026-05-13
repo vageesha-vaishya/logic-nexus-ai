@@ -34,7 +34,7 @@ function parseCapability(req: ApiRequest): AmroAuditLedgerCapability | undefined
   const value = Array.isArray(req.query.capability) ? req.query.capability[0] : req.query.capability;
   const normalized = String(value || '').trim().toLowerCase();
   if (!normalized) return undefined;
-  if (normalized === 'work-packages' || normalized === 'tasks' || normalized === 'compliance-gates') {
+  if (normalized === 'work-orders' || normalized === 'tasks' || normalized === 'compliance-gates') {
     return normalized;
   }
   throw new Error('Bad Request: Invalid capability filter');

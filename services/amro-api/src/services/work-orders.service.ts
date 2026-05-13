@@ -5,11 +5,11 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
-  WorkPackage,
+  WorkOrder,
   Task,
   Material,
-  CreateWorkPackageRequest,
-  UpdateWorkPackageRequest,
+  CreateWorkOrderRequest,
+  UpdateWorkOrderRequest,
   CreateTaskRequest,
   UpdateTaskRequest,
   AmroAssetSummary,
@@ -21,10 +21,10 @@ import {
 import { amroEventsProducer } from '../events/amro-events.producer';
 import { AmroEventType } from '../events/amro-events.types';
 import { withSpan } from '../instrumentation/amro-tracing';
-import { workPackagesStream } from '../realtime/work-packages-stream';
+import { workOrdersStream } from '../realtime/work-orders-stream';
 import { logger } from '../utils/logger';
 
-type WorkPackageTemplateTaskItem = {
+type WorkOrderTemplateTaskItem = {
   task_template_id: string | null;
   sequence_order: number;
   title: string;
@@ -38,12 +38,12 @@ type WorkPackageTemplateTaskItem = {
 type TaskInsertPayload = {
   tenant_id: string;
   franchise_id: string | null;
-  work_package_id: string;
+  work_order_id: string;
   task_number: string;
   title: string;
   description: string | null;
   task_category: string;
-  estimated_duration_hours: number | null;
+  estimated_duration_hours: string | null;
   complexity_level: number | null;
   sequence_order: number;
   status: 'pending';
@@ -63,8 +63,34 @@ export class WorkOrdersService {
     return compact || fallback;
   }
 
-  private parseWorkPackageSequence(workPackageNumber: string, targetYear: number): number {
-    const match = String(workPackageNumber || '').match(/^WP-(.+)-(\d{4})-(\d+)-([A-Z0-9-]+)$/);
+  private parseHoursFromInterval(value: unknown): number | null {
+    if (value === null || value === undefined || value === '') return null;
+    if (typeof value === 'number' && Number.isFinite(value)) return Number(value.toFixed(2));
+    const text = String(value).trim();
+    if (!text) return null;
+    if (/^-?\d+(\.\d+)?$/.test(text)) return Number(Number(text).toFixed(2));
+    const daysMatch = text.match(/(-?\d+)\s+day/);
+    const days = daysMatch ? Number(daysMatch[1]) : 0;
+    const timeMatch = text.match(/(\d+):(\d{2})(?::(\d{2}))?/);
+    if (timeMatch) {
+      const hours = Number(timeMatch[1]);
+      const mins = Number(timeMatch[2]);
+      const secs = Number(timeMatch[3] || 0);
+      const total = (days * 24) + hours + (mins / 60) + (secs / 3600);
+      return Number(total.toFixed(2));
+    }
+    const hourWord = text.match(/(-?\d+(?:\.\d+)?)\s*hour/);
+    if (hourWord) return Number(Number(hourWord[1]).toFixed(2));
+    return null;
+  }
+
+  private toIntervalLiteral(value: unknown): string | null {
+    const hours = this.asNullableNumber(value);
+    return hours === null ? null : `${hours} hours`;
+  }
+
+  private parseWorkOrderSequence(workOrderNumber: string, targetYear: number): number {
+    const match = String(workOrderNumber || '').match(/^WP-(.+)-(\d{4})-(\d+)-([A-Z0-9-]+)$/);
     if (!match) return 0;
     const year = Number.parseInt(match[2], 10);
     const seq = Number.parseInt(match[3], 10);
@@ -89,14 +115,14 @@ export class WorkOrdersService {
 
   private async resolveTitleCodeAndText(
     tenantId: string,
-    params: { workPackageTitleId?: string; title?: string; franchiseId?: string | null },
-  ): Promise<{ title: string; wpTitle: string; workPackageTitleId: string | null }> {
-    const titleId = String(params.workPackageTitleId || '').trim();
+    params: { workOrderTitleId?: string; title?: string; franchiseId?: string | null },
+  ): Promise<{ title: string; wpTitle: string; workOrderTitleId: string | null }> {
+    const titleId = String(params.workOrderTitleId || '').trim();
     const inputTitle = String(params.title || '').trim();
 
     if (titleId) {
       let query = this.supabase
-        .from('work_packages_title')
+        .from('work_orders_title')
         .select('id,title,wp_title,franchise_id')
         .eq('tenant_id', tenantId)
         .eq('id', titleId)
@@ -115,13 +141,13 @@ export class WorkOrdersService {
       return {
         title: String(row.title || '').trim(),
         wpTitle: this.sanitizeSegment(String(row.wp_title || ''), 'GENERAL'),
-        workPackageTitleId: String(row.id || '').trim() || null,
+        workOrderTitleId: String(row.id || '').trim() || null,
       };
     }
 
     if (inputTitle) {
       let query = this.supabase
-        .from('work_packages_title')
+        .from('work_orders_title')
         .select('id,title,wp_title,franchise_id')
         .eq('tenant_id', tenantId)
         .eq('title', inputTitle)
@@ -136,49 +162,49 @@ export class WorkOrdersService {
           return {
             title: String(row.title || '').trim(),
             wpTitle: this.sanitizeSegment(String(row.wp_title || ''), 'GENERAL'),
-            workPackageTitleId: String(row.id || '').trim() || null,
+            workOrderTitleId: String(row.id || '').trim() || null,
           };
         }
       }
       return {
         title: inputTitle,
         wpTitle: this.sanitizeSegment(inputTitle, 'GENERAL'),
-        workPackageTitleId: null,
+        workOrderTitleId: null,
       };
     }
 
-    throw new Error('Either title or work_package_title_id is required');
+    throw new Error('Either title or work_order_title_id is required');
   }
 
-  private async generateNextWorkPackageNumber(
+  private async generateNextWorkOrderNumber(
     tenantId: string,
     aircraftRegistration: string,
     wpTitle: string,
   ): Promise<string> {
     const currentYear = new Date().getUTCFullYear();
     const { data, error } = await this.supabase
-      .from('work_packages')
-      .select('work_package_number')
+      .from('work_orders')
+      .select('work_order_number')
       .eq('tenant_id', tenantId)
-      .ilike('work_package_number', `WP-%-${currentYear}-%`);
+      .ilike('work_order_number', `WP-%-${currentYear}-%`);
     if (error) {
       throw new Error(`Failed to generate work package sequence: ${error.message}`);
     }
 
     const maxSeq = (Array.isArray(data) ? data : []).reduce((max, row) => {
-      const current = this.parseWorkPackageSequence(String((row as Record<string, unknown>).work_package_number || ''), currentYear);
+      const current = this.parseWorkOrderSequence(String((row as Record<string, unknown>).work_order_number || ''), currentYear);
       return current > max ? current : max;
     }, 0);
     const nextSeq = String(maxSeq + 1).padStart(4, '0');
     return `WP-${aircraftRegistration}-${currentYear}-${nextSeq}-${wpTitle}`;
   }
 
-  async getWorkPackageTitles(
+  async getWorkOrderTitles(
     tenantId: string,
     franchiseId?: string | null,
   ): Promise<Array<{ id: string; title: string; wp_title: string; tenant_id: string; franchise_id: string | null }>> {
     let query = this.supabase
-      .from('work_packages_title')
+      .from('work_orders_title')
       .select('id,title,wp_title,tenant_id,franchise_id')
       .eq('tenant_id', tenantId)
       .order('title', { ascending: true });
@@ -205,8 +231,8 @@ export class WorkOrdersService {
       .filter((item) => item.id && item.title && item.wp_title);
   }
 
-  private getWorkPackageNumber(workPackage: WorkPackage): string {
-    return workPackage.work_package_number ?? workPackage.work_package_number ?? '';
+  private getWorkOrderNumber(workOrder: WorkOrder): string {
+    return workOrder.work_order_number ?? workOrder.work_order_number ?? '';
   }
 
   private getTaskSequence(task: Task): number | undefined {
@@ -217,7 +243,7 @@ export class WorkOrdersService {
     if (task.required_qualification) {
       return task.required_qualification;
     }
-    const rating = task.qualifications?.rating;
+    const rating = task.qualifications_json?.rating;
     return typeof rating === 'string' ? rating : undefined;
   }
 
@@ -246,7 +272,7 @@ export class WorkOrdersService {
     return rounded;
   }
 
-  private parseTemplateTasks(rawTasksJson: unknown, templateId: string): WorkPackageTemplateTaskItem[] {
+  private parseTemplateTasks(rawTasksJson: unknown, templateId: string): WorkOrderTemplateTaskItem[] {
     let parsed: unknown = rawTasksJson;
     if (typeof rawTasksJson === 'string') {
       const normalized = rawTasksJson.trim();
@@ -289,10 +315,10 @@ export class WorkOrdersService {
         title: title || `Template Task ${sequenceOrder}`,
         description: this.asNullableText(row.description),
         task_category: String(row.task_category || row.category_code || 'general').trim() || 'general',
-        estimated_duration_hours: this.asNullableNumber(row.estimated_duration_hours ?? row.estimated_man_hours),
+        estimated_duration_hours: this.parseHoursFromInterval(row.estimated_duration_hours ?? row.estimated_man_hours),
         complexity_level: this.asNullableComplexity(row.complexity_level),
         notes: this.asNullableText(row.reference_amp),
-      } as WorkPackageTemplateTaskItem;
+      } as WorkOrderTemplateTaskItem;
     });
 
     const duplicateGuard = new Set<string>();
@@ -311,22 +337,22 @@ export class WorkOrdersService {
   private buildTaskInsertPayloads(params: {
     tenantId: string;
     franchiseId?: string | null;
-    workPackageId: string;
-    workPackageNumber: string;
+    workOrderId: string;
+    workOrderNumber: string;
     userId: string;
-    templateTasks: WorkPackageTemplateTaskItem[];
+    templateTasks: WorkOrderTemplateTaskItem[];
   }): TaskInsertPayload[] {
     return params.templateTasks.map((templateTask, index) => {
       const sequence = this.asPositiveInt(templateTask.sequence_order, index + 1);
       return {
         tenant_id: params.tenantId,
         franchise_id: params.franchiseId || null,
-        work_package_id: params.workPackageId,
-        task_number: `${params.workPackageNumber}-${String(sequence).padStart(3, '0')}`,
+        work_order_id: params.workOrderId,
+        task_number: `${params.workOrderNumber}-${String(sequence).padStart(3, '0')}`,
         title: templateTask.title,
         description: templateTask.description,
         task_category: templateTask.task_category || 'general',
-        estimated_duration_hours: templateTask.estimated_duration_hours,
+        estimated_duration_hours: this.toIntervalLiteral(templateTask.estimated_duration_hours),
         complexity_level: templateTask.complexity_level,
         sequence_order: sequence,
         status: 'pending',
@@ -337,19 +363,19 @@ export class WorkOrdersService {
     });
   }
 
-  private async createTasksFromTemplateForWorkPackage(params: {
+  private async createTasksFromTemplateForWorkOrder(params: {
     tenantId: string;
     userId: string;
     franchiseId?: string | null;
-    workPackageId: string;
-    workPackageNumber: string;
-    workPackageTemplateId: string;
+    workOrderId: string;
+    workOrderNumber: string;
+    workOrderTemplateId: string;
   }): Promise<number> {
     let templateQuery = this.supabase
-      .from('work_package_templates')
+      .from('work_order_templates')
       .select('id,tasks_json,franchise_id')
       .eq('tenant_id', params.tenantId)
-      .eq('id', params.workPackageTemplateId)
+      .eq('id', params.workOrderTemplateId)
       .is('deleted_at', null)
       .limit(1);
 
@@ -364,12 +390,12 @@ export class WorkOrdersService {
 
     const templateTasks = this.parseTemplateTasks(
       (template as Record<string, unknown>).tasks_json,
-      params.workPackageTemplateId
+      params.workOrderTemplateId
     );
     if (templateTasks.length === 0) {
-      logger.info('work-package-template-has-no-tasks', {
-        workPackageTemplateId: params.workPackageTemplateId,
-        workPackageId: params.workPackageId,
+      logger.info('work-order-template-has-no-tasks', {
+        workOrderTemplateId: params.workOrderTemplateId,
+        workOrderId: params.workOrderId,
         tenantId: params.tenantId,
       });
       return 0;
@@ -379,7 +405,7 @@ export class WorkOrdersService {
       .from('tasks')
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', params.tenantId)
-      .eq('work_package_id', params.workPackageId);
+      .eq('work_order_id', params.workOrderId);
 
     if (duplicateCheckError) {
       throw new Error(`Failed duplicate task guard check: ${duplicateCheckError.message}`);
@@ -391,8 +417,8 @@ export class WorkOrdersService {
     const payloads = this.buildTaskInsertPayloads({
       tenantId: params.tenantId,
       franchiseId: params.franchiseId,
-      workPackageId: params.workPackageId,
-      workPackageNumber: params.workPackageNumber,
+      workOrderId: params.workOrderId,
+      workOrderNumber: params.workOrderNumber,
       userId: params.userId,
       templateTasks,
     });
@@ -519,9 +545,9 @@ export class WorkOrdersService {
    * Get all work packages for a tenant
    * Explicitly filters by tenant_id (belt and suspenders approach)
    */
-  async getWorkPackages(tenantId: string): Promise<WorkPackage[]> {
+  async getWorkOrders(tenantId: string): Promise<WorkOrder[]> {
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
@@ -530,16 +556,16 @@ export class WorkOrdersService {
       throw new Error(`Failed to fetch work packages: ${error.message}`);
     }
 
-    return data as WorkPackage[];
+    return data as WorkOrder[];
   }
 
   /**
    * Get a specific work package
    * Explicitly filters by tenant_id
    */
-  async getWorkPackage(tenantId: string, id: string): Promise<WorkPackage> {
+  async getWorkOrder(tenantId: string, id: string): Promise<WorkOrder> {
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('id', id)
@@ -553,7 +579,7 @@ export class WorkOrdersService {
       throw new Error('Work package not found');
     }
 
-    return data as WorkPackage;
+    return data as WorkOrder;
   }
 
   /**
@@ -561,38 +587,38 @@ export class WorkOrdersService {
    * Explicitly sets tenant_id
    * Wrapped with distributed tracing
    */
-  async createWorkPackage(
+  async createWorkOrder(
     tenantId: string,
     userId: string,
-    request: CreateWorkPackageRequest,
+    request: CreateWorkOrderRequest,
     franchiseId?: string | null,
-  ): Promise<WorkPackage> {
+  ): Promise<WorkOrder> {
     return withSpan(
-      'work_package.create',
+      'work_order.create',
       async () => {
         const plannedEndDate = request.planned_end_date ?? request.planned_completion_date;
         const aircraftId = await this.resolveValidAircraftId(tenantId, request.aircraft_id, userId);
         const aircraftRegistration = await this.resolveAircraftRegistration(tenantId, aircraftId);
         const titleResolution = await this.resolveTitleCodeAndText(tenantId, {
-          workPackageTitleId: request.work_package_title_id,
+          workOrderTitleId: request.work_order_title_id,
           title: request.title,
           franchiseId: franchiseId || null,
         });
-        const workOrderNumber = await this.generateNextWorkPackageNumber(
+        const workOrderNumber = await this.generateNextWorkOrderNumber(
           tenantId,
           aircraftRegistration,
           titleResolution.wpTitle,
         );
 
         const { data, error } = await this.supabase
-          .from('work_packages')
+          .from('work_orders')
           .insert({
             tenant_id: tenantId,
             aircraft_id: aircraftId,
-            work_package_number: workOrderNumber,
+            work_order_number: workOrderNumber,
             title: titleResolution.title,
-            work_package_template_id: request.work_package_template_id || null,
-            work_package_title_id: titleResolution.workPackageTitleId,
+            work_order_template_id: request.work_order_template_id || null,
+            work_order_title_id: titleResolution.workOrderTitleId,
             description: request.description,
             work_type: request.work_type ?? 'general',
             maintenance_type: request.maintenance_type,
@@ -611,42 +637,42 @@ export class WorkOrdersService {
           throw new Error(`Failed to create work package: ${error.message}`);
         }
 
-        const workPackage = data as WorkPackage & { generated_tasks_count?: number };
+        const workOrder = data as WorkOrder & { generated_tasks_count?: number };
         let generatedTasksCount = 0;
 
-        if (request.work_package_template_id) {
+        if (request.work_order_template_id) {
           try {
-            generatedTasksCount = await this.createTasksFromTemplateForWorkPackage({
+            generatedTasksCount = await this.createTasksFromTemplateForWorkOrder({
               tenantId,
               userId,
               franchiseId,
-              workPackageId: workPackage.id,
-              workPackageNumber: this.getWorkPackageNumber(workPackage) || workOrderNumber,
-              workPackageTemplateId: request.work_package_template_id,
+              workOrderId: workOrder.id,
+              workOrderNumber: this.getWorkOrderNumber(workOrder) || workOrderNumber,
+              workOrderTemplateId: request.work_order_template_id,
             });
-            workPackage.generated_tasks_count = generatedTasksCount;
-            logger.info('work-package-template-task-generation-complete', {
+            workOrder.generated_tasks_count = generatedTasksCount;
+            logger.info('work-order-template-task-generation-complete', {
               tenantId,
-              workPackageId: workPackage.id,
-              workPackageTemplateId: request.work_package_template_id,
+              workOrderId: workOrder.id,
+              workOrderTemplateId: request.work_order_template_id,
               generatedTasksCount,
             });
           } catch (taskCreationError) {
-            logger.error('work-package-template-task-generation-failed', {
+            logger.error('work-order-template-task-generation-failed', {
               tenantId,
-              workPackageId: workPackage.id,
-              workPackageTemplateId: request.work_package_template_id,
+              workOrderId: workOrder.id,
+              workOrderTemplateId: request.work_order_template_id,
               message: taskCreationError instanceof Error ? taskCreationError.message : String(taskCreationError),
             });
             const { error: rollbackError } = await this.supabase
-              .from('work_packages')
+              .from('work_orders')
               .delete()
               .eq('tenant_id', tenantId)
-              .eq('id', workPackage.id);
+              .eq('id', workOrder.id);
             if (rollbackError) {
-              logger.error('work-package-template-task-generation-rollback-failed', {
+              logger.error('work-order-template-task-generation-rollback-failed', {
                 tenantId,
-                workPackageId: workPackage.id,
+                workOrderId: workOrder.id,
                 message: rollbackError.message,
               });
             }
@@ -661,43 +687,43 @@ export class WorkOrdersService {
           userId,
           AmroEventType.WORK_ORDER_CREATED,
           {
-            id: workPackage.id,
-            work_package_id: workPackage.id,
-            work_package_number: this.getWorkPackageNumber(workPackage) || workOrderNumber,
+            id: workOrder.id,
+            work_order_id: workOrder.id,
+            work_order_number: this.getWorkOrderNumber(workOrder) || workOrderNumber,
             aircraft_id: aircraftId,
-            title: workPackage.title,
-            description: workPackage.description,
-            maintenance_type: workPackage.maintenance_type,
-            status: workPackage.status,
-            estimated_cost: workPackage.estimated_cost,
-            estimated_labor_hours: workPackage.estimated_labor_hours,
+            title: workOrder.title,
+            description: workOrder.description,
+            maintenance_type: workOrder.maintenance_type,
+            status: workOrder.status,
+            estimated_cost: workOrder.estimated_cost,
+            estimated_labor_hours: workOrder.estimated_labor_hours,
             generated_tasks_count: generatedTasksCount,
           },
         );
 
-        workPackagesStream.publish({
+        workOrdersStream.publish({
           type: 'created',
           tenantId,
           userId,
           at: new Date().toISOString(),
-          workPackage: {
-            id: workPackage.id,
-            title: workPackage.title,
-            status: workPackage.status,
-            work_package_number: workPackage.work_package_number,
-            maintenance_type: workPackage.maintenance_type,
+          workOrder: {
+            id: workOrder.id,
+            title: workOrder.title,
+            status: workOrder.status,
+            work_order_number: this.getWorkOrderNumber(workOrder),
+            maintenance_type: workOrder.maintenance_type,
           },
         });
 
-        return workPackage;
+        return workOrder;
       },
       {
         tenant_id: tenantId,
         user_id: userId,
         aircraft_id: request.aircraft_id,
         maintenance_type: request.maintenance_type,
-        work_package_template_id: request.work_package_template_id,
-        work_package_title_id: request.work_package_title_id,
+        work_order_template_id: request.work_order_template_id,
+        work_order_title_id: request.work_order_title_id,
       },
     );
   }
@@ -706,14 +732,14 @@ export class WorkOrdersService {
    * Update a work package
    * Explicitly filters by tenant_id
    */
-  async updateWorkPackage(
+  async updateWorkOrder(
     tenantId: string,
     id: string,
     userId: string,
-    request: UpdateWorkPackageRequest,
-  ): Promise<WorkPackage> {
+    request: UpdateWorkOrderRequest,
+  ): Promise<WorkOrder> {
     // Verify work package belongs to tenant
-    await this.getWorkPackage(tenantId, id);
+    await this.getWorkOrder(tenantId, id);
 
     const updateData: Record<string, any> = {
       updated_by: userId,
@@ -742,7 +768,7 @@ export class WorkOrdersService {
     if (request.assigned_to !== undefined) updateData.assigned_to = request.assigned_to;
 
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .update(updateData)
       .eq('tenant_id', tenantId)
       .eq('id', id)
@@ -753,7 +779,7 @@ export class WorkOrdersService {
       throw new Error(`Failed to update work package: ${error.message}`);
     }
 
-    const workPackage = data as WorkPackage;
+    const workOrder = data as WorkOrder;
 
     // Publish work order updated event (fire-and-forget)
     amroEventsProducer.publishWorkOrderEvent(
@@ -761,48 +787,48 @@ export class WorkOrdersService {
       userId,
       AmroEventType.WORK_ORDER_UPDATED,
       {
-        id: workPackage.id,
-        work_package_id: workPackage.id,
-        work_package_number: this.getWorkPackageNumber(workPackage),
-        aircraft_id: workPackage.aircraft_id,
-        title: workPackage.title,
-        description: workPackage.description,
-        maintenance_type: workPackage.maintenance_type,
-        status: workPackage.status,
-        estimated_cost: workPackage.estimated_cost,
-        estimated_labor_hours: workPackage.estimated_labor_hours,
-        actual_cost: workPackage.actual_cost,
-        actual_labor_hours: workPackage.actual_labor_hours,
+        id: workOrder.id,
+        work_order_id: workOrder.id,
+        work_order_number: this.getWorkOrderNumber(workOrder),
+        aircraft_id: workOrder.aircraft_id,
+        title: workOrder.title,
+        description: workOrder.description,
+        maintenance_type: workOrder.maintenance_type,
+        status: workOrder.status,
+        estimated_cost: workOrder.estimated_cost,
+        estimated_labor_hours: workOrder.estimated_labor_hours,
+        actual_cost: workOrder.actual_cost,
+        actual_labor_hours: workOrder.actual_labor_hours,
       },
     );
 
-    workPackagesStream.publish({
+    workOrdersStream.publish({
       type: 'updated',
       tenantId,
       userId,
       at: new Date().toISOString(),
-      workPackage: {
-        id: workPackage.id,
-        title: workPackage.title,
-        status: workPackage.status,
-        work_package_number: workPackage.work_package_number,
-        maintenance_type: workPackage.maintenance_type,
+      workOrder: {
+        id: workOrder.id,
+        title: workOrder.title,
+        status: workOrder.status,
+        work_order_number: this.getWorkOrderNumber(workOrder),
+        maintenance_type: workOrder.maintenance_type,
       },
     });
 
-    return workPackage;
+    return workOrder;
   }
 
   /**
    * Delete a work package
    * Explicitly filters by tenant_id
    */
-  async deleteWorkPackage(tenantId: string, id: string, userId: string): Promise<void> {
+  async deleteWorkOrder(tenantId: string, id: string, userId: string): Promise<void> {
     // Verify work package belongs to tenant and get it for event data
-    const workPackage = await this.getWorkPackage(tenantId, id);
+    const workOrder = await this.getWorkOrder(tenantId, id);
 
     const { error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .delete()
       .eq('tenant_id', tenantId)
       .eq('id', id);
@@ -817,25 +843,25 @@ export class WorkOrdersService {
       userId,
       AmroEventType.WORK_ORDER_DELETED,
       {
-        id: workPackage.id,
-        work_package_id: workPackage.id,
-        work_package_number: this.getWorkPackageNumber(workPackage),
-        aircraft_id: workPackage.aircraft_id,
-        title: workPackage.title,
+        id: workOrder.id,
+        work_order_id: workOrder.id,
+        work_order_number: this.getWorkOrderNumber(workOrder),
+        aircraft_id: workOrder.aircraft_id,
+        title: workOrder.title,
       },
     );
 
-    workPackagesStream.publish({
+    workOrdersStream.publish({
       type: 'deleted',
       tenantId,
       userId,
       at: new Date().toISOString(),
-      workPackage: {
-        id: workPackage.id,
-        title: workPackage.title,
-        status: workPackage.status,
-        work_package_number: workPackage.work_package_number,
-        maintenance_type: workPackage.maintenance_type,
+      workOrder: {
+        id: workOrder.id,
+        title: workOrder.title,
+        status: workOrder.status,
+        work_order_number: this.getWorkOrderNumber(workOrder),
+        maintenance_type: workOrder.maintenance_type,
       },
     });
   }
@@ -848,12 +874,12 @@ export class WorkOrdersService {
    * Get all tasks for a work package
    * Explicitly filters by tenant_id
    */
-  async getTasks(tenantId: string, workPackageId: string): Promise<Task[]> {
+  async getTasks(tenantId: string, workOrderId: string): Promise<Task[]> {
     const { data, error } = await this.supabase
       .from('tasks')
       .select('*')
       .eq('tenant_id', tenantId)
-      .eq('work_package_id', workPackageId)
+      .eq('work_order_id', workOrderId)
       .order('sequence_order', { ascending: true });
 
     if (error) {
@@ -902,18 +928,18 @@ export class WorkOrdersService {
         const taskNumber = `TASK-${Date.now()}`;
         const sequenceOrder = request.sequence_order ?? request.sequence_number;
         const plannedEndDate = request.planned_end_date ?? request.planned_completion_date;
-        const workPackageId = request.work_package_id;
-        if (!workPackageId) {
-          throw new Error('work_package_id is required');
+        const workOrderId = request.work_order_id ?? request.work_order_id;
+        if (!workOrderId) {
+          throw new Error('work_order_id is required');
         }
-        const taskQualifications = request.qualifications
+        const taskQualifications = request.qualifications_json
           ?? (request.required_qualification ? { rating: request.required_qualification } : undefined);
 
         const { data, error } = await this.supabase
           .from('tasks')
           .insert({
             tenant_id: tenantId,
-            work_package_id: workPackageId,
+            work_order_id: workOrderId,
             task_number: taskNumber,
             title: request.title,
             description: request.description,
@@ -922,7 +948,7 @@ export class WorkOrdersService {
             sequence_order: sequenceOrder,
             planned_start_date: request.planned_start_date,
             planned_end_date: plannedEndDate,
-            qualifications: taskQualifications,
+            qualifications_json: taskQualifications,
             created_by: userId,
             updated_by: userId,
           })
@@ -944,7 +970,7 @@ export class WorkOrdersService {
             id: task.id,
             task_id: task.id,
             task_number: task.task_number,
-            work_package_id: task.work_package_id,
+            work_order_id: task.work_order_id ?? task.work_order_id,
             title: task.title,
             description: task.description,
             status: task.status,
@@ -958,7 +984,7 @@ export class WorkOrdersService {
       {
         tenant_id: tenantId,
         user_id: userId,
-        work_package_id: request.work_package_id,
+        work_order_id: request.work_order_id ?? request.work_order_id,
         sequence_order: request.sequence_order ?? request.sequence_number,
       },
     );
@@ -998,9 +1024,9 @@ export class WorkOrdersService {
     if (request.actual_end_date !== undefined || request.actual_completion_date !== undefined) {
       updateData.actual_end_date = request.actual_end_date ?? request.actual_completion_date;
     }
-    if (request.assigned_to !== undefined) updateData.assigned_to = request.assigned_to;
-    if (request.qualifications !== undefined || request.required_qualification !== undefined) {
-      updateData.qualifications = request.qualifications
+    if (request.assigned_technician_id !== undefined) updateData.assigned_technician_id = request.assigned_technician_id;
+    if (request.qualifications_json !== undefined || request.required_qualification !== undefined) {
+      updateData.qualifications_json = request.qualifications_json
         ?? (request.required_qualification ? { rating: request.required_qualification } : null);
     }
 
@@ -1027,12 +1053,12 @@ export class WorkOrdersService {
         id: task.id,
         task_id: task.id,
         task_number: task.task_number,
-        work_package_id: task.work_package_id,
+        work_order_id: task.work_order_id ?? task.work_order_id,
         title: task.title,
         description: task.description,
         status: task.status,
         sequence_number: this.getTaskSequence(task),
-        assigned_to: task.assigned_to,
+        assigned_technician_id: task.assigned_technician_id,
         required_qualification: this.getTaskRequiredQualification(task),
       },
     );
@@ -1047,11 +1073,11 @@ export class WorkOrdersService {
           id: task.id,
           task_id: task.id,
           task_number: task.task_number,
-          work_package_id: task.work_package_id,
+          work_order_id: task.work_order_id ?? task.work_order_id,
           title: task.title,
           description: task.description,
           status: task.status,
-          assigned_to: task.assigned_to,
+          assigned_technician_id: task.assigned_technician_id,
           started_at: new Date().toISOString(),
         },
       );
@@ -1067,11 +1093,11 @@ export class WorkOrdersService {
           id: task.id,
           task_id: task.id,
           task_number: task.task_number,
-          work_package_id: task.work_package_id,
+          work_order_id: task.work_order_id ?? task.work_order_id,
           title: task.title,
           description: task.description,
           status: task.status,
-          assigned_to: task.assigned_to,
+          assigned_technician_id: task.assigned_technician_id,
           completed_at: new Date().toISOString(),
         },
       );
@@ -1107,7 +1133,7 @@ export class WorkOrdersService {
         id: task.id,
         task_id: task.id,
         task_number: task.task_number,
-        work_package_id: task.work_package_id,
+        work_order_id: task.work_order_id ?? task.work_order_id,
         title: task.title,
       },
     );
@@ -1141,7 +1167,7 @@ export class WorkOrdersService {
           id: `maint-${Date.now()}`,
           task_id: task.id,
           task_number: task.task_number,
-          work_package_id: task.work_package_id,
+          work_order_id: task.work_order_id ?? task.work_order_id,
           executed_by: eventData.executed_by,
           evidence_captured: eventData.evidence_captured,
           event_type: eventData.event_type || 'execution',
@@ -1167,12 +1193,12 @@ export class WorkOrdersService {
    * Get all materials for a work package
    * Explicitly filters by tenant_id
    */
-  async getMaterials(tenantId: string, workPackageId: string): Promise<Material[]> {
+  async getMaterials(tenantId: string, workOrderId: string): Promise<Material[]> {
     const { data, error } = await this.supabase
       .from('materials')
       .select('*')
       .eq('tenant_id', tenantId)
-      .eq('work_package_id', workPackageId)
+      .eq('work_order_id', workOrderId)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -1300,8 +1326,8 @@ export class WorkOrdersService {
 
   async getForecastRecommendations(tenantId: string): Promise<AmroForecastRecommendation[]> {
     const { data, error } = await this.supabase
-      .from('work_packages')
-      .select('id,work_package_number,status,maintenance_type,planned_start_date')
+      .from('work_orders')
+      .select('id,work_order_number,status,maintenance_type,planned_start_date')
       .eq('tenant_id', tenantId)
       .order('updated_at', { ascending: false })
       .limit(10);
@@ -1312,7 +1338,7 @@ export class WorkOrdersService {
 
     const rows = (data ?? []) as Array<{
       id: string;
-      work_package_number: string;
+      work_order_number: string;
       status: string;
       maintenance_type: string;
       planned_start_date?: string | null;
@@ -1334,7 +1360,7 @@ export class WorkOrdersService {
         row.maintenance_type === 'line' ? 'telemetry' : row.planned_start_date ? 'calendar' : 'reliability';
       return {
         id: `rec-${row.id}`,
-        digital_twin_reference: `DT-${row.work_package_number || row.id}`,
+        digital_twin_reference: `DT-${row.work_order_number || row.id}`,
         risk_score: riskScore,
         trigger,
         recommendation:
@@ -1355,7 +1381,7 @@ export class WorkOrdersService {
     next_slot_at: string | null;
   }> {
     const { data, error } = await this.supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('status,planned_start_date')
       .eq('tenant_id', tenantId);
 

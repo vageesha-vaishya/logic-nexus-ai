@@ -1,0 +1,192 @@
+tenant_id,assembly_models,code_form_no,ata_code,reference_amp,description,category_code,is_rii,show_in_c_of_a,estimated_man_hours,revision_status
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Tail rotor hub mast nut torque check,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,MAin rotor mast nut torque check .,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Main rotor lower cone torque check .,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Engine mount torque check,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Fwd and Aft TDS shaft torque check,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,TGB mounting torque check,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Main rotor Hub lower cone torque check,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,MAin rotor Hub mast nut torque check,CH1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,Annual Inspection of Slide Window Lock,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,300Hrs/12Months Inspection of Barrier Filter,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,300Hrs/12Months Inspection of Wire Strike Protection System,CH*,,,0:00,"Rev No. 00, Form No. Bell407/71/2009"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,72,,"Annual Inspection Windows, Windshields",CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,"Annual Inspection of Windows, Chin Bubble",CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,Annual Inspection of Door Openers,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Engine Compartment Bleed Air System (Annual Inspection),CH*,,,0:00,form no Bell 407/68
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Aeromobile Licence,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Insurance,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Form No: Bell407/120,Annual Inspection of AAI Console Assembly,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Form No: Bell407/123,Every 24 Months Inspection of Auxiliary Fuel Tank Kit,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Every 300 Hours / 12 Months inspection of Inlet Barrier Filter,CH*,,,0:00,Cleaning & Oiling
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Cargo Hook Inspection,CH*,,,0:00,Form No. Bell407/61
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Bell407/407 GX/126,Pre Flight step handle Inspection,CH*,,,0:00,Form No. Bell407/126
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Skid Tubes,CH*,,,0:00,Form no Bell 407/69
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Hard point kit Inspection,CH*,,,0:00,Form No. Bell407/79
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Particle Separator,CH*,,,0:00,Part of 300 Hrs/12 mnth Inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,300Hrs/12Months Inspection of Blade Folding Kit,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Dual Control,CH*,,,0:00,Part of 300Hrs/12 Mnth Inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Form No: Bell407/407 GX/68,Annual Inspection of engine compartment Bleed Air System,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Form No: Bell407/407 GX/66,Annual Inspection of LH & RH Folding Maintenance Steps,CH*,,,0:00,Form No. Bell407/66
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Rotor Brake,CH*,,,0:00,Part of 300Hrs/12Mnth Inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Garmin GPS waas system Inspection,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Form No: Bell 407/407 GX/73,Every 100 Hours Inspection of Aircomm cabin air conditioning system,CH*,,,0:00,"Rev No. 00, Form No. Bell407/73/2009"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Form No: Bell407/75,Annual Inspection Cabin Heater,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,"Annual Inspection Windows, Litter & Fixed Panel",CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,72,,"Annual Inspection Windows, Crew with Slide Kit",CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,"Annual Inspection Windows, Passenger Window",CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Bell407/59,300Hrs/12Months Inspection of Auxiliary Fuel Tank Kit,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,"Annual ?Inspection Windows, Skylight Kit",CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Bearpaw kit Inspection,CH*,,,0:00,Form No. Bell407/60
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Aeromobile License,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,300Hrs/12Month Inspection of Float Steps,CH*,,,0:00,Form No. Bell407/65
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Intermediate storage of airframe upto 180 days.,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Wire Strike Protection Corrosion Inspection,CH*,,,0:00,PM-965-045E
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Every 300 Hours Inspection of Heli Access Step,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,100,,Annual Inspection of Fuel Cap Lock,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Bell407/69,100Hrs/6Months Inspection of Skids Tube.,CH*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Float Step Kit,CH*,,,0:00,Form No. Bell 407/65
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,201,12,Bell407/407 GX/39,150 Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,12,Form No: Bell407/407 GX/41,Every 300 Hours Lubrication Inspection,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,12,,25 Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,201,12,Bell407/407 GX/39,100Hrs Lubrication,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,12,,Ground Handling Wheel,LS*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,12,,6 months Lubrication,LS*,,,0:00,"Rev No. 00, Form No. Bell407/35/2009"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,ASB88,27,ASB 407-09-88,"STAKED BEARINGS, ONE-TIME INSPECTION OF. ASB 407-09-88",OP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,ASB 09-89,64,ASB 407-09-89,"Tail Rotor Gearbox P/N 406-040-400-ALL and Tail Rotor Gearbox Case Assembly P/N 406-040-406-ALL, One Time Inspection Of ASB 407-09-89",OP1,,,0:00,PartI:Immediately Upon receipt (Spares) Part II:Within 10 hrs/30 days Part III:At next scheduled insptn(not later than 60 days)
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,DGCA Mand Mod,29,DGCA Mand Mod,DGCA/Bell 407/27 Ref: TC AD CF-2009-03 Hydraulic Pump - Driveshaft Assembly,OP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,53,TB 407-10-92 'A',"Airframe Production Shim Records, Reissue of. Technical Bulletin 407-10-92 'A', Dt 15-Dec-2010",OP1,,,0:00,"At customer's option, but recommended before 31 Dec 2011."
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,TC AD,11,TC AD CF-2009-06,TC AD CF-2009-06 Placard - Gas Producer RPM (NG) Limitation,OP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Engine Inlet Air Filter System,OP*,,,0:00,"Rev No. 00, Form No. Bell407/78/2009"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,600Hrs / 6Months Out of Phase Inspection,OP*,,,0:00,Form no. Bell407/12
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,25Hrs OOP Insp.,OP*,,,0:00,"Rev No. 01, Form No. Bell407/08/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,67,,5000Hrs Main Rotor Pitch Link inspection.,OP*,,,0:00,Main Rotor Pitch Link inspection. Initially carryout at 5000Hrs then reduce the frequency to 2500Hrs.
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No:Bell 407/407GX/114,Every 150 Hours/12 month Engine inspection,OP*,,,0:00,If third generation oil MIL-PRF-23699 IS USED.
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,150Hrs Out of Phase Inspection,OP*,,,0:00,"Rev No. 00, Form No. Bell407/84/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Engine Inlet Air Filter System,OP*,,,0:00,"Rev No. 00, Form No. Bell407/77/2009"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No: Bell 407/407GX/113,Every 50 Hrs OOP Inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No: Bell407/407GX/11,Every 600 Hours Scheduled Inspection,OP*,,,0:00,Form No. Bell407/11
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,2000Hrs Out of Phase Inspection,OP*,,,0:00,"Rev No. 01, Form No. Bell407/16/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,175,5,"Part- D, No.1",25hrs Out of phase Inspection,OP*,,,0:00,Form No. Bell407/08
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,1000 Cycles Out of Phase Inspection,OP*,,,0:00,"Rev No. 00, Form No. Bell407/13/2009"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No: Bell 407/407GX/12,Every 600 Hrs / 6 Months Schedule Inspection,OP*,,,0:00,"For helicopters operated in corrosive environment or extreme environmental conditions, the recommended interval for inspection and lubrication must be reduced to 600 hours or 6 months."
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,50 Hours OOP,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Engine Inlet Air Filter System,OP*,,,0:00,"Rev No. 00, Form No. Bell407/76/2009"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,176,5,"Part- D, No.2",50Hrs Out of Phase Inspection,OP*,,,0:00,Form no. Bell407/113
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,600 hrs/12 month OOP inspection,OP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,43,,Oil System Contamination Inspection,ROU1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No: Bell 407/407 GX/151,Every 1200 Hours Scheduled Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,FAR 91.411,ALTIMETER Every 2 year static pressure system test and inspection.,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Aircraft Battery CT - 12mths,ROU*,,,0:00,Battery CT
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,12,,Short Term storage (1-45 days),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,AEROMOBILE LICENCE 2 Years,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Inlet Barrier filter oiling & cleaning,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,95,,Pitot static leak test,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,85,,Particle separator,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Annual Radio Inspection,ROU*,,,0:00,Rev No.1 Form No. 641
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,63,,Transmission assembly interim inspection,ROU*,,,0:00,DAW Letter No. DECN/SCH/COSL/129
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No: Bell407/407 GX/07,Every 12 Months Inspection,ROU*,,,0:00,"Repetitive compliance of ASB 407-11-94 Garmin GPS waas systems ref: ICA 190-00356-21 Rev C, Dtd-24-4-2009"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,63,,Tail Boom inspection (interim insp),ROU*,,,0:00,"P/N- 407-030-801-205, S/N- 53864"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,C of A - 5 Years,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Pylon side FP,ROU*,,,0:00,Tail boom interim insp+ pylon side FPI
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,62,DMC-407-A-67-12-08-00A-281A-A,Spring Link Assembly,ROU*,,,0:00,Interim Inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,63,,FREE WHEEL INTERIM INSPECTION,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Annual Steerable Landing Light Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,600 Hrs OOP Inspection of Rotor Brake Caliper,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,67,"Note : The first 2500-hour inspection occurs at 5000 hours of Component Operating time, and subsequent inspections occur every 2500 hours. Ref. : MM 5-24A",M/R Pitch Link Assemblies Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,ELT Battery Replacement - Pointer ELT,ROU*,,,0:00,24 MONTHS
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Rotor Brake Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Cabin Fire Extinguisher-Hefting,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,ELT BATTERY REPLACEMENT - 406MHz ELT,ROU*,,,0:00,P/N-452-0133 S/N-362110-061
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Annual inspection of IBF,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,3 month lubrication,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Annual Inspection of Pre Flight Kit,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,,Rotor brake,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No: Bell407/407 GX/15,Every 24 Months Scheduled Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,RN/32,Transponder System Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,AMM 4-00-00 Table 4-2,Every 25 FH (Airframe/Engine),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Fire Extinguisher re-weighing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Fuel MBT - 6Mths,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,C of A - 2 years,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Fuel MBT(12 Mths),ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,50 Hours OOP Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Aeromobile License Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,96,,RR Compass swing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Aeromobile License - 1 Year,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No: Bell407/407 GX/139,Every 2500 Hours Scheduled Inspection,ROU*,,,0:00,Main Rotor Pitch Link inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,150 Hours Routine Inspection,ROU*,,,0:00,"Rev No. 03, Form No. Bell407/04/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,96,,DR Compass swing,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Skid Tubes,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Bell407/407 GX/11,600 Hours Scheduled Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,97,,ATC Transponder- Biennial inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Bell407/407 GX/06,Every 300 Hrs/12 Months Scheduled Inspection,ROU*,,,0:00,Form No. Bell407/06
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,"BHT-407-MM,Chapter 5-00-00 Para 5-19",Dual Controls,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,TRANSMISSION OIL CHANGE,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Initially at 6900hrs then after 150 hrs out phase inspection,ROU*,,,0:00,Initially at 6900Hrs the after 150hrs.
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,62,,MAST ASSEMBLY INTERIM INSPECTION,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,200 Hours inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,64,,Rotor Brake Caliper # 1,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,26,,Cabin Fire Extinguisher,ROU*,,,0:00,6 Yrs Maintenance / Recharge
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,TGB OIL CHANGE,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Battery CT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,63,,TRANSMISSION INTERIM INSPECTION,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No:Bell407/407 GX/10,Every 300 Hours Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,95,,"Altimeter - Calibration P/N- 206-070-263-101 (5934-D-3), S/N- 465103",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,95,,Air Speed indicator- Calibration P/N- 206-075-725-103 (8000),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,73,,HMU Spline check CEB-A-73-6044,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,FIRST AID KIT - 12 MONTHS,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,65,,"Tail Rotor Gearbox assembly, P/N- 406-040-400-121",ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,63,,MAST POLE INTERIM INSPECTION,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,73,,Inlet Barrier filter assy,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,99,Form No: Bell 407/128,Every 100 Hrs Inspection of IBF,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Annual Compass Swing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,65,,Rotor Brake Disc P/N- 407-340-302-103,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,24,,Aircraft Battery CT,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,63,,Pylon side beam flurescent pent. insp,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,C of A - 3 Years,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Aeromobile License .,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,95,,Fuel Quantity gauge,ROU*,,,0:00,Part of 24 months OOP Inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Bell407/407 GX/09,100 Hours Scheduled Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,COMPASS SWING,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,26,Form No:Bell407/407 GX/129,Monthly Fire Extinguisher inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,64,,Rotor Brake Caliper #2,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,65,,TGB INTERIM INSPECTION,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,ELT Battery Replacement,ROU*,,,0:00,Expiry Date mentioned on Battery.
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,ELT Battery Replacement,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,FIRST AID KIT - 6 MONTHS,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,207,5,"Part- G, No.1",150hrs / 6months corrosion inspection,ROU*,,,0:00,"Rev No:1, Form no. Bell407/45/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,C of R Renewal,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Aeromobile License 5 Yrs,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Bell407/407 GX/10,Every 300 Hrs,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,168,5,"Part- C, No.6",300Hrs Engine Inspection - Periodic Inspection,ROU*,,,0:00,"Rev No. 03, Form No. Bell407/05/2010"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,180days Radio Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,ELT Battery Replacement,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,250 Hours inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,First aid Kit(1 Year),ROU*,,,0:00,CAR Revision
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Bell407/407 GX/114,150 Hours/12 month inspection (Airframe/Engine),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Range and Performance Check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,66,DMC-407-A-05-10-00-01A-281A-A,Tail Rotor Gearbox,ROU*,,,0:00,Interim Inspection
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,Altimeter leak check,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,Form No:Bell407/130,Annual Fire Extinguisher Weighing,ROU*,,,0:00,CAR Requirement
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,12,,Intermediate storage (45-180 days),ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,62,,MAST ASSEMBLY INTERIM INSPECTION,ROU*,,,0:00,"Frequency modified as per approved AMP ISSUE II, Rev 02, Dt: June 2025"
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Form No: Bell407/407 GX/14,Every 1200 Hrs / 24 Months Scheduled Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,AMM Ch 04-00-00 Table 4-2,25 Hrs Inspection,ROU*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,All tail rotor driveshaft disc pack couplings torque check,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,Bell407/32,Transmission top case torque check 100+10 hrs,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,1 to 5 hrs torque check for main rotor through bolt,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,72,,Tail rotor drive shaft pack coupling Torque check.,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,72,,Engine mounts torque check.,SP1,,,0:00,It should be carried out (100 ± 10 hrs)
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Swash plate tilt friction check 10 to 25 hrs,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Main rotor lower cone torque check,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,10 to 25 hrs fwd and Aft tail drive shaft disc pack coupling torque check,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,TGB mounting torque check & Swash plate tilt friction check,SP1,,,0:00,Special inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,72,,Oil system contamination check.,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,10 to 25 hrs Tail rotor gearbox torque check,SP1,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Transmission Top case retorqueing,SP1,,,0:00,Special Inspection schedule
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,10,,Every 30 days maintenance during intermediate storage,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,,Carry out 14 days inspection and maintenance of aircraft during flyable storage.,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,CAMO Contract Validity,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,,NSOP Renewal,SP*,,,0:00,
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,5,"BHT-ALL-SPM, para 10-06",Airframe FLYABLE STORAGE- MAINTENANCE,SP*,,,0:00,Ref: OOM/VT-MHN/2016/08/26/015 & Repetitive every 14days
+157b8d12-c115-446e-a4dc-d12077751fe2,732866d9-221e-4edd-976b-a5c3fe783078,,101,Form No:RN/020,Monthly ELT Functional Check,SP*,,,0:00,

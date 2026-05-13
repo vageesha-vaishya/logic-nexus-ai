@@ -3,14 +3,14 @@
  * 
  * DATABASE SCHEMA:
  * - Uses: amro_certificates_release_service (existing)
- * - Uses: work_packages (existing)
+ * - Uses: work_orders (existing)
  * - Uses: aircraft (existing)
  * - Auto-generates certificate number
  * - Validates certifying staff license
  * - Creates immutable audit record
  * 
  * ENDPOINT:
- * - POST /api/v2/amro/work-packages/[id]/certificates
+ * - POST /api/v2/amro/work-orders/[id]/certificates
  * 
  * BODY:
  * - certifying_staff_id: user_id (required)
@@ -50,7 +50,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
   if (handlePreflight(req, res)) return;
 
   const ctx = buildApiContext(req);
-  const workPackageId = String(req.query.id || '').trim();
+  const workOrderId = String(req.query.id || '').trim();
 
   try {
     if (req.method !== 'POST') {
@@ -59,7 +59,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       return;
     }
 
-    if (!workPackageId) {
+    if (!workOrderId) {
       res.status(400).json({ error: 'Work Package ID is required', version: 'v2', correlationId: ctx.correlationId });
       return;
     }
@@ -83,9 +83,9 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // Verify work package exists
     const { data: wp, error: wpError } = await supabase
-      .from('work_packages')
+      .from('work_orders')
       .select('id, aircraft_id, title, status')
-      .eq('id', workPackageId)
+      .eq('id', workOrderId)
       .eq('tenant_id', tenantId)
       .single();
 
@@ -147,7 +147,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       .insert({
         tenant_id: tenantId,
         certificate_number: certNumber,
-        work_package_id: workPackageId,
+        work_order_id: workOrderId,
         aircraft_id: wp.aircraft_id,
         issue_date: new Date().toISOString(),
         maintenance_organization_approval: maintenanceOrgApproval,
@@ -172,13 +172,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     // Update work package status to 'completed' if not already
     if (wp.status !== 'completed') {
       await supabase
-        .from('work_packages')
+        .from('work_orders')
         .update({
           status: 'completed',
           updated_by: authUser.userId,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', workPackageId)
+        .eq('id', workOrderId)
         .eq('tenant_id', tenantId);
     }
 
@@ -190,7 +190,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         certificate_id: certificate.id,
         certificate_number: certificate.certificate_number,
         issue_date: certificate.issue_date,
-        work_package_id: workPackageId,
+        work_order_id: workOrderId,
         aircraft_id: wp.aircraft_id,
         certifying_staff_id: certifyingStaffId,
         staff_license_type: staffLicenseType,

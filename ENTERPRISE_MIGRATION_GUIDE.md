@@ -730,7 +730,7 @@ For each page migrated, verify:
 - AmroParts (list, detail, new)
 - AmroCompliance
 - AmroInventory (multiple views)
-- AmroWorkPackages
+- AmroWorkOrders
 - Stock Ledger pages
 - Master Data pages
 - Settings pages

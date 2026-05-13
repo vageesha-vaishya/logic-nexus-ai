@@ -129,17 +129,17 @@ npm run lint:fix
 
 ### Work Packages
 
-- `GET /api/v1/work-packages` - List all work packages
-- `GET /api/v1/work-packages/:id` - Get specific work package
-- `POST /api/v1/work-packages` - Create work package
-- `PATCH /api/v1/work-packages/:id` - Update work package
-- `DELETE /api/v1/work-packages/:id` - Delete work package
+- `GET /api/v1/work-orders` - List all work packages
+- `GET /api/v1/work-orders/:id` - Get specific work package
+- `POST /api/v1/work-orders` - Create work package
+- `PATCH /api/v1/work-orders/:id` - Update work package
+- `DELETE /api/v1/work-orders/:id` - Delete work package
 
 ### Tasks
 
-- `GET /api/v1/work-packages/:workPackageId/tasks` - List tasks for work package
+- `GET /api/v1/work-orders/:workOrderId/tasks` - List tasks for work package
 - `GET /api/v1/tasks/:id` - Get specific task
-- `POST /api/v1/work-packages/:workPackageId/tasks` - Create task
+- `POST /api/v1/work-orders/:workOrderId/tasks` - Create task
 - `PATCH /api/v1/tasks/:id` - Update task
 - `DELETE /api/v1/tasks/:id` - Delete task
 
@@ -148,7 +148,7 @@ npm run lint:fix
 ### Create Work Package
 
 ```bash
-curl -X POST http://localhost:3001/api/v1/work-packages \
+curl -X POST http://localhost:3001/api/v1/work-orders \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -211,7 +211,7 @@ The service requires these Supabase tables (created by M0-1 and M0-2 migrations)
 - `tenants` - Tenant data with multi-tenant support
 - `user_roles` - User-to-tenant mappings with role information
 - `aircraft` - Aircraft asset registry
-- `work_packages` - Maintenance work packages with tenant isolation
+- `work_orders` - Maintenance work packages with tenant isolation
 - `tasks` - Individual tasks within work packages
 - `materials` - Materials/parts used in work packages
 

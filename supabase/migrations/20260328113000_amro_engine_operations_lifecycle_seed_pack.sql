@@ -17,7 +17,7 @@ DECLARE
   easa_profile_id uuid;
   policy_snapshot_id uuid;
   seeded_aircraft_count integer;
-  seeded_work_package_count integer;
+  seeded_work_order_count integer;
   seeded_flight_log_count integer;
   seeded_event_count integer;
   seeded_signal_count integer;
@@ -642,13 +642,13 @@ BEGIN
       updated_by = EXCLUDED.updated_by,
       updated_at = now();
 
-    INSERT INTO public.work_packages (
+    INSERT INTO public.work_orders (
       id,
       tenant_id,
       franchise_id,
       aircraft_id,
       work_order_number,
-      work_package_number,
+      work_order_number,
       title,
       description,
       work_type,
@@ -699,7 +699,7 @@ BEGIN
       p.estimated_cost,
       CASE WHEN p.package_status IN ('completed', 'closed') THEN p.estimated_labor_hours - 2 ELSE NULL END,
       CASE WHEN p.package_status IN ('completed', 'closed') THEN p.estimated_cost * 0.97 ELSE NULL END,
-      p.package_status::public.work_package_status,
+      p.package_status::public.work_order_status,
       actor_user_id,
       actor_user_id,
       ARRAY[
@@ -744,7 +744,7 @@ BEGIN
     )
     ON CONFLICT (work_order_number) DO UPDATE
     SET
-      work_package_number = EXCLUDED.work_package_number,
+      work_order_number = EXCLUDED.work_order_number,
       title = EXCLUDED.title,
       description = EXCLUDED.description,
       work_type = EXCLUDED.work_type,
@@ -776,7 +776,7 @@ BEGIN
       id,
       tenant_id,
       franchise_id,
-      work_package_id,
+      work_order_id,
       task_number,
       title,
       description,
@@ -807,7 +807,7 @@ BEGIN
       t.id,
       selected_franchise_id,
       wp.id,
-      format('TSK-%s-%s', right(wp.work_package_number, 4), tp.task_code),
+      format('TSK-%s-%s', right(wp.work_order_number, 4), tp.task_code),
       tp.title,
       tp.description,
       tp.category,
@@ -838,7 +838,7 @@ BEGIN
       tp.task_notes,
       actor_user_id,
       actor_user_id
-    FROM public.work_packages wp
+    FROM public.work_orders wp
     CROSS JOIN LATERAL (
       VALUES
         (
@@ -946,7 +946,7 @@ BEGIN
       task_notes
     )
     WHERE wp.tenant_id = t.id
-      AND wp.work_package_number LIKE format('WP-%s-%%', tenant_key)
+      AND wp.work_order_number LIKE format('WP-%s-%%', tenant_key)
     ON CONFLICT (id) DO UPDATE
     SET
       task_number = EXCLUDED.task_number,
@@ -1500,7 +1500,7 @@ BEGIN
       tenant_id,
       franchise_id,
       staff_qualification_id,
-      work_package_id,
+      work_order_id,
       task_id,
       action_type,
       action_status,
@@ -1530,7 +1530,7 @@ BEGIN
       (
         SELECT tk.id
         FROM public.tasks tk
-        WHERE tk.work_package_id = wp.id
+        WHERE tk.work_order_id = wp.id
           AND tk.sequence = 4
         LIMIT 1
       ),
@@ -1548,10 +1548,10 @@ BEGIN
       policy_snapshot_id,
       actor_user_id,
       actor_user_id
-    FROM public.work_packages wp
+    FROM public.work_orders wp
     WHERE wp.tenant_id = t.id
-      AND wp.work_package_number LIKE format('WP-%s-%%', tenant_key)
-      AND right(wp.work_package_number, 8) IN ('WARRANTY', 'LANALYSIS')
+      AND wp.work_order_number LIKE format('WP-%s-%%', tenant_key)
+      AND right(wp.work_order_number, 8) IN ('WARRANTY', 'LANALYSIS')
     ON CONFLICT (id) DO UPDATE
     SET
       staff_qualification_id = EXCLUDED.staff_qualification_id,
@@ -1579,7 +1579,7 @@ BEGIN
       regulator_profile_id,
       regulator_code,
       aircraft_id,
-      work_package_id,
+      work_order_id,
       obligation_code,
       obligation_type,
       title,
@@ -1601,7 +1601,7 @@ BEGIN
       ob.reg_code,
       wp.aircraft_id,
       wp.id,
-      format('OBL-%s-%s-%s', tenant_key, wp.work_package_number, ob.obligation_code),
+      format('OBL-%s-%s-%s', tenant_key, wp.work_order_number, ob.obligation_code),
       ob.obligation_type,
       ob.title,
       ob.description,
@@ -1610,10 +1610,10 @@ BEGIN
       CASE WHEN ob.obligation_code = 'CYCLES' THEN 120 ELSE NULL END,
       ob.priority,
       ob.obligation_status,
-      format('AD-%s-%s', ob.reg_code, wp.work_package_number),
+      format('AD-%s-%s', ob.reg_code, wp.work_order_number),
       actor_user_id,
       actor_user_id
-    FROM public.work_packages wp
+    FROM public.work_orders wp
     CROSS JOIN LATERAL (
       VALUES
         ('DATE', 'FAA', 'ad_sb', 'AD/SB date-based closure', 'Date-based AD closure validation for engine configuration', -3, 'critical', 'overdue'),
@@ -1630,13 +1630,13 @@ BEGIN
       obligation_status
     )
     WHERE wp.tenant_id = t.id
-      AND wp.work_package_number LIKE format('WP-%s-%%', tenant_key)
+      AND wp.work_order_number LIKE format('WP-%s-%%', tenant_key)
     ON CONFLICT (tenant_id, obligation_code) DO UPDATE
     SET
       regulator_profile_id = EXCLUDED.regulator_profile_id,
       regulator_code = EXCLUDED.regulator_code,
       aircraft_id = EXCLUDED.aircraft_id,
-      work_package_id = EXCLUDED.work_package_id,
+      work_order_id = EXCLUDED.work_order_id,
       obligation_type = EXCLUDED.obligation_type,
       title = EXCLUDED.title,
       description = EXCLUDED.description,
@@ -1656,7 +1656,7 @@ BEGIN
       franchise_id,
       aircraft_id,
       component_id,
-      work_package_id,
+      work_order_id,
       task_id,
       event_type,
       event_code,
@@ -1688,7 +1688,7 @@ BEGIN
       (
         SELECT tk.id
         FROM public.tasks tk
-        WHERE tk.work_package_id = wp.id
+        WHERE tk.work_order_id = wp.id
         ORDER BY tk.sequence NULLS LAST, tk.created_at
         LIMIT 1
       ),
@@ -1742,7 +1742,7 @@ BEGIN
     ) AS st(stage_no, event_type, event_code, title, description, lifecycle_stage)
     LEFT JOIN LATERAL (
       SELECT wp.id
-      FROM public.work_packages wp
+      FROM public.work_orders wp
       WHERE wp.tenant_id = t.id
         AND wp.aircraft_id = c.aircraft_id
       ORDER BY wp.created_at DESC
@@ -1762,7 +1762,7 @@ BEGIN
       obligation_id,
       maintenance_event_id,
       task_id,
-      work_package_id,
+      work_order_id,
       decision_status,
       decision_reason,
       evidence_reference,
@@ -1784,7 +1784,7 @@ BEGIN
         SELECT me.id
         FROM public.maintenance_events me
         WHERE me.tenant_id = t.id
-          AND me.work_package_id = co.work_package_id
+          AND me.work_order_id = co.work_order_id
           AND me.event_type = 'engine_overhaul_completed'
         ORDER BY me.event_timestamp DESC
         LIMIT 1
@@ -1792,11 +1792,11 @@ BEGIN
       (
         SELECT tk.id
         FROM public.tasks tk
-        WHERE tk.work_package_id = co.work_package_id
+        WHERE tk.work_order_id = co.work_order_id
           AND tk.sequence = 4
         LIMIT 1
       ),
-      co.work_package_id,
+      co.work_order_id,
       CASE WHEN co.status IN ('completed') THEN 'approved' ELSE 'pending' END,
       CASE WHEN co.status IN ('completed') THEN 'All release criteria satisfied' ELSE 'Awaiting final release checks' END,
       format('EVID-%s', right(co.obligation_code, 6)),
@@ -1815,7 +1815,7 @@ BEGIN
     SET
       maintenance_event_id = EXCLUDED.maintenance_event_id,
       task_id = EXCLUDED.task_id,
-      work_package_id = EXCLUDED.work_package_id,
+      work_order_id = EXCLUDED.work_order_id,
       decision_status = EXCLUDED.decision_status,
       decision_reason = EXCLUDED.decision_reason,
       evidence_reference = EXCLUDED.evidence_reference,
@@ -1836,10 +1836,10 @@ BEGIN
       AND serial_number LIKE format('EOPS-%s-%%', tenant_key);
 
     SELECT count(*)
-    INTO seeded_work_package_count
-    FROM public.work_packages
+    INTO seeded_work_order_count
+    FROM public.work_orders
     WHERE tenant_id = t.id
-      AND work_package_number LIKE format('WP-%s-%%', tenant_key);
+      AND work_order_number LIKE format('WP-%s-%%', tenant_key);
 
     SELECT count(*)
     INTO seeded_flight_log_count
@@ -1863,8 +1863,8 @@ BEGIN
       RAISE EXCEPTION 'Engine seed validation failed for tenant %: expected at least 12 aircraft, got %', t.id, seeded_aircraft_count;
     END IF;
 
-    IF seeded_work_package_count < 50 THEN
-      RAISE EXCEPTION 'Engine seed validation failed for tenant %: expected at least 50 work packages, got %', t.id, seeded_work_package_count;
+    IF seeded_work_order_count < 50 THEN
+      RAISE EXCEPTION 'Engine seed validation failed for tenant %: expected at least 50 work packages, got %', t.id, seeded_work_order_count;
     END IF;
 
     IF seeded_flight_log_count < 240 THEN

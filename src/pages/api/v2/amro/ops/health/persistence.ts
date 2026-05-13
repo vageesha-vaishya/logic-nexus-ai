@@ -10,7 +10,7 @@ import {
   resolveAndApplyAccessContext,
 } from '../../../../_utils/http';
 import { sendErrorResponse } from '../../../../_utils/errorHandler';
-import { checkAmroOpsPersistenceHealth } from '../../work-package-persistence';
+import { checkAmroOpsPersistenceHealth } from '../../work-order-persistence';
 
 export default async function handler(req: ApiRequest, res: ApiResponse): Promise<void> {
   applyCors(req, res, { methods: ['GET', 'OPTIONS'] });

@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -31,7 +31,7 @@ export type EditFieldType = 'text' | 'textarea' | 'select' | 'number' | 'date';
 
 export interface InlineEditCellProps {
   // Cell configuration
-  field: keyof WorkPackageTemplate;
+  field: keyof WorkOrderTemplate;
   value: any;
   type: EditFieldType;
   

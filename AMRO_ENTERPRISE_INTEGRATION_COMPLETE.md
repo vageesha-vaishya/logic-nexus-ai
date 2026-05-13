@@ -118,7 +118,7 @@ AD/SB Feed API → amro_compliance_ad_sb_registry table
 npm run dev
 
 # Navigate to:
-# http://localhost:3000/dashboard/amro/settings/work-package-templates
+# http://localhost:3000/dashboard/amro/settings/work-order-templates
 # or wherever your template management page is
 
 # Click "Create Template" or "Edit" on existing template

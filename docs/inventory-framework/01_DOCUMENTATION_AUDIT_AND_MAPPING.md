@@ -70,7 +70,7 @@ Primary concentration files:
 The following AMRO-specific inventory logic is retained as reference for extension-layer documentation:
 - Inventory quantity state maintained in `parts_inventory` with `quantity_on_hand`, `quantity_reserved`, and generated availability.
 - Movement tracking in `stock_movements` by typed movement plus positive quantity.
-- Reservation linkage to `work_package_id` and `task_id`.
+- Reservation linkage to `work_order_id` and `task_id`.
 - Scan lifecycle tracking via `amro_inventory_scan_events`.
 - Reorder queue generation via `amro_inventory_reorder_queue`.
 - Work-order posting trace via `amro_inventory_work_order_links`.

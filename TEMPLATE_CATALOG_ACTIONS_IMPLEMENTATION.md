@@ -80,7 +80,7 @@ const handleDelete = (template: TemplateRecord) => {
 };
 
 const confirmDelete = async () => {
-  // API call to DELETE /api/v2/amro/master-data/work_package_templates/:id
+  // API call to DELETE /api/v2/amro/master-data/work_order_templates/:id
   // Shows success/error toast
   // Refreshes template list
 };

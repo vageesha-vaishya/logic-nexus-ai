@@ -59,20 +59,20 @@ Transform the AMRO Work Package Management module from a basic work order system
 
 | Table | Purpose | Compliance |
 |-------|---------|------------|
-| `amro_work_package_template_versions` | Template versioning with approval workflow | Change control |
-| `amro_work_package_template_categories` | Template classification system | MPD/MRB alignment |
+| `amro_work_order_template_versions` | Template versioning with approval workflow | Change control |
+| `amro_work_order_template_categories` | Template classification system | MPD/MRB alignment |
 | `amro_task_dependencies` | Task dependency graph | Critical path analysis |
 | `amro_task_time_logs` | Actual labor hour tracking | Cost accounting |
 | `amro_compliance_directives` | AD/SB directive tracking | FAA/EASA compliance |
-| `amro_work_package_compliance_records` | Task-level compliance records | Digital signatures |
+| `amro_work_order_compliance_records` | Task-level compliance records | Digital signatures |
 | `amro_certificates_release_service` | CRS generation | EASA Part-145 |
 | `amro_predictive_maintenance_recommendations` | AI/ML predictions | Condition-based maintenance |
 | `amro_resource_pools` | Resource management | Qualification tracking |
-| `amro_work_package_resource_assignments` | Resource allocation | Conflict detection |
-| `amro_emergency_work_packages` | Emergency/AOP registry | Rapid response |
+| `amro_work_order_resource_assignments` | Resource allocation | Conflict detection |
+| `amro_emergency_work_orders` | Emergency/AOP registry | Rapid response |
 | `amro_maintenance_triggers` | Scheduled maintenance triggers | MPD compliance |
 | `amro_non_scheduled_tasks` | Non-scheduled task registry | Pilot/mechanic reports |
-| `amro_work_package_audit_log` | Immutable audit trail | Cryptographic integrity |
+| `amro_work_order_audit_log` | Immutable audit trail | Cryptographic integrity |
 
 **Features:**
 - ✅ Row Level Security (RLS) policies for all tables
@@ -82,7 +82,7 @@ Transform the AMRO Work Package Management module from a basic work order system
 - ✅ Multi-tenant isolation with franchise scoping
 - ✅ Soft delete support where applicable
 
-**Deliverable:** `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql`
+**Deliverable:** `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql`
 
 ---
 
@@ -245,7 +245,7 @@ npx supabase db push
 
 | File | Purpose | Lines |
 |------|---------|-------|
-| `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql` | Enhanced database schema | 500+ lines |
+| `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql` | Enhanced database schema | 500+ lines |
 
 ### Research (2 comprehensive agent reports)
 
@@ -383,7 +383,7 @@ All new UI components will follow the unified design system established in the W
    - Feature specifications
    - Industry benchmarks
 
-3. **Apply Database Schema:** `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql`
+3. **Apply Database Schema:** `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql`
    - Run migration to create new tables
    - Review RLS policies
    - Test indexes
@@ -444,7 +444,7 @@ All new UI components will follow the unified design system established in the W
 | Industry Analysis | `MRO_WORK_PACKAGE_PLATFORMS_ANALYSIS.md` |
 | Enhancement Strategy | `AMRO_WORK_PACKAGE_ENHANCEMENT_STRATEGY.md` |
 | Implementation Roadmap | `AMRO_WORK_PACKAGE_IMPLEMENTATION_ROADMAP.md` |
-| Database Schema | `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql` |
+| Database Schema | `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql` |
 | Design System | `src/features/module-amro/AMRO_DESIGN_SYSTEM.md` |
 | Unified Implementation | `AMRO_WORK_ORDERS_UNIFIED_IMPLEMENTATION.md` |
 | Pattern Alignment | `AMRO_DESIGN_PATTERN_ALIGNMENT.md` |
@@ -470,7 +470,7 @@ npx supabase db push
 # See: AMRO_WORK_PACKAGE_IMPLEMENTATION_ROADMAP.md - Phase 2
 
 # 3. Create React Query hooks
-# Follow existing patterns in useWorkPackageState.ts
+# Follow existing patterns in useWorkOrderState.ts
 
 # 4. Build UI components
 # Use AmroModuleSurface, AmroStandardToolbar, etc.

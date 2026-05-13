@@ -47,10 +47,10 @@ BEGIN
     SELECT 1
     FROM pg_type t
     JOIN pg_namespace n ON n.oid = t.typnamespace
-    WHERE t.typname = 'work_package_status'
+    WHERE t.typname = 'work_order_status'
       AND n.nspname = 'public'
   ) THEN
-    CREATE DOMAIN public.work_package_status AS text CHECK (VALUE IN ('planning', 'approved', 'scheduled', 'in_progress', 'on_hold', 'completed', 'closed', 'cancelled'));
+    CREATE DOMAIN public.work_order_status AS text CHECK (VALUE IN ('planning', 'approved', 'scheduled', 'in_progress', 'on_hold', 'completed', 'closed', 'cancelled'));
   END IF;
 
   IF NOT EXISTS (
@@ -199,7 +199,7 @@ CREATE TABLE IF NOT EXISTS public.components (
 
   -- Current location and assignment
   location text,
-  work_package_id uuid,
+  work_order_id uuid,
 
   -- Timestamps and audit
   created_at timestamptz NOT NULL DEFAULT now(),
@@ -214,12 +214,12 @@ CREATE INDEX IF NOT EXISTS idx_components_aircraft_id ON public.components(aircr
 CREATE INDEX IF NOT EXISTS idx_components_part_number ON public.components(part_number);
 CREATE INDEX IF NOT EXISTS idx_components_serial_number ON public.components(serial_number);
 CREATE INDEX IF NOT EXISTS idx_components_status ON public.components(status);
-CREATE INDEX IF NOT EXISTS idx_components_work_package_id ON public.components(work_package_id);
+CREATE INDEX IF NOT EXISTS idx_components_work_order_id ON public.components(work_order_id);
 
 -- ============================================================================
 -- 3. WORK_PACKAGES TABLE - Maintenance work orders and campaigns
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.work_packages (
+CREATE TABLE IF NOT EXISTS public.work_orders (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS public.work_packages (
   actual_cost decimal(15, 2),
 
   -- Status tracking
-  status work_package_status NOT NULL DEFAULT 'planning'::work_package_status,
+  status work_order_status NOT NULL DEFAULT 'planning'::work_order_status,
 
   -- Assignments
   assigned_to uuid REFERENCES auth.users(id) ON DELETE SET NULL,
@@ -267,20 +267,20 @@ CREATE TABLE IF NOT EXISTS public.work_packages (
   updated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_work_packages_tenant_id ON public.work_packages(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_work_packages_franchise_id ON public.work_packages(franchise_id);
-CREATE INDEX IF NOT EXISTS idx_work_packages_aircraft_id ON public.work_packages(aircraft_id);
-CREATE INDEX IF NOT EXISTS idx_work_packages_work_order_number ON public.work_packages(work_order_number);
-CREATE INDEX IF NOT EXISTS idx_work_packages_status ON public.work_packages(status);
-CREATE INDEX IF NOT EXISTS idx_work_packages_assigned_to ON public.work_packages(assigned_to);
-CREATE INDEX IF NOT EXISTS idx_work_packages_maintenance_type ON public.work_packages(maintenance_type);
+CREATE INDEX IF NOT EXISTS idx_work_orders_tenant_id ON public.work_orders(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_franchise_id ON public.work_orders(franchise_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_aircraft_id ON public.work_orders(aircraft_id);
+CREATE INDEX IF NOT EXISTS idx_work_orders_work_order_number ON public.work_orders(work_order_number);
+CREATE INDEX IF NOT EXISTS idx_work_orders_status ON public.work_orders(status);
+CREATE INDEX IF NOT EXISTS idx_work_orders_assigned_to ON public.work_orders(assigned_to);
+CREATE INDEX IF NOT EXISTS idx_work_orders_maintenance_type ON public.work_orders(maintenance_type);
 
 ALTER TABLE public.components
-  DROP CONSTRAINT IF EXISTS components_work_package_id_fkey;
+  DROP CONSTRAINT IF EXISTS components_work_order_id_fkey;
 
 ALTER TABLE public.components
-  ADD CONSTRAINT components_work_package_id_fkey
-  FOREIGN KEY (work_package_id) REFERENCES public.work_packages(id) ON DELETE SET NULL;
+  ADD CONSTRAINT components_work_order_id_fkey
+  FOREIGN KEY (work_order_id) REFERENCES public.work_orders(id) ON DELETE SET NULL;
 
 -- ============================================================================
 -- 4. TASKS TABLE - Individual maintenance tasks within work packages
@@ -289,7 +289,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
-  work_package_id uuid NOT NULL REFERENCES public.work_packages(id) ON DELETE CASCADE,
+  work_order_id uuid NOT NULL REFERENCES public.work_orders(id) ON DELETE CASCADE,
 
   -- Task identification
   task_number text NOT NULL,
@@ -336,7 +336,7 @@ CREATE TABLE IF NOT EXISTS public.tasks (
 
 CREATE INDEX IF NOT EXISTS idx_tasks_tenant_id ON public.tasks(tenant_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_franchise_id ON public.tasks(franchise_id);
-CREATE INDEX IF NOT EXISTS idx_tasks_work_package_id ON public.tasks(work_package_id);
+CREATE INDEX IF NOT EXISTS idx_tasks_work_order_id ON public.tasks(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_tasks_status ON public.tasks(status);
 CREATE INDEX IF NOT EXISTS idx_tasks_assigned_to ON public.tasks(assigned_to);
 CREATE INDEX IF NOT EXISTS idx_tasks_task_category ON public.tasks(task_category);
@@ -450,7 +450,7 @@ CREATE TABLE IF NOT EXISTS public.maintenance_events (
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
   aircraft_id uuid REFERENCES public.aircraft(id) ON DELETE SET NULL,
   component_id uuid REFERENCES public.components(id) ON DELETE SET NULL,
-  work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
 
   -- Event classification
@@ -488,7 +488,7 @@ CREATE INDEX IF NOT EXISTS idx_maintenance_events_tenant_id ON public.maintenanc
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_franchise_id ON public.maintenance_events(franchise_id);
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_aircraft_id ON public.maintenance_events(aircraft_id);
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_component_id ON public.maintenance_events(component_id);
-CREATE INDEX IF NOT EXISTS idx_maintenance_events_work_package_id ON public.maintenance_events(work_package_id);
+CREATE INDEX IF NOT EXISTS idx_maintenance_events_work_order_id ON public.maintenance_events(work_order_id);
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_task_id ON public.maintenance_events(task_id);
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_event_type ON public.maintenance_events(event_type);
 CREATE INDEX IF NOT EXISTS idx_maintenance_events_event_timestamp ON public.maintenance_events(event_timestamp);
@@ -514,11 +514,11 @@ COMMENT ON COLUMN public.maintenance_events.metadata IS 'JSON object containing 
 -- ============================================================================
 -- 7. WORK_PACKAGE_MATERIALS TABLE - Parts and materials required for work
 -- ============================================================================
-CREATE TABLE IF NOT EXISTS public.work_package_materials (
+CREATE TABLE IF NOT EXISTS public.work_order_materials (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
-  work_package_id uuid NOT NULL REFERENCES public.work_packages(id) ON DELETE CASCADE,
+  work_order_id uuid NOT NULL REFERENCES public.work_orders(id) ON DELETE CASCADE,
 
   -- Material identification
   part_number text NOT NULL,
@@ -562,12 +562,12 @@ CREATE TABLE IF NOT EXISTS public.work_package_materials (
   updated_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_work_package_materials_tenant_id ON public.work_package_materials(tenant_id);
-CREATE INDEX IF NOT EXISTS idx_work_package_materials_franchise_id ON public.work_package_materials(franchise_id);
-CREATE INDEX IF NOT EXISTS idx_work_package_materials_work_package_id ON public.work_package_materials(work_package_id);
-CREATE INDEX IF NOT EXISTS idx_work_package_materials_part_number ON public.work_package_materials(part_number);
-CREATE INDEX IF NOT EXISTS idx_work_package_materials_status ON public.work_package_materials(status);
-CREATE INDEX IF NOT EXISTS idx_work_package_materials_order_date ON public.work_package_materials(order_date);
+CREATE INDEX IF NOT EXISTS idx_work_order_materials_tenant_id ON public.work_order_materials(tenant_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_materials_franchise_id ON public.work_order_materials(franchise_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_materials_work_order_id ON public.work_order_materials(work_order_id);
+CREATE INDEX IF NOT EXISTS idx_work_order_materials_part_number ON public.work_order_materials(part_number);
+CREATE INDEX IF NOT EXISTS idx_work_order_materials_status ON public.work_order_materials(status);
+CREATE INDEX IF NOT EXISTS idx_work_order_materials_order_date ON public.work_order_materials(order_date);
 
 -- ============================================================================
 -- 8. ROW LEVEL SECURITY (RLS) POLICIES
@@ -576,11 +576,11 @@ CREATE INDEX IF NOT EXISTS idx_work_package_materials_order_date ON public.work_
 -- Enable RLS on all AMRO tables
 ALTER TABLE public.aircraft ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.components ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.work_packages ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.work_orders ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.staff_qualifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.maintenance_events ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.work_package_materials ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.work_order_materials ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================================
 -- Aircraft RLS Policies
@@ -679,9 +679,9 @@ CREATE POLICY "Components: tenant users access own tenant data"
 -- ============================================================================
 -- Work Packages RLS Policies
 -- ============================================================================
-DROP POLICY IF EXISTS "Work packages: platform admin full access" ON public.work_packages;
+DROP POLICY IF EXISTS "Work packages: platform admin full access" ON public.work_orders;
 CREATE POLICY "Work packages: platform admin full access"
-  ON public.work_packages
+  ON public.work_orders
   FOR ALL
   TO authenticated
   USING (
@@ -701,9 +701,9 @@ CREATE POLICY "Work packages: platform admin full access"
     )
   );
 
-DROP POLICY IF EXISTS "Work packages: tenant users access own tenant data" ON public.work_packages;
+DROP POLICY IF EXISTS "Work packages: tenant users access own tenant data" ON public.work_orders;
 CREATE POLICY "Work packages: tenant users access own tenant data"
-  ON public.work_packages
+  ON public.work_orders
   FOR ALL
   TO authenticated
   USING (
@@ -867,9 +867,9 @@ CREATE POLICY "Maintenance events: tenant users access own tenant data"
 -- ============================================================================
 -- Work Package Materials RLS Policies
 -- ============================================================================
-DROP POLICY IF EXISTS "Work package materials: platform admin full access" ON public.work_package_materials;
+DROP POLICY IF EXISTS "Work package materials: platform admin full access" ON public.work_order_materials;
 CREATE POLICY "Work package materials: platform admin full access"
-  ON public.work_package_materials
+  ON public.work_order_materials
   FOR ALL
   TO authenticated
   USING (
@@ -889,9 +889,9 @@ CREATE POLICY "Work package materials: platform admin full access"
     )
   );
 
-DROP POLICY IF EXISTS "Work package materials: tenant users access own tenant data" ON public.work_package_materials;
+DROP POLICY IF EXISTS "Work package materials: tenant users access own tenant data" ON public.work_order_materials;
 CREATE POLICY "Work package materials: tenant users access own tenant data"
-  ON public.work_package_materials
+  ON public.work_order_materials
   FOR ALL
   TO authenticated
   USING (

@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS public.amro_overview_kpi_snapshots (
   date_range_start date NOT NULL,
   date_range_end date NOT NULL CHECK (date_range_end >= date_range_start),
   snapshot_at timestamptz NOT NULL DEFAULT now(),
-  open_work_packages integer NOT NULL DEFAULT 0 CHECK (open_work_packages >= 0),
+  open_work_orders integer NOT NULL DEFAULT 0 CHECK (open_work_orders >= 0),
   in_progress_tasks integer NOT NULL DEFAULT 0 CHECK (in_progress_tasks >= 0),
   deferred_items integer NOT NULL DEFAULT 0 CHECK (deferred_items >= 0),
   compliance_alerts integer NOT NULL DEFAULT 0 CHECK (compliance_alerts >= 0),
@@ -69,7 +69,7 @@ CREATE TABLE IF NOT EXISTS public.amro_operational_telemetry (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
-  work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   aircraft_id uuid REFERENCES public.aircraft(id) ON DELETE SET NULL,
   source_record_key text NOT NULL,
   telemetry_source text NOT NULL,
@@ -84,8 +84,8 @@ CREATE TABLE IF NOT EXISTS public.amro_operational_telemetry (
 
 CREATE INDEX IF NOT EXISTS idx_amro_operational_telemetry_scope_metric_time
   ON public.amro_operational_telemetry(tenant_id, metric_key, recorded_at DESC);
-CREATE INDEX IF NOT EXISTS idx_amro_operational_telemetry_work_package
-  ON public.amro_operational_telemetry(work_package_id);
+CREATE INDEX IF NOT EXISTS idx_amro_operational_telemetry_work_order
+  ON public.amro_operational_telemetry(work_order_id);
 CREATE UNIQUE INDEX IF NOT EXISTS uq_amro_operational_telemetry_scope_record_key
   ON public.amro_operational_telemetry(
     tenant_id,
@@ -98,7 +98,7 @@ CREATE TABLE IF NOT EXISTS public.amro_compliance_events (
   tenant_id uuid NOT NULL REFERENCES public.tenants(id) ON DELETE CASCADE,
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
   obligation_id uuid REFERENCES public.compliance_obligations(id) ON DELETE SET NULL,
-  work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
   maintenance_event_id uuid REFERENCES public.maintenance_events(id) ON DELETE SET NULL,
   event_code text NOT NULL,

@@ -47,7 +47,7 @@ ALTER TABLE public.compliance_obligations
   ADD COLUMN IF NOT EXISTS deleted_at timestamptz;
 
 ALTER TABLE public.compliance_records
-  ADD COLUMN IF NOT EXISTS work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  ADD COLUMN IF NOT EXISTS work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS approving_authority uuid REFERENCES auth.users(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS approving_authority_profile_id uuid REFERENCES public.regulator_profiles(id) ON DELETE SET NULL,
   ADD COLUMN IF NOT EXISTS policy_snapshot_id uuid REFERENCES public.policy_snapshots(id) ON DELETE SET NULL,
@@ -680,8 +680,8 @@ BEGIN
     updated_by = EXCLUDED.updated_by,
     updated_at = now();
 
-  INSERT INTO public.work_packages (
-    id, tenant_id, franchise_id, aircraft_id, work_order_number, work_package_number, title, description,
+  INSERT INTO public.work_orders (
+    id, tenant_id, franchise_id, aircraft_id, work_order_number, work_order_number, title, description,
     work_type, maintenance_type, priority, source,
     planned_start_date, planned_end_date, planned_start, planned_end,
     status, assigned_to, supervisor_id, created_by, updated_by
@@ -704,11 +704,11 @@ BEGIN
     now() - make_interval(days => (60 - gs)),
     now() - make_interval(days => (58 - gs)),
     CASE
-      WHEN gs % 5 = 0 THEN 'completed'::public.work_package_status
-      WHEN gs % 5 = 1 THEN 'in_progress'::public.work_package_status
-      WHEN gs % 5 = 2 THEN 'scheduled'::public.work_package_status
-      WHEN gs % 5 = 3 THEN 'planning'::public.work_package_status
-      ELSE 'approved'::public.work_package_status
+      WHEN gs % 5 = 0 THEN 'completed'::public.work_order_status
+      WHEN gs % 5 = 1 THEN 'in_progress'::public.work_order_status
+      WHEN gs % 5 = 2 THEN 'scheduled'::public.work_order_status
+      WHEN gs % 5 = 3 THEN 'planning'::public.work_order_status
+      ELSE 'approved'::public.work_order_status
     END,
     v_actor_user_id,
     v_actor_user_id,
@@ -904,7 +904,7 @@ BEGIN
     deleted_at = NULL;
 
   INSERT INTO public.compliance_obligations (
-    id, tenant_id, franchise_id, regulator_profile_id, regulator_code, aircraft_id, work_package_id,
+    id, tenant_id, franchise_id, regulator_profile_id, regulator_code, aircraft_id, work_order_id,
     obligation_code, obligation_type, title, description, due_date, due_hours, due_cycles,
     priority, status, source_reference, created_by, updated_by
   )
@@ -939,7 +939,7 @@ BEGIN
   ) rp ON true
   JOIN LATERAL (
     SELECT wp.id
-    FROM public.work_packages wp
+    FROM public.work_orders wp
     WHERE wp.tenant_id = v_tenant_id
       AND wp.aircraft_id = v_aircraft_id
     ORDER BY wp.created_at DESC
@@ -958,7 +958,7 @@ BEGIN
     deleted_at = NULL;
 
   INSERT INTO public.maintenance_events (
-    id, tenant_id, franchise_id, aircraft_id, component_id, work_package_id, task_id,
+    id, tenant_id, franchise_id, aircraft_id, component_id, work_order_id, task_id,
     event_type, event_code, event_status, title, description,
     performed_by, approved_by, data, metadata, signature, signature_timestamp, signature_method,
     evidence_hash, regulatory_requirement, compliance_authority, event_timestamp, event_hash, previous_hash,
@@ -1017,7 +1017,7 @@ BEGIN
   ) c ON true
   JOIN LATERAL (
     SELECT wp.id
-    FROM public.work_packages wp
+    FROM public.work_orders wp
     WHERE wp.tenant_id = v_tenant_id
       AND wp.aircraft_id = v_aircraft_id
     ORDER BY wp.created_at DESC
@@ -1034,7 +1034,7 @@ BEGIN
     deleted_at = NULL;
 
   INSERT INTO public.compliance_records (
-    id, tenant_id, franchise_id, obligation_id, maintenance_event_id, task_id, work_package_id,
+    id, tenant_id, franchise_id, obligation_id, maintenance_event_id, task_id, work_order_id,
     decision_status, decision_reason, evidence_reference, evidence_hash, reviewed_by, reviewed_at,
     approving_authority, approving_authority_profile_id, policy_snapshot_id, created_by, updated_by
   )
@@ -1045,7 +1045,7 @@ BEGIN
     co.id,
     me.id,
     NULL,
-    co.work_package_id,
+    co.work_order_id,
     CASE WHEN co.status = 'overdue' THEN 'deferred' ELSE 'approved' END,
     CASE WHEN co.status = 'overdue' THEN 'Deferred pending overdue closure package' ELSE 'Approved for release' END,
     format('AUTO-EVID-%s', right(co.obligation_code, 3)),

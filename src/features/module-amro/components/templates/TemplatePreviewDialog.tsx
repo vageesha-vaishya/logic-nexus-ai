@@ -30,7 +30,7 @@ interface TemplateRecord {
   version: number;
   active: boolean;
   status: string;
-  scope_items_count: number;
+  scope_items_count?: number;
   tasks_count: number;
   estimated_labor_hours: number | null;
   created_at: string;

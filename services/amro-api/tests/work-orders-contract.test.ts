@@ -1,11 +1,11 @@
 import request from 'supertest';
 
 const mockWorkOrdersService = {
-  getWorkPackages: jest.fn(),
-  getWorkPackage: jest.fn(),
-  createWorkPackage: jest.fn(),
-  updateWorkPackage: jest.fn(),
-  deleteWorkPackage: jest.fn(),
+  getWorkOrders: jest.fn(),
+  getWorkOrder: jest.fn(),
+  createWorkOrder: jest.fn(),
+  updateWorkOrder: jest.fn(),
+  deleteWorkOrder: jest.fn(),
   getTasks: jest.fn(),
   getTask: jest.fn(),
   createTask: jest.fn(),
@@ -35,11 +35,11 @@ describe('Work Orders Routes Field Contract', () => {
     jest.clearAllMocks();
   });
 
-  it('maps route workPackageId and keeps legacy sequence_number', async () => {
+  it('maps route workOrderId and keeps legacy sequence_number', async () => {
     mockWorkOrdersService.createTask.mockResolvedValue({
       id: 'task-1',
       tenant_id: 'tenant-1',
-      work_package_id: 'wp-1',
+      work_order_id: 'wp-1',
       task_number: 'TASK-1',
       title: 'Task',
       status: 'pending',
@@ -47,7 +47,7 @@ describe('Work Orders Routes Field Contract', () => {
       updated_at: new Date().toISOString(),
     });
 
-    const response = await request(app).post('/api/v1/work-packages/wp-1/tasks').send({
+    const response = await request(app).post('/api/v1/work-orders/wp-1/tasks').send({
       title: 'Task',
       sequence_number: 5,
     });
@@ -57,7 +57,7 @@ describe('Work Orders Routes Field Contract', () => {
       'tenant-1',
       'user-1',
       expect.objectContaining({
-        work_package_id: 'wp-1',
+        work_order_id: 'wp-1',
         sequence_number: 5,
       }),
     );
@@ -67,7 +67,7 @@ describe('Work Orders Routes Field Contract', () => {
     mockWorkOrdersService.createTask.mockResolvedValue({
       id: 'task-2',
       tenant_id: 'tenant-1',
-      work_package_id: 'wp-1',
+      work_order_id: 'wp-1',
       task_number: 'TASK-2',
       title: 'Task 2',
       status: 'pending',
@@ -75,7 +75,7 @@ describe('Work Orders Routes Field Contract', () => {
       updated_at: new Date().toISOString(),
     });
 
-    const response = await request(app).post('/api/v1/work-packages/wp-1/tasks').send({
+    const response = await request(app).post('/api/v1/work-orders/wp-1/tasks').send({
       title: 'Task 2',
       sequence_order: 7,
     });
@@ -85,7 +85,7 @@ describe('Work Orders Routes Field Contract', () => {
       'tenant-1',
       'user-1',
       expect.objectContaining({
-        work_package_id: 'wp-1',
+        work_order_id: 'wp-1',
         sequence_order: 7,
       }),
     );
@@ -94,7 +94,7 @@ describe('Work Orders Routes Field Contract', () => {
   it('forwards tenant scope to materials endpoint', async () => {
     mockWorkOrdersService.getMaterials.mockResolvedValue([]);
 
-    const response = await request(app).get('/api/v1/work-packages/wp-42/materials');
+    const response = await request(app).get('/api/v1/work-orders/wp-42/materials');
 
     expect(response.status).toBe(200);
     expect(mockWorkOrdersService.getMaterials).toHaveBeenCalledWith('tenant-1', 'wp-42');

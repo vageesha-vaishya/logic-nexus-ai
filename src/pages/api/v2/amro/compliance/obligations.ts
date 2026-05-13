@@ -72,7 +72,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     const franchiseId = scopedAccess.franchiseId ? String(scopedAccess.franchiseId) : null;
 
     if (req.method === 'GET') {
-      const workPackageId = String(req.query.work_package_id || '').trim();
+      const workOrderId = String(req.query.work_order_id || '').trim();
       res.status(200).json({
         version: 'v2',
         interface: 'list-compliance-obligations',
@@ -80,7 +80,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         output: {
           tenant_id: tenantId,
           franchise_id: franchiseId,
-          work_package_id: workPackageId || null,
+          work_order_id: workOrderId || null,
           obligations: [
             {
               obligation_id: `${tenantId}-ad-sb-001`,

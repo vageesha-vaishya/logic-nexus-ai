@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { AircraftActionPalette, type AircraftPaletteAction } from './AircraftActionPalette';
 
-export type AircraftUnifiedLayoutModuleKey = 'list' | 'templates' | 'engine' | 'components' | 'documents' | 'ad-sb' | 'work-packages';
+export type AircraftUnifiedLayoutModuleKey = 'list' | 'templates' | 'engine' | 'components' | 'documents' | 'ad-sb' | 'work-orders';
 
 export type AircraftUnifiedNavItem = {
   key: AircraftUnifiedLayoutModuleKey;

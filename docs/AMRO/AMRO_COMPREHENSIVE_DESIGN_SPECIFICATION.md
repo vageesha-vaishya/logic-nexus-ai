@@ -1008,20 +1008,20 @@ For each component, follow this technical specification:
 
 ```typescript
 // ✅ GOOD: Typed, immutable, DRY
-interface WorkPackage {
+interface WorkOrder {
   id: string;
   tenant_id: string;
   title: string;
-  status: WorkPackageStatus;
+  status: WorkOrderStatus;
 }
 
-type WorkPackageStatus = 'open' | 'planning' | 'scheduled' | 'in_execution' | 'closed';
+type WorkOrderStatus = 'open' | 'planning' | 'scheduled' | 'in_execution' | 'closed';
 
 // ❌ AVOID: Any types, mutable, loose typing
 const wp: any = { id: '123', title: 'Test' };
 
 // ✅ GOOD: Explicit state management
-const [status, setStatus] = useState<WorkPackageStatus>('open');
+const [status, setStatus] = useState<WorkOrderStatus>('open');
 const [isLoading, setIsLoading] = useState(false);
 const [error, setError] = useState<Error | null>(null);
 
@@ -1030,7 +1030,7 @@ const [state, setState] = useState({});
 
 // ✅ GOOD: Clear error handling
 try {
-  const result = await updateWorkPackage(id, updates);
+  const result = await updateWorkOrder(id, updates);
   setStatus(result.status);
 } catch (error) {
   setError(error);
@@ -1038,17 +1038,17 @@ try {
 }
 
 // ❌ AVOID: Silent failures
-updateWorkPackage(id, updates);
+updateWorkOrder(id, updates);
 
 // ✅ GOOD: Tenant scoping in all queries
 const query = supabase
-  .from('work_packages')
+  .from('work_orders')
   .select('*')
   .eq('tenant_id', currentTenant);
 
 // ❌ AVOID: Missing tenant filters
 const query = supabase
-  .from('work_packages')
+  .from('work_orders')
   .select('*');
 ```
 
@@ -1056,10 +1056,10 @@ const query = supabase
 
 ```typescript
 // ✅ GOOD: Functional component with hooks
-export function WorkPackageDetail({ id }: Props) {
+export function WorkOrderDetail({ id }: Props) {
   const { data, isLoading, error } = useQuery(
-    ['work_packages', id],
-    () => getWorkPackage(id),
+    ['work_orders', id],
+    () => getWorkOrder(id),
   );
 
   if (isLoading) return <Skeleton />;
@@ -1074,7 +1074,7 @@ export function WorkPackageDetail({ id }: Props) {
 }
 
 // ❌ AVOID: Class components, prop drilling
-class WorkPackageDetail extends React.Component {
+class WorkOrderDetail extends React.Component {
   // ...
 }
 ```

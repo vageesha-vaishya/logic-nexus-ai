@@ -54,7 +54,7 @@ Response:
 ### List all work packages for tenant
 
 ```bash
-curl -X GET http://localhost:3001/api/v1/work-packages \
+curl -X GET http://localhost:3001/api/v1/work-orders \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json"
 ```
@@ -67,7 +67,7 @@ Response:
       "id": "wp-123",
       "tenant_id": "tenant-456",
       "aircraft_id": "ac-789",
-      "work_package_number": "WP-1710960345123",
+      "work_order_number": "WP-1710960345123",
       "title": "100-Hour Inspection",
       "description": "Scheduled maintenance per FAA",
       "maintenance_type": "inspection",
@@ -85,7 +85,7 @@ Response:
 ### Get specific work package
 
 ```bash
-curl -X GET http://localhost:3001/api/v1/work-packages/wp-123 \
+curl -X GET http://localhost:3001/api/v1/work-orders/wp-123 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json"
 ```
@@ -97,7 +97,7 @@ Response:
     "id": "wp-123",
     "tenant_id": "tenant-456",
     "aircraft_id": "ac-789",
-    "work_package_number": "WP-1710960345123",
+    "work_order_number": "WP-1710960345123",
     "title": "100-Hour Inspection",
     "description": "Scheduled maintenance per FAA",
     "maintenance_type": "inspection",
@@ -113,7 +113,7 @@ Response:
 ### Create work package
 
 ```bash
-curl -X POST http://localhost:3001/api/v1/work-packages \
+curl -X POST http://localhost:3001/api/v1/work-orders \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -135,7 +135,7 @@ Response:
     "id": "wp-new-id",
     "tenant_id": "tenant-456",
     "aircraft_id": "ac-789",
-    "work_package_number": "WP-1710960400000",
+    "work_order_number": "WP-1710960400000",
     "title": "Annual Inspection",
     "description": "Annual airworthiness inspection",
     "maintenance_type": "inspection",
@@ -153,7 +153,7 @@ Response:
 ### Update work package
 
 ```bash
-curl -X PATCH http://localhost:3001/api/v1/work-packages/wp-123 \
+curl -X PATCH http://localhost:3001/api/v1/work-orders/wp-123 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -170,7 +170,7 @@ Response:
     "id": "wp-123",
     "tenant_id": "tenant-456",
     "aircraft_id": "ac-789",
-    "work_package_number": "WP-1710960345123",
+    "work_order_number": "WP-1710960345123",
     "title": "100-Hour Inspection",
     "status": "approved",
     "assigned_to": "tech-001",
@@ -183,7 +183,7 @@ Response:
 ### Delete work package
 
 ```bash
-curl -X DELETE http://localhost:3001/api/v1/work-packages/wp-123 \
+curl -X DELETE http://localhost:3001/api/v1/work-orders/wp-123 \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json"
 ```
@@ -195,7 +195,7 @@ Response: `204 No Content`
 ### List tasks for work package
 
 ```bash
-curl -X GET http://localhost:3001/api/v1/work-packages/wp-123/tasks \
+curl -X GET http://localhost:3001/api/v1/work-orders/wp-123/tasks \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json"
 ```
@@ -207,7 +207,7 @@ Response:
     {
       "id": "task-001",
       "tenant_id": "tenant-456",
-      "work_package_id": "wp-123",
+      "work_order_id": "wp-123",
       "task_number": "TASK-1710960345123",
       "title": "Engine oil change",
       "description": "Change engine oil and filter",
@@ -222,7 +222,7 @@ Response:
     {
       "id": "task-002",
       "tenant_id": "tenant-456",
-      "work_package_id": "wp-123",
+      "work_order_id": "wp-123",
       "task_number": "TASK-1710960350000",
       "title": "Hydraulic fluid check",
       "description": "Check hydraulic fluid levels",
@@ -252,7 +252,7 @@ Response:
   "data": {
     "id": "task-001",
     "tenant_id": "tenant-456",
-    "work_package_id": "wp-123",
+    "work_order_id": "wp-123",
     "task_number": "TASK-1710960345123",
     "title": "Engine oil change",
     "description": "Change engine oil and filter",
@@ -268,11 +268,11 @@ Response:
 ### Create task
 
 ```bash
-curl -X POST http://localhost:3001/api/v1/work-packages/wp-123/tasks \
+curl -X POST http://localhost:3001/api/v1/work-orders/wp-123/tasks \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
-    "work_package_id": "wp-123",
+    "work_order_id": "wp-123",
     "title": "Brake inspection",
     "description": "Inspect brake system components",
     "sequence_number": 3,
@@ -288,7 +288,7 @@ Response:
   "data": {
     "id": "task-new-id",
     "tenant_id": "tenant-456",
-    "work_package_id": "wp-123",
+    "work_order_id": "wp-123",
     "task_number": "TASK-1710960450000",
     "title": "Brake inspection",
     "description": "Inspect brake system components",
@@ -322,7 +322,7 @@ Response:
   "data": {
     "id": "task-001",
     "tenant_id": "tenant-456",
-    "work_package_id": "wp-123",
+    "work_order_id": "wp-123",
     "task_number": "TASK-1710960345123",
     "title": "Engine oil change",
     "status": "in_progress",
@@ -348,7 +348,7 @@ Response: `204 No Content`
 ### Missing authentication
 
 ```bash
-curl -X GET http://localhost:3001/api/v1/work-packages
+curl -X GET http://localhost:3001/api/v1/work-orders
 ```
 
 Response: `401 Unauthorized`
@@ -363,7 +363,7 @@ Response: `401 Unauthorized`
 ### Invalid token
 
 ```bash
-curl -X GET http://localhost:3001/api/v1/work-packages \
+curl -X GET http://localhost:3001/api/v1/work-orders \
   -H "Authorization: Bearer invalid-token"
 ```
 
@@ -379,7 +379,7 @@ Response: `401 Unauthorized`
 ### Validation error
 
 ```bash
-curl -X POST http://localhost:3001/api/v1/work-packages \
+curl -X POST http://localhost:3001/api/v1/work-orders \
   -H "Authorization: Bearer <token>" \
   -H "Content-Type: application/json" \
   -d '{
@@ -399,7 +399,7 @@ Response: `400 Bad Request`
 ### Resource not found
 
 ```bash
-curl -X GET http://localhost:3001/api/v1/work-packages/non-existent-id \
+curl -X GET http://localhost:3001/api/v1/work-orders/non-existent-id \
   -H "Authorization: Bearer <token>"
 ```
 
@@ -419,8 +419,8 @@ const API_URL = 'http://localhost:3001/api/v1';
 const token = 'your-jwt-token';
 
 // Fetch work packages
-async function getWorkPackages() {
-  const response = await fetch(`${API_URL}/work-packages`, {
+async function getWorkOrders() {
+  const response = await fetch(`${API_URL}/work-orders`, {
     method: 'GET',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -437,8 +437,8 @@ async function getWorkPackages() {
 }
 
 // Create work package
-async function createWorkPackage(payload) {
-  const response = await fetch(`${API_URL}/work-packages`, {
+async function createWorkOrder(payload) {
+  const response = await fetch(`${API_URL}/work-orders`, {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -456,8 +456,8 @@ async function createWorkPackage(payload) {
 }
 
 // Update work package
-async function updateWorkPackage(id, updates) {
-  const response = await fetch(`${API_URL}/work-packages/${id}`, {
+async function updateWorkOrder(id, updates) {
+  const response = await fetch(`${API_URL}/work-orders/${id}`, {
     method: 'PATCH',
     headers: {
       'Authorization': `Bearer ${token}`,
@@ -478,7 +478,7 @@ async function updateWorkPackage(id, updates) {
 ## TypeScript Client Example
 
 ```typescript
-import { WorkPackage, Task, CreateWorkPackageRequest } from '../services/amro-api/src/types/amro.types';
+import { WorkOrder, Task, CreateWorkOrderRequest } from '../services/amro-api/src/types/amro.types';
 
 class AMROClient {
   private apiUrl = 'http://localhost:3001/api/v1';
@@ -506,21 +506,21 @@ class AMROClient {
     return response.json();
   }
 
-  async getWorkPackages(): Promise<{ data: WorkPackage[]; count: number }> {
-    return this.request('GET', '/work-packages');
+  async getWorkOrders(): Promise<{ data: WorkOrder[]; count: number }> {
+    return this.request('GET', '/work-orders');
   }
 
-  async createWorkPackage(payload: CreateWorkPackageRequest): Promise<{ data: WorkPackage }> {
-    return this.request('POST', '/work-packages', payload);
+  async createWorkOrder(payload: CreateWorkOrderRequest): Promise<{ data: WorkOrder }> {
+    return this.request('POST', '/work-orders', payload);
   }
 
-  async getTasks(workPackageId: string): Promise<{ data: Task[]; count: number }> {
-    return this.request('GET', `/work-packages/${workPackageId}/tasks`);
+  async getTasks(workOrderId: string): Promise<{ data: Task[]; count: number }> {
+    return this.request('GET', `/work-orders/${workOrderId}/tasks`);
   }
 }
 
 // Usage
 const client = new AMROClient(token);
-const workPackages = await client.getWorkPackages();
-console.log(workPackages.data);
+const workOrders = await client.getWorkOrders();
+console.log(workOrders.data);
 ```

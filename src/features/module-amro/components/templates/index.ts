@@ -1,5 +1,5 @@
 // Template Management Components
-export { AmroWorkPackageTemplateAdapter } from './AmroWorkPackageTemplateAdapter';
+export { AmroWorkOrderTemplateAdapter } from './AmroWorkOrderTemplateAdapter';
 export { AmroTemplateVersionManager } from './AmroTemplateVersionManager';
 export { AmroTemplateCatalogPage } from './AmroTemplateCatalogPage';
 export { TemplatePreviewDialog } from './TemplatePreviewDialog';

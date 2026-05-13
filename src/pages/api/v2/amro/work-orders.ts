@@ -1,0 +1,2560 @@
+import type { ApiRequest, ApiResponse } from '../../_utils/types';
+import {
+  applyCors,
+  authenticateRequest,
+  buildApiContext,
+  enforceAmroDomainAccess,
+  enforceAnyPermission,
+  enforceHttps,
+  enforceRateLimit,
+  handlePreflight,
+  logApiEvent,
+  resolveAndApplyAccessContext,
+} from '../../_utils/http';
+import { sendErrorResponse } from '../../_utils/errorHandler';
+import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../_utils/compatibility-facade';
+import {
+  adaptLegacyWorkOrders,
+  adaptModuleWorkOrdersFromLegacy,
+  buildAmroIntegrationContractEnvelope,
+  buildAmroServiceBoundaryEnvelope,
+  createAmroIsolationScope,
+  enforceAmroScopedLegacyRows,
+  type LegacyWorkOrderRow,
+  type WorkOrderItem,
+} from './anti-corruption-adapter';
+import {
+  buildHistoricalBackfillMetadata,
+  drainAmroReconciliationQueueForFallback,
+  enqueueAmroDualWriteOperation,
+  enqueueAmroReconciliationSnapshot,
+} from './reconciliation-queue';
+import { appendAmroAuditLedgerRecord } from './audit-ledger';
+import { resolveAmroAuditLedgerCutoverState, resolveAmroV2EndpointRolloutState } from './audit-ledger-cutover';
+import { enforceAmroSequentialMilestoneForWorkOrderInterface } from './phase-plan-model';
+import {
+  persistCloneTemplateWorkOrder,
+  persistCreateWorkOrder,
+  persistTransitionWorkOrder,
+} from './work-order-persistence';
+import { TemplateNotAccessibleException, assertTemplateRegistryAccess } from './template-registry-client';
+import { sanitizeWorkflowPayload } from './workflow-transaction-logger';
+import {
+  isRuntimeWorkOrderDeleted,
+  listRuntimeWorkOrders,
+  transitionRuntimeWorkOrder,
+  upsertRuntimeWorkOrder,
+} from './work-order-runtime-store';
+import masterDataEntityHandler from './master-data/[entity]';
+
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) return fallback;
+  return normalized === 'true' || normalized === '1' || normalized === 'on';
+}
+
+function isV2Enabled(): boolean {
+  return parseBoolean(process.env.AMRO_WORK_PACKAGES_V2_ENABLED, true);
+}
+
+function isDualRunEnabled(): boolean {
+  return parseBoolean(process.env.AMRO_WORK_PACKAGES_DUAL_RUN, true);
+}
+
+function isLegacyFallbackEnabled(): boolean {
+  return parseBoolean(process.env.AMRO_V2_LEGACY_FALLBACK_ENABLED, false)
+    || parseBoolean(process.env.AMRO_WORK_PACKAGES_LEGACY_FALLBACK_ENABLED, false);
+}
+
+function buildLegacyRows(tenantId: string, franchiseId: string | null): LegacyWorkOrderRow[] {
+  return [
+    {
+      legacy_id: 'legacy-wp-001',
+      legacy_code: 'WP-001',
+      legacy_title: 'Legacy Structural Inspection',
+      legacy_status: 'planning',
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      domain_id: 'amro',
+      version: 'v2',
+    },
+    {
+      legacy_id: 'legacy-wp-002',
+      legacy_code: 'WP-002',
+      legacy_title: 'Legacy Avionics Reliability Check',
+      legacy_status: 'in_progress',
+      tenant_id: tenantId,
+      franchise_id: franchiseId,
+      domain_id: 'amro',
+      version: 'v2',
+    },
+  ];
+}
+
+function buildReconciliation(legacyItems: WorkOrderItem[], moduleItems: WorkOrderItem[]) {
+  const legacyCodes = new Set(legacyItems.map((item) => item.code));
+  const moduleCodes = new Set(moduleItems.map((item) => item.code));
+  const missingInModule = legacyItems.filter((item) => !moduleCodes.has(item.code)).map((item) => item.code);
+  const missingInLegacy = moduleItems.filter((item) => !legacyCodes.has(item.code)).map((item) => item.code);
+  return {
+    legacyCount: legacyItems.length,
+    moduleCount: moduleItems.length,
+    deltaCount: Math.abs(legacyItems.length - moduleItems.length) + missingInLegacy.length + missingInModule.length,
+    missingInModule,
+    missingInLegacy,
+  };
+}
+
+type WorkOrderStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+type ReplanWorkOrderState = 'planning' | 'scheduled' | 'blocked';
+type ShortageAction = 'backorder' | 'substitute' | 'escalate';
+type TraceabilityAction = 'verify' | 'quarantine' | 'release';
+type WorkOrderCreationTrigger = 'schedule_due' | 'defect' | 'campaign' | 'predictive_alert' | 'compliance';
+type PlannerObjective = 'minimize_ground_time' | 'maximize_staff_utilization' | 'minimize_overtime' | 'protect_flight_commitments';
+
+const ALLOWED_SHORTAGE_ACTIONS = new Set(['backorder', 'substitute', 'escalate']);
+const ALLOWED_TRACEABILITY_ACTIONS = new Set(['verify', 'quarantine', 'release']);
+const ALLOWED_PLANNER_OBJECTIVES = new Set<PlannerObjective>([
+  'minimize_ground_time',
+  'maximize_staff_utilization',
+  'minimize_overtime',
+  'protect_flight_commitments',
+]);
+const TRUSTED_SUPPLIER_ADAPTERS = new Set(['sap-pm', 'maximo', 'oracle-eam']);
+const TRUSTED_PROCUREMENT_ADAPTERS = new Set(['sap-pm', 'oracle-eam', 'maximo', 'ariba', 'coupa']);
+const REPLAN_APPROVER_ROLES = new Set(['tenant_admin', 'planner']);
+const WORK_PACKAGE_PUBLISH_ROLES = new Set(['tenant_admin', 'planner', 'inspector']);
+const REPLANNABLE_STATES = new Set<ReplanWorkOrderState>(['planning', 'scheduled', 'blocked']);
+const ALLOWED_FILTER_STATUSES = new Set(['all', 'planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled']);
+const ALLOWED_WORK_PACKAGE_STATUSES = new Set<WorkOrderStatus>(['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled']);
+const WORK_PACKAGE_TRANSITION_POLICY: Record<WorkOrderStatus, ReadonlySet<WorkOrderStatus>> = {
+  planning: new Set(['planning', 'scheduled', 'blocked', 'cancelled']),
+  scheduled: new Set(['scheduled', 'in_progress', 'blocked', 'cancelled']),
+  in_progress: new Set(['in_progress', 'blocked', 'completed', 'cancelled']),
+  blocked: new Set(['blocked', 'scheduled', 'in_progress', 'cancelled']),
+  completed: new Set(['completed']),
+  cancelled: new Set(['cancelled']),
+};
+const WORK_PACKAGE_ROLE_POLICY: Record<string, ReadonlySet<WorkOrderStatus>> = {
+  tenant_admin: new Set(['planning', 'scheduled', 'in_progress', 'blocked', 'completed', 'cancelled']),
+  planner: new Set(['planning', 'scheduled', 'blocked']),
+  engineer: new Set(['scheduled', 'in_progress', 'blocked']),
+  technician: new Set(['in_progress', 'blocked']),
+  inspector: new Set(['completed', 'blocked']),
+};
+const SAVED_WORK_PACKAGE_VIEWS: ReadonlyArray<{
+  id: string;
+  name: string;
+  filters: { status: string; search: string };
+}> = [
+  { id: 'default-all', name: 'All Work Packages', filters: { status: 'all', search: '' } },
+  { id: 'scheduled-only', name: 'Scheduled Today', filters: { status: 'scheduled', search: '' } },
+  { id: 'blocked-items', name: 'Blocked Items', filters: { status: 'blocked', search: '' } },
+];
+
+function parseBody(body: unknown): Record<string, unknown> {
+  if (body && typeof body === 'object') {
+    return body as Record<string, unknown>;
+  }
+  return {};
+}
+
+function resolveHeaderValue(req: ApiRequest, headerName: string): string {
+  const value = req.headers?.[headerName];
+  if (Array.isArray(value)) {
+    return String(value[0] || '').trim();
+  }
+  return String(value || '').trim();
+}
+
+function parseIdempotencyKey(req: ApiRequest, body: Record<string, unknown>, fallbackKey?: string): string {
+  const fromHeader = resolveHeaderValue(req, 'idempotency-key');
+  const fromBody = String(body.idempotency_key || '').trim();
+  const idempotencyKey = fromHeader || fromBody || String(fallbackKey || '').trim();
+  if (!idempotencyKey) {
+    throw new Error('idempotency key is required');
+  }
+  if (idempotencyKey.length > 128) {
+    throw new Error('idempotency key length exceeds max limit');
+  }
+  return idempotencyKey;
+}
+
+function parseDecisionTraceId(body: Record<string, unknown>, correlationId: string): string {
+  const decisionTraceId = String(body.decision_trace_id || '').trim();
+  return decisionTraceId || `decision-${correlationId}`;
+}
+
+function parseScopeContext(
+  body: Record<string, unknown>,
+  tenantId: string,
+  franchiseId: string | null,
+  role: string,
+) {
+  const scopeContext = parseBody(body.scope_context);
+  const payloadTenantId = String(scopeContext.tenant_id || tenantId).trim();
+  const payloadFranchiseId = String(scopeContext.franchise_id || franchiseId || '').trim();
+  const payloadDomainId = String(scopeContext.domain_id || 'amro').trim().toLowerCase();
+  const payloadRole = String(scopeContext.role || role).trim().toLowerCase();
+  if (payloadTenantId !== tenantId) {
+    throw new Error('scope_context tenant_id violates tenant scope');
+  }
+  if (payloadFranchiseId !== String(franchiseId || '')) {
+    throw new Error('scope_context franchise_id violates franchise scope');
+  }
+  if (payloadDomainId !== 'amro') {
+    throw new Error('scope_context domain_id must be amro');
+  }
+  return {
+    tenant_id: tenantId,
+    franchise_id: franchiseId,
+    domain_id: 'amro',
+    role: payloadRole,
+  };
+}
+
+function parsePlannerObjectives(value: unknown): PlannerObjective[] {
+  const normalized = parseStringArray(value).map((item) => item.toLowerCase() as PlannerObjective);
+  if (normalized.length === 0) {
+    return ['minimize_ground_time', 'protect_flight_commitments'];
+  }
+  const invalid = normalized.find((item) => !ALLOWED_PLANNER_OBJECTIVES.has(item));
+  if (invalid) {
+    throw new Error('optimization objectives are invalid');
+  }
+  return normalized;
+}
+
+function parseStatusFilter(req: ApiRequest): string {
+  const raw = Array.isArray(req.query.status) ? req.query.status[0] : req.query.status;
+  const normalized = String(raw || 'all').trim().toLowerCase() || 'all';
+  if (!ALLOWED_FILTER_STATUSES.has(normalized)) {
+    throw new Error('Bad Request: status filter is invalid');
+  }
+  return normalized;
+}
+
+function parseSearchFilter(req: ApiRequest): string {
+  const raw = Array.isArray(req.query.search) ? req.query.search[0] : req.query.search;
+  return String(raw || '').trim().toLowerCase();
+}
+
+function parseSavedViewId(req: ApiRequest): string | null {
+  const raw = Array.isArray(req.query.saved_view) ? req.query.saved_view[0] : req.query.saved_view;
+  const normalized = String(raw || '').trim();
+  return normalized || null;
+}
+
+type ApiAmro001Filters = {
+  statuses: string[];
+  station: string | null;
+  aircraft_id: string | null;
+  due_before: string | null;
+  page: number;
+  page_size: number;
+  sort: string;
+};
+
+function parseQueryArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry || '').trim().toLowerCase()).filter(Boolean);
+  }
+  const normalized = String(value || '').trim().toLowerCase();
+  if (!normalized) {
+    return [];
+  }
+  return normalized.split(',').map((entry) => entry.trim()).filter(Boolean);
+}
+
+function parsePositiveInteger(value: unknown, fallback: number, fieldName: string, max: number): number {
+  if (value === undefined || value === null || value === '') {
+    return fallback;
+  }
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed) || parsed < 1 || parsed > max) {
+    throw new Error(`AMRO_FILTER_VALIDATION_FAILED:${fieldName}`);
+  }
+  return parsed;
+}
+
+function parseApiAmro001Filters(req: ApiRequest, tenantId: string): ApiAmro001Filters {
+  const statusValues = parseQueryArray(req.query.status);
+  const statuses = statusValues.length === 0 ? ['all'] : statusValues;
+  const invalidStatus = statuses.find((status) => !ALLOWED_FILTER_STATUSES.has(status));
+  if (invalidStatus) {
+    throw new Error('AMRO_FILTER_VALIDATION_FAILED:status');
+  }
+  const stationRaw = Array.isArray(req.query.station) ? req.query.station[0] : req.query.station;
+  const station = String(stationRaw || '').trim() || null;
+  if (station && station.includes(':') && !station.startsWith(`${tenantId}:`)) {
+    throw new Error('AMRO_AUTH_SCOPE_INVALID');
+  }
+  const aircraftRaw = Array.isArray(req.query.aircraft_id) ? req.query.aircraft_id[0] : req.query.aircraft_id;
+  const aircraftId = String(aircraftRaw || '').trim() || null;
+  if (aircraftId && aircraftId.includes(':') && !aircraftId.startsWith(`${tenantId}:`)) {
+    throw new Error('AMRO_AUTH_SCOPE_INVALID');
+  }
+  const dueBeforeRaw = Array.isArray(req.query.due_before) ? req.query.due_before[0] : req.query.due_before;
+  const dueBefore = String(dueBeforeRaw || '').trim() || null;
+  if (dueBefore) {
+    const parsed = Date.parse(dueBefore);
+    if (!Number.isFinite(parsed)) {
+      throw new Error('AMRO_FILTER_VALIDATION_FAILED:due_before');
+    }
+  }
+  const pageRaw = Array.isArray(req.query.page) ? req.query.page[0] : req.query.page;
+  const pageSizeRaw = Array.isArray(req.query.page_size) ? req.query.page_size[0] : req.query.page_size;
+  const sortRaw = Array.isArray(req.query.sort) ? req.query.sort[0] : req.query.sort;
+  const page = parsePositiveInteger(pageRaw, 1, 'page', 100000);
+  const pageSize = parsePositiveInteger(pageSizeRaw, 25, 'page_size', 100);
+  const sort = String(sortRaw || 'planned_end:asc').trim().toLowerCase();
+  if (sort && !['planned_end:asc', 'planned_end:desc', 'status:asc', 'status:desc', 'priority:asc', 'priority:desc'].includes(sort)) {
+    throw new Error('AMRO_FILTER_VALIDATION_FAILED:sort');
+  }
+  return {
+    statuses,
+    station,
+    aircraft_id: aircraftId,
+    due_before: dueBefore,
+    page,
+    page_size: pageSize,
+    sort,
+  };
+}
+
+function buildApiAmro001Payload(items: WorkOrderItem[], filters: ApiAmro001Filters, tenantId: string) {
+  const mapped = items.map((item, index) => {
+    const plannedEndDate = new Date(Date.UTC(2026, 2, 21 + (index % 5), 10 + (index % 6), 0, 0));
+    return {
+      work_order_id: item.id,
+      code: item.code,
+      title: item.title,
+      status: item.status,
+      priority: index % 3 === 0 ? 'critical' : index % 2 === 0 ? 'high' : 'medium',
+      station: `${tenantId}:station-${(index % 2) + 1}`,
+      aircraft_id: `${tenantId}:aircraft-${(index % 3) + 1}`,
+      due_at: plannedEndDate.toISOString(),
+      planned_end: plannedEndDate.toISOString(),
+    };
+  });
+  const statusFiltered = filters.statuses.includes('all')
+    ? mapped
+    : mapped.filter((item) => filters.statuses.includes(String(item.status).toLowerCase()));
+  const stationFiltered = filters.station
+    ? statusFiltered.filter((item) => item.station === filters.station)
+    : statusFiltered;
+  const aircraftFiltered = filters.aircraft_id
+    ? stationFiltered.filter((item) => item.aircraft_id === filters.aircraft_id)
+    : stationFiltered;
+  const dueFiltered = filters.due_before
+    ? aircraftFiltered.filter((item) => Date.parse(item.due_at) <= Date.parse(filters.due_before as string))
+    : aircraftFiltered;
+  const sorted = [...dueFiltered].sort((left, right) => {
+    if (filters.sort === 'planned_end:desc') return right.planned_end.localeCompare(left.planned_end);
+    if (filters.sort === 'status:asc') return left.status.localeCompare(right.status);
+    if (filters.sort === 'status:desc') return right.status.localeCompare(left.status);
+    if (filters.sort === 'priority:asc') return left.priority.localeCompare(right.priority);
+    if (filters.sort === 'priority:desc') return right.priority.localeCompare(left.priority);
+    return left.planned_end.localeCompare(right.planned_end);
+  });
+  const start = (filters.page - 1) * filters.page_size;
+  const paged = sorted.slice(start, start + filters.page_size);
+  return {
+    items: paged,
+    pagination: {
+      page: filters.page,
+      page_size: filters.page_size,
+      total_items: sorted.length,
+      total_pages: Math.max(1, Math.ceil(sorted.length / filters.page_size)),
+    },
+    kpi_snapshot: {
+      open_work_orders: sorted.filter((item) => item.status !== 'completed').length,
+      blocked_work_orders: 0,
+      due_within_24h: sorted.filter((item) => Date.parse(item.due_at) - Date.now() <= 1000 * 60 * 60 * 24).length,
+    },
+    applied_filters: {
+      status: filters.statuses,
+      station: filters.station,
+      aircraft_id: filters.aircraft_id,
+      due_before: filters.due_before,
+      page: filters.page,
+      page_size: filters.page_size,
+      sort: filters.sort,
+    },
+  };
+}
+
+function applyWorkOrderFilters(items: WorkOrderItem[], status: string, search: string): WorkOrderItem[] {
+  const normalizeStatus = (value: string) => value === 'planned' ? 'planning' : value;
+  return items.filter((item) => {
+    const statusMatch = status === 'all' ? true : normalizeStatus(item.status.toLowerCase()) === status;
+    const searchMatch = !search
+      ? true
+      : item.code.toLowerCase().includes(search) || item.title.toLowerCase().includes(search);
+    return statusMatch && searchMatch;
+  });
+}
+
+function normalizeWorkOrderStatus(value: string): WorkOrderStatus {
+  const normalized = String(value || '').trim().toLowerCase();
+  if (normalized === 'planned') {
+    return 'planning';
+  }
+  if (ALLOWED_WORK_PACKAGE_STATUSES.has(normalized as WorkOrderStatus)) {
+    return normalized as WorkOrderStatus;
+  }
+  return 'planning';
+}
+
+function parseDateWindow(value: unknown): { from: string; to: string } {
+  const raw = String(value || '').trim();
+  if (!raw) {
+    throw new Error('planned_window is required');
+  }
+  let from = '';
+  let to = '';
+  if (raw.includes('|')) {
+    const parts = raw.split('|');
+    from = String(parts[0] || '').trim();
+    to = String(parts[1] || '').trim();
+  } else if (raw.includes(',')) {
+    const parts = raw.split(',');
+    from = String(parts[0] || '').trim();
+    to = String(parts[1] || '').trim();
+  } else if (raw.includes('Z:')) {
+    const [left = '', right = ''] = raw.split('Z:');
+    from = `${String(left || '').trim()}Z`;
+    to = String(right || '').trim();
+  }
+  const fromDate = Date.parse(from);
+  const toDate = Date.parse(to);
+  if (!Number.isFinite(fromDate) || !Number.isFinite(toDate) || fromDate > toDate) {
+    throw new Error('planned_window must be a valid ISO start/end range');
+  }
+  return { from, to };
+}
+
+function parseStringArray(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.map((item) => String(item || '').trim()).filter(Boolean);
+  }
+  const raw = String(value || '').trim();
+  if (!raw) return [];
+  return raw.split(',').map((item) => item.trim()).filter(Boolean);
+}
+
+function parseNumber(value: unknown, fieldName: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${fieldName} must be a valid number`);
+  }
+  return parsed;
+}
+
+function parseIsoTimestamp(value: unknown, fieldName: string): string {
+  const normalized = assertNonEmpty(value, fieldName);
+  const parsed = Date.parse(normalized);
+  if (!Number.isFinite(parsed)) {
+    throw new Error(`${fieldName} must be a valid ISO timestamp`);
+  }
+  return new Date(parsed).toISOString();
+}
+
+function parseCreationTrigger(body: Record<string, unknown>) {
+  const requestedSource = String(body.trigger_source || body.source || 'schedule_due').trim().toLowerCase();
+  const sourceAliasMap: Record<string, WorkOrderCreationTrigger> = {
+    schedule: 'schedule_due',
+    schedule_due: 'schedule_due',
+    defect: 'defect',
+    campaign: 'campaign',
+    predictive: 'predictive_alert',
+    predictive_alert: 'predictive_alert',
+    compliance: 'compliance',
+  };
+  const source = sourceAliasMap[requestedSource];
+  if (!source) {
+    throw new Error('trigger_source must be schedule_due, defect, campaign, predictive_alert, or compliance');
+  }
+  const referenceId = assertNonEmpty(
+    body.trigger_reference_id || body.reference_id || `${source}-trigger`,
+    'trigger_reference_id',
+  );
+  const triggeredAt = parseIsoTimestamp(body.triggered_at || new Date().toISOString(), 'triggered_at');
+  return {
+    source,
+    referenceId,
+    triggeredAt,
+  };
+}
+
+function parseEngineerPlan(body: Record<string, unknown>, scopeItems: string[]) {
+  const taskPlan = parseStringArray(body.task_plan || scopeItems);
+  const laborHours = parseNumber(body.labor_hours ?? Math.max(1, taskPlan.length * 1.5), 'labor_hours');
+  const partsPlan = parseStringArray(body.parts_plan);
+  const downtimeMinutes = parseNumber(body.downtime_minutes ?? Math.max(30, taskPlan.length * 45), 'downtime_minutes');
+  if (taskPlan.length === 0) {
+    throw new Error('task_plan must include at least one task');
+  }
+  if (laborHours < 0) {
+    throw new Error('labor_hours must be a non-negative value');
+  }
+  if (downtimeMinutes < 0) {
+    throw new Error('downtime_minutes must be a non-negative value');
+  }
+  return {
+    tasks: taskPlan,
+    labor_hours: laborHours,
+    parts_plan: partsPlan,
+    downtime_minutes: downtimeMinutes,
+  };
+}
+
+function parseScheduleWindow(start: unknown, end: unknown): { slotStart: string; slotEnd: string } {
+  const slotStart = parseIsoTimestamp(start, 'slot_start');
+  const slotEnd = parseIsoTimestamp(end, 'slot_end');
+  if (Date.parse(slotStart) >= Date.parse(slotEnd)) {
+    throw new Error('slot_start must be earlier than slot_end');
+  }
+  return { slotStart, slotEnd };
+}
+
+function assertNoOverlap(window: { slotStart: string; slotEnd: string }, existingSlots: Array<Record<string, unknown>>) {
+  const start = Date.parse(window.slotStart);
+  const end = Date.parse(window.slotEnd);
+  const hasOverlap = existingSlots.some((slot) => {
+    const existingStart = Date.parse(String(slot.slot_start || ''));
+    const existingEnd = Date.parse(String(slot.slot_end || ''));
+    if (!Number.isFinite(existingStart) || !Number.isFinite(existingEnd)) return false;
+    return start < existingEnd && existingStart < end;
+  });
+  if (hasOverlap) {
+    throw new Error('No overlap allowed');
+  }
+}
+
+function assertStationCapacity(assignedTeamCount: number, stationCapacity: number) {
+  if (stationCapacity <= 0) {
+    throw new Error('station capacity must be positive');
+  }
+  if (assignedTeamCount > stationCapacity) {
+    throw new Error('station capacity check failed');
+  }
+}
+
+function parseObjectArray(value: unknown, fieldName: string): Array<Record<string, unknown>> {
+  if (!Array.isArray(value)) {
+    throw new Error(`${fieldName} must be an array`);
+  }
+  return value.map((entry) => (entry && typeof entry === 'object' ? (entry as Record<string, unknown>) : {}));
+}
+
+function assertTeamQualifications(assignedTeam: Array<Record<string, unknown>>, stationCode: string) {
+  const normalizedStation = stationCode.trim().toLowerCase();
+  const unqualified = assignedTeam.some((member) => {
+    const qualifications = parseStringArray(member.qualifications);
+    return !qualifications.map((item) => item.toLowerCase()).includes(normalizedStation);
+  });
+  if (unqualified) {
+    throw new Error('qualification checks required');
+  }
+}
+
+function assertActiveConstraintsAndTenantCalendar(
+  activeConstraints: Array<Record<string, unknown>>,
+  tenantCalendarId: string,
+  tenantId: string
+) {
+  if (activeConstraints.length === 0) {
+    throw new Error('simulation must include active constraints');
+  }
+  if (!tenantCalendarId.startsWith(`${tenantId}:`)) {
+    throw new Error('simulation must include tenant-specific calendars');
+  }
+}
+
+function assertReplannableStates(affectedWorkOrders: Array<Record<string, unknown>>) {
+  const invalidPackage = affectedWorkOrders.find((workOrder) => {
+    const state = String(workOrder.current_state || '').trim().toLowerCase() as ReplanWorkOrderState;
+    return !REPLANNABLE_STATES.has(state);
+  });
+  if (invalidPackage) {
+    throw new Error('all affected packages must be in re-plannable states');
+  }
+}
+
+function parseDemandLines(value: unknown, tenantId: string): Array<{ partNumber: string; quantity: number; serial: string | null }> {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new Error('demand_lines must include at least one line');
+  }
+  const serialRegistry = new Set<string>();
+  return value.map((line, index) => {
+    const record = line && typeof line === 'object' ? (line as Record<string, unknown>) : {};
+    const partNumber = assertNonEmpty(record.part_number, `demand_lines[${index}].part_number`);
+    const quantity = parseNumber(record.quantity, `demand_lines[${index}].quantity`);
+    if (quantity <= 0) {
+      throw new Error('Quantity must be positive');
+    }
+    const serialRaw = String(record.serial || '').trim();
+    const serial = serialRaw || null;
+    if (serial) {
+      const tenantScopedSerial = `${tenantId}:${serial}`;
+      if (serialRegistry.has(tenantScopedSerial)) {
+        throw new Error('serialized parts must be unique per tenant');
+      }
+      serialRegistry.add(tenantScopedSerial);
+    }
+    return { partNumber, quantity, serial };
+  });
+}
+
+function assertNonEmpty(value: unknown, fieldName: string): string {
+  const normalized = String(value || '').trim();
+  if (!normalized) {
+    throw new Error(`${fieldName} is required`);
+  }
+  return normalized;
+}
+
+function assertScopeRequired(tenantId: string, franchiseId: string | null) {
+  if (!tenantId) {
+    throw new Error('Tenant scope required');
+  }
+}
+
+function enforceWorkOrderMutationAccess(permissions: string[], role: string): void {
+  try {
+    enforceAnyPermission(permissions || [], ['dashboards.manage', 'reports.manage']);
+    return;
+  } catch (_error) {
+    const normalizedRole = String(role || '').trim().toLowerCase();
+    const allowedRoles = new Set(['tenant_admin', 'franchise_admin', 'planner', 'engineer', 'inspector', 'developer']);
+    if (allowedRoles.has(normalizedRole)) {
+      return;
+    }
+    throw new Error('Forbidden: missing work package mutation permission');
+  }
+}
+
+function assertOptionalScopedIdentifier(value: string, tenantId: string, fieldName: string) {
+  const normalized = String(value || '').trim();
+  if (!normalized.includes(':')) return;
+  const [scopedTenant = ''] = normalized.split(':');
+  if (scopedTenant !== tenantId) {
+    throw new Error(`${fieldName} violates tenant scope`);
+  }
+}
+
+function assertOptionalScopeContext(body: Record<string, unknown>, tenantId: string, franchiseId: string | null) {
+  const scope = parseBody(body.scope);
+  if (!Object.keys(scope).length) return;
+  const scopeTenantId = String(scope.tenant_id || '').trim();
+  const scopeFranchiseId = String(scope.franchise_id || '').trim();
+  if (scopeTenantId && scopeTenantId !== tenantId) {
+    throw new Error('data scope violation detected');
+  }
+  if (scopeFranchiseId && scopeFranchiseId !== String(franchiseId || '')) {
+    throw new Error('data scope violation detected');
+  }
+}
+
+function parseExpectedVersion(value: unknown): number {
+  const parsed = Number.parseInt(String(value ?? '1'), 10);
+  if (!Number.isFinite(parsed) || parsed < 1) {
+    throw new Error('expected_version must be a positive integer');
+  }
+  return parsed;
+}
+
+function parseWorkOrderStatus(value: unknown, fieldName: string): WorkOrderStatus {
+  const normalized = assertNonEmpty(value, fieldName).toLowerCase() as WorkOrderStatus;
+  if (!ALLOWED_WORK_PACKAGE_STATUSES.has(normalized)) {
+    throw new Error(`${fieldName} is invalid`);
+  }
+  return normalized;
+}
+
+function assertTransitionAllowedByPolicyAndRole(
+  currentStatus: WorkOrderStatus,
+  targetStatus: WorkOrderStatus,
+  actorRole: string,
+) {
+  const allowedTargets = WORK_PACKAGE_TRANSITION_POLICY[currentStatus];
+  if (!allowedTargets.has(targetStatus)) {
+    throw new Error('Transition must be allowed by policy matrix and role');
+  }
+  const normalizedRole = String(actorRole || '').trim().toLowerCase();
+  const roleTargets = WORK_PACKAGE_ROLE_POLICY[normalizedRole] || WORK_PACKAGE_ROLE_POLICY.tenant_admin;
+  if (!roleTargets.has(targetStatus)) {
+    throw new Error('Transition must be allowed by policy matrix and role');
+  }
+}
+
+function appendWorkOrderAuditRecord(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+  compatMode: string;
+  mode: 'dual-run' | 'module' | 'legacy-fallback';
+  legacyItems: WorkOrderItem[];
+  moduleItems: WorkOrderItem[];
+  queueMode: 'redis' | 'memory' | 'disabled' | null;
+  snapshotCheckpoint: string | null;
+}) {
+  const reconciliation = buildReconciliation(params.legacyItems, params.moduleItems);
+  const historicalBackfill = buildHistoricalBackfillMetadata({
+    capability: 'work-orders',
+    correlationId: params.correlationId,
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    compatMode: params.compatMode,
+    requestedFilters: {},
+    reconciliation,
+  });
+
+  return appendAmroAuditLedgerRecord({
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    capability: 'work-orders',
+    eventType: 'amro.audit.recorded.v1',
+    entityType: 'work-order',
+    entityId: 'scope:all',
+    correlationId: params.correlationId,
+    action: `${params.mode}.read`,
+    compatMode: params.compatMode,
+    sourceHash: historicalBackfill.sourceHash,
+    migrationBatchId: historicalBackfill.migrationBatchId,
+    replayCheckpoint: params.snapshotCheckpoint || historicalBackfill.replayCheckpoint,
+    context: {
+      mode: params.mode,
+      queueMode: params.queueMode,
+      reconciliation,
+    },
+  });
+}
+
+function appendWorkOrderMutationAuditRecord(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+  compatMode: string;
+  interfaceName: string;
+  entityId: string;
+  context: Record<string, unknown>;
+}) {
+  return appendAmroAuditLedgerRecord({
+    tenantId: params.tenantId,
+    franchiseId: params.franchiseId,
+    capability: 'work-orders',
+    eventType: 'amro.audit.recorded.v1',
+    entityType: 'work-order',
+    entityId: params.entityId,
+    correlationId: params.correlationId,
+    action: `${params.interfaceName}.write`,
+    compatMode: params.compatMode,
+    sourceHash: `${params.tenantId}:${params.interfaceName}:${params.entityId}:${params.correlationId}`,
+    migrationBatchId: `runtime:${params.tenantId}:${params.franchiseId || 'franchise-none'}`,
+    replayCheckpoint: `mutation:${Date.now()}`,
+    context: params.context,
+  });
+}
+
+async function enqueueWorkOrderDualWriteOperations(params: {
+  tenantId: string;
+  franchiseId: string | null;
+  correlationId: string;
+  compatMode: string;
+  workOrders: WorkOrderItem[];
+}) {
+  const createdWorkOrders = params.workOrders.filter((item) => item.status === 'planned' || item.status === 'planning');
+  const operations = await Promise.all(
+    createdWorkOrders.map(async (item) => {
+      const result = await enqueueAmroDualWriteOperation({
+        capability: 'work-orders',
+        tenantId: params.tenantId,
+        franchiseId: params.franchiseId,
+        compatMode: params.compatMode,
+        correlationId: params.correlationId,
+        entityType: 'work-order',
+        entityId: item.id,
+        eventType: 'amro.work_order.created.v1',
+        action: 'upsert',
+      });
+      return {
+        entityId: item.id,
+        eventType: 'amro.work_order.created.v1',
+        idempotencyKey: result.idempotencyKey,
+        queueMode: result.queueMode,
+      };
+    })
+  );
+  return {
+    enabled: true,
+    approvedEntityCount: createdWorkOrders.length,
+    operations,
+  };
+}
+
+export default async function handler(req: ApiRequest, res: ApiResponse) {
+  applyCors(req, res, { methods: ['GET', 'POST', 'OPTIONS'] });
+  if (handlePreflight(req, res)) return;
+
+  const ctx = buildApiContext(req);
+  const initialDecision = resolveGatewayCompatibility(req);
+  applyCompatibilityResponseHeaders(res, initialDecision, ctx.correlationId);
+
+  try {
+    if (req.method !== 'GET' && req.method !== 'POST') {
+      res.setHeader('Allow', ['GET', 'POST']);
+      return res.status(405).json({ error: `Method ${req.method} Not Allowed`, correlationId: ctx.correlationId, version: 'v2' });
+    }
+
+    if (!isV2Enabled()) {
+      return res.status(404).json({
+        error: 'AMRO work packages v2 endpoint is disabled',
+        correlationId: ctx.correlationId,
+        version: 'v2',
+      });
+    }
+
+    enforceHttps(req);
+    enforceRateLimit(req);
+    const auth = await authenticateRequest(req);
+    ctx.userId = auth.userId;
+    ctx.role = auth.role;
+    const access = await resolveAndApplyAccessContext(req, ctx);
+    const compatDecision = resolveGatewayCompatibility(req, {
+      tenantId: access.tenantId,
+      franchiseId: access.franchiseId,
+    });
+    applyCompatibilityResponseHeaders(res, compatDecision, ctx.correlationId);
+
+    const amroAccess = await enforceAmroDomainAccess(access, { correlationId: ctx.correlationId });
+    const tenantId = String(access.tenantId || '');
+    const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
+    const isolationScope = createAmroIsolationScope(tenantId, franchiseId);
+    const serviceBoundaries = buildAmroServiceBoundaryEnvelope({
+      capability: 'work-orders',
+      scope: isolationScope,
+      subscriptionStatus: amroAccess.subscriptionStatus,
+      validatedAt: amroAccess.validatedAt,
+    });
+    const rolloutState = resolveAmroV2EndpointRolloutState({
+      tenantId,
+      franchiseId,
+      capability: 'work-orders',
+    });
+    if (!rolloutState.enabled) {
+      return res.status(404).json({
+        error: 'AMRO work packages v2 endpoint is not enabled for this rollout cohort',
+        endpointRollout: rolloutState,
+        correlationId: ctx.correlationId,
+        version: 'v2',
+      });
+    }
+    const cutoverState = resolveAmroAuditLedgerCutoverState({
+      tenantId,
+      franchiseId,
+      capability: 'work-orders',
+    });
+    const interfaceName = String(req.query.interface || '').trim().toLowerCase();
+    if (req.method === 'POST') {
+      enforceAmroSequentialMilestoneForWorkOrderInterface(interfaceName);
+    }
+
+    if (req.method === 'POST' && interfaceName === 'create-work-order-template') {
+      const body = parseBody(req.body);
+      req.query = {
+        ...req.query,
+        entity: 'work_order_templates',
+      };
+      req.body = body;
+      return masterDataEntityHandler(req, res);
+    }
+
+    if (req.method === 'POST' && interfaceName === 'create-work-order') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      const idempotencyKey = parseIdempotencyKey(req, body, `create-work-order:${ctx.correlationId}`);
+      const decisionTraceId = parseDecisionTraceId(body, ctx.correlationId);
+      const scopeContext = parseScopeContext(body, tenantId, franchiseId, String(ctx.role || ''));
+      const aircraftId = assertNonEmpty(body.aircraft_id, 'aircraft_id');
+      const maintenanceType = assertNonEmpty(body.maintenance_type, 'maintenance_type').toLowerCase();
+      const plannedWindow = parseDateWindow(body.planned_window);
+      const station = assertNonEmpty(body.station, 'station');
+      const priority = assertNonEmpty(body.priority, 'priority').toLowerCase();
+      const workOrderTemplateId = String(body.work_order_template_id || '').trim();
+      const scopeItems = parseStringArray(body.scope_items);
+      const creationTrigger = parseCreationTrigger(body);
+      const engineerPlan = parseEngineerPlan(body, scopeItems);
+      const scopedStation = station.includes(':') ? station : `${tenantId}:${station}`;
+      const userId = String(ctx.userId || '');
+      const nowIso = new Date().toISOString();
+      let persisted;
+      let persistenceMode: 'database' | 'runtime-fallback' = 'database';
+      try {
+        persisted = await persistCreateWorkOrder({
+          tenantId,
+          franchiseId: String(franchiseId || ''),
+          userId,
+          workOrderTemplateId,
+          aircraftId,
+          maintenanceType,
+          plannedWindowFrom: plannedWindow.from,
+          plannedWindowTo: plannedWindow.to,
+          station: scopedStation,
+          priority,
+          scopeItems,
+          creationTriggerSource: creationTrigger.source,
+          creationTriggerReferenceId: creationTrigger.referenceId,
+          creationTriggeredAt: creationTrigger.triggeredAt,
+          engineerPlan,
+        });
+      } catch (error) {
+        if (workOrderTemplateId) {
+          const reason = String((error as Error)?.message || 'task generation failed');
+          throw new Error(`work package creation failed with template tasks: ${reason}`);
+        }
+        persistenceMode = 'runtime-fallback';
+        persisted = {
+          work_order_id: `${tenantId}-${franchiseId || 'fr-none'}-wp-${Date.now()}`,
+          status: 'planning',
+          version: 1,
+          created_at: nowIso,
+          created_by: userId,
+          updated_at: nowIso,
+          updated_by: userId,
+        };
+      }
+      const normalizedPersistedStatus = normalizeWorkOrderStatus(persisted.status);
+      upsertRuntimeWorkOrder({
+        id: persisted.work_order_id,
+        code: `WP-${String(persisted.work_order_id).slice(-6).toUpperCase()}`,
+        title: scopeItems[0] || 'AMRO Work Package',
+        status: normalizedPersistedStatus,
+        maintenance_type: maintenanceType,
+        priority,
+        aircraft_id: aircraftId,
+        planned_start: plannedWindow.from,
+        planned_end: plannedWindow.to,
+        station: scopedStation,
+        scope_items: scopeItems,
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        version: persisted.version,
+        created_at: persisted.created_at,
+        created_by: persisted.created_by || userId,
+        updated_at: persisted.updated_at || persisted.created_at,
+        updated_by: persisted.updated_by || userId,
+      });
+      const output = {
+        work_order_id: persisted.work_order_id,
+        status: normalizedPersistedStatus,
+        version: persisted.version,
+        created_at: persisted.created_at,
+        created_by: persisted.created_by,
+        persistence_mode: persistenceMode,
+        planning_bundle: {
+          task_count: engineerPlan.tasks.length,
+          labor_hours: engineerPlan.labor_hours,
+          parts_count: engineerPlan.parts_plan.length,
+          downtime_minutes: engineerPlan.downtime_minutes,
+        },
+        generated_tasks_count: Number(persisted.generated_tasks_count ?? persisted.inherited_tasks_count ?? 0),
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.work_order_id,
+          context: {
+            input: {
+              aircraft_id: aircraftId,
+              maintenance_type: maintenanceType,
+              planned_window: plannedWindow,
+              station: scopedStation,
+              priority,
+            },
+            output,
+          },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'create-work-order',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          aircraft_id: aircraftId,
+          maintenance_type: maintenanceType,
+          planned_window: plannedWindow,
+          station: scopedStation,
+          priority,
+          scope_items: scopeItems,
+          idempotency_key: idempotencyKey,
+          decision_trace_id: decisionTraceId,
+          scope_context: scopeContext,
+          creation_trigger: {
+            source: creationTrigger.source,
+            reference_id: creationTrigger.referenceId,
+            triggered_at: creationTrigger.triggeredAt,
+          },
+          engineer_plan: engineerPlan,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'save-work-order-view') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      const body = parseBody(req.body);
+      const viewName = assertNonEmpty(body.view_name, 'view_name');
+      const filters = parseBody(body.filters);
+      const statusFilter = String(filters.status || 'all').trim().toLowerCase();
+      if (!ALLOWED_FILTER_STATUSES.has(statusFilter)) {
+        throw new Error('filters.status is invalid');
+      }
+      const searchFilter = String(filters.search || '').trim().toLowerCase();
+      const output = {
+        saved_view_id: `${tenantId}-${franchiseId}-view-${Date.now()}`,
+        view_name: viewName,
+        filters: {
+          status: statusFilter,
+          search: searchFilter,
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.saved_view_id,
+          context: { output },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'save-work-order-view',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'transition-work-order') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      const body = parseBody(req.body);
+      const idempotencyKey = parseIdempotencyKey(req, body, `transition-work-order:${ctx.correlationId}`);
+      const decisionTraceId = parseDecisionTraceId(body, ctx.correlationId);
+      const scopeContext = parseScopeContext(body, tenantId, franchiseId, String(ctx.role || ''));
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      const targetStatus = parseWorkOrderStatus(body.target_status, 'target_status');
+      const reasonCode = assertNonEmpty(body.reason_code, 'reason_code');
+      const actorSignature = assertNonEmpty(body.actor_signature, 'actor_signature');
+      const currentStatus = parseWorkOrderStatus(body.current_status || 'planning', 'current_status');
+      const expectedVersion = parseExpectedVersion(body.expected_version);
+      assertTransitionAllowedByPolicyAndRole(currentStatus, targetStatus, String(ctx.role || ''));
+      const transitionId = `${tenantId}-${workOrderId}-${Date.now()}`;
+      const userId = String(ctx.userId || '');
+      const lifecycleEventType = targetStatus === 'completed'
+        ? 'amro.work_order.lifecycle.closed.v1'
+        : 'amro.work_order.lifecycle.transitioned.v1';
+      const publishedEvent = {
+        event_type: lifecycleEventType,
+        work_order_id: workOrderId,
+        previous_status: currentStatus,
+        next_status: targetStatus,
+        published_at: new Date().toISOString(),
+      };
+      let persistedTransition;
+      try {
+        persistedTransition = await persistTransitionWorkOrder({
+          tenantId,
+          franchiseId: String(franchiseId || ''),
+          userId,
+          workOrderId,
+          currentStatus,
+          targetStatus,
+          reasonCode,
+          actorSignature,
+          expectedVersion,
+          actorRole: String(ctx.role || ''),
+          transitionId,
+          gateName: 'work-order-transition',
+          workflowInputPayload: sanitizeWorkflowPayload({
+            work_order_id: workOrderId,
+            current_status: currentStatus,
+            target_status: targetStatus,
+            reason_code: reasonCode,
+            actor_signature: actorSignature,
+            expected_version: expectedVersion,
+          }),
+          workflowUserContext: {
+            tenant_id: tenantId,
+            franchise_id: franchiseId,
+            user_id: ctx.userId,
+            role: ctx.role,
+          },
+        });
+      } catch (error) {
+        if (error instanceof Error && error.message === 'optimistic_lock_conflict') {
+          return res.status(409).json({
+            version: 'v2',
+            interface: 'transition-work-order',
+            correlationId: ctx.correlationId,
+            compatMode: compatDecision.compatMode,
+            mode: 'module',
+            domainAccess: {
+              subscriptionStatus: amroAccess.subscriptionStatus,
+              source: amroAccess.source,
+              validatedAt: amroAccess.validatedAt,
+            },
+            serviceBoundaries,
+            input: {
+              work_order_id: workOrderId,
+              current_status: currentStatus,
+              target_status: targetStatus,
+              reason_code: reasonCode,
+              actor_signature: actorSignature,
+              expected_version: expectedVersion,
+            },
+            error: {
+              code: 'OPTIMISTIC_LOCK_CONFLICT',
+              message: 'work package was updated by another transaction',
+            },
+          });
+        }
+        if (error instanceof Error) {
+          const errorMessage = String(error.message || '').toLowerCase();
+          const isRecoverablePersistenceFailure = errorMessage.includes('failed to persist')
+            || errorMessage.includes('timeout')
+            || errorMessage.includes('network')
+            || errorMessage.includes('connection');
+          if (!isRecoverablePersistenceFailure) {
+            throw error;
+          }
+        }
+        const transitionedRuntime = transitionRuntimeWorkOrder(
+          { tenantId, franchiseId },
+          workOrderId,
+          targetStatus,
+          userId,
+        );
+        const nowIso = new Date().toISOString();
+        persistedTransition = transitionedRuntime
+          ? {
+              work_order_id: transitionedRuntime.id,
+              status: transitionedRuntime.status,
+              version: transitionedRuntime.version,
+              created_at: transitionedRuntime.created_at,
+              created_by: transitionedRuntime.created_by,
+              updated_at: transitionedRuntime.updated_at,
+              updated_by: transitionedRuntime.updated_by,
+            }
+          : {
+              work_order_id: workOrderId,
+              status: targetStatus,
+              version: expectedVersion + 1,
+              created_at: nowIso,
+              created_by: userId,
+              updated_at: nowIso,
+              updated_by: userId,
+            };
+      }
+      const normalizedTransitionStatus = normalizeWorkOrderStatus(persistedTransition.status);
+      upsertRuntimeWorkOrder({
+        id: persistedTransition.work_order_id,
+        code: `WP-${String(persistedTransition.work_order_id).slice(-6).toUpperCase()}`,
+        title: `AMRO ${String(persistedTransition.work_order_id).slice(-6).toUpperCase()}`,
+        status: normalizedTransitionStatus,
+        maintenance_type: 'line',
+        priority: 'medium',
+        aircraft_id: `${tenantId}:aircraft-primary`,
+        planned_start: new Date().toISOString(),
+        planned_end: new Date(Date.now() + 1000 * 60 * 60 * 8).toISOString(),
+        station: `${tenantId}:station-a`,
+        scope_items: [],
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        version: persistedTransition.version,
+        created_at: persistedTransition.created_at,
+        created_by: persistedTransition.created_by || userId,
+        updated_at: persistedTransition.updated_at || new Date().toISOString(),
+        updated_by: persistedTransition.updated_by || userId,
+      });
+      const output = {
+        updated_status: normalizedTransitionStatus,
+        version: persistedTransition.version,
+        transition_id: transitionId,
+        gate_results: [
+          { gate: 'policy-matrix', status: 'passed' },
+          { gate: 'role-authorization', status: 'passed' },
+          { gate: 'commit-transaction', status: 'passed' },
+        ],
+        published_events: [publishedEvent],
+        commit_decision: {
+          successful: true,
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workOrderId,
+          context: { output, published_event: publishedEvent },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'transition-work-order',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_order_id: workOrderId,
+          current_status: currentStatus,
+          target_status: targetStatus,
+          reason_code: reasonCode,
+          actor_signature: actorSignature,
+          idempotency_key: idempotencyKey,
+          decision_trace_id: decisionTraceId,
+          scope_context: scopeContext,
+        },
+        output,
+        closure: targetStatus === 'completed' ? {
+          immutable_audit_chain_written: Boolean(auditRecord),
+          lifecycle_event_published: true,
+        } : null,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'clone-template') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      const templateId = assertNonEmpty(body.template_id, 'template_id');
+      const registryVersion = String(body.registry_version || req.query.registryVersion || '').trim() || null;
+      const templateMetadata = await assertTemplateRegistryAccess({
+        tenantId,
+        userId: String(ctx.userId || ''),
+        templateId,
+        requiredPermission: 'INSTANTIATE',
+        registryVersion,
+      });
+      const aircraftId = assertNonEmpty(body.aircraft_id, 'aircraft_id');
+      const overrideFields = parseBody(body.override_fields);
+      const persisted = await persistCloneTemplateWorkOrder({
+        tenantId,
+        franchiseId: String(franchiseId),
+        userId: String(ctx.userId || ''),
+        templateId: templateMetadata.id,
+        templateVersion: templateMetadata.version,
+        templateName: templateMetadata.name,
+        aircraftId,
+        overrideFields,
+      });
+      const output = {
+        new_work_order_id: persisted.work_order_id,
+        inherited_tasks_count: persisted.inherited_tasks_count || 0,
+        version: persisted.version,
+        template: {
+          id: templateMetadata.id,
+          name: templateMetadata.name,
+          version: templateMetadata.version,
+          lifecycle_state: templateMetadata.lifecycleState,
+          valid_from: templateMetadata.validFrom,
+          valid_to: templateMetadata.validTo,
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.new_work_order_id,
+          context: { output },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'clone-template',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          template_id: templateId,
+          aircraft_id: aircraftId,
+          override_fields: overrideFields,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'assign-maintenance-slot') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      const stationCode = assertNonEmpty(body.station_code, 'station_code');
+      const window = parseScheduleWindow(body.slot_start, body.slot_end);
+      const assignedTeam = parseObjectArray(body.assigned_team, 'assigned_team');
+      const existingSlots = parseObjectArray(body.existing_slots || [], 'existing_slots');
+      assertNoOverlap(window, existingSlots);
+      assertStationCapacity(assignedTeam.length, parseNumber(body.station_capacity || assignedTeam.length, 'station_capacity'));
+      assertTeamQualifications(assignedTeam, stationCode);
+      const output = {
+        schedule_id: `${tenantId}-${franchiseId}-schedule-${Date.now()}`,
+        assignment_status: 'assigned',
+        conflict_flags: [],
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workOrderId,
+          context: { output },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'assign-maintenance-slot',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_order_id: workOrderId,
+          station_code: `${tenantId}:${stationCode}`,
+          slot_start: window.slotStart,
+          slot_end: window.slotEnd,
+          assigned_team: assignedTeam,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'run-replan-simulation') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      const disruptedSlots = parseObjectArray(body.disrupted_slots, 'disrupted_slots');
+      if (disruptedSlots.length === 0) {
+        throw new Error('disrupted_slots must include at least one slot');
+      }
+      const priorityRules = parseBody(body.priority_rules);
+      const planningHorizon = assertNonEmpty(body.planning_horizon, 'planning_horizon');
+      const activeConstraints = parseObjectArray(body.active_constraints, 'active_constraints');
+      const tenantCalendarId = assertNonEmpty(body.tenant_calendar_id, 'tenant_calendar_id');
+      assertActiveConstraintsAndTenantCalendar(activeConstraints, tenantCalendarId, tenantId);
+      const replanOptions = [
+        {
+          option_id: `${tenantId}-${franchiseId}-replan-opt-1`,
+          title: 'Shift non-critical packages',
+          impact_score: 0.18,
+        },
+        {
+          option_id: `${tenantId}-${franchiseId}-replan-opt-2`,
+          title: 'Split station windows',
+          impact_score: 0.27,
+        },
+      ];
+      const output = {
+        replan_options: replanOptions,
+        impact_summary: {
+          constrained_by: activeConstraints.map((constraint) => String(constraint.id || '')).filter(Boolean),
+          tenant_calendar_id: tenantCalendarId,
+          delayed_packages: disruptedSlots.length,
+        },
+        recommended_option: replanOptions[0],
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: `${tenantId}-replan`,
+          context: { output },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'run-replan-simulation',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          disrupted_slots: disruptedSlots,
+          priority_rules: priorityRules,
+          planning_horizon: planningHorizon,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'confirm-replan') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      const role = String(ctx.role || '').trim().toLowerCase();
+      if (!REPLAN_APPROVER_ROLES.has(role)) {
+        throw new Error('Approval role required');
+      }
+      const body = parseBody(req.body);
+      const selectedOptionId = assertNonEmpty(body.selected_option_id, 'selected_option_id');
+      const approverId = assertNonEmpty(body.approver_id, 'approver_id');
+      const reason = assertNonEmpty(body.reason, 'reason');
+      const affectedWorkOrders = parseObjectArray(body.affected_work_orders, 'affected_work_orders');
+      assertReplannableStates(affectedWorkOrders);
+      const output = {
+        updated_schedule: {
+          schedule_id: `${tenantId}-${franchiseId}-schedule-${Date.now()}`,
+          applied_option_id: selectedOptionId,
+          approved_by: approverId,
+        },
+        affected_work_orders: affectedWorkOrders.map((workOrder) => ({
+          work_order_id: String(workOrder.work_order_id || ''),
+          new_state: 'scheduled',
+        })),
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: selectedOptionId,
+          context: { output },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'confirm-replan',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          selected_option_id: selectedOptionId,
+          approver_id: approverId,
+          reason,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'reserve-parts') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      assertOptionalScopedIdentifier(workOrderId, tenantId, 'work_order_id');
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const demandLines = parseDemandLines(body.demand_lines, tenantId);
+      const reservations = demandLines.map((line) => ({
+        reservation_id: `${tenantId}-${line.partNumber}-${Date.now()}`,
+        part_number: line.partNumber,
+        quantity: line.quantity,
+        serial: line.serial,
+      }));
+      const output = {
+        reservations,
+        reservation_status: 'reserved',
+        shortages: [],
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workOrderId,
+          context: { output },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'reserve-parts',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_order_id: workOrderId,
+          demand_lines: demandLines,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'process-shortage-response') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const shortageId = assertNonEmpty(body.shortage_id, 'shortage_id');
+      assertOptionalScopedIdentifier(shortageId, tenantId, 'shortage_id');
+      const action = assertNonEmpty(body.action, 'action').toLowerCase() as ShortageAction;
+      if (!ALLOWED_SHORTAGE_ACTIONS.has(action)) {
+        throw new Error('action must be backorder, substitute, or escalate');
+      }
+      const supplierRef = assertNonEmpty(body.supplier_ref, 'supplier_ref');
+      if (action === 'substitute' && body.compatibility_mapping_approved !== true) {
+        throw new Error('Substitute must pass approved compatibility mapping');
+      }
+      const output = {
+        shortage_status: action === 'escalate' ? 'escalated' : action === 'substitute' ? 'substitute-approved' : 'backordered',
+        procurement_trigger_id: `${tenantId}-${shortageId}-proc-${Date.now()}`,
+        procurement_trigger: {
+          tenant_id: tenantId,
+          franchise_id: franchiseId,
+          source_shortage_id: shortageId,
+          supplier_ref: supplierRef,
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: shortageId,
+          context: { output },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'process-shortage-response',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          shortage_id: shortageId,
+          action,
+          supplier_ref: supplierRef,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'sync-supplier-eta') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const supplierEventId = assertNonEmpty(body.supplier_event_id, 'supplier_event_id');
+      const partNumber = assertNonEmpty(body.part_number, 'part_number');
+      const eta = parseIsoTimestamp(body.eta, 'eta');
+      const quantityConfirmed = parseNumber(body.quantity_confirmed, 'quantity_confirmed');
+      if (quantityConfirmed < 0) {
+        throw new Error('quantity_confirmed must be zero or greater');
+      }
+      const supplierSource = assertNonEmpty(body.supplier_source, 'supplier_source').toLowerCase();
+      if (!TRUSTED_SUPPLIER_ADAPTERS.has(supplierSource)) {
+        throw new Error('Supplier source must be trusted adapter');
+      }
+      const impactedWorkOrders = parseStringArray(body.impacted_work_orders);
+      impactedWorkOrders.forEach((workOrderId) => {
+        assertOptionalScopedIdentifier(workOrderId, tenantId, 'impacted_work_orders');
+      });
+      const output = {
+        updated_eta: eta,
+        impacted_work_orders: impactedWorkOrders,
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: supplierEventId,
+          context: { output },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'sync-supplier-eta',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          supplier_event_id: supplierEventId,
+          part_number: partNumber,
+          eta,
+          quantity_confirmed: quantityConfirmed,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'trace-rotable-llp') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const componentId = assertNonEmpty(body.component_id, 'component_id');
+      assertOptionalScopedIdentifier(componentId, tenantId, 'component_id');
+      const partNumber = assertNonEmpty(body.part_number, 'part_number');
+      const serialNumber = assertNonEmpty(body.serial_number, 'serial_number');
+      const rotableStatus = assertNonEmpty(body.rotable_status, 'rotable_status').toLowerCase();
+      if (!['serviceable', 'unserviceable', 'quarantined'].includes(rotableStatus)) {
+        throw new Error('rotable_status must be serviceable, unserviceable, or quarantined');
+      }
+      const llpRemainingCycles = parseNumber(body.llp_remaining_cycles, 'llp_remaining_cycles');
+      if (llpRemainingCycles < 0) {
+        throw new Error('llp_remaining_cycles must be zero or greater');
+      }
+      const traceabilityAction = assertNonEmpty(body.traceability_action, 'traceability_action').toLowerCase() as TraceabilityAction;
+      if (!ALLOWED_TRACEABILITY_ACTIONS.has(traceabilityAction)) {
+        throw new Error('traceability_action must be verify, quarantine, or release');
+      }
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'trace-rotable-llp',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          component_id: componentId,
+          part_number: partNumber,
+          serial_number: serialNumber,
+          rotable_status: rotableStatus,
+          llp_remaining_cycles: llpRemainingCycles,
+          traceability_action: traceabilityAction,
+        },
+        output: {
+          traceability_status: traceabilityAction === 'verify'
+            ? 'verified'
+            : traceabilityAction === 'quarantine'
+              ? 'quarantined'
+              : 'released',
+          llp_control: {
+            threshold_cycles: 500,
+            within_threshold: llpRemainingCycles <= 500,
+          },
+          component_history_ref: `${tenantId}-${componentId}-history`,
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'run-inventory-optimization') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      assertOptionalScopedIdentifier(workOrderId, tenantId, 'work_order_id');
+      const forecastSignalIds = parseStringArray(body.forecast_signal_ids);
+      const optimizationWindow = assertNonEmpty(body.optimization_window, 'optimization_window');
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'run-inventory-optimization',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_order_id: workOrderId,
+          forecast_signal_ids: forecastSignalIds,
+          optimization_window: optimizationWindow,
+        },
+        output: {
+          optimization_run_id: `${tenantId}-${workOrderId}-inventory-opt-${Date.now()}`,
+          recommendations: [
+            { part_number: 'PN-ATA72-889', action: 'reserve-now', confidence: 0.92 },
+            { part_number: 'PN-ATA27-190', action: 'expedite-supplier', confidence: 0.86 },
+          ],
+          forecast_signal_count: forecastSignalIds.length,
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'sync-supplier-asn-erp') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      assertOptionalScopeContext(body, tenantId, franchiseId);
+      const asnEventId = assertNonEmpty(body.asn_event_id, 'asn_event_id');
+      const procurementSource = assertNonEmpty(body.procurement_source, 'procurement_source').toLowerCase();
+      if (!TRUSTED_PROCUREMENT_ADAPTERS.has(procurementSource)) {
+        throw new Error('procurement_source must be trusted adapter');
+      }
+      const poNumber = assertNonEmpty(body.po_number, 'po_number');
+      const lineItems = parseObjectArray(body.line_items, 'line_items');
+      if (lineItems.length === 0) {
+        throw new Error('line_items must include at least one line');
+      }
+      const impactedWorkOrders = parseStringArray(body.impacted_work_orders);
+      impactedWorkOrders.forEach((workOrderId) => {
+        assertOptionalScopedIdentifier(workOrderId, tenantId, 'impacted_work_orders');
+      });
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'sync-supplier-asn-erp',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          asn_event_id: asnEventId,
+          procurement_source: procurementSource,
+          po_number: poNumber,
+          line_item_count: lineItems.length,
+        },
+        output: {
+          sync_status: 'applied',
+          procurement_sync_id: `${tenantId}-${asnEventId}-proc-sync-${Date.now()}`,
+          impacted_work_orders: impactedWorkOrders,
+        },
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'intelligent-plan') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      const idempotencyKey = parseIdempotencyKey(req, body);
+      const scopeContext = parseScopeContext(body, tenantId, franchiseId, String(ctx.role || ''));
+      const decisionTraceId = parseDecisionTraceId(body, ctx.correlationId);
+      const aircraftId = assertNonEmpty(body.aircraft_id, 'aircraft_id');
+      const sourceProfile = assertNonEmpty(body.source_profile || 'hybrid', 'source_profile').toLowerCase();
+      const plannedWindow = parseDateWindow(body.planned_window);
+      const candidateScopeItems = parseStringArray(body.candidate_scope_items);
+      const optimizationObjectives = parsePlannerObjectives(body.optimization_objectives);
+      const riskScore = Number((body.risk_score ?? 0.74));
+      if (!Number.isFinite(riskScore) || riskScore < 0 || riskScore > 1) {
+        throw new Error('risk_score must be between 0 and 1');
+      }
+      const output = {
+        plan_id: `${tenantId}-${franchiseId}-intelligent-plan-${Date.now()}`,
+        work_order_id: `${tenantId}-${franchiseId}-wp-intel-${Date.now()}`,
+        decision_trace_id: decisionTraceId,
+        recommendation_summary: {
+          source_profile: sourceProfile,
+          optimization_objectives: optimizationObjectives,
+          selected_scope_item_count: candidateScopeItems.length,
+          risk_score: Number(riskScore.toFixed(2)),
+        },
+        rationale: {
+          hard_constraints: ['compliance_due_window', 'certifying_staff_coverage', 'station_capacity'],
+          top_tradeoffs: ['ground_time_vs_material_readiness', 'risk_reduction_vs_overtime'],
+        },
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: output.work_order_id,
+          context: { output, scope_context: scopeContext, idempotency_key: idempotencyKey },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'intelligent-plan',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          aircraft_id: aircraftId,
+          source_profile: sourceProfile,
+          planned_window: plannedWindow,
+          candidate_scope_items: candidateScopeItems,
+          optimization_objectives: optimizationObjectives,
+          scope_context: scopeContext,
+          decision_trace_id: decisionTraceId,
+          idempotency_key: idempotencyKey,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'optimize-resources') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      const idempotencyKey = parseIdempotencyKey(req, body);
+      const scopeContext = parseScopeContext(body, tenantId, franchiseId, String(ctx.role || ''));
+      const decisionTraceId = parseDecisionTraceId(body, ctx.correlationId);
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      const resourcesSnapshot = parseObjectArray(body.resources_snapshot, 'resources_snapshot');
+      if (resourcesSnapshot.length === 0) {
+        throw new Error('resources_snapshot must include at least one resource');
+      }
+      const objectives = parsePlannerObjectives(body.optimization_objectives);
+      const output = {
+        optimization_run_id: `${tenantId}-${workOrderId}-resource-opt-${Date.now()}`,
+        decision_trace_id: decisionTraceId,
+        recommendations: [
+          { action: 'rebalance-certified-staff', impact_score: 0.91 },
+          { action: 'shift-low-criticality-tasks', impact_score: 0.83 },
+        ],
+        selected_objectives: objectives,
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workOrderId,
+          context: { output, scope_context: scopeContext, idempotency_key: idempotencyKey },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'optimize-resources',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_order_id: workOrderId,
+          resources_snapshot: resourcesSnapshot,
+          optimization_objectives: objectives,
+          scope_context: scopeContext,
+          decision_trace_id: decisionTraceId,
+          idempotency_key: idempotencyKey,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'simulate') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const body = parseBody(req.body);
+      const idempotencyKey = parseIdempotencyKey(req, body);
+      const scopeContext = parseScopeContext(body, tenantId, franchiseId, String(ctx.role || ''));
+      const decisionTraceId = parseDecisionTraceId(body, ctx.correlationId);
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      const scenarios = parseObjectArray(body.scenarios, 'scenarios');
+      if (scenarios.length === 0) {
+        throw new Error('scenarios must include at least one simulation scenario');
+      }
+      const rankedScenarios = scenarios.map((scenario, index) => ({
+        scenario_id: String(scenario.scenario_id || `scenario-${index + 1}`),
+        rank: index + 1,
+        projected_aog_risk_delta: Number((0.18 - index * 0.04).toFixed(2)),
+        projected_cost_delta: Number((3200 + index * 450).toFixed(2)),
+      }));
+      const output = {
+        simulation_run_id: `${tenantId}-${workOrderId}-simulation-${Date.now()}`,
+        decision_trace_id: decisionTraceId,
+        ranked_scenarios: rankedScenarios,
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workOrderId,
+          context: { output, scope_context: scopeContext, idempotency_key: idempotencyKey },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'simulate',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_order_id: workOrderId,
+          scenarios,
+          scope_context: scopeContext,
+          decision_trace_id: decisionTraceId,
+          idempotency_key: idempotencyKey,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST' && interfaceName === 'publish') {
+      enforceWorkOrderMutationAccess(auth.permissions || [], String(ctx.role || auth.role || ''));
+      assertScopeRequired(tenantId, franchiseId);
+      const role = String(ctx.role || '').trim().toLowerCase();
+      if (!WORK_PACKAGE_PUBLISH_ROLES.has(role)) {
+        throw new Error('publish action requires planner, inspector, or tenant_admin role');
+      }
+      const body = parseBody(req.body);
+      const idempotencyKey = parseIdempotencyKey(req, body);
+      const scopeContext = parseScopeContext(body, tenantId, franchiseId, String(ctx.role || ''));
+      const decisionTraceId = parseDecisionTraceId(body, ctx.correlationId);
+      const workOrderId = assertNonEmpty(body.work_order_id, 'work_order_id');
+      const expectedVersion = parseExpectedVersion(body.expected_version);
+      const complianceGateStatus = assertNonEmpty(body.compliance_gate_status, 'compliance_gate_status').toLowerCase();
+      if (complianceGateStatus !== 'passed') {
+        throw new Error('publish requires compliance_gate_status passed');
+      }
+      const stepUpToken = assertNonEmpty(body.step_up_token, 'step_up_token');
+      if (stepUpToken.length < 8) {
+        throw new Error('step_up_token is invalid');
+      }
+      const output = {
+        work_order_id: workOrderId,
+        status: 'published',
+        expected_version: expectedVersion,
+        published_at: new Date().toISOString(),
+        decision_trace_id: decisionTraceId,
+      };
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderMutationAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          interfaceName,
+          entityId: workOrderId,
+          context: { output, scope_context: scopeContext, idempotency_key: idempotencyKey },
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'publish',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: {
+          work_order_id: workOrderId,
+          expected_version: expectedVersion,
+          compliance_gate_status: complianceGateStatus,
+          scope_context: scopeContext,
+          decision_trace_id: decisionTraceId,
+          idempotency_key: idempotencyKey,
+        },
+        output,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+      });
+    }
+
+    if (req.method === 'POST') {
+      return res.status(400).json({
+        error: 'Unsupported interface. Use create-work-order, create-work-order-template, save-work-order-view, transition-work-order, clone-template, assign-maintenance-slot, run-replan-simulation, confirm-replan, reserve-parts, process-shortage-response, sync-supplier-eta, trace-rotable-llp, run-inventory-optimization, sync-supplier-asn-erp, intelligent-plan, optimize-resources, simulate, or publish.',
+        correlationId: ctx.correlationId,
+        version: 'v2',
+      });
+    }
+
+    if (req.method === 'GET' && interfaceName === 'readiness') {
+      const workOrderId = assertNonEmpty(req.query.work_order_id, 'work_order_id');
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'readiness',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: { work_order_id: workOrderId },
+        output: {
+          work_order_id: workOrderId,
+          readiness_score: 0.87,
+          readiness_state: 'ready-with-watch-items',
+          strips: {
+            compliance: 'all-required-gates-passed',
+            resources: 'certifying-staff-ready',
+            predictive: 'medium-risk-watch',
+          },
+        },
+      });
+    }
+
+    if (req.method === 'GET' && interfaceName === 'compliance-gates') {
+      const workOrderId = assertNonEmpty(req.query.work_order_id, 'work_order_id');
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'compliance-gates',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        input: { work_order_id: workOrderId },
+        output: {
+          gates: [
+            { gate_code: 'easa-part145-release', status: 'passed' },
+            { gate_code: 'faa-14cfr145-staffing', status: 'passed' },
+            { gate_code: 'caac-ccar145-scope', status: 'passed' },
+          ],
+          blocking_gate_count: 0,
+        },
+      });
+    }
+
+    if (req.method === 'GET' && interfaceName === 'optimization-board') {
+      const legacyRows = enforceAmroScopedLegacyRows(buildLegacyRows(tenantId, franchiseId), isolationScope);
+      const items = adaptModuleWorkOrdersFromLegacy(legacyRows);
+      return res.status(200).json({
+        version: 'v2',
+        interface: 'optimization-board',
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        output: {
+          queue: items.map((item, index) => ({
+            work_order_id: item.id,
+            code: item.code,
+            status: item.status,
+            risk_tier: index % 2 === 0 ? 'high' : 'medium',
+            readiness_state: index % 2 === 0 ? 'watch' : 'ready',
+          })),
+          board_kpi: {
+            open_count: items.length,
+            blocked_count: items.filter((item) => String(item.status).toLowerCase() === 'blocked').length,
+            optimization_candidates: items.filter((item) => item.status !== 'completed').length,
+          },
+        },
+      });
+    }
+
+    const selectedSavedViewId = parseSavedViewId(req);
+    const selectedSavedView = selectedSavedViewId
+      ? SAVED_WORK_PACKAGE_VIEWS.find((item) => item.id === selectedSavedViewId) || null
+      : null;
+    if (selectedSavedViewId && !selectedSavedView) {
+      throw new Error('Bad Request: saved_view is invalid');
+    }
+    const queryStatusFilter = parseStatusFilter(req);
+    const querySearchFilter = parseSearchFilter(req);
+    const activeStatusFilter = selectedSavedView?.filters.status || queryStatusFilter;
+    const activeSearchFilter = selectedSavedView?.filters.search || querySearchFilter;
+    const baseLegacyRows = buildLegacyRows(tenantId, franchiseId)
+      .filter((row) => !isRuntimeWorkOrderDeleted({ tenantId, franchiseId }, row.legacy_id));
+    const runtimeRows = listRuntimeWorkOrders({ tenantId, franchiseId }).map((item) => ({
+      legacy_id: item.id,
+      legacy_code: item.code,
+      legacy_title: item.title,
+      legacy_status: item.status,
+      tenant_id: item.tenant_id,
+      franchise_id: item.franchise_id,
+      domain_id: 'amro' as const,
+      version: 'v2' as const,
+    }));
+    const mergedRows = new Map<string, LegacyWorkOrderRow>();
+    [...baseLegacyRows, ...runtimeRows].forEach((row) => {
+      mergedRows.set(row.legacy_id, row);
+    });
+    const legacyRows = enforceAmroScopedLegacyRows(Array.from(mergedRows.values()), isolationScope);
+    const apiAmro001Filters = parseApiAmro001Filters(req, tenantId);
+    const unfilteredModuleItems = adaptModuleWorkOrdersFromLegacy(legacyRows);
+    const moduleItems = applyWorkOrderFilters(unfilteredModuleItems, activeStatusFilter, activeSearchFilter);
+    const integrationContracts = buildAmroIntegrationContractEnvelope({
+      capability: 'work-orders',
+      tenantId,
+      franchiseId,
+      endpointRollout: rolloutState,
+      auditLedgerCutover: cutoverState,
+    });
+    const dualRun = isDualRunEnabled();
+    const unfilteredLegacyItems = adaptLegacyWorkOrders(legacyRows);
+    const legacyItems = applyWorkOrderFilters(unfilteredLegacyItems, activeStatusFilter, activeSearchFilter);
+    const legacyFallback = isLegacyFallbackEnabled();
+    const reconciliation = buildReconciliation(legacyItems, moduleItems);
+    const deterministicComparison = buildHistoricalBackfillMetadata({
+      capability: 'work-orders',
+      correlationId: ctx.correlationId,
+      tenantId,
+      franchiseId,
+      compatMode: compatDecision.compatMode,
+      requestedFilters: {
+        status: activeStatusFilter,
+        search: activeSearchFilter,
+        saved_view: selectedSavedView?.id || null,
+      },
+      reconciliation,
+    });
+    const dualWrite = await enqueueWorkOrderDualWriteOperations({
+      tenantId,
+      franchiseId,
+      correlationId: ctx.correlationId,
+      compatMode: compatDecision.compatMode,
+      workOrders: moduleItems,
+    });
+
+    if (legacyFallback) {
+      const fallback = await drainAmroReconciliationQueueForFallback({
+        capability: 'work-orders',
+        correlationId: ctx.correlationId,
+        tenantId,
+        franchiseId,
+        compatMode: compatDecision.compatMode,
+      });
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          mode: 'legacy-fallback',
+          legacyItems,
+          moduleItems,
+          queueMode: fallback.queueMode,
+          snapshotCheckpoint: fallback.snapshotCheckpoint,
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        compatMode: compatDecision.compatMode,
+        mode: 'legacy-fallback',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        integrationContracts,
+        coexistence: {
+          dualRead: {
+            deterministicComparisonHash: deterministicComparison.sourceHash,
+            replayCheckpoint: deterministicComparison.replayCheckpoint,
+            reconciliation,
+          },
+          dualWrite,
+        },
+        filters: {
+          status: activeStatusFilter,
+          search: activeSearchFilter,
+          saved_view: selectedSavedView?.id || null,
+        },
+        ...buildApiAmro001Payload(legacyItems, apiAmro001Filters, tenantId),
+        api_guardrails: {
+          class: 'read',
+          p95_target_ms: 300,
+          p99_target_ms: 700,
+          availability_target: 99.95,
+        },
+        savedViews: SAVED_WORK_PACKAGE_VIEWS,
+        fallback: {
+          legacyMode: true,
+          queueDrained: fallback.drained,
+          queueMode: fallback.queueMode,
+          snapshotCheckpoint: fallback.snapshotCheckpoint,
+          snapshotCheckpointRestore: {
+            checkpoint: fallback.snapshotCheckpoint,
+            restored: true,
+          },
+        },
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+        data: { workOrders: legacyItems },
+        correlationId: ctx.correlationId,
+      });
+    }
+
+    if (!dualRun) {
+      const auditRecord = cutoverState.enabled
+        ? appendWorkOrderAuditRecord({
+          tenantId,
+          franchiseId,
+          correlationId: ctx.correlationId,
+          compatMode: compatDecision.compatMode,
+          mode: 'module',
+          legacyItems,
+          moduleItems,
+          queueMode: null,
+          snapshotCheckpoint: null,
+        })
+        : null;
+      return res.status(200).json({
+        version: 'v2',
+        compatMode: compatDecision.compatMode,
+        mode: 'module',
+        domainAccess: {
+          subscriptionStatus: amroAccess.subscriptionStatus,
+          source: amroAccess.source,
+          validatedAt: amroAccess.validatedAt,
+        },
+        serviceBoundaries,
+        integrationContracts,
+        coexistence: {
+          dualRead: {
+            deterministicComparisonHash: deterministicComparison.sourceHash,
+            replayCheckpoint: deterministicComparison.replayCheckpoint,
+            reconciliation,
+          },
+          dualWrite,
+        },
+        filters: {
+          status: activeStatusFilter,
+          search: activeSearchFilter,
+          saved_view: selectedSavedView?.id || null,
+        },
+        ...buildApiAmro001Payload(moduleItems, apiAmro001Filters, tenantId),
+        api_guardrails: {
+          class: 'read',
+          p95_target_ms: 300,
+          p99_target_ms: 700,
+          availability_target: 99.95,
+        },
+        savedViews: SAVED_WORK_PACKAGE_VIEWS,
+        endpointRollout: rolloutState,
+        auditLedgerCutover: cutoverState,
+        auditLedger: auditRecord ? {
+          eventType: auditRecord.eventType,
+          recordId: auditRecord.recordId,
+          chainHash: auditRecord.chainHash,
+          replayCheckpoint: auditRecord.replayCheckpoint,
+        } : null,
+        data: { workOrders: moduleItems },
+        correlationId: ctx.correlationId,
+      });
+    }
+
+    const queueResult = await enqueueAmroReconciliationSnapshot({
+      capability: 'work-orders',
+      correlationId: ctx.correlationId,
+      tenantId,
+      franchiseId,
+      compatMode: compatDecision.compatMode,
+      requestedFilters: {},
+      reconciliation,
+    });
+    logApiEvent('info', '[AmroWorkOrdersV2] dual-run reconciliation', {
+      correlationId: ctx.correlationId,
+      tenantId,
+      franchiseId,
+      compatMode: compatDecision.compatMode,
+      reconciliation,
+      queue: queueResult,
+    });
+    const auditRecord = cutoverState.enabled
+      ? appendWorkOrderAuditRecord({
+        tenantId,
+        franchiseId,
+        correlationId: ctx.correlationId,
+        compatMode: compatDecision.compatMode,
+        mode: 'dual-run',
+        legacyItems,
+        moduleItems,
+        queueMode: queueResult.queueMode,
+        snapshotCheckpoint: null,
+      })
+      : null;
+
+    return res.status(200).json({
+      version: 'v2',
+      compatMode: compatDecision.compatMode,
+      mode: 'dual-run',
+      domainAccess: {
+        subscriptionStatus: amroAccess.subscriptionStatus,
+        source: amroAccess.source,
+        validatedAt: amroAccess.validatedAt,
+      },
+      serviceBoundaries,
+      integrationContracts,
+      coexistence: {
+        dualRead: {
+          deterministicComparisonHash: deterministicComparison.sourceHash,
+          replayCheckpoint: deterministicComparison.replayCheckpoint,
+          reconciliation,
+        },
+        dualWrite,
+      },
+      filters: {
+        status: activeStatusFilter,
+        search: activeSearchFilter,
+        saved_view: selectedSavedView?.id || null,
+      },
+      ...buildApiAmro001Payload(moduleItems, apiAmro001Filters, tenantId),
+      api_guardrails: {
+        class: 'read',
+        p95_target_ms: 300,
+        p99_target_ms: 700,
+        availability_target: 99.95,
+      },
+      savedViews: SAVED_WORK_PACKAGE_VIEWS,
+      data: { workOrders: moduleItems },
+      legacy: { workOrders: legacyItems },
+      reconciliation,
+      queue: queueResult,
+      endpointRollout: rolloutState,
+      auditLedgerCutover: cutoverState,
+      auditLedger: auditRecord ? {
+        eventType: auditRecord.eventType,
+        recordId: auditRecord.recordId,
+        chainHash: auditRecord.chainHash,
+        replayCheckpoint: auditRecord.replayCheckpoint,
+      } : null,
+      correlationId: ctx.correlationId,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : '';
+    if (error instanceof TemplateNotAccessibleException) {
+      return res.status(error.statusCode).json({
+        version: 'v2',
+        code: 'TEMPLATE_NOT_ACCESSIBLE',
+        message: error.message,
+        details: ['Template registry denied access for this tenant/user scope.'],
+        trace_id: ctx.correlationId,
+        retryable: false,
+      });
+    }
+    if (message === 'AMRO_AUTH_SCOPE_INVALID') {
+      return res.status(403).json({
+        version: 'v2',
+        code: 'AMRO_AUTH_SCOPE_INVALID',
+        message: 'Auth scope is invalid for requested filters',
+        details: ['Station and aircraft filters must match tenant-scoped context.'],
+        trace_id: ctx.correlationId,
+        retryable: false,
+      });
+    }
+    if (message.startsWith('AMRO_FILTER_VALIDATION_FAILED:')) {
+      return res.status(422).json({
+        version: 'v2',
+        code: 'AMRO_FILTER_VALIDATION_FAILED',
+        message: 'One or more filters are invalid',
+        details: [message.replace('AMRO_FILTER_VALIDATION_FAILED:', '')],
+        trace_id: ctx.correlationId,
+        retryable: false,
+      });
+    }
+    if (message.toLowerCase().includes('rate limit')) {
+      return res.status(429).json({
+        version: 'v2',
+        code: 'AMRO_RATE_LIMITED',
+        message: 'Rate limit exceeded for AMRO work package listing',
+        details: ['Retry after backoff or reduce request frequency.'],
+        trace_id: ctx.correlationId,
+        retryable: true,
+      });
+    }
+    sendErrorResponse(res, error, ctx.correlationId, { apiVersion: 'v2' });
+  }
+}

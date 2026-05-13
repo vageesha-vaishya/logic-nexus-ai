@@ -346,8 +346,8 @@ const hasTable = async (table) => {
 const seedOverviewAnalytics = async ({
   tenantId,
   franchiseId,
-  workPackageId,
-  heavyWorkPackageId,
+  workOrderId,
+  heavyWorkOrderId,
   taskId,
   maintenanceEventId,
   complianceObligationId,
@@ -385,9 +385,9 @@ const seedOverviewAnalytics = async ({
   const snapshotAt = new Date(Date.UTC(dateRangeEnd.getUTCFullYear(), dateRangeEnd.getUTCMonth(), dateRangeEnd.getUTCDate(), 0, 0, 0)).toISOString();
 
   const snapshots = [
-    { persona: 'management', openWorkPackages: 38, inProgressTasks: 246, deferredItems: 12, complianceAlerts: 19, aogCount: 3, slaBreachCount: 7 },
-    { persona: 'planner', openWorkPackages: 28, inProgressTasks: 192, deferredItems: 9, complianceAlerts: 11, aogCount: 2, slaBreachCount: 5 },
-    { persona: 'compliance_lead', openWorkPackages: 21, inProgressTasks: 134, deferredItems: 6, complianceAlerts: 23, aogCount: 1, slaBreachCount: 4 },
+    { persona: 'management', openWorkOrders: 38, inProgressTasks: 246, deferredItems: 12, complianceAlerts: 19, aogCount: 3, slaBreachCount: 7 },
+    { persona: 'planner', openWorkOrders: 28, inProgressTasks: 192, deferredItems: 9, complianceAlerts: 11, aogCount: 2, slaBreachCount: 5 },
+    { persona: 'compliance_lead', openWorkOrders: 21, inProgressTasks: 134, deferredItems: 6, complianceAlerts: 23, aogCount: 1, slaBreachCount: 4 },
   ];
   let sampleSnapshot = null;
   for (const snapshot of snapshots) {
@@ -400,7 +400,7 @@ const seedOverviewAnalytics = async ({
         date_range_start: dateRangeStartIso,
         date_range_end: dateRangeEndIso,
         snapshot_at: snapshotAt,
-        open_work_packages: snapshot.openWorkPackages,
+        open_work_orders: snapshot.openWorkOrders,
         in_progress_tasks: snapshot.inProgressTasks,
         deferred_items: snapshot.deferredItems,
         compliance_alerts: snapshot.complianceAlerts,
@@ -475,7 +475,7 @@ const seedOverviewAnalytics = async ({
       batchRows.push({
         tenant_id: tenantId,
         franchise_id: franchiseId,
-        work_package_id: index % 7 === 0 ? heavyWorkPackageId : workPackageId,
+        work_order_id: index % 7 === 0 ? heavyWorkOrderId : workOrderId,
         source_record_key: `deccan-telemetry-${index + 1}`,
         telemetry_source: index % 2 === 0 ? 'iot-gateway' : 'ops-import',
         metric_key: metric.key,
@@ -505,7 +505,7 @@ const seedOverviewAnalytics = async ({
         tenant_id: tenantId,
         franchise_id: franchiseId,
         obligation_id: complianceObligationId,
-        work_package_id: index % 9 === 0 ? heavyWorkPackageId : workPackageId,
+        work_order_id: index % 9 === 0 ? heavyWorkOrderId : workOrderId,
         task_id: taskId,
         maintenance_event_id: maintenanceEventId,
         event_code: `DECCAN-COMP-EVT-${String(index + 1).padStart(5, '0')}`,
@@ -693,14 +693,14 @@ const run = async () => {
     'Upsert aircraft'
   );
 
-  const workPackage = await upsertReturning(
-    'work_packages',
+  const workOrder = await upsertReturning(
+    'work_orders',
     {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
       aircraft_id: aircraft.id,
       work_order_number: `WO-DECCAN-${runSuffix}`,
-      work_package_number: `WP-DECCAN-${runSuffix}`,
+      work_order_number: `WP-DECCAN-${runSuffix}`,
       title: 'A-Check Deccan Fly',
       work_type: 'A-Check',
       maintenance_type: 'line',
@@ -732,7 +732,7 @@ const run = async () => {
       manufacturer: 'HydroTech',
       model: 'HT-200',
       status: 'installed',
-      work_package_id: workPackage.id,
+      work_order_id: workOrder.id,
       created_by: usersByKey.technician.id,
       updated_by: usersByKey.technician.id,
     },
@@ -745,7 +745,7 @@ const run = async () => {
     {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
-      work_package_id: workPackage.id,
+      work_order_id: workOrder.id,
       task_number: `TASK-DECCAN-${runSuffix}`,
       title: 'Inspect hydraulic lines',
       task_category: 'inspection',
@@ -811,7 +811,7 @@ const run = async () => {
       franchise_id: franchise.id,
       aircraft_id: aircraft.id,
       component_id: component.id,
-      work_package_id: workPackage.id,
+      work_order_id: workOrder.id,
       task_id: task.id,
       event_type: 'task_execution',
       title: 'Hydraulic inspection started',
@@ -870,13 +870,13 @@ const run = async () => {
     'Upsert parts inventory'
   );
 
-  const [workPackageMaterial, componentPosition, shiftCalendar, schedule, stockMovement, reservation, complianceObligation, certificationAction, integrationJob, integrationMapping, webhookOutbox, assetHealthSignal, forecastOutput, workPackageTemplate, syncConflict, regulatorDossier, forecastFeature, taskEvidence, taskQualificationRequirement] = await Promise.all([
+  const [workOrderMaterial, componentPosition, shiftCalendar, schedule, stockMovement, reservation, complianceObligation, certificationAction, integrationJob, integrationMapping, webhookOutbox, assetHealthSignal, forecastOutput, workOrderTemplate, syncConflict, regulatorDossier, forecastFeature, taskEvidence, taskQualificationRequirement] = await Promise.all([
     upsertReturning(
-      'work_package_materials',
+      'amro_work_order_materials',
       {
         tenant_id: tenant.id,
         franchise_id: franchise.id,
-        work_package_id: workPackage.id,
+        work_order_id: workOrder.id,
         part_number: partsInventory.part_number,
         description: partsInventory.description,
         component_id: component.id,
@@ -898,7 +898,7 @@ const run = async () => {
         component_id: component.id,
         position_code: 'LH-HYD-01',
         station_code: 'BLR',
-        installation_work_package_id: workPackage.id,
+        installation_work_order_id: workOrder.id,
       },
       'component_id',
       'Upsert component position'
@@ -923,14 +923,14 @@ const run = async () => {
       {
         tenant_id: tenant.id,
         franchise_id: franchise.id,
-        work_package_id: workPackage.id,
+        work_order_id: workOrder.id,
         aircraft_id: aircraft.id,
         station_code: 'BLR',
         slot_start: nowIso,
         slot_end: twoHoursLaterIso,
         status: 'planned',
       },
-      'tenant_id,work_package_id,slot_start',
+      'tenant_id,work_order_id,slot_start',
       'Upsert schedule'
     ),
     upsertReturning(
@@ -953,7 +953,7 @@ const run = async () => {
         tenant_id: tenant.id,
         franchise_id: franchise.id,
         inventory_id: partsInventory.id,
-        work_package_id: workPackage.id,
+        work_order_id: workOrder.id,
         task_id: task.id,
         reserved_quantity: 1,
         status: 'active',
@@ -970,7 +970,7 @@ const run = async () => {
         franchise_id: franchise.id,
         regulator_profile_id: regulatorProfile.id,
         aircraft_id: aircraft.id,
-        work_package_id: workPackage.id,
+        work_order_id: workOrder.id,
         obligation_code: `OBL-DECCAN-${runSuffix}`,
         obligation_type: 'inspection',
         title: 'Hydraulic safety compliance',
@@ -988,7 +988,7 @@ const run = async () => {
         tenant_id: tenant.id,
         franchise_id: franchise.id,
         staff_qualification_id: staffQualification.id,
-        work_package_id: workPackage.id,
+        work_order_id: workOrder.id,
         task_id: task.id,
         action_type: 'defer',
         action_status: 'pending',
@@ -1090,7 +1090,7 @@ const run = async () => {
       'Insert forecast output'
     ),
     upsertReturning(
-      'work_package_templates',
+      'work_order_templates',
       {
         tenant_id: tenant.id,
         franchise_id: franchise.id,
@@ -1112,8 +1112,8 @@ const run = async () => {
       {
         tenant_id: tenant.id,
         franchise_id: franchise.id,
-        entity_type: 'work_packages',
-        entity_id: workPackage.id,
+        entity_type: 'work_orders',
+        entity_id: workOrder.id,
         conflict_ref: `SYNC-DECCAN-${runSuffix}`,
         conflict_class: 'version_mismatch',
         local_payload: { status: 'planning' },
@@ -1130,7 +1130,7 @@ const run = async () => {
       {
         tenant_id: tenant.id,
         franchise_id: franchise.id,
-        work_package_id: workPackage.id,
+        work_order_id: workOrder.id,
         regulator_code: regulatorProfile.regulator_code,
         dossier_ref: `DOS-DECCAN-${runSuffix}`,
         status: 'draft',
@@ -1297,14 +1297,14 @@ const run = async () => {
     'Upsert heavy aircraft'
   );
 
-  const heavyWorkPackage = await upsertReturning(
-    'work_packages',
+  const heavyWorkOrder = await upsertReturning(
+    'work_orders',
     {
       tenant_id: tenant.id,
       franchise_id: heavyFranchise.id,
       aircraft_id: heavyAircraft.id,
       work_order_number: `WO-DECCAN-HEAVY-${runSuffix}`,
-      work_package_number: `WP-DECCAN-HEAVY-${runSuffix}`,
+      work_order_number: `WP-DECCAN-HEAVY-${runSuffix}`,
       title: 'C-Check Deccan Fly Heavy',
       work_type: 'C-Check',
       maintenance_type: 'overhaul',
@@ -1328,7 +1328,7 @@ const run = async () => {
     {
       tenant_id: tenant.id,
       franchise_id: heavyFranchise.id,
-      work_package_id: heavyWorkPackage.id,
+      work_order_id: heavyWorkOrder.id,
       task_number: `TASK-DECCAN-HEAVY-${runSuffix}`,
       title: 'Borescope engine inspection',
       task_category: 'inspection',
@@ -1394,7 +1394,7 @@ const run = async () => {
       franchise_id: heavyFranchise.id,
       regulator_profile_id: heavyRegulatorProfile.id,
       aircraft_id: heavyAircraft.id,
-      work_package_id: heavyWorkPackage.id,
+      work_order_id: heavyWorkOrder.id,
       obligation_code: `OBL-DECCAN-HEAVY-${runSuffix}`,
       obligation_type: 'inspection',
       title: 'Engine borescope mandatory compliance',
@@ -1488,7 +1488,7 @@ const run = async () => {
       tenant_id: tenant.id,
       franchise_id: heavyFranchise.id,
       staff_qualification_id: heavyStaffQualification.id,
-      work_package_id: heavyWorkPackage.id,
+      work_order_id: heavyWorkOrder.id,
       task_id: heavyTask.id,
       action_type: 'approve',
       action_status: 'executed',
@@ -1506,7 +1506,7 @@ const run = async () => {
       tenant_id: tenant.id,
       franchise_id: heavyFranchise.id,
       obligation_id: heavyComplianceObligation.id,
-      work_package_id: heavyWorkPackage.id,
+      work_order_id: heavyWorkOrder.id,
       task_id: heavyTask.id,
       decision_status: 'approved',
       reviewed_by: usersByKey.inspector.id,
@@ -1523,8 +1523,8 @@ const run = async () => {
   const analyticsSeedSummary = await seedOverviewAnalytics({
     tenantId: tenant.id,
     franchiseId: franchise.id,
-    workPackageId: workPackage.id,
-    heavyWorkPackageId: heavyWorkPackage.id,
+    workOrderId: workOrder.id,
+    heavyWorkOrderId: heavyWorkOrder.id,
     taskId: task.id,
     maintenanceEventId: maintenanceEvent.id,
     complianceObligationId: complianceObligation.id,
@@ -1535,12 +1535,12 @@ const run = async () => {
   const { error: insertAuditRecordError } = await supabase.schema('mro_audit').from('records').insert({
     tenant_id: tenant.id,
     record_type: 'maintenance_completion',
-    related_entity_id: workPackage.id,
-    related_entity_type: 'work_package',
+    related_entity_id: workOrder.id,
+    related_entity_type: 'work_order',
     actor_id: usersByKey.technician.id,
     actor_role: 'technician',
     action: 'Seeded maintenance completion record',
-    context: { work_order_number: workPackage.work_order_number },
+    context: { work_order_number: workOrder.work_order_number },
     signature,
     previous_hash: previousHash,
   });
@@ -1555,9 +1555,9 @@ const run = async () => {
   if (auditSchemaAvailable) {
     const { error: insertAuditTrailError } = await supabase.schema('mro_audit').from('trails').insert({
       tenant_id: tenant.id,
-      event_type: 'work_package_completed',
-      entity_type: 'work_package',
-      entity_id: workPackage.id,
+      event_type: 'work_order_completed',
+      entity_type: 'work_order',
+      entity_id: workOrder.id,
       user_id: usersByKey.technician.id,
       user_email: usersByKey.technician.email,
       timestamp: nowIso,
@@ -1593,13 +1593,13 @@ const run = async () => {
     moduleId: 'MOD-AMRO-02',
     moduleName: 'Work Package Management',
     componentName: 'Work packages',
-    table: 'work_packages',
+    table: 'work_orders',
     createPayload: {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
       aircraft_id: aircraft.id,
       work_order_number: `CRUD-WO-${runSuffix}`,
-      work_package_number: `CRUD-WP-${runSuffix}`,
+      work_order_number: `CRUD-WP-${runSuffix}`,
       title: 'CRUD Work Package',
       work_type: 'inspection',
       maintenance_type: 'line',
@@ -1617,7 +1617,7 @@ const run = async () => {
     createPayload: {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
-      work_package_id: workPackage.id,
+      work_order_id: workOrder.id,
       task_number: `CRUD-TASK-${runSuffix}`,
       title: 'CRUD Task',
       task_category: 'inspection',
@@ -1635,7 +1635,7 @@ const run = async () => {
     createPayload: {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
-      work_package_id: workPackage.id,
+      work_order_id: workOrder.id,
       aircraft_id: aircraft.id,
       shift_calendar_id: shiftCalendar.id,
       station_code: 'BLR',
@@ -1671,7 +1671,7 @@ const run = async () => {
     createPayload: {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
-      work_package_id: workPackage.id,
+      work_order_id: workOrder.id,
       obligation_code: `CRUD-OBL-${runSuffix}`,
       obligation_type: 'check',
       title: 'CRUD Compliance Obligation',
@@ -1691,7 +1691,7 @@ const run = async () => {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
       staff_qualification_id: staffQualification.id,
-      work_package_id: workPackage.id,
+      work_order_id: workOrder.id,
       action_type: 'defer',
       action_status: 'pending',
       policy_snapshot_id: policySnapshot.id,
@@ -1742,7 +1742,7 @@ const run = async () => {
     moduleId: 'MOD-AMRO-02',
     moduleName: 'Work Package Management',
     componentName: 'Work package templates',
-    table: 'work_package_templates',
+    table: 'work_order_templates',
     createPayload: {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
@@ -1789,7 +1789,7 @@ const run = async () => {
       tenant_id: tenant.id,
       franchise_id: franchise.id,
       inventory_id: partsInventory.id,
-      work_package_id: workPackage.id,
+      work_order_id: workOrder.id,
       task_id: task.id,
       reserved_quantity: 1,
       status: 'active',
@@ -1941,10 +1941,10 @@ const run = async () => {
   });
 
   await Promise.all([
-    verifyScopeCounts({ tenantId: tenant.id, franchiseId: franchise.id, table: 'work_packages' }),
+    verifyScopeCounts({ tenantId: tenant.id, franchiseId: franchise.id, table: 'work_orders' }),
     verifyScopeCounts({ tenantId: tenant.id, franchiseId: franchise.id, table: 'tasks' }),
     verifyScopeCounts({ tenantId: tenant.id, franchiseId: franchise.id, table: 'policy_snapshots' }),
-    verifyScopeCounts({ tenantId: tenant.id, franchiseId: heavyFranchise.id, table: 'work_packages' }),
+    verifyScopeCounts({ tenantId: tenant.id, franchiseId: heavyFranchise.id, table: 'work_orders' }),
     verifyScopeCounts({ tenantId: tenant.id, franchiseId: heavyFranchise.id, table: 'tasks' }),
     verifyScopeCounts({ tenantId: tenant.id, franchiseId: heavyFranchise.id, table: 'policy_snapshots' }),
   ]);
@@ -1960,7 +1960,7 @@ const run = async () => {
     seedReferences: {
       aircraftId: aircraft.id,
       componentId: component.id,
-      workPackageId: workPackage.id,
+      workOrderId: workOrder.id,
       taskId: task.id,
       supplierId: supplier.id,
       partsInventoryId: partsInventory.id,
@@ -1979,7 +1979,7 @@ const run = async () => {
       forecastOutputId: forecastOutput.id,
       forecastFeatureId: forecastFeature.id,
       forecastDecisionId: forecastDecision.id,
-      workPackageTemplateId: workPackageTemplate.id,
+      workOrderTemplateId: workOrderTemplate.id,
       syncConflictId: syncConflict.id,
       regulatorDossierId: regulatorDossier.id,
       taskQualificationRequirementId: taskQualificationRequirement.id,
@@ -1989,10 +1989,10 @@ const run = async () => {
       shiftCalendarId: shiftCalendar.id,
       scheduleId: schedule.id,
       scheduleConstraintId: scheduleConstraint.id,
-      workPackageMaterialId: workPackageMaterial.id,
+      workOrderMaterialId: workOrderMaterial.id,
       heavyPolicySnapshotId: heavyPolicySnapshot.id,
       heavyAircraftId: heavyAircraft.id,
-      heavyWorkPackageId: heavyWorkPackage.id,
+      heavyWorkOrderId: heavyWorkOrder.id,
       heavyTaskId: heavyTask.id,
       heavyRegulatorProfileId: heavyRegulatorProfile.id,
       heavyStaffQualificationId: heavyStaffQualification.id,

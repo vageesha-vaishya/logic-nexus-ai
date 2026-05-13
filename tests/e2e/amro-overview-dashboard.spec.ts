@@ -33,7 +33,7 @@ const AIRCRAFT_NAV_STEPS = [
   { label: 'Components', slug: 'components', urlSegment: '/dashboard/amro/aircraft/components' },
   { label: 'Documents', slug: 'documents', urlSegment: '/dashboard/amro/aircraft/documents' },
   { label: 'AD/SB', slug: 'ad-sb', urlSegment: '/dashboard/amro/aircraft/ad-sb' },
-  { label: 'Operations', slug: 'work-packages', urlSegment: '/dashboard/amro/aircraft/work-packages' },
+  { label: 'Operations', slug: 'work-orders', urlSegment: '/dashboard/amro/aircraft/work-orders' },
 ] as const;
 
 test.describe('amro overview dashboard', () => {
@@ -254,21 +254,21 @@ test.describe('amro aircraft CRUD smoke', () => {
     test.skip((await masterDataRoot.count()) === 0, 'AMRO master data surface is unavailable in this environment profile');
     await expect(masterDataRoot.first()).toBeVisible();
 
-    const createWorkPackageButton = page.getByRole('button', { name: 'Create Work Package' }).first();
-    test.skip((await createWorkPackageButton.count()) === 0, 'Create Work Package action is unavailable in this environment profile');
-    await createWorkPackageButton.click();
+    const createWorkOrderButton = page.getByRole('button', { name: 'Create Work Package' }).first();
+    test.skip((await createWorkOrderButton.count()) === 0, 'Create Work Package action is unavailable in this environment profile');
+    await createWorkOrderButton.click();
 
-    const workPackageDialog = page.getByTestId('amro-aircraft-work-package-dialog');
-    await expect(workPackageDialog).toBeVisible({ timeout: 20000 });
-    await workPackageDialog.getByRole('tab', { name: 'New WP' }).click();
-    await expect(workPackageDialog.getByText('Template registry')).toBeVisible();
+    const workOrderDialog = page.getByTestId('amro-aircraft-work-order-dialog');
+    await expect(workOrderDialog).toBeVisible({ timeout: 20000 });
+    await workOrderDialog.getByRole('tab', { name: 'New WP' }).click();
+    await expect(workOrderDialog.getByText('Template registry')).toBeVisible();
 
-    const refreshTemplatesButton = workPackageDialog.getByRole('button', { name: /Refresh Templates|Refreshing/i });
+    const refreshTemplatesButton = workOrderDialog.getByRole('button', { name: /Refresh Templates|Refreshing/i });
     if (await refreshTemplatesButton.count()) {
       await refreshTemplatesButton.click();
     }
 
-    const templateTrigger = workPackageDialog.getByLabel('Template registry');
+    const templateTrigger = workOrderDialog.getByLabel('Template registry');
     if (await templateTrigger.count()) {
       await templateTrigger.first().click();
       const templateOptions = page.getByRole('option');
@@ -276,8 +276,8 @@ test.describe('amro aircraft CRUD smoke', () => {
       await templateOptions.first().click();
     }
 
-    await expect(workPackageDialog.getByText(/Maintenance/i).first()).toBeVisible();
-    await expect(workPackageDialog.getByText(/Scope items/i).first()).toBeVisible();
-    await expect(workPackageDialog.getByText(/Tasks/i).first()).toBeVisible();
+    await expect(workOrderDialog.getByText(/Maintenance/i).first()).toBeVisible();
+    await expect(workOrderDialog.getByText(/Scope items/i).first()).toBeVisible();
+    await expect(workOrderDialog.getByText(/Tasks/i).first()).toBeVisible();
   });
 });

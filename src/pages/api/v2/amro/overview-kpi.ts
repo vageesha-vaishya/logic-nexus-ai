@@ -22,7 +22,7 @@ type JsonRecord = Record<string, unknown>;
 type OverviewPersona = 'management' | 'planner';
 
 const ALLOWED_METRIC_KEYS = new Set([
-  'open_work_packages',
+  'open_work_orders',
   'schedule_adherence',
   'aog_count',
   'compliance_risk',
@@ -36,8 +36,8 @@ const DEFAULT_PAGE = 1;
 const DEFAULT_PAGE_SIZE = 15;
 const MAX_PAGE_SIZE = 200;
 const TABLE_FALLBACK_CANDIDATES: Record<string, string[]> = {
-  work_package_master: ['work_packages'],
-  materials_inventory: ['parts_inventory', 'work_package_materials'],
+  work_order_master: ['work_orders'],
+  materials_inventory: ['parts_inventory', 'amro_work_order_materials', 'work_order_materials'],
   compliance_gates: ['compliance_records', 'compliance_obligations'],
   integration_logs: ['integration_jobs', 'webhook_outbox'],
   forecast_recommendations: ['forecast_outputs', 'forecast_decisions'],
@@ -900,7 +900,7 @@ async function fetchScopedRows(
   }
 }
 
-function mapWorkPackageOverview(
+function mapWorkOrderOverview(
   rows: JsonRecord[],
   plannerFilter: string | null,
   engineerFilter: string | null,
@@ -913,8 +913,8 @@ function mapWorkPackageOverview(
     return plannerPass && engineerPass;
   });
   return filtered.slice(0, 15).map((row) => ({
-    work_package_id: getStringValue(row, ['id', 'work_package_id', 'code', 'work_package_number'], 'unknown-work-package'),
-    title: getStringValue(row, ['title', 'name', 'description', 'work_package_number'], 'Untitled work package'),
+    work_order_id: getStringValue(row, ['id', 'work_order_id', 'code', 'work_order_number', 'work_order_number'], 'unknown-work-order'),
+    title: getStringValue(row, ['title', 'name', 'description', 'work_order_number', 'work_order_number'], 'Untitled work package'),
     status: resolveStatus(row) || 'unknown',
     planner_id: getStringValue(row, ['planner_id', 'assigned_planner_id', 'assigned_to'], 'unassigned'),
     engineer_id: getStringValue(row, ['engineer_id', 'assigned_engineer_id', 'lead_engineer_id'], 'unassigned'),
@@ -1070,7 +1070,7 @@ function mapCertificationQueue(rows: JsonRecord[]) {
   return rows
     .map((row) => ({
       certification_id: getStringValue(row, ['id', 'certification_id'], 'unknown-certification'),
-      work_package_id: getStringValue(row, ['work_package_id', 'package_id'], 'unknown-work-package'),
+      work_order_id: getStringValue(row, ['work_order_id', 'package_id'], 'unknown-work-order'),
       authority: getStringValue(row, ['authority', 'certifying_authority', 'regulator'], 'unspecified'),
       status: resolveStatus(row) || 'unknown',
       submitted_at: getStringValue(row, ['submitted_at', 'created_at'], ''),
@@ -1160,7 +1160,7 @@ function mapForecastRecommendations(rows: JsonRecord[]) {
       const riskScore = normalizePercent(getNumericValue(row, ['risk_score', 'risk_pct'], 0));
       return {
         recommendation_id: getStringValue(row, ['id', 'recommendation_id'], 'forecast'),
-        work_package_id: getStringValue(row, ['work_package_id', 'package_id'], 'unknown-work-package'),
+        work_order_id: getStringValue(row, ['work_order_id', 'package_id'], 'unknown-work-order'),
         recommendation: getStringValue(row, ['recommendation', 'action', 'suggested_action'], 'Review intervention plan'),
         confidence_pct: Math.round(confidence * 10) / 10,
         risk_score: Math.round(riskScore * 10) / 10,
@@ -1201,7 +1201,7 @@ function mapForecastRecommendationsFromTelemetry(rows: JsonRecord[]) {
       const confidencePct = Math.max(35, Math.min(98, Math.round((100 - (varianceScore * 0.55)) * 10) / 10));
       return {
         recommendation_id: `telemetry-${metricKey}-${index + 1}`,
-        work_package_id: 'telemetry-derived',
+        work_order_id: 'telemetry-derived',
         recommendation: `Investigate ${metricKey.replace(/_/g, ' ')} drift`,
         confidence_pct: confidencePct,
         risk_score: riskScore,
@@ -1350,7 +1350,7 @@ function mapRiskHeatmapFromSnapshot(
 function mapTrendLinesFromSnapshot(
   snapshot: JsonRecord | null,
   defaultLines: Array<{ metric_key: string; points: Array<{ date: string; value: number }> }>,
-  baseline: { openWorkPackages: number; complianceStatusPct: number; inProgressTasks: number; slaBreachCount: number },
+  baseline: { openWorkOrders: number; complianceStatusPct: number; inProgressTasks: number; slaBreachCount: number },
 ): Array<{ metric_key: string; points: Array<{ date: string; value: number }> }> {
   if (!snapshot) return defaultLines;
   const trendLines = Array.isArray(snapshot.trend_lines) ? snapshot.trend_lines : [];
@@ -1390,7 +1390,7 @@ function mapTrendLinesFromSnapshot(
           ? baseline.complianceStatusPct
           : metricName.includes('task')
             ? baseline.inProgressTasks
-            : baseline.openWorkPackages;
+            : baseline.openWorkOrders;
       const points = generateTimeSeries('30d').map((point, index) => ({
         date: point.date,
         value: Math.max(0, Math.round((baseValue + (slope * index * 10)) * 10) / 10),
@@ -1471,7 +1471,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
     const franchiseId = access.franchiseId ? String(access.franchiseId) : null;
     const scope = createAmroIsolationScope(tenantId, franchiseId);
     const serviceBoundaries = buildAmroServiceBoundaryEnvelope({
-      capability: 'work-packages',
+      capability: 'work-orders',
       scope,
       subscriptionStatus: amroAccess.subscriptionStatus,
       validatedAt: amroAccess.validatedAt,
@@ -1507,7 +1507,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       };
 
       const [
-        workPackageRows,
+        workOrderRows,
         materialsRows,
         complianceRows,
         integrationRows,
@@ -1517,7 +1517,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         complianceEventRows,
         slaDefinitionRows,
       ] = await Promise.all([
-        fetchScopedRows('work_package_master', tenantId, 200, dataIssues),
+        fetchScopedRows('work_order_master', tenantId, 200, dataIssues),
         fetchScopedRows('materials_inventory', tenantId, 200, dataIssues),
         fetchScopedRows('compliance_gates', tenantId, 200, dataIssues),
         fetchScopedRows('integration_logs', tenantId, 200, dataIssues),
@@ -1530,15 +1530,15 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
 
       const now = Date.now();
       const snapshot = selectLatestOverviewSnapshot(overviewSnapshotRows, persona, franchiseId, dateRange.from, dateRange.to);
-      const scopedWorkPackageRows = filterRowsByScope(workPackageRows, sharedFilters);
+      const scopedWorkOrderRows = filterRowsByScope(workOrderRows, sharedFilters);
       const scopedMaterialsRows = filterRowsByScope(materialsRows, sharedFilters);
       const scopedComplianceRows = filterRowsByScope(complianceRows, sharedFilters);
       const scopedIntegrationRows = filterRowsByScope(integrationRows, sharedFilters);
       const scopedForecastRows = filterRowsByScope(forecastRows, sharedFilters);
       const scopedTelemetryRows = filterRowsByDateRange(telemetryRows, dateRange.from, dateRange.to, ['recorded_at', 'created_at']);
       const scopedComplianceEventRows = filterRowsByDateRange(complianceEventRows, dateRange.from, dateRange.to, ['detected_at', 'created_at']);
-      const activeWorkPackagesFromRows = scopedWorkPackageRows.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
-      const overdueTasksApproxFromRows = scopedWorkPackageRows.filter((row) => {
+      const activeWorkOrdersFromRows = scopedWorkOrderRows.filter((row) => !isResolvedStatus(resolveStatus(row))).length;
+      const overdueTasksApproxFromRows = scopedWorkOrderRows.filter((row) => {
         const dueMs = parseDateMs(getStringValue(row, ['due_at', 'planned_end_at', 'target_end_at']));
         const status = resolveStatus(row);
         return Number.isFinite(dueMs) && dueMs < now && !isResolvedStatus(status);
@@ -1548,8 +1548,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
       const forecast = scopedForecastRows.length > 0
         ? mapForecastRecommendations(scopedForecastRows)
         : mapForecastRecommendationsFromTelemetry(scopedTelemetryRows);
-      const fullWorkPackageOverview = mapWorkPackageOverview(scopedWorkPackageRows, effectivePlannerId, engineerId);
-      const workPackageOverviewPaging = paginate(fullWorkPackageOverview, page, pageSize);
+      const fullWorkOrderOverview = mapWorkOrderOverview(scopedWorkOrderRows, effectivePlannerId, engineerId);
+      const workOrderOverviewPaging = paginate(fullWorkOrderOverview, page, pageSize);
       const materialsAlerts = mapMaterialsAlerts(scopedMaterialsRows);
       const complianceAttention = scopedComplianceRows.length > 0
         ? mapComplianceAttention(scopedComplianceRows)
@@ -1566,11 +1566,11 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           recent_failures: [],
         };
       const defaultRiskHeatmapCells = complianceAttention.slice(0, 8).map((item, index) => ({
-        station: fullWorkPackageOverview[index]?.planner_id || scopeStationIds[index] || `${tenantId}:station-${index + 1}`,
+        station: fullWorkOrderOverview[index]?.planner_id || scopeStationIds[index] || `${tenantId}:station-${index + 1}`,
         severity: item.status === 'failed' ? 'high' : item.status === 'blocked' ? 'medium' : 'low',
         score: item.status === 'failed' ? 90 : item.status === 'blocked' ? 65 : 30,
       }));
-      const snapshotOpenWorkPackages = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['open_work_packages'], activeWorkPackagesFromRows))) : activeWorkPackagesFromRows;
+      const snapshotOpenWorkOrders = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['open_work_orders'], activeWorkOrdersFromRows))) : activeWorkOrdersFromRows;
       const snapshotOverdueTasks = snapshot ? Math.max(0, Math.round(getNumericValue(snapshot, ['sla_breach_count', 'deferred_items'], overdueTasksApproxFromRows))) : overdueTasksApproxFromRows;
       const snapshotComplianceAlerts = snapshot
         ? Math.max(0, Math.round(getNumericValue(snapshot, ['compliance_alerts'], 0)))
@@ -1580,24 +1580,24 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         );
       const snapshotAogCount = snapshot
         ? Math.max(0, Math.round(getNumericValue(snapshot, ['aog_count'], 0)))
-        : scopedWorkPackageRows.filter((row) => resolveStatus(row).includes('aog')).length;
+        : scopedWorkOrderRows.filter((row) => resolveStatus(row).includes('aog')).length;
       const snapshotDeferredItems = snapshot
         ? Math.max(0, Math.round(getNumericValue(snapshot, ['deferred_items'], 0)))
-        : scopedWorkPackageRows.filter((row) => ['deferred', 'blocked', 'on_hold'].includes(resolveStatus(row))).length;
+        : scopedWorkOrderRows.filter((row) => ['deferred', 'blocked', 'on_hold'].includes(resolveStatus(row))).length;
       const snapshotComplianceStatusPct = snapshot
-        ? Math.max(0, Math.min(100, Math.round(((snapshotOpenWorkPackages / Math.max(1, snapshotOpenWorkPackages + snapshotComplianceAlerts)) * 100) * 10) / 10))
+        ? Math.max(0, Math.min(100, Math.round(((snapshotOpenWorkOrders / Math.max(1, snapshotOpenWorkOrders + snapshotComplianceAlerts)) * 100) * 10) / 10))
         : Math.round(compliancePctFromRows * 10) / 10;
       const snapshotInProgressTasks = snapshot
         ? Math.max(0, Math.round(getNumericValue(snapshot, ['in_progress_tasks'], 0)))
-        : scopedWorkPackageRows.filter((row) => resolveStatus(row) === 'in_progress').length;
+        : scopedWorkOrderRows.filter((row) => resolveStatus(row) === 'in_progress').length;
       const dashboardTrendLines = mapTrendLinesFromSnapshot(
         snapshot,
         [
-          { metric_key: 'open_work_packages', points: generateTimeSeries('30d').map((point) => ({ ...point, value: Math.max(0, snapshotOpenWorkPackages + point.value % 4) })) },
+          { metric_key: 'open_work_orders', points: generateTimeSeries('30d').map((point) => ({ ...point, value: Math.max(0, snapshotOpenWorkOrders + point.value % 4) })) },
           { metric_key: 'compliance_status_pct', points: generateTimeSeries('30d').map((point) => ({ ...point, value: Math.max(0, Math.min(100, Math.round(snapshotComplianceStatusPct + (point.value % 5) - 2))) })) },
         ],
         {
-          openWorkPackages: snapshotOpenWorkPackages,
+          openWorkOrders: snapshotOpenWorkOrders,
           complianceStatusPct: snapshotComplianceStatusPct,
           inProgressTasks: snapshotInProgressTasks,
           slaBreachCount: snapshotOverdueTasks,
@@ -1619,7 +1619,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         cacheAgeSeconds,
         snapshot,
         sourceRows: [
-          ...scopedWorkPackageRows,
+          ...scopedWorkOrderRows,
           ...scopedComplianceRows,
           ...scopedIntegrationRows,
           ...scopedTelemetryRows,
@@ -1658,13 +1658,13 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
         },
         output: {
           executive_summary: {
-            active_work_packages: snapshotOpenWorkPackages,
+            active_work_orders: snapshotOpenWorkOrders,
             overdue_tasks: snapshotOverdueTasks,
             compliance_status_pct: snapshotComplianceStatusPct,
             forecast_accuracy_pct: forecast.forecast_accuracy_pct,
           },
           kpi_cards: [
-            { key: 'open_work_packages', label: 'Open Work Packages', value: snapshotOpenWorkPackages, trend: snapshotOpenWorkPackages > 0 ? '+2%' : '0%' },
+            { key: 'open_work_orders', label: 'Open Work Packages', value: snapshotOpenWorkOrders, trend: snapshotOpenWorkOrders > 0 ? '+2%' : '0%' },
             { key: 'in_progress_tasks', label: 'In Progress Tasks', value: snapshotInProgressTasks, trend: snapshotInProgressTasks > 0 ? '+1.1%' : '0%' },
             { key: 'deferred_items', label: 'Deferred Items', value: snapshotDeferredItems, trend: snapshotDeferredItems > 0 ? '+0.9%' : '0%' },
             { key: 'aog_count', label: 'AOG Count', value: snapshotAogCount, trend: snapshotAogCount > 0 ? '+0.4%' : '0%' },
@@ -1677,8 +1677,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse) {
           },
           trend_lines: dashboardTrendLines,
           anomaly_flags: anomalyFlags,
-          work_package_overview: workPackageOverviewPaging.items,
-          pagination: workPackageOverviewPaging.pagination,
+          work_order_overview: workOrderOverviewPaging.items,
+          pagination: workOrderOverviewPaging.pagination,
           materials_reservation_alerts: materialsAlerts,
           compliance_gate_status: complianceAttention,
           integration_monitor: scopedIntegrationMonitor,

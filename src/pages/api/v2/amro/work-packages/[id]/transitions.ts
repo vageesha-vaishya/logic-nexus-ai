@@ -13,7 +13,7 @@ import {
 import { sendErrorResponse } from '../../../../_utils/errorHandler';
 import { applyCompatibilityResponseHeaders, resolveGatewayCompatibility } from '../../../../_utils/compatibility-facade';
 
-type WorkPackageStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
+type WorkOrderStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
 type ApiAmroErrorCode =
   | 'AMRO_TRANSITION_NOT_ALLOWED'
   | 'AMRO_COMPLIANCE_GATE_FAILED'
@@ -21,7 +21,7 @@ type ApiAmroErrorCode =
   | 'AMRO_AUTH_SCOPE_INVALID'
   | 'AMRO_IDEMPOTENCY_KEY_REQUIRED';
 
-const ROLE_TRANSITION_POLICY: Record<string, ReadonlyArray<WorkPackageStatus>> = {
+const ROLE_TRANSITION_POLICY: Record<string, ReadonlyArray<WorkOrderStatus>> = {
   platform_admin: ['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'],
   admin: ['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'],
   tenant_admin: ['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'],
@@ -31,7 +31,7 @@ const ROLE_TRANSITION_POLICY: Record<string, ReadonlyArray<WorkPackageStatus>> =
   technician: ['in_progress'],
   inspector: ['completed', 'blocked'],
 };
-const ALLOWED_TRANSITIONS: Record<WorkPackageStatus, ReadonlyArray<WorkPackageStatus>> = {
+const ALLOWED_TRANSITIONS: Record<WorkOrderStatus, ReadonlyArray<WorkOrderStatus>> = {
   planning: ['scheduled', 'blocked', 'cancelled'],
   scheduled: ['in_progress', 'blocked', 'cancelled'],
   in_progress: ['completed', 'blocked', 'cancelled'],
@@ -68,7 +68,7 @@ function assertNonEmpty(value: unknown, fieldName: string): string {
   return normalized;
 }
 
-function parseStatus(value: unknown, fieldName: string): WorkPackageStatus {
+function parseStatus(value: unknown, fieldName: string): WorkOrderStatus {
   const normalized = String(value || '').trim().toLowerCase();
   if (
     normalized === 'planning'
@@ -286,10 +286,10 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     res.status(200).json({
       version: 'v2',
-      interface: 'transition-work-package',
+      interface: 'transition-work-order',
       correlationId: ctx.correlationId,
       output: {
-        work_package_id: id,
+        work_order_id: id,
         from_status: fromStatus,
         to_status: toStatus,
         reason_code: reasonCode,

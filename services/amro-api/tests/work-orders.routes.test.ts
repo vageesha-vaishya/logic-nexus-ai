@@ -3,16 +3,16 @@ import request from 'supertest';
 import { EventEmitter } from 'events';
 import { WorkOrdersService } from '../src/services/work-orders.service';
 import router from '../src/routes/work-orders.routes';
-import { workPackagesStream } from '../src/realtime/work-packages-stream';
+import { workOrdersStream } from '../src/realtime/work-orders-stream';
 
 jest.mock('../src/services/work-orders.service', () => ({
   WorkOrdersService: jest.fn(() => ({
-    getWorkPackages: jest.fn(),
-    getWorkPackageTitles: jest.fn(),
-    getWorkPackage: jest.fn(),
-    createWorkPackage: jest.fn(),
-    updateWorkPackage: jest.fn(),
-    deleteWorkPackage: jest.fn(),
+    getWorkOrders: jest.fn(),
+    getWorkOrderTitles: jest.fn(),
+    getWorkOrder: jest.fn(),
+    createWorkOrder: jest.fn(),
+    updateWorkOrder: jest.fn(),
+    deleteWorkOrder: jest.fn(),
     getTasks: jest.fn(),
     getTask: jest.fn(),
     createTask: jest.fn(),
@@ -31,8 +31,8 @@ jest.mock('../src/services/work-orders.service', () => ({
   })),
 }));
 
-jest.mock('../src/realtime/work-packages-stream', () => ({
-  workPackagesStream: {
+jest.mock('../src/realtime/work-orders-stream', () => ({
+  workOrdersStream: {
     subscribe: jest.fn(),
     publish: jest.fn(),
   },
@@ -56,12 +56,12 @@ function createTestApp(withContext = true) {
 }
 
 const mockService = (WorkOrdersService as unknown as jest.Mock).mock.results[0]?.value as {
-  getWorkPackages: jest.Mock;
-  getWorkPackageTitles: jest.Mock;
-  getWorkPackage: jest.Mock;
-  createWorkPackage: jest.Mock;
-  updateWorkPackage: jest.Mock;
-  deleteWorkPackage: jest.Mock;
+  getWorkOrders: jest.Mock;
+  getWorkOrderTitles: jest.Mock;
+  getWorkOrder: jest.Mock;
+  createWorkOrder: jest.Mock;
+  updateWorkOrder: jest.Mock;
+  deleteWorkOrder: jest.Mock;
   getTasks: jest.Mock;
   getTask: jest.Mock;
   createTask: jest.Mock;
@@ -86,12 +86,12 @@ describe('work-orders.routes', () => {
 
   it('serves work package and task CRUD endpoints', async () => {
     const app = createTestApp(true);
-    mockService.getWorkPackages.mockResolvedValue([{ id: 'wp-1' }]);
-    mockService.getWorkPackageTitles.mockResolvedValue([{ id: 'ttl-1', title: 'Starter Work Package', wp_title: 'STARTER' }]);
-    mockService.getWorkPackage.mockResolvedValue({ id: 'wp-1' });
-    mockService.createWorkPackage.mockResolvedValue({ id: 'wp-2' });
-    mockService.updateWorkPackage.mockResolvedValue({ id: 'wp-1', title: 'Updated' });
-    mockService.deleteWorkPackage.mockResolvedValue(undefined);
+    mockService.getWorkOrders.mockResolvedValue([{ id: 'wp-1' }]);
+    mockService.getWorkOrderTitles.mockResolvedValue([{ id: 'ttl-1', title: 'Starter Work Package', wp_title: 'STARTER' }]);
+    mockService.getWorkOrder.mockResolvedValue({ id: 'wp-1' });
+    mockService.createWorkOrder.mockResolvedValue({ id: 'wp-2' });
+    mockService.updateWorkOrder.mockResolvedValue({ id: 'wp-1', title: 'Updated' });
+    mockService.deleteWorkOrder.mockResolvedValue(undefined);
     mockService.getTasks.mockResolvedValue([{ id: 'task-1' }]);
     mockService.getTask.mockResolvedValue({ id: 'task-1' });
     mockService.createTask.mockResolvedValue({ id: 'task-2' });
@@ -108,12 +108,12 @@ describe('work-orders.routes', () => {
     mockService.getSchedulingSummary.mockResolvedValue({ scheduled: 1 });
     mockService.getIntegrationSummary.mockResolvedValue({ adapter_health: 'healthy' });
 
-    await request(app).get('/api/v1/work-packages').expect(200);
+    await request(app).get('/api/v1/work-orders').expect(200);
     await request(app).get('/api/v1/amro/work-orders').expect(200);
-    await request(app).get('/api/v1/amro/work-package-titles').expect(200);
-    await request(app).get('/api/v1/work-packages/wp-1').expect(200);
+    await request(app).get('/api/v1/amro/work-order-titles').expect(200);
+    await request(app).get('/api/v1/work-orders/wp-1').expect(200);
     await request(app).get('/api/v1/amro/work-orders/wp-1').expect(200);
-    await request(app).post('/api/v1/work-packages').send({
+    await request(app).post('/api/v1/work-orders').send({
       aircraft_id: 'ac-1',
       title: 'T',
       maintenance_type: 'line',
@@ -123,21 +123,21 @@ describe('work-orders.routes', () => {
       title: 'T',
       maintenance_type: 'line',
     }).expect(201);
-    await request(app).patch('/api/v1/work-packages/wp-1').send({ title: 'Updated' }).expect(200);
+    await request(app).patch('/api/v1/work-orders/wp-1').send({ title: 'Updated' }).expect(200);
     await request(app).patch('/api/v1/amro/work-orders/wp-1').send({ title: 'Updated' }).expect(200);
-    await request(app).delete('/api/v1/work-packages/wp-1').expect(204);
+    await request(app).delete('/api/v1/work-orders/wp-1').expect(204);
     await request(app).delete('/api/v1/amro/work-orders/wp-1').expect(204);
 
-    await request(app).get('/api/v1/work-packages/wp-1/tasks').expect(200);
+    await request(app).get('/api/v1/work-orders/wp-1/tasks').expect(200);
     await request(app).get('/api/v1/tasks/task-1').expect(200);
-    await request(app).post('/api/v1/work-packages/wp-1/tasks').send({
+    await request(app).post('/api/v1/work-orders/wp-1/tasks').send({
       title: 'Task',
       sequence_order: 1,
     }).expect(201);
     await request(app).patch('/api/v1/tasks/task-1').send({ status: 'completed' }).expect(200);
     await request(app).delete('/api/v1/tasks/task-1').expect(204);
 
-    await request(app).get('/api/v1/work-packages/wp-1/materials').expect(200);
+    await request(app).get('/api/v1/work-orders/wp-1/materials').expect(200);
     await request(app).get('/api/v1/materials/mat-1').expect(200);
     await request(app).get('/api/v1/assets').expect(200);
     await request(app).get('/api/v1/qualifications').expect(200);
@@ -156,21 +156,21 @@ describe('work-orders.routes', () => {
     const app = createTestApp(true);
     const appWithoutContext = createTestApp(false);
 
-    await request(app).post('/api/v1/work-packages').send({ title: 'Missing' }).expect(400);
-    await request(app).post('/api/v1/work-packages/wp-1/tasks').send({ title: 'No sequence' }).expect(400);
+    await request(app).post('/api/v1/work-orders').send({ title: 'Missing' }).expect(400);
+    await request(app).post('/api/v1/work-orders/wp-1/tasks').send({ title: 'No sequence' }).expect(400);
     await request(app).post('/api/v1/tasks/task-1/maintenance-events').send({ executed_by: 'tech' }).expect(400);
-    await request(appWithoutContext).get('/api/v1/work-packages').expect(401);
+    await request(appWithoutContext).get('/api/v1/work-orders').expect(401);
   });
 
   it('streams SSE updates and filters by tenant', () => {
     let callback: ((event: any) => void) | undefined;
     const unsubscribe = jest.fn();
-    (workPackagesStream.subscribe as jest.Mock).mockImplementation((fn: (event: any) => void) => {
+    (workOrdersStream.subscribe as jest.Mock).mockImplementation((fn: (event: any) => void) => {
       callback = fn;
       return unsubscribe;
     });
 
-    const sseLayer = (router as any).stack.find((layer: any) => layer.route?.path === '/work-packages/stream');
+    const sseLayer = (router as any).stack.find((layer: any) => layer.route?.path === '/work-orders/stream');
     const handler = sseLayer.route.stack[0].handle;
     const req = new EventEmitter() as any;
     req.tenantId = 'tenant-1';
@@ -186,13 +186,13 @@ describe('work-orders.routes', () => {
     };
 
     handler(req, res);
-    callback?.({ tenantId: 'tenant-1', type: 'updated', workPackage: { id: 'wp-1' } });
-    callback?.({ tenantId: 'tenant-2', type: 'updated', workPackage: { id: 'wp-2' } });
+    callback?.({ tenantId: 'tenant-1', type: 'updated', workOrder: { id: 'wp-1' } });
+    callback?.({ tenantId: 'tenant-2', type: 'updated', workOrder: { id: 'wp-2' } });
     req.emit('close');
 
     expect(writes.join('')).toContain('event: connected');
-    expect(writes.join('')).toContain('work-package-change');
-    expect(workPackagesStream.subscribe).toHaveBeenCalledTimes(1);
+    expect(writes.join('')).toContain('work-order-change');
+    expect(workOrdersStream.subscribe).toHaveBeenCalledTimes(1);
     expect(unsubscribe).toHaveBeenCalledTimes(1);
   });
 });

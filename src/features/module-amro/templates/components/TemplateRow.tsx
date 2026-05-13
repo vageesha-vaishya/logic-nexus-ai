@@ -33,19 +33,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useTemplateGridStore } from '../store/useTemplateGridStore';
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 interface TemplateRowProps {
-  template: WorkPackageTemplate;
+  template: WorkOrderTemplate;
   isSelected: boolean;
   onToggleSelect: (id: string) => void;
-  onEdit: (template: WorkPackageTemplate) => void;
-  onDelete: (template: WorkPackageTemplate) => void;
-  onClone: (template: WorkPackageTemplate) => void;
-  onPreview: (template: WorkPackageTemplate) => void;
-  onManageVersions: (template: WorkPackageTemplate) => void;
+  onEdit: (template: WorkOrderTemplate) => void;
+  onDelete: (template: WorkOrderTemplate) => void;
+  onClone: (template: WorkOrderTemplate) => void;
+  onPreview: (template: WorkOrderTemplate) => void;
+  onManageVersions: (template: WorkOrderTemplate) => void;
   onContextMenu: (e: React.MouseEvent, templateId: string) => void;
   rowIndex: number;
   visibleColumns: string[];

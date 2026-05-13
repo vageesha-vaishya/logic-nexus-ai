@@ -1,7 +1,7 @@
 import type {
   AircraftPresenceCollaborator,
-  AircraftWorkPackageFormValues,
-  AircraftWorkPackageSnapshot,
+  AircraftWorkOrderFormValues,
+  AircraftWorkOrderSnapshot,
   EntityFormField,
   FormValues,
   MasterEntity,
@@ -17,6 +17,8 @@ import {
   ENTITY_FORM_FIELDS,
   MANUFACTURER_SEED_NAMES,
 } from './constants';
+
+const UUID_V4_LIKE_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export function getPayloadRecords(payload: Record<string, unknown>): RecordRow[] {
   const output = payload.output;
@@ -109,7 +111,7 @@ export function createSeedRecords(entity: MasterEntity): Record<string, unknown>
       },
     ];
   }
-  if (entity === 'work_package_templates') {
+  if (entity === 'work_order_templates') {
     return [
       {
         template_code: 'TMP-A320-LINE-48H',
@@ -197,7 +199,7 @@ export function toDateTimeInputValue(value: Date): string {
   return local.toISOString().slice(0, 16);
 }
 
-export function getDefaultAircraftWorkPackageValues(stationHint?: string): AircraftWorkPackageFormValues {
+export function getDefaultAircraftWorkOrderValues(stationHint?: string): AircraftWorkOrderFormValues {
   const now = new Date();
   const end = new Date(now.getTime() + 4 * 60 * 60 * 1000);
   const nowDate = now.toISOString().slice(0, 10);
@@ -210,7 +212,7 @@ export function getDefaultAircraftWorkPackageValues(stationHint?: string): Aircr
     plannedStart: toDateTimeInputValue(now),
     plannedEnd: toDateTimeInputValue(end),
     station: stationHint || '',
-    workPackageNumber: '',
+    workOrderNumber: '',
     topic: '',
     ttafHours: '',
     openingDate: nowDate,
@@ -231,12 +233,12 @@ export function getDefaultAircraftWorkPackageValues(stationHint?: string): Aircr
   };
 }
 
-export function parseWorkPackageItems(payload: Record<string, unknown>): Record<string, unknown>[] {
+export function parseWorkOrderItems(payload: Record<string, unknown>): Record<string, unknown>[] {
   const data = payload.data;
   if (data && typeof data === 'object') {
-    const workPackages = (data as Record<string, unknown>).workPackages;
-    if (Array.isArray(workPackages)) {
-      return workPackages.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
+    const workOrders = (data as Record<string, unknown>).workOrders;
+    if (Array.isArray(workOrders)) {
+      return workOrders.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === 'object');
     }
   }
   const items = payload.items;
@@ -259,6 +261,14 @@ function parseJsonLikeValue(value: unknown): unknown {
   } catch {
     return value;
   }
+}
+
+function parseJsonObjectInput(value: unknown): Record<string, unknown> | null {
+  const parsed = parseJsonLikeValue(value);
+  if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+    return null;
+  }
+  return parsed as Record<string, unknown>;
 }
 
 function toRecordArray(value: unknown): Record<string, unknown>[] {
@@ -306,7 +316,7 @@ export function normalizeTemplateTaskRows(tasksSource: unknown): Array<{
   }));
 }
 
-export function buildAircraftWorkPackageSnapshot(items: Record<string, unknown>[]): AircraftWorkPackageSnapshot {
+export function buildAircraftWorkOrderSnapshot(items: Record<string, unknown>[]): AircraftWorkOrderSnapshot {
   let open = 0;
   let inProgress = 0;
   let deferred = 0;
@@ -436,13 +446,109 @@ export function pickFormValuesFromRow(entity: MasterEntity, row: RecordRow): For
       next[field.key] = normalizeFormValue(field, row[field.key]);
     }
   });
-  if (entity === 'work_package_templates' && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
+  if (entity === 'work_order_templates' && Object.prototype.hasOwnProperty.call(row, 'model_id')) {
     next.model_id = String(row.model_id ?? '').trim();
   }
   if (entity === 'parts_inventory' && !String(next.part_number ?? '').trim()) {
     const itemNumber = String(row.item_number ?? row.itemNumber ?? '').trim();
     if (itemNumber) {
       next.part_number = itemNumber;
+    }
+  }
+  if (entity === 'aircraft') {
+    const passthroughKeys = [
+      'tenant_id',
+      'franchise_id',
+      'aircraft_template_id',
+      'aircraft_template',
+      'assembly_models',
+      'manufacturing_date',
+      'base_location',
+      'aircraft_operators_id',
+      'aircraft_owners_id',
+      'owner_name',
+      'line_number',
+      'variable_number',
+      'maintenance_revision_number',
+      'maintenance_revision_date',
+      'amendment_number',
+      'amendment_date',
+      'is_under_warranty',
+      'warranty_start_date',
+      'warranty_end_date',
+      'warranty_json',
+      'aircraft_weight_and_capacity_json',
+      'aircraft_other_details_json',
+      'empty_weight',
+      'empty_weight_unit',
+      'all_up_weight',
+      'all_up_weight_unit',
+      'gross_payload',
+      'gross_payload_unit',
+      'taxi_weight',
+      'taxi_weight_unit',
+      'takeoff_weight',
+      'takeoff_weight_unit',
+      'zero_fuel_weight',
+      'zero_fuel_weight_unit',
+      'landing_weight',
+      'landing_weight_unit',
+      'fuel_capacity',
+      'fuel_capacity_unit',
+      'is_not_in_use',
+      'not_in_use_date',
+      'is_readonly',
+      'readonly_date',
+      'is_flight_log_under_utc',
+    ];
+    passthroughKeys.forEach((key) => {
+      if (!Object.prototype.hasOwnProperty.call(row, key)) {
+        return;
+      }
+      next[key] = row[key];
+    });
+    if (!String(next.aircraft_template ?? '').trim()) {
+      const templateId = String(row.aircraft_template_id ?? '').trim();
+      if (templateId) {
+        next.aircraft_template = templateId;
+      }
+    }
+    const weightAndCapacityJson = parseJsonObjectInput(row.aircraft_weight_and_capacity_json);
+    if (weightAndCapacityJson) {
+      const weightKeys = [
+        'empty_weight',
+        'empty_weight_unit',
+        'all_up_weight',
+        'all_up_weight_unit',
+        'gross_payload',
+        'gross_payload_unit',
+        'taxi_weight',
+        'taxi_weight_unit',
+        'takeoff_weight',
+        'takeoff_weight_unit',
+        'zero_fuel_weight',
+        'zero_fuel_weight_unit',
+        'landing_weight',
+        'landing_weight_unit',
+        'fuel_capacity',
+        'fuel_capacity_unit',
+      ];
+      weightKeys.forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(weightAndCapacityJson, key)) {
+          return;
+        }
+        next[key] = weightAndCapacityJson[key];
+      });
+    }
+    const otherDetailsJson = parseJsonObjectInput(row.aircraft_other_details_json);
+    if (otherDetailsJson) {
+      const otherDetailsKeys = ['is_not_in_use', 'not_in_use_date', 'is_readonly', 'readonly_date', 'is_flight_log_under_utc'];
+      otherDetailsKeys.forEach((key) => {
+        if (!Object.prototype.hasOwnProperty.call(otherDetailsJson, key)) {
+          return;
+        }
+        next[key] = otherDetailsJson[key];
+      });
     }
   }
   return next;
@@ -487,10 +593,10 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
   const payload: Record<string, unknown> = {};
   fields.forEach((field) => {
     const raw = values[field.key];
-    const isWorkPackageAircraftModelSatisfiedByModelId = entity === 'work_package_templates'
+    const isWorkOrderAircraftModelSatisfiedByModelId = entity === 'work_order_templates'
       && field.key === 'aircraft_model'
       && !isBlank(values.model_id);
-    if (field.required && isBlank(raw) && field.type !== 'boolean' && !isWorkPackageAircraftModelSatisfiedByModelId) {
+    if (field.required && isBlank(raw) && field.type !== 'boolean' && !isWorkOrderAircraftModelSatisfiedByModelId) {
       errors[field.key] = `${field.label} is required`;
       return;
     }
@@ -581,7 +687,7 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
         errors.serial_number = 'Serial Number must be at least 3 characters';
       }
     }
-    if (payload.aircraft_type && !AIRCRAFT_TYPE_OPTIONS.includes(String(payload.aircraft_type))) {
+    if (payload.aircraft_type && !String(payload.aircraft_type).trim()) {
       errors.aircraft_type = 'Aircraft Type is invalid';
     }
     if (payload.status && !AIRCRAFT_STATUS_OPTIONS.includes(String(payload.status) as (typeof AIRCRAFT_STATUS_OPTIONS)[number])) {
@@ -616,6 +722,23 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     if (ownerNameRaw && ownerNameRaw !== AIRCRAFT_OWNER_OPTIONS[0]) {
       payload.owner_name = ownerNameRaw;
     }
+
+    const aircraftOwnershipUuidFields: Array<{ key: 'aircraft_operators_id' | 'aircraft_owners_id' | 'aircraft_base_location_id'; label: string }> = [
+      { key: 'aircraft_operators_id', label: 'Operator Owner' },
+      { key: 'aircraft_owners_id', label: 'Aircraft Owner' },
+      { key: 'aircraft_base_location_id', label: 'Base Location' },
+    ];
+    aircraftOwnershipUuidFields.forEach(({ key, label }) => {
+      const rawValue = String(values[key] ?? '').trim();
+      if (!rawValue || rawValue === AIRCRAFT_OWNER_OPTIONS[0]) {
+        return;
+      }
+      if (!UUID_V4_LIKE_PATTERN.test(rawValue)) {
+        errors[key] = `${label} must be a valid UUID`;
+        return;
+      }
+      payload[key] = rawValue;
+    });
 
     const aircraftOptionalNumberFields = [
       'defect_count',
@@ -657,9 +780,9 @@ export function buildPayloadFromForm(entity: MasterEntity, values: FormValues): 
     });
   }
 
-  if (entity === 'work_package_templates') {
+  if (entity === 'work_order_templates') {
     const modelId = String(values.model_id ?? '').trim();
-    // model_id is required by database constraint ck_work_package_templates_model_id_required
+    // model_id is required by database constraint ck_work_order_templates_model_id_required
     if (!modelId) {
       errors.model_id = 'Model ID is required';
     } else {

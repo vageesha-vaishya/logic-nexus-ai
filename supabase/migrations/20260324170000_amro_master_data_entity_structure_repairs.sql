@@ -82,9 +82,9 @@ CREATE INDEX IF NOT EXISTS idx_regulator_profiles_tenant_active
   ON public.regulator_profiles (tenant_id, is_active)
   WHERE deleted_at IS NULL AND is_active = true;
 
-DROP INDEX IF EXISTS public.uq_work_package_templates_tenant_franchise_code_version;
-CREATE UNIQUE INDEX IF NOT EXISTS uq_work_package_templates_tenant_franchise_code_version_active
-  ON public.work_package_templates (
+DROP INDEX IF EXISTS public.uq_work_order_templates_tenant_franchise_code_version;
+CREATE UNIQUE INDEX IF NOT EXISTS uq_work_order_templates_tenant_franchise_code_version_active
+  ON public.work_order_templates (
     tenant_id,
     COALESCE(franchise_id, '00000000-0000-0000-0000-000000000000'::uuid),
     template_code,
@@ -92,14 +92,14 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_work_package_templates_tenant_franchise_cod
   )
   WHERE deleted_at IS NULL;
 
-ALTER TABLE public.work_package_templates
-  DROP CONSTRAINT IF EXISTS ck_work_package_templates_scope_json_array;
-ALTER TABLE public.work_package_templates
-  ADD CONSTRAINT ck_work_package_templates_scope_json_array
+ALTER TABLE public.work_order_templates
+  DROP CONSTRAINT IF EXISTS ck_work_order_templates_scope_json_array;
+ALTER TABLE public.work_order_templates
+  ADD CONSTRAINT ck_work_order_templates_scope_json_array
   CHECK (jsonb_typeof(scope_json) = 'array');
 
-ALTER TABLE public.work_package_templates
-  DROP CONSTRAINT IF EXISTS ck_work_package_templates_tasks_json_array;
-ALTER TABLE public.work_package_templates
-  ADD CONSTRAINT ck_work_package_templates_tasks_json_array
+ALTER TABLE public.work_order_templates
+  DROP CONSTRAINT IF EXISTS ck_work_order_templates_tasks_json_array;
+ALTER TABLE public.work_order_templates
+  ADD CONSTRAINT ck_work_order_templates_tasks_json_array
   CHECK (jsonb_typeof(tasks_json) = 'array');

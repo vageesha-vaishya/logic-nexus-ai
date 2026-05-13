@@ -18,14 +18,14 @@ BEGIN
     SELECT 1
     FROM information_schema.columns
     WHERE table_schema = 'public'
-      AND table_name = 'work_package_templates'
+      AND table_name = 'work_order_templates'
       AND column_name = 'aircraft_model'
   )
   INTO v_has_aircraft_model;
 
   IF v_has_aircraft_model THEN
     EXECUTE $sql$
-      UPDATE public.work_package_templates
+      UPDATE public.work_order_templates
       SET
         aircraft_model = 'PC - 12/45',
         updated_at = now()

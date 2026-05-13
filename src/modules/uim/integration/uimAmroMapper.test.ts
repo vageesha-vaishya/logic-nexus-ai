@@ -21,7 +21,7 @@ describe('uimAmroMapper', () => {
   it('maps AMRO payload fields into UIM metadata contract', () => {
     const metadata = mapAmroPayloadToUimMetadata({
       maintenance_order_id: 'MO-1',
-      work_package_id: 'WP-1',
+      work_order_id: 'WP-1',
       task_id: 'TASK-1',
       requested_by: 'planner',
       amro_reference: 'AMRO-REF',

@@ -11,17 +11,17 @@ Provide concrete migration steps to implement Work Package Templates using Story
 
 ## Recommended Story Baseline
 - Primary implementation reference:
-  - `WorkPackageTemplates_ProductionParity`
+  - `WorkOrderTemplates_ProductionParity`
 - Validation reference:
-  - `WorkPackageTemplates_ProductionParity_ValidationError`
+  - `WorkOrderTemplates_ProductionParity_ValidationError`
 
 ## Story-to-Module Mapping
 | Story | Runtime Mapping | Use |
 |---|---|---|
-| `WorkPackageTemplates_ProductionParity` | Adapter ON path | Primary UI baseline |
-| `WorkPackageTemplates_ProductionParity_ValidationError` | Adapter ON + errors | Validation parity |
-| `WorkPackageTemplates_ProductionParity_Loading` | Loading state | Data loading UX |
-| `WorkPackageTemplates_ProductionParity_FeatureFlagOffFallback` | Legacy path | Rollback/fallback verification |
+| `WorkOrderTemplates_ProductionParity` | Adapter ON path | Primary UI baseline |
+| `WorkOrderTemplates_ProductionParity_ValidationError` | Adapter ON + errors | Validation parity |
+| `WorkOrderTemplates_ProductionParity_Loading` | Loading state | Data loading UX |
+| `WorkOrderTemplates_ProductionParity_FeatureFlagOffFallback` | Legacy path | Rollback/fallback verification |
 | `DesktopOperations` | Main desktop operation mode | Enterprise reference |
 | `TabletGlovedHandMode` | Tablet/large touch target mode | Responsive operation |
 | `HighContrastLowLight` | Hangar/low-light visibility reference | Accessibility |
@@ -43,7 +43,7 @@ Provide concrete migration steps to implement Work Package Templates using Story
 ## Component Usage Example
 ```tsx
 <AmroStandardFormTemplate
-  moduleKey="work_package_templates"
+  moduleKey="work_order_templates"
   title="Work Package Templates"
   mode="edit"
   state="ready"
@@ -63,7 +63,7 @@ Provide concrete migration steps to implement Work Package Templates using Story
 ## Quick Rollback
 - Set `VITE_AMRO_WPT_STANDARD_TEMPLATE=false`
 - Restart runtime
-- Confirm module uses legacy `WorkPackageTemplateCreateSection` path only
+- Confirm module uses legacy `WorkOrderTemplateCreateSection` path only
 
 ## Required Evidence for Sign-off
 - Storybook parity screenshots (ready + validation)

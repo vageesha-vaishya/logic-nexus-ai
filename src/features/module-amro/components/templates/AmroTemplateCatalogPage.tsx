@@ -37,10 +37,10 @@ import { TemplatePreviewDialog } from './TemplatePreviewDialog';
 import { TemplateCreateEditDialog } from '@/features/module-amro/templates/TemplateCreateEditDialog';
 import { TemplateVersionManager } from '@/features/module-amro/templates/TemplateVersionManager';
 import { TemplateCloneDialog } from '@/features/module-amro/templates/TemplateCloneDialog';
-import type { WorkPackageTemplate } from '@/features/module-amro/templates/AmroWorkPackageTemplatesPage';
+import type { WorkOrderTemplate } from '@/features/module-amro/templates/AmroWorkOrderTemplatesPage';
 
-// Use the shared WorkPackageTemplate type from the templates module
-type TemplateRecord = WorkPackageTemplate;
+// Use the shared WorkOrderTemplate type from the templates module
+type TemplateRecord = WorkOrderTemplate;
 
 interface TemplateVersionRecord {
   id: string;
@@ -96,7 +96,7 @@ async function fetchTemplates(
     page_size: String(params.pageSize || 50),
   });
 
-  const response = await fetch(`/api/v2/amro/master-data/work_package_templates?${query.toString()}`, {
+  const response = await fetch(`/api/v2/amro/master-data/work_order_templates?${query.toString()}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
@@ -163,7 +163,7 @@ async function fetchTemplateVersions(
     headers['x-tenant-id'] = tenantId;
   }
 
-  const response = await fetch(`/api/v2/amro/work-package-template-versions?${query.toString()}`, {
+  const response = await fetch(`/api/v2/amro/work-order-template-versions?${query.toString()}`, {
     method: 'GET',
     headers,
   });
@@ -252,7 +252,7 @@ export function AmroTemplateCatalogPage() {
     if (!tenantId || !accessToken) return;
     const load = async () => {
       try {
-        const response = await fetch(`/api/v2/amro/work-package-templates/model-options?tenant_id=${tenantId}`, {
+        const response = await fetch(`/api/v2/amro/work-order-templates/model-options?tenant_id=${tenantId}`, {
           headers: { Authorization: `Bearer ${accessToken}` },
         });
         if (response.ok) {
@@ -377,7 +377,7 @@ export function AmroTemplateCatalogPage() {
   const confirmDelete = async () => {
     if (!deleteCandidate || !accessToken) return;
     try {
-      const response = await fetch(`/api/v2/amro/master-data/work_package_templates/${deleteCandidate.id}`, {
+      const response = await fetch(`/api/v2/amro/master-data/work_order_templates/${deleteCandidate.id}`, {
         method: 'DELETE',
         headers: { Authorization: `Bearer ${accessToken}` },
       });
@@ -502,7 +502,7 @@ export function AmroTemplateCatalogPage() {
                   title="No Templates Found"
                   description="Create your first template to get started"
                   actionLabel="Create Template"
-                  onAction={() => navigate('/dashboard/amro/settings/work-package-templates/new')}
+                  onAction={() => navigate('/dashboard/amro/settings/work-order-templates/new')}
                 />
               ) : (
                 <>
@@ -648,7 +648,7 @@ export function AmroTemplateCatalogPage() {
       <TemplatePreviewDialog
         open={!!previewTemplate}
         onOpenChange={(open) => { if (!open) { setPreviewTemplate(null); setPreviewVersions([]); } }}
-        template={previewTemplate}
+        template={previewTemplate as any}
         versions={previewVersions}
         loading={previewLoading}
       />

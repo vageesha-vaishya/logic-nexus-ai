@@ -3,7 +3,7 @@
 ## Existing Module Analysis Summary
 - **Observed patterns**:
   - Dense data-entry forms with mixed controls (`Input`, `Select`, `Textarea`, table-like task selectors).
-  - Modal and page-level forms coexist (`FlightLogForm`, work-package dialogs/sections, master-data pages).
+  - Modal and page-level forms coexist (`FlightLogForm`, work-order dialogs/sections, master-data pages).
   - Multi-tenant/branch-aware data loading through scoped DB access and adapter logic.
   - Repeated states across modules: loading, save/update, validation errors, inline helper text, and read-only paths.
 - **Core compatibility requirement**:
@@ -122,7 +122,7 @@
 - **Rollback**:
   1. Set `VITE_AMRO_WPT_STANDARD_TEMPLATE=false`
   2. Restart runtime
-  3. Module immediately falls back to existing `WorkPackageTemplateCreateSection` path
+  3. Module immediately falls back to existing `WorkOrderTemplateCreateSection` path
 
 ## Step 3: Task Row Block Standardization (Hybrid)
 - **Current implementation**:
@@ -143,7 +143,7 @@
 
 ## Related Sections To Update During Step 3+
 - **Stories**:
-  - Add `WorkPackageTaskRowsVariant` and `TaskRowValidationVariant` in `AmroStandardFormTemplate.stories.tsx`.
+  - Add `WorkOrderTaskRowsVariant` and `TaskRowValidationVariant` in `AmroStandardFormTemplate.stories.tsx`.
 - **Tests**:
   - Add parity tests for task-row ordering, duplicate prevention, and payload integrity.
 - **Accessibility checks**:

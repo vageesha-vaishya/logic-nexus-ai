@@ -32,6 +32,9 @@ All notable changes to this project will be documented in this file.
 ### Changed
 
 * Renamed the quotation option label from "Manual Entry" to "Manual Quote" across the quotation UI and documentation.
+* Executed comprehensive AMRO domain naming migration from `work_package*` to `work_order*` across database schema objects, APIs, application code, configuration files, test assets, and technical documentation.
+* Finalized canonical table usage to `work_orders` and `work_order_templates`, including migration alignment for constraints, indexes, and foreign keys.
+* Added comprehensive impact analysis artifact at `artifacts/mro/analysis/2026-04-26-work-order-domain-comprehensive-impact-analysis.md`.
 
 ## \[2026-01-21]
 

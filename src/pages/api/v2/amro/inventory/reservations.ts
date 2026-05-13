@@ -97,7 +97,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
 
     // ── GET: list reservations ──────────────────────────────────────────────
     if (req.method === 'GET') {
-      const workPackageId = String(req.query.work_package_id || '').trim() || null;
+      const workOrderId = String(req.query.work_order_id || '').trim() || null;
       const inventoryId = String(req.query.inventory_id || '').trim() || null;
       const statusFilter = String(req.query.status || '').trim() || null;
       const limit = Math.min(Number(req.query.limit || 50), 200);
@@ -108,7 +108,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         .eq('tenant_id', tenantId);
 
       if (franchiseId) query = query.eq('franchise_id', franchiseId);
-      if (workPackageId) query = query.eq('work_package_id', workPackageId);
+      if (workOrderId) query = query.eq('work_order_id', workOrderId);
       if (inventoryId) query = query.eq('inventory_id', inventoryId);
       if (statusFilter && isValidStatus(statusFilter)) query = query.eq('status', statusFilter);
 
@@ -124,7 +124,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         serial_number: r.parts_inventory?.serial_number || null,
         description: r.parts_inventory?.description || null,
         warehouse_location: r.parts_inventory?.warehouse_location || null,
-        work_package_id: r.work_package_id,
+        work_order_id: r.work_order_id,
         task_id: r.task_id,
         reserved_quantity: r.reserved_quantity,
         status: r.status,
@@ -151,7 +151,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
     // ── POST: create reservation ────────────────────────────────────────────
     if (req.method === 'POST') {
       const payload = parseBody(req.body);
-      const workPackageId = payload.work_package_id ? assertNonEmpty(payload.work_package_id, 'work_package_id') : null;
+      const workOrderId = payload.work_order_id ? assertNonEmpty(payload.work_order_id, 'work_order_id') : null;
       const taskId = payload.task_id ? assertNonEmpty(payload.task_id, 'task_id') : null;
       const expiresAt = payload.expires_at ? String(payload.expires_at).trim() : null;
       const lineItems = toLineItems(payload);
@@ -210,7 +210,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
             tenant_id: tenantId,
             franchise_id: franchiseId,
             inventory_id: line.inventory_id,
-            work_package_id: workPackageId,
+            work_order_id: workOrderId,
             task_id: taskId,
             reserved_quantity: line.quantity,
             status: 'active',
@@ -271,7 +271,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         correlationId: ctx.correlationId,
         output: {
           tenant_id: tenantId,
-          work_package_id: workPackageId,
+          work_order_id: workOrderId,
           task_id: taskId,
           total_requested: lineItems.length,
           succeeded: succeeded.length,

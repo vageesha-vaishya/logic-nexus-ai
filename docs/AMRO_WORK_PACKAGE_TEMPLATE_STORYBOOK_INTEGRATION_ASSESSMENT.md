@@ -5,21 +5,21 @@
 - Identify integration gaps, dependencies, risks, and migration-safe implementation strategy.
 
 ## 2. Current State Architecture
-- **UI container**: `AmroSettingsMasterDataPage` orchestrates list/form/create/update/delete workflows for `work_package_templates`.
+- **UI container**: `AmroSettingsMasterDataPage` orchestrates list/form/create/update/delete workflows for `work_order_templates`.
 - **Feature flag switch**: `VITE_AMRO_WPT_STANDARD_TEMPLATE` toggles standard Storybook-aligned adapter path.
 - **Form implementation**:
-  - `AmroWorkPackageTemplateAdapter` provides Storybook-standard labels/validation contract surface.
-  - `WorkPackageTemplateCreateSection` contains operational sections:
+  - `AmroWorkOrderTemplateAdapter` provides Storybook-standard labels/validation contract surface.
+  - `WorkOrderTemplateCreateSection` contains operational sections:
     - Work Package Details
     - Selected Tasks
     - Scope Definition
 - **API routes**:
-  - `/api/v2/amro/work-package-templates` and `/api/v2/amro/work_package_templates` map to generic master-data handler.
+  - `/api/v2/amro/work-order-templates` and `/api/v2/amro/work_order_templates` map to generic master-data handler.
   - Generic handlers in `master-data/[entity].ts` and `master-data/[entity]/[id].ts`.
 - **Data model**:
-  - `work_package_templates` core columns: template code/name/version/maintenance type/scope/tasks/policy snapshot.
+  - `work_order_templates` core columns: template code/name/version/maintenance type/scope/tasks/policy snapshot.
   - `model_id` added by migration with FK/check constraint (check currently `NOT VALID`).
-  - Link table `work_package_template_task_templates` manages template-task relationships.
+  - Link table `work_order_template_task_templates` manages template-task relationships.
 
 ## 3. Storybook Section Mapping
 - **Storybook standardized fields**
@@ -40,18 +40,18 @@
   - JSON editors for `scope_json` and `tasks_json` are present.
 
 ## 4. Gap Analysis
-- **Gap A (resolved in this phase)**: API contract previously omitted `model_id` and `aircraft_model` in write/list projection for `work_package_templates`.
+- **Gap A (resolved in this phase)**: API contract previously omitted `model_id` and `aircraft_model` in write/list projection for `work_order_templates`.
   - Impact: model context could be dropped in create/update payloads and list hydration.
 - **Gap B**: API wrappers are still generic passthrough at route boundary; domain behavior lives in generic handler.
   - Impact: discoverability and API ownership are weaker; behavior is harder to reason about externally.
-- **Gap C**: DB check `ck_work_package_templates_model_id_required` exists as `NOT VALID`.
+- **Gap C**: DB check `ck_work_order_templates_model_id_required` exists as `NOT VALID`.
   - Impact: legacy rows may not satisfy final model integrity requirement.
 - **Gap D**: Potential divergence risk between `tasks_json` and relation table if out-of-band writes bypass sync logic.
   - Impact: UI-selected tasks and persisted links can drift.
 
 ## 5. Integration Strategy
 ### Phase 1: Contract Alignment (Implemented)
-- Extend `work_package_templates` entity config in `master-data/shared.ts`:
+- Extend `work_order_templates` entity config in `master-data/shared.ts`:
   - include `model_id`, `aircraft_model` in `writeAllowedFields`.
   - include `model_id`, `aircraft_model` in `listColumns`.
   - include model context in search columns.
@@ -61,7 +61,7 @@
 - Keep route compatibility while leveraging existing relationship sync internals:
   - parse selected task IDs/tokens from `tasks_json`.
   - resolve scoped task templates.
-  - sync `work_package_template_task_templates`.
+  - sync `work_order_template_task_templates`.
   - enforce model resolution logic and relationship validation.
 - Ensure create/update paths preserve existing API responses and audits.
 

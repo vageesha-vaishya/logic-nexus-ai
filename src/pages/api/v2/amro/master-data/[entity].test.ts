@@ -132,6 +132,76 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect((res.jsonBody as any)?.output?.entity).toBe('aircraft');
   });
 
+  it('adds planning and directive capability counts for assembly models', async () => {
+    const modelsEqTenantMock = vi.fn().mockResolvedValue({
+      data: [
+        {
+          id: 'model-1',
+          model_code: 'A320-200',
+          name: 'A320-200',
+          manufacturer_id: 'man-1',
+          assembly_type_id: 'type-1',
+          is_active: true,
+        },
+      ],
+      count: 1,
+      error: null,
+    });
+    const modelsRangeMock = vi.fn().mockReturnValue({ eq: modelsEqTenantMock });
+    const modelsOrderMock = vi.fn().mockReturnValue({ range: modelsRangeMock });
+    const modelsSelectMock = vi.fn().mockReturnValue({ order: modelsOrderMock });
+
+    const taskTemplateEqModelMock = vi.fn().mockResolvedValue({
+      count: 3,
+      error: null,
+    });
+    const taskTemplateEqTenantMock = vi.fn().mockReturnValue({ eq: taskTemplateEqModelMock });
+    const taskTemplateSelectMock = vi.fn().mockReturnValue({ eq: taskTemplateEqTenantMock });
+
+    const directivesEqModelMock = vi.fn().mockResolvedValue({
+      count: 9,
+      error: null,
+    });
+    const directivesEqTenantMock = vi.fn().mockReturnValue({ eq: directivesEqModelMock });
+    const directivesSelectMock = vi.fn().mockReturnValue({ eq: directivesEqTenantMock });
+
+    const fromMock = vi.fn((table: string) => {
+      if (table === 'assembly_models') {
+        return { select: modelsSelectMock };
+      }
+      if (table === 'task_templates') {
+        return { select: taskTemplateSelectMock };
+      }
+      if (table === 'directives') {
+        return { select: directivesSelectMock };
+      }
+      return {};
+    });
+    vi.mocked(getSupabaseAdminClient).mockReturnValue({
+      from: fromMock,
+    } as any);
+
+    const req: ApiRequest = {
+      method: 'GET',
+      query: {
+        entity: 'assembly_models',
+        page: '1',
+        page_size: '25',
+      },
+      headers: {},
+    };
+    const res = createResponse();
+
+    await handler(req, res);
+
+    expect(res.statusCode).toBe(200);
+    const record = (res.jsonBody as any)?.output?.records?.[0] || {};
+    expect(record.planning_capability).toBe(3);
+    expect(record.directive_capability).toBe(9);
+    expect(fromMock).toHaveBeenCalledWith('task_templates');
+    expect(fromMock).toHaveBeenCalledWith('directives');
+  });
+
   it('accepts hyphenated flight logs entity route segment', async () => {
     const eqTenantMock = vi.fn();
     const eqDeletedMock = vi.fn().mockResolvedValue({
@@ -385,7 +455,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const req: ApiRequest = {
       method: 'GET',
       query: {
-        entity: 'work_package_templates',
+        entity: 'work_order_templates',
         page: '1',
         page_size: '25',
       },
@@ -822,7 +892,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         },
         created_relationships: [
           {
-            work_package_template_id: 'wpt-1',
+            work_order_template_id: 'wpt-1',
             task_template_id: '11111111-1111-4111-8111-111111111111',
             tenant_id: 'tenant-1',
             model_id: 'model-1',
@@ -839,7 +909,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const linkSelectMock = vi.fn().mockReturnValue({ eq: linkEqTenantMock });
     const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
     const fromMock = vi.fn((table: string) => {
-      if (table === 'work_package_template_task_templates') {
+      if (table === 'work_order_template_task_templates') {
         return { select: linkSelectMock };
       }
       if (table === 'maintenance_events') {
@@ -851,7 +921,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     const req: ApiRequest = {
       method: 'POST',
-      query: { entity: 'work_package_templates' },
+      query: { entity: 'work_order_templates' },
       body: {
         template_code: 'WP-LINE-001',
         version: 1,
@@ -873,8 +943,8 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const rpcPayload = (rpcArgs?.p_payload || {}) as Record<string, unknown>;
     expect(Array.isArray(rpcPayload.tasks_json)).toBe(true);
     expect(Array.isArray(rpcPayload.scope_json)).toBe(true);
-    expect(fromMock).toHaveBeenCalledWith('work_package_template_task_templates');
-    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-1');
+    expect(fromMock).toHaveBeenCalledWith('work_order_template_task_templates');
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_order_template_id', 'wpt-1');
   });
 
   it('roundtrips model_id and aircraft_model in work package template create flow', async () => {
@@ -889,7 +959,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
         },
         created_relationships: [
           {
-            work_package_template_id: 'wpt-model-1',
+            work_order_template_id: 'wpt-model-1',
             task_template_id: '11111111-1111-4111-8111-111111111111',
             tenant_id: 'tenant-1',
             model_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -927,10 +997,10 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const patchUpdateMock = vi.fn().mockReturnValue(patchQuery);
     const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
     const fromMock = vi.fn((table: string) => {
-      if (table === 'work_package_template_task_templates') {
+      if (table === 'work_order_template_task_templates') {
         return { select: linkSelectMock };
       }
-      if (table === 'work_package_templates') {
+      if (table === 'work_order_templates') {
         return { update: patchUpdateMock };
       }
       if (table === 'maintenance_events') {
@@ -942,7 +1012,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     const req: ApiRequest = {
       method: 'POST',
-      query: { entity: 'work_package_templates' },
+      query: { entity: 'work_order_templates' },
       body: {
         template_code: 'WP-MODEL-001',
         version: 1,
@@ -983,7 +1053,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     const req: ApiRequest = {
       method: 'POST',
-      query: { entity: 'work_package_templates' },
+      query: { entity: 'work_order_templates' },
       body: {
         template_code: 'WP-LINE-ROLLBACK',
         version: 1,
@@ -1026,7 +1096,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     const linkSelectMock = vi.fn().mockReturnValue({ eq: linkEqTenantMock });
     const auditInsertMock = vi.fn().mockResolvedValue({ error: null });
     const fromMock = vi.fn((table: string) => {
-      if (table === 'work_package_template_task_templates') {
+      if (table === 'work_order_template_task_templates') {
         return { select: linkSelectMock };
       }
       if (table === 'maintenance_events') {
@@ -1038,7 +1108,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
 
     const req: ApiRequest = {
       method: 'POST',
-      query: { entity: 'work_package_templates' },
+      query: { entity: 'work_order_templates' },
       body: {
         template_code: 'WP-EMPTY-001',
         version: 1,
@@ -1057,7 +1127,7 @@ describe('/api/v2/amro/master-data/[entity]', () => {
     expect(res.statusCode).toBe(201);
     expect(Array.isArray((res.jsonBody as any)?.output?.created_task_relationships)).toBe(true);
     expect(((res.jsonBody as any)?.output?.created_task_relationships || []).length).toBe(0);
-    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_package_template_id', 'wpt-empty-1');
+    expect(linkEqTemplateMock).toHaveBeenCalledWith('work_order_template_id', 'wpt-empty-1');
   });
 
   it('creates ATA code with parent hierarchy context', async () => {

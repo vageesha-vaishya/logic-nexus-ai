@@ -10,7 +10,7 @@ import {
   enforceAmroSequentialMilestoneForAuditReplay,
   enforceAmroSequentialMilestoneForForecastReliabilityInterface,
   enforceAmroSequentialMilestoneForTaskInterface,
-  enforceAmroSequentialMilestoneForWorkPackageInterface,
+  enforceAmroSequentialMilestoneForWorkOrderInterface,
   resolveAmroPhasePlanStatuses,
 } from './phase-plan-model';
 
@@ -213,7 +213,7 @@ describe('phase-plan-model', () => {
     vi.stubEnv('AMRO_SEQ_M2_TRANSITION_NEGATIVE_PATH_TESTS_PASS', 'true');
     vi.stubEnv('AMRO_SEQ_M2_E2E_CREATE_TRANSITION_100', 'true');
 
-    expect(() => enforceAmroSequentialMilestoneForWorkPackageInterface('run-replan-simulation')).toThrow(
+    expect(() => enforceAmroSequentialMilestoneForWorkOrderInterface('run-replan-simulation')).toThrow(
       /Sequential milestone M3 is not started/
     );
 
@@ -302,7 +302,7 @@ describe('phase-plan-model', () => {
     vi.stubEnv('AMRO_SEQ_M2_TRANSITION_NEGATIVE_PATH_TESTS_PASS', 'false');
     vi.stubEnv('AMRO_SEQ_M2_E2E_CREATE_TRANSITION_100', 'true');
 
-    expect(() => enforceAmroSequentialMilestoneForWorkPackageInterface('run-replan-simulation')).toThrow(
+    expect(() => enforceAmroSequentialMilestoneForWorkOrderInterface('run-replan-simulation')).toThrow(
       /dependency acceptance criteria check failed/
     );
 

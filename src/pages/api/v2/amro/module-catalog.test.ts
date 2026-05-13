@@ -136,9 +136,9 @@ describe('/api/v2/amro/module-catalog', () => {
     });
     expect((res.jsonBody as any)?.data?.moduleCatalog?.databaseMappingMatrix?.[1]).toEqual({
       moduleId: 'MOD-AMRO-02',
-      primaryTables: ['work_packages', 'work_package_templates', 'tasks'],
-      keyFieldsUsedByModule: ['work_package_number', 'maintenance_type', 'priority', 'status'],
-      criticalConstraintsAndRules: ['Unique (tenant_id, work_package_number)', 'Transition policy validation required'],
+      primaryTables: ['work_orders', 'work_order_templates', 'tasks'],
+      keyFieldsUsedByModule: ['work_order_number', 'maintenance_type', 'priority', 'status'],
+      criticalConstraintsAndRules: ['Unique (tenant_id, work_order_number)', 'Transition policy validation required'],
     });
     expect((res.jsonBody as any)?.data?.moduleCatalog?.databaseMappingMatrix?.[9]).toEqual({
       moduleId: 'MOD-AMRO-10',
@@ -147,12 +147,12 @@ describe('/api/v2/amro/module-catalog', () => {
       criticalConstraintsAndRules: ['Append-only semantics', 'Hash-chain integrity required'],
     });
     expect((res.jsonBody as any)?.data?.moduleCatalog?.tableRelationshipCrossReference?.[0]).toEqual({
-      relationshipPath: 'aircraft -> work_packages -> tasks -> maintenance_events',
+      relationshipPath: 'aircraft -> work_orders -> tasks -> maintenance_events',
       purpose: 'End-to-end execution trace',
       modulesConsumingPath: ['MOD-AMRO-02', 'MOD-AMRO-03', 'MOD-AMRO-10'],
     });
     expect((res.jsonBody as any)?.data?.moduleCatalog?.tableRelationshipCrossReference?.[5]).toEqual({
-      relationshipPath: 'asset_health_signals -> forecast_outputs -> work_packages',
+      relationshipPath: 'asset_health_signals -> forecast_outputs -> work_orders',
       purpose: 'Predictive recommendation to planned work creation',
       modulesConsumingPath: ['MOD-AMRO-09', 'MOD-AMRO-02'],
     });
@@ -228,7 +228,7 @@ describe('/api/v2/amro/module-catalog', () => {
       module: 'Overview and KPI Intelligence',
       subModules: 'KPI Aggregation, Risk Heatmap, Forecast Panel',
       uiUx: 'SCR-001, SCR-012',
-      dbTables: 'work_packages, maintenance_events, forecast_outputs',
+      dbTables: 'work_orders, maintenance_events, forecast_outputs',
       workflow: '17.1, 18.1',
       apis: 'API-001, API-015',
       implementationSequence: 'S8',

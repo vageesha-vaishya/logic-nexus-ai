@@ -27,7 +27,7 @@ This specification defines the enterprise-grade grid implementation for Work Pac
 
 ### 1.1 Existing Implementation
 
-**File**: `src/features/module-amro/templates/AmroWorkPackageTemplatesPage.tsx` (776 lines)
+**File**: `src/features/module-amro/templates/AmroWorkOrderTemplatesPage.tsx` (776 lines)
 
 **Current Features**:
 - ✅ Basic table view with shadcn `Table` component
@@ -76,7 +76,7 @@ Based on codebase analysis, the following patterns will be leveraged:
 ### 2.1 Component Hierarchy
 
 ```
-AmroWorkPackageTemplatesPage (Container)
+AmroWorkOrderTemplatesPage (Container)
 ├── AmroModuleSurface (Module header with breadcrumbs)
 ├── GridToolbar
 │   ├── SearchInput (Debounced text search)
@@ -92,7 +92,7 @@ AmroWorkPackageTemplatesPage (Container)
 │       ├── DensitySelector (Compact/Normal/Comfortable)
 │       ├── ViewModeToggle (Table/Card)
 │       └── ColumnVisibilityButton
-├── WorkPackageTemplatesGrid (Core Grid Component)
+├── WorkOrderTemplatesGrid (Core Grid Component)
 │   ├── GridHeader
 │   │   ├── SelectAllCheckbox
 │   │   ├── SortableColumnHeaders (with visual indicators)
@@ -147,13 +147,13 @@ AmroWorkPackageTemplatesPage (Container)
                        ↓
 ┌─────────────────────────────────────────────────────────────┐
 │              API Integration Layer                          │
-│  • GET /api/v2/amro/work_package_templates                  │
-│  • POST /api/v2/amro/work_package_templates                 │
-│  • PUT /api/v2/amro/work_package_templates/:id              │
-│  • DELETE /api/v2/amro/work_package_templates/:id           │
-│  • POST /api/v2/amro/work_package_templates/:id/clone       │
-│  • POST /api/v2/amro/work_package_templates/bulk-delete     │
-│  • POST /api/v2/amro/work_package_templates/export          │
+│  • GET /api/v2/amro/work_order_templates                  │
+│  • POST /api/v2/amro/work_order_templates                 │
+│  • PUT /api/v2/amro/work_order_templates/:id              │
+│  • DELETE /api/v2/amro/work_order_templates/:id           │
+│  • POST /api/v2/amro/work_order_templates/:id/clone       │
+│  • POST /api/v2/amro/work_order_templates/bulk-delete     │
+│  • POST /api/v2/amro/work_order_templates/export          │
 └──────────────────────┬──────────────────────────────────────┘
                        ↓
 ┌─────────────────────────────────────────────────────────────┐
@@ -203,7 +203,7 @@ interface TemplateGridState {
   
   // Editing
   editingRowId: string | null;
-  editingValues: Partial<WorkPackageTemplate>;
+  editingValues: Partial<WorkOrderTemplate>;
   
   // Bulk Operations
   bulkOperation: BulkOperation | null;
@@ -353,7 +353,7 @@ User clicks "Save" OR presses Ctrl+S
     ↓
 Optimistic UI update (row shows saving state)
     ↓
-API call: PUT /api/v2/amro/work_package_templates/:id
+API call: PUT /api/v2/amro/work_order_templates/:id
     ↓
 If success: Show success toast, exit edit mode
 If failure: Show error toast, keep in edit mode, revert to previous values
@@ -480,7 +480,7 @@ const handleColumnReorder = (fromIndex: number, toIndex: number) => {
 - [ ] Export all rows / Export selected rows only
 - [ ] Include header row (default: checked)
 - [ ] Export format: CSV | Excel | PDF
-- [ ] File name template: `work_package_templates_YYYY-MM-DD`
+- [ ] File name template: `work_order_templates_YYYY-MM-DD`
 
 **Implementation**:
 ```typescript
@@ -669,11 +669,11 @@ ws.onmessage = (event) => {
 ### 4.1 Existing Endpoints (Unchanged)
 
 ```typescript
-GET    /api/v2/amro/work_package_templates
-POST   /api/v2/amro/work_package_templates
-GET    /api/v2/amro/work_package_templates/:id
-PUT    /api/v2/amro/work_package_templates/:id
-DELETE /api/v2/amro/work_package_templates/:id
+GET    /api/v2/amro/work_order_templates
+POST   /api/v2/amro/work_order_templates
+GET    /api/v2/amro/work_order_templates/:id
+PUT    /api/v2/amro/work_order_templates/:id
+DELETE /api/v2/amro/work_order_templates/:id
 ```
 
 ### 4.2 New Endpoints
@@ -681,7 +681,7 @@ DELETE /api/v2/amro/work_package_templates/:id
 #### 4.2.1 Bulk Delete
 
 ```typescript
-POST /api/v2/amro/work_package_templates/bulk-delete
+POST /api/v2/amro/work_order_templates/bulk-delete
 Content-Type: application/json
 
 Request:
@@ -702,7 +702,7 @@ Response:
 #### 4.2.2 Bulk Status Change
 
 ```typescript
-POST /api/v2/amro/work_package_templates/bulk-status
+POST /api/v2/amro/work_order_templates/bulk-status
 Content-Type: application/json
 
 Request:
@@ -723,7 +723,7 @@ Response:
 #### 4.2.3 Export Templates
 
 ```typescript
-POST /api/v2/amro/work_package_templates/export
+POST /api/v2/amro/work_order_templates/export
 Content-Type: application/json
 
 Request:
@@ -737,7 +737,7 @@ Request:
 
 Response:
 {
-  download_url: "/api/v2/amro/work_package_templates/export/download/abc123",
+  download_url: "/api/v2/amro/work_order_templates/export/download/abc123",
   expires_at: "2026-04-14T12:00:00Z"
 }
 ```
@@ -745,7 +745,7 @@ Response:
 #### 4.2.4 Column Options
 
 ```typescript
-GET /api/v2/amro/work_package_templates/columns
+GET /api/v2/amro/work_order_templates/columns
 Response:
 {
   columns: [
@@ -767,7 +767,7 @@ Response:
 ### 4.3 Query Parameters (Enhanced)
 
 ```typescript
-GET /api/v2/amro/work_package_templates?
+GET /api/v2/amro/work_order_templates?
   page=1
   &page_size=20
   &search=check
@@ -829,7 +829,7 @@ GET /api/v2/amro/work_package_templates?
 ### 6.1 Unit Tests (>90% coverage)
 
 **Components**:
-- `WorkPackageTemplatesGrid.test.tsx`
+- `WorkOrderTemplatesGrid.test.tsx`
 - `GridToolbar.test.tsx`
 - `TemplateRow.test.tsx`
 - `FilterBar.test.tsx`
@@ -845,10 +845,10 @@ GET /api/v2/amro/work_package_templates?
 
 **Example Test**:
 ```typescript
-describe('WorkPackageTemplatesGrid', () => {
+describe('WorkOrderTemplatesGrid', () => {
   it('renders templates in virtual list', () => {
     const templates = generateMockTemplates(100);
-    render(<WorkPackageTemplatesGrid templates={templates} />);
+    render(<WorkOrderTemplatesGrid templates={templates} />);
     
     // Should only render visible rows + overscan
     const rows = screen.getAllByRole('row');
@@ -856,7 +856,7 @@ describe('WorkPackageTemplatesGrid', () => {
   });
   
   it('handles multi-column sort', async () => {
-    render(<WorkPackageTemplatesGrid templates={mockTemplates} />);
+    render(<WorkOrderTemplatesGrid templates={mockTemplates} />);
     
     const nameHeader = screen.getByText('Template Name');
     const versionHeader = screen.getByText('Version');
@@ -898,7 +898,7 @@ describe('WorkPackageTemplatesGrid', () => {
 ```typescript
 describe('Work Package Templates Grid', () => {
   it('completes full template management workflow', async () => {
-    await page.goto('/dashboard/amro/work-package-templates');
+    await page.goto('/dashboard/amro/work-order-templates');
     
     // Create new template
     await page.click('[data-testid="new-template-button"]');
@@ -940,7 +940,7 @@ describe('Performance Benchmarks', () => {
     const templates = generateMockTemplates(1000);
     const start = performance.now();
     
-    render(<WorkPackageTemplatesGrid templates={templates} />);
+    render(<WorkOrderTemplatesGrid templates={templates} />);
     await waitFor(() => screen.getAllByRole('row').length > 0);
     
     const duration = performance.now() - start;
@@ -948,7 +948,7 @@ describe('Performance Benchmarks', () => {
   });
   
   it('maintains > 55fps during scroll', async () => {
-    render(<WorkPackageTemplatesGrid templates={generateMockTemplates(1000)} />);
+    render(<WorkOrderTemplatesGrid templates={generateMockTemplates(1000)} />);
     
     const grid = screen.getByRole('grid');
     const fps = await measureScrollFPS(grid);
@@ -992,7 +992,7 @@ describe('Performance Benchmarks', () => {
 ### Phase 1: Foundation (Weeks 1-2)
 
 **Tasks**:
-- [ ] Create `WorkPackageTemplatesGrid` component skeleton
+- [ ] Create `WorkOrderTemplatesGrid` component skeleton
 - [ ] Integrate `@tanstack/react-virtual` for virtual scrolling
 - [ ] Implement basic row rendering
 - [ ] Add server-side pagination
@@ -1122,7 +1122,7 @@ return useNewGrid ? <NewTemplatesPage /> : <OldTemplatesPage />;
 - Remove old implementation
 
 4. **Cleanup** (Week 5):
-- Delete old `AmroWorkPackageTemplatesPage.tsx`
+- Delete old `AmroWorkOrderTemplatesPage.tsx`
 - Remove feature flag
 - Update documentation
 
@@ -1302,9 +1302,9 @@ Questions? Check out the [user guide](/docs/templates-grid)
 ### 11.4 Component Props Reference
 
 ```typescript
-interface WorkPackageTemplatesGridProps {
+interface WorkOrderTemplatesGridProps {
   // Data
-  templates: WorkPackageTemplate[];
+  templates: WorkOrderTemplate[];
   totalCount: number;
   isLoading: boolean;
   
@@ -1327,10 +1327,10 @@ interface WorkPackageTemplatesGridProps {
   onSelectionChange: (selectedIds: Set<string>) => void;
   
   // Actions
-  onEdit: (template: WorkPackageTemplate) => void;
-  onDelete: (template: WorkPackageTemplate) => void;
-  onClone: (template: WorkPackageTemplate) => void;
-  onPreview: (template: WorkPackageTemplate) => void;
+  onEdit: (template: WorkOrderTemplate) => void;
+  onDelete: (template: WorkOrderTemplate) => void;
+  onClone: (template: WorkOrderTemplate) => void;
+  onPreview: (template: WorkOrderTemplate) => void;
   
   // Configuration
   editableFields: string[];

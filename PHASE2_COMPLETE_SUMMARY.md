@@ -29,8 +29,8 @@
 | 8 | Maintenance Facilities | `/dashboard/amro/settings/master-data/maintenance-facilities` | Medium | 3 hours | P1 |
 | 9 | Model | `/dashboard/amro/settings/master-data/model` | Medium | 3 hours | P1 |
 | 10 | Regulator Profiles | `/dashboard/amro/settings/master-data/regulator-profiles` | Medium | 3 hours | P2 |
-| 11 | Work Packages | `/dashboard/amro/settings/master-data/work-packages` | High | 4 hours | P2 |
-| 12 | Work Package Templates | `/dashboard/amro/settings/master-data/work_package_templates` | High | 4 hours | P2 |
+| 11 | Work Packages | `/dashboard/amro/settings/master-data/work-orders` | High | 4 hours | P2 |
+| 12 | Work Package Templates | `/dashboard/amro/settings/master-data/work_order_templates` | High | 4 hours | P2 |
 
 **Estimated Remaining Time:** ~25 hours
 

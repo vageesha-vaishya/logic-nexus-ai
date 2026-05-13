@@ -171,7 +171,7 @@ This guide shows how Work Orders now matches the Item Master Catalog design patt
   onSelect={setSelectedRecordId}
   detailTitle="Work Order Detail"
   columns={[
-    { key: 'workOrderNumber', label: 'Work Order #', render: (record) => record.work_package_number },
+    { key: 'workOrderNumber', label: 'Work Order #', render: (record) => record.work_order_number },
     { key: 'title', label: 'Title', render: (record) => record.title || '—' },
     { key: 'status', label: 'Status', render: (record) => <StatusBadge status={record.status} /> },
     { key: 'priority', label: 'Priority', render: (record) => <PriorityBadge priority={record.priority} /> },
@@ -181,7 +181,7 @@ This guide shows how Work Orders now matches the Item Master Catalog design patt
   renderDetail={(record) => (
     !record ? <p>Select a work order to inspect details.</p> : (
       <div className="space-y-2 text-xs">
-        <p><span className="font-semibold">Work Order #:</span> {record.work_package_number}</p>
+        <p><span className="font-semibold">Work Order #:</span> {record.work_order_number}</p>
         <p><span className="font-semibold">Title:</span> {record.title || '—'}</p>
         <p><span className="font-semibold">Aircraft:</span> {record.aircraft_registration || '—'}</p>
         <p><span className="font-semibold">Status:</span> {STATUS_CONFIG[record.status].label}</p>
@@ -321,7 +321,7 @@ This guide shows how Work Orders now matches the Item Master Catalog design patt
     <AlertDialogHeader>
       <AlertDialogTitle>Delete Work Order?</AlertDialogTitle>
       <AlertDialogDescription>
-        This will permanently delete work order {deleteCandidate?.work_package_number}.
+        This will permanently delete work order {deleteCandidate?.work_order_number}.
         This action cannot be undone.
       </AlertDialogDescription>
     </AlertDialogHeader>
@@ -383,7 +383,7 @@ const { invalidate } = useItemMasterActions();
 ### ✅ Work Orders (ALIGNED)
 ```typescript
 // List query
-const { data } = useListWorkPackages({
+const { data } = useListWorkOrders({
   page: 1,
   pageSize: 50,
   search,
@@ -393,12 +393,12 @@ const { data } = useListWorkPackages({
 });
 
 // Mutations
-const createMutation = useCreateWorkPackage();
-const updateMutation = useUpdateWorkPackage();
-const deleteMutation = useDeleteWorkPackage();
+const createMutation = useCreateWorkOrder();
+const updateMutation = useUpdateWorkOrder();
+const deleteMutation = useDeleteWorkOrder();
 
 // Invalidation
-const { invalidate } = useWorkPackageActions();
+const { invalidate } = useWorkOrderActions();
 ```
 
 **Match:** ✅ Perfect alignment
@@ -417,7 +417,7 @@ const { invalidate } = useWorkPackageActions();
 | Dialog Footer | AmroCrudDialogFooter | AmroCrudDialogFooter | ✅ 100% |
 | Create/Edit Dialog | Tabbed Dialog | Tabbed Dialog | ✅ 100% |
 | Delete Confirmation | AlertDialog | AlertDialog | ✅ 100% |
-| React Query Hooks | useItemMaster* | useWorkPackage* | ✅ 100% |
+| React Query Hooks | useItemMaster* | useWorkOrder* | ✅ 100% |
 | TypeScript Types | Strong typing | Strong typing | ✅ 100% |
 
 **Overall Alignment Score: 100%** ✅
@@ -493,7 +493,7 @@ These customizations are **additive** and don't break the unified pattern.
 ### Source Code
 - Item Master: `src/features/module-amro/components/parts/AmroItemMasterCatalogPanel.tsx`
 - Work Orders: `src/features/module-amro/components/work-orders/AmroWorkOrdersListPage.tsx`
-- Work Package Detail: `src/features/module-amro/components/work-orders/AmroWorkPackageDetailPage.tsx`
+- Work Package Detail: `src/features/module-amro/components/work-orders/AmroWorkOrderDetailPage.tsx`
 
 ### Shared Components
 - UI Standards: `src/features/module-amro/components/parts/AmroPartsUiStandards.tsx`

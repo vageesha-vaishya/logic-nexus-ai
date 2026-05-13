@@ -22,12 +22,12 @@ import {
   FetchTemplatesParams,
 } from '../services/templateService';
 import { useTemplateGridStore, useFilterQueryParams, useSortQueryString } from '../store/useTemplateGridStore';
-import { WorkPackageTemplate } from '../AmroWorkPackageTemplatesPage';
+import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
 
 // ── Query Keys ─────────────────────────────────────────────────────────────────
 
 export const templateQueryKeys = {
-  all: ['amro', 'work-package-templates'] as const,
+  all: ['amro', 'work-order-templates'] as const,
   lists: () => [...templateQueryKeys.all, 'list'] as const,
   list: (params: FetchTemplatesParams) => [...templateQueryKeys.lists(), params] as const,
   details: () => [...templateQueryKeys.all, 'detail'] as const,
@@ -95,7 +95,7 @@ export function useCreateTemplate(accessToken: string) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (templateData: Partial<WorkPackageTemplate>) =>
+    mutationFn: (templateData: Partial<WorkOrderTemplate>) =>
       createTemplate(accessToken, templateData),
     onSuccess: (newTemplate) => {
       // Invalidate and refetch templates list
@@ -126,7 +126,7 @@ export function useUpdateTemplate(accessToken: string) {
       expectedUpdatedAt,
     }: {
       templateId: string;
-      templateData: Partial<WorkPackageTemplate>;
+      templateData: Partial<WorkOrderTemplate>;
       expectedUpdatedAt?: string;
     }) => updateTemplate(accessToken, templateId, templateData, expectedUpdatedAt),
     onMutate: async ({ templateId, templateData }) => {
@@ -140,7 +140,7 @@ export function useUpdateTemplate(accessToken: string) {
         
         return {
           ...old,
-          templates: old.templates.map((t: WorkPackageTemplate) =>
+          templates: old.templates.map((t: WorkOrderTemplate) =>
             t.id === templateId ? { ...t, ...templateData } : t
           ),
         };

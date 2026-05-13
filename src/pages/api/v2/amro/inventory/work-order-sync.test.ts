@@ -111,7 +111,7 @@ describe('/api/v2/amro/inventory/work-order-sync', () => {
       method: 'POST',
       query: { interface: 'reserve' },
       headers: {},
-      body: { part_number: 'AMRO-PN-000001', quantity: 4, work_package_id: 'wp-1' },
+      body: { part_number: 'AMRO-PN-000001', quantity: 4, work_order_id: 'wp-1' },
     };
     const res = createResponse();
     await handler(req, res);

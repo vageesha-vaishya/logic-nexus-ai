@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS public.amro_inventory_work_order_links (
   franchise_id uuid REFERENCES public.franchises(id) ON DELETE SET NULL,
   inventory_id uuid NOT NULL REFERENCES public.parts_inventory(id) ON DELETE CASCADE,
   reservation_id uuid REFERENCES public.reservations(id) ON DELETE SET NULL,
-  work_package_id uuid REFERENCES public.work_packages(id) ON DELETE SET NULL,
+  work_order_id uuid REFERENCES public.work_orders(id) ON DELETE SET NULL,
   task_id uuid REFERENCES public.tasks(id) ON DELETE SET NULL,
   action_type text NOT NULL CHECK (action_type IN ('reserve', 'consume', 'release', 'return', 'reconcile')),
   quantity integer NOT NULL CHECK (quantity > 0),
@@ -95,8 +95,8 @@ CREATE TABLE IF NOT EXISTS public.amro_inventory_work_order_links (
   created_by uuid REFERENCES auth.users(id) ON DELETE SET NULL
 );
 
-CREATE INDEX IF NOT EXISTS idx_amro_inventory_work_order_links_tenant_work_package
-  ON public.amro_inventory_work_order_links (tenant_id, work_package_id, created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_amro_inventory_work_order_links_tenant_work_order
+  ON public.amro_inventory_work_order_links (tenant_id, work_order_id, created_at DESC);
 
 CREATE OR REPLACE VIEW public.amro_inventory_health_overview AS
 SELECT

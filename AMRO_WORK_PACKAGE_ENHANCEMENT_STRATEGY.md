@@ -49,7 +49,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 - Non-scheduled task registry
 - Immutable audit trail
 
-**Status:** ✅ Database schema created (migration: `20260412100000_amro_work_package_enhanced_schema.sql`)
+**Status:** ✅ Database schema created (migration: `20260412100000_amro_work_order_enhanced_schema.sql`)
 
 **1.2 API Layer Enhancements**
 - Template version management endpoints
@@ -81,9 +81,9 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 - Target: Support 100+ templates with 1000+ task templates
 
 **Implementation:**
-- Frontend: Enhanced `AmroWorkPackageTemplateAdapter` with version selector
+- Frontend: Enhanced `AmroWorkOrderTemplateAdapter` with version selector
 - Backend: Template version CRUD with approval workflow
-- Database: `amro_work_package_template_versions` table
+- Database: `amro_work_order_template_versions` table
 
 **2.2 Dual-Path Work Package Creation**
 
@@ -135,7 +135,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 **Implementation:**
 - Frontend: Emergency quick-access panel
 - Backend: Conversion service with priority algorithm
-- Database: `amro_emergency_work_packages` table
+- Database: `amro_emergency_work_orders` table
 
 **3.2 Predictive Maintenance Integration**
 
@@ -200,7 +200,7 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 **Implementation:**
 - Frontend: Resource allocation Gantt chart
 - Backend: Optimization algorithm service
-- Database: `amro_resource_pools` + `amro_work_package_resource_assignments`
+- Database: `amro_resource_pools` + `amro_work_order_resource_assignments`
 
 **3.5 Real-Time Progress Monitoring**
 
@@ -320,24 +320,24 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 
 | Table | Purpose | Priority |
 |-------|---------|----------|
-| `amro_work_package_template_versions` | Template versioning with approval | P0 |
-| `amro_work_package_template_categories` | Template classification | P1 |
+| `amro_work_order_template_versions` | Template versioning with approval | P0 |
+| `amro_work_order_template_categories` | Template classification | P1 |
 | `amro_task_dependencies` | Task dependency graph | P0 |
 | `amro_task_time_logs` | Actual labor hour tracking | P1 |
 | `amro_compliance_directives` | AD/SB tracking | P0 |
-| `amro_work_package_compliance_records` | Task-level compliance | P0 |
+| `amro_work_order_compliance_records` | Task-level compliance | P0 |
 | `amro_certificates_release_service` | CRS generation | P0 |
 | `amro_predictive_maintenance_recommendations` | AI predictions | P2 |
 | `amro_resource_pools` | Resource management | P1 |
-| `amro_work_package_resource_assignments` | Resource allocation | P1 |
-| `amro_emergency_work_packages` | Emergency/AOG tracking | P0 |
+| `amro_work_order_resource_assignments` | Resource allocation | P1 |
+| `amro_emergency_work_orders` | Emergency/AOG tracking | P0 |
 | `amro_maintenance_triggers` | Scheduled maintenance triggers | P0 |
 | `amro_non_scheduled_tasks` | Non-scheduled task registry | P0 |
-| `amro_work_package_audit_log` | Immutable audit trail | P0 |
+| `amro_work_order_audit_log` | Immutable audit trail | P0 |
 
 ### Enhanced Existing Tables
 
-- `amro_work_packages`: Add `creation_path` (scheduled/non-scheduled), `emergency_flag`
+- `amro_work_orders`: Add `creation_path` (scheduled/non-scheduled), `emergency_flag`
 - `amro_tasks`: Add dependency tracking, time logging references
 
 ---
@@ -347,23 +347,23 @@ This document presents a comprehensive enhancement strategy for the AMRO Work Pa
 ### Template Management
 
 ```
-GET    /api/v2/amro/work-package-templates/:id/versions
-POST   /api/v2/amro/work-package-templates/:id/versions
-PUT    /api/v2/amro/work-package-templates/versions/:version_id
-POST   /api/v2/amro/work-package-templates/versions/:version_id/submit
-POST   /api/v2/amro/work-package-templates/versions/:version_id/approve
-GET    /api/v2/amro/work-package-templates/categories
-POST   /api/v2/amro/work-package-templates/categories
+GET    /api/v2/amro/work-order-templates/:id/versions
+POST   /api/v2/amro/work-order-templates/:id/versions
+PUT    /api/v2/amro/work-order-templates/versions/:version_id
+POST   /api/v2/amro/work-order-templates/versions/:version_id/submit
+POST   /api/v2/amro/work-order-templates/versions/:version_id/approve
+GET    /api/v2/amro/work-order-templates/categories
+POST   /api/v2/amro/work-order-templates/categories
 ```
 
 ### Task Management
 
 ```
-GET    /api/v2/amro/work-packages/:id/tasks/dependencies
-POST   /api/v2/amro/work-packages/:id/tasks/dependencies
-DELETE /api/v2/amro/work-packages/:id/tasks/dependencies/:dep_id
-POST   /api/v2/amro/work-packages/:id/tasks/:task_id/time-logs
-GET    /api/v2/amro/work-packages/:id/tasks/:task_id/time-logs
+GET    /api/v2/amro/work-orders/:id/tasks/dependencies
+POST   /api/v2/amro/work-orders/:id/tasks/dependencies
+DELETE /api/v2/amro/work-orders/:id/tasks/dependencies/:dep_id
+POST   /api/v2/amro/work-orders/:id/tasks/:task_id/time-logs
+GET    /api/v2/amro/work-orders/:id/tasks/:task_id/time-logs
 ```
 
 ### Compliance Management
@@ -371,17 +371,17 @@ GET    /api/v2/amro/work-packages/:id/tasks/:task_id/time-logs
 ```
 GET    /api/v2/amro/compliance/directives
 POST   /api/v2/amro/compliance/directives
-GET    /api/v2/amro/work-packages/:id/compliance-records
-POST   /api/v2/amro/work-packages/:id/compliance-records
-POST   /api/v2/amro/work-packages/:id/certificates
-GET    /api/v2/amro/work-packages/:id/certificates
+GET    /api/v2/amro/work-orders/:id/compliance-records
+POST   /api/v2/amro/work-orders/:id/compliance-records
+POST   /api/v2/amro/work-orders/:id/certificates
+GET    /api/v2/amro/work-orders/:id/certificates
 ```
 
 ### Emergency & Non-Scheduled
 
 ```
-POST   /api/v2/amro/emergency/work-packages
-GET    /api/v2/amro/emergency/work-packages
+POST   /api/v2/amro/emergency/work-orders
+GET    /api/v2/amro/emergency/work-orders
 POST   /api/v2/amro/non-scheduled-tasks
 POST   /api/v2/amro/non-scheduled-tasks/:id/convert-to-wp
 GET    /api/v2/amro/maintenance-triggers
@@ -393,14 +393,14 @@ POST   /api/v2/amro/maintenance-triggers/evaluate
 ```
 GET    /api/v2/amro/resources
 POST   /api/v2/amro/resources/availability
-POST   /api/v2/amro/work-packages/:id/resource-assignments
-GET    /api/v2/amro/work-packages/:id/resource-conflicts
+POST   /api/v2/amro/work-orders/:id/resource-assignments
+GET    /api/v2/amro/work-orders/:id/resource-conflicts
 ```
 
 ### Audit & Reporting
 
 ```
-GET    /api/v2/amro/work-packages/:id/audit-log
+GET    /api/v2/amro/work-orders/:id/audit-log
 GET    /api/v2/amro/compliance/summary
 GET    /api/v2/amro/emergency/summary
 GET    /api/v2/amro/predictive/recommendations
@@ -543,7 +543,7 @@ GET    /api/v2/amro/predictive/recommendations
 
 - **Industry Analysis:** `MRO_WORK_PACKAGE_PLATFORMS_ANALYSIS.md`
 - **Technical Audit:** Available in agent research results
-- **Database Schema:** `supabase/migrations/20260412100000_amro_work_package_enhanced_schema.sql`
+- **Database Schema:** `supabase/migrations/20260412100000_amro_work_order_enhanced_schema.sql`
 - **Design System:** `src/features/module-amro/AMRO_DESIGN_SYSTEM.md`
 - **API Documentation:** OpenAPI 3.1 specs in `src/pages/api/v2/amro/contracts/`
 

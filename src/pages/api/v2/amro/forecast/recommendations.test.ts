@@ -12,7 +12,7 @@ describe('/api/v2/amro/forecast/recommendations', () => {
     vi.mocked(forecastReliabilityHandler).mockResolvedValue(undefined as never);
     const req: ApiRequest = {
       method: 'GET',
-      query: { work_package_id: 'wp-1', planning_horizon_days: '14', scenario: 'base' },
+      query: { work_order_id: 'wp-1', planning_horizon_days: '14', scenario: 'base' },
       headers: {},
       body: {},
     };
@@ -25,7 +25,7 @@ describe('/api/v2/amro/forecast/recommendations', () => {
         method: 'POST',
         query: expect.objectContaining({ interface: 'generate-intervention-recommendations' }),
         body: expect.objectContaining({
-          work_package_id: 'wp-1',
+          work_order_id: 'wp-1',
           planning_horizon_days: 14,
           scenario: 'base',
         }),

@@ -27,10 +27,10 @@
 
 ```
 Work Package Module
-├── AmroWorkPackageDetailPage.tsx          # Main detail page (ENTERPRISE-GRADE)
-├── AmroWorkPackageDetailPage.test.tsx     # Unit tests (80%+ coverage)
-├── AmroWorkPackageDetailPage.integration.test.tsx  # Integration tests
-├── useWorkPackageState.ts                 # React Query hooks & state management
+├── AmroWorkOrderDetailPage.tsx          # Main detail page (ENTERPRISE-GRADE)
+├── AmroWorkOrderDetailPage.test.tsx     # Unit tests (80%+ coverage)
+├── AmroWorkOrderDetailPage.integration.test.tsx  # Integration tests
+├── useWorkOrderState.ts                 # React Query hooks & state management
 └── index.ts                               # Barrel exports
 ```
 
@@ -60,9 +60,9 @@ User Action
     ↓
 Component Event Handler
     ↓
-React Query Mutation (useUpdateWorkPackage/useTransitionWorkPackage)
+React Query Mutation (useUpdateWorkOrder/useTransitionWorkOrder)
     ↓
-API Call (PATCH/POST /api/v2/amro/work-packages/:id)
+API Call (PATCH/POST /api/v2/amro/work-orders/:id)
     ↓
 Response Handling
     ├── Success: invalidate() cache → Update UI → Toast notification
@@ -132,7 +132,7 @@ Response Handling
 
 ### 3.1 Work Package Detail Endpoint
 
-#### GET /api/v2/amro/work-packages/:id
+#### GET /api/v2/amro/work-orders/:id
 
 **Description:** Retrieve detailed work package information  
 **Authentication:** Required (Bearer token)  
@@ -142,7 +142,7 @@ Response Handling
 ```json
 {
   "id": "string (UUID)",
-  "work_package_number": "string",
+  "work_order_number": "string",
   "work_order_number": "string (optional)",
   "title": "string",
   "description": "string | null",
@@ -158,8 +158,8 @@ Response Handling
   "actual_cost": "number | null",
   "estimated_labor_hours": "number | null",
   "actual_labor_hours": "number | null",
-  "tasks": "WorkPackageTask[]",
-  "materials": "WorkPackageMaterial[]",
+  "tasks": "WorkOrderTask[]",
+  "materials": "WorkOrderMaterial[]",
   "maintenance_events": "MaintenanceEvent[]",
   "created_at": "ISO 8601 datetime",
   "updated_at": "ISO 8601 datetime"
@@ -189,7 +189,7 @@ Response Handling
 
 ### 3.2 Update Work Package Endpoint
 
-#### PATCH /api/v2/amro/work-packages/:id
+#### PATCH /api/v2/amro/work-orders/:id
 
 **Description:** Update work package details  
 **Authentication:** Required  
@@ -211,7 +211,7 @@ Response Handling
 ```json
 {
   "id": "string",
-  "work_package_number": "string",
+  "work_order_number": "string",
   "title": "string",
   "updated_at": "ISO 8601 datetime",
   "message": "Work package updated successfully"
@@ -231,7 +231,7 @@ Response Handling
 
 ### 3.3 Status Transition Endpoint
 
-#### POST /api/v2/amro/work-packages/:id/transitions
+#### POST /api/v2/amro/work-orders/:id/transitions
 
 **Description:** Transition work package to new status  
 **Authentication:** Required  
@@ -269,10 +269,10 @@ completed → closed
 
 ## 4. Component Architecture
 
-### 4.1 Main Component: AmroWorkPackageDetailPage
+### 4.1 Main Component: AmroWorkOrderDetailPage
 
 ```typescript
-export function AmroWorkPackageDetailPage()
+export function AmroWorkOrderDetailPage()
 ```
 
 **Responsibilities:**
@@ -286,24 +286,24 @@ export function AmroWorkPackageDetailPage()
 
 **State:**
 ```typescript
-const [transitionDialog, setTransitionDialog] = useState<WorkPackageStatus | null>(null);
+const [transitionDialog, setTransitionDialog] = useState<WorkOrderStatus | null>(null);
 const [editDialogOpen, setEditDialogOpen] = useState(false);
 ```
 
 **Hooks:**
 ```typescript
-const { data: wp, isLoading, isError } = useWorkPackage(id || null);
-const transitionMutation = useTransitionWorkPackage();
-const { invalidate } = useWorkPackageActions();
+const { data: wp, isLoading, isError } = useWorkOrder(id || null);
+const transitionMutation = useTransitionWorkOrder();
+const { invalidate } = useWorkOrderActions();
 ```
 
 ### 4.2 Edit Dialog Component
 
 ```typescript
-function EditWorkPackageDialog({
+function EditWorkOrderDialog({
   open,
   onOpenChange,
-  workPackage,
+  workOrder,
   onSuccess,
 }: EditDialogProps)
 ```
@@ -344,37 +344,37 @@ function EditWorkPackageDialog({
 
 #### StatusBadge
 ```typescript
-function StatusBadge({ status }: { status: WorkPackageStatus })
+function StatusBadge({ status }: { status: WorkOrderStatus })
 ```
 Displays work package status with appropriate color coding.
 
 #### InfoCard
 ```typescript
-function InfoCard({ wp }: { wp: WorkPackageDetail })
+function InfoCard({ wp }: { wp: WorkOrderDetail })
 ```
 Displays work package metadata (aircraft, type, assignee, dates).
 
 #### CostTrackingCard
 ```typescript
-function CostTrackingCard({ wp }: { wp: WorkPackageDetail })
+function CostTrackingCard({ wp }: { wp: WorkOrderDetail })
 ```
 Displays cost tracking information with visual progress bar.
 
 #### TasksTab
 ```typescript
-function TasksTab({ wp }: { wp: WorkPackageDetail })
+function TasksTab({ wp }: { wp: WorkOrderDetail })
 ```
 Displays list of tasks in table format.
 
 #### MaterialsTab
 ```typescript
-function MaterialsTab({ wp }: { wp: WorkPackageDetail })
+function MaterialsTab({ wp }: { wp: WorkOrderDetail })
 ```
 Displays list of materials in table format.
 
 #### TimelineTab
 ```typescript
-function TimelineTab({ wp }: { wp: WorkPackageDetail })
+function TimelineTab({ wp }: { wp: WorkOrderDetail })
 ```
 Displays maintenance events in timeline format.
 
@@ -564,7 +564,7 @@ Recommended accessibility testing tools:
 
 ### 7.1 Test Coverage
 
-**Unit Tests:** `AmroWorkPackageDetailPage.test.tsx`
+**Unit Tests:** `AmroWorkOrderDetailPage.test.tsx`
 - Target: 80%+ coverage
 - Current: ~85% (estimated)
 
@@ -627,7 +627,7 @@ Recommended accessibility testing tools:
 
 ### 7.2 Integration Tests
 
-**File:** `AmroWorkPackageDetailPage.integration.test.tsx`
+**File:** `AmroWorkOrderDetailPage.integration.test.tsx`
 
 **Test Categories:**
 1. **Navigation Flow (3 tests)**
@@ -679,13 +679,13 @@ Recommended accessibility testing tools:
 npm test
 
 # Run specific test file
-npm test AmroWorkPackageDetailPage.test.tsx
+npm test AmroWorkOrderDetailPage.test.tsx
 
 # Run with coverage
 npm test -- --coverage
 
 # Run integration tests
-npm test AmroWorkPackageDetailPage.integration.test.tsx
+npm test AmroWorkOrderDetailPage.integration.test.tsx
 ```
 
 ### 7.4 Test Coverage Report
@@ -699,8 +699,8 @@ Lines: 84%
 ```
 
 Critical files (must have 80%+):
-- `AmroWorkPackageDetailPage.tsx` ✅
-- `EditWorkPackageDialog` (inline) ✅
+- `AmroWorkOrderDetailPage.tsx` ✅
+- `EditWorkOrderDialog` (inline) ✅
 - Status transition handlers ✅
 - Error handlers ✅
 
@@ -713,7 +713,7 @@ Critical files (must have 80%+):
 **Strategy:** React Query with intelligent caching
 
 ```typescript
-const { data, isLoading, isError } = useWorkPackage(id, {
+const { data, isLoading, isError } = useWorkOrder(id, {
   staleTime: 10_000,        // Consider fresh for 10 seconds
   cacheTime: 5 * 60_000,    // Keep in cache for 5 minutes
   retry: 2,                  // Retry failed requests twice
@@ -805,7 +805,7 @@ const { data, isLoading, isError } = useWorkPackage(id, {
 1. **Merge to staging:**
    ```bash
    git checkout staging
-   git merge feature/work-package-redesign
+   git merge feature/work-order-redesign
    git push origin staging
    ```
 

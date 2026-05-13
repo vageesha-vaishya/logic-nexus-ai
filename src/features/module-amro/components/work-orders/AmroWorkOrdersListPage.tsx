@@ -14,25 +14,25 @@ import { AmroUnifiedGridRecordDetailShell } from '@/features/module-amro/compone
 import type { GridColumnDefinition } from '@/features/module-amro/components/templates/AmroInventoryDataGridTemplate';
 import { AmroRecordWizard } from '@/features/module-amro/components/data-grid/AmroRecordWizard';
 import {
-  useCreateWorkPackage,
-  useListWorkPackages,
-  useDeleteWorkPackage,
-  useUpdateWorkPackage,
-  useWorkPackageActions,
-  type WorkPackageListItem,
-  type WorkPackageStatus,
-  type WorkPackagePriority,
+  useCreateWorkOrder,
+  useListWorkOrders,
+  useDeleteWorkOrder,
+  useUpdateWorkOrder,
+  useWorkOrderActions,
+  type WorkOrderListItem,
+  type WorkOrderStatus,
+  type WorkOrderPriority,
   type MaintenanceType,
-} from './useWorkPackageState';
+} from './useWorkOrderState';
 import { useAircraftOptions } from './useAircraftState';
-import { useWorkPackageTemplateOptions } from './useWorkPackageTemplates';
-import { buildWorkPackageWizardSteps, getWorkPackageWizardInitialData } from './workPackageWizardConfig';
+import { useWorkOrderTemplateOptions } from './useWorkOrderTemplates';
+import { buildWorkOrderWizardSteps, getWorkOrderWizardInitialData } from './workOrderWizardConfig';
 import { useAuth } from '@/hooks/useAuth';
 import { useCRM } from '@/hooks/useCRM';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 
-const STATUS_CONFIG: Record<WorkPackageStatus, { label: string; badge: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
+const STATUS_CONFIG: Record<WorkOrderStatus, { label: string; badge: 'default' | 'secondary' | 'destructive' | 'outline' }> = {
   planning: { label: 'Planning', badge: 'outline' },
   approved: { label: 'Approved', badge: 'secondary' },
   scheduled: { label: 'Scheduled', badge: 'default' },
@@ -44,7 +44,7 @@ const STATUS_CONFIG: Record<WorkPackageStatus, { label: string; badge: 'default'
   cancelled: { label: 'Cancelled', badge: 'destructive' },
 };
 
-const PRIORITY_CONFIG: Record<WorkPackagePriority, { label: string; color: string }> = {
+const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; color: string }> = {
   1: { label: 'P1 - Critical', color: 'text-red-600' },
   2: { label: 'P2 - High', color: 'text-orange-600' },
   3: { label: 'P3 - Medium', color: 'text-yellow-600' },
@@ -73,11 +73,11 @@ const DEFAULT_FORM = {
   assigned_to: '',
   notes: '',
   aircraft_id: '',
-  work_package_title_id: '',
+  work_order_title_id: '',
   template_version_id: '',
 };
 
-function cloneFormValue(record?: WorkPackageListItem | null) {
+function cloneFormValue(record?: WorkOrderListItem | null) {
   if (!record) return { ...DEFAULT_FORM };
   return {
     title: record.title || '',
@@ -89,12 +89,12 @@ function cloneFormValue(record?: WorkPackageListItem | null) {
     assigned_to: record.assigned_to || '',
     notes: '',
     aircraft_id: record.aircraft_id || '',
-    work_package_title_id: '',
+    work_order_title_id: '',
     template_version_id: '',
   };
 }
 
-type WorkPackageGridRow = WorkPackageListItem & Record<string, unknown>;
+type WorkOrderGridRow = WorkOrderListItem & Record<string, unknown>;
 
 // ── Main Component ───────────────────────────────────────────────────────────
 
@@ -102,7 +102,7 @@ export function AmroWorkOrdersListPage() {
   const navigate = useNavigate();
   const { session } = useAuth();
   const { scopedDb, context } = useCRM();
-  const [records, setRecords] = useState<WorkPackageListItem[]>([]);
+  const [records, setRecords] = useState<WorkOrderListItem[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -110,16 +110,16 @@ export function AmroWorkOrdersListPage() {
   const [wizardOpen, setWizardOpen] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formValue, setFormValue] = useState(DEFAULT_FORM);
-  const [deleteCandidate, setDeleteCandidate] = useState<WorkPackageListItem | null>(null);
+  const [deleteCandidate, setDeleteCandidate] = useState<WorkOrderListItem | null>(null);
   const [titleOptions, setTitleOptions] = useState<Array<{ value: string; label: string; title: string; wp_title: string }>>([]);
   const [titleOptionsLoading, setTitleOptionsLoading] = useState(false);
 
-  const { invalidate } = useWorkPackageActions();
-  const createMutation = useCreateWorkPackage();
-  const updateMutation = useUpdateWorkPackage();
-  const deleteMutation = useDeleteWorkPackage();
+  const { invalidate } = useWorkOrderActions();
+  const createMutation = useCreateWorkOrder();
+  const updateMutation = useUpdateWorkOrder();
+  const deleteMutation = useDeleteWorkOrder();
   const { options: aircraftOptions } = useAircraftOptions(wizardOpen);
-  const { options: templateOptions } = useWorkPackageTemplateOptions(wizardOpen);
+  const { options: templateOptions } = useWorkOrderTemplateOptions(wizardOpen);
   const loadTitleOptions = useCallback(async () => {
     if (!wizardOpen) return;
     setTitleOptionsLoading(true);
@@ -140,7 +140,7 @@ export function AmroWorkOrdersListPage() {
 
       let mapped: Array<{ value: string; label: string; title: string; wp_title: string }> = [];
       try {
-        const response = await fetch('/api/v2/amro/work-package-titles', { method: 'GET', headers });
+        const response = await fetch('/api/v2/amro/work-order-titles', { method: 'GET', headers });
         if (!response.ok) {
           throw new Error(`Failed to load work package titles: ${response.status}`);
         }
@@ -150,7 +150,7 @@ export function AmroWorkOrdersListPage() {
       } catch {
         // Fallback for environments where new endpoint is not yet routed/restarted.
         let query = (scopedDb as any)
-          .from('work_packages_title', Boolean(context.isPlatformAdmin))
+          .from('work_orders_title', Boolean(context.isPlatformAdmin))
           .select('id,title,wp_title,tenant_id,franchise_id')
           .order('title', { ascending: true });
 
@@ -183,7 +183,7 @@ export function AmroWorkOrdersListPage() {
     void loadTitleOptions();
   }, [loadTitleOptions, wizardOpen]);
   const wizardSteps = useMemo(
-    () => buildWorkPackageWizardSteps({
+    () => buildWorkOrderWizardSteps({
       aircraftOptions,
       templateOptions,
       assignmentOptions: [],
@@ -195,7 +195,7 @@ export function AmroWorkOrdersListPage() {
     [aircraftOptions, templateOptions, titleOptions, titleOptionsLoading],
   );
 
-  const { data, isLoading, isError, error: listError } = useListWorkPackages({
+  const { data, isLoading, isError, error: listError } = useListWorkOrders({
     page: 1,
     pageSize: 50,
   });
@@ -239,7 +239,7 @@ export function AmroWorkOrdersListPage() {
   }, [deleteMutation, invalidate]);
 
   const handleView = useCallback((id: string) => {
-    navigate(`/dashboard/amro/work-packages/${id}`);
+    navigate(`/dashboard/amro/work-orders/${id}`);
   }, [navigate]);
   const handleWizardSubmit = useCallback(async (payload: Record<string, any>) => {
     if (wizardMode === 'edit') {
@@ -247,39 +247,39 @@ export function AmroWorkOrdersListPage() {
       setWizardOpen(false);
       return;
     }
-    const selectedTitle = titleOptions.find((option) => option.value === String(payload.work_package_title_id || '').trim());
+    const selectedTitle = titleOptions.find((option) => option.value === String(payload.work_order_title_id || '').trim());
     await createMutation.mutateAsync({
       aircraft_id: String(payload.aircraft_id || '').trim() || undefined,
       title: selectedTitle?.title || String(payload.title || '').trim(),
-      work_package_title_id: String(payload.work_package_title_id || '').trim() || undefined,
+      work_order_title_id: String(payload.work_order_title_id || '').trim() || undefined,
       description: String(payload.description || '').trim() || undefined,
       maintenance_type: (String(payload.maintenance_type || 'line').trim() as MaintenanceType),
-      priority: Number(payload.priority || 3) as WorkPackagePriority,
+      priority: Number(payload.priority || 3) as WorkOrderPriority,
       planned_start_date: String(payload.planned_start_date || '').trim() || undefined,
       planned_end_date: String(payload.planned_end_date || '').trim() || undefined,
-      work_package_template_id: String(payload.template_version_id || '').trim() || undefined,
+      work_order_template_id: String(payload.template_version_id || '').trim() || undefined,
     });
     toast.success('Work package created successfully');
     setWizardOpen(false);
     invalidate();
   }, [createMutation, invalidate, titleOptions, wizardMode]);
-  const handleInlineSave = useCallback(async (record: WorkPackageGridRow) => {
+  const handleInlineSave = useCallback(async (record: WorkOrderGridRow) => {
     await updateMutation.mutateAsync({
       id: String(record.id),
       title: String(record.title || '').trim() || undefined,
       description: String(record.description || '').trim() || undefined,
       maintenance_type: String(record.maintenance_type || '').trim() as MaintenanceType,
-      priority: Number(record.priority || 3) as WorkPackagePriority,
+      priority: Number(record.priority || 3) as WorkOrderPriority,
       planned_start_date: String(record.planned_start_date || '').trim() || undefined,
       planned_end_date: String(record.planned_end_date || '').trim() || undefined,
       assigned_to: String(record.assigned_to || '').trim() || undefined,
       notes: String(record.notes || '').trim() || undefined,
-      status: String(record.status || '').trim() as WorkPackageStatus,
+      status: String(record.status || '').trim() as WorkOrderStatus,
     });
     toast.success('Work package updated');
     invalidate();
   }, [invalidate, updateMutation]);
-  const gridRecords = useMemo<WorkPackageGridRow[]>(() => records as WorkPackageGridRow[], [records]);
+  const gridRecords = useMemo<WorkOrderGridRow[]>(() => records as WorkOrderGridRow[], [records]);
 
   const stats = useMemo(() => {
     const activeRecords = records.filter((r) => !['completed', 'closed', 'cancelled'].includes(r.status));
@@ -324,7 +324,7 @@ export function AmroWorkOrdersListPage() {
           subtitle="Single workspace for search, filters, layout, and inline side-form editing."
           records={gridRecords}
           columns={[
-            { key: 'work_package_number', header: 'Work Package #', sortable: true, filterable: true, groupable: true, resizable: true, width: 170 },
+            { key: 'work_order_number', header: 'Work Package #', sortable: true, filterable: true, groupable: true, resizable: true, width: 170 },
             { key: 'title', header: 'Title', sortable: true, filterable: true, groupable: false, resizable: true, width: 260 },
             { key: 'status', header: 'Status', sortable: true, filterable: true, groupable: true, resizable: true, width: 130 },
             { key: 'priority', header: 'Priority', sortable: true, filterable: true, groupable: true, resizable: true, width: 110, dataType: 'numeric' },
@@ -332,14 +332,14 @@ export function AmroWorkOrdersListPage() {
             { key: 'aircraft_registration', header: 'Aircraft', sortable: true, filterable: true, groupable: true, resizable: true, width: 130 },
             { key: 'planned_start_date', header: 'Planned Start', sortable: true, filterable: true, groupable: false, resizable: true, width: 130, dataType: 'date' },
             { key: 'planned_end_date', header: 'Planned End', sortable: true, filterable: true, groupable: false, resizable: true, width: 130, dataType: 'date' },
-          ] satisfies GridColumnDefinition<WorkPackageGridRow>[]}
+          ] satisfies GridColumnDefinition<WorkOrderGridRow>[]}
           viewMode="grid-with-right-form"
-          persistKey="amro-work-package-advanced-grid"
+          persistKey="amro-work-order-advanced-grid"
           ariaLabel="Work package advanced grid"
           enableDetailPanelToggle={false}
           onCreateRecord={openCreateDialog}
           onReadRecord={(record) => handleView(String(record.id))}
-          onDeleteRecord={(record) => setDeleteCandidate(record as WorkPackageListItem)}
+          onDeleteRecord={(record) => setDeleteCandidate(record as WorkOrderListItem)}
           onSaveRecord={(record) => { void handleInlineSave(record); }}
           onCancelRecord={() => {
             toast.info('Inline edits cancelled');
@@ -358,7 +358,7 @@ export function AmroWorkOrdersListPage() {
           ]}
           hiddenDetailFieldKeys={[
             'id',
-            'work_package_number',
+            'work_order_number',
             'work_order_number',
             'aircraft_id',
             'aircraft_registration',
@@ -378,7 +378,7 @@ export function AmroWorkOrdersListPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Work Package?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete work package {deleteCandidate?.work_package_number || deleteCandidate?.work_order_number}.
+              This will permanently delete work package {deleteCandidate?.work_order_number || deleteCandidate?.work_order_number}.
               This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
@@ -399,7 +399,7 @@ export function AmroWorkOrdersListPage() {
         <AmroRecordWizard
           mode={wizardMode}
           steps={wizardSteps}
-          initialData={{ ...getWorkPackageWizardInitialData(), ...formValue }}
+          initialData={{ ...getWorkOrderWizardInitialData(), ...formValue }}
           onClose={() => setWizardOpen(false)}
           onSubmit={async (data) => {
             await handleWizardSubmit(data);
