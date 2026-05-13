@@ -1,0 +1,17 @@
+{
+  "name": "@sos/services-canvas",
+  "version": "1.0.0",
+  "private": false,
+  "type": "module",
+  "scripts": {
+    "lint": "eslint . --ext .ts,.md",
+    "typecheck": "tsc --noEmit",
+    "test:unit": "vitest run tests/unit",
+    "test:integration": "vitest run tests/integration",
+    "test:contract": "vitest run tests/contract",
+    "test:coverage:gate": "vitest run --coverage --coverage.thresholds.lines 80",
+    "security:scan": "npm audit --audit-level=high",
+    "integration:contract:smoke": "node scripts/integration/contract-smoke.mjs",
+    "release": "semantic-release"
+  }
+}

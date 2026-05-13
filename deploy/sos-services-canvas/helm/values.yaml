@@ -1,0 +1,30 @@
+replicaCount: 3
+
+image:
+  repository: ghcr.io/sos/services-canvas
+  tag: "1.0.0"
+  pullPolicy: IfNotPresent
+
+service:
+  type: ClusterIP
+  port: 8080
+
+resources:
+  requests:
+    cpu: 200m
+    memory: 256Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 20
+  targetCPUUtilizationPercentage: 65
+  targetMemoryUtilizationPercentage: 75
+
+env:
+  CANVAS_DEFAULT_REGION: us-east
+  CANVAS_DEPLOYMENT_STRATEGY: blue_green
+  CANVAS_TLS_MODE: tls1_3_required

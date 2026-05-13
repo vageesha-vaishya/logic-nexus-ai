@@ -1,0 +1,1 @@
+/Users/vims/Downloads/Development Projects/Trae/SOS Logistics Pro/logic-nexus-ai/tests/e2e/quotation/quotation-comprehensive.spec.ts-snapshots/quotation-composer-visual-firefox-main-firefox-darwin.png

@@ -1,0 +1,8 @@
+* @sos-platform/framework-maintainers
+
+/src/domain/ @sos-platform/architecture-council @sos-platform/framework-maintainers
+/src/application/ @sos-platform/framework-maintainers
+/contracts/ @sos-platform/integration-owners @sos-platform/framework-maintainers
+/deploy/ @sos-platform/devops-team
+/.github/workflows/ @sos-platform/devops-team @sos-platform/security-reviewers
+/docs/adr/ @sos-platform/architecture-council

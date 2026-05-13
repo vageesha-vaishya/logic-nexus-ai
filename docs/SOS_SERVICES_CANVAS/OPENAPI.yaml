@@ -1,0 +1,162 @@
+openapi: 3.0.3
+info:
+  title: SOS Services Canvas API
+  version: 1.0.0
+  description: Core infrastructure API for authentication, tenancy, franchise, gateway, payments, and notifications.
+servers:
+  - url: https://api.sos-services-canvas.example.com
+tags:
+  - name: Auth
+  - name: Tenancy
+  - name: Franchise
+  - name: Payments
+  - name: Notifications
+paths:
+  /v1/auth/token:
+    post:
+      tags: [Auth]
+      summary: Issue service token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TokenIssueRequest'
+      responses:
+        '200':
+          description: Token issued
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TokenIssueResponse'
+  /v1/tenants/{tenantId}/context:
+    get:
+      tags: [Tenancy]
+      security:
+        - bearerAuth: []
+      summary: Resolve tenant context
+      parameters:
+        - in: path
+          name: tenantId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Tenant context resolved
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TenantContextResponse'
+        '401':
+          description: Unauthorized
+  /v1/franchises/{franchiseId}/hierarchy:
+    get:
+      tags: [Franchise]
+      security:
+        - bearerAuth: []
+      summary: Get franchise hierarchy
+      parameters:
+        - in: path
+          name: franchiseId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Franchise hierarchy returned
+  /v1/payments/charge:
+    post:
+      tags: [Payments]
+      security:
+        - bearerAuth: []
+      summary: Charge payment using configured provider
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChargeRequest'
+      responses:
+        '200':
+          description: Payment accepted
+  /v1/notifications/send:
+    post:
+      tags: [Notifications]
+      security:
+        - bearerAuth: []
+      summary: Send notification over supported channels
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/NotificationRequest'
+      responses:
+        '202':
+          description: Notification queued
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    TokenIssueRequest:
+      type: object
+      required: [userId, tenantId, roles, permissions]
+      properties:
+        userId:
+          type: string
+        tenantId:
+          type: string
+        franchiseId:
+          type: string
+        roles:
+          type: array
+          items: { type: string }
+        permissions:
+          type: array
+          items: { type: string }
+    TokenIssueResponse:
+      type: object
+      required: [token]
+      properties:
+        token:
+          type: string
+    TenantContextResponse:
+      type: object
+      properties:
+        data:
+          type: object
+          properties:
+            tenantId: { type: string }
+            tenantKey: { type: string }
+            isolationMode:
+              type: string
+              enum: [shared_schema, dedicated_database]
+            dataResidencyRegion: { type: string }
+            shardKey: { type: string }
+    ChargeRequest:
+      type: object
+      required: [provider, paymentMethodReference, amount, currency, idempotencyKey]
+      properties:
+        provider:
+          type: string
+        paymentMethodReference:
+          type: string
+        amount:
+          type: number
+        currency:
+          type: string
+        idempotencyKey:
+          type: string
+    NotificationRequest:
+      type: object
+      required: [channel, payload]
+      properties:
+        channel:
+          type: string
+          enum: [email, sms, push, in_app]
+        payload:
+          type: object

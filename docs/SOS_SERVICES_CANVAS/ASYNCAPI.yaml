@@ -1,0 +1,67 @@
+asyncapi: 2.6.0
+info:
+  title: SOS Services Canvas Events
+  version: 1.0.0
+  description: Event contracts for tenant, auth, payment, and notification workflows.
+defaultContentType: application/json
+channels:
+  canvas.auth.token.issued.v1:
+    publish:
+      message:
+        $ref: '#/components/messages/AuthTokenIssued'
+  canvas.tenant.provisioned.v1:
+    publish:
+      message:
+        $ref: '#/components/messages/TenantProvisioned'
+  canvas.payment.charge.succeeded.v1:
+    publish:
+      message:
+        $ref: '#/components/messages/PaymentChargeSucceeded'
+  canvas.notification.dispatched.v1:
+    publish:
+      message:
+        $ref: '#/components/messages/NotificationDispatched'
+components:
+  messages:
+    AuthTokenIssued:
+      name: AuthTokenIssued
+      payload:
+        type: object
+        required: [eventId, tenantId, userId, issuedAt]
+        properties:
+          eventId: { type: string }
+          tenantId: { type: string }
+          franchiseId: { type: string }
+          userId: { type: string }
+          issuedAt: { type: string, format: date-time }
+    TenantProvisioned:
+      name: TenantProvisioned
+      payload:
+        type: object
+        required: [eventId, tenantId, shardKey, region]
+        properties:
+          eventId: { type: string }
+          tenantId: { type: string }
+          shardKey: { type: string }
+          region: { type: string }
+    PaymentChargeSucceeded:
+      name: PaymentChargeSucceeded
+      payload:
+        type: object
+        required: [eventId, tenantId, paymentId, amount, currency]
+        properties:
+          eventId: { type: string }
+          tenantId: { type: string }
+          paymentId: { type: string }
+          amount: { type: number }
+          currency: { type: string }
+    NotificationDispatched:
+      name: NotificationDispatched
+      payload:
+        type: object
+        required: [eventId, tenantId, channel, messageId]
+        properties:
+          eventId: { type: string }
+          tenantId: { type: string }
+          channel: { type: string }
+          messageId: { type: string }
