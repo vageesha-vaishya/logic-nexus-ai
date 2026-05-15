@@ -12,12 +12,13 @@ interface Contact {
 }
 
 export function MyActiveLeads() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [leads, setLeads] = useState<Contact[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchLeads = async () => {
       try {
         setLoading(true);
@@ -39,7 +40,7 @@ export function MyActiveLeads() {
     };
 
     fetchLeads();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const columns: Column<Contact>[] = [
     { key: 'first_name', label: 'First Name', width: '150px' },

@@ -35,7 +35,7 @@ const VALID_DASHBOARD_ROLES = new Set<UserRole>([
 ]);
 
 export function DashboardRouter() {
-  const { context, user, scopedDb } = useCRM();
+  const { context, user, scopedDb, contextReady } = useCRM();
   const [userRole, setUserRole] = useState<UserRole | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -73,6 +73,10 @@ export function DashboardRouter() {
     };
 
     const determineDashboardRole = async () => {
+      if (!contextReady) {
+        // Auth still loading — keep spinner, don't set a role yet
+        return;
+      }
       try {
         if (!user?.id) {
           setLoading(false);
@@ -106,7 +110,7 @@ export function DashboardRouter() {
     };
 
     determineDashboardRole();
-  }, [user?.id, context, scopedDb]);
+  }, [user?.id, context, scopedDb, contextReady]);
 
   if (loading) {
     return (

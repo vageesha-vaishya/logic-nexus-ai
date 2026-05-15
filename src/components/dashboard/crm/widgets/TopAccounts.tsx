@@ -10,12 +10,13 @@ interface Account {
 }
 
 export function TopAccounts() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchAccounts = async () => {
       try {
         setLoading(true);
@@ -37,7 +38,7 @@ export function TopAccounts() {
     };
 
     fetchAccounts();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const columns: Column<Account>[] = [
     { key: 'company_name', label: 'Company', width: '250px' },

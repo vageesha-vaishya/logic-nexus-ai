@@ -9,11 +9,12 @@ interface TrendData {
 }
 
 export function RevenueTrends() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [trends, setTrends] = useState<TrendData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchTrends = async () => {
       try {
         setLoading(true);
@@ -55,7 +56,7 @@ export function RevenueTrends() {
     };
 
     fetchTrends();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const maxRevenue = Math.max(...trends.map(t => t.revenue)) || 1;
 

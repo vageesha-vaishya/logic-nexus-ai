@@ -10,7 +10,7 @@ interface ActivityStats {
 }
 
 export function TeamActivity() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [stats, setStats] = useState<ActivityStats>({
     calls: 0,
     emails: 0,
@@ -20,6 +20,7 @@ export function TeamActivity() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchActivity = async () => {
       try {
         setLoading(true);
@@ -48,7 +49,7 @@ export function TeamActivity() {
     };
 
     fetchActivity();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return (

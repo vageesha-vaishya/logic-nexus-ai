@@ -11,11 +11,12 @@ interface SalesRepPerformance {
 }
 
 export function SalesPerformance() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [performance, setPerformance] = useState<SalesRepPerformance[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchPerformance = async () => {
       try {
         setLoading(true);
@@ -68,7 +69,7 @@ export function SalesPerformance() {
     };
 
     fetchPerformance();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return (

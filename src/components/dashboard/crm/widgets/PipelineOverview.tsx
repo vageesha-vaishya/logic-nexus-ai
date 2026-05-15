@@ -9,11 +9,12 @@ interface PipelineStage {
 }
 
 export function PipelineOverview() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [pipeline, setPipeline] = useState<PipelineStage[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchPipeline = async () => {
       try {
         setLoading(true);
@@ -54,7 +55,7 @@ export function PipelineOverview() {
     };
 
     fetchPipeline();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return <div className="h-48 bg-gray-100 rounded animate-pulse" />;

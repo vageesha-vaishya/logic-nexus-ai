@@ -10,11 +10,12 @@ interface KeyAccount {
 }
 
 export function KeyAccounts() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [accounts, setAccounts] = useState<KeyAccount[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchAccounts = async () => {
       try {
         setLoading(true);
@@ -43,7 +44,7 @@ export function KeyAccounts() {
     };
 
     fetchAccounts();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return (

@@ -11,7 +11,7 @@ interface RevenueData {
 }
 
 export function RevenueYTD() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [revenueData, setRevenueData] = useState<RevenueData>({
     ytd: 0,
     target: 0,
@@ -22,6 +22,7 @@ export function RevenueYTD() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchRevenue = async () => {
       try {
         setLoading(true);
@@ -79,7 +80,7 @@ export function RevenueYTD() {
     };
 
     fetchRevenue();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const maxRevenue = Math.max(...revenueData.byQuarter.map(q => q.revenue)) || 1;
 

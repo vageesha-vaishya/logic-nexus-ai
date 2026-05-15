@@ -9,6 +9,8 @@ interface CRMContextType {
   context: DataAccessContext;
   supabase: any;
   scopedDb: ScopedDataAccess;
+  /** true once auth + roles have finished loading; gates all scoped DB calls */
+  contextReady: boolean;
   preferences: { tenant_id: string | null; franchise_id: string | null; admin_override_enabled: boolean } | null;
   loadingPreferences: boolean;
   setScopePreference: (tenantId: string | null, franchiseId: string | null, adminOverride?: boolean) => Promise<void>;
@@ -19,7 +21,7 @@ interface CRMContextType {
 const CRMContext = createContext<CRMContextType | undefined>(undefined);
 
 export function CRMProvider({ children }: { children: ReactNode }) {
-  const { user, roles, isPlatformAdmin: hasPlatformAdminAccess } = useAuth();
+  const { user, roles, loading: authLoading, isPlatformAdmin: hasPlatformAdminAccess } = useAuth();
   const [pref, setPref] = useState<{ tenant_id: string | null; franchise_id: string | null; admin_override_enabled: boolean } | null>(null);
   const [loadingPref, setLoadingPref] = useState(false);
   
@@ -202,6 +204,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     context,
     supabase,
     scopedDb,
+    contextReady: !authLoading,
     preferences: pref,
     loadingPreferences: loadingPref,
     setScopePreference,

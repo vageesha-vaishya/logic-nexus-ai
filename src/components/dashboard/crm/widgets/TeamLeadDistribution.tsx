@@ -9,11 +9,12 @@ interface DistributionItem {
 }
 
 export function TeamLeadDistribution() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [distribution, setDistribution] = useState<DistributionItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchDistribution = async () => {
       try {
         setLoading(true);
@@ -64,7 +65,7 @@ export function TeamLeadDistribution() {
     };
 
     fetchDistribution();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return (

@@ -9,11 +9,12 @@ interface StageData {
 }
 
 export function TeamPipeline() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [pipeline, setPipeline] = useState<StageData[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchPipeline = async () => {
       try {
         setLoading(true);
@@ -54,7 +55,7 @@ export function TeamPipeline() {
     };
 
     fetchPipeline();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const maxValue = Math.max(...pipeline.map(p => p.value)) || 1;
 

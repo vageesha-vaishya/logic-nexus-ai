@@ -10,7 +10,7 @@ interface WinLossData {
 }
 
 export function WinLossMetrics() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [metrics, setMetrics] = useState<WinLossData>({
     wins: 0,
     losses: 0,
@@ -20,6 +20,7 @@ export function WinLossMetrics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchMetrics = async () => {
       try {
         setLoading(true);
@@ -58,7 +59,7 @@ export function WinLossMetrics() {
     };
 
     fetchMetrics();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return (

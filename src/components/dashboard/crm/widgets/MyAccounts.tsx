@@ -11,11 +11,12 @@ interface Account {
 }
 
 export function MyAccounts() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchAccounts = async () => {
       try {
         setLoading(true);
@@ -35,7 +36,7 @@ export function MyAccounts() {
     };
 
     fetchAccounts();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const getStatusColor = (status?: string) => {
     switch (status?.toLowerCase()) {

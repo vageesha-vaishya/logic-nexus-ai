@@ -9,12 +9,13 @@ interface PipelineStage {
 }
 
 export function PipelineByStage() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [totalPipeline, setTotalPipeline] = useState(0);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchPipeline = async () => {
       try {
         setLoading(true);
@@ -58,7 +59,7 @@ export function PipelineByStage() {
     };
 
     fetchPipeline();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const maxAmount = stages.length > 0 ? Math.max(...stages.map(s => s.amount)) : 0;
 

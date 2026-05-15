@@ -42,13 +42,12 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
     enabled: Boolean(portfolioId),
     staleTime: 30_000,
     queryFn: async (): Promise<PortfolioHoldingsResult> => {
+      // Two separate queries — avoids PostgREST embedded-resource ambiguity
+      // in non-default schemas.
       const { data: holdings, error: holdingsErr } = await (supabase as any)
         .schema("markets")
         .from("holdings")
-        .select(
-          "id, instrument_id, qty, avg_cost, realized_pnl, last_updated_at," +
-          " instrument:instruments(id, symbol, exchange, instrument_type, isin)",
-        )
+        .select("id, instrument_id, qty, avg_cost, realized_pnl, last_updated_at")
         .eq("portfolio_id", portfolioId);
 
       if (holdingsErr) throw new Error(holdingsErr.message);
@@ -57,6 +56,16 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
       }
 
       const instrumentIds: string[] = holdings.map((h: any) => h.instrument_id);
+
+      // Fetch instruments separately then merge client-side
+      const { data: instruments } = await (supabase as any)
+        .schema("markets")
+        .from("instruments")
+        .select("id, symbol, exchange, instrument_type, isin")
+        .in("id", instrumentIds);
+
+      const instrumentMap: Record<string, any> = {};
+      for (const i of (instruments ?? []) as any[]) instrumentMap[i.id] = i;
 
       const { data: prices } = await (supabase as any)
         .schema("markets")
@@ -88,7 +97,14 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
         nav += qty * (lastPrice ?? cost);
         todayPnl += qty * ((lastPrice ?? 0) - (prevPrice ?? lastPrice ?? 0));
         costBasis += qty * cost;
-        return { ...h, qty, avg_cost: cost, last_price: lastPrice, prev_price: prevPrice };
+        return {
+          ...h,
+          qty,
+          avg_cost: cost,
+          instrument: instrumentMap[h.instrument_id] ?? null,
+          last_price: lastPrice,
+          prev_price: prevPrice,
+        };
       });
 
       return {

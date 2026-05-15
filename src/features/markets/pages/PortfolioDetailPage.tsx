@@ -189,14 +189,21 @@ export default function PortfolioDetailPage() {
       </Card>
 
       {/* ─── Holdings table ───────────────────────────────────────────── */}
-      {(holdings.data?.holdings.length ?? 0) > 0 && (
+      {holdings.isError && (
+        <ErrorState
+          title="Could not load holdings"
+          message={holdings.error?.message ?? "Unknown error"}
+          onRetry={() => holdings.refetch()}
+        />
+      )}
+      {holdings.isSuccess && holdings.data.holdings.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base">Holdings</CardTitle>
           </CardHeader>
           <CardContent>
             <HoldingsTable
-              holdings={holdings.data!.holdings}
+              holdings={holdings.data.holdings}
               currency={p.base_currency}
             />
           </CardContent>

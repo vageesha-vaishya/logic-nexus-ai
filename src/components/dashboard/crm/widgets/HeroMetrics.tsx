@@ -9,7 +9,7 @@ interface Metrics {
 }
 
 export function HeroMetrics() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [metrics, setMetrics] = useState<Metrics>({
     todayActivities: 0,
     callsMade: 0,
@@ -18,6 +18,7 @@ export function HeroMetrics() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchMetrics = async () => {
       try {
         setLoading(true);
@@ -73,7 +74,7 @@ export function HeroMetrics() {
     };
 
     fetchMetrics();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return (

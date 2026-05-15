@@ -11,11 +11,12 @@ interface TimelineItem {
 }
 
 export function AccountTimeline() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [timeline, setTimeline] = useState<TimelineItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchTimeline = async () => {
       try {
         setLoading(true);
@@ -51,7 +52,7 @@ export function AccountTimeline() {
     };
 
     fetchTimeline();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const getIcon = (type: string) => {
     switch (type?.toLowerCase()) {

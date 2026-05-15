@@ -10,12 +10,13 @@ interface ForecastData {
 }
 
 export function SalesForecast() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [forecastData, setForecastData] = useState<ForecastData[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalForecast, setTotalForecast] = useState(0);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchForecast = async () => {
       try {
         setLoading(true);
@@ -83,7 +84,7 @@ export function SalesForecast() {
     };
 
     fetchForecast();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   const maxValue = forecastData.length > 0 ? Math.max(...forecastData.map(d => d.highCase)) : 0;
 

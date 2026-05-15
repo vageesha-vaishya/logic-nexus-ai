@@ -11,11 +11,12 @@ interface Activity {
 }
 
 export function UpcomingActivities() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [activities, setActivities] = useState<Activity[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchActivities = async () => {
       try {
         setLoading(true);
@@ -39,7 +40,7 @@ export function UpcomingActivities() {
     };
 
     fetchActivities();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return (

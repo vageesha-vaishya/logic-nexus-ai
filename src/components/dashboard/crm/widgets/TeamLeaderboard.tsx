@@ -12,11 +12,12 @@ interface TeamMember {
 }
 
 export function TeamLeaderboard() {
-  const { scopedDb } = useCRM();
+  const { scopedDb, contextReady } = useCRM();
   const [teamMembers, setTeamMembers] = useState<TeamMember[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (!contextReady) return;
     const fetchTeamPerformance = async () => {
       try {
         setLoading(true);
@@ -75,7 +76,7 @@ export function TeamLeaderboard() {
     };
 
     fetchTeamPerformance();
-  }, [scopedDb]);
+  }, [scopedDb, contextReady]);
 
   if (loading) {
     return (
