@@ -42,7 +42,7 @@ import { cn } from "@/lib/utils";
 
 // ── Format metadata ────────────────────────────────────────────────────────
 
-const FORMATS: { value: ImportFormat; label: string; hint: string; columns: string }[] = [
+const FORMATS: { value: ImportFormat; label: string; hint: string; columns: string; note?: string }[] = [
   {
     value: "generic",
     label: "Generic / Our template",
@@ -52,31 +52,38 @@ const FORMATS: { value: ImportFormat; label: string; hint: string; columns: stri
   {
     value: "zerodha",
     label: "Zerodha",
-    hint: "Console → Portfolio → Holdings → Download (CSV)",
+    hint: "Console → Portfolio → Holdings → Download (CSV icon, top-right)",
     columns: "Instrument, ISIN, Qty, Avg. cost, LTP, Cur. val, P&L …",
   },
   {
     value: "groww",
     label: "Groww",
-    hint: "Groww app → Portfolio → Export Holdings (CSV)",
+    hint: "App → Portfolio → ⋮ menu → Export Holdings",
     columns: "Name, Symbol, ISIN, Quantity, Average Price, Investment Value …",
+  },
+  {
+    value: "icici_direct",
+    label: "ICICI Direct",
+    hint: "Website → Stocks → Portfolio → download icon → CSV",
+    columns: "NSE Code / Symbol, ISIN, Qty, Avg. Rate, Exchange …",
+    note: "Column names vary by account type — the parser auto-detects them.",
   },
   {
     value: "hdfc",
     label: "HDFC Securities",
-    hint: "HDFC Sec portal → Portfolio → Holdings → Download",
+    hint: "Portal → Portfolio → Holdings → Download",
     columns: "Scrip Name, Market, ISIN, Qty., Avg. Price …",
   },
   {
     value: "angel",
     label: "Angel One",
-    hint: "Angel One → Portfolio → Download Holdings CSV",
+    hint: "App → Portfolio → Download Holdings CSV",
     columns: "Symbol Name, Token, Buy Qty, Buy Price …",
   },
   {
     value: "upstox",
     label: "Upstox",
-    hint: "Upstox → Portfolio → Holdings → Export",
+    hint: "App → Portfolio → Holdings → Export",
     columns: "symbol, quantity, buy_price, last_price, exchange …",
   },
 ];
@@ -214,6 +221,9 @@ export function ImportHoldingsDialog({
                     <div className="rounded-md bg-muted/50 px-3 py-2 text-xs text-muted-foreground space-y-1">
                       <p>{f.hint}</p>
                       <p className="font-mono">{f.columns}</p>
+                      {f.note && (
+                        <p className="text-amber-700 dark:text-amber-400 font-medium">{f.note}</p>
+                      )}
                     </div>
                   );
                 })()}

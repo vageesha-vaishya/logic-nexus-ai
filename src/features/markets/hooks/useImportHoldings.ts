@@ -18,7 +18,7 @@ import { useAuth } from "@/hooks/useAuth";
 // ── Types ──────────────────────────────────────────────────────────────────
 
 export type ImportFormat =
-  | "generic" | "zerodha" | "groww" | "hdfc" | "angel" | "upstox";
+  | "generic" | "zerodha" | "groww" | "hdfc" | "angel" | "upstox" | "icici_direct";
 
 export interface ImportRow {
   symbol:        string;
@@ -223,15 +223,102 @@ function parseUpstox(csv: string): ImportRow[] {
   }).filter((r) => r.symbol && r.qty > 0);
 }
 
+/**
+ * ICICI Direct Holdings export — flexible multi-variant parser.
+ *
+ * ICICI Direct column names vary by account type and have changed over time.
+ * This parser tries several known header aliases for each field.
+ *
+ * Known header variants observed in the wild:
+ *   Symbol  : "nse_code", "symbol", "scrip_code", "script_name", "scrip_name",
+ *             "security_name", "stock_name", "company_name"
+ *   Exchange: "exchange", "market"
+ *   ISIN    : "isin", "isin_code", "isin_no"
+ *   Qty     : "qty", "quantity", "balance_qty", "net_qty", "current_qty", "holding_qty"
+ *   AvgCost : "avg__rate", "average_price", "avg_cost", "cost_price",
+ *             "avg_buy_price", "purchase_price", "buy_price", "rate"
+ *
+ * If auto-detection produces 0 rows, the UI asks the user to share their
+ * header row so we can refine the parser.
+ */
+function parseIciciDirect(csv: string): ImportRow[] {
+  // ICICI sometimes prepends account info rows — skip until we find the data header
+  const text  = csv.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
+
+  // Find the header row — look for a line containing common ICICI field keywords
+  const headerKeywords = /symbol|scrip|isin|qty|quantity|rate|price|nse|bse/i;
+  let headerIdx = 0;
+  for (let i = 0; i < Math.min(lines.length, 10); i++) {
+    if (headerKeywords.test(lines[i])) { headerIdx = i; break; }
+  }
+
+  // Re-parse from found header line
+  const adjustedCsv = lines.slice(headerIdx).join("\n");
+  const rows = parseCsvToObjects(adjustedCsv);
+
+  // Helper: pick first matching key from an object
+  const pick = (obj: Record<string, string>, ...keys: string[]) => {
+    for (const k of keys) {
+      const v = obj[k];
+      if (v !== undefined && v !== "") return v;
+    }
+    return undefined;
+  };
+
+  return rows.map((r, i) => {
+    // Symbol: prefer NSE code over company name
+    const sym = (
+      pick(r,
+        "nse_code", "nse_symbol", "symbol", "trading_symbol",
+        "scrip_code", "script_name", "scrip_name",
+        "security_name", "stock_name", "company_name", "scrip",
+      ) ?? ""
+    ).replace(/\s+/g, "").toUpperCase();
+
+    const exch = (
+      pick(r, "exchange", "market", "segment") ?? "NSE"
+    ).toUpperCase().replace(/\s/g, "");
+
+    const isin = pick(r, "isin", "isin_code", "isin_no");
+
+    const qty = parseNum(
+      pick(r, "qty", "quantity", "balance_qty", "net_qty",
+          "current_qty", "holding_qty", "balance", "units")
+    );
+
+    const avgCost = parseNum(
+      pick(r,
+        "avg__rate", "avg_rate", "average_price", "avg_cost",
+        "cost_price", "avg_buy_price", "purchase_price",
+        "buy_price", "rate", "buy_avg", "average_rate",
+        "average_buy_price", "avg_buy_rate",
+      )
+    );
+
+    return {
+      symbol:      sym,
+      exchange:    exch || "NSE",
+      isin:        isin || undefined,
+      qty,
+      avg_cost:    avgCost,
+      asset_class: "equity",
+      _name:       pick(r, "company_name", "security_name", "scrip_name", "script_name") ?? sym,
+      _raw_row:    i + headerIdx + 2,
+    };
+  }).filter((r) => r.symbol && r.qty > 0);
+}
+
 // ── Parser registry ────────────────────────────────────────────────────────
 
 const PARSERS: Record<ImportFormat, (csv: string) => ImportRow[]> = {
-  generic: parseGeneric,
-  zerodha: parseZerodha,
-  groww:   parseGroww,
-  hdfc:    parseHdfc,
-  angel:   parseAngel,
-  upstox:  parseUpstox,
+  generic:      parseGeneric,
+  zerodha:      parseZerodha,
+  groww:        parseGroww,
+  hdfc:         parseHdfc,
+  angel:        parseAngel,
+  upstox:       parseUpstox,
+  icici_direct: parseIciciDirect,
 };
 
 export function parseHoldingsCsv(csv: string, format: ImportFormat): ImportRow[] {
