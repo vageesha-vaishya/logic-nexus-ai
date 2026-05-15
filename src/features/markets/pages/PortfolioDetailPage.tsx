@@ -9,7 +9,7 @@ import { useRef, useMemo, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
-  ArrowLeft, Brain, Loader2, Newspaper, Plus, Trash2,
+  ArrowLeft, Brain, Loader2, Newspaper, Plus, Trash2, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -19,6 +19,7 @@ import { useBriefs, useGenerateBrief }          from "../hooks/useBriefs";
 import {
   useTransactions, useCreateTransaction, useDeleteTransaction, useInstrumentSearch,
 } from "../hooks/useTransactions";
+import { ImportHoldingsDialog } from "../components/ImportHoldingsDialog";
 import { NewsPanel } from "../components/NewsPanel";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import {
@@ -56,6 +57,7 @@ export default function PortfolioDetailPage() {
 
   const [addTxnOpen,   setAddTxnOpen]   = useState(false);
   const [deleteTxnId,  setDeleteTxnId]  = useState<string | null>(null);
+  const [importOpen,   setImportOpen]   = useState(false);
 
   const latestBrief    = briefs.data?.[0];
   const previousBriefs = briefs.data?.slice(1) ?? [];
@@ -146,15 +148,29 @@ export default function PortfolioDetailPage() {
 
         {/* ── Holdings tab ──────────────────────────────────────────────── */}
         <TabsContent value="holdings" className="mt-4 space-y-4">
+          {/* Action bar */}
+          <div className="flex items-center justify-end gap-2">
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
+              <Upload className="mr-1.5 h-4 w-4" />
+              Import holdings
+            </Button>
+            <Button size="sm" onClick={() => setAddTxnOpen(true)}>
+              <Plus className="mr-1.5 h-4 w-4" />
+              Add transaction
+            </Button>
+          </div>
+
           {holdings.isError && (
             <ErrorState title="Could not load holdings" message={holdings.error?.message ?? "Unknown error"} onRetry={() => holdings.refetch()} />
           )}
           {holdings.isSuccess && holdings.data.holdings.length === 0 && (
             <EmptyState
               title="No holdings yet"
-              description="Add transactions to start tracking your positions."
-              actionLabel="Add transaction"
-              onAction={() => setAddTxnOpen(true)}
+              description="Import from Zerodha, Groww, HDFC, Angel, or Upstox — or add transactions manually."
+              actionLabel="Import holdings"
+              onAction={() => setImportOpen(true)}
+              secondaryActionLabel="Add transaction"
+              onSecondaryAction={() => setAddTxnOpen(true)}
             />
           )}
           {holdings.isSuccess && holdings.data.holdings.length > 0 && (
@@ -261,6 +277,16 @@ export default function PortfolioDetailPage() {
         portfolioId={id}
         onClose={() => setDeleteTxnId(null)}
       />
+
+      {/* Import holdings dialog */}
+      {id && (
+        <ImportHoldingsDialog
+          portfolioId={id}
+          portfolioName={p.name}
+          open={importOpen}
+          onOpenChange={setImportOpen}
+        />
+      )}
     </div>
   );
 }
