@@ -190,6 +190,115 @@ export interface AddWatchlistItemInput {
   note?: string;
 }
 
+// ─── Asset classes ────────────────────────────────────────────────────
+export type AssetClass =
+  | "equity"
+  | "mutual_fund"
+  | "commodity"
+  | "forex"
+  | "fixed_income"
+  | "derivative"
+  | "reit"
+  | "cash"
+  | "other";
+
+export const ASSET_CLASS_LABELS: Record<AssetClass, string> = {
+  equity:        "Equity",
+  mutual_fund:   "Mutual Fund",
+  commodity:     "Commodity",
+  forex:         "Forex / Currency",
+  fixed_income:  "Fixed Income / Bond",
+  derivative:    "Derivative (F&O)",
+  reit:          "REIT / InvIT",
+  cash:          "Cash / FD",
+  other:         "Other",
+};
+
+// ─── Transactions ──────────────────────────────────────────────────────
+export type TransactionType =
+  | "buy" | "sell"
+  | "sip" | "redemption"
+  | "dividend" | "interest"
+  | "bonus" | "split"
+  | "transfer_in" | "transfer_out"
+  | "fd_deposit" | "fd_maturity"
+  | "fee" | "adjustment";
+
+export const TXN_TYPE_LABELS: Record<TransactionType, string> = {
+  buy:          "Buy",
+  sell:         "Sell",
+  sip:          "SIP (MF)",
+  redemption:   "Redemption (MF)",
+  dividend:     "Dividend",
+  interest:     "Interest",
+  bonus:        "Bonus Issue",
+  split:        "Stock Split",
+  transfer_in:  "Transfer In",
+  transfer_out: "Transfer Out",
+  fd_deposit:   "FD Deposit",
+  fd_maturity:  "FD Maturity",
+  fee:          "Fee / Charge",
+  adjustment:   "Adjustment",
+};
+
+// Types that require an instrument
+export const TXN_TYPES_NEED_INSTRUMENT: TransactionType[] = [
+  "buy","sell","sip","redemption","dividend","bonus","split","transfer_in","transfer_out",
+];
+
+export interface Transaction {
+  id: string;
+  portfolio_id: string;
+  instrument_id: string | null;
+  txn_type: TransactionType;
+  txn_date: string;
+  settlement_date: string | null;
+  qty: number;
+  price: number;
+  charges: number;
+  net_amount: number | null;
+  currency: string;
+  fx_rate: number;
+  asset_class: AssetClass | null;
+  notes: string | null;
+  source: "manual" | "import" | "broker_api" | "cas_import";
+  reference_id: string | null;
+  folio_number: string | null;
+  owner_user_id: string;
+  tenant_id: string | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  updated_at: string;
+  // joined
+  instrument?: {
+    symbol: string;
+    exchange: string;
+    instrument_type: string;
+    asset_class: string | null;
+    currency_code: string | null;
+  } | null;
+}
+
+export interface CreateTransactionInput {
+  portfolio_id: string;
+  instrument_id?: string | null;
+  txn_type: TransactionType;
+  txn_date: string;
+  qty: number;
+  price: number;
+  charges?: number;
+  currency?: string;
+  asset_class?: AssetClass | null;
+  notes?: string | null;
+  folio_number?: string | null;
+  reference_id?: string | null;
+}
+
+export interface TransactionsListResponse {
+  data: Transaction[];
+  count: number;
+}
+
 // ─── Holdings + NAV ────────────────────────────────────────────────────
 
 export interface Holding {
