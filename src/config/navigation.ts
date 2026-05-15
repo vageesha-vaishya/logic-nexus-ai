@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -154,6 +154,47 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Franchises', path: '/dashboard/franchises', icon: Package, description: 'Franchise entities', roles: ['platform_admin', 'tenant_admin'] },
       { name: 'Users', path: '/dashboard/users', icon: Users, description: 'Manage users and roles', permissions: ['admin.users.manage'] },
       { name: 'Transfer Center', path: '/dashboard/transfers', icon: ArrowRightLeft, description: 'Move records between entities', permissions: ['transfers.view'] },
+    ],
+  },
+  {
+    label: 'Markets',
+    items: [
+      {
+        name: 'Portfolios',
+        path: '/dashboard/markets/portfolios',
+        icon: Wallet,
+        description: 'Manage equity, MF, commodity & F&O portfolios',
+        screens: [
+          { name: 'Holdings',     path: '/dashboard/markets/portfolios/:id', description: 'Current positions and P&L' },
+          { name: 'Transactions', path: '/dashboard/markets/portfolios/:id', description: 'Buy/sell/SIP transaction history' },
+          { name: 'AI Briefs',    path: '/dashboard/markets/portfolios/:id', description: 'LLM-generated market analysis' },
+        ],
+      },
+      {
+        name: 'Watchlists',
+        path: '/dashboard/markets/watchlists',
+        icon: Eye,
+        description: 'Track instruments across asset classes',
+      },
+      {
+        name: 'AI Briefs',
+        path: '/dashboard/markets/portfolios',
+        icon: Brain,
+        description: 'AI-generated portfolio and market briefs',
+      },
+      {
+        name: 'Market News',
+        path: '/dashboard/markets/portfolios',
+        icon: Newspaper,
+        description: 'Live news with sentiment scoring',
+      },
+      {
+        name: 'LLM Settings',
+        path: '/dashboard/markets/settings/llm',
+        icon: CandlestickChart,
+        description: 'Configure AI providers for market analysis',
+        roles: ['platform_admin', 'tenant_admin'],
+      },
     ],
   },
   {
