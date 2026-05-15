@@ -86,6 +86,34 @@ const FORMATS: { value: ImportFormat; label: string; hint: string; columns: stri
     hint: "App → Portfolio → Holdings → Export",
     columns: "symbol, quantity, buy_price, last_price, exchange …",
   },
+  {
+    value: "kotak",
+    label: "Kotak Securities / Kotak Neo",
+    hint: "Website → Portfolio → Holdings → Download  OR  Kotak Neo app → Portfolio → Investments → Export",
+    columns: "symbol / NSE Code, ISIN, Quantity, Average Price, Exchange …",
+    note: "Handles both old Kotak Securities and new Kotak Neo column formats.",
+  },
+  {
+    value: "cams_mf",
+    label: "CAMS Mutual Fund (CAS)",
+    hint: "Option A: camsonline.com → Portfolio → Download → CSV  |  Option B: CASParser tool output CSV",
+    columns: "Scheme Name, ISIN, Units / close_units, Avg. Cost Price / cost, AMC …",
+    note: "CAMS CAS is emailed as PDF. Use camsonline.com flat CSV or run the open-source CASParser tool (pip install casparser) to convert PDF → CSV.",
+  },
+  {
+    value: "cdsl",
+    label: "CDSL Demat CAS (Equity)",
+    hint: "web.cdslindia.com → Login → Transactions → Holding Statement → Excel",
+    columns: "Scrip Name, ISIN, Balance Qty (Free), Market Price …",
+    note: "⚠️ CDSL CAS does not include purchase price. Avg cost will be set to ₹0 — update via the Transactions tab after import.",
+  },
+  {
+    value: "nsdl",
+    label: "NSDL Demat CAS (Equity)",
+    hint: "eservices.nsdl.com → IDeAS → Holdings → Download Excel  OR  NSDL Demat app → Statement → Export",
+    columns: "Company Name, ISIN, Balance Qty (Free), Category, LTP …",
+    note: "⚠️ NSDL CAS does not include purchase price. Avg cost will be set to ₹0 — update via the Transactions tab after import.",
+  },
 ];
 
 type Step = "setup" | "preview" | "done";
@@ -329,7 +357,10 @@ export function ImportHoldingsDialog({
                         <TableCell className="text-xs text-muted-foreground">{r.exchange || "auto"}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">{r.qty}</TableCell>
                         <TableCell className="text-right tabular-nums text-sm">
-                          {r.avg_cost.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+                          {r.avg_cost > 0
+                            ? r.avg_cost.toLocaleString("en-IN", { maximumFractionDigits: 2 })
+                            : <span className="text-amber-600 text-xs font-medium">₹0 — update later</span>
+                          }
                         </TableCell>
                         <TableCell className="text-xs text-muted-foreground">{r.purchase_date || "today"}</TableCell>
                         <TableCell>
