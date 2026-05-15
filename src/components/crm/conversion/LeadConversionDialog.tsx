@@ -199,6 +199,9 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
 
       // 2. Create Contact
       if (createContact && contactPayload) {
+        if (!newAccountId) {
+          throw new Error('Cannot create a contact without a parent account. Enable "Create Account" and try again.');
+        }
         const { data: conData, error: conError } = await supabase
           .from('contacts')
           .insert({
@@ -211,7 +214,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
           })
           .select('id')
           .single();
-        
+
         if (conError) throw new Error(`Failed to create contact: ${conError.message}`);
         newContactId = conData.id;
       }
@@ -483,7 +486,14 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
                   render={({ field }) => (
                     <FormItem className="flex items-center space-x-2 space-y-0">
                       <FormControl>
-                        <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                        <Checkbox
+                          checked={field.value}
+                          onCheckedChange={(checked) => {
+                            field.onChange(checked);
+                            // A contact must belong to an account — auto-enable account creation.
+                            if (checked) form.setValue('createAccount', true);
+                          }}
+                        />
                       </FormControl>
                       <FormLabel className="font-semibold text-base">Create Contact</FormLabel>
                     </FormItem>

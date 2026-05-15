@@ -40,6 +40,14 @@ export const leadConversionSchema = z.object({
     }
   }
   if (data.createContact) {
+    // A contact must always belong to an account — enforce the parent account rule.
+    if (!data.createAccount) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: 'An account is required before creating a contact. Enable "Create Account" above.',
+        path: ['createContact'],
+      });
+    }
     if (!data.firstName) {
       ctx.addIssue({
         code: z.ZodIssueCode.custom,

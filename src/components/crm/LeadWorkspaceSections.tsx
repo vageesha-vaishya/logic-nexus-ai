@@ -848,6 +848,10 @@ export function LeadWorkspaceSections({
       toast.info('Save lead first to create related contact');
       return;
     }
+    if (!selectedAccountId) {
+      toast.error('Select or create an account before adding a contact');
+      return;
+    }
     const firstName = contactDraft.first_name.trim();
     const lastName = contactDraft.last_name.trim();
     const email = contactDraft.email.trim();
