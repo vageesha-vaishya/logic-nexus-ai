@@ -166,18 +166,22 @@ export function useDeletePortfolio() {
 // ── CRM contact search ───────────────────────────────────────────────────
 
 export function useCrmContactSearch(query: string) {
-  const debounced   = useDebounce(query.trim(), 300);
-  const { tenantId } = useActiveScope();
+  const debounced    = useDebounce(query.trim(), 300);
+  const { userId }   = useActiveScope();
 
   return useQuery<CrmContactSearchResult[]>({
-    queryKey: ["crm", "contacts", "search", tenantId, debounced],
-    enabled:  Boolean(tenantId) && debounced.length >= 2,
+    // Don't include tenantId in the key — RLS handles scoping
+    queryKey: ["crm", "contacts", "search", debounced],
+    enabled:  Boolean(userId) && debounced.length >= 2,
     staleTime: 30_000,
     queryFn: async (): Promise<CrmContactSearchResult[]> => {
+      // No explicit tenant_id filter — RLS on the contacts table scopes results
+      // correctly for every role (platform_admin sees all, tenant/franchise admins
+      // see only their own). Adding a client-side filter would break platform admins
+      // whose active-scope tenant differs from the tenant that owns the contacts.
       const { data, error } = await (supabase as any)
         .from("contacts")
         .select("id, first_name, last_name, email, account_id, account:accounts(name)")
-        .eq("tenant_id", tenantId)
         .or(`first_name.ilike.%${debounced}%,last_name.ilike.%${debounced}%,email.ilike.%${debounced}%`)
         .limit(20);
 
