@@ -67,6 +67,7 @@ const GROUP_STRIP_COLOR_TOKEN: Record<string, { cssVar: string; fallback: string
   logistics: { cssVar: '--menu-strip-logistics', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.logistics },
   uim: { cssVar: '--menu-strip-uim', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.other },
   amro: { cssVar: '--menu-strip-amro', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.amro },
+  markets: { cssVar: '--menu-strip-markets', fallback: '#0d9488' },
   admin: { cssVar: '--menu-strip-administration', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.administration },
   administration: { cssVar: '--menu-strip-administration', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.administration },
   other: { cssVar: '--menu-strip-other', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.other },
@@ -135,6 +136,15 @@ const GROUP_THEME: Record<string, { heading: string; trigger: string; item: stri
     iconActive: 'bg-fuchsia-500/20 text-fuchsia-900 dark:text-fuchsia-100',
     panel: 'border-fuchsia-500/10 bg-gradient-to-br from-fuchsia-500/[0.06] via-transparent to-transparent',
   },
+  markets: {
+    heading: 'text-teal-700 dark:text-teal-300',
+    trigger: 'hover:bg-teal-500/10 hover:text-teal-900 dark:hover:text-teal-100',
+    item: 'hover:bg-teal-500/10',
+    active: 'border-teal-500/30 bg-gradient-to-r from-teal-500/20 to-teal-500/5 text-teal-900 dark:text-teal-100',
+    icon: 'bg-teal-500/10 text-teal-700 dark:text-teal-300',
+    iconActive: 'bg-teal-500/20 text-teal-900 dark:text-teal-100',
+    panel: 'border-teal-500/10 bg-gradient-to-br from-teal-500/[0.06] via-transparent to-transparent',
+  },
 };
 
 const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
@@ -170,6 +180,11 @@ export function CommandCenterNav() {
     || isAuthPlatformAdmin()
     || hasRole('platform_admin')
     || availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO');
+
+  const hasMarketsDomain = isPlatformAdmin
+    || isAuthPlatformAdmin()
+    || hasRole('platform_admin')
+    || availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'MARKETS');
   const prefetchedRoutes = useRef(new Set<string>());
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
     const getStoredExpandedItems = () => {
@@ -214,6 +229,7 @@ export function CommandCenterNav() {
       logistics: false,
       uim: false,
       amro: false,
+      markets: false,
       financials: false,
       admin: false,
     };
@@ -350,6 +366,10 @@ export function CommandCenterNav() {
       ? mapModuleItems('AMRO').filter((item) => (amroRbacFixEnabled ? canAccessItem(item) : true))
       : [];
 
+    const marketsItems = hasMarketsDomain
+      ? mapModuleItems('Markets').filter(canAccessItem)
+      : [];
+
     // Financials (Finance + Billing)
     const financialItems = [
       ...mapModuleItems('Finance'),
@@ -372,13 +392,14 @@ export function CommandCenterNav() {
     return [
       { id: 'crm', label: 'CRM', items: crmItems },
       { id: 'sales', label: 'Sales', items: salesItems },
+      { id: 'markets', label: 'Markets', items: marketsItems },
       { id: 'financials', label: 'Financials', items: financialItems },
       { id: 'logistics', label: 'Logistics', items: logisticsItems },
       { id: 'uim', label: 'UIM', items: uimItems },
       { id: 'amro', label: 'AMRO', items: amroItems },
       { id: 'admin', label: 'Administration', items: adminItems },
     ].filter((group) => group.items.length > 0);
-  }, [amroRbacFixEnabled, hasAmroDomain, hasPermission, hasRole, isAuthPlatformAdmin]);
+  }, [amroRbacFixEnabled, hasAmroDomain, hasMarketsDomain, hasPermission, hasRole, isAuthPlatformAdmin]);
 
   // 2. Filter Logic
   const filteredGroups = useMemo(() => {
