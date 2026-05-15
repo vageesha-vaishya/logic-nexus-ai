@@ -107,6 +107,30 @@ const HOLDER_TYPE_LABELS: Record<PortfolioHolderType, string> = {
   joint:         "Joint account",
 };
 
+const MODE_OPTIONS: { value: PortfolioMode; label: string; description: string }[] = [
+  { value: "paper", label: "Paper",  description: "Simulated — no real money, safe for backtesting" },
+  { value: "live",  label: "Live",   description: "Real broker-connected portfolio (T2 broker integration)" },
+];
+
+// Common currencies ordered by relevance to the platform
+const CURRENCIES: { code: string; name: string }[] = [
+  { code: "INR", name: "Indian Rupee" },
+  { code: "USD", name: "US Dollar" },
+  { code: "EUR", name: "Euro" },
+  { code: "GBP", name: "British Pound" },
+  { code: "SGD", name: "Singapore Dollar" },
+  { code: "AED", name: "UAE Dirham" },
+  { code: "JPY", name: "Japanese Yen" },
+  { code: "HKD", name: "Hong Kong Dollar" },
+  { code: "CHF", name: "Swiss Franc" },
+  { code: "CAD", name: "Canadian Dollar" },
+  { code: "AUD", name: "Australian Dollar" },
+  { code: "CNY", name: "Chinese Yuan" },
+  { code: "MYR", name: "Malaysian Ringgit" },
+  { code: "THB", name: "Thai Baht" },
+  { code: "ZAR", name: "South African Rand" },
+];
+
 // ─── Page ─────────────────────────────────────────────────────────────────
 
 export default function PortfoliosPage() {
@@ -490,33 +514,48 @@ function PortfolioForm({
         />
       </div>
 
-      {/* Mode + Currency */}
-      <div className="grid grid-cols-2 gap-3">
-        <div className="space-y-1.5">
-          <Label>Mode</Label>
-          <Select value={watchedMode} onValueChange={(v) => setValue("mode", v as PortfolioMode)}>
-            <SelectTrigger><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="paper">Paper</SelectItem>
-              <SelectItem value="live" disabled>Live (deferred)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-        <div className="space-y-1.5">
-          <Label htmlFor="pf-currency">Base currency</Label>
-          <Input
-            id="pf-currency"
-            maxLength={3}
-            className="uppercase"
-            {...register("base_currency", {
-              required: true,
-              pattern: { value: /^[A-Za-z]{3}$/, message: "3-letter code (INR, USD…)" },
-            })}
-          />
-          {errors.base_currency && (
-            <p className="text-xs text-destructive">{errors.base_currency.message}</p>
-          )}
-        </div>
+      {/* Mode */}
+      <div className="space-y-1.5">
+        <Label>Mode</Label>
+        <Select value={watchedMode} onValueChange={(v) => setValue("mode", v as PortfolioMode)}>
+          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectContent>
+            {MODE_OPTIONS.map(({ value, label, description }) => (
+              <SelectItem key={value} value={value}>
+                <div className="flex flex-col">
+                  <span className="font-medium">{label}</span>
+                  <span className="text-xs text-muted-foreground">{description}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {watchedMode === "live" && (
+          <p className="text-xs text-amber-600 dark:text-amber-400">
+            Live mode requires broker integration — configure in Markets settings before use.
+          </p>
+        )}
+      </div>
+
+      {/* Base currency */}
+      <div className="space-y-1.5">
+        <Label>Base currency</Label>
+        <Select
+          value={watch("base_currency")}
+          onValueChange={(v) => setValue("base_currency", v)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder="Select currency" />
+          </SelectTrigger>
+          <SelectContent>
+            {CURRENCIES.map(({ code, name }) => (
+              <SelectItem key={code} value={code}>
+                <span className="font-mono font-medium">{code}</span>
+                <span className="ml-2 text-muted-foreground">{name}</span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
 
       {mutationError && (
