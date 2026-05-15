@@ -128,7 +128,7 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'markets-ingest-prices-eod') THEN
     PERFORM cron.schedule(
       'markets-ingest-prices-eod',
-      '35 10 * * 1-5',
+      '5 13 * * 1-5',
       'SELECT public.trigger_markets_ingest_prices();'
     );
   END IF;
