@@ -21,3 +21,11 @@ export { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 export { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 export { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 export { Progress } from '@/components/ui/progress';
+
+// ADR-026 §2 — markets/platform primitive set
+export { Numeric, type NumericFormat } from '@/components/system/Numeric';
+export { MoneyDelta } from '@/components/system/MoneyDelta';
+export { Sparkline } from '@/components/system/Sparkline';
+export { EmptyState } from '@/components/system/EmptyState';
+export { ErrorState } from '@/components/system/ErrorState';
+export { SkeletonRow, SkeletonCard } from '@/components/system/Skeletons';

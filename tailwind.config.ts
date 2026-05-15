@@ -35,6 +35,20 @@ export default {
           DEFAULT: "hsl(var(--info))",
           foreground: "hsl(var(--info-foreground))",
         },
+        // ADR-026 §5 — markets up/down semantics with soft-bg variants
+        up: {
+          DEFAULT: "hsl(var(--up))",
+          foreground: "hsl(var(--up-foreground))",
+          soft: "hsl(var(--up-soft))",
+        },
+        down: {
+          DEFAULT: "hsl(var(--down))",
+          foreground: "hsl(var(--down-foreground))",
+          soft: "hsl(var(--down-soft))",
+        },
+        neutral: {
+          DEFAULT: "hsl(var(--neutral))",
+        },
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",

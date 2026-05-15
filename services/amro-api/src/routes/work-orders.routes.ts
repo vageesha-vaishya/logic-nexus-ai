@@ -115,6 +115,7 @@ router.get(
   '/work-orders',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
     if (!tenantId) {
       res.status(401).json({
         error: 'Missing tenant context',
@@ -124,7 +125,7 @@ router.get(
       return;
     }
 
-    const workOrders = await workOrdersService.getWorkOrders(tenantId);
+    const workOrders = await workOrdersService.getWorkOrders(tenantId, franchiseId);
     res.json({
       data: workOrders,
       count: workOrders.length,
@@ -141,6 +142,7 @@ router.get(
   '/amro/work-orders',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
     if (!tenantId) {
       res.status(401).json({
         error: 'Missing tenant context',
@@ -151,7 +153,7 @@ router.get(
     }
 
     try {
-      const workOrders = await workOrdersService.getWorkOrders(tenantId);
+      const workOrders = await workOrdersService.getWorkOrders(tenantId, franchiseId);
       res.json({
         items: workOrders,
         pagination: {
@@ -222,6 +224,7 @@ router.get(
   '/work-orders/:id',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
     const { id } = req.params;
 
     if (!tenantId) {
@@ -233,7 +236,7 @@ router.get(
       return;
     }
 
-    const workOrder = await workOrdersService.getWorkOrder(tenantId, id);
+    const workOrder = await workOrdersService.getWorkOrder(tenantId, id, franchiseId);
     res.json({ data: workOrder });
     return;
   }),
@@ -247,6 +250,7 @@ router.get(
   '/amro/work-orders/:id',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
     const { id } = req.params;
 
     if (!tenantId) {
@@ -258,7 +262,7 @@ router.get(
       return;
     }
 
-    const workOrder = await workOrdersService.getWorkOrder(tenantId, id);
+    const workOrder = await workOrdersService.getWorkOrder(tenantId, id, franchiseId);
     if (!workOrder) {
       res.status(404).json({
         error: 'Work package not found',
@@ -345,7 +349,6 @@ router.post(
       output: {
         id: workOrder.id,
         work_order_number: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
-        work_order_number: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
         status: workOrder.status,
         generated_tasks_count: Number(workOrder.generated_tasks_count || 0),
       },
@@ -369,13 +372,13 @@ router.patch(
       return;
     }
     const request: UpdateWorkOrderRequest = req.body;
-    const workOrder = await workOrdersService.updateWorkOrder(tenantId, id, userId, request);
+    const franchiseId = getFranchiseId(req);
+    const workOrder = await workOrdersService.updateWorkOrder(tenantId, id, userId, request, franchiseId);
     res.status(200).json({
       version: 'v2',
       interface: 'update-work-order',
       output: {
         id: workOrder.id,
-        work_order_number: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
         work_order_number: workOrder.work_order_number || workOrder.work_order_number || workOrder.id,
         status: workOrder.status,
       },
@@ -398,7 +401,8 @@ router.delete(
       } as ErrorResponse);
       return;
     }
-    await workOrdersService.deleteWorkOrder(tenantId, id, userId);
+    const franchiseId = getFranchiseId(req);
+    await workOrdersService.deleteWorkOrder(tenantId, id, userId, franchiseId);
     res.status(204).send();
     return;
   }),
@@ -408,6 +412,7 @@ router.get(
   '/amro/work-orders/:id',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
     const { id } = req.params;
     if (!tenantId) {
       res.status(401).json({
@@ -417,7 +422,7 @@ router.get(
       } as ErrorResponse);
       return;
     }
-    const workOrder = await workOrdersService.getWorkOrder(tenantId, id);
+    const workOrder = await workOrdersService.getWorkOrder(tenantId, id, franchiseId);
     res.status(200).json({
       version: 'v2',
       interface: 'get-work-order',
@@ -433,6 +438,7 @@ router.get(
   '/amro/work-orders',
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
+    const franchiseId = getFranchiseId(req);
     if (!tenantId) {
       res.status(401).json({
         error: 'Missing tenant context',
@@ -442,10 +448,9 @@ router.get(
       return;
     }
 
-    const workOrders = await workOrdersService.getWorkOrders(tenantId);
+    const workOrders = await workOrdersService.getWorkOrders(tenantId, franchiseId);
     const records = workOrders.map((row) => ({
       id: row.id,
-      work_order_number: row.work_order_number || row.work_order_number || row.id,
       work_order_number: row.work_order_number || row.work_order_number || row.id,
       title: row.title,
       aircraft_id: row.aircraft_id,
@@ -543,7 +548,8 @@ router.patch(
     }
 
     const request: UpdateWorkOrderRequest = req.body;
-    const workOrder = await workOrdersService.updateWorkOrder(tenantId, id, userId, request);
+    const franchiseId = getFranchiseId(req);
+    const workOrder = await workOrdersService.updateWorkOrder(tenantId, id, userId, request, franchiseId);
     res.json({ data: workOrder });
     return;
   }),
@@ -569,7 +575,8 @@ router.delete(
       return;
     }
 
-    await workOrdersService.deleteWorkOrder(tenantId, id, userId);
+    const franchiseId = getFranchiseId(req);
+    await workOrdersService.deleteWorkOrder(tenantId, id, userId, franchiseId);
     res.status(204).send();
     return;
   }),
@@ -588,6 +595,7 @@ router.get(
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const { workOrderId } = req.params;
+    const franchiseId = getFranchiseId(req);
 
     if (!tenantId) {
       res.status(401).json({
@@ -598,7 +606,7 @@ router.get(
       return;
     }
 
-    const tasks = await workOrdersService.getTasks(tenantId, workOrderId);
+    const tasks = await workOrdersService.getTasks(tenantId, workOrderId, franchiseId);
     res.json({
       data: tasks,
       count: tasks.length,
@@ -616,6 +624,7 @@ router.get(
   asyncHandler(async (req: AuthRequest, res): Promise<void> => {
     const tenantId = req.tenantId;
     const { id } = req.params;
+    const franchiseId = getFranchiseId(req);
 
     if (!tenantId) {
       res.status(401).json({
@@ -626,7 +635,7 @@ router.get(
       return;
     }
 
-    const task = await workOrdersService.getTask(tenantId, id);
+    const task = await workOrdersService.getTask(tenantId, id, franchiseId);
     res.json({ data: task });
     return;
   }),
@@ -654,7 +663,6 @@ router.post(
 
     const request: CreateTaskRequest = {
       ...req.body,
-      work_order_id: req.body?.work_order_id || req.body?.work_order_id || workOrderId,
       work_order_id: req.body?.work_order_id || workOrderId,
     };
     const sequenceOrder = request.sequence_order ?? request.sequence_number;

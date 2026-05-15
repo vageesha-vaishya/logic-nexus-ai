@@ -58,7 +58,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
       // If admin override is enabled, prioritize the selected tenant from preferences.
       // If not enabled, prioritize the owned tenant id if it exists.
       effectiveTenant = adminOverride ? (pref?.tenant_id ?? null) : (ownedTenantId ?? null);
-      effectiveFranchise = adminOverride ? (pref?.franchise_id ?? null) : null;
+      effectiveFranchise = adminOverride ? (pref?.franchise_id ?? null) : (ownedFranchiseId ?? null);
     } else if (isTenantAdmin) {
       effectiveTenant = baseTenant;
       adminOverride = !!pref?.admin_override_enabled;

@@ -1,6 +1,7 @@
 import express, { Express, NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
+import { createClient } from '@supabase/supabase-js';
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware';
 import leadsRoutes from './routes/leads.routes';
 import invoicesRoutes from './routes/invoices.routes';
@@ -10,6 +11,7 @@ import { logger } from './utils/logger';
 
 const app: Express = express();
 type RequestWithCorrelation = Request & { correlationId?: string };
+type RequestWithScope = RequestWithCorrelation & { userId?: string; tenantId?: string; franchiseId?: string | null };
 
 app.use(express.json());
 
@@ -54,7 +56,39 @@ app.get('/health', (_req: Request, res: Response) => {
   });
 });
 
-app.use('/api', authMiddleware, leadsRoutes, invoicesRoutes, taxRoutes);
+function auditApiRequest(req: Request, res: Response, next: NextFunction): void {
+  const startedAt = Date.now();
+  const request = req as RequestWithScope;
+  res.on('finish', () => {
+    try {
+      const supabaseUrl = String(process.env.SUPABASE_URL || '').replace(/\/$/, '');
+      const supabaseServiceKey = String(process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || '').trim();
+      if (!supabaseUrl || !supabaseServiceKey) return;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
+      const payload: Record<string, unknown> = {
+        user_id: request.userId || null,
+        tenant_id: request.tenantId || null,
+        franchise_id: request.franchiseId || null,
+        action: 'API_REQUEST',
+        resource_type: 'crm-api',
+        details: {
+          correlationId: request.correlationId || null,
+          method: req.method,
+          path: req.path,
+          statusCode: res.statusCode,
+          latencyMs: Date.now() - startedAt,
+        },
+        ip_address: req.ip,
+      };
+      void Promise.resolve(supabase.from('audit_logs').insert(payload) as any).catch(() => undefined);
+    } catch {
+      return;
+    }
+  });
+  next();
+}
+
+app.use('/api', authMiddleware, auditApiRequest, leadsRoutes, invoicesRoutes, taxRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;

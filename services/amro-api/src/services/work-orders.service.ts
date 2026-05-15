@@ -545,12 +545,18 @@ export class WorkOrdersService {
    * Get all work packages for a tenant
    * Explicitly filters by tenant_id (belt and suspenders approach)
    */
-  async getWorkOrders(tenantId: string): Promise<WorkOrder[]> {
-    const { data, error } = await this.supabase
+  async getWorkOrders(tenantId: string, franchiseId?: string | null): Promise<WorkOrder[]> {
+    let query = this.supabase
       .from('work_orders')
       .select('*')
       .eq('tenant_id', tenantId)
       .order('created_at', { ascending: false });
+
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`Failed to fetch work packages: ${error.message}`);
@@ -563,13 +569,18 @@ export class WorkOrdersService {
    * Get a specific work package
    * Explicitly filters by tenant_id
    */
-  async getWorkOrder(tenantId: string, id: string): Promise<WorkOrder> {
-    const { data, error } = await this.supabase
+  async getWorkOrder(tenantId: string, id: string, franchiseId?: string | null): Promise<WorkOrder> {
+    let query = this.supabase
       .from('work_orders')
       .select('*')
       .eq('tenant_id', tenantId)
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) {
       throw new Error(`Failed to fetch work package: ${error.message}`);
@@ -614,6 +625,7 @@ export class WorkOrdersService {
           .from('work_orders')
           .insert({
             tenant_id: tenantId,
+            franchise_id: franchiseId || null,
             aircraft_id: aircraftId,
             work_order_number: workOrderNumber,
             title: titleResolution.title,
@@ -737,9 +749,10 @@ export class WorkOrdersService {
     id: string,
     userId: string,
     request: UpdateWorkOrderRequest,
+    franchiseId?: string | null,
   ): Promise<WorkOrder> {
     // Verify work package belongs to tenant
-    await this.getWorkOrder(tenantId, id);
+    await this.getWorkOrder(tenantId, id, franchiseId || null);
 
     const updateData: Record<string, any> = {
       updated_by: userId,
@@ -767,13 +780,17 @@ export class WorkOrdersService {
     if (request.actual_cost !== undefined) updateData.actual_cost = request.actual_cost;
     if (request.assigned_to !== undefined) updateData.assigned_to = request.assigned_to;
 
-    const { data, error } = await this.supabase
+    let query = this.supabase
       .from('work_orders')
       .update(updateData)
       .eq('tenant_id', tenantId)
-      .eq('id', id)
-      .select()
-      .single();
+      .eq('id', id);
+
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+
+    const { data, error } = await query.select().single();
 
     if (error) {
       throw new Error(`Failed to update work package: ${error.message}`);
@@ -823,15 +840,21 @@ export class WorkOrdersService {
    * Delete a work package
    * Explicitly filters by tenant_id
    */
-  async deleteWorkOrder(tenantId: string, id: string, userId: string): Promise<void> {
+  async deleteWorkOrder(tenantId: string, id: string, userId: string, franchiseId?: string | null): Promise<void> {
     // Verify work package belongs to tenant and get it for event data
-    const workOrder = await this.getWorkOrder(tenantId, id);
+    const workOrder = await this.getWorkOrder(tenantId, id, franchiseId || null);
 
-    const { error } = await this.supabase
+    let query = this.supabase
       .from('work_orders')
       .delete()
       .eq('tenant_id', tenantId)
       .eq('id', id);
+
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+
+    const { error } = await query;
 
     if (error) {
       throw new Error(`Failed to delete work package: ${error.message}`);
@@ -874,13 +897,19 @@ export class WorkOrdersService {
    * Get all tasks for a work package
    * Explicitly filters by tenant_id
    */
-  async getTasks(tenantId: string, workOrderId: string): Promise<Task[]> {
-    const { data, error } = await this.supabase
+  async getTasks(tenantId: string, workOrderId: string, franchiseId?: string | null): Promise<Task[]> {
+    let query = this.supabase
       .from('tasks')
       .select('*')
       .eq('tenant_id', tenantId)
       .eq('work_order_id', workOrderId)
       .order('sequence_order', { ascending: true });
+
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+
+    const { data, error } = await query;
 
     if (error) {
       throw new Error(`Failed to fetch tasks: ${error.message}`);
@@ -893,13 +922,18 @@ export class WorkOrdersService {
    * Get a specific task
    * Explicitly filters by tenant_id
    */
-  async getTask(tenantId: string, id: string): Promise<Task> {
-    const { data, error } = await this.supabase
+  async getTask(tenantId: string, id: string, franchiseId?: string | null): Promise<Task> {
+    let query = this.supabase
       .from('tasks')
       .select('*')
       .eq('tenant_id', tenantId)
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+
+    if (franchiseId) {
+      query = query.eq('franchise_id', franchiseId);
+    }
+
+    const { data, error } = await query.single();
 
     if (error) {
       throw new Error(`Failed to fetch task: ${error.message}`);

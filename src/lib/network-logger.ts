@@ -64,10 +64,19 @@ export const initNetworkLogger = () => {
     // Check ignoredUrls from debug config
     const isIgnored = debugConfig.network.ignoredUrls.some(ignore => url.includes(ignore));
 
+    // Third-party APIs whose CORS allow-headers list does NOT include `X-Correlation-ID`.
+    // Injecting it would cause the browser's preflight to fail. Bypass the wrapper entirely.
+    const isThirdPartyApi =
+      url.includes('openrouter.ai') ||
+      url.includes('api.openai.com') ||
+      url.includes('api.anthropic.com') ||
+      url.includes('generativelanguage.googleapis.com');
+
     if (
-      url.includes('system_logs') || 
-      url.includes('ingest.sentry.io') || 
+      url.includes('system_logs') ||
+      url.includes('ingest.sentry.io') ||
       url.includes('app.posthog.com') ||
+      isThirdPartyApi ||
       isIgnored
     ) {
       return originalFetch(...args);

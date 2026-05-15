@@ -1,6 +1,6 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info, Globe, Mail, FileCheck } from 'lucide-react';
+import { Settings as SettingsIcon, User, Bell, Shield, Database, CreditCard, Palette, Info, Globe, Mail, FileCheck, Sparkles } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
@@ -324,6 +324,44 @@ export default function Settings() {
                   <p className="text-sm text-muted-foreground">Configure and activate messaging channels for unified communications.</p>
                   <Button variant="default" onClick={() => navigate('/dashboard/settings/channel-integrations')}>
                     Open
+                  </Button>
+                </CardContent>
+              </Card>
+
+              <div className="md:col-span-2 lg:col-span-3">
+                <div className="flex items-center">
+                  <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider">AI & Automation</h2>
+                  <div className="ml-4 flex-1 h-px bg-border"></div>
+                </div>
+              </div>
+              <Card className="md:col-span-2 lg:col-span-3">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-5 w-5 text-primary" />
+                    <CardTitle className="flex items-center gap-2">
+                      LLM Providers
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center cursor-help">
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Per-tenant LLM provider + API keys shared across all AI features (Markets briefs, CRM assist, Logistics, etc.)</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </CardTitle>
+                  </div>
+                  <CardDescription>
+                    Configure OpenRouter, Anthropic, OpenAI, Gemini, or a local Qwen endpoint. Keys are encrypted in Supabase Vault and reused by every AI feature on the platform.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Pick a default model from the live OpenRouter catalog with pricing and context window, or paste any model id.
+                  </p>
+                  <Button variant="default" onClick={() => navigate('/dashboard/settings/llm-providers')}>
+                    Manage providers
                   </Button>
                 </CardContent>
               </Card>

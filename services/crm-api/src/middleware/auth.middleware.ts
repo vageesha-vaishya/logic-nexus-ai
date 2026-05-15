@@ -193,6 +193,14 @@ function isPlatformAdminRole(role: UserRoleScope): boolean {
   return role.role === 'platform_admin';
 }
 
+function isPlatformScopedRole(role: UserRoleScope): boolean {
+  return role.role === 'platform_admin' || role.role === 'platform_domain_admin';
+}
+
+function roleRequiresFranchise(roleName: string): boolean {
+  return ['franchise_admin', 'user', 'sales_manager', 'viewer'].includes(roleName);
+}
+
 function canAccessScope(
   roles: UserRoleScope[],
   requestedTenantId: string,
@@ -289,7 +297,53 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
     const { tenantId: requestedTenantId, franchiseId: requestedFranchiseId } = resolveRequestedScope(req);
     const hasPlatformAdmin = roles.some(isPlatformAdminRole);
 
+    for (const role of roles) {
+      if (!role.role) {
+        res.status(401).json({
+          error: 'Invalid user role assignment',
+          code: 'INVALID_ROLE_SCOPE',
+          statusCode: 401
+        });
+        return;
+      }
+
+      if (!isPlatformScopedRole(role) && !role.tenant_id) {
+        res.status(401).json({
+          error: 'User has an invalid tenant assignment',
+          code: 'INVALID_ROLE_SCOPE',
+          statusCode: 401
+        });
+        return;
+      }
+
+      if (roleRequiresFranchise(role.role) && !role.franchise_id) {
+        res.status(401).json({
+          error: 'User has an invalid franchise assignment',
+          code: 'INVALID_ROLE_SCOPE',
+          statusCode: 401
+        });
+        return;
+      }
+    }
+
     if (requestedTenantId) {
+      if (requestedFranchiseId) {
+        const { data: franchiseRow, error: franchiseLookupError } = await supabase
+          .from('franchises')
+          .select('tenant_id')
+          .eq('id', requestedFranchiseId)
+          .maybeSingle();
+
+        if (franchiseLookupError || !franchiseRow?.tenant_id || franchiseRow.tenant_id !== requestedTenantId) {
+          res.status(403).json({
+            error: 'Requested franchise scope does not belong to requested tenant',
+            code: 'FORBIDDEN_SCOPE',
+            statusCode: 403
+          });
+          return;
+        }
+      }
+
       if (!hasPlatformAdmin && !canAccessScope(roles, requestedTenantId, requestedFranchiseId)) {
         res.status(403).json({
           error: 'Requested tenant/franchise scope is not assigned to the user',
@@ -303,6 +357,15 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
       req.franchiseId = requestedFranchiseId;
       recordAuthHeaderResult(true, 'authorization', correlationId, req.path);
       next();
+      return;
+    }
+
+    if (requestedFranchiseId && !requestedTenantId) {
+      res.status(400).json({
+        error: 'Franchise scope requires tenant scope',
+        code: 'INVALID_SCOPE',
+        statusCode: 400
+      });
       return;
     }
 

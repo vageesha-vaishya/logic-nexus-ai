@@ -1,20 +1,31 @@
 import * as Sentry from "@sentry/react";
 
+// Sampling tuned per §16.11 G-4 (2026-05-15). Production economics:
+//   tracesSampleRate 1.0 → blows Sentry quota at >10k users
+//   replaysSessionSampleRate 0.1 → same; sessions are expensive
+// Errors are always captured (errorsSampleRate is implicit 1.0).
+const IS_DEV = import.meta.env.DEV === true;
+
 export const initSentry = () => {
   if (import.meta.env.VITE_SENTRY_DSN) {
     Sentry.init({
       dsn: import.meta.env.VITE_SENTRY_DSN,
+      environment: import.meta.env.MODE,
       integrations: [
         Sentry.browserTracingIntegration(),
         Sentry.replayIntegration(),
       ],
-      // Performance Monitoring
-      tracesSampleRate: 1.0, //  Capture 100% of the transactions
-      // Set 'tracePropagationTargets' to control for which URLs distributed tracing should be enabled
-      tracePropagationTargets: ["localhost", /^https:\/\/yourserver\.io\/api/],
-      // Session Replay
-      replaysSessionSampleRate: 0.1, // This sets the sample rate at 10%. You may want to change it to 100% while in development and then sample at a lower rate in production.
-      replaysOnErrorSampleRate: 1.0, // If you're not already sampling the entire session, change the sample rate to 100% when sampling sessions where errors occur.
+      // Performance Monitoring — 100% in dev for visibility, 5% in prod to keep quota usable at scale.
+      tracesSampleRate: IS_DEV ? 1.0 : 0.05,
+      // Distributed tracing — only propagate trace headers to our own backends.
+      tracePropagationTargets: [
+        "localhost",
+        /^https:\/\/[a-z0-9-]+\.supabase\.co/,
+        /^\/api\//,
+      ],
+      // Session Replay — only on error in prod (random sampling is the cost killer).
+      replaysSessionSampleRate: IS_DEV ? 0.1 : 0.0,
+      replaysOnErrorSampleRate: 1.0,
     });
   } else {
     console.warn("Sentry DSN not found. Sentry is disabled.");

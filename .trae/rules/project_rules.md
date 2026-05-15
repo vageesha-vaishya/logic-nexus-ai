@@ -113,6 +113,27 @@
 - Require migration files with `CREATE TABLE` to include `DB-VERIFICATION:` and `DB-ARCH-APPROVAL:` metadata lines.
 - Use JWT Signing Key and do not use Legacy JWT Secret.
 
+### Domain Schema Isolation Governance
+- **Rule ID:** `LNX-GOV-DB-002`
+- **Status:** `Active`
+- **Owner:** `Database Architecture Board`
+- **Effective Date:** `2026-05-14`
+- **Last Updated:** `2026-05-14`
+- **Applies To:** `all Supabase PostgreSQL schema and object creation`
+
+#### Purpose
+- Enforce strict domain isolation boundaries and prevent cross-domain database coupling.
+
+#### Scope
+- In scope: every new business domain and all database objects created for that domain.
+- Out of scope: `public` shared platform primitives (auth, tenancy, shared reference types) explicitly approved by the database architecture board.
+
+#### Requirements
+- Require every new business domain to receive its own dedicated PostgreSQL schema.
+- Require all domain-specific database objects to be created inside that dedicated schema, including tables, functions, views, indexes, triggers, policies, and sequences.
+- Disallow creation of domain-specific objects in `public` or in other domain schemas.
+- Require migrations introducing a new domain schema to include an explicit schema creation step and a clearly defined ownership/grants strategy for that schema.
+
 ### Backward Compatibility Governance
 - **Rule ID:** `LNX-GOV-COMPAT-001`
 - **Status:** `Active`

@@ -113,6 +113,39 @@ function getSupabaseAdminClient(): SupabaseClient {
   return createClient(url, serviceKey);
 }
 
+function auditApiRequest(req: AuthRequest, res: Response, next: NextFunction): void {
+  const startedAt = Date.now();
+  const requestId = String(req.header('x-request-id') || '').trim() || crypto.randomUUID();
+  res.on('finish', () => {
+    try {
+      const supabase = getSupabaseAdminClient();
+      const tenantId = req.tenantId ? String(req.tenantId).trim() : null;
+      const franchiseId = req.franchiseId ? String(req.franchiseId).trim() : null;
+      const userId = req.userId ? String(req.userId).trim() : null;
+      const statusCode = res.statusCode;
+      const payload: Record<string, unknown> = {
+        user_id: userId,
+        tenant_id: tenantId,
+        franchise_id: franchiseId,
+        action: 'API_REQUEST',
+        resource_type: 'amro-api',
+        details: {
+          requestId,
+          method: req.method,
+          path: req.path,
+          statusCode,
+          latencyMs: Date.now() - startedAt,
+        },
+        ip_address: req.ip,
+      };
+      void Promise.resolve(supabase.from('audit_logs').insert(payload) as any).catch(() => undefined);
+    } catch {
+      return;
+    }
+  });
+  next();
+}
+
 function recordMonitoringStatus(statusCode: number, requestId: string, pathName: string): void {
   const now = Date.now();
   monitoringState.totalRequests += 1;
@@ -2018,6 +2051,8 @@ app.get('/api/v2/amro/airports', authMiddleware as any, async (req: AuthRequest,
 // Apply authentication middleware to all API routes
 app.use('/api/v1', authMiddleware);
 app.use('/api/v2/amro', authMiddleware);
+app.use('/api/v1', auditApiRequest);
+app.use('/api/v2/amro', auditApiRequest);
 
 // Mount work orders routes
 app.use('/api/v1', workOrdersRoutes);

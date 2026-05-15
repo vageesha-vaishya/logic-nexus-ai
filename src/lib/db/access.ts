@@ -17,6 +17,101 @@ export interface DataAccessContext {
 type TableName = string;
 
 /**
+ * Canonical platform domain `code` values from public.platform_domains.
+ * Used to gate cross-cutting access checks via assertDomainAccess().
+ */
+export const PlatformDomains = {
+  AMRO: 'amro',
+  LOGISTICS: 'logistics',
+  MARKETS: 'markets',
+  CRM: 'crm',
+  FINANCE: 'finance',
+  TRADING: 'trading',
+  INSURANCE: 'insurance',
+  CUSTOMS: 'customs',
+  BANKING: 'banking',
+  ECOMMERCE: 'ecommerce',
+  TELECOM: 'telecom',
+  HEALTHCARE: 'healthcare',
+  REAL_ESTATE: 'real_estate',
+} as const;
+
+export type PlatformDomainKey = typeof PlatformDomains[keyof typeof PlatformDomains];
+
+/** Subscription states that grant active access. */
+const ACTIVE_SUBSCRIPTION_STATES = new Set(['active', 'trialing', 'grace_period']);
+
+export interface DomainAccessResult {
+  allowed: boolean;
+  subscriptionStatus?: string;
+  graceUntil?: string | null;
+  domainStatus?: string;
+  reason?: string;
+}
+
+/**
+ * Free function: check whether a tenant has the named domain assigned and active.
+ * Equivalent to: SELECT … FROM tenant_domain_assignments tda JOIN platform_domains pd …
+ *
+ * No caching — at scale this hits the DB on every call; T1.5 (markets-doc §16.8 P2)
+ * introduces Redis caching for these checks.
+ */
+export async function checkDomainAccess(
+  supabase: SupabaseClient<Database>,
+  tenantId: string,
+  domain: PlatformDomainKey,
+): Promise<DomainAccessResult> {
+  // We can't .from('tenant_domain_assignments') with strong typing if it isn't in
+  // the generated Database type, so cast through any for safety.
+  const { data, error } = await (supabase as any)
+    .from('tenant_domain_assignments')
+    .select(
+      'is_active, subscription_status, grace_until, platform_domains!inner(code, status, is_active)'
+    )
+    .eq('tenant_id', tenantId)
+    .eq('is_active', true)
+    .eq('platform_domains.code', domain)
+    .eq('platform_domains.is_active', true)
+    .maybeSingle();
+
+  if (error) {
+    return { allowed: false, reason: `domain_lookup_error: ${error.message ?? 'unknown'}` };
+  }
+  if (!data) {
+    return { allowed: false, reason: 'no_assignment' };
+  }
+
+  const subStatus: string = data.subscription_status;
+  if (!ACTIVE_SUBSCRIPTION_STATES.has(subStatus)) {
+    return {
+      allowed: false,
+      subscriptionStatus: subStatus,
+      reason: `subscription_${subStatus}`,
+    };
+  }
+
+  // grace_period expires at grace_until
+  if (subStatus === 'grace_period' && data.grace_until) {
+    const graceUntil = new Date(data.grace_until);
+    if (Number.isFinite(graceUntil.getTime()) && graceUntil < new Date()) {
+      return {
+        allowed: false,
+        subscriptionStatus: subStatus,
+        graceUntil: data.grace_until,
+        reason: 'grace_period_expired',
+      };
+    }
+  }
+
+  return {
+    allowed: true,
+    subscriptionStatus: subStatus,
+    graceUntil: data.grace_until ?? null,
+    domainStatus: data.platform_domains?.status,
+  };
+}
+
+/**
  * Applies mandatory scope filters to a Supabase query based on user context.
  * This is a standalone function that can be used with any query builder.
  */
@@ -45,7 +140,10 @@ export function withScope<T>(query: T, context: DataAccessContext): T {
   }
 
   // Tenant Admin: Must scope to their tenant
-  if (context.isTenantAdmin && context.tenantId) {
+  if (context.isTenantAdmin) {
+    if (!context.tenantId) {
+      throw new Error('Missing tenant scope for tenant admin');
+    }
     scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
     
     // Allow Tenant Admin to filter by franchise if specified
@@ -59,22 +157,20 @@ export function withScope<T>(query: T, context: DataAccessContext): T {
   
   // Franchise Admin: Must scope to their franchise (and implicitly tenant)
   if (context.isFranchiseAdmin) {
-    if (context.tenantId) {
-      scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
+    if (!context.tenantId || !context.franchiseId) {
+      throw new Error('Missing tenant/franchise scope for franchise admin');
     }
-    if (context.franchiseId) {
-      scopedQuery = scopedQuery.eq('franchise_id', context.franchiseId);
-    }
+    scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
+    scopedQuery = scopedQuery.eq('franchise_id', context.franchiseId);
   }
 
   // Regular user: Must scope to their tenant + franchise (defense-in-depth with RLS)
   if (!context.isPlatformAdmin && !context.isTenantAdmin && !context.isFranchiseAdmin) {
-    if (context.tenantId) {
-      scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
+    if (!context.tenantId || !context.franchiseId) {
+      throw new Error('Missing tenant/franchise scope for user');
     }
-    if (context.franchiseId) {
-      scopedQuery = scopedQuery.eq('franchise_id', context.franchiseId);
-    }
+    scopedQuery = scopedQuery.eq('tenant_id', context.tenantId);
+    scopedQuery = scopedQuery.eq('franchise_id', context.franchiseId);
   }
 
   return scopedQuery as T;
@@ -276,7 +372,10 @@ export class ScopedDataAccess {
     }
 
     // Tenant Admin: Must scope to their tenant
-    if (ctx.isTenantAdmin && ctx.tenantId) {
+    if (ctx.isTenantAdmin) {
+      if (!ctx.tenantId) {
+        throw new Error('Missing tenant scope for tenant admin');
+      }
       query = query.eq('tenant_id', ctx.tenantId);
       
       if (ctx.franchiseId && table !== 'franchises') {
@@ -289,9 +388,10 @@ export class ScopedDataAccess {
     
     // Franchise Admin: Must scope to their franchise (and implicitly tenant)
     if (ctx.isFranchiseAdmin) {
-      if (ctx.tenantId) {
-        query = query.eq('tenant_id', ctx.tenantId);
+      if (!ctx.tenantId || !ctx.franchiseId) {
+        throw new Error('Missing tenant/franchise scope for franchise admin');
       }
+      query = query.eq('tenant_id', ctx.tenantId);
       if (ctx.franchiseId) {
         // Special-case: franchises table uses 'id' not 'franchise_id'
         if (table === 'franchises') {
@@ -304,6 +404,9 @@ export class ScopedDataAccess {
 
     // Regular user: Must scope to their tenant + franchise (defense-in-depth with RLS)
     if (!ctx.isPlatformAdmin && !ctx.isTenantAdmin && !ctx.isFranchiseAdmin) {
+      if (!ctx.tenantId || !ctx.franchiseId) {
+        throw new Error('Missing tenant/franchise scope for user');
+      }
       if (ctx.tenantId) {
         query = query.eq('tenant_id', ctx.tenantId);
       }
@@ -322,7 +425,7 @@ export class ScopedDataAccess {
   private injectScope(value: any, table?: TableName): any {
     const newValue = { ...value };
     // Inject if not platform admin, or if platform admin has enabled override
-    const shouldInject = !this.context.isPlatformAdmin || (this.context.isPlatformAdmin && this.context.adminOverrideEnabled);
+    const shouldInject = !this.context.isPlatformAdmin || (this.context.isPlatformAdmin && (this.context.adminOverrideEnabled || Boolean(this.context.tenantId)));
 
     if (shouldInject) {
       // Ports/Locations are global, do not inject scope
@@ -361,6 +464,55 @@ export class ScopedDataAccess {
       code: 'platform_admin_required',
       status: 403,
     };
+  }
+
+  /**
+   * Assert that the current tenant has the named domain enabled.
+   * Returns `{ data: { allowed: true, … }, error: null }` on success,
+   * or `{ data: null, error: { message, code, status } }` if the tenant lacks
+   * an active assignment for that domain.
+   *
+   * Platform admins bypass the check entirely.
+   * Edge functions should use the parallel helper at
+   *   supabase/functions/_shared/domain-access.ts
+   * (Deno-side; same query shape, runs against the user's JWT-scoped client).
+   */
+  public async assertDomainAccess(
+    domain: PlatformDomainKey,
+  ): Promise<{
+    data: DomainAccessResult | null;
+    error: { message: string; code: string; status: number } | null;
+  }> {
+    // Platform admins always pass — they see everything by design.
+    if (this.context.isPlatformAdmin && !this.context.adminOverrideEnabled) {
+      return { data: { allowed: true, reason: 'platform_admin_bypass' }, error: null };
+    }
+
+    if (!this.context.tenantId) {
+      return {
+        data: null,
+        error: {
+          message: 'Missing tenant context — cannot check domain access',
+          code: 'no_tenant_in_context',
+          status: 401,
+        },
+      };
+    }
+
+    const result = await checkDomainAccess(this.supabase, this.context.tenantId, domain);
+
+    if (!result.allowed) {
+      return {
+        data: null,
+        error: {
+          message: `Tenant does not have the "${domain}" domain enabled (${result.reason ?? 'denied'})`,
+          code: 'domain_not_enabled',
+          status: 403,
+        },
+      };
+    }
+
+    return { data: result, error: null };
   }
 
   /**

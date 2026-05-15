@@ -205,6 +205,16 @@ const AmroAtaCodesMasterData = lazy(() => import("./features/module-amro/setting
 const AmroPartsInventoryMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.PartsInventoryMasterDataPage })));
 const AmroSuppliersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.SuppliersMasterDataPage })));
 const AmroMaintenanceFacilitiesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.MaintenanceFacilitiesMasterDataPage })));
+
+// Markets domain (per design doc 2026-05-14 §6.2, ADR-025)
+const MarketsPortfolios = lazy(() => import("./features/markets/pages/PortfoliosPage"));
+const MarketsPortfolioDetail = lazy(() => import("./features/markets/pages/PortfolioDetailPage"));
+const MarketsLlmSettings = lazy(() => import("./features/markets/pages/LlmSettingsPage"));
+const MarketsWatchlists = lazy(() => import("./features/markets/pages/WatchlistsPage"));
+const MarketsWatchlistDetail = lazy(() => import("./features/markets/pages/WatchlistDetailPage"));
+const MarketsInstrumentDetail = lazy(() => import("./features/markets/pages/InstrumentDetailPage"));
+// Platform-wide LLM provider settings — same component, reachable from main settings hub.
+const PlatformLlmSettings = MarketsLlmSettings;
 const AmroWorkCentersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkCentersMasterDataPage })));
 const AmroSkillCodesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.SkillCodesMasterDataPage })));
 const AmroManufacturersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.ManufacturersMasterDataPage })));
@@ -416,13 +426,22 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/dashboard/settings" 
+            <Route
+              path="/dashboard/settings"
               element={
                 <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <Settings />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            {/* Platform-wide LLM/AI provider configuration (per-tenant). Edge function enforces admin role. */}
+            <Route
+              path="/dashboard/settings/llm-providers"
+              element={
+                <ProtectedRoute>
+                  <PlatformLlmSettings />
+                </ProtectedRoute>
+              }
             />
             <Route 
               path="/dashboard/settings/permissions" 
@@ -931,7 +950,16 @@ const App = () => (
             <Route path="/dashboard/amro/workspace-documentation" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkspaceDocumentation /></ProtectedRoute>} />
             <Route path="/dashboard/amro/design-system-showcase" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroDesignSystemShowcase /></ProtectedRoute>} />
             <Route path="/dashboard/amro/changes" element={<Navigate to="/dashboard/amro/work-orders" replace />} />
-            
+
+            {/* Markets domain (Multi-Asset Trading Platform) — per design doc 2026-05-14 */}
+            <Route path="/dashboard/markets" element={<Navigate to="/dashboard/markets/portfolios" replace />} />
+            <Route path="/dashboard/markets/portfolios" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsPortfolios /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/portfolios/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsPortfolioDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/watchlists" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsWatchlists /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/watchlists/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsWatchlistDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/instruments/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsInstrumentDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
+
             {/* Sales Dashboard Routes */}
             <Route path="/dashboard/sales/command-center" element={<ProtectedRoute><SalesCommandCenter /></ProtectedRoute>} />
             <Route path="/dashboard/sales" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />

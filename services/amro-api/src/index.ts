@@ -30,6 +30,12 @@ loadEnvironment();
 
 const PORT = process.env.PORT || 3001;
 const NODE_ENV = process.env.NODE_ENV || 'development';
+const isTruthy = (value: string | undefined, fallback: boolean): boolean => {
+  if (value == null) return fallback;
+  const normalized = value.trim().toLowerCase();
+  return ['1', 'true', 'yes', 'on'].includes(normalized);
+};
+const kafkaEnabled = isTruthy(process.env.AMRO_KAFKA_ENABLED ?? process.env.KAFKA_ENABLED, process.env.NODE_ENV === 'production');
 
 // Initialize Kafka producer and start server
 async function startServer() {
@@ -43,13 +49,17 @@ async function startServer() {
     await initializeTracing();
     logger.info('OpenTelemetry tracing initialized');
 
-    try {
-      await amroEventsProducer.initialize();
-      logger.info('Kafka producer initialized');
-    } catch (kafkaError) {
-      logger.warn('Kafka producer unavailable, continuing without event bus', {
-        error: kafkaError instanceof Error ? kafkaError.message : String(kafkaError),
-      });
+    if (kafkaEnabled) {
+      try {
+        await amroEventsProducer.initialize();
+        logger.info('Kafka producer initialized');
+      } catch (kafkaError) {
+        logger.warn('Kafka producer unavailable, continuing without event bus', {
+          error: kafkaError instanceof Error ? kafkaError.message : String(kafkaError),
+        });
+      }
+    } else {
+      logger.info('Kafka bootstrap disabled for amro-api');
     }
 
     // Start Express server

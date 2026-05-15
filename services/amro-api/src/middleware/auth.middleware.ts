@@ -10,6 +10,7 @@ import { executeWithResilience } from '../utils/resilience';
 
 interface AuthRequest extends Request {
   tenantId?: string;
+  franchiseId?: string | null;
   userId?: string;
   user?: any;
 }
@@ -34,6 +35,10 @@ type TenantRoleScope = {
   tenant_id: string | null;
   franchise_id: string | null;
 };
+
+function roleRequiresFranchise(roleName: string): boolean {
+  return ['franchise_admin', 'user', 'sales_manager', 'viewer'].includes(roleName);
+}
 
 type ParsedAuthorizationHeader = {
   present: boolean;
@@ -374,6 +379,15 @@ export async function authMiddleware(
           : '';
     const requestedTenantId = requestedTenantRaw.trim().length > 0 ? requestedTenantRaw.trim() : null;
 
+    const requestedFranchiseHeader = req.headers['x-franchise-id'];
+    const requestedFranchiseRaw =
+      typeof requestedFranchiseHeader === 'string'
+        ? requestedFranchiseHeader
+        : Array.isArray(requestedFranchiseHeader)
+          ? requestedFranchiseHeader[0]
+          : '';
+    const requestedFranchiseId = requestedFranchiseRaw.trim().length > 0 ? requestedFranchiseRaw.trim() : null;
+
     const { data: userRoles, error: roleError } = await executeWithResilience(
       {
         dependency: 'supabase',
@@ -407,6 +421,47 @@ export async function authMiddleware(
 
     const scopedRoles = (Array.isArray(userRoles) ? userRoles : []) as TenantRoleScope[];
     const hasPlatformAdminRole = scopedRoles.some((role) => String(role.role || '') === 'platform_admin');
+
+    if (requestedFranchiseId && !requestedTenantId) {
+      res.status(400).json({
+        error: 'Franchise scope requires tenant scope',
+        code: 'INVALID_SCOPE',
+        statusCode: 400,
+      });
+      return;
+    }
+
+    for (const role of scopedRoles) {
+      const roleName = String(role.role || '').trim();
+      if (!roleName) {
+        res.status(401).json({
+          error: 'Invalid user role assignment',
+          code: 'INVALID_ROLE_SCOPE',
+          statusCode: 401,
+        });
+        return;
+      }
+
+      const isPlatformScoped = roleName === 'platform_admin' || roleName === 'platform_domain_admin';
+      if (!isPlatformScoped && !String(role.tenant_id || '').trim()) {
+        res.status(401).json({
+          error: 'User has an invalid tenant assignment',
+          code: 'INVALID_ROLE_SCOPE',
+          statusCode: 401,
+        });
+        return;
+      }
+
+      if (roleRequiresFranchise(roleName) && !String(role.franchise_id || '').trim()) {
+        res.status(401).json({
+          error: 'User has an invalid franchise assignment',
+          code: 'INVALID_ROLE_SCOPE',
+          statusCode: 401,
+        });
+        return;
+      }
+    }
+
     const normalizedRoleTenantIds = scopedRoles
       .map((role) => String(role.tenant_id || '').trim())
       .filter((tenantId) => tenantId.length > 0);
@@ -417,6 +472,56 @@ export async function authMiddleware(
     const roleFranchiseIds = scopedRoles
       .map((role) => String(role.franchise_id || '').trim())
       .filter((franchiseId) => franchiseId.length > 0);
+
+    if (requestedTenantId && requestedFranchiseId) {
+      if (roleLookupRecoverable) {
+        res.status(503).json({
+          error: 'Unable to validate franchise scope',
+          code: 'SCOPE_VALIDATION_UNAVAILABLE',
+          statusCode: 503,
+        });
+        return;
+      }
+
+      const canAccessRequested = hasPlatformAdminRole || scopedRoles.some((role) => {
+        if (String(role.tenant_id || '').trim() !== requestedTenantId) return false;
+        if (String(role.role || '').trim() === 'tenant_admin' && !String(role.franchise_id || '').trim()) return true;
+        return String(role.franchise_id || '').trim() === requestedFranchiseId;
+      });
+
+      if (!canAccessRequested) {
+        res.status(403).json({
+          error: 'Requested tenant/franchise scope is not assigned to the user',
+          code: 'FORBIDDEN_SCOPE',
+          statusCode: 403,
+        });
+        return;
+      }
+
+      const { data: franchiseScopeRow, error: franchiseScopeError } = await executeWithResilience(
+        {
+          dependency: 'supabase',
+          operation: 'auth.franchise.scope.validate',
+          requestId,
+          tenantId: requestedTenantId,
+        },
+        async () =>
+          await supabase
+            .from('franchises')
+            .select('tenant_id')
+            .eq('id', requestedFranchiseId)
+            .maybeSingle(),
+      );
+
+      if (franchiseScopeError || !franchiseScopeRow?.tenant_id || String(franchiseScopeRow.tenant_id) !== requestedTenantId) {
+        res.status(403).json({
+          error: 'Requested franchise scope does not belong to requested tenant',
+          code: 'FORBIDDEN_SCOPE',
+          statusCode: 403,
+        });
+        return;
+      }
+    }
     let franchiseResolvedTenantId: string | null = null;
     if (roleFranchiseIds.length > 0) {
       const { data: franchiseRows, error: franchiseError } = await executeWithResilience(
@@ -546,6 +651,41 @@ export async function authMiddleware(
     }
 
     req.tenantId = resolvedTenantId;
+    const hasTenantAdminRole = scopedRoles.some((role) => String(role.role || '').trim() === 'tenant_admin' && String(role.tenant_id || '').trim() === resolvedTenantId);
+    let resolvedFranchiseId: string | null = null;
+    if (requestedFranchiseId) {
+      resolvedFranchiseId = requestedFranchiseId;
+    } else if (!hasTenantAdminRole) {
+      resolvedFranchiseId = roleFranchiseIds[0] || null;
+    }
+
+    if (resolvedFranchiseId) {
+      const { data: franchiseRow, error: franchiseError } = await executeWithResilience(
+        {
+          dependency: 'supabase',
+          operation: 'auth.franchise.resolve',
+          requestId,
+          tenantId: resolvedTenantId,
+        },
+        async () =>
+          await supabase
+            .from('franchises')
+            .select('tenant_id')
+            .eq('id', resolvedFranchiseId)
+            .maybeSingle(),
+      );
+
+      if (franchiseError || !franchiseRow?.tenant_id || String(franchiseRow.tenant_id) !== resolvedTenantId) {
+        res.status(403).json({
+          error: 'Resolved franchise scope does not belong to resolved tenant',
+          code: 'FORBIDDEN_SCOPE',
+          statusCode: 403,
+        });
+        return;
+      }
+    }
+
+    req.franchiseId = resolvedFranchiseId;
     recordAuthHeaderResult(true, source === 'authorization' ? 'authorization' : source === 'query' ? 'query' : 'fallback', requestId, req.path);
     next();
   } catch (err) {
