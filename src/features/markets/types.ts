@@ -8,6 +8,7 @@
  */
 
 export type PortfolioMode = "paper" | "live";
+export type PortfolioHolderType = "individual" | "huf" | "corporate" | "joint" | "self_directed";
 
 export interface Portfolio {
   id: string;
@@ -15,6 +16,10 @@ export interface Portfolio {
   description: string | null;
   mode: PortfolioMode;
   base_currency: string;
+  holder_type: PortfolioHolderType;
+  contact_id: string | null;
+  account_id: string | null;
+  managed_by: string | null;
   is_active: boolean;
   metadata: Record<string, unknown>;
   created_at: string;
@@ -26,6 +31,19 @@ export interface CreatePortfolioInput {
   description?: string | null;
   mode?: PortfolioMode;
   base_currency?: string;
+  holder_type?: PortfolioHolderType;
+  contact_id?: string | null;
+  account_id?: string | null;
+}
+
+// Contact + account search result used in portfolio creation picker
+export interface CrmContactSearchResult {
+  id: string;
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  account_id: string;
+  account_name: string;
 }
 
 /** Edge-function response envelope shape (markets-portfolios). */

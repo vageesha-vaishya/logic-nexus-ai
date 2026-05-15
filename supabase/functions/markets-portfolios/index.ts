@@ -5,7 +5,8 @@
 //   JWT → user → domain-access (tenant_domain_assignments) → RLS-gated CRUD on markets.portfolios
 //
 // GET  /markets-portfolios            → list the authenticated user's portfolios
-// POST /markets-portfolios { name, description?, mode?, base_currency? }
+// POST /markets-portfolios { name, description?, mode?, base_currency?,
+//                            holder_type?, contact_id?, account_id? }
 //                                     → create a portfolio (needs x-tenant-id, x-franchise-id headers)
 //
 // Per design doc 2026-05-14 §6.2 + §16 platform-scale review.
@@ -66,7 +67,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       const { data, error } = await marketsDb
         .from("portfolios" as any)
         .select(
-          "id, name, description, mode, base_currency, is_active, metadata, created_at, updated_at",
+          "id, name, description, mode, base_currency, holder_type, contact_id, account_id, managed_by, is_active, metadata, created_at, updated_at",
         )
         .order("created_at", { ascending: false });
 
@@ -117,21 +118,62 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
           : "INR";
       const description = typeof body?.description === "string" ? body.description : null;
 
+      const VALID_HOLDER_TYPES = ["individual","huf","corporate","joint","self_directed"];
+      const holderType: string =
+        typeof body?.holder_type === "string" && VALID_HOLDER_TYPES.includes(body.holder_type)
+          ? body.holder_type
+          : "self_directed";
+
+      const contactId: string | null =
+        typeof body?.contact_id === "string" ? body.contact_id : null;
+      const accountId: string | null =
+        typeof body?.account_id === "string" ? body.account_id : null;
+
+      // Managed portfolios require both contact and account.
+      if (holderType !== "self_directed" && (!contactId || !accountId)) {
+        return new Response(
+          JSON.stringify({
+            error: `holder_type '${holderType}' requires both contact_id and account_id`,
+          }),
+          { status: 400, headers: jsonHeaders },
+        );
+      }
+
+      // Validate contact belongs to the account (guard against mismatched IDs).
+      if (contactId && accountId) {
+        const { data: contactCheck, error: contactErr } = await (supabaseAdmin as any)
+          .from("contacts")
+          .select("id")
+          .eq("id", contactId)
+          .eq("account_id", accountId)
+          .maybeSingle();
+        if (contactErr || !contactCheck) {
+          return new Response(
+            JSON.stringify({ error: "Contact does not belong to the specified account" }),
+            { status: 400, headers: jsonHeaders },
+          );
+        }
+      }
+
       const insertRow = {
         tenant_id: tenantId,
         franchise_id: franchiseId,
         owner_user_id: user.id,
+        managed_by: user.id,
         name,
         description,
         mode,
         base_currency: baseCurrency,
+        holder_type: holderType,
+        contact_id: contactId,
+        account_id: accountId,
       };
 
       const { data, error } = await marketsDb
         .from("portfolios" as any)
         .insert(insertRow as any)
         .select(
-          "id, name, description, mode, base_currency, is_active, metadata, created_at, updated_at",
+          "id, name, description, mode, base_currency, holder_type, contact_id, account_id, managed_by, is_active, metadata, created_at, updated_at",
         )
         .single();
 

@@ -15,14 +15,31 @@
  *   • alert / inline msg → sonner toast on create success
  */
 
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Eye, Plus, Wallet } from "lucide-react";
+import { Check, ChevronsUpDown, Eye, Loader2, Plus, Search, Wallet } from "lucide-react";
 
-import { usePortfolios, useCreatePortfolio } from "../hooks/usePortfolios";
+import { usePortfolios, useCreatePortfolio, useCrmContactSearch } from "../hooks/usePortfolios";
 import { NewsPanel } from "../components/NewsPanel";
-import type { CreatePortfolioInput, Portfolio, PortfolioMode } from "../types";
+import type {
+  CreatePortfolioInput,
+  CrmContactSearchResult,
+  Portfolio,
+  PortfolioHolderType,
+  PortfolioMode,
+} from "../types";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { cn } from "@/lib/utils";
 
 import {
   Numeric,
@@ -49,13 +66,13 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/design-system";
-import { useState } from "react";
 
 interface PortfolioFormValues {
   name: string;
   description: string;
   mode: PortfolioMode;
   base_currency: string;
+  holder_type: PortfolioHolderType;
 }
 
 const DEFAULT_FORM_VALUES: PortfolioFormValues = {
@@ -63,6 +80,15 @@ const DEFAULT_FORM_VALUES: PortfolioFormValues = {
   description: "",
   mode: "paper",
   base_currency: "INR",
+  holder_type: "self_directed",
+};
+
+const HOLDER_TYPE_LABELS: Record<PortfolioHolderType, string> = {
+  self_directed: "Self-directed (my own)",
+  individual:    "Individual client",
+  huf:           "HUF",
+  corporate:     "Corporate / Company",
+  joint:         "Joint account",
 };
 
 export default function PortfoliosPage() {
@@ -187,12 +213,16 @@ function PortfolioCard({ portfolio }: { portfolio: Portfolio }) {
             </p>
           )}
         </div>
-        <Badge
-          variant={portfolio.mode === "live" ? "default" : "secondary"}
-          className="shrink-0 capitalize"
-        >
-          {portfolio.mode}
-        </Badge>
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          <Badge variant={portfolio.mode === "live" ? "default" : "secondary"} className="capitalize">
+            {portfolio.mode}
+          </Badge>
+          {portfolio.holder_type !== "self_directed" && (
+            <Badge variant="outline" className="text-xs capitalize">
+              {portfolio.holder_type}
+            </Badge>
+          )}
+        </div>
       </CardHeader>
       <CardContent className="space-y-3">
         {/* KPI strip */}
@@ -237,6 +267,10 @@ function PortfoliosSkeleton() {
 
 function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
   const createPortfolio = useCreatePortfolio();
+  const [selectedContact, setSelectedContact] = useState<CrmContactSearchResult | null>(null);
+  const [contactPickerOpen, setContactPickerOpen] = useState(false);
+  const [contactQuery, setContactQuery] = useState("");
+  const contactSearch = useCrmContactSearch(contactQuery);
 
   const {
     register,
@@ -250,80 +284,186 @@ function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
     mode: "onBlur",
   });
 
-  const mode = watch("mode");
+  const mode       = watch("mode");
+  const holderType = watch("holder_type");
+  const isManaged  = holderType !== "self_directed";
 
   const onSubmit = handleSubmit(async (values) => {
+    if (isManaged && !selectedContact) {
+      toast.error("Select a client contact for this portfolio type");
+      return;
+    }
     const payload: CreatePortfolioInput = {
-      name: values.name,
-      description: values.description?.trim() ? values.description.trim() : null,
-      mode: values.mode,
+      name:         values.name,
+      description:  values.description?.trim() || null,
+      mode:         values.mode,
       base_currency: values.base_currency.toUpperCase(),
+      holder_type:  values.holder_type,
+      contact_id:   selectedContact?.id ?? null,
+      account_id:   selectedContact?.account_id ?? null,
     };
     try {
       const created = await createPortfolio.mutateAsync(payload);
       toast.success(`Portfolio "${created.name}" created`);
       reset(DEFAULT_FORM_VALUES);
+      setSelectedContact(null);
+      setContactQuery("");
       onSuccess();
     } catch (e: any) {
-      // Toast also; create button shows ErrorState inline.
       toast.error(`Could not create portfolio: ${e?.message ?? "Unknown error"}`);
     }
   });
 
   return (
     <form onSubmit={onSubmit} className="mt-4 space-y-4">
+
+      {/* Holder type */}
       <div className="space-y-1.5">
-        <Label htmlFor="portfolio-name">Name</Label>
+        <Label>Portfolio type</Label>
+        <Select
+          value={holderType}
+          onValueChange={(v) => {
+            setValue("holder_type", v as PortfolioHolderType);
+            setSelectedContact(null);
+            setContactQuery("");
+          }}
+        >
+          <SelectTrigger>
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {(Object.entries(HOLDER_TYPE_LABELS) as [PortfolioHolderType, string][]).map(([v, label]) => (
+              <SelectItem key={v} value={v}>{label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      {/* Contact picker — only for managed portfolios */}
+      {isManaged && (
+        <div className="space-y-1.5">
+          <Label>Client contact <span className="text-destructive">*</span></Label>
+          <Popover open={contactPickerOpen} onOpenChange={setContactPickerOpen}>
+            <PopoverTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                role="combobox"
+                className="w-full justify-between font-normal"
+              >
+                {selectedContact
+                  ? `${selectedContact.first_name} ${selectedContact.last_name} — ${selectedContact.account_name}`
+                  : "Search by name or email…"}
+                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[24rem] p-0" align="start">
+              <Command shouldFilter={false}>
+                <CommandInput
+                  placeholder="Name or email…"
+                  value={contactQuery}
+                  onValueChange={setContactQuery}
+                />
+                <CommandList className="max-h-64">
+                  {contactQuery.length < 2 && (
+                    <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
+                      <Search className="h-4 w-4" />
+                      Type at least 2 characters to search contacts.
+                    </div>
+                  )}
+                  {contactQuery.length >= 2 && contactSearch.isPending && (
+                    <div className="flex items-center justify-center gap-2 p-5 text-sm text-muted-foreground">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Searching…
+                    </div>
+                  )}
+                  {contactQuery.length >= 2 && contactSearch.isSuccess && (
+                    <>
+                      <CommandEmpty>No contacts matched.</CommandEmpty>
+                      {contactSearch.data.length > 0 && (
+                        <CommandGroup>
+                          {contactSearch.data.map((c) => (
+                            <CommandItem
+                              key={c.id}
+                              value={c.id}
+                              onSelect={() => {
+                                setSelectedContact(c);
+                                setContactPickerOpen(false);
+                                setContactQuery("");
+                              }}
+                              className="flex items-center gap-2"
+                            >
+                              <Check className={cn("h-4 w-4", selectedContact?.id === c.id ? "opacity-100" : "opacity-0")} />
+                              <div>
+                                <p className="text-sm font-medium">
+                                  {c.first_name} {c.last_name}
+                                </p>
+                                <p className="text-xs text-muted-foreground">
+                                  {c.account_name}{c.email ? ` · ${c.email}` : ""}
+                                </p>
+                              </div>
+                            </CommandItem>
+                          ))}
+                        </CommandGroup>
+                      )}
+                    </>
+                  )}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          {isManaged && !selectedContact && (
+            <p className="text-xs text-muted-foreground">
+              Account will be auto-filled from the contact's CRM record.
+            </p>
+          )}
+          {selectedContact && (
+            <p className="text-xs text-emerald-600 dark:text-emerald-400">
+              Account: {selectedContact.account_name}
+            </p>
+          )}
+        </div>
+      )}
+
+      {/* Name */}
+      <div className="space-y-1.5">
+        <Label htmlFor="portfolio-name">Portfolio name</Label>
         <Input
           id="portfolio-name"
           type="text"
           placeholder="e.g. Long-only equity"
           {...register("name", {
             required: "Name is required",
-            minLength: { value: 1, message: "Name cannot be empty" },
             maxLength: { value: 100, message: "Max 100 chars" },
           })}
           aria-invalid={errors.name ? "true" : "false"}
         />
-        {errors.name && (
-          <p className="text-xs text-destructive">{errors.name.message}</p>
-        )}
+        {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
       </div>
 
+      {/* Description */}
       <div className="space-y-1.5">
         <Label htmlFor="portfolio-description">Description (optional)</Label>
         <Input
           id="portfolio-description"
           type="text"
           placeholder="What is this portfolio for?"
-          {...register("description", {
-            maxLength: { value: 500, message: "Max 500 chars" },
-          })}
+          {...register("description", { maxLength: { value: 500, message: "Max 500 chars" } })}
         />
-        {errors.description && (
-          <p className="text-xs text-destructive">{errors.description.message}</p>
-        )}
       </div>
 
+      {/* Mode + currency */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
-          <Label htmlFor="portfolio-mode">Mode</Label>
-          <Select
-            value={mode}
-            onValueChange={(v) => setValue("mode", v as PortfolioMode)}
-          >
-            <SelectTrigger id="portfolio-mode">
-              <SelectValue />
-            </SelectTrigger>
+          <Label>Mode</Label>
+          <Select value={mode} onValueChange={(v) => setValue("mode", v as PortfolioMode)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
               <SelectItem value="paper">paper</SelectItem>
-              <SelectItem value="live" disabled>
-                live (deferred)
-              </SelectItem>
+              <SelectItem value="live" disabled>live (deferred)</SelectItem>
             </SelectContent>
           </Select>
         </div>
-
         <div className="space-y-1.5">
           <Label htmlFor="portfolio-currency">Base currency</Label>
           <Input
@@ -333,10 +473,7 @@ function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
             className="uppercase"
             {...register("base_currency", {
               required: true,
-              pattern: {
-                value: /^[A-Za-z]{3}$/,
-                message: "3-letter ISO code (INR, USD, ...)",
-              },
+              pattern: { value: /^[A-Za-z]{3}$/, message: "3-letter code (INR, USD…)" },
             })}
           />
           {errors.base_currency && (
@@ -355,15 +492,10 @@ function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
       )}
 
       <div className="flex items-center gap-2 pt-2">
-        <Button
-          type="submit"
-          disabled={isSubmitting || createPortfolio.isPending}
-        >
+        <Button type="submit" disabled={isSubmitting || createPortfolio.isPending}>
           {createPortfolio.isPending ? "Creating…" : "Create portfolio"}
         </Button>
-        <Button type="button" variant="ghost" onClick={onSuccess}>
-          Cancel
-        </Button>
+        <Button type="button" variant="ghost" onClick={onSuccess}>Cancel</Button>
       </div>
     </form>
   );

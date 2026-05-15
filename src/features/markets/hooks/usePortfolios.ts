@@ -17,11 +17,13 @@
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useDebounce } from "@/hooks/useDebounce";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
 import { marketsKeys } from "./queryKeys";
 import type {
   CreatePortfolioInput,
+  CrmContactSearchResult,
   Portfolio,
   PortfoliosListResponse,
   PortfolioMutationResponse,
@@ -126,6 +128,9 @@ export function useCreatePortfolio() {
             description: input.description ?? null,
             mode: input.mode ?? "paper",
             base_currency: input.base_currency ?? "INR",
+            holder_type: input.holder_type ?? "self_directed",
+            contact_id: input.contact_id ?? null,
+            account_id: input.account_id ?? null,
           },
         },
       );
@@ -135,13 +140,46 @@ export function useCreatePortfolio() {
       return data.data;
     },
     onSuccess: (created) => {
-      // Push the new row into every list-query cache for this tenant
-      // and invalidate so any out-of-band filters refetch cleanly.
       queryClient.setQueriesData<Portfolio[]>(
         { queryKey: marketsKeys.portfolios.all() },
         (prev) => (prev ? [created, ...prev] : [created]),
       );
       queryClient.invalidateQueries({ queryKey: marketsKeys.portfolios.all() });
+    },
+  });
+}
+
+/**
+ * Search CRM contacts by name or email for the portfolio contact picker.
+ * Returns contact + parent account name so the user sees full context.
+ */
+export function useCrmContactSearch(query: string) {
+  const debounced = useDebounce(query.trim(), 300);
+  const { tenantId } = useActiveScope();
+
+  return useQuery<CrmContactSearchResult[]>({
+    queryKey: ["crm", "contacts", "search", tenantId, debounced],
+    enabled: Boolean(tenantId) && debounced.length >= 2,
+    staleTime: 30_000,
+    queryFn: async (): Promise<CrmContactSearchResult[]> => {
+      const { data, error } = await (supabase as any)
+        .from("contacts")
+        .select("id, first_name, last_name, email, account_id, account:accounts(name)")
+        .eq("tenant_id", tenantId)
+        .or(
+          `first_name.ilike.%${debounced}%,last_name.ilike.%${debounced}%,email.ilike.%${debounced}%`,
+        )
+        .limit(20);
+
+      if (error) throw new Error(error.message);
+      return ((data ?? []) as any[]).map((c: any) => ({
+        id: c.id,
+        first_name: c.first_name,
+        last_name: c.last_name,
+        email: c.email,
+        account_id: c.account_id,
+        account_name: c.account?.name ?? "—",
+      }));
     },
   });
 }
