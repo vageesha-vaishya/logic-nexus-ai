@@ -1,27 +1,33 @@
 /**
- * Markets — portfolios page (v1.1, rewritten on ADR-026 primitives).
- *
- * Chain unchanged:
- *   React → react-query hooks → supabase.functions.invoke('markets-portfolios')
- *     → Edge Function (requireAuth → checkDomainAccess → schema('markets'))
- *     → Postgres RLS (owner_user_id = auth.uid())
- *
- * UI replaced:
- *   • Bare HTML form     → react-hook-form + shadcn primitives
- *   • Inline red text    → <ErrorState> with retry
- *   • "Loading…" text    → <SkeletonCard> matching final layout
- *   • Plain list         → portfolio cards w/ mode badge, KPI strip, sparkline
- *   • Numbers in JSX     → <Numeric> / <MoneyDelta>
- *   • alert / inline msg → sonner toast on create success
+ * Markets — Portfolios page.
+ * Full CRUD: list, create (sheet), edit (sheet), delete (confirm dialog).
+ * Contact search: inline autocomplete input, no Popover trigger needed.
  */
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
-import { Check, ChevronsUpDown, Eye, Loader2, Plus, Search, Wallet } from "lucide-react";
+import {
+  Edit2,
+  Eye,
+  Loader2,
+  MoreHorizontal,
+  Plus,
+  Search,
+  Trash2,
+  Wallet,
+  X,
+} from "lucide-react";
 
-import { usePortfolios, useCreatePortfolio, useCrmContactSearch } from "../hooks/usePortfolios";
+import {
+  usePortfolios,
+  useCreatePortfolio,
+  useUpdatePortfolio,
+  useDeletePortfolio,
+  useCrmContactSearch,
+  type UpdatePortfolioInput,
+} from "../hooks/usePortfolios";
 import { NewsPanel } from "../components/NewsPanel";
 import type {
   CreatePortfolioInput,
@@ -30,16 +36,24 @@ import type {
   PortfolioHolderType,
   PortfolioMode,
 } from "../types";
+
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { cn } from "@/lib/utils";
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 import {
   Numeric,
@@ -67,6 +81,8 @@ import {
   SheetTitle,
 } from "@/design-system";
 
+// ─── Types ────────────────────────────────────────────────────────────────
+
 interface PortfolioFormValues {
   name: string;
   description: string;
@@ -75,7 +91,7 @@ interface PortfolioFormValues {
   holder_type: PortfolioHolderType;
 }
 
-const DEFAULT_FORM_VALUES: PortfolioFormValues = {
+const DEFAULT_FORM: PortfolioFormValues = {
   name: "",
   description: "",
   mode: "paper",
@@ -86,119 +102,147 @@ const DEFAULT_FORM_VALUES: PortfolioFormValues = {
 const HOLDER_TYPE_LABELS: Record<PortfolioHolderType, string> = {
   self_directed: "Self-directed (my own)",
   individual:    "Individual client",
-  huf:           "HUF",
+  huf:           "HUF (Hindu Undivided Family)",
   corporate:     "Corporate / Company",
   joint:         "Joint account",
 };
 
+// ─── Page ─────────────────────────────────────────────────────────────────
+
 export default function PortfoliosPage() {
-  const portfolios = usePortfolios();
-  const navigate = useNavigate();
-  const [createOpen, setCreateOpen] = useState(false);
+  const portfolios  = usePortfolios();
+  const navigate    = useNavigate();
+
+  const [createOpen,       setCreateOpen]       = useState(false);
+  const [editPortfolio,    setEditPortfolio]     = useState<Portfolio | null>(null);
+  const [deletePortfolio,  setDeletePortfolio]   = useState<Portfolio | null>(null);
 
   return (
     <div className="mx-auto max-w-7xl space-y-6 p-6">
-      {/* ─── Header ─────────────────────────────────────────────────── */}
+      {/* Header */}
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Portfolios</h1>
           <p className="text-sm text-muted-foreground">
-            Personal-use paper portfolios. Live (broker-integrated) mode deferred per §11 T2.
+            Track holdings, NAV and AI market briefs for each portfolio.
           </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" onClick={() => navigate("/dashboard/markets/watchlists")}>
-            <Eye className="mr-1.5 h-4 w-4" aria-hidden="true" />
+            <Eye className="mr-1.5 h-4 w-4" />
             Watchlists
           </Button>
           <Button onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1.5 h-4 w-4" aria-hidden="true" />
+            <Plus className="mr-1.5 h-4 w-4" />
             New portfolio
           </Button>
         </div>
       </header>
 
-      {/* ─── Two-column layout: portfolios + news rail ──────────────── */}
+      {/* Content */}
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
         <div className="min-w-0 space-y-6">
-          {/* portfolios body */}
-          {renderPortfolios(portfolios, setCreateOpen)}
+          {portfolios.isPending && <PortfoliosSkeleton />}
+
+          {portfolios.isError && (
+            <ErrorState
+              title="Failed to load portfolios"
+              message={portfolios.error?.message ?? "Unknown error"}
+              onRetry={() => portfolios.refetch()}
+            />
+          )}
+
+          {portfolios.isSuccess && portfolios.data.length === 0 && (
+            <EmptyState
+              icon={<Wallet className="h-10 w-10" />}
+              title="No portfolios yet"
+              description="Create your first portfolio to start tracking holdings and generating AI briefs."
+              actionLabel="Create a portfolio"
+              onAction={() => setCreateOpen(true)}
+              secondaryActionLabel="Use template"
+              onSecondaryAction={() => toast.info("Templates coming soon")}
+            />
+          )}
+
+          {portfolios.isSuccess && portfolios.data.length > 0 && (
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {portfolios.data.map((p) => (
+                <PortfolioCard
+                  key={p.id}
+                  portfolio={p}
+                  onEdit={() => setEditPortfolio(p)}
+                  onDelete={() => setDeletePortfolio(p)}
+                />
+              ))}
+            </div>
+          )}
         </div>
+
         <aside className="space-y-6">
           <NewsPanel limit={10} />
         </aside>
       </div>
 
-      {/* ─── Create panel (slide-in sheet, ADR-026 §3) ──────────────── */}
+      {/* Create sheet */}
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
           <SheetHeader>
             <SheetTitle>Create a portfolio</SheetTitle>
           </SheetHeader>
-          <CreatePortfolioForm onSuccess={() => setCreateOpen(false)} />
+          <PortfolioForm
+            mode="create"
+            onSuccess={() => setCreateOpen(false)}
+            onCancel={() => setCreateOpen(false)}
+          />
         </SheetContent>
       </Sheet>
+
+      {/* Edit sheet */}
+      <Sheet open={Boolean(editPortfolio)} onOpenChange={(o) => { if (!o) setEditPortfolio(null); }}>
+        <SheetContent side="right" className="w-full sm:max-w-md overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Edit portfolio</SheetTitle>
+          </SheetHeader>
+          {editPortfolio && (
+            <PortfolioForm
+              mode="edit"
+              portfolio={editPortfolio}
+              onSuccess={() => setEditPortfolio(null)}
+              onCancel={() => setEditPortfolio(null)}
+            />
+          )}
+        </SheetContent>
+      </Sheet>
+
+      {/* Delete dialog */}
+      <DeletePortfolioDialog
+        portfolio={deletePortfolio}
+        onClose={() => setDeletePortfolio(null)}
+      />
     </div>
   );
 }
 
-// Extracted to keep the page body lean; pure presentation.
-function renderPortfolios(
-  portfolios: ReturnType<typeof usePortfolios>,
-  setCreateOpen: (open: boolean) => void,
-) {
-  return (
-    <>
-      {portfolios.isPending && <PortfoliosSkeleton />}
+// ─── Portfolio card ────────────────────────────────────────────────────────
 
-      {portfolios.isError && (
-        <ErrorState
-          title="Failed to load portfolios"
-          message={portfolios.error?.message ?? "Unknown error"}
-          onRetry={() => portfolios.refetch()}
-        />
-      )}
-
-      {portfolios.isSuccess && portfolios.data.length === 0 && (
-        <EmptyState
-          icon={<Wallet className="h-10 w-10" />}
-          title="No portfolios yet"
-          description="Create your first paper portfolio to start tracking holdings and generating AI briefs."
-          actionLabel="Create a portfolio"
-          onAction={() => setCreateOpen(true)}
-          secondaryActionLabel="Use template"
-          onSecondaryAction={() => {
-            // TODO: open a template-picker sheet (long-only equity, balanced, F&O paper)
-            toast.info("Templates coming soon");
-          }}
-        />
-      )}
-
-      {portfolios.isSuccess && portfolios.data.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {portfolios.data.map((p) => (
-            <PortfolioCard key={p.id} portfolio={p} />
-          ))}
-        </div>
-      )}
-    </>
-  );
-}
-
-// ─── Portfolio card ────────────────────────────────────────────────────
-
-function PortfolioCard({ portfolio }: { portfolio: Portfolio }) {
-  // v1 has no real holdings/P&L yet — render placeholder series + zeros.
-  // These will be wired to markets.holdings + markets.price_history in T2.
+function PortfolioCard({
+  portfolio,
+  onEdit,
+  onDelete,
+}: {
+  portfolio: Portfolio;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
   const placeholderSeries = generatePlaceholderSeries();
-  const navValue = readMetadataNumber(portfolio.metadata, "nav_value") ?? 0;
-  const dayChange = readMetadataNumber(portfolio.metadata, "day_change_value");
-  const dayChangePct = readMetadataNumber(portfolio.metadata, "day_change_pct");
+  const navValue    = readMetaNum(portfolio.metadata, "nav_value")     ?? 0;
+  const dayChange   = readMetaNum(portfolio.metadata, "day_change_value");
+  const dayChangePct = readMetaNum(portfolio.metadata, "day_change_pct");
 
   return (
     <Card className="group transition-shadow hover:shadow-md">
       <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0">
-        <div className="min-w-0">
+        <div className="min-w-0 flex-1">
           <CardTitle className="truncate text-base">
             <Link
               to={`/dashboard/markets/portfolios/${portfolio.id}`}
@@ -212,20 +256,51 @@ function PortfolioCard({ portfolio }: { portfolio: Portfolio }) {
               {portfolio.description}
             </p>
           )}
-        </div>
-        <div className="flex shrink-0 flex-col items-end gap-1">
-          <Badge variant={portfolio.mode === "live" ? "default" : "secondary"} className="capitalize">
-            {portfolio.mode}
-          </Badge>
-          {portfolio.holder_type !== "self_directed" && (
-            <Badge variant="outline" className="text-xs capitalize">
-              {portfolio.holder_type}
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            <Badge
+              variant={portfolio.mode === "live" ? "default" : "secondary"}
+              className="text-xs capitalize"
+            >
+              {portfolio.mode}
             </Badge>
-          )}
+            {portfolio.holder_type !== "self_directed" && (
+              <Badge variant="outline" className="text-xs capitalize">
+                {HOLDER_TYPE_LABELS[portfolio.holder_type] ?? portfolio.holder_type}
+              </Badge>
+            )}
+          </div>
         </div>
+
+        {/* Actions menu */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 focus:opacity-100"
+              aria-label="Portfolio actions"
+            >
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-40">
+            <DropdownMenuItem onClick={onEdit}>
+              <Edit2 className="mr-2 h-4 w-4" />
+              Edit
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={onDelete}
+              className="text-destructive focus:text-destructive"
+            >
+              <Trash2 className="mr-2 h-4 w-4" />
+              Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </CardHeader>
+
       <CardContent className="space-y-3">
-        {/* KPI strip */}
         <div className="flex items-end justify-between gap-3">
           <div>
             <p className="text-xs uppercase tracking-wide text-muted-foreground">NAV</p>
@@ -238,15 +313,9 @@ function PortfolioCard({ portfolio }: { portfolio: Portfolio }) {
           </div>
           <Sparkline series={placeholderSeries} accessibleLabel="Recent NAV trend" />
         </div>
-
-        {/* Day change */}
         <div className="flex items-center justify-between border-t pt-3 text-sm">
           <span className="text-muted-foreground">Today</span>
-          <MoneyDelta
-            value={dayChange ?? 0}
-            secondary={dayChangePct ?? 0}
-            currency={portfolio.base_currency}
-          />
+          <MoneyDelta value={dayChange ?? 0} secondary={dayChangePct ?? 0} currency={portfolio.base_currency} />
         </div>
       </CardContent>
     </Card>
@@ -256,21 +325,29 @@ function PortfolioCard({ portfolio }: { portfolio: Portfolio }) {
 function PortfoliosSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-      {Array.from({ length: 3 }).map((_, i) => (
-        <SkeletonCard key={i} lines={4} />
-      ))}
+      {Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} lines={4} />)}
     </div>
   );
 }
 
-// ─── Create form ───────────────────────────────────────────────────────
+// ─── Shared form (Create + Edit) ──────────────────────────────────────────
 
-function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
-  const createPortfolio = useCreatePortfolio();
+function PortfolioForm({
+  mode,
+  portfolio,
+  onSuccess,
+  onCancel,
+}: {
+  mode: "create" | "edit";
+  portfolio?: Portfolio;
+  onSuccess: () => void;
+  onCancel: () => void;
+}) {
+  const createMutation = useCreatePortfolio();
+  const updateMutation = useUpdatePortfolio();
+  const isPending = mode === "create" ? createMutation.isPending : updateMutation.isPending;
+
   const [selectedContact, setSelectedContact] = useState<CrmContactSearchResult | null>(null);
-  const [contactPickerOpen, setContactPickerOpen] = useState(false);
-  const [contactQuery, setContactQuery] = useState("");
-  const contactSearch = useCrmContactSearch(contactQuery);
 
   const {
     register,
@@ -280,57 +357,79 @@ function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
     watch,
     formState: { errors, isSubmitting },
   } = useForm<PortfolioFormValues>({
-    defaultValues: DEFAULT_FORM_VALUES,
+    defaultValues: portfolio
+      ? {
+          name:          portfolio.name,
+          description:   portfolio.description ?? "",
+          mode:          portfolio.mode,
+          base_currency: portfolio.base_currency,
+          holder_type:   portfolio.holder_type,
+        }
+      : DEFAULT_FORM,
     mode: "onBlur",
   });
 
-  const mode       = watch("mode");
-  const holderType = watch("holder_type");
-  const isManaged  = holderType !== "self_directed";
+  const watchedMode       = watch("mode");
+  const watchedHolderType = watch("holder_type");
+  const isManaged         = watchedHolderType !== "self_directed";
 
   const onSubmit = handleSubmit(async (values) => {
-    if (isManaged && !selectedContact) {
+    if (isManaged && !selectedContact && mode === "create") {
       toast.error("Select a client contact for this portfolio type");
       return;
     }
-    const payload: CreatePortfolioInput = {
-      name:         values.name,
-      description:  values.description?.trim() || null,
-      mode:         values.mode,
-      base_currency: values.base_currency.toUpperCase(),
-      holder_type:  values.holder_type,
-      contact_id:   selectedContact?.id ?? null,
-      account_id:   selectedContact?.account_id ?? null,
-    };
+
     try {
-      const created = await createPortfolio.mutateAsync(payload);
-      toast.success(`Portfolio "${created.name}" created`);
-      reset(DEFAULT_FORM_VALUES);
-      setSelectedContact(null);
-      setContactQuery("");
+      if (mode === "create") {
+        const payload: CreatePortfolioInput = {
+          name:          values.name,
+          description:   values.description?.trim() || null,
+          mode:          values.mode,
+          base_currency: values.base_currency.toUpperCase(),
+          holder_type:   values.holder_type,
+          contact_id:    selectedContact?.id ?? null,
+          account_id:    selectedContact?.account_id ?? null,
+        };
+        const created = await createMutation.mutateAsync(payload);
+        toast.success(`Portfolio "${created.name}" created`);
+        reset(DEFAULT_FORM);
+        setSelectedContact(null);
+      } else {
+        const payload: UpdatePortfolioInput = {
+          id:            portfolio!.id,
+          name:          values.name,
+          description:   values.description?.trim() || null,
+          mode:          values.mode,
+          base_currency: values.base_currency.toUpperCase(),
+          holder_type:   values.holder_type,
+          contact_id:    selectedContact?.id ?? portfolio!.contact_id,
+          account_id:    selectedContact?.account_id ?? portfolio!.account_id,
+        };
+        const updated = await updateMutation.mutateAsync(payload);
+        toast.success(`Portfolio "${updated.name}" updated`);
+      }
       onSuccess();
     } catch (e: any) {
-      toast.error(`Could not create portfolio: ${e?.message ?? "Unknown error"}`);
+      toast.error(e?.message ?? "Something went wrong");
     }
   });
 
-  return (
-    <form onSubmit={onSubmit} className="mt-4 space-y-4">
+  const mutationError = mode === "create" ? createMutation.error : updateMutation.error;
 
-      {/* Holder type */}
+  return (
+    <form onSubmit={onSubmit} className="mt-4 space-y-5">
+
+      {/* Portfolio type */}
       <div className="space-y-1.5">
         <Label>Portfolio type</Label>
         <Select
-          value={holderType}
+          value={watchedHolderType}
           onValueChange={(v) => {
             setValue("holder_type", v as PortfolioHolderType);
             setSelectedContact(null);
-            setContactQuery("");
           }}
         >
-          <SelectTrigger>
-            <SelectValue />
-          </SelectTrigger>
+          <SelectTrigger><SelectValue /></SelectTrigger>
           <SelectContent>
             {(Object.entries(HOLDER_TYPE_LABELS) as [PortfolioHolderType, string][]).map(([v, label]) => (
               <SelectItem key={v} value={v}>{label}</SelectItem>
@@ -339,87 +438,28 @@ function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
         </Select>
       </div>
 
-      {/* Contact picker — only for managed portfolios */}
+      {/* Client contact picker — only for managed types */}
       {isManaged && (
         <div className="space-y-1.5">
-          <Label>Client contact <span className="text-destructive">*</span></Label>
-          <Popover open={contactPickerOpen} onOpenChange={setContactPickerOpen}>
-            <PopoverTrigger asChild>
-              <Button
-                type="button"
-                variant="outline"
-                role="combobox"
-                className="w-full justify-between font-normal"
-              >
-                {selectedContact
-                  ? `${selectedContact.first_name} ${selectedContact.last_name} — ${selectedContact.account_name}`
-                  : "Search by name or email…"}
-                <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-              </Button>
-            </PopoverTrigger>
-            <PopoverContent className="w-[24rem] p-0" align="start">
-              <Command shouldFilter={false}>
-                <CommandInput
-                  placeholder="Name or email…"
-                  value={contactQuery}
-                  onValueChange={setContactQuery}
-                />
-                <CommandList className="max-h-64">
-                  {contactQuery.length < 2 && (
-                    <div className="flex items-center gap-2 px-4 py-5 text-sm text-muted-foreground">
-                      <Search className="h-4 w-4" />
-                      Type at least 2 characters to search contacts.
-                    </div>
-                  )}
-                  {contactQuery.length >= 2 && contactSearch.isPending && (
-                    <div className="flex items-center justify-center gap-2 p-5 text-sm text-muted-foreground">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Searching…
-                    </div>
-                  )}
-                  {contactQuery.length >= 2 && contactSearch.isSuccess && (
-                    <>
-                      <CommandEmpty>No contacts matched.</CommandEmpty>
-                      {contactSearch.data.length > 0 && (
-                        <CommandGroup>
-                          {contactSearch.data.map((c) => (
-                            <CommandItem
-                              key={c.id}
-                              value={c.id}
-                              onSelect={() => {
-                                setSelectedContact(c);
-                                setContactPickerOpen(false);
-                                setContactQuery("");
-                              }}
-                              className="flex items-center gap-2"
-                            >
-                              <Check className={cn("h-4 w-4", selectedContact?.id === c.id ? "opacity-100" : "opacity-0")} />
-                              <div>
-                                <p className="text-sm font-medium">
-                                  {c.first_name} {c.last_name}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                  {c.account_name}{c.email ? ` · ${c.email}` : ""}
-                                </p>
-                              </div>
-                            </CommandItem>
-                          ))}
-                        </CommandGroup>
-                      )}
-                    </>
-                  )}
-                </CommandList>
-              </Command>
-            </PopoverContent>
-          </Popover>
-          {isManaged && !selectedContact && (
+          <Label>
+            Client contact <span className="text-destructive">*</span>
+          </Label>
+          <ContactAutocomplete
+            value={selectedContact}
+            onChange={setSelectedContact}
+            initialLabel={
+              mode === "edit" && portfolio?.contact_id
+                ? `${portfolio.contact_id} (loaded from record)`
+                : undefined
+            }
+          />
+          {selectedContact ? (
+            <p className="text-xs text-emerald-600">
+              Account: {selectedContact.account_name}
+            </p>
+          ) : (
             <p className="text-xs text-muted-foreground">
               Account will be auto-filled from the contact's CRM record.
-            </p>
-          )}
-          {selectedContact && (
-            <p className="text-xs text-emerald-600 dark:text-emerald-400">
-              Account: {selectedContact.account_name}
             </p>
           )}
         </div>
@@ -427,10 +467,9 @@ function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
 
       {/* Name */}
       <div className="space-y-1.5">
-        <Label htmlFor="portfolio-name">Portfolio name</Label>
+        <Label htmlFor="pf-name">Portfolio name</Label>
         <Input
-          id="portfolio-name"
-          type="text"
+          id="pf-name"
           placeholder="e.g. Long-only equity"
           {...register("name", {
             required: "Name is required",
@@ -443,32 +482,30 @@ function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
 
       {/* Description */}
       <div className="space-y-1.5">
-        <Label htmlFor="portfolio-description">Description (optional)</Label>
+        <Label htmlFor="pf-desc">Description (optional)</Label>
         <Input
-          id="portfolio-description"
-          type="text"
+          id="pf-desc"
           placeholder="What is this portfolio for?"
           {...register("description", { maxLength: { value: 500, message: "Max 500 chars" } })}
         />
       </div>
 
-      {/* Mode + currency */}
+      {/* Mode + Currency */}
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1.5">
           <Label>Mode</Label>
-          <Select value={mode} onValueChange={(v) => setValue("mode", v as PortfolioMode)}>
+          <Select value={watchedMode} onValueChange={(v) => setValue("mode", v as PortfolioMode)}>
             <SelectTrigger><SelectValue /></SelectTrigger>
             <SelectContent>
-              <SelectItem value="paper">paper</SelectItem>
-              <SelectItem value="live" disabled>live (deferred)</SelectItem>
+              <SelectItem value="paper">Paper</SelectItem>
+              <SelectItem value="live" disabled>Live (deferred)</SelectItem>
             </SelectContent>
           </Select>
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="portfolio-currency">Base currency</Label>
+          <Label htmlFor="pf-currency">Base currency</Label>
           <Input
-            id="portfolio-currency"
-            type="text"
+            id="pf-currency"
             maxLength={3}
             className="uppercase"
             {...register("base_currency", {
@@ -482,50 +519,218 @@ function CreatePortfolioForm({ onSuccess }: { onSuccess: () => void }) {
         </div>
       </div>
 
-      {createPortfolio.isError && (
+      {mutationError && (
         <ErrorState
           title="Could not save"
-          message={createPortfolio.error?.message ?? "Unknown error"}
+          message={mutationError.message}
           size="compact"
           onRetry={onSubmit}
         />
       )}
 
       <div className="flex items-center gap-2 pt-2">
-        <Button type="submit" disabled={isSubmitting || createPortfolio.isPending}>
-          {createPortfolio.isPending ? "Creating…" : "Create portfolio"}
+        <Button type="submit" disabled={isSubmitting || isPending}>
+          {isPending ? (
+            <><Loader2 className="mr-2 h-4 w-4 animate-spin" />{mode === "create" ? "Creating…" : "Saving…"}</>
+          ) : (
+            mode === "create" ? "Create portfolio" : "Save changes"
+          )}
         </Button>
-        <Button type="button" variant="ghost" onClick={onSuccess}>Cancel</Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>Cancel</Button>
       </div>
     </form>
   );
 }
 
-// ─── Helpers ───────────────────────────────────────────────────────────
+// ─── Contact autocomplete input ───────────────────────────────────────────
 
-function readMetadataNumber(
-  metadata: Record<string, unknown> | null | undefined,
+function ContactAutocomplete({
+  value,
+  onChange,
+  initialLabel,
+}: {
+  value: CrmContactSearchResult | null;
+  onChange: (c: CrmContactSearchResult | null) => void;
+  initialLabel?: string;
+}) {
+  const [query, setQuery]   = useState("");
+  const [open,  setOpen]    = useState(false);
+  const inputRef            = useRef<HTMLInputElement>(null);
+  const search              = useCrmContactSearch(query);
+
+  // Selected state — show chip
+  if (value) {
+    const initials = `${value.first_name[0] ?? ""}${value.last_name[0] ?? ""}`.toUpperCase();
+    return (
+      <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+          {initials}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">
+            {value.first_name} {value.last_name}
+          </p>
+          <p className="truncate text-xs text-muted-foreground">
+            {value.account_name}{value.email ? ` · ${value.email}` : ""}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => onChange(null)}
+          className="rounded p-1 hover:bg-muted"
+          aria-label="Clear contact"
+        >
+          <X className="h-3.5 w-3.5 text-muted-foreground" />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      {/* Search input */}
+      <div className="relative">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+        <Input
+          ref={inputRef}
+          type="text"
+          placeholder="Search by name or email…"
+          value={query}
+          className="pl-9 pr-9"
+          autoComplete="off"
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(e.target.value.length >= 2);
+          }}
+          onFocus={() => { if (query.length >= 2) setOpen(true); }}
+          onBlur={() => setTimeout(() => setOpen(false), 150)}
+        />
+        {search.isFetching && (
+          <Loader2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 animate-spin text-muted-foreground" />
+        )}
+      </div>
+
+      {/* Dropdown results */}
+      {open && (
+        <div className="absolute left-0 right-0 top-full z-50 mt-1 max-h-60 overflow-auto rounded-md border bg-popover shadow-lg">
+          {query.length < 2 && (
+            <p className="px-4 py-3 text-sm text-muted-foreground">
+              Type at least 2 characters to search
+            </p>
+          )}
+
+          {query.length >= 2 && search.isPending && (
+            <div className="flex items-center gap-2 px-4 py-3 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Searching contacts…
+            </div>
+          )}
+
+          {query.length >= 2 && search.isSuccess && search.data.length === 0 && (
+            <p className="px-4 py-3 text-sm text-muted-foreground">No contacts matched.</p>
+          )}
+
+          {query.length >= 2 && search.isSuccess && search.data.map((c) => {
+            const initials = `${c.first_name[0] ?? ""}${c.last_name[0] ?? ""}`.toUpperCase();
+            return (
+              <button
+                key={c.id}
+                type="button"
+                className="flex w-full items-center gap-3 px-3 py-2.5 text-left transition-colors hover:bg-accent focus:bg-accent focus:outline-none"
+                onMouseDown={(e) => {
+                  e.preventDefault(); // prevent input blur before selection
+                  onChange(c);
+                  setQuery("");
+                  setOpen(false);
+                }}
+              >
+                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-xs font-semibold text-primary">
+                  {initials}
+                </div>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">
+                    {c.first_name} {c.last_name}
+                  </p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {c.account_name}{c.email ? ` · ${c.email}` : ""}
+                  </p>
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Delete confirmation dialog ───────────────────────────────────────────
+
+function DeletePortfolioDialog({
+  portfolio,
+  onClose,
+}: {
+  portfolio: Portfolio | null;
+  onClose: () => void;
+}) {
+  const deletePortfolio = useDeletePortfolio();
+
+  const handleConfirm = async () => {
+    if (!portfolio) return;
+    try {
+      await deletePortfolio.mutateAsync(portfolio.id);
+      toast.success(`Portfolio "${portfolio.name}" deleted`);
+      onClose();
+    } catch (e: any) {
+      toast.error(e?.message ?? "Failed to delete portfolio");
+    }
+  };
+
+  return (
+    <AlertDialog open={Boolean(portfolio)} onOpenChange={(o) => { if (!o) onClose(); }}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Delete portfolio?</AlertDialogTitle>
+          <AlertDialogDescription>
+            <strong>"{portfolio?.name}"</strong> and all its holdings data will be permanently
+            removed. This cannot be undone.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={onClose}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            onClick={handleConfirm}
+            disabled={deletePortfolio.isPending}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deletePortfolio.isPending ? (
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Deleting…</>
+            ) : (
+              "Delete portfolio"
+            )}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
+// ─── Helpers ──────────────────────────────────────────────────────────────
+
+function readMetaNum(
+  meta: Record<string, unknown> | null | undefined,
   key: string,
 ): number | null {
-  if (!metadata) return null;
-  const v = metadata[key];
+  if (!meta) return null;
+  const v = meta[key];
   return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
-/**
- * Visual-only deterministic-but-feels-random series for the sparkline.
- * Removed when markets.price_history wiring lands (T2).
- */
 function generatePlaceholderSeries(): number[] {
-  const len = 30;
+  const len  = 30;
   const seed = Date.now() % 10_000;
   return Array.from({ length: len }).map((_, i) => {
     const t = i / (len - 1);
-    return (
-      100 +
-      Math.sin((seed + i) * 0.7) * 4 +
-      t * 8 +
-      Math.cos((seed + i) * 0.3) * 2
-    );
+    return 100 + Math.sin((seed + i) * 0.7) * 4 + t * 8 + Math.cos((seed + i) * 0.3) * 2;
   });
 }
