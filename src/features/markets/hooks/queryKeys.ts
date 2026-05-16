@@ -73,6 +73,13 @@ export const marketsKeys = {
     detail: (id: string) => [...marketsKeys.strategies.all(), "detail", id] as const,
   },
 
+  brokers: {
+    all:         () => [...marketsKeys.all, "brokers"] as const,
+    supported:   () => [...marketsKeys.brokers.all(), "supported"] as const,
+    connections: () => [...marketsKeys.brokers.all(), "connections"] as const,
+    connection:  (id: string) => [...marketsKeys.brokers.connections(), id] as const,
+  },
+
   backtests: {
     all:    () => [...marketsKeys.all, "backtests"] as const,
     list:   (filters?: { strategyId?: string | null }) =>

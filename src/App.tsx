@@ -210,7 +210,8 @@ const AmroMaintenanceFacilitiesMasterData = lazy(() => import("./features/module
 // Markets domain (per design doc 2026-05-14 §6.2, ADR-025)
 const MarketsPortfolios = lazy(() => import("./features/markets/pages/PortfoliosPage"));
 const MarketsPortfolioDetail = lazy(() => import("./features/markets/pages/PortfolioDetailPage"));
-const MarketsLlmSettings = lazy(() => import("./features/markets/pages/LlmSettingsPage"));
+const MarketsLlmSettings        = lazy(() => import("./features/markets/pages/LlmSettingsPage"));
+const MarketsBrokerConnections  = lazy(() => import("./features/markets/pages/BrokerConnectionsPage"));
 const MarketsWatchlists = lazy(() => import("./features/markets/pages/WatchlistsPage"));
 const MarketsWatchlistDetail = lazy(() => import("./features/markets/pages/WatchlistDetailPage"));
 const MarketsInstrumentDetail = lazy(() => import("./features/markets/pages/InstrumentDetailPage"));
@@ -970,6 +971,7 @@ const App = () => (
             <Route path="/dashboard/markets/backtests" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBacktests /></ProtectedRoute>} />
             <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSignals /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerConnections /></ProtectedRoute>} />
             <Route path="/dashboard/settings/feature-flags" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><FeatureFlagsAdmin /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}
