@@ -84,11 +84,82 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
     if not auth.tenant_id or not auth.franchise_id:
         raise HTTPException(400, detail="x-tenant-id and x-franchise-id headers required")
 
-    # Validate broker name
     try:
-        get_adapter_class(body.broker)
+        cls = get_adapter_class(body.broker)
     except ValueError as exc:
         raise HTTPException(400, detail=str(exc))
+
+    creds = dict(body.credentials)
+
+    # ── Verify credentials immediately for brokers that support it ──────────
+    # angel_one (TOTP): authenticate now, store fresh access_token
+    # dhan (api_key): call holdings to verify token is valid
+    # Others: can't verify without user interaction (OAuth/OTP) — store as-is
+    from datetime import datetime, timedelta, timezone
+    _IST = timezone(timedelta(hours=5, minutes=30))
+
+    if body.broker == "angel_one":
+        try:
+            import pyotp                       # type: ignore
+            from SmartApi import SmartConnect  # type: ignore
+            import asyncio
+
+            api_key     = creds.get("api_key", "")
+            client_id   = creds.get("client_id", "")
+            password    = creds.get("password", "")
+            totp_secret = creds.get("totp_secret", "")
+            if not all([api_key, client_id, password, totp_secret]):
+                raise HTTPException(400, detail="angel_one requires api_key, client_id, password, totp_secret")
+
+            def _auth():
+                obj  = SmartConnect(api_key=api_key)
+                totp = pyotp.TOTP(totp_secret).now()
+                data = obj.generateSession(clientCode=client_id, password=password, totp=totp)
+                if data.get("status") is False:
+                    raise ValueError(data.get("message", "Authentication failed"))
+                return data.get("data", {})
+
+            tok = await asyncio.to_thread(_auth)
+            creds["access_token"]  = tok.get("jwtToken", "")
+            creds["refresh_token"] = tok.get("refreshToken", "")
+            creds["feed_token"]    = tok.get("feedToken", "")
+            logger.info("angel.verified_on_add", client_id=client_id)
+
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(400, detail=f"Angel One authentication failed: {exc}") from exc
+
+    elif body.broker == "dhan":
+        try:
+            from dhanhq import dhanhq  # type: ignore
+            import asyncio
+
+            client_id    = creds.get("client_id", "")
+            access_token = creds.get("access_token", "")
+            if not client_id or not access_token:
+                raise HTTPException(400, detail="dhan requires client_id and access_token")
+
+            def _verify():
+                d = dhanhq(client_id=client_id, access_token=access_token)
+                result = d.get_fund_limits()
+                if result and result.get("status") == "failure":
+                    raise ValueError(result.get("remarks", "Invalid credentials"))
+
+            await asyncio.to_thread(_verify)
+            logger.info("dhan.verified_on_add", client_id=client_id)
+
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(400, detail=f"Dhan authentication failed: {exc}") from exc
+
+    # ── Compute token_expires_at for brokers with daily tokens ───────────────
+    daily_token_brokers = {"angel_one", "icici_breeze", "fyers", "zerodha", "kotak_neo"}
+    token_expires_at = None
+    if body.broker in daily_token_brokers:
+        midnight_ist = datetime.now(_IST).replace(hour=23, minute=59, second=59)
+        token_expires_at = midnight_ist.astimezone(timezone.utc).isoformat()
 
     db = get_supabase()
     row = {
@@ -101,9 +172,10 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
         "broker_client_id": body.broker_client_id,
         "display_name":     body.display_name,
         "status":           "active",
-        "credentials_enc":  encrypt_credentials(body.credentials),
+        "credentials_enc":  encrypt_credentials(creds),
         "segments":         body.segments,
         "can_trade":        body.can_trade,
+        "token_expires_at": token_expires_at,
     }
 
     result = (
@@ -111,7 +183,7 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
         .insert(row)
         .select(
             "id, broker, broker_client_id, display_name, status, "
-            "segments, can_trade, created_at"
+            "segments, can_trade, token_expires_at, created_at"
         )
         .single()
         .execute()
