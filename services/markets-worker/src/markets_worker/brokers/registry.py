@@ -13,6 +13,7 @@ from .angel import AngelAdapter
 from .dhan import DhanAdapter
 from .fyers import FyersAdapter
 from .zerodha import ZerodhaAdapter
+from .kotak import KotakAdapter
 
 _REGISTRY: dict[str, Type[BrokerAdapter]] = {
     "icici_breeze":    BreezeAdapter,
@@ -20,6 +21,35 @@ _REGISTRY: dict[str, Type[BrokerAdapter]] = {
     "dhan":            DhanAdapter,
     "fyers":           FyersAdapter,
     "zerodha":         ZerodhaAdapter,
+    "kotak_neo":       KotakAdapter,
+}
+
+# ── Import-only brokers (no trading API available) ────────────────────────────
+# These appear in the frontend so users can see why live trading isn't offered,
+# and are directed to the CSV import flow instead.
+_IMPORT_ONLY: dict[str, dict[str, Any]] = {
+    "axis_direct": {
+        "id":          "axis_direct",
+        "name":        "Axis Bank Direct",
+        "auth_type":   "none",
+        "data_cost":   "N/A",
+        "supports":    ["equity"],
+        "refresh":     "none",
+        "import_note": "No public trading API. Import holdings via NSDL Demat CAS statement.",
+        "logo":        "axis.svg",
+        "tier":        "import_only",
+    },
+    "hdfc_securities": {
+        "id":          "hdfc_securities",
+        "name":        "HDFC Securities",
+        "auth_type":   "none",
+        "data_cost":   "N/A",
+        "supports":    ["equity"],
+        "refresh":     "none",
+        "import_note": "Import holdings via CDSL/NSDL Demat CAS or HDFC Securities CSV export.",
+        "logo":        "hdfc.svg",
+        "tier":        "import_only",
+    },
 }
 
 
@@ -39,8 +69,8 @@ def build_adapter(broker: str, credentials: dict[str, Any]) -> BrokerAdapter:
 
 
 def list_brokers() -> list[dict[str, Any]]:
-    """Return metadata for all registered brokers (used by the frontend)."""
-    return [
+    """Return metadata for all brokers — full API + import-only tiers."""
+    full_api = [
         {
             "id":            "icici_breeze",
             "name":          "ICICI Direct (Breeze API)",
@@ -49,6 +79,7 @@ def list_brokers() -> list[dict[str, Any]]:
             "supports":      ["equity", "fno", "currency", "commodity"],
             "refresh":       "manual",
             "logo":          "icici.svg",
+            "tier":          "full_api",
         },
         {
             "id":            "angel_one",
@@ -58,6 +89,7 @@ def list_brokers() -> list[dict[str, Any]]:
             "supports":      ["equity", "fno", "currency", "commodity", "mf"],
             "refresh":       "automated",
             "logo":          "angel.svg",
+            "tier":          "full_api",
         },
         {
             "id":            "dhan",
@@ -67,6 +99,7 @@ def list_brokers() -> list[dict[str, Any]]:
             "supports":      ["equity", "fno", "currency", "commodity", "mf"],
             "refresh":       "none",
             "logo":          "dhan.svg",
+            "tier":          "full_api",
         },
         {
             "id":            "fyers",
@@ -76,6 +109,7 @@ def list_brokers() -> list[dict[str, Any]]:
             "supports":      ["equity", "fno", "currency", "commodity", "mf"],
             "refresh":       "manual",
             "logo":          "fyers.svg",
+            "tier":          "full_api",
         },
         {
             "id":            "zerodha",
@@ -85,5 +119,17 @@ def list_brokers() -> list[dict[str, Any]]:
             "supports":      ["equity", "fno", "currency", "commodity", "mf"],
             "refresh":       "manual",
             "logo":          "zerodha.svg",
+            "tier":          "full_api",
+        },
+        {
+            "id":            "kotak_neo",
+            "name":          "Kotak Securities (Neo API)",
+            "auth_type":     "otp",
+            "data_cost":     "Free",
+            "supports":      ["equity", "fno", "currency", "commodity", "mf"],
+            "refresh":       "otp",
+            "logo":          "kotak.svg",
+            "tier":          "full_api",
         },
     ]
+    return full_api + list(_IMPORT_ONLY.values())

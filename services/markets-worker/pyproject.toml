@@ -44,6 +44,7 @@ dependencies = [
     "dhanhq>=2.0.0",               # Dhan HQ API
     "fyers-apiv3>=3.0.0",          # Fyers API v3
     "kiteconnect>=5.0.0",          # Zerodha Kite Connect
+    "neo-api-client>=1.0.0",       # Kotak Securities Neo API
     # ── Credential encryption ─────────────────────────────────────────────────
     "cryptography>=42.0.0",        # Fernet encryption for broker credentials
 ]
