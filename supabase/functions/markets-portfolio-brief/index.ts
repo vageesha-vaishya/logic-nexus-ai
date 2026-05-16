@@ -28,6 +28,7 @@ import { corsHeaders, preflight } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { checkDomainAccess, PlatformDomains } from "../_shared/domain-access.ts";
 import { callLLM, LlmGatewayError } from "../_shared/llm-gateway.ts";
+import { checkRateLimit, rlKey, rateLimitResponse, POLICIES } from "../_shared/rate-limit.ts";
 
 const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 
@@ -72,7 +73,11 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       );
     }
 
-    // 3. Domain access (markets must be enabled for this tenant)
+    // 3. Rate limit — LLM calls are expensive; 20/min per tenant
+    const rl = await checkRateLimit(rlKey("brief.generate", tenantId, user.id), POLICIES.llm_call);
+    if (!rl.allowed) return rateLimitResponse(rl, corsHeaders);
+
+    // 4. Domain access (markets must be enabled for this tenant)
     const access = await checkDomainAccess(supabaseAdmin, tenantId, PlatformDomains.MARKETS);
     if (!access.allowed) {
       return new Response(
@@ -149,8 +154,8 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       ...((watchlistItems ?? []) as any[]).map((i) => i.instrument_id),
     ].filter(Boolean)));
 
-    let instrumentBySymbol: Record<string, any> = {};
-    let instrumentById: Record<string, any> = {};
+    const instrumentBySymbol: Record<string, any> = {};
+    const instrumentById: Record<string, any> = {};
     if (trackedInstrumentIds.length > 0) {
       const { data: insts } = await (supabaseAdmin as any)
         .schema("markets")

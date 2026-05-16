@@ -20,6 +20,7 @@ import { serveWithLogger } from "../_shared/logger.ts";
 import { corsHeaders, preflight } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { checkDomainAccess, PlatformDomains } from "../_shared/domain-access.ts";
+import { checkRateLimit, rlKey, rateLimitResponse, POLICIES } from "../_shared/rate-limit.ts";
 
 const jsonH = { ...corsHeaders, "Content-Type": "application/json" };
 
@@ -158,6 +159,14 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     const access = await checkDomainAccess(supabaseAdmin, tenantId, PlatformDomains.MARKETS);
     if (!access.allowed)
       return new Response(JSON.stringify({ error: "Markets domain not enabled", reason: access.reason }), { status: 403, headers: jsonH });
+
+    // Rate limit: reads 120/min, mutations 30/min per tenant+user
+    const isWrite = req.method !== "GET" && req.method !== "HEAD";
+    const rl = await checkRateLimit(
+      rlKey("transactions", tenantId, user.id),
+      isWrite ? POLICIES.api_mutation : POLICIES.api_read,
+    );
+    if (!rl.allowed) return rateLimitResponse(rl, jsonH);
 
     const marketsDb = supabaseClient.schema("markets" as any);
 

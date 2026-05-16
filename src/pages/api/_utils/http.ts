@@ -3,6 +3,11 @@ import { ServiceUnavailableException } from './errors';
 import { getSupabaseAdminClient } from './supabaseAdmin';
 import { logger } from '@/lib/logger';
 
+// ── In-memory rate stores ─────────────────────────────────────────────────────
+// These are per-process. The Node.js API server runs as a single instance behind
+// Nginx, so this is safe for production today. If the server is ever scaled
+// horizontally, replace with Redis sorted-sets via ioredis (T1.5-P2 — Upstash
+// credentials are already in UPSTASH_REDIS_REST_URL / UPSTASH_REDIS_REST_TOKEN).
 const rateStore = new Map<string, { count: number; resetAt: number }>();
 const mutationStore = new Map<string, { count: number; targets: Set<string>; resetAt: number }>();
 const tokenReplayStore = new Map<string, number>();
