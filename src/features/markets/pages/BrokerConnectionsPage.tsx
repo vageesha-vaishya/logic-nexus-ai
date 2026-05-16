@@ -47,25 +47,23 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { SheetDescription } from "@/components/ui/sheet";
 import {
   Badge,
   Button,
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
   EmptyState,
   ErrorState,
   Input,
   Label,
   Sheet,
   SheetContent,
-  SheetDescription,
   SheetHeader,
   SheetTitle,
   SkeletonCard,
   Switch,
-} from "@/components/ui";
+} from "@/design-system";
 
 import {
   AddConnectionInput,
