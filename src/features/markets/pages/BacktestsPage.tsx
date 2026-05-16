@@ -452,14 +452,49 @@ function BacktestDetailPanel({
             />
           </div>
 
+          {/* Trade-level stats — only shown for rule_based strategies */}
+          {(m.n_trades ?? 0) > 0 && (
+            <>
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground pt-2">
+                Trade statistics
+              </h3>
+              <div className="grid grid-cols-3 gap-3">
+                <MetricCard label="Trades"      value={m.n_trades.toString()} neutral />
+                <MetricCard label="Win Rate"    value={`${m.win_rate.toFixed(1)}%`} positive={m.win_rate >= 50} />
+                <MetricCard label="Profit Factor" value={m.profit_factor?.toFixed(2) ?? "—"} positive={(m.profit_factor ?? 0) >= 1} />
+                <MetricCard label="Avg Trade"   value={`${m.avg_trade_return_pct >= 0 ? "+" : ""}${m.avg_trade_return_pct?.toFixed(2) ?? "—"}%`} positive={m.avg_trade_return_pct >= 0} />
+                <MetricCard label="Avg Win"     value={`+${m.avg_win_pct?.toFixed(2) ?? "—"}%`} positive />
+                <MetricCard label="Avg Loss"    value={`${m.avg_loss_pct?.toFixed(2) ?? "—"}%`} positive={false} alwaysRed />
+              </div>
+            </>
+          )}
+
+          {/* Equity curve sparkline */}
+          {m.equity_curve && m.equity_curve.length > 2 && (
+            <div className="space-y-1.5">
+              <h3 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+                Equity curve
+              </h3>
+              <div className="rounded-lg border bg-muted/20 p-3">
+                <EquityCurve values={m.equity_curve} dates={m.equity_dates ?? []} />
+                <div className="mt-2 flex justify-between text-[10px] text-muted-foreground font-mono">
+                  <span>₹{(m.initial_capital ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}</span>
+                  <span className={(m.final_value ?? 0) >= (m.initial_capital ?? 0) ? "text-emerald-600 font-semibold" : "text-red-500 font-semibold"}>
+                    ₹{(m.final_value ?? 0).toLocaleString("en-IN", { maximumFractionDigits: 0 })}
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Universe symbols */}
-          {m.symbols.length > 0 && (
+          {(m.symbols_used ?? m.symbols ?? []).length > 0 && (
             <div className="space-y-1.5">
               <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                 Symbols backtested ({m.n_assets})
               </p>
               <div className="flex flex-wrap gap-1">
-                {m.symbols.map((sym) => (
+                {(m.symbols_used ?? m.symbols).map((sym) => (
                   <Badge key={sym} variant="outline" className="text-[10px] font-mono px-1.5 py-0">
                     {sym}
                   </Badge>
@@ -491,6 +526,36 @@ function BacktestDetailPanel({
         <X className="h-4 w-4" />
         Close
       </Button>
+    </div>
+  );
+}
+
+// ─── Equity curve mini-chart ──────────────────────────────────────────────
+
+function EquityCurve({ values, dates }: { values: number[]; dates: string[] }) {
+  if (values.length < 2) return null;
+  const w = 400, h = 80, pad = 4;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const pts = values.map((v, i) => {
+    const x = pad + (i / (values.length - 1)) * (w - pad * 2);
+    const y = pad + (1 - (v - min) / range) * (h - pad * 2);
+    return `${x},${y}`;
+  }).join(" ");
+  const isUp = values[values.length - 1] >= values[0];
+  const color = isUp ? "#10b981" : "#ef4444";
+  const firstDate = dates[0]?.slice(0, 10) ?? "";
+  const lastDate  = dates[dates.length - 1]?.slice(0, 10) ?? "";
+  return (
+    <div className="space-y-1">
+      <svg viewBox={`0 0 ${w} ${h}`} className="w-full h-16" preserveAspectRatio="none">
+        <polyline points={pts} fill="none" stroke={color} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+      </svg>
+      <div className="flex justify-between text-[10px] text-muted-foreground">
+        <span>{firstDate}</span>
+        <span>{lastDate}</span>
+      </div>
     </div>
   );
 }

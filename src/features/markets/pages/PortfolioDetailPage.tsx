@@ -50,18 +50,21 @@ import type { Transaction } from "../types";
 // ─── Sector map ────────────────────────────────────────────────────────────
 
 const SECTOR_MAP: Record<string, string> = {
-  EXIIND: "Auto / Auto Ancillary", BORGLA: "Auto / Auto Ancillary",
-  IDFBAN: "Banks", YESBAN: "Banks",
+  EXIIND: "Auto / Auto Ancillary",
+  BORGLA: "Glass / Solar",          // Borosil Renewables Ltd
+  IDFBAN: "Banks", YESBAN: "Banks", KAARAD: "Technology (Micro-cap)",
   TRITUR: "Engineering / Capital Goods", NTPC: "Power", RELIND: "Energy",
   AADVEN: "Finance", JIOFIN: "Finance", REPHOM: "Finance", PENMER: "Finance",
   GLEPHA: "Pharma", AMAREM: "Pharma", GRANUL: "Pharma", MORLAB: "Pharma",
   HCLTEC: "Technology", TCS: "Technology", TECMAH: "Technology",
-  GLOTEC: "Technology", TELDAT: "Technology", TELMAR: "Technology", TELTEC: "Technology", KAARAD: "Technology",
+  GLOTEC: "Technology (Micro-cap)", TELDAT: "Technology (Micro-cap)",
+  TELMAR: "Technology (Micro-cap)", TELTEC: "Technology (Micro-cap)",
   ITC: "FMCG", ASIPAI: "FMCG",
   TATSTE: "Metals & Mining",
   ITCHOT: "Hotels & Hospitality",
-  TRILTD: "Textiles",
-  GOLDEX: "ETF", DILMED: "Media", SITCAB: "Media", ZEELEA: "Media", ZEEMED: "Media",
+  TRILTD: "Textiles",               // Trident Ltd (yarn/paper)
+  GOLDEX: "ETF / Gold",
+  DILMED: "Media", SITCAB: "Media", ZEELEA: "Media", ZEEMED: "Media",
 };
 
 function getSector(symbol: string): string {
@@ -171,17 +174,24 @@ export default function PortfolioDetailPage() {
       {/* KPI strip */}
       <Card>
         <CardContent className="grid grid-cols-2 gap-4 p-5 md:grid-cols-4">
-          <KpiCell label="NAV">
+          <KpiCell label="Portfolio Value">
             <Numeric value={holdings.data?.nav ?? 0} format="currency" currency={p.base_currency} className="text-2xl font-semibold" />
+            {(holdings.data?.bonusValue ?? 0) > 0 && (
+              <p className="text-[11px] text-muted-foreground mt-0.5">
+                incl. ₹{((holdings.data?.bonusValue ?? 0)).toLocaleString("en-IN", { maximumFractionDigits: 0 })} bonus shares
+              </p>
+            )}
+          </KpiCell>
+          <KpiCell label="Invested">
+            <Numeric value={holdings.data?.investedValue ?? 0} format="currency" currency={p.base_currency} className="text-xl font-semibold" />
+            <p className="text-[11px] text-muted-foreground mt-0.5">cost basis (excl. bonus)</p>
           </KpiCell>
           <KpiCell label="Today P&L">
             <Numeric value={holdings.data?.todayPnl ?? 0} format="pnl" currency={p.base_currency} colorBySign withArrow className="text-xl font-semibold" />
           </KpiCell>
-          <KpiCell label="Since inception">
+          <KpiCell label="Return on Invested">
             <Numeric value={holdings.data?.sinceInceptionPct ?? 0} format="percent" colorBySign withArrow className="text-xl font-semibold" />
-          </KpiCell>
-          <KpiCell label="Transactions">
-            <span className="text-2xl font-semibold">{transactions.data?.length ?? 0}</span>
+            <p className="text-[11px] text-muted-foreground mt-0.5">purchased positions only</p>
           </KpiCell>
         </CardContent>
       </Card>

@@ -45,42 +45,47 @@ ICICI_TO_NSE: dict[str, str] = {
     "EXIIND":  "EXIDEIND",
     "MORLAB":  "MOREPENLAB",
     "GRANUL":  "GRANULES",
-    "AMAREM":  "AMARARAJA",      # Amara Raja Energy & Mobility (renamed from AMARAJABAT)
-    "BORGLA":  "BOROLTD",
+    "AMAREM":  "AMARARAJA",      # Amara Raja Energy & Mobility
+    "BORGLA":  "BORORENEW",      # Borosil Renewables Ltd (NOT Borosil Ltd)
     "IDFBAN":  "IDFCFIRSTB",
     "YESBAN":  "YESBANK",
     "TRITUR":  "TRITURBINE",
-    "TRILTD":  "TRIVENI",
+    "TRILTD":  "TRIDENT",        # Trident Ltd (NOT Triveni Engineering)
     "ZEELEA":  "ZEELEARN",
     "ZEEMED":  "ZEEMEDIA",
-    "AADVEN":  "AADHARHFL",
+    # AADVEN = Aadhaar Ventures India Ltd (≠ Aadhaar HFL) — try direct
     "ITCHOT":  "ITCHOTELS",
-    "PENMER":  "PENNARIND",
-    "REPHOM":  "REPCO",
+    # PENMER = Platinum Corporation Ltd (≠ Pennar Industries) — try direct
+    "REPHOM":  "REPCOHOME",      # Repco Home Finance Ltd
     "JIOFIN":  "JIOFIN",
-    "KAARAD":  "KARURVYSYA",
-    "SITCAB":  "SITICABLE",
-    "DILMED":  "DIVISLAB",       # Divi's Laboratories
-    "GLOTEC":  "GOLDENTORC",     # fallback; will try NSE master
-    "TELDAT":  "TATAELXSI",      # Tata Elxsi
-    "TELMAR":  "TAML",           # fallback
-    "TELTEC":  "TELTEC",         # keep as-is, try direct
+    # KAARAD = Kaashyap Technologies Ltd (≠ Karur Vysya Bank) — try direct
+    "SITCAB":  "SITI",           # Siti Networks Ltd
+    # DILMED = Diligent Media Corporation Ltd — try direct
+    "GLOTEC":  "GLODYNE",        # Glodyne Technoserve Ltd
+    # TELDAT = Tele Data Informatics Ltd (≠ Tata Elxsi) — try direct
+    "TELMAR":  "TELEMAR",        # Teledata Marine Solutions — try direct
+    # TELTEC = Teledata Technology Solutions — try direct
+    "GOLDEX":  "GOLDBEES",       # Nippon India ETF Gold BeES
 }
 
 # Extended fallback: try multiple aliases for stubborn tickers
 ICICI_EXTRA_ALIASES: dict[str, list[str]] = {
-    "AMAREM":  ["AMARARAJA", "AMARAJABAT"],
-    "AADVEN":  ["AADHARHFL", "AADHAR"],
+    "AMAREM":  ["AMARARAJA", "AMARAJABAT"],   # renamed; try both
+    "AADVEN":  ["AADVEN"],                     # Aadhaar Ventures India Ltd
     "TATSTE":  ["TATASTEEL", "TATASTEEL.NS"],
     "TECMAH":  ["TECHM", "TECHM.NS"],
-    "DILMED":  ["DIVISLAB", "DIVISLABS"],
-    "SITCAB":  ["SITICABLE", "SITI"],
-    "GLOTEC":  ["GOLDENTORC", "GLOTEC"],
-    "TELDAT":  ["TATAELXSI", "TELDAT"],
-    "TELMAR":  ["TAML", "TELMAR"],
-    "TELTEC":  ["TATAINVEST", "TELTEC"],
-    "PENMER":  ["PENNARIND", "PENNAR"],
-    "REPHOM":  ["REPCO", "REPCOBANK"],
+    "DILMED":  ["DILMED", "DMED"],             # Diligent Media Corp
+    "SITCAB":  ["SITI", "SITINETW"],           # Siti Networks
+    "GLOTEC":  ["GLODYNE", "GLOTEC"],          # Glodyne Technoserve
+    "TELDAT":  ["TELDATA", "TELEDATA", "TELDAT"],  # Tele Data Informatics
+    "TELMAR":  ["TELEMAR", "TELMAR"],          # Teledata Marine Solutions
+    "TELTEC":  ["TELTEC", "TELETECH"],         # Teledata Technology Solutions (NOT TATAINVEST)
+    "PENMER":  ["PLATINCORP", "PENMER"],       # Platinum Corporation Ltd
+    "REPHOM":  ["REPCOHOME", "REPCO"],         # Repco Home Finance
+    "BORGLA":  ["BORORENEW", "BORRENEW"],      # Borosil Renewables
+    "KAARAD":  ["KAASHYAP", "KAARAD"],         # Kaashyap Technologies Ltd
+    "GOLDEX":  ["GOLDBEES", "NIPPONIGOLD"],    # Nippon India ETF Gold BeES
+    "TRILTD":  ["TRIDENT", "TRIDENTLTD"],      # Trident Ltd
 }
 
 # ISINs that are MF/ETF — fetch NAV separately via AMFI (not yfinance equity)

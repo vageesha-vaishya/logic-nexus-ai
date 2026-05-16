@@ -35,12 +35,28 @@ export function useSignals(filters?: { portfolioId?: string | null; limit?: numb
     staleTime: 15_000,
     gcTime: 5 * 60_000,
     queryFn: async (): Promise<Signal[]> => {
+      // When scoped to a portfolio, first get the active holding instrument IDs
+      // so we never show signals for instruments that left the portfolio.
+      let holdingIds: string[] | null = null;
+      if (filters?.portfolioId) {
+        const { data: holdings } = await (supabase as any)
+          .schema("markets")
+          .from("holdings")
+          .select("instrument_id")
+          .eq("portfolio_id", filters.portfolioId)
+          .gt("qty", 0);
+        holdingIds = (holdings ?? []).map((h: any) => h.instrument_id as string);
+        // If portfolio has no holdings, return empty immediately
+        if (holdingIds.length === 0) return [];
+      }
+
       let q = (supabase as any)
         .schema("markets")
         .from("signals")
         .select(
           "id, ts, instrument_id, strategy_id, portfolio_id, signal_type, direction, " +
           "confidence, score, rationale, price_at_signal, generated_by, expires_at, metadata, " +
+          "horizon, asset_class, risk_params, " +
           "instrument:instruments(symbol, exchange, instrument_type)",
         )
         .order("ts", { ascending: false })
@@ -48,6 +64,11 @@ export function useSignals(filters?: { portfolioId?: string | null; limit?: numb
 
       if (filters?.portfolioId) {
         q = q.eq("portfolio_id", filters.portfolioId);
+      }
+
+      // Restrict to instruments currently in the portfolio's holdings
+      if (holdingIds) {
+        q = q.in("instrument_id", holdingIds);
       }
 
       const { data, error } = await q;

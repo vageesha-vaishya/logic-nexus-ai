@@ -405,17 +405,32 @@ export interface CreateStrategyInput {
 export type BacktestStatus = "queued" | "running" | "completed" | "failed";
 
 export interface BacktestMetrics {
-  cagr: number;
-  sharpe: number;
-  sortino: number;
-  calmar: number;
-  max_drawdown: number;
-  volatility_annualised: number;
-  total_return: number;
-  n_trading_days: number;
-  symbols: string[];
-  n_assets: number;
-  strategy_type: string;
+  // All pct fields are stored as actual percentages (e.g. 19.77, not 0.1977)
+  cagr:                   number;
+  total_return:           number;
+  max_drawdown:           number;   // negative e.g. -5.83
+  volatility_annualised:  number;
+  sharpe:                 number;
+  sortino:                number;
+  calmar:                 number;
+  n_trading_days:         number;
+  // Trade-level stats (rule_based strategies)
+  n_trades:               number;
+  win_rate:               number;   // pct e.g. 72.5
+  profit_factor:          number;
+  avg_trade_return_pct:   number;
+  avg_win_pct:            number;
+  avg_loss_pct:           number;
+  // Equity curve for chart
+  equity_curve:           number[] | null;
+  equity_dates:           string[] | null;
+  // Universe
+  symbols:                string[];
+  symbols_used:           string[] | null;
+  n_assets:               number;
+  strategy_type:          string;
+  initial_capital:        number;
+  final_value:            number;
 }
 
 export interface Backtest {
@@ -460,10 +475,12 @@ export interface HoldingWithPrice extends Holding {
 }
 
 export interface PortfolioHoldingsResult {
-  holdings: HoldingWithPrice[];
-  nav: number;
-  todayPnl: number;
+  holdings:         HoldingWithPrice[];
+  nav:              number;
+  todayPnl:         number;
   sinceInceptionPct: number;
+  investedValue:    number;   // cost basis of purchased holdings (avg_cost > 0)
+  bonusValue:       number;   // market value of bonus/free shares (avg_cost = 0)
 }
 
 export interface InstrumentDetail {

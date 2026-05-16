@@ -1,240 +1,218 @@
-"""RQ job: run a vectorised backtest using Polars + DuckDB and write results to markets.backtests."""
+"""
+RQ job wrapper for the backtest engine.
 
-import time
+Entry point: run_backtest_job(backtest_id)
+  1. Load backtest + strategy rows from DB
+  2. Fetch price history for all universe symbols
+  3. Run the engine (buy_and_hold or rule_based)
+  4. Write metrics + equity curve + equity dates to backtests.metrics
+  5. Update status → completed | failed
+"""
+
+from __future__ import annotations
+
 import traceback
-from datetime import date
+from datetime import date, datetime, timezone
 
-import duckdb
 import polars as pl
 import structlog
 
-from markets_worker.db import get_duckdb, get_supabase
+from markets_worker.db import get_supabase
+from markets_worker.jobs.backtest_engine import BacktestParams, run_backtest as _run_engine
 
 logger = structlog.get_logger()
 
-
-def _update_backtest(backtest_id: str, **fields) -> None:
-    get_supabase().schema("markets").from_("backtests").update(fields).eq("id", backtest_id).execute()
+_MAX_BARS = 800   # per symbol — ~3 years @ 252 trading days/yr
 
 
-def _load_price_history(
-    conn: duckdb.DuckDBPyConnection,
-    instrument_ids: list[str],
-    period_from: date,
-    period_to: date,
-) -> pl.DataFrame:
-    """Pull OHLCV from Supabase into DuckDB, return as Polars DataFrame."""
+def _set_status(
+    db, backtest_id: str, status: str, progress: int = 0,
+    metrics: dict | None = None, error: str | None = None, finished: bool = False
+) -> None:
+    upd: dict = {"status": status, "progress": progress}
+    if metrics is not None:
+        upd["metrics"] = metrics
+    if error is not None:
+        upd["error"] = error[:2000]
+    if finished:
+        upd["finished_at"] = datetime.now(timezone.utc).isoformat()
+    try:
+        db.schema("markets").from_("backtests").update(upd).eq("id", backtest_id).execute()
+    except Exception as exc:
+        logger.error("backtest.status_update_failed", error=str(exc))
+
+
+def _downsample(lst: list, n: int) -> list:
+    if len(lst) <= n:
+        return lst
+    step = len(lst) / n
+    return [lst[int(i * step)] for i in range(n)]
+
+
+def run_backtest(backtest_id: str) -> dict:
+    """RQ job entry point — called by the router as markets_worker.jobs.backtest.run_backtest."""
     db = get_supabase()
-    result = (
-        db.schema("markets")
-        .from_("price_history")
-        .select("instrument_id,ts,open,high,low,close,volume")
-        .in_("instrument_id", instrument_ids)
-        .gte("ts", period_from.isoformat())
-        .lte("ts", period_to.isoformat())
-        .order("ts")
-        .limit(50_000)
-        .execute()
-    )
-    rows = result.data or []
-    if not rows:
-        return pl.DataFrame()
-
-    df = pl.DataFrame(rows)
-    df = df.with_columns(pl.col("ts").str.slice(0, 10).alias("date").cast(pl.Date))
-    for col in ("open", "high", "low", "close"):
-        df = df.with_columns(pl.col(col).cast(pl.Float64))
-    df = df.with_columns(pl.col("volume").cast(pl.Float64, strict=False))
-    return df
-
-
-def _compute_metrics(
-    equity_curve: pl.Series,
-    period_from: date,
-    period_to: date,
-) -> dict:
-    """Compute standard performance metrics from a daily equity curve."""
-    if equity_curve.is_empty() or equity_curve.null_count() == equity_curve.len():
-        return {}
-
-    returns = equity_curve.pct_change().drop_nulls()
-    if returns.is_empty():
-        return {}
-
-    n_days = (period_to - period_from).days or 1
-    n_years = n_days / 365.25
-    final_value = float(equity_curve[-1])
-    initial_value = float(equity_curve[0])
-
-    cagr = ((final_value / initial_value) ** (1 / n_years) - 1) if n_years > 0 else 0.0
-    vol = float(returns.std() or 0) * (252 ** 0.5)
-    sharpe = (returns.mean() * 252) / (vol + 1e-9)
-
-    # Max drawdown
-    peak = equity_curve.cum_max()
-    drawdown = (equity_curve - peak) / peak
-    max_dd = float(drawdown.min() or 0)
-
-    # Calmar ratio
-    calmar = cagr / abs(max_dd + 1e-9)
-
-    # Sortino (downside deviation)
-    down_returns = returns.filter(returns < 0)
-    down_vol = float(down_returns.std() or 0) * (252 ** 0.5)
-    sortino = (float(returns.mean() or 0) * 252) / (down_vol + 1e-9)
-
-    return {
-        "cagr":                 round(cagr * 100, 2),
-        "sharpe":               round(float(sharpe), 3),
-        "sortino":              round(sortino, 3),
-        "calmar":               round(calmar, 3),
-        "max_drawdown":         round(max_dd * 100, 2),
-        "volatility_annualised": round(vol * 100, 2),
-        "total_return":         round((final_value / initial_value - 1) * 100, 2),
-        "n_trading_days":       len(equity_curve),
-    }
-
-
-def run_backtest(backtest_id: str) -> None:
-    """
-    RQ job entrypoint. Fetches backtest config, runs simulation, writes metrics.
-
-    Strategy is interpreted as equal-weight buy-and-hold over the universe
-    (v1 baseline). More sophisticated execution logic (signals, rebalancing,
-    stop-loss) plugs in here in subsequent iterations.
-    """
-    logger.info("backtest.start", id=backtest_id)
-    t0 = time.monotonic()
+    _set_status(db, backtest_id, "running", progress=5)
 
     try:
-        _update_backtest(backtest_id, status="running", progress=5)
-
-        # ── Load backtest config ──────────────────────────────────────────
-        db = get_supabase()
-        result = (
-            db.schema("markets")
-            .from_("backtests")
-            .select("*, strategies(universe, constraints)")
+        # ── 1. Load backtest row ────────────────────────────────────────────
+        bt_res = (
+            db.schema("markets").from_("backtests")
+            .select(
+                "id, strategy_id, period_from, period_to, "
+                "initial_capital, commission_model, params"
+            )
             .eq("id", backtest_id)
-            .single()
-            .execute()
+            .maybe_single().execute()
         )
-        bt = result.data
+        bt = bt_res.data
         if not bt:
-            raise ValueError(f"Backtest {backtest_id} not found")
+            _set_status(db, backtest_id, "failed",
+                        error="Backtest record not found", finished=True)
+            return {"backtest_id": backtest_id, "status": "failed"}
 
-        strategy = bt.get("strategies") or {}
-        universe: dict = strategy.get("universe") or {}
-        symbol_list: list[str] = universe.get("symbols") or []
-        period_from = date.fromisoformat(bt["period_from"] or "2023-01-01")
-        period_to   = date.fromisoformat(bt["period_to"]   or date.today().isoformat())
-        initial_capital = float(bt.get("initial_capital") or 1_000_000)
-        commission_model: dict = bt.get("commission_model") or {}
-        per_trade_bps = float(commission_model.get("per_trade_bps", 3))
+        # ── 2. Load strategy ────────────────────────────────────────────────
+        strat_res = (
+            db.schema("markets").from_("strategies")
+            .select("id, name, dsl, universe")
+            .eq("id", bt["strategy_id"])
+            .maybe_single().execute()
+        )
+        strat = strat_res.data
+        if not strat:
+            _set_status(db, backtest_id, "failed",
+                        error="Strategy not found", finished=True)
+            return {"backtest_id": backtest_id, "status": "failed"}
 
-        if not symbol_list:
-            raise ValueError("Strategy universe.symbols is empty")
+        _set_status(db, backtest_id, "running", progress=15)
 
-        _update_backtest(backtest_id, progress=15)
+        # ── 3. Resolve universe symbols ─────────────────────────────────────
+        universe = strat.get("universe") or bt.get("params", {}).get("universe") or {}
+        symbols: list[str] = universe.get("symbols", [])
+        exchange: str = universe.get("exchange", "NSE")
 
-        # ── Resolve instrument IDs from symbols ───────────────────────────
-        instr_result = (
-            db.schema("markets")
-            .from_("instruments")
-            .select("id, symbol, exchange")
-            .in_("symbol", symbol_list)
-            .eq("is_active", True)
+        if not symbols:
+            _set_status(db, backtest_id, "failed",
+                        error="Strategy has no universe symbols defined. "
+                              "Edit the strategy and add symbols to the universe.",
+                        finished=True)
+            return {"backtest_id": backtest_id, "status": "failed"}
+
+        # ── 4. Resolve instrument IDs ───────────────────────────────────────
+        instr_res = (
+            db.schema("markets").from_("instruments")
+            .select("id, symbol")
+            .in_("symbol", symbols)
+            .eq("exchange", exchange)
             .execute()
         )
-        instruments = instr_result.data or []
-        if not instruments:
-            raise ValueError(f"No instruments found for symbols: {symbol_list}")
+        instr_rows = instr_res.data or []
+        sym_to_id  = {row["symbol"]: row["id"] for row in instr_rows}
+        known_ids  = list(sym_to_id.values())
 
-        instrument_ids = [i["id"] for i in instruments]
-        id_to_symbol = {i["id"]: i["symbol"] for i in instruments}
+        if not known_ids:
+            _set_status(db, backtest_id, "failed",
+                        error=f"No instruments found for {symbols[:5]} on {exchange}.",
+                        finished=True)
+            return {"backtest_id": backtest_id, "status": "failed"}
 
-        _update_backtest(backtest_id, progress=25)
+        _set_status(db, backtest_id, "running", progress=30)
 
-        # ── Load price history into Polars ────────────────────────────────
-        conn = get_duckdb()
-        prices_df = _load_price_history(conn, instrument_ids, period_from, period_to)
-        conn.close()
+        # ── 5. Fetch price history ──────────────────────────────────────────
+        period_from = date.fromisoformat(bt["period_from"])
+        period_to   = date.fromisoformat(bt["period_to"])
 
-        if prices_df.is_empty():
-            raise ValueError("No price data found for the specified period and symbols")
+        price_res = (
+            db.schema("markets").from_("price_history")
+            .select("instrument_id, ts, close")
+            .in_("instrument_id", known_ids)
+            .gte("ts", period_from.isoformat())
+            .lte("ts", period_to.isoformat())
+            .order("ts", desc=False)
+            .limit(_MAX_BARS * len(known_ids))
+            .execute()
+        )
+        price_rows = price_res.data or []
 
-        _update_backtest(backtest_id, progress=50)
+        if not price_rows:
+            _set_status(db, backtest_id, "failed",
+                        error="No price history found for the selected period and universe. "
+                              "Run 'Fetch Prices' from the Signals page first.",
+                        finished=True)
+            return {"backtest_id": backtest_id, "status": "failed"}
 
-        # ── v1 strategy: equal-weight buy-and-hold ────────────────────────
-        # Pivot to wide format: dates × symbols, fill forward missing prices
-        wide = (
-            prices_df.select(["date", "instrument_id", "close"])
-            .pivot(on="instrument_id", index="date", values="close")
-            .sort("date")
-            .fill_null(strategy="forward")
-            .fill_null(strategy="backward")
+        _set_status(db, backtest_id, "running", progress=50)
+
+        id_to_sym = {v: k for k, v in sym_to_id.items()}
+
+        records = []
+        for r in price_rows:
+            sym = id_to_sym.get(r["instrument_id"])
+            if not sym:
+                continue
+            ts_raw = r["ts"]
+            if isinstance(ts_raw, str):
+                ts_val = date.fromisoformat(ts_raw[:10])
+            elif hasattr(ts_raw, "date"):
+                ts_val = ts_raw.date()
+            else:
+                ts_val = ts_raw
+            records.append({"symbol": sym, "ts": ts_val, "close": float(r["close"])})
+
+        if not records:
+            _set_status(db, backtest_id, "failed",
+                        error="Price data could not be parsed.", finished=True)
+            return {"backtest_id": backtest_id, "status": "failed"}
+
+        price_df = pl.DataFrame(records).sort(["symbol", "ts"])
+
+        _set_status(db, backtest_id, "running", progress=60)
+
+        # ── 6. Run engine ───────────────────────────────────────────────────
+        params = BacktestParams(
+            strategy_id      = bt["strategy_id"],
+            strategy_name    = strat.get("name", ""),
+            dsl_raw          = strat.get("dsl"),
+            universe_symbols = symbols,
+            period_from      = period_from,
+            period_to        = period_to,
+            initial_capital  = float(bt.get("initial_capital", 1_000_000)),
+            commission_model = bt.get("commission_model") or {"pct": 0.05},
         )
 
-        n_assets = len(instrument_ids)
-        if n_assets == 0:
-            raise ValueError("No asset columns in pivoted data")
+        result = _run_engine(params, price_df)
 
-        # Equal weight allocation per asset
-        weight = 1.0 / n_assets
-        asset_cols = [c for c in wide.columns if c != "date"]
+        _set_status(db, backtest_id, "running", progress=90)
 
-        # Compute daily portfolio value
-        # Each position starts at initial_capital * weight / entry_price shares
-        portfolio_values = []
-        entry_prices = {col: float(wide[col][0]) for col in asset_cols if wide[col][0] is not None}
+        # ── 7. Persist ──────────────────────────────────────────────────────
+        if result.error:
+            _set_status(db, backtest_id, "failed",
+                        error=result.error, finished=True)
+            return {"backtest_id": backtest_id, "status": "failed", "error": result.error}
 
-        # Apply entry commission on day 0
-        entry_commission = sum(
-            (initial_capital * weight) * (per_trade_bps / 10_000)
-            for _ in asset_cols
+        full_metrics = {
+            **result.metrics,
+            "equity_curve": _downsample(result.equity_curve, 500),
+            "equity_dates": _downsample(result.dates, 500),
+            "symbols_used": result.symbols_used,
+        }
+
+        _set_status(db, backtest_id, "completed",
+                    progress=100, metrics=full_metrics, finished=True)
+
+        logger.info(
+            "backtest.job_done",
+            backtest_id  = backtest_id,
+            strategy     = strat.get("name"),
+            total_return = result.metrics.get("total_return"),
+            sharpe       = result.metrics.get("sharpe"),
+            n_trades     = result.metrics.get("n_trades"),
         )
-
-        for row in wide.iter_rows(named=True):
-            day_value = 0.0
-            for col in asset_cols:
-                if col not in entry_prices or entry_prices[col] == 0:
-                    continue
-                n_shares = (initial_capital * weight) / entry_prices[col]
-                price = row.get(col)
-                if price is not None:
-                    day_value += n_shares * float(price)
-            portfolio_values.append(day_value - entry_commission)
-            entry_commission = 0.0  # commission only on entry day
-
-        equity_curve = pl.Series("equity", portfolio_values)
-        _update_backtest(backtest_id, progress=80)
-
-        # ── Compute metrics ───────────────────────────────────────────────
-        metrics = _compute_metrics(equity_curve, period_from, period_to)
-        metrics["symbols"] = [id_to_symbol.get(iid, iid) for iid in instrument_ids]
-        metrics["n_assets"] = n_assets
-        metrics["strategy_type"] = "equal_weight_buy_hold_v1"
-
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        logger.info("backtest.complete", id=backtest_id, metrics=metrics, elapsed_ms=elapsed_ms)
-
-        _update_backtest(
-            backtest_id,
-            status="completed",
-            progress=100,
-            finished_at="now()",
-            metrics=metrics,
-        )
+        return {"backtest_id": backtest_id, "status": "completed", "metrics": full_metrics}
 
     except Exception as exc:
-        elapsed_ms = int((time.monotonic() - t0) * 1000)
-        error_msg = f"{type(exc).__name__}: {exc}"
-        logger.error("backtest.failed", id=backtest_id, error=error_msg, elapsed_ms=elapsed_ms)
-        logger.debug("backtest.traceback", tb=traceback.format_exc())
-        _update_backtest(
-            backtest_id,
-            status="failed",
-            finished_at="now()",
-            error=error_msg,
-        )
-        raise
+        tb = traceback.format_exc()
+        logger.error("backtest.job_error", backtest_id=backtest_id, error=str(exc))
+        _set_status(db, backtest_id, "failed",
+                    error=f"{exc}\n{tb[:800]}", finished=True)
+        return {"backtest_id": backtest_id, "status": "failed", "error": str(exc)}

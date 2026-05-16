@@ -1035,21 +1035,32 @@ async def persist_signal(state: SignalState) -> dict:
 
     try:
         db  = get_supabase()
-        # Deduplication: delete any signal generated today for this instrument+portfolio
-        # before inserting the fresh one. Keeps exactly one current signal per holding.
-        today_utc = datetime.now(timezone.utc).replace(
+        today_start = datetime.now(timezone.utc).replace(
             hour=0, minute=0, second=0, microsecond=0
         ).isoformat()
+
+        # Delete today's signal for this exact (instrument, portfolio, horizon) before
+        # inserting the fresh one.  This is the primary dedup path; the unique index
+        # signals_portfolio_daily_dedup acts as a safety net for concurrent runs.
         del_q = (
             db.schema("markets").from_("signals").delete()
             .eq("instrument_id", state["instrument_id"])
-            .gte("ts", today_utc)
+            .gte("ts", today_start)
         )
         if state.get("portfolio_id"):
             del_q = del_q.eq("portfolio_id", state["portfolio_id"])
+        if horizon:
+            del_q = del_q.eq("horizon", horizon)
         del_q.execute()
 
-        db.schema("markets").from_("signals").insert(row).execute()
+        # Insert the fresh signal; ON CONFLICT DO UPDATE handles any race condition
+        # between concurrent worker runs thanks to the unique index.
+        db.schema("markets").from_("signals").upsert(
+            row,
+            on_conflict="instrument_id,portfolio_id,horizon,date_trunc('day', ts AT TIME ZONE 'UTC')",
+            ignore_duplicates=False,
+        ).execute()
+
         logger.info("persist_signal.ok", symbol=state["symbol"],
                     signal=state["signal_type"], confidence=state["confidence"],
                     asset_cls=asset_cls, horizon=horizon)

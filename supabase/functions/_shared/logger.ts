@@ -1,4 +1,5 @@
 import { SupabaseClient, createClient } from '@supabase/supabase-js';
+import { logAccess } from './audit.ts';
 declare const Deno: any;
 
 export enum LogLevel {
@@ -167,25 +168,33 @@ export class Logger {
 
 /**
  * Middleware wrapper for Deno.serve to automatically handle logging,
- * correlation IDs, and error catching.
+ * correlation IDs, error catching, and access logging to platform.access_log.
+ *
+ * Every request (except CORS preflights) writes a fire-and-forget row to
+ * platform.access_log with: request_id, domain, op, decision, ms.
+ * Functions that have auth context (user_id, tenant_id) should additionally
+ * call logAccess() directly after requireAuth() for richer semantic entries.
  */
 export const serveWithLogger = (
   handler: (req: Request, logger: Logger, supabase: SupabaseClient) => Promise<Response>,
   componentName: string = 'edge-function'
 ) => {
   Deno.serve(async (req: Request) => {
-    const correlationId = req.headers.get('x-correlation-id') || (globalThis.crypto && typeof globalThis.crypto.randomUUID === 'function'
-      ? globalThis.crypto.randomUUID()
-      : (() => {
-          const arr = new Uint8Array(16);
-          if (globalThis.crypto && typeof globalThis.crypto.getRandomValues === 'function') {
-            globalThis.crypto.getRandomValues(arr);
-          } else {
-            for (let i = 0; i < arr.length; i++) arr[i] = Math.floor(Math.random() * 256);
-          }
-          return Array.from(arr).map(b => b.toString(16).padStart(2, '0')).join('');
-        })());
-    
+    const t0 = Date.now();
+
+    const correlationId = req.headers.get('x-correlation-id') ||
+      req.headers.get('x-request-id') ||
+      (globalThis.crypto?.randomUUID?.() ?? crypto.randomUUID());
+
+    // Skip access logging for CORS preflights — not real access decisions.
+    const isOptions = req.method === 'OPTIONS';
+
+    let url: URL;
+    try { url = new URL(req.url); } catch { url = new URL('https://edge/unknown'); }
+    // Include path + query for routing context; strip long values for storage safety.
+    const rawOp = `${req.method} ${url.pathname}${url.search}`;
+    const op = rawOp.length > 300 ? rawOp.slice(0, 300) : rawOp;
+
     // Initial logger (no DB access yet)
     let logger = new Logger(null, {
       method: req.method,
@@ -193,11 +202,13 @@ export const serveWithLogger = (
       component: componentName
     }, correlationId);
 
+    let supabase!: SupabaseClient;
+
     try {
-      // Initialize Supabase Client (Standard Pattern)
+      // Initialize Supabase admin client (service-role)
       const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
       const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      supabase = createClient(supabaseUrl, supabaseKey);
 
       // Upgrade logger with DB client
       logger = new Logger(supabase, {
@@ -209,14 +220,37 @@ export const serveWithLogger = (
       await logger.info(`Request received: ${req.method} ${req.url}`);
 
       const response = await handler(req, logger, supabase);
-      
+
+      // ── Access log: every non-preflight request ───────────────────────────
+      if (!isOptions && supabase) {
+        logAccess(supabase, {
+          requestId:  correlationId,
+          domain:     componentName,
+          op,
+          decision:   response.status < 400 ? 'allow' : 'deny',
+          reason:     response.status >= 400 ? `HTTP ${response.status}` : null,
+          ms:         Date.now() - t0,
+        });
+      }
+
       return response;
     } catch (error: any) {
-      await logger.critical(`Unhandled Exception in ${componentName}`, { 
-        error: error.message, 
-        stack: error.stack 
+      await logger.critical(`Unhandled Exception in ${componentName}`, {
+        error: error.message,
+        stack: error.stack,
       });
-      
+
+      if (!isOptions && supabase) {
+        logAccess(supabase, {
+          requestId: correlationId,
+          domain:    componentName,
+          op,
+          decision:  'deny',
+          reason:    'unhandled_exception',
+          ms:        Date.now() - t0,
+        });
+      }
+
       return new Response(
         JSON.stringify({ error: 'Internal Server Error', correlation_id: correlationId }),
         { status: 500, headers: { 'Content-Type': 'application/json' } }

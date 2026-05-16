@@ -45,23 +45,44 @@ async function recalcHolding(
   userId: string,
   logger: any,
 ) {
-  // Aggregate all open lots → rebuild holding from scratch
-  const { data: lots } = await marketsDb
+  // ── Open lots → current qty + avg_cost ──────────────────────────────────
+  const { data: openLots } = await marketsDb
     .from("tax_lots")
     .select("remaining_qty, buy_price")
     .eq("portfolio_id", portfolioId)
     .eq("instrument_id", instrumentId)
     .eq("is_closed", false);
 
-  const totalQty = (lots as any[] ?? []).reduce((s: number, l: any) => s + Number(l.remaining_qty), 0);
-
-  // Weighted-average cost
-  const totalCost = (lots as any[] ?? []).reduce((s: number, l: any) =>
+  const totalQty  = (openLots as any[] ?? []).reduce((s: number, l: any) => s + Number(l.remaining_qty), 0);
+  const totalCost = (openLots as any[] ?? []).reduce((s: number, l: any) =>
     s + Number(l.remaining_qty) * Number(l.buy_price), 0);
-  const avgCost = totalQty > 0 ? totalCost / totalQty : 0;
+  const avgCost   = totalQty > 0 ? totalCost / totalQty : 0;
+
+  // ── Realized P&L: sell proceeds minus FIFO cost of sold shares ──────────
+  // Cost of sold shares is derived from all lots (buy_qty - remaining_qty) × buy_price,
+  // which exactly matches the FIFO quantities consumed by each sell transaction.
+  const [allLotsRes, sellTxnsRes] = await Promise.all([
+    marketsDb
+      .from("tax_lots")
+      .select("buy_qty, remaining_qty, buy_price")
+      .eq("portfolio_id", portfolioId)
+      .eq("instrument_id", instrumentId),
+    marketsDb
+      .from("transactions")
+      .select("qty, price, charges")
+      .eq("portfolio_id", portfolioId)
+      .eq("instrument_id", instrumentId)
+      .in("txn_type", ["sell", "redemption", "transfer_out"]),
+  ]);
+
+  const costOfSoldShares = ((allLotsRes.data ?? []) as any[]).reduce((s: number, l: any) =>
+    s + (Number(l.buy_qty) - Number(l.remaining_qty)) * Number(l.buy_price), 0);
+  const sellProceeds = ((sellTxnsRes.data ?? []) as any[]).reduce((s: number, t: any) =>
+    s + Number(t.qty) * Number(t.price) - Number(t.charges ?? 0), 0);
+  const realizedPnl = sellProceeds - costOfSoldShares;
 
   if (totalQty <= 0) {
-    // Remove the holding row if fully sold
+    // Fully sold — remove holding row
     await marketsDb.from("holdings")
       .delete()
       .eq("portfolio_id", portfolioId)
@@ -70,10 +91,11 @@ async function recalcHolding(
   }
 
   await marketsDb.from("holdings").upsert({
-    portfolio_id: portfolioId,
-    instrument_id: instrumentId,
-    qty: totalQty,
-    avg_cost: avgCost,
+    portfolio_id:   portfolioId,
+    instrument_id:  instrumentId,
+    qty:            totalQty,
+    avg_cost:       avgCost,
+    realized_pnl:   realizedPnl,
     last_updated_at: new Date().toISOString(),
   }, { onConflict: "portfolio_id,instrument_id" });
 }

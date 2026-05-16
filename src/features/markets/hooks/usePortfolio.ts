@@ -88,38 +88,35 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
       const instrumentMap: Record<string, any> = {};
       for (const i of (instruments ?? []) as any[]) instrumentMap[i.id] = i;
 
-      // Fetch 2 most recent prices per instrument via a generated-column view approach.
-      // We do two targeted queries (latest + previous) rather than relying on a single
-      // order+limit which can return fewer than 2 per instrument for large portfolios.
-      const [latestRes, prevRes] = await Promise.all([
-        (supabase as any)
-          .schema("markets")
-          .from("price_history")
-          .select("instrument_id, close")
-          .in("instrument_id", instrumentIds)
-          .order("ts", { ascending: false })
-          .limit(instrumentIds.length * 2),
-        (supabase as any)
-          .schema("markets")
-          .from("price_history")
-          .select("instrument_id, close, ts")
-          .in("instrument_id", instrumentIds)
-          .order("ts", { ascending: false })
-          .limit(instrumentIds.length * 4),
-      ]);
+      // Fetch the two most recent trading days of prices per instrument.
+      // limit = instruments × 10 ensures we always capture at least 2 distinct
+      // trading days even if the batch ingest ran unevenly across symbols.
+      const priceRes = await (supabase as any)
+        .schema("markets")
+        .from("price_history")
+        .select("instrument_id, close, ts")
+        .in("instrument_id", instrumentIds)
+        .order("ts", { ascending: false })
+        .limit(instrumentIds.length * 10);
 
-      // Build price map: latest close + previous close per instrument
-      const ltpMap: Record<string, number>  = {};
-      const prevMap: Record<string, number> = {};
-      for (const p of (latestRes.data ?? []) as any[]) {
-        if (!(p.instrument_id in ltpMap)) ltpMap[p.instrument_id] = Number(p.close);
-      }
-      for (const p of (prevRes.data ?? []) as any[]) {
-        const id = p.instrument_id;
-        if (id in ltpMap && !(id in prevMap) && Number(p.close) !== ltpMap[id]) {
+      // Build price map: latest close + previous-day close per instrument.
+      // Compare calendar date strings (not close values) so flat-priced stocks
+      // still get a valid prev_price for today's P&L calculation.
+      const ltpMap:      Record<string, number> = {};
+      const prevMap:     Record<string, number> = {};
+      const latestDate:  Record<string, string> = {};
+
+      for (const p of (priceRes.data ?? []) as any[]) {
+        const id      = p.instrument_id;
+        const dateStr = (p.ts as string).slice(0, 10);
+        if (!(id in ltpMap)) {
+          ltpMap[id]     = Number(p.close);
+          latestDate[id] = dateStr;
+        } else if (!(id in prevMap) && dateStr !== latestDate[id]) {
           prevMap[id] = Number(p.close);
         }
       }
+
       // Flatten into the shape the rest of the code expects
       const priceMap: Record<string, number[]> = {};
       for (const id of instrumentIds) {
@@ -128,17 +125,32 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
 
       let nav = 0;
       let todayPnl = 0;
-      let costBasis = 0;
+      // Separate accumulators: purchased (avg_cost > 0) vs bonus/free (avg_cost = 0)
+      let purchasedCurrentValue = 0;  // current value of holdings we paid for
+      let purchasedCostBasis    = 0;  // what we paid for those holdings
+      let bonusCurrentValue     = 0;  // current value of bonus/free shares
+      let totalRealizedPnl      = 0;
 
       const enriched = holdings.map((h: any) => {
         const pts = priceMap[h.instrument_id] ?? [];
         const lastPrice: number | null = pts[0] ?? null;
         const prevPrice: number | null = pts[1] ?? null;
-        const qty = Number(h.qty);
+        const qty  = Number(h.qty);
         const cost = Number(h.avg_cost);
-        nav += qty * (lastPrice ?? cost);
+        const mktVal = qty * (lastPrice ?? cost);
+
+        nav      += mktVal;
         todayPnl += qty * ((lastPrice ?? 0) - (prevPrice ?? lastPrice ?? 0));
-        costBasis += qty * cost;
+        totalRealizedPnl += Number(h.realized_pnl ?? 0);
+
+        if (cost > 0) {
+          // Only count holdings we actually paid for in the return metric
+          purchasedCostBasis    += qty * cost;
+          purchasedCurrentValue += qty * (lastPrice ?? cost);
+        } else {
+          bonusCurrentValue += qty * (lastPrice ?? 0);
+        }
+
         return {
           ...h,
           qty,
@@ -149,13 +161,21 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
         };
       });
 
+      // sinceInceptionPct: return on PURCHASED positions only.
+      // Bonus / gifted shares have avg_cost = 0 — they cannot contribute to a
+      // meaningful % return (dividing by zero cost is undefined) so they are
+      // excluded from the denominator. Their market value is still in NAV.
+      const purchasedGain = (purchasedCurrentValue - purchasedCostBasis) + totalRealizedPnl;
+
       return {
         holdings: enriched,
-        nav: Math.round(nav * 100) / 100,
-        todayPnl: Math.round(todayPnl * 100) / 100,
+        nav:            Math.round(nav * 100) / 100,
+        todayPnl:       Math.round(todayPnl * 100) / 100,
+        investedValue:  Math.round(purchasedCostBasis * 100) / 100,
+        bonusValue:     Math.round(bonusCurrentValue * 100) / 100,
         sinceInceptionPct:
-          costBasis > 0
-            ? Math.round(((nav - costBasis) / costBasis) * 10000) / 10000
+          purchasedCostBasis > 0
+            ? Math.round((purchasedGain / purchasedCostBasis) * 10000) / 10000
             : 0,
       };
     },
