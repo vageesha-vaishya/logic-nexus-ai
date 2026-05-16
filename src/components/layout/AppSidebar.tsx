@@ -90,14 +90,17 @@ export function AppSidebar() {
 
   return (
     <>
-      {/* Semi-transparent backdrop for mobile/expanded state */}
+      {/* Semi-transparent backdrop for tablet (md–lg) expanded state.
+          z-[9]: intentionally below the sidebar panel (z-10) so clicks
+          inside the sidebar are not intercepted. Clicks on the backdrop
+          (outside the sidebar) correctly collapse it. */}
       {!collapsed && (
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           data-testid="sidebar-backdrop"
-          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          className="fixed inset-0 bg-black/50 z-[9] lg:hidden"
           onClick={() => isMobile ? setOpenMobile(false) : setOpen(false)}
         />
       )}

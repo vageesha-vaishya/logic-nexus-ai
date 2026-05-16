@@ -1,0 +1,38 @@
+# Gitleaks configuration
+# https://github.com/gitleaks/gitleaks
+
+title = "Logic Nexus AI - Gitleaks Config"
+
+[extend]
+# Use default rules as base
+useDefault = true
+
+[[rules]]
+id = "supabase-service-role"
+description = "Supabase service role key"
+regex = '''eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9\.[A-Za-z0-9+/=]+\.[A-Za-z0-9+/=_-]+'''
+tags = ["supabase", "jwt", "service-role"]
+
+[[rules]]
+id = "supabase-url"
+description = "Supabase project URL with credentials"
+regex = '''https://[a-z0-9]+\.supabase\.co'''
+tags = ["supabase", "url"]
+[rules.allowlist]
+  # Allow in .env.example and docs
+  paths = ['''.env\.example''', '''docs/.*''', '''README.*''']
+
+[allowlist]
+  description = "Global allowlist"
+  paths = [
+    '''.env\.example''',
+    '''docs/incidents/.*''',
+    '''\.gitleaks\.toml''',
+  ]
+  # Allow placeholder values in example files
+  regexes = [
+    '''your-.*-key''',
+    '''your-project-id''',
+    '''sb_publishable_xxx''',
+    '''YOUR_PASSWORD''',
+  ]

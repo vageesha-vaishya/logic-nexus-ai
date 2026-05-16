@@ -1,0 +1,130 @@
+"""Auth middleware: validates service-account keys and Supabase user JWTs."""
+
+import hashlib
+from datetime import datetime, timezone
+from typing import Annotated
+
+import structlog
+from fastapi import Depends, HTTPException, Request, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
+
+from markets_worker.config import get_settings
+from markets_worker.db import get_supabase
+
+logger = structlog.get_logger()
+bearer = HTTPBearer(auto_error=False)
+
+
+def _sha256(raw: str) -> str:
+    return hashlib.sha256(raw.encode()).hexdigest()
+
+
+def _verify_supabase_jwt(token: str) -> dict:
+    s = get_settings()
+    try:
+        return jwt.decode(
+            token,
+            s.supabase_jwt_secret,
+            algorithms=["HS256"],
+            options={"verify_aud": False},
+        )
+    except JWTError as e:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=f"Invalid JWT: {e}") from e
+
+
+async def _lookup_service_account(key_hash: str) -> dict | None:
+    db = get_supabase()
+    result = (
+        db.schema("platform")
+        .from_("service_accounts")
+        .select("id, tenant_id, franchise_id, name, scope")
+        .eq("key_hash", key_hash)
+        .eq("is_active", True)
+        .maybe_single()
+        .execute()
+    )
+    if not result.data:
+        return None
+    sa = result.data
+    if sa.get("expires_at"):
+        if datetime.fromisoformat(sa["expires_at"]) < datetime.now(timezone.utc):
+            return None
+    return sa
+
+
+class AuthContext:
+    """Resolved identity — either a service account or an authenticated user."""
+
+    def __init__(
+        self,
+        *,
+        user_id: str | None = None,
+        tenant_id: str | None = None,
+        franchise_id: str | None = None,
+        service_account_id: str | None = None,
+        service_account_name: str | None = None,
+        scope: list[str] | None = None,
+        is_service_account: bool = False,
+    ):
+        self.user_id = user_id
+        self.tenant_id = tenant_id
+        self.franchise_id = franchise_id
+        self.service_account_id = service_account_id
+        self.service_account_name = service_account_name
+        self.scope = scope or []
+        self.is_service_account = is_service_account
+
+    def require_scope(self, required: str) -> None:
+        if self.scope and required not in self.scope:
+            raise HTTPException(
+                status.HTTP_403_FORBIDDEN,
+                detail=f"Scope '{required}' required",
+            )
+
+
+async def get_auth(
+    request: Request,
+    credentials: Annotated[HTTPAuthorizationCredentials | None, Depends(bearer)],
+) -> AuthContext:
+    if not credentials:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Missing Authorization header")
+
+    token = credentials.credentials
+
+    # 1. Try service account: sha256(token) lookup
+    key_hash = _sha256(token)
+    sa = await _lookup_service_account(key_hash)
+    if sa:
+        logger.info("auth.service_account", name=sa["name"])
+        return AuthContext(
+            tenant_id=sa.get("tenant_id"),
+            franchise_id=sa.get("franchise_id"),
+            service_account_id=sa["id"],
+            service_account_name=sa["name"],
+            scope=sa.get("scope") or [],
+            is_service_account=True,
+        )
+
+    # 2. Try Supabase JWT (user-facing calls from Edge Functions)
+    claims = _verify_supabase_jwt(token)
+    user_id = claims.get("sub")
+    if not user_id:
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="JWT missing sub claim")
+
+    logger.info("auth.jwt_user", user_id=user_id)
+
+    # Pull tenant from x-tenant-id header (mirrors Edge Function convention)
+    tenant_id = request.headers.get("x-tenant-id")
+    franchise_id = request.headers.get("x-franchise-id")
+
+    return AuthContext(
+        user_id=user_id,
+        tenant_id=tenant_id,
+        franchise_id=franchise_id,
+        is_service_account=False,
+    )
+
+
+# Convenient FastAPI dependency alias
+Auth = Annotated[AuthContext, Depends(get_auth)]

@@ -97,7 +97,8 @@
     "rules:analyze": "node scripts/project-rules-workflow.mjs analyze",
     "rules:propose": "node scripts/project-rules-workflow.mjs propose",
     "rules:sync": "node scripts/project-rules-workflow.mjs sync",
-    "rules:hook:install": "node scripts/install-project-rules-hook.mjs"
+    "rules:hook:install": "node scripts/install-project-rules-hook.mjs",
+    "prepare": "husky"
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
@@ -235,6 +236,7 @@
     "eslint-plugin-react-refresh": "^0.4.20",
     "eslint-plugin-storybook": "10.2.19",
     "globals": "^15.15.0",
+    "husky": "^9.1.7",
     "identity-obj-proxy": "^3.0.0",
     "jest": "^30.0.5",
     "jest-axe": "^10.0.0",

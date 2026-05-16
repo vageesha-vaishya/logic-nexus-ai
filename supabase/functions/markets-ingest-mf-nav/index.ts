@@ -23,7 +23,7 @@ import { requireServiceRoleOrAdmin } from "../_shared/auth.ts";
 
 declare const Deno: any;
 
-const AMFI_URL  = "https://www.amfiindia.com/spages/NAVAll.txt";
+const AMFI_URL  = "https://portal.amfiindia.com/spages/NAVAll.txt";
 const CHUNK     = 400;   // upsert rows per batch
 
 // ── Category → instrument_type mapping ──────────────────────────────────
@@ -111,9 +111,13 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       if (inHeader && t.startsWith("Scheme Code")) { inHeader = false; continue; }
 
       const parts = t.split(";");
-      if (parts.length < 8) continue;
+      if (parts.length < 6) continue;
 
-      const [code, isin1, isin2, name, navStr, , , dateStr] = parts;
+      // New AMFI format (6 cols): Code;ISIN_Growth;ISIN_IDCW;Name;NAV;Date
+      // Old format (8 cols) had Repurchase;Sale between NAV and Date — stripped by AMFI in 2025.
+      const [code, isin1, isin2, name, navStr, dateStr] = parts.length >= 8
+        ? [parts[0], parts[1], parts[2], parts[3], parts[4], parts[7]]
+        : parts;
       const nav = parseFloat(navStr);
       if (!code || isNaN(nav) || nav <= 0) continue;
       const navDate = parseAmfiDate(dateStr ?? "");

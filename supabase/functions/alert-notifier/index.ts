@@ -1,6 +1,7 @@
 import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireServiceRoleOrAdmin } from "../_shared/auth.ts";
+import { checkRateLimit, rlKey, POLICIES } from "../_shared/rate-limit.ts";
 
 declare const Deno: any;
 
@@ -8,11 +9,6 @@ const SLACK_WEBHOOK_URL = Deno.env.get("SLACK_WEBHOOK_URL");
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
 const ALERT_EMAIL_TO = Deno.env.get("ALERT_EMAIL_TO");
 const ENVIRONMENT = Deno.env.get("ENVIRONMENT") || "development";
-
-// Basic in-memory rate limiting (per instance)
-// Key: "component:message_hash", Value: Timestamp
-const lastAlerts: Map<string, number> = new Map();
-const THROTTLE_MS = 60 * 1000; // 1 minute throttle per identical error
 
 serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
@@ -41,13 +37,13 @@ serveWithLogger(async (req, logger, supabase) => {
     return new Response(JSON.stringify({ message: "Level ignored" }), { status: 200 });
   }
 
-  const alertKey = `${logEntry.component}:${logEntry.message}`;
-  const now = Date.now();
-  if (lastAlerts.has(alertKey) && (now - lastAlerts.get(alertKey)!) < THROTTLE_MS) {
+  // Distributed dedup: 5 identical alerts per minute across all instances
+  const alertKey = rlKey("alert_dedup", null, null) + `:${logEntry.component}:${logEntry.message}`.slice(0, 80);
+  const rl = await checkRateLimit(alertKey, POLICIES.alert_dedup);
+  if (!rl.allowed) {
     logger.info(`Alert throttled for: ${alertKey}`);
     return new Response(JSON.stringify({ message: "Throttled" }), { status: 200 });
   }
-  lastAlerts.set(alertKey, now);
 
   const results = { slack: false, email: false };
 

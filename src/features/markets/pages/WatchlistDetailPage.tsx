@@ -10,6 +10,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -66,6 +67,7 @@ export default function WatchlistDetailPage() {
   const watchlist = useWatchlist(id);
 
   return (
+    <DashboardLayout>
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <div>
         <button
@@ -127,6 +129,7 @@ export default function WatchlistDetailPage() {
         </>
       )}
     </div>
+    </DashboardLayout>
   );
 }
 

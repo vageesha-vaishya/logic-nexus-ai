@@ -5,6 +5,7 @@
  */
 
 import { useRef, useState } from "react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
 import { toast } from "sonner";
@@ -142,6 +143,7 @@ export default function PortfoliosPage() {
   const [deletePortfolio,  setDeletePortfolio]   = useState<Portfolio | null>(null);
 
   return (
+    <DashboardLayout>
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       {/* Header */}
       <header className="flex items-start justify-between gap-4">
@@ -244,6 +246,7 @@ export default function PortfoliosPage() {
         onClose={() => setDeletePortfolio(null)}
       />
     </div>
+    </DashboardLayout>
   );
 }
 

@@ -1,0 +1,43 @@
+# fly.toml — Fly.io deployment config for markets-worker
+# Deploy: fly deploy --config services/markets-worker/fly.toml
+
+app      = "logic-nexus-markets-worker"
+primary_region = "sin"   # Singapore — closest to India with good Anthropic latency
+
+[build]
+  dockerfile = "services/markets-worker/Dockerfile"
+
+[env]
+  ENVIRONMENT = "production"
+  LOG_LEVEL   = "INFO"
+  PORT        = "8000"
+
+[http_service]
+  internal_port        = 8000
+  force_https          = true
+  auto_stop_machines   = true
+  auto_start_machines  = true
+  min_machines_running = 0   # scale to zero when idle (personal-use phase)
+
+  [http_service.concurrency]
+    type       = "requests"
+    hard_limit = 50
+    soft_limit = 40
+
+[[vm]]
+  size   = "shared-cpu-1x"
+  memory = "512mb"
+
+# Secrets set via: fly secrets set KEY=value --app logic-nexus-markets-worker
+# Required: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, SUPABASE_JWT_SECRET,
+#           ANTHROPIC_API_KEY, UPSTASH_REDIS_REST_URL, UPSTASH_REDIS_REST_TOKEN
+
+# RQ Worker process (separate machine)
+[[processes]]
+  name    = "worker"
+  command = "python -m markets_worker.worker"
+
+[[vm]]
+  process_group = "worker"
+  size          = "shared-cpu-1x"
+  memory        = "1gb"   # Polars + DuckDB need more headroom

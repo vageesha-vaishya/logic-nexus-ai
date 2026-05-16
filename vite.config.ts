@@ -571,20 +571,31 @@ export default defineConfig(({ mode }) => {
     port: 8081,
     strictPort: true,
     headers: {
+      // Dev CSP mirrors nginx.conf — catches policy violations before they
+      // reach production. 'unsafe-eval' removed; hot-reload uses ws: already
+      // covered by wss://*.supabase.co + ws://localhost wildcard below.
       "Content-Security-Policy": [
         "default-src 'self'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://challenges.cloudflare.com",
+        "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data: https:",
-        "connect-src 'self' https: ws: wss:",
+        // Dev: allow localhost WS for Vite HMR + Supabase Realtime
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* ws://0.0.0.0:* https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com",
         "frame-src 'self' https://challenges.cloudflare.com",
         "worker-src 'self' blob:",
         "base-uri 'self'",
         "form-action 'self'",
         "object-src 'none'",
-        "frame-ancestors 'none'"
+        "frame-ancestors 'none'",
+        "upgrade-insecure-requests",
       ].join("; "),
+      "X-Content-Type-Options":          "nosniff",
+      "X-Frame-Options":                 "DENY",
+      "Referrer-Policy":                 "strict-origin-when-cross-origin",
+      "Permissions-Policy":              "geolocation=(), camera=(), microphone=(), payment=(), usb=()",
+      "Cross-Origin-Opener-Policy":      "same-origin",
+      "Cross-Origin-Resource-Policy":    "same-site",
     },
     proxy: {
       '/api/crm': crmProxy,

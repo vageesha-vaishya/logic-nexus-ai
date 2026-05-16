@@ -33,6 +33,8 @@ import { serveWithLogger }          from "../_shared/logger.ts";
 import { corsHeaders, preflight }   from "../_shared/cors.ts";
 import { requireAuth }              from "../_shared/auth.ts";
 import { checkDomainAccess, PlatformDomains } from "../_shared/domain-access.ts";
+import { logAccess, logAudit, extractIp, extractRequestId } from "../_shared/audit.ts";
+import { checkRateLimit, rlKey, rateLimitResponse, POLICIES } from "../_shared/rate-limit.ts";
 
 declare const Deno: any;
 
@@ -64,18 +66,51 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
   const pre = preflight(req);
   if (pre) return pre;
 
+  const requestId = extractRequestId(req);
+  const ip        = extractIp(req);
+  const userAgent = req.headers.get("user-agent") ?? null;
+  const op        = "POST /markets-import-holdings";
+  const t0        = Date.now();
+
   try {
     const { user, error: authError, supabaseClient } = await requireAuth(req, logger);
-    if (authError || !user)
+    if (authError || !user) {
+      logAccess(supabaseAdmin, {
+        requestId, domain: "markets", op, decision: "deny",
+        reason: "unauthorized", ms: Date.now() - t0,
+      });
       return new Response(JSON.stringify({ error: authError ?? "Unauthorized" }), { status: 401, headers: jsonH });
+    }
 
     const tenantId = req.headers.get("x-tenant-id");
-    if (!tenantId)
+    if (!tenantId) {
+      logAccess(supabaseAdmin, {
+        requestId, domain: "markets", op, userId: user.id,
+        decision: "deny", reason: "missing_tenant_id", ms: Date.now() - t0,
+      });
       return new Response(JSON.stringify({ error: "Missing x-tenant-id header" }), { status: 400, headers: jsonH });
+    }
 
     const access = await checkDomainAccess(supabaseAdmin, tenantId, PlatformDomains.MARKETS);
-    if (!access.allowed)
+    if (!access.allowed) {
+      logAccess(supabaseAdmin, {
+        requestId, domain: "markets", op, userId: user.id, tenantId,
+        decision: "deny", reason: access.reason ?? "domain_not_enabled", ms: Date.now() - t0,
+      });
       return new Response(JSON.stringify({ error: "Markets domain not enabled", reason: access.reason }), { status: 403, headers: jsonH });
+    }
+
+    logAccess(supabaseAdmin, {
+      requestId, domain: "markets", op, userId: user.id, tenantId,
+      decision: "allow", ms: Date.now() - t0,
+    });
+
+    // 5 imports/min per tenant+user (bulk operation — expensive)
+    const rl = await checkRateLimit(rlKey("holdings.import", tenantId, user.id), POLICIES.import_holdings);
+    if (!rl.allowed) return new Response(
+      JSON.stringify({ error: "Too many requests", retry_after_ms: rl.retryAfter }),
+      { status: 429, headers: { ...jsonH, "Retry-After": String(Math.ceil(rl.retryAfter / 1000)) } },
+    );
 
     let body: any;
     try { body = await req.json(); } catch {
@@ -307,6 +342,14 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
     logger.info("holdings import complete", {
       portfolio_id: portfolioId, imported: insertedCount, skipped: errors.length,
+    });
+
+    logAudit(supabaseAdmin, {
+      requestId, domain: "markets", op, opMs: Date.now() - t0,
+      tenantId, userId: user.id, ip, userAgent,
+      resourceType: "portfolio", resourceId: portfolioId,
+      action: "import",
+      after: { imported: insertedCount, skipped: errors.length, instrument_count: affectedInstrumentIds.length },
     });
 
     return new Response(

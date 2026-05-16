@@ -13,6 +13,7 @@
  */
 
 import { useNavigate, useParams } from "react-router-dom";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ArrowLeft, ExternalLink, Newspaper, Star, Trash2 } from "lucide-react";
 
 import {
@@ -40,6 +41,7 @@ export default function InstrumentDetailPage() {
   const detail = useInstrumentDetail(id);
 
   return (
+    <DashboardLayout>
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       <div>
         <button
@@ -84,6 +86,7 @@ export default function InstrumentDetailPage() {
         </>
       )}
     </div>
+    </DashboardLayout>
   );
 }
 

@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -177,16 +177,28 @@ export const APP_MENU: MenuModule[] = [
         description: 'Track instruments across asset classes',
       },
       {
-        name: 'AI Briefs',
-        path: '/dashboard/markets/portfolios',
+        name: 'AI Research',
+        path: '/dashboard/markets/research',
         icon: Brain,
-        description: 'AI-generated portfolio and market briefs',
+        description: 'Chat with an AI analyst over your portfolio and market data',
       },
       {
-        name: 'Market News',
-        path: '/dashboard/markets/portfolios',
-        icon: Newspaper,
-        description: 'Live news with sentiment scoring',
+        name: 'Strategies',
+        path: '/dashboard/markets/strategies',
+        icon: GitBranch,
+        description: 'Define and manage rule-based or AI-driven trading strategies',
+      },
+      {
+        name: 'Backtests',
+        path: '/dashboard/markets/backtests',
+        icon: BarChart3,
+        description: 'Run historical simulations of your strategies',
+      },
+      {
+        name: 'Signals',
+        path: '/dashboard/markets/signals',
+        icon: Activity,
+        description: 'AI-generated buy, sell, and hold signals across instruments',
       },
       {
         name: 'LLM Settings',

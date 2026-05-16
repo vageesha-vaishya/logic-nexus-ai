@@ -543,3 +543,120 @@ function interpolate(template: string, vars: Record<string, string>): string {
     return vars[key];
   });
 }
+
+// ─── Multi-turn conversation API ───────────────────────────────────────────
+// Used by the research thread edge function to pass full conversation history.
+
+export interface ConversationMessage {
+  role:    "user" | "assistant";
+  content: string;
+}
+
+/**
+ * Like callLLM but accepts a full conversation history.
+ * The history is passed directly to the provider; the task's system prompt
+ * is still resolved from the gateway (tenant config or env fallback).
+ *
+ * @param taskId     Gateway task ID — used to resolve provider config + system prompt.
+ * @param messages   Full conversation: [...history, { role:"user", content: latestMsg }]
+ * @param ctx        Same LlmCallContext as callLLM.
+ */
+export async function callLLMConversation(
+  taskId:   LlmTaskId,
+  messages: ConversationMessage[],
+  ctx:      LlmCallContext,
+  systemSuffix?: string,
+): Promise<LlmCallResult> {
+  const prompt = PROMPTS[taskId];
+  if (!prompt) throw new LlmGatewayError("unknown_task", `Unknown LLM task '${taskId}'`, 400);
+
+  const config = await resolveConfig(taskId, ctx);
+  const system = systemSuffix ? `${prompt.system}\n\n${systemSuffix}` : prompt.system;
+  const t0 = Date.now();
+
+  // Build provider-specific message array (assistant messages may not start with "user")
+  // Anthropic requires alternating user/assistant starting with user.
+  // Ensure messages array is valid.
+  const validMessages: ConversationMessage[] = messages.length > 0 ? messages : [{ role: "user", content: "" }];
+
+  let result: LlmCallResult;
+  try {
+    switch (config.provider) {
+      case "anthropic": {
+        const url = (config.baseUrl ?? "https://api.anthropic.com") + "/v1/messages";
+        const body = {
+          model:      config.model,
+          max_tokens: config.maxOutputTokens,
+          system,
+          messages:   validMessages,
+        };
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "x-api-key": config.apiKey,
+            "anthropic-version": "2023-06-01",
+            "content-type": "application/json",
+          },
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+          const txt = await resp.text().catch(() => "");
+          throw new LlmGatewayError(`anthropic_${resp.status}`, `Anthropic ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
+        }
+        const json: any = await resp.json();
+        const text = Array.isArray(json?.content)
+          ? json.content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("")
+          : "";
+        const inputTokens  = Number(json?.usage?.input_tokens  ?? 0);
+        const outputTokens = Number(json?.usage?.output_tokens ?? 0);
+        const cachedInputTokens = Number(json?.usage?.cache_read_input_tokens ?? 0);
+        const p = ANTHROPIC_PRICING[config.model];
+        const costUsd = p
+          ? ((inputTokens - cachedInputTokens) * p.inputPerMillion + cachedInputTokens * (p.cachedInputPerMillion ?? p.inputPerMillion) + outputTokens * p.outputPerMillion) / 1_000_000
+          : 0;
+        result = { text, provider: "anthropic", model: config.model, inputTokens, outputTokens, cachedInputTokens, costUsd, latencyMs: 0, promptVersion: "", raw: json };
+        break;
+      }
+      case "openrouter":
+      case "openai": {
+        const baseUrl = config.baseUrl ?? (config.provider === "openrouter" ? "https://openrouter.ai/api" : "https://api.openai.com");
+        const url = baseUrl + "/v1/chat/completions";
+        const oaiMessages = [{ role: "system", content: system }, ...validMessages];
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${config.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ model: config.model, max_tokens: config.maxOutputTokens, messages: oaiMessages }),
+        });
+        if (!resp.ok) {
+          const txt = await resp.text().catch(() => "");
+          throw new LlmGatewayError(`provider_${resp.status}`, `Provider ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
+        }
+        const json: any = await resp.json();
+        const text = json?.choices?.[0]?.message?.content ?? "";
+        result = { text, provider: config.provider, model: config.model, inputTokens: Number(json?.usage?.prompt_tokens ?? 0), outputTokens: Number(json?.usage?.completion_tokens ?? 0), cachedInputTokens: 0, costUsd: 0, latencyMs: 0, promptVersion: "", raw: json };
+        break;
+      }
+      default:
+        throw new LlmGatewayError("provider_not_implemented", `Provider '${config.provider}' not wired for conversation mode.`, 501);
+    }
+  } catch (e: any) {
+    const latency = Date.now() - t0;
+    await recordUsage(ctx, { taskId, promptVersion: prompt.version, provider: config.provider, model: config.model, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, costUsd: 0, latencyMs: latency, status: "error", errorCode: e?.code ?? "provider_error", errorMessage: e?.message, configSource: config.source });
+    if (e instanceof LlmGatewayError) throw e;
+    throw new LlmGatewayError("provider_error", e?.message ?? "Provider call failed", 502);
+  }
+
+  result.latencyMs    = Date.now() - t0;
+  result.promptVersion = prompt.version;
+
+  await recordUsage(ctx, { taskId, promptVersion: prompt.version, provider: result.provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, cachedInputTokens: result.cachedInputTokens, costUsd: result.costUsd, latencyMs: result.latencyMs, status: "ok", configSource: config.source, configId: config.configId });
+
+  if (config.source === "tenant_config" && config.configId) {
+    await (ctx.supabaseAdmin as any).schema("platform").from("llm_provider_configs").update({ last_used_at: new Date().toISOString() }).eq("id", config.configId);
+  }
+
+  return result;
+}

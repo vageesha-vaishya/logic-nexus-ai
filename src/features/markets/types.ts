@@ -299,6 +299,48 @@ export interface TransactionsListResponse {
   count: number;
 }
 
+// ─── Research threads ─────────────────────────────────────────────────────
+
+export type ResearchContextType = "portfolio" | "watchlist" | "instrument" | "sector" | "general";
+export type ResearchThreadStatus = "active" | "archived";
+
+export interface ResearchThread {
+  id:              string;
+  title:           string;
+  status:          ResearchThreadStatus;
+  context_type:    ResearchContextType | null;
+  context_ref_id:  string | null;
+  message_count:   number;
+  last_message_at: string | null;
+  created_at:      string;
+  updated_at:      string;
+}
+
+export interface ResearchMessage {
+  id:            string;
+  role:          "user" | "assistant";
+  content:       string;
+  citations:     Array<{ url: string; title: string; snippet?: string }> | null;
+  sequence_num:  number | null;
+  is_error:      boolean;
+  llm_model:     string | null;
+  input_tokens:  number | null;
+  output_tokens: number | null;
+  cost_usd:      number | null;
+  created_at:    string;
+}
+
+export interface CreateThreadInput {
+  title?:          string;
+  context_type?:   ResearchContextType;
+  context_ref_id?: string;
+}
+
+export interface SendMessageInput {
+  thread_id: string;
+  content:   string;
+}
+
 // ─── Holdings + NAV ────────────────────────────────────────────────────
 
 export interface Holding {

@@ -213,6 +213,10 @@ const MarketsLlmSettings = lazy(() => import("./features/markets/pages/LlmSettin
 const MarketsWatchlists = lazy(() => import("./features/markets/pages/WatchlistsPage"));
 const MarketsWatchlistDetail = lazy(() => import("./features/markets/pages/WatchlistDetailPage"));
 const MarketsInstrumentDetail = lazy(() => import("./features/markets/pages/InstrumentDetailPage"));
+const MarketsResearch = lazy(() => import("./features/markets/pages/ResearchThreadsPage"));
+const MarketsStrategies = lazy(() => import("./features/markets/pages/StrategiesPage"));
+const MarketsBacktests = lazy(() => import("./features/markets/pages/BacktestsPage"));
+const MarketsSignals = lazy(() => import("./features/markets/pages/SignalsPage"));
 // Platform-wide LLM provider settings — same component, reachable from main settings hub.
 const PlatformLlmSettings = MarketsLlmSettings;
 const AmroWorkCentersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkCentersMasterDataPage })));
@@ -958,6 +962,10 @@ const App = () => (
             <Route path="/dashboard/markets/watchlists" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsWatchlists /></ProtectedRoute>} />
             <Route path="/dashboard/markets/watchlists/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsWatchlistDetail /></ProtectedRoute>} />
             <Route path="/dashboard/markets/instruments/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsInstrumentDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/research" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsResearch /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/strategies" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsStrategies /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/backtests" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBacktests /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSignals /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}

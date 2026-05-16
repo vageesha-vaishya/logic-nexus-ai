@@ -50,4 +50,14 @@ export const marketsKeys = {
     detail: (id: string) =>
       [...marketsKeys.news.all(), "detail", id] as const,
   },
+
+  threads: {
+    all:      () => [...marketsKeys.all, "threads"] as const,
+    list:     (filters?: { status?: string }) =>
+      [...marketsKeys.threads.all(), "list", filters ?? {}] as const,
+    detail:   (id: string) =>
+      [...marketsKeys.threads.all(), "detail", id] as const,
+    messages: (threadId: string) =>
+      [...marketsKeys.threads.all(), "messages", threadId] as const,
+  },
 } as const;

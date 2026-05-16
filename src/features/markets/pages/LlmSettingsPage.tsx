@@ -15,6 +15,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import {
@@ -100,6 +101,7 @@ export default function LlmSettingsPage() {
   const [createOpen, setCreateOpen] = useState(false);
 
   return (
+    <DashboardLayout>
     <div className="mx-auto max-w-4xl space-y-6 p-6">
       <header className="flex items-start justify-between gap-4">
         <div>
@@ -184,6 +186,7 @@ export default function LlmSettingsPage() {
         </SheetContent>
       </Sheet>
     </div>
+    </DashboardLayout>
   );
 }
 
