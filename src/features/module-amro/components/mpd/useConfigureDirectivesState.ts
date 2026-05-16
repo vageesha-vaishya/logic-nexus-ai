@@ -315,14 +315,32 @@ export function useConfigureDirectivesActions() {
   }, [queryClient]);
 
   const configure = useMutation({
-    mutationFn: async (input: { aircraftId: string; directiveIds: string[] }) => {
+    mutationFn: async (input: {
+      aircraftId: string;
+      directiveIds: string[];
+      done_on?: string;
+      work_order_no?: string;
+      license_no?: string;
+      place?: string;
+      actual_man_hours?: number;
+      method_of_compliance?: string;
+      remark?: string;
+      revision_no?: string;
+      page_no?: string;
+      book_no?: string;
+      source_doc?: string;
+      extension_date?: string;
+      approval_remark?: string;
+    }) => {
       if (!authHeaders) throw new Error('Not authenticated');
+      const { aircraftId, directiveIds, ...extraFields } = input;
       const response = await fetch('/api/v2/amro/configure-directives/configure', {
         method: 'POST',
         headers: authHeaders,
         body: JSON.stringify({
-          aircraft_id: input.aircraftId,
-          directive_ids: input.directiveIds,
+          aircraft_id: aircraftId,
+          directive_ids: directiveIds,
+          ...extraFields,
         }),
       });
       const payload = await parseApiResponse(response);

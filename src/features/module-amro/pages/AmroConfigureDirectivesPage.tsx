@@ -20,6 +20,7 @@ import {
 } from '@/features/module-amro/components/mpd/useConfigureDirectivesState';
 import type { DirectiveRecord } from '@/features/module-amro/components/mpd/useDirectivesState';
 import { formatThresholdFrequency } from '@/features/module-amro/components/mpd/frequencyFormatter';
+import { AssemblyDirectiveStatusModal, type AssemblyDirectiveStatusFormData } from '@/features/module-amro/components/mpd/AssemblyDirectiveStatusModal';
 
 type ConfigureTab = 'non-configured' | 'configured';
 type NonConfiguredGridRow = DirectiveRecord & Record<string, unknown>;
@@ -48,6 +49,7 @@ export function AmroConfigureDirectivesPage() {
   const [activeTab, setActiveTab] = useState<ConfigureTab>('non-configured');
   const [selectedDirectiveIds, setSelectedDirectiveIds] = useState<Set<string>>(new Set());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [configureModalDirective, setConfigureModalDirective] = useState<NonConfiguredGridRow | null>(null);
   const [advancedFilters, setAdvancedFilters] = useState({
     assemblyType: '',
     model: '',
@@ -221,7 +223,7 @@ export function AmroConfigureDirectivesPage() {
     });
   }, []);
 
-  const handleConfigureDirectives = useCallback(async (directiveIds: string[]) => {
+  const handleConfigureDirectives = useCallback(async (directiveIds: string[], formData?: AssemblyDirectiveStatusFormData) => {
     if (!advancedFilters.aircraftId) {
       toast.error('Aircraft selection is required to configure directives');
       return;
@@ -234,6 +236,21 @@ export function AmroConfigureDirectivesPage() {
       const payload = await actions.configure.mutateAsync({
         aircraftId: advancedFilters.aircraftId,
         directiveIds,
+        ...(formData ? {
+          done_on: formData.doneOn || undefined,
+          work_order_no: formData.workOrderNo || undefined,
+          license_no: formData.licenseNo || undefined,
+          place: formData.place || undefined,
+          actual_man_hours: formData.actualManHours ? Number(formData.actualManHours) : undefined,
+          method_of_compliance: formData.methodOfCompliance || undefined,
+          remark: formData.remark || undefined,
+          revision_no: formData.revisionNo || undefined,
+          page_no: formData.pageNo || undefined,
+          book_no: formData.bookNo || undefined,
+          source_doc: formData.sourceDoc || undefined,
+          extension_date: formData.extensionDate || undefined,
+          approval_remark: formData.approvalRemark || undefined,
+        } : {}),
       });
       const output = payload.output && typeof payload.output === 'object'
         ? payload.output as Record<string, unknown>
@@ -246,6 +263,12 @@ export function AmroConfigureDirectivesPage() {
       toast.error(error instanceof Error ? error.message : 'Failed to configure directives');
     }
   }, [actions.configure, advancedFilters.aircraftId]);
+
+  const handleModalSave = useCallback(async (formData: AssemblyDirectiveStatusFormData) => {
+    if (!configureModalDirective) return;
+    await handleConfigureDirectives([configureModalDirective.id], formData);
+    setConfigureModalDirective(null);
+  }, [configureModalDirective, handleConfigureDirectives]);
 
   const handleBulkConfigure = useCallback(() => {
     void handleConfigureDirectives(Array.from(selectedDirectiveIds));
@@ -394,14 +417,14 @@ export function AmroConfigureDirectivesPage() {
           disabled={isBusy || !advancedFilters.aircraftId}
           onClick={(event) => {
             event.stopPropagation();
-            void handleConfigureDirectives([record.id]);
+            setConfigureModalDirective(record);
           }}
         >
           Configure
         </Button>
       ),
     },
-  ], [advancedFilters.aircraftId, handleConfigureDirectives, handleToggleSelected, isBusy, selectedDirectiveIds]);
+  ], [advancedFilters.aircraftId, handleToggleSelected, isBusy, selectedDirectiveIds]);
 
   const configuredColumns = useMemo<GridColumnDefinition<ConfiguredGridRow>[]>(() => [
     { key: 'task_number', header: 'Task Number', sortable: true, filterable: true, groupable: true, resizable: true, width: 180 },
@@ -700,6 +723,16 @@ export function AmroConfigureDirectivesPage() {
           </Tabs>
         </AmroModuleSurface>
       </div>
+
+      <AssemblyDirectiveStatusModal
+        open={configureModalDirective !== null}
+        onClose={() => setConfigureModalDirective(null)}
+        onSave={(formData) => { void handleModalSave(formData); }}
+        directive={configureModalDirective}
+        aircraftRegistration={selectedAircraftLabel}
+        aircraftModel={modelOptions.find((m) => m.id === advancedFilters.model)?.name ?? ''}
+        isSaving={actions.configure.isPending}
+      />
     </DashboardLayout>
   );
 }
