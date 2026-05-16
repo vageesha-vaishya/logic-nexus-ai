@@ -7,9 +7,7 @@ from typing import Annotated
 import structlog
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 
-from markets_worker.config import get_settings
 from markets_worker.db import get_supabase
 
 logger = structlog.get_logger()
@@ -21,32 +19,38 @@ def _sha256(raw: str) -> str:
 
 
 def _verify_supabase_jwt(token: str) -> dict:
-    s = get_settings()
+    """Verify a Supabase user JWT by calling the Auth API (works regardless of signing key)."""
+    db = get_supabase()
     try:
-        return jwt.decode(
-            token,
-            s.supabase_jwt_secret,
-            algorithms=["HS256"],
-            options={"verify_aud": False},
-        )
-    except JWTError as e:
+        resp = db.auth.get_user(token)
+        if not resp or not resp.user:
+            raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail="Invalid JWT: user not found")
+        user = resp.user
+        return {"sub": user.id, "email": getattr(user, "email", None), "role": "authenticated"}
+    except HTTPException:
+        raise
+    except Exception as e:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, detail=f"Invalid JWT: {e}") from e
 
 
 async def _lookup_service_account(key_hash: str) -> dict | None:
     db = get_supabase()
-    result = (
-        db.schema("platform")
-        .from_("service_accounts")
-        .select("id, tenant_id, franchise_id, name, scope")
-        .eq("key_hash", key_hash)
-        .eq("is_active", True)
-        .maybe_single()
-        .execute()
-    )
-    if not result.data:
+    try:
+        resp = (
+            db.schema("platform")
+            .from_("service_accounts")
+            .select("id, tenant_id, franchise_id, name, scope, expires_at")
+            .eq("key_hash", key_hash)
+            .eq("is_active", True)
+            .limit(1)
+            .execute()
+        )
+        rows = resp.data if resp and resp.data else []
+        if not rows:
+            return None
+        sa = rows[0]
+    except Exception:
         return None
-    sa = result.data
     if sa.get("expires_at"):
         if datetime.fromisoformat(sa["expires_at"]) < datetime.now(timezone.utc):
             return None

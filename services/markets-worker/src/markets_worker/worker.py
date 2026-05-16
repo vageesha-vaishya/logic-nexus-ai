@@ -1,8 +1,7 @@
 """RQ worker entrypoint.
 
 Run with:
-  uv run python -m markets_worker.worker
-  # or via Docker CMD
+  OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run python -m markets_worker.worker
 """
 
 import logging
@@ -25,10 +24,19 @@ def main() -> None:
         ]
     )
     logger = structlog.get_logger()
-    logger.info("worker.starting", queues=["markets_backtests"], redis=s.effective_redis_url[:40])
+    queues = ["markets_signals", "markets_backtests"]
+    logger.info("worker.starting", queues=queues, redis=s.effective_redis_url[:40])
 
     conn = redis.from_url(s.effective_redis_url, decode_responses=False)
-    worker = Worker(["markets_backtests"], connection=conn)
+
+    # Register daily 07:00 IST refresh+signal jobs for all portfolios
+    try:
+        from markets_worker.scheduler import setup_daily_jobs
+        setup_daily_jobs()
+    except Exception as exc:
+        logger.warning("scheduler.setup_error", error=str(exc))
+
+    worker = Worker(queues, connection=conn)
     worker.work(with_scheduler=True)
 
 

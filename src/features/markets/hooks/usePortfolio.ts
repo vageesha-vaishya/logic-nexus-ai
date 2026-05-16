@@ -4,10 +4,31 @@
  * — RLS confirms owner_user_id = auth.uid().
  */
 
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { marketsKeys } from "./queryKeys";
 import type { Portfolio, PortfolioHoldingsResult } from "../types";
+
+// Triggers a server-side NAV refresh for one or all portfolios, then
+// invalidates the portfolio list so the updated metadata appears immediately.
+export function useRefreshNav() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (portfolioId?: string) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) return;
+      const res = await supabase.functions.invoke("markets-compute-nav", {
+        method: "POST",
+        body: portfolioId ? { portfolio_id: portfolioId } : {},
+      });
+      if (res.error) throw new Error(res.error.message);
+      return res.data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: marketsKeys.portfolios.all() });
+    },
+  });
+}
 
 export function usePortfolio(id: string | undefined) {
   return useQuery({
@@ -67,21 +88,42 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
       const instrumentMap: Record<string, any> = {};
       for (const i of (instruments ?? []) as any[]) instrumentMap[i.id] = i;
 
-      const { data: prices } = await (supabase as any)
-        .schema("markets")
-        .from("price_history")
-        .select("instrument_id, close, ts")
-        .in("instrument_id", instrumentIds)
-        .order("ts", { ascending: false })
-        .limit(instrumentIds.length * 5);
+      // Fetch 2 most recent prices per instrument via a generated-column view approach.
+      // We do two targeted queries (latest + previous) rather than relying on a single
+      // order+limit which can return fewer than 2 per instrument for large portfolios.
+      const [latestRes, prevRes] = await Promise.all([
+        (supabase as any)
+          .schema("markets")
+          .from("price_history")
+          .select("instrument_id, close")
+          .in("instrument_id", instrumentIds)
+          .order("ts", { ascending: false })
+          .limit(instrumentIds.length * 2),
+        (supabase as any)
+          .schema("markets")
+          .from("price_history")
+          .select("instrument_id, close, ts")
+          .in("instrument_id", instrumentIds)
+          .order("ts", { ascending: false })
+          .limit(instrumentIds.length * 4),
+      ]);
 
-      // Group prices per instrument, keep the two most recent closes.
-      const priceMap: Record<string, number[]> = {};
-      for (const p of (prices ?? []) as any[]) {
-        if (!priceMap[p.instrument_id]) priceMap[p.instrument_id] = [];
-        if (priceMap[p.instrument_id].length < 2) {
-          priceMap[p.instrument_id].push(Number(p.close));
+      // Build price map: latest close + previous close per instrument
+      const ltpMap: Record<string, number>  = {};
+      const prevMap: Record<string, number> = {};
+      for (const p of (latestRes.data ?? []) as any[]) {
+        if (!(p.instrument_id in ltpMap)) ltpMap[p.instrument_id] = Number(p.close);
+      }
+      for (const p of (prevRes.data ?? []) as any[]) {
+        const id = p.instrument_id;
+        if (id in ltpMap && !(id in prevMap) && Number(p.close) !== ltpMap[id]) {
+          prevMap[id] = Number(p.close);
         }
+      }
+      // Flatten into the shape the rest of the code expects
+      const priceMap: Record<string, number[]> = {};
+      for (const id of instrumentIds) {
+        priceMap[id] = [ltpMap[id], prevMap[id]].filter((v): v is number => v !== undefined);
       }
 
       let nav = 0;
@@ -113,7 +155,7 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
         todayPnl: Math.round(todayPnl * 100) / 100,
         sinceInceptionPct:
           costBasis > 0
-            ? Math.round(((nav - costBasis) / costBasis) * 10000) / 100
+            ? Math.round(((nav - costBasis) / costBasis) * 10000) / 10000
             : 0,
       };
     },

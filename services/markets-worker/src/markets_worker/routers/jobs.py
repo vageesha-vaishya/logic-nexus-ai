@@ -1,7 +1,12 @@
-"""Backtest job endpoints.
+"""Job endpoints — backtest + signal generation + price ingest.
 
-POST /v1/jobs/backtest  — enqueue a backtest job
-GET  /v1/jobs/{job_id} — poll job status
+POST /v1/jobs/backtest                  — enqueue a backtest job
+POST /v1/jobs/signals/portfolio         — generate signals for all holdings
+POST /v1/jobs/signals/watchlist         — generate signals for watchlist
+POST /v1/jobs/prices/ingest/portfolio   — fetch 2yr OHLCV for all holdings
+POST /v1/jobs/prices/refresh/portfolio  — fetch last 30d OHLCV (daily refresh)
+GET  /v1/jobs/{job_id}                  — poll job status
+GET  /v1/jobs/prices/{job_id}           — poll price ingest job status
 """
 
 import uuid
@@ -22,10 +27,10 @@ logger = structlog.get_logger()
 router = APIRouter(prefix="/v1/jobs")
 
 
-def _get_queue() -> Queue:
+def _get_queue(name: str = "markets_backtests") -> Queue:
     s = get_settings()
     r = redis.from_url(s.effective_redis_url, decode_responses=False)
-    return Queue("markets_backtests", connection=r)
+    return Queue(name, connection=r)
 
 
 class BacktestRequest(BaseModel):
@@ -116,6 +121,127 @@ async def submit_backtest(body: BacktestRequest, auth: Auth):
             {"status": "failed", "error": str(exc)}
         ).eq("id", backtest_id).execute()
         raise HTTPException(503, detail=f"Job queue unavailable: {exc}") from exc
+
+
+class SignalPortfolioRequest(BaseModel):
+    portfolio_id: str
+
+
+class SignalWatchlistRequest(BaseModel):
+    watchlist_id:  str
+    owner_user_id: str
+    tenant_id:     str
+    franchise_id:  str
+
+
+@router.post("/signals/portfolio")
+async def generate_portfolio_signals(body: SignalPortfolioRequest, auth: Auth):
+    """Enqueue LangGraph signal generation for all holdings in a portfolio."""
+    from markets_worker.jobs.signal_generator import generate_signals_for_portfolio
+    try:
+        q = _get_queue("markets_signals")
+        job = q.enqueue(
+            generate_signals_for_portfolio,
+            body.portfolio_id,
+            job_id=f"sig-portfolio-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}",
+            job_timeout=300,
+            result_ttl=3600,
+        )
+        logger.info("signals.enqueued", portfolio_id=body.portfolio_id, job_id=job.id)
+        return {"job_id": job.id, "portfolio_id": body.portfolio_id, "status": "queued"}
+    except Exception as exc:
+        logger.error("signals.enqueue_failed", error=str(exc))
+        raise HTTPException(503, detail=f"Job queue unavailable: {exc}") from exc
+
+
+@router.post("/signals/watchlist")
+async def generate_watchlist_signals(body: SignalWatchlistRequest, auth: Auth):
+    """Enqueue LangGraph signal generation for all instruments in a watchlist."""
+    from markets_worker.jobs.signal_generator import generate_signals_for_watchlist
+    try:
+        q = _get_queue("markets_signals")
+        job = q.enqueue(
+            generate_signals_for_watchlist,
+            body.watchlist_id,
+            body.owner_user_id,
+            body.tenant_id,
+            body.franchise_id,
+            job_id=f"sig-watchlist-{body.watchlist_id[:8]}-{uuid.uuid4().hex[:6]}",
+            job_timeout=300,
+            result_ttl=3600,
+        )
+        return {"job_id": job.id, "watchlist_id": body.watchlist_id, "status": "queued"}
+    except Exception as exc:
+        raise HTTPException(503, detail=f"Job queue unavailable: {exc}") from exc
+
+
+# ── Price ingest endpoints ────────────────────────────────────────────────────
+
+class PriceIngestRequest(BaseModel):
+    portfolio_id:  str
+    lookback_days: int = 730   # 2 years default
+
+
+@router.post("/prices/ingest/portfolio")
+async def ingest_portfolio_prices(body: PriceIngestRequest, auth: Auth):
+    """Enqueue full OHLCV backfill (2 years) for all holdings in a portfolio."""
+    from markets_worker.jobs.price_ingest import ingest_prices_for_portfolio
+    try:
+        q = _get_queue("markets_signals")   # reuse same queue
+        job_id = f"price-ingest-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}"
+        job = q.enqueue(
+            ingest_prices_for_portfolio,
+            body.portfolio_id,
+            body.lookback_days,
+            job_id=job_id,
+            job_timeout=900,      # 15 min max for full historical fetch
+            result_ttl=3600,
+        )
+        logger.info("price_ingest.enqueued", portfolio_id=body.portfolio_id, job_id=job.id)
+        return {"job_id": job.id, "portfolio_id": body.portfolio_id, "status": "queued"}
+    except Exception as exc:
+        logger.error("price_ingest.enqueue_failed", error=str(exc))
+        raise HTTPException(503, detail=f"Job queue unavailable: {exc}") from exc
+
+
+@router.post("/prices/refresh/portfolio")
+async def refresh_portfolio_prices(body: PriceIngestRequest, auth: Auth):
+    """Enqueue 30-day price refresh for all holdings (use after initial backfill)."""
+    from markets_worker.jobs.price_ingest import refresh_prices_for_portfolio
+    try:
+        q = _get_queue("markets_signals")
+        job_id = f"price-refresh-{body.portfolio_id[:8]}-{uuid.uuid4().hex[:6]}"
+        job = q.enqueue(
+            refresh_prices_for_portfolio,
+            body.portfolio_id,
+            job_id=job_id,
+            job_timeout=300,
+            result_ttl=3600,
+        )
+        return {"job_id": job.id, "portfolio_id": body.portfolio_id, "status": "queued"}
+    except Exception as exc:
+        raise HTTPException(503, detail=f"Job queue unavailable: {exc}") from exc
+
+
+@router.get("/prices/{job_id}")
+async def get_price_ingest_status(job_id: str, auth: Auth):
+    """Poll a price ingest job by its RQ job ID."""
+    try:
+        q = _get_queue("markets_signals")
+        job = Job.fetch(job_id, connection=q.connection)
+        status = job.get_status()
+        result = None
+        if status and status.value == "finished":
+            result = job.result
+        return {
+            "job_id": job_id,
+            "status": status.value if status else "unknown",
+            "result": result,
+        }
+    except NoSuchJobError:
+        raise HTTPException(404, detail="Job not found")
+    except Exception as exc:
+        raise HTTPException(500, detail=str(exc))
 
 
 @router.get("/{job_id}", response_model=JobStatusResponse)

@@ -25,7 +25,6 @@ logger = structlog.get_logger()
 
 mcp = FastMCP(
     name="markets-data",
-    version="0.1.0",
     instructions=(
         "You have read-only access to the Logic Nexus AI markets database. "
         "Use these tools to ground your analysis in live data — "

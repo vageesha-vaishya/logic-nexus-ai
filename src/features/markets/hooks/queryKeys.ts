@@ -60,4 +60,23 @@ export const marketsKeys = {
     messages: (threadId: string) =>
       [...marketsKeys.threads.all(), "messages", threadId] as const,
   },
+
+  signals: {
+    all:  () => [...marketsKeys.all, "signals"] as const,
+    list: (filters?: { portfolioId?: string | null; limit?: number }) =>
+      [...marketsKeys.signals.all(), "list", filters ?? {}] as const,
+  },
+
+  strategies: {
+    all:    () => [...marketsKeys.all, "strategies"] as const,
+    list:   () => [...marketsKeys.strategies.all(), "list"] as const,
+    detail: (id: string) => [...marketsKeys.strategies.all(), "detail", id] as const,
+  },
+
+  backtests: {
+    all:    () => [...marketsKeys.all, "backtests"] as const,
+    list:   (filters?: { strategyId?: string | null }) =>
+      [...marketsKeys.backtests.all(), "list", filters ?? {}] as const,
+    detail: (id: string) => [...marketsKeys.backtests.all(), "detail", id] as const,
+  },
 } as const;

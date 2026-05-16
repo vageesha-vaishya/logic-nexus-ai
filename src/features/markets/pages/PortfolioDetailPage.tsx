@@ -10,7 +10,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useParams, Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
-  ArrowLeft, Brain, Loader2, Newspaper, Plus, Trash2, Upload,
+  ArrowLeft, Brain, Download, Loader2, MoreVertical, Newspaper, Plus, Trash2, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -45,6 +45,62 @@ import {
   TXN_TYPE_LABELS    as TTL,
   TXN_TYPES_NEED_INSTRUMENT as TTN,
 } from "../types";
+import type { Transaction } from "../types";
+
+// ─── Sector map ────────────────────────────────────────────────────────────
+
+const SECTOR_MAP: Record<string, string> = {
+  EXIIND: "Auto / Auto Ancillary", BORGLA: "Auto / Auto Ancillary",
+  IDFBAN: "Banks", YESBAN: "Banks",
+  TRITUR: "Engineering / Capital Goods", NTPC: "Power", RELIND: "Energy",
+  AADVEN: "Finance", JIOFIN: "Finance", REPHOM: "Finance", PENMER: "Finance",
+  GLEPHA: "Pharma", AMAREM: "Pharma", GRANUL: "Pharma", MORLAB: "Pharma",
+  HCLTEC: "Technology", TCS: "Technology", TECMAH: "Technology",
+  GLOTEC: "Technology", TELDAT: "Technology", TELMAR: "Technology", TELTEC: "Technology", KAARAD: "Technology",
+  ITC: "FMCG", ASIPAI: "FMCG",
+  TATSTE: "Metals & Mining",
+  ITCHOT: "Hotels & Hospitality",
+  TRILTD: "Textiles",
+  GOLDEX: "ETF", DILMED: "Media", SITCAB: "Media", ZEELEA: "Media", ZEEMED: "Media",
+};
+
+function getSector(symbol: string): string {
+  return SECTOR_MAP[symbol?.toUpperCase()] ?? "Others";
+}
+
+// ─── LTCG qty computation ─────────────────────────────────────────────────
+
+function ltcgQty(instrumentId: string, totalQty: number, transactions: Transaction[]): number {
+  const oneYearAgo = new Date();
+  oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+  const instTxns = transactions.filter((t) => t.instrument_id === instrumentId);
+  if (!instTxns.length) return totalQty;
+  const oldBuys = instTxns
+    .filter((t) => ["buy", "sip", "transfer_in"].includes(t.txn_type) && new Date(t.txn_date) < oneYearAgo)
+    .reduce((s, t) => s + Number(t.qty), 0);
+  const oldSells = instTxns
+    .filter((t) => ["sell", "redemption", "transfer_out"].includes(t.txn_type) && new Date(t.txn_date) < oneYearAgo)
+    .reduce((s, t) => s + Number(t.qty), 0);
+  return Math.min(Math.max(0, oldBuys - oldSells), totalQty);
+}
+
+// ─── Formatting helpers ───────────────────────────────────────────────────
+
+function fmtINR(value: number): string {
+  return value.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+function fmtPct(value: number): string {
+  return (value * 100).toFixed(2) + "%";
+}
+
+function pnlClass(value: number): string {
+  return value >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-500 dark:text-red-400";
+}
+
+// ─── Grouping type ────────────────────────────────────────────────────────
+
+type GroupingMode = "None" | "Sector" | "Exchange" | "Asset Class";
 
 // ─── Page ─────────────────────────────────────────────────────────────────
 
@@ -59,6 +115,7 @@ export default function PortfolioDetailPage() {
   const [addTxnOpen,   setAddTxnOpen]   = useState(false);
   const [deleteTxnId,  setDeleteTxnId]  = useState<string | null>(null);
   const [importOpen,   setImportOpen]   = useState(false);
+  const [grouping,     setGrouping]     = useState<GroupingMode>("None");
 
   const latestBrief    = briefs.data?.[0];
   const previousBriefs = briefs.data?.slice(1) ?? [];
@@ -176,12 +233,49 @@ export default function PortfolioDetailPage() {
             />
           )}
           {holdings.isSuccess && holdings.data.holdings.length > 0 && (
-            <Card>
-              <CardHeader><CardTitle className="text-base">Current positions</CardTitle></CardHeader>
-              <CardContent>
-                <HoldingsTable holdings={holdings.data.holdings} currency={p.base_currency} />
-              </CardContent>
-            </Card>
+            <>
+              {/* Summary bar */}
+              <HoldingsSummaryBar holdings={holdings.data.holdings} currency={p.base_currency} />
+
+              {/* Grouping controls + download */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-muted-foreground font-medium">Grouping:</span>
+                  <Select value={grouping} onValueChange={(v) => setGrouping(v as GroupingMode)}>
+                    <SelectTrigger className="h-7 w-36 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(["None", "Sector", "Exchange", "Asset Class"] as GroupingMode[]).map((g) => (
+                        <SelectItem key={g} value={g} className="text-xs">{g}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <button
+                  type="button"
+                  className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  title="Download holdings"
+                  aria-label="Download holdings"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              </div>
+
+              {/* Holdings table */}
+              <Card>
+                <CardContent className="p-0 overflow-x-auto">
+                  <HoldingsTable
+                    holdings={holdings.data.holdings}
+                    currency={p.base_currency}
+                    transactions={transactions.data ?? []}
+                    grouping={grouping}
+                    onBuy={() => setAddTxnOpen(true)}
+                    onSell={() => setAddTxnOpen(true)}
+                  />
+                </CardContent>
+              </Card>
+            </>
           )}
         </TabsContent>
 
@@ -294,7 +388,7 @@ export default function PortfolioDetailPage() {
   );
 }
 
-// ─── Holdings table ────────────────────────────────────────────────────────
+// ─── KPI Cell ──────────────────────────────────────────────────────────────
 
 function KpiCell({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -305,54 +399,337 @@ function KpiCell({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
-function HoldingsTable({ holdings, currency }: { holdings: HoldingWithPrice[]; currency: string }) {
+// ─── Holdings Summary Bar ─────────────────────────────────────────────────
+
+function HoldingsSummaryBar({ holdings, currency }: { holdings: HoldingWithPrice[]; currency: string }) {
+  const amountInvested = holdings.reduce((s, h) => s + h.qty * h.avg_cost, 0);
+  const currentValue   = holdings.reduce((s, h) => s + h.qty * (h.last_price ?? h.avg_cost), 0);
+  const dayGainAbs     = holdings.reduce((s, h) => s + h.qty * ((h.last_price ?? 0) - (h.prev_price ?? h.last_price ?? 0)), 0);
+  const dayGainPct     = currentValue > 0 ? dayGainAbs / (currentValue - dayGainAbs) : 0;
+  const absReturnsPct  = amountInvested > 0 ? (currentValue - amountInvested) / amountInvested : 0;
+
+  const withDayPct = holdings
+    .filter((h) => h.last_price && h.prev_price)
+    .map((h) => ({ ...h, dayPct: (h.last_price! - h.prev_price!) / h.prev_price! }));
+
+  const maxGainer = withDayPct.length > 0
+    ? withDayPct.reduce((best, h) => h.dayPct > (best?.dayPct ?? -Infinity) ? h : best, null as any)
+    : null;
+  const maxLoser = withDayPct.length > 0
+    ? withDayPct.reduce((best, h) => h.dayPct < (best?.dayPct ?? Infinity) ? h : best, null as any)
+    : null;
+
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          {/* Left block */}
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
+            <SummaryKpi label="Amount Invested">
+              <span className="font-semibold tabular-nums">₹{fmtINR(amountInvested)}</span>
+            </SummaryKpi>
+            <SummaryKpi label="Current Value">
+              <span className="font-semibold tabular-nums">₹{fmtINR(currentValue)}</span>
+            </SummaryKpi>
+            <SummaryKpi label="Day's Gain">
+              <span className={`font-semibold tabular-nums ${pnlClass(dayGainAbs)}`}>
+                ₹{fmtINR(dayGainAbs)}{" "}
+                <span className="text-xs">({dayGainAbs >= 0 ? "+" : ""}{fmtPct(dayGainPct)})</span>
+              </span>
+            </SummaryKpi>
+            <SummaryKpi label="Absolute Returns">
+              <span className={`font-semibold tabular-nums ${pnlClass(absReturnsPct)}`}>
+                {absReturnsPct >= 0 ? "+" : ""}{fmtPct(absReturnsPct)}
+              </span>
+            </SummaryKpi>
+          </div>
+
+          {/* Right block — Max Gainer / Max Loser */}
+          {(maxGainer || maxLoser) && (
+            <div className="flex gap-6 text-xs">
+              {maxGainer && (
+                <div>
+                  <p className="text-muted-foreground mb-0.5">Max Gainer</p>
+                  <p className="font-mono font-semibold text-sm">{maxGainer.instrument?.symbol ?? "—"}</p>
+                  <p className="tabular-nums font-medium">₹{fmtINR(maxGainer.last_price ?? 0)}</p>
+                  <p className={`tabular-nums ${pnlClass(maxGainer.dayPct)}`}>
+                    +₹{fmtINR((maxGainer.last_price ?? 0) - (maxGainer.prev_price ?? 0))} ({fmtPct(maxGainer.dayPct)})
+                  </p>
+                </div>
+              )}
+              {maxLoser && maxLoser.instrument?.id !== maxGainer?.instrument?.id && (
+                <div>
+                  <p className="text-muted-foreground mb-0.5">Max Loser</p>
+                  <p className="font-mono font-semibold text-sm">{maxLoser.instrument?.symbol ?? "—"}</p>
+                  <p className="tabular-nums font-medium">₹{fmtINR(maxLoser.last_price ?? 0)}</p>
+                  <p className={`tabular-nums ${pnlClass(maxLoser.dayPct)}`}>
+                    ₹{fmtINR((maxLoser.last_price ?? 0) - (maxLoser.prev_price ?? 0))} ({fmtPct(maxLoser.dayPct)})
+                  </p>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SummaryKpi({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="text-xs text-muted-foreground mb-0.5">{label}</p>
+      <div className="text-sm">{children}</div>
+    </div>
+  );
+}
+
+// ─── Holdings table ────────────────────────────────────────────────────────
+
+interface HoldingsTableProps {
+  holdings: HoldingWithPrice[];
+  currency: string;
+  transactions: Transaction[];
+  grouping: GroupingMode;
+  onBuy: (h: HoldingWithPrice) => void;
+  onSell: (h: HoldingWithPrice) => void;
+}
+
+function HoldingsTable({ holdings, currency, transactions, grouping, onBuy, onSell }: HoldingsTableProps) {
+  const [menuOpen, setMenuOpen] = useState<string | null>(null);
+
+  // Build groups
+  const grouped = useMemo(() => {
+    if (grouping === "None") {
+      return [{ label: null, items: holdings }];
+    }
+    const map = new Map<string, HoldingWithPrice[]>();
+    holdings.forEach((h) => {
+      let key: string;
+      if (grouping === "Sector") {
+        key = getSector(h.instrument?.symbol ?? "");
+      } else if (grouping === "Exchange") {
+        key = h.instrument?.exchange ?? "Unknown";
+      } else {
+        // Asset Class — instrument_type as proxy
+        key = h.instrument?.instrument_type ?? "Other";
+      }
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push(h);
+    });
+    // Sort groups alphabetically, "Others" last
+    const entries = Array.from(map.entries()).sort(([a], [b]) => {
+      if (a === "Others") return 1;
+      if (b === "Others") return -1;
+      return a.localeCompare(b);
+    });
+    return entries.map(([label, items]) => ({ label, items }));
+  }, [holdings, grouping]);
+
   return (
     <Table>
       <TableHeader>
-        <TableRow>
-          <TableHead>Symbol</TableHead>
-          <TableHead className="text-right">Qty</TableHead>
-          <TableHead className="text-right">Avg cost</TableHead>
-          <TableHead className="text-right">LTP</TableHead>
-          <TableHead className="text-right">Value</TableHead>
-          <TableHead className="text-right">P&amp;L</TableHead>
-          <TableHead className="text-right">P&amp;L %</TableHead>
+        <TableRow className="text-xs">
+          <TableHead className="font-semibold">Stock Symbol</TableHead>
+          <TableHead className="text-right font-semibold">Total Qty</TableHead>
+          <TableHead className="text-right font-semibold text-blue-600 dark:text-blue-400">
+            Qty &gt; 1 Yr
+          </TableHead>
+          <TableHead className="text-right font-semibold">Avg. Cost</TableHead>
+          <TableHead className="text-right font-semibold text-blue-600 dark:text-blue-400">CMP</TableHead>
+          <TableHead className="text-right font-semibold">% Change</TableHead>
+          <TableHead className="text-right font-semibold">Value At Cost</TableHead>
+          <TableHead className="text-right font-semibold">Value At CMP</TableHead>
+          <TableHead className="text-right font-semibold">Realized P&amp;L</TableHead>
+          {/* Unrealized P&L merged header */}
+          <TableHead colSpan={2} className="text-center font-semibold border-l">
+            Unrealized P&amp;L
+          </TableHead>
+          <TableHead className="text-right font-semibold">P&amp;L %</TableHead>
+          <TableHead className="text-center font-semibold">Actions</TableHead>
+        </TableRow>
+        {/* Sub-header for Unrealized P&L columns */}
+        <TableRow className="text-xs bg-muted/20">
+          <TableHead colSpan={9} />
+          <TableHead className="text-right text-muted-foreground font-normal border-l py-1 text-xs">Day's P&amp;L</TableHead>
+          <TableHead className="text-right text-muted-foreground font-normal py-1 text-xs">Overall</TableHead>
+          <TableHead colSpan={2} />
         </TableRow>
       </TableHeader>
       <TableBody>
-        {holdings.map((h) => {
-          const ltp   = h.last_price ?? h.avg_cost;
-          const value = h.qty * ltp;
-          const pnl   = h.qty * (ltp - h.avg_cost);
-          const pnlPct = h.avg_cost > 0 ? ((ltp - h.avg_cost) / h.avg_cost) * 100 : 0;
-          const sign  = pnl >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400";
+        {grouped.map(({ label, items }) => {
+          // Group sub-totals
+          const groupValueAtCost = items.reduce((s, h) => s + h.qty * h.avg_cost, 0);
+          const groupValueAtCmp  = items.reduce((s, h) => s + h.qty * (h.last_price ?? h.avg_cost), 0);
+          const groupRealizedPnl = items.reduce((s, h) => s + (h.realized_pnl ?? 0), 0);
+          const groupDaysPnl     = items.reduce((s, h) => s + h.qty * ((h.last_price ?? 0) - (h.prev_price ?? h.last_price ?? 0)), 0);
+          const groupOverallPnl  = items.reduce((s, h) => s + h.qty * ((h.last_price ?? h.avg_cost) - h.avg_cost), 0);
+
           return (
-            <TableRow key={h.id}>
-              <TableCell className="font-mono font-medium">
-                <div className="flex items-center gap-2">
-                  {h.instrument?.symbol ?? "—"}
-                  <Badge variant="secondary" className="text-xs">{h.instrument?.exchange ?? "—"}</Badge>
-                </div>
-              </TableCell>
-              <TableCell className="text-right tabular-nums">{h.qty}</TableCell>
-              <TableCell className="text-right tabular-nums text-muted-foreground">
-                <Numeric value={h.avg_cost} format="currency" currency={currency} />
-              </TableCell>
-              <TableCell className="text-right tabular-nums">
-                {h.last_price != null
-                  ? <Numeric value={h.last_price} format="currency" currency={currency} />
-                  : <span className="text-muted-foreground">—</span>}
-              </TableCell>
-              <TableCell className="text-right tabular-nums font-medium">
-                <Numeric value={value} format="currency" currency={currency} />
-              </TableCell>
-              <TableCell className={`text-right tabular-nums ${sign}`}>
-                <Numeric value={pnl} format="pnl" currency={currency} colorBySign />
-              </TableCell>
-              <TableCell className={`text-right tabular-nums ${sign}`}>
-                <Numeric value={pnlPct} format="percent" colorBySign withArrow />
-              </TableCell>
-            </TableRow>
+            <>
+              {/* Group header row */}
+              {label !== null && (
+                <TableRow key={`group-${label}`} className="bg-muted/40 hover:bg-muted/40">
+                  <TableCell colSpan={13} className="py-1.5 font-bold text-xs text-foreground tracking-wide">
+                    {label}
+                  </TableCell>
+                </TableRow>
+              )}
+
+              {/* Holding rows */}
+              {items.map((h) => {
+                const ltp         = h.last_price ?? h.avg_cost;
+                const prev        = h.prev_price ?? ltp;
+                const dayChangePct = prev > 0 ? (ltp - prev) / prev : 0;
+                const valueAtCost = h.qty * h.avg_cost;
+                const valueAtCmp  = h.qty * ltp;
+                const realizedPnl = h.realized_pnl ?? 0;
+                const daysPnl     = h.qty * (ltp - prev);
+                const overallPnl  = h.qty * (ltp - h.avg_cost);
+                const overallPct  = h.avg_cost > 0 ? (ltp - h.avg_cost) / h.avg_cost : 0;
+                const ltcg        = ltcgQty(h.instrument_id, h.qty, transactions);
+
+                return (
+                  <TableRow key={h.id} className="text-xs hover:bg-muted/30">
+                    {/* Symbol */}
+                    <TableCell className="font-mono font-medium py-2">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-foreground">{h.instrument?.symbol ?? "—"}</span>
+                        <span className="text-muted-foreground text-xs">{h.instrument?.exchange ?? ""}</span>
+                      </div>
+                    </TableCell>
+
+                    {/* Total Qty */}
+                    <TableCell className="text-right tabular-nums py-2">{h.qty}</TableCell>
+
+                    {/* Qty > 1 Yr (LTCG) */}
+                    <TableCell className="text-right tabular-nums py-2 text-blue-600 dark:text-blue-400">
+                      {ltcg}
+                    </TableCell>
+
+                    {/* Avg Cost */}
+                    <TableCell className="text-right tabular-nums py-2 text-muted-foreground">
+                      ₹{fmtINR(h.avg_cost)}
+                    </TableCell>
+
+                    {/* CMP */}
+                    <TableCell className="text-right tabular-nums py-2 text-blue-600 dark:text-blue-400 font-medium">
+                      {h.last_price != null ? `₹${fmtINR(h.last_price)}` : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* % Change (day) */}
+                    <TableCell className={`text-right tabular-nums py-2 ${pnlClass(dayChangePct)}`}>
+                      {h.last_price != null && h.prev_price != null
+                        ? `${dayChangePct >= 0 ? "+" : ""}${fmtPct(dayChangePct)}`
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* Value At Cost */}
+                    <TableCell className="text-right tabular-nums py-2">
+                      ₹{fmtINR(valueAtCost)}
+                    </TableCell>
+
+                    {/* Value At CMP */}
+                    <TableCell className="text-right tabular-nums py-2 font-medium">
+                      ₹{fmtINR(valueAtCmp)}
+                    </TableCell>
+
+                    {/* Realized P&L */}
+                    <TableCell className={`text-right tabular-nums py-2 ${pnlClass(realizedPnl)}`}>
+                      ₹{fmtINR(realizedPnl)}
+                    </TableCell>
+
+                    {/* Day's P&L */}
+                    <TableCell className={`text-right tabular-nums py-2 border-l ${pnlClass(daysPnl)}`}>
+                      {h.last_price != null && h.prev_price != null
+                        ? `${daysPnl >= 0 ? "+" : ""}₹${fmtINR(Math.abs(daysPnl))}`
+                        : <span className="text-muted-foreground">—</span>}
+                    </TableCell>
+
+                    {/* Overall Unrealized P&L */}
+                    <TableCell className={`text-right tabular-nums py-2 ${pnlClass(overallPnl)}`}>
+                      {overallPnl >= 0 ? "+" : ""}₹{fmtINR(Math.abs(overallPnl))}
+                    </TableCell>
+
+                    {/* P&L % */}
+                    <TableCell className={`text-right tabular-nums py-2 ${pnlClass(overallPct)}`}>
+                      {overallPct >= 0 ? "+" : ""}{fmtPct(overallPct)}
+                    </TableCell>
+
+                    {/* Actions */}
+                    <TableCell className="py-2">
+                      <div className="flex items-center gap-1 justify-center">
+                        <button
+                          type="button"
+                          onClick={() => onBuy(h)}
+                          className="rounded px-1.5 py-0.5 text-xs font-medium text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950"
+                        >
+                          Buy
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onSell(h)}
+                          className="rounded px-1.5 py-0.5 text-xs font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
+                        >
+                          Sell
+                        </button>
+                        <div className="relative">
+                          <button
+                            type="button"
+                            onClick={() => setMenuOpen(menuOpen === h.id ? null : h.id)}
+                            className="rounded p-0.5 text-muted-foreground hover:bg-muted"
+                            aria-label="More options"
+                          >
+                            <MoreVertical className="h-3.5 w-3.5" />
+                          </button>
+                          {menuOpen === h.id && (
+                            <div className="absolute right-0 top-full z-50 mt-1 min-w-[160px] rounded-md border bg-popover shadow-md">
+                              <button
+                                type="button"
+                                className="flex w-full items-center gap-2 px-3 py-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                                onClick={() => {
+                                  setMenuOpen(null);
+                                  toast.info("Use the Transactions tab to manage individual transactions");
+                                }}
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                                Delete holding
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+
+              {/* Sub-total row (only when grouping is active) */}
+              {label !== null && (
+                <TableRow key={`subtotal-${label}`} className="bg-muted/30 font-medium text-xs">
+                  <TableCell colSpan={6} className="text-right text-muted-foreground py-1.5 pr-4">
+                    Sub Total :
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums py-1.5">
+                    ₹{fmtINR(groupValueAtCost)}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums py-1.5">
+                    ₹{fmtINR(groupValueAtCmp)}
+                  </TableCell>
+                  <TableCell className={`text-right tabular-nums py-1.5 ${pnlClass(groupRealizedPnl)}`}>
+                    ₹{fmtINR(groupRealizedPnl)}
+                  </TableCell>
+                  <TableCell className={`text-right tabular-nums py-1.5 border-l ${pnlClass(groupDaysPnl)}`}>
+                    {groupDaysPnl >= 0 ? "+" : ""}₹{fmtINR(Math.abs(groupDaysPnl))}
+                  </TableCell>
+                  <TableCell className={`text-right tabular-nums py-1.5 ${pnlClass(groupOverallPnl)}`}>
+                    {groupOverallPnl >= 0 ? "+" : ""}₹{fmtINR(Math.abs(groupOverallPnl))}
+                  </TableCell>
+                  <TableCell />
+                  <TableCell />
+                </TableRow>
+              )}
+            </>
           );
         })}
       </TableBody>
@@ -361,8 +738,6 @@ function HoldingsTable({ holdings, currency }: { holdings: HoldingWithPrice[]; c
 }
 
 // ─── Transactions table ────────────────────────────────────────────────────
-
-import type { Transaction } from "../types";
 
 const TXN_TYPE_COLOR: Partial<Record<TransactionType, string>> = {
   buy:          "bg-blue-100 text-blue-800",

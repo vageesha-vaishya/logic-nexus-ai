@@ -82,7 +82,8 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       return new Response(JSON.stringify({ error: authError ?? "Unauthorized" }), { status: 401, headers: jsonH });
     }
 
-    const tenantId = req.headers.get("x-tenant-id");
+    const tenantId   = req.headers.get("x-tenant-id");
+    const franchiseId = req.headers.get("x-franchise-id") ?? null;
     if (!tenantId) {
       logAccess(supabaseAdmin, {
         requestId, domain: "markets", op, userId: user.id,
@@ -129,6 +130,16 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       return new Response(JSON.stringify({ error: "Maximum 500 rows per import" }), { status: 400, headers: jsonH });
 
     const marketsAdmin = (supabaseAdmin as any).schema("markets");
+
+    // Resolve franchise_id: use header if provided, else look up from portfolio
+    let resolvedFranchiseId = franchiseId;
+    if (!resolvedFranchiseId) {
+      const { data: pf } = await marketsAdmin
+        .from("portfolios").select("franchise_id").eq("id", portfolioId).maybeSingle();
+      resolvedFranchiseId = (pf as any)?.franchise_id ?? null;
+    }
+    if (!resolvedFranchiseId)
+      return new Response(JSON.stringify({ error: "Could not resolve franchise_id for this portfolio" }), { status: 400, headers: jsonH });
     const marketsUser  = (supabaseClient as any).schema("markets");
 
     // ── Resolve instruments ──────────────────────────────────────────────
@@ -310,8 +321,14 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
       if (totalQty > 0) {
         await marketsAdmin.from("holdings").upsert({
-          portfolio_id: portfolioId, instrument_id: instrId,
-          qty: totalQty, avg_cost: avgCost, last_updated_at: new Date().toISOString(),
+          portfolio_id:  portfolioId,
+          instrument_id: instrId,
+          tenant_id:     tenantId,
+          franchise_id:  resolvedFranchiseId,
+          owner_user_id: user.id,
+          qty:           totalQty,
+          avg_cost:      avgCost,
+          last_updated_at: new Date().toISOString(),
         }, { onConflict: "portfolio_id,instrument_id" });
       }
 

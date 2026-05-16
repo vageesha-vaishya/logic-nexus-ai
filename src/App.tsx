@@ -111,6 +111,7 @@ const Vehicles = lazy(() => import("./pages/dashboard/Vehicles"));
 const VehicleNew = lazy(() => import("./pages/dashboard/VehicleNew"));
 const SubscriptionManagement = lazy(() => import("./pages/dashboard/SubscriptionManagement"));
 const TenantSubscription = lazy(() => import("./pages/dashboard/TenantSubscription"));
+const BillingInvoiceDetail = lazy(() => import("./pages/dashboard/billing/BillingInvoiceDetail"));
 const Quotes = lazy(() => import("./pages/dashboard/Quotes"));
 const QuoteTemplates = lazy(() => import("./pages/dashboard/QuoteTemplates"));
 const QuoteNew = lazy(() => import("./pages/dashboard/QuoteNew"));
@@ -219,6 +220,7 @@ const MarketsBacktests = lazy(() => import("./features/markets/pages/BacktestsPa
 const MarketsSignals = lazy(() => import("./features/markets/pages/SignalsPage"));
 // Platform-wide LLM provider settings — same component, reachable from main settings hub.
 const PlatformLlmSettings = MarketsLlmSettings;
+const FeatureFlagsAdmin = lazy(() => import("./pages/dashboard/settings/FeatureFlagsPage"));
 const AmroWorkCentersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkCentersMasterDataPage })));
 const AmroSkillCodesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.SkillCodesMasterDataPage })));
 const AmroManufacturersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.ManufacturersMasterDataPage })));
@@ -905,6 +907,7 @@ const App = () => (
             {/* Subscription & Billing Routes */}
             <Route path="/dashboard/subscriptions" element={<ProtectedRoute><SubscriptionManagement /></ProtectedRoute>} />
             <Route path="/dashboard/tenant-subscriptions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TenantSubscription /></ProtectedRoute>} />
+            <Route path="/dashboard/billing/invoices/:id" element={<ProtectedRoute><BillingInvoiceDetail /></ProtectedRoute>} />
             <Route path="/dashboard/log-test" element={<ProtectedRoute><LogTestPage /></ProtectedRoute>} />
             <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
             <Route path="/dashboard/amro" element={<Navigate to="/dashboard/amro/overview" replace />} />
@@ -967,6 +970,7 @@ const App = () => (
             <Route path="/dashboard/markets/backtests" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBacktests /></ProtectedRoute>} />
             <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSignals /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
+            <Route path="/dashboard/settings/feature-flags" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><FeatureFlagsAdmin /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}
             <Route path="/dashboard/sales/command-center" element={<ProtectedRoute><SalesCommandCenter /></ProtectedRoute>} />

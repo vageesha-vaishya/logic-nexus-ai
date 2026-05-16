@@ -4,7 +4,7 @@
  * Contact search: inline autocomplete input, no Popover trigger needed.
  */
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useForm } from "react-hook-form";
 import { Link, useNavigate } from "react-router-dom";
@@ -29,6 +29,7 @@ import {
   useCrmContactSearch,
   type UpdatePortfolioInput,
 } from "../hooks/usePortfolios";
+import { useRefreshNav } from "../hooks/usePortfolio";
 import { NewsPanel } from "../components/NewsPanel";
 import type {
   CreatePortfolioInput,
@@ -137,10 +138,15 @@ const CURRENCIES: { code: string; name: string }[] = [
 export default function PortfoliosPage() {
   const portfolios  = usePortfolios();
   const navigate    = useNavigate();
+  const refreshNav  = useRefreshNav();
 
   const [createOpen,       setCreateOpen]       = useState(false);
   const [editPortfolio,    setEditPortfolio]     = useState<Portfolio | null>(null);
   const [deletePortfolio,  setDeletePortfolio]   = useState<Portfolio | null>(null);
+
+  // Refresh NAV metadata once on mount so the list shows current values.
+  // Fire-and-forget — the mutation invalidates portfolio list on success.
+  useEffect(() => { refreshNav.mutate(undefined); }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <DashboardLayout>

@@ -64,9 +64,9 @@ const FORMATS: { value: ImportFormat; label: string; hint: string; columns: stri
   {
     value: "icici_direct",
     label: "ICICI Direct",
-    hint: "Website → Stocks → Portfolio → download icon → CSV",
-    columns: "NSE Code / Symbol, ISIN, Qty, Avg. Rate, Exchange …",
-    note: "Column names vary by account type — the parser auto-detects them.",
+    hint: "Brokerage: Website → Stocks → Portfolio → download icon → CSV  |  Demat: ICICI Direct app → Demat Holdings → Export",
+    columns: "Stock Name, Stock, ISIN, Allocated Quantity … (or) NSE Code, Qty, Avg. Rate …",
+    note: "⚠️ The Demat/depository export does not include avg purchase price — avg cost will be ₹0. Update via Transactions tab after import.",
   },
   {
     value: "hdfc",

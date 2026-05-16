@@ -57,7 +57,7 @@ function useActiveScope() {
   const franchiseScoped = roles.find((r) => Boolean(r.tenant_id) && Boolean(r.franchise_id));
   const tenantScoped    = roles.find((r) => Boolean(r.tenant_id));
   const active          = franchiseScoped ?? tenantScoped ?? roles[0];
-  return { tenantId: active?.tenant_id ?? null, userId: user?.id ?? null };
+  return { tenantId: active?.tenant_id ?? null, franchiseId: active?.franchise_id ?? null, userId: user?.id ?? null };
 }
 
 // ── CSV utility ────────────────────────────────────────────────────────────
@@ -235,71 +235,140 @@ function parseUpstox(csv: string): ImportRow[] {
  * ICICI Direct column names vary by account type and have changed over time.
  * This parser tries several known header aliases for each field.
  *
- * Known header variants observed in the wild:
- *   Symbol  : "nse_code", "symbol", "scrip_code", "script_name", "scrip_name",
- *             "security_name", "stock_name", "company_name"
- *   Exchange: "exchange", "market"
- *   ISIN    : "isin", "isin_code", "isin_no"
- *   Qty     : "qty", "quantity", "balance_qty", "net_qty", "current_qty", "holding_qty"
- *   AvgCost : "avg__rate", "average_price", "avg_cost", "cost_price",
- *             "avg_buy_price", "purchase_price", "buy_price", "rate"
+ * Two sub-formats handled automatically:
  *
- * If auto-detection produces 0 rows, the UI asks the user to share their
- * header row so we can refine the parser.
+ * A) Demat / holdings snapshot (e.g. 8500608300_Demat.csv):
+ *    Stock Name, Stock (short code), ISIN, Allocated Quantity, ...
+ *    → one row per current holding, no Action column
+ *
+ * B) Transaction history (e.g. 8500608300_PortFolioEqtAll.csv):
+ *    Stock Symbol, Company Name, ISIN Code, Action (Buy/Sell), Quantity,
+ *    Transaction Price, ..., Transaction Date (DD-Mon-YYYY), Exchange
+ *    → multiple rows per stock; grouped by symbol, net qty computed
+ *
+ * Format is auto-detected by presence of the "action" column.
  */
+
+const _MONTH: Record<string, string> = {
+  jan:"01",feb:"02",mar:"03",apr:"04",may:"05",jun:"06",
+  jul:"07",aug:"08",sep:"09",oct:"10",nov:"11",dec:"12",
+};
+function _parseDdMonYyyy(s: string): string | undefined {
+  const m = s?.match(/^(\d{1,2})-([A-Za-z]{3})-(\d{4})$/);
+  if (!m) return undefined;
+  const mo = _MONTH[m[2].toLowerCase()];
+  if (!mo) return undefined;
+  return `${m[3]}-${mo}-${m[1].padStart(2, "0")}`;
+}
+
 function parseIciciDirect(csv: string): ImportRow[] {
-  // ICICI sometimes prepends account info rows — skip until we find the data header
   const text  = csv.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
-  // Find the header row — look for a line containing common ICICI field keywords
-  const headerKeywords = /symbol|scrip|isin|qty|quantity|rate|price|nse|bse/i;
+  const headerKeywords = /symbol|scrip|isin|qty|quantity|rate|price|nse|bse|action/i;
   let headerIdx = 0;
   for (let i = 0; i < Math.min(lines.length, 10); i++) {
     if (headerKeywords.test(lines[i])) { headerIdx = i; break; }
   }
 
-  // Re-parse from found header line
-  const adjustedCsv = lines.slice(headerIdx).join("\n");
-  const rows = parseCsvToObjects(adjustedCsv);
+  const rows = parseCsvToObjects(lines.slice(headerIdx).join("\n"));
+  if (rows.length === 0) return [];
 
-  // Helper: pick first matching key from an object
   const pick = (obj: Record<string, string>, ...keys: string[]) => {
     for (const k of keys) {
       const v = obj[k];
-      if (v !== undefined && v !== "") return v;
+      if (v !== undefined && v !== "" && v !== "NA") return v;
     }
     return undefined;
   };
 
+  const sample = rows[0];
+  const isTxnHistory = "action" in sample || "transaction_price" in sample;
+
+  if (isTxnHistory) {
+    // ── Transaction history format ────────────────────────────────────────
+    // Group by (symbol, exchange), compute net qty + weighted avg cost from buys.
+    type Group = { sym: string; exch: string; isin?: string; name: string;
+                   buyQty: number; buyCost: number; sellQty: number; lastBuyDate?: string; };
+    const groups = new Map<string, Group>();
+
+    for (const r of rows) {
+      const sym = (
+        pick(r, "stock_symbol", "nse_code", "nse_symbol", "symbol", "trading_symbol", "stock",
+             "scrip_code", "scrip_name", "script_name", "security_name", "company_name") ?? ""
+      ).replace(/\s+/g, "").toUpperCase();
+      if (!sym) continue;
+
+      const exch = (pick(r, "exchange", "market") ?? "NSE").toUpperCase().split(/[^A-Z]/)[0] || "NSE";
+      const key  = `${sym}::${exch}`;
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          sym, exch,
+          isin: pick(r, "isin_code", "isin", "isin_no") || undefined,
+          name: pick(r, "company_name", "security_name", "scrip_name") ?? sym,
+          buyQty: 0, buyCost: 0, sellQty: 0,
+        });
+      }
+      const g = groups.get(key)!;
+
+      const action = (pick(r, "action") ?? "buy").toLowerCase();
+      const qty    = parseNum(pick(r, "quantity", "qty"));
+      const price  = parseNum(pick(r, "transaction_price", "price", "rate"));
+      const date   = _parseDdMonYyyy(pick(r, "transaction_date", "date") ?? "");
+
+      if (action === "buy" || action === "b") {
+        g.buyQty  += qty;
+        g.buyCost += qty * price;
+        if (date && (!g.lastBuyDate || date > g.lastBuyDate)) g.lastBuyDate = date;
+      } else if (action === "sell" || action === "s") {
+        g.sellQty += qty;
+      }
+    }
+
+    const result: ImportRow[] = [];
+    let rowNum = 2;
+    for (const g of groups.values()) {
+      const netQty = g.buyQty - g.sellQty;
+      if (netQty <= 0) continue;
+      const avgCost = g.buyQty > 0 ? g.buyCost / g.buyQty : 0;
+      result.push({
+        symbol:        g.sym,
+        exchange:      g.exch,
+        isin:          g.isin,
+        qty:           netQty,
+        avg_cost:      Math.round(avgCost * 100) / 100,
+        purchase_date: g.lastBuyDate,
+        asset_class:   "equity",
+        _name:         g.name,
+        _raw_row:      rowNum++,
+      });
+    }
+    return result;
+  }
+
+  // ── Demat / snapshot format ───────────────────────────────────────────────
   return rows.map((r, i) => {
-    // Symbol: prefer NSE code over company name
     const sym = (
-      pick(r,
-        "nse_code", "nse_symbol", "symbol", "trading_symbol",
-        "scrip_code", "script_name", "scrip_name",
-        "security_name", "stock_name", "company_name", "scrip",
-      ) ?? ""
+      pick(r, "stock_symbol", "nse_code", "nse_symbol", "symbol", "trading_symbol", "stock",
+           "scrip_code", "script_name", "scrip_name", "security_name", "stock_name",
+           "company_name", "scrip") ?? ""
     ).replace(/\s+/g, "").toUpperCase();
 
-    const exch = (
-      pick(r, "exchange", "market", "segment") ?? "NSE"
-    ).toUpperCase().replace(/\s/g, "");
+    const exch = (pick(r, "exchange", "market", "segment") ?? "NSE")
+      .toUpperCase().replace(/\s/g, "");
 
     const isin = pick(r, "isin", "isin_code", "isin_no");
 
     const qty = parseNum(
-      pick(r, "qty", "quantity", "balance_qty", "net_qty",
+      pick(r, "qty", "quantity", "allocated_quantity", "balance_qty", "net_qty",
           "current_qty", "holding_qty", "balance", "units")
     );
 
     const avgCost = parseNum(
-      pick(r,
-        "avg__rate", "avg_rate", "average_price", "avg_cost",
-        "cost_price", "avg_buy_price", "purchase_price",
-        "buy_price", "rate", "buy_avg", "average_rate",
-        "average_buy_price", "avg_buy_rate",
-      )
+      pick(r, "avg__rate", "avg_rate", "average_price", "avg_cost", "cost_price",
+          "avg_buy_price", "purchase_price", "buy_price", "rate", "buy_avg",
+          "average_rate", "average_buy_price", "avg_buy_rate")
     );
 
     return {
@@ -635,7 +704,7 @@ export function downloadTemplate() {
 
 export function useImportHoldings(portfolioId: string | undefined) {
   const queryClient  = useQueryClient();
-  const { tenantId } = useActiveScope();
+  const { tenantId, franchiseId } = useActiveScope();
 
   return useMutation<ImportResult, Error, { rows: ImportRow[]; txnType: ImportTxnType }>({
     mutationFn: async ({ rows, txnType }) => {
@@ -643,16 +712,31 @@ export function useImportHoldings(portfolioId: string | undefined) {
       if (!portfolioId)  throw new Error("No portfolio selected");
       if (rows.length === 0) throw new Error("No rows to import");
 
+      const headers: Record<string, string> = { "x-tenant-id": tenantId };
+      if (franchiseId) headers["x-franchise-id"] = franchiseId;
+
       const { data, error } = await supabase.functions.invoke<ImportResult>(
         "markets-import-holdings",
         {
           method: "POST",
-          headers: { "x-tenant-id": tenantId },
+          headers,
           body: { portfolio_id: portfolioId, rows, txn_type: txnType },
         },
       );
-      if (error) throw new Error(error.message ?? "Import failed");
-      if (!data)  throw new Error("No response from server");
+      if (error) {
+        // Try to extract the real server error from the context body
+        const ctx = (error as any).context;
+        if (ctx instanceof Response) {
+          try {
+            const body = await ctx.json();
+            throw new Error(body?.error ?? error.message ?? "Import failed");
+          } catch {
+            throw new Error(error.message ?? "Import failed");
+          }
+        }
+        throw new Error(error.message ?? "Import failed");
+      }
+      if (!data) throw new Error("No response from server");
       return data;
     },
     onSuccess: () => {

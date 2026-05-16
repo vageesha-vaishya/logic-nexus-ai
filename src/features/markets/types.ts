@@ -341,6 +341,107 @@ export interface SendMessageInput {
   content:   string;
 }
 
+// ─── Signals ──────────────────────────────────────────────────────────────
+
+export type SignalType = "buy" | "sell" | "hold";
+export type SignalDirection = "long" | "short" | "neutral";
+
+export interface Signal {
+  id: string;
+  ts: string;
+  instrument_id: string;
+  strategy_id: string | null;
+  portfolio_id: string | null;
+  signal_type: SignalType;
+  direction: SignalDirection | null;
+  confidence: number | null;
+  score: number | null;
+  rationale: string | null;
+  price_at_signal: number | null;
+  generated_by: string | null;
+  expires_at: string | null;
+  metadata: Record<string, unknown>;
+  instrument: {
+    symbol: string;
+    exchange: string;
+    instrument_type: string;
+  } | null;
+}
+
+// ─── Strategies ───────────────────────────────────────────────────────────
+
+export type StrategyLifecycle = "draft" | "active" | "archived";
+
+export interface StrategyUniverse {
+  symbols: string[];
+  exchange?: string;
+}
+
+export interface Strategy {
+  id: string;
+  name: string;
+  description: string | null;
+  dsl: string | null;
+  lifecycle_state: StrategyLifecycle;
+  universe: StrategyUniverse | null;
+  constraints: Record<string, unknown> | null;
+  tags: string[];
+  version: number;
+  metadata: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateStrategyInput {
+  name: string;
+  description?: string | null;
+  dsl?: string | null;
+  universe?: StrategyUniverse | null;
+  tags?: string[];
+}
+
+// ─── Backtests ────────────────────────────────────────────────────────────
+
+export type BacktestStatus = "queued" | "running" | "completed" | "failed";
+
+export interface BacktestMetrics {
+  cagr: number;
+  sharpe: number;
+  sortino: number;
+  calmar: number;
+  max_drawdown: number;
+  volatility_annualised: number;
+  total_return: number;
+  n_trading_days: number;
+  symbols: string[];
+  n_assets: number;
+  strategy_type: string;
+}
+
+export interface Backtest {
+  id: string;
+  strategy_id: string;
+  status: BacktestStatus;
+  progress: number;
+  period_from: string | null;
+  period_to: string | null;
+  initial_capital: number;
+  commission_model: Record<string, unknown>;
+  metrics: BacktestMetrics | null;
+  error: string | null;
+  worker_job_id: string | null;
+  started_at: string;
+  finished_at: string | null;
+  params: Record<string, unknown>;
+}
+
+export interface RunBacktestInput {
+  strategy_id: string;
+  period_from: string;
+  period_to: string;
+  initial_capital?: number;
+}
+
 // ─── Holdings + NAV ────────────────────────────────────────────────────
 
 export interface Holding {

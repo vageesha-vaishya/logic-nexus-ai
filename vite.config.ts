@@ -86,6 +86,15 @@ export default defineConfig(({ mode }) => {
     targetEnvVar: 'VITE_TENANT_BRANDING_PROXY_TARGET',
     healthPathHint: '/',
   });
+  const marketsWorkerProxyTarget =
+    process.env.VITE_MARKETS_WORKER_TARGET || env.VITE_MARKETS_WORKER_TARGET || 'http://localhost:8001';
+  const marketsWorkerProxy = createServiceProxy({
+    serviceName: 'Markets Worker',
+    startCommand: 'uv run python -m markets_worker.worker',
+    target: marketsWorkerProxyTarget,
+    targetEnvVar: 'VITE_MARKETS_WORKER_TARGET',
+    healthPathHint: '/health',
+  });
 
   // Domain management API handler with Supabase persistence
   const domainAssignments = new Map();
@@ -580,8 +589,8 @@ export default defineConfig(({ mode }) => {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data: https:",
-        // Dev: allow localhost WS for Vite HMR + Supabase Realtime
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* ws://0.0.0.0:* https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com",
+        // Dev: allow localhost WS for Vite HMR + Supabase Realtime, HTTP for markets-worker (port 8001)
+        "connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* ws://0.0.0.0:* http://localhost:* https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com",
         "frame-src 'self' https://challenges.cloudflare.com",
         "worker-src 'self' blob:",
         "base-uri 'self'",
@@ -599,6 +608,10 @@ export default defineConfig(({ mode }) => {
     },
     proxy: {
       '/api/crm': crmProxy,
+      '/api/markets-worker': {
+        ...marketsWorkerProxy,
+        rewrite: (path: string) => path.replace(/^\/api\/markets-worker/, ''),
+      },
       '/api/v1/tenant-branding.css': tenantBrandingProxy,
       '/api/v1/tenant-branding': tenantBrandingProxy,
       // Domain management APIs are served by the core web API host, not AMRO API.
@@ -632,6 +645,10 @@ export default defineConfig(({ mode }) => {
     strictPort: true,
     proxy: {
       '/api/crm': crmProxy,
+      '/api/markets-worker': {
+        ...marketsWorkerProxy,
+        rewrite: (path: string) => path.replace(/^\/api\/markets-worker/, ''),
+      },
       '/api/v1/tenant-branding.css': tenantBrandingProxy,
       '/api/v1/tenant-branding': tenantBrandingProxy,
       '/api/v1/platform-domains': uimProxy,
