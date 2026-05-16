@@ -121,10 +121,33 @@ def _enqueue_daily_for_portfolio(portfolio_id: str) -> Job | None:
 
 # ── Setup — called once on worker startup ────────────────────────────────────
 
+def _enqueue_token_refresh() -> None:
+    """Schedule the daily broker token refresh at 08:00 IST (before market open)."""
+    try:
+        from markets_worker.jobs.broker_sync import refresh_broker_tokens
+        q      = _get_queue()
+        run_at = _next_run_at(hour=8, minute=0)
+        job_id = f"broker-token-refresh-{run_at.strftime('%Y%m%d')}"
+        try:
+            existing = Job.fetch(job_id, connection=q.connection)
+            if existing.get_status() in ("scheduled", "queued"):
+                return
+        except Exception:
+            pass
+        q.enqueue_at(
+            run_at, refresh_broker_tokens,
+            job_id=job_id, job_timeout=300, result_ttl=86400,
+        )
+        logger.info("token_refresh.scheduled", run_at=run_at.isoformat())
+    except Exception as exc:
+        logger.error("token_refresh.schedule_failed", error=str(exc))
+
+
 def setup_daily_jobs() -> None:
     """
     Load all active portfolios from DB and schedule a daily refresh+signal job
     for each one at 07:00 IST. Safe to call multiple times (idempotent).
+    Also schedules the broker token-refresh job at 08:00 IST.
     """
     try:
         db         = get_supabase()
@@ -143,6 +166,8 @@ def setup_daily_jobs() -> None:
 
     for p in portfolios:
         _enqueue_daily_for_portfolio(p["id"])
+
+    _enqueue_token_refresh()
 
     logger.info("scheduler.setup_done", portfolios=len(portfolios))
 

@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from markets_worker.config import get_settings
 from markets_worker.mcp_server import mcp
 from markets_worker.routers import health, jobs, llm, research
+from markets_worker.routers import broker as broker_router
 
 
 def configure_logging() -> None:
@@ -50,10 +51,11 @@ def create_app() -> FastAPI:
     )
 
     # ── Routers ───────────────────────────────────────────────────────────
-    app.include_router(health.router, tags=["ops"])
-    app.include_router(llm.router,    tags=["llm"])
-    app.include_router(research.router, tags=["research"])
-    app.include_router(jobs.router,   tags=["jobs"])
+    app.include_router(health.router,          tags=["ops"])
+    app.include_router(llm.router,             tags=["llm"])
+    app.include_router(research.router,        tags=["research"])
+    app.include_router(jobs.router,            tags=["jobs"])
+    app.include_router(broker_router.router,   tags=["brokers"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.

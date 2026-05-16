@@ -1,0 +1,10 @@
+-- ══════════════════════════════════════════════════════════════════════════
+-- T2.5 Phase A: Broker connectivity tables
+-- markets.broker_connections, markets.orders, markets.positions
+-- (Applied via MCP on 2026-05-16; file added for local migration parity)
+-- ══════════════════════════════════════════════════════════════════════════
+-- DB-VERIFICATION: markets-broker-connectivity-v1
+-- DB-ARCH-APPROVAL: vimal-2026-05-16
+-- NOTE: Tables, indexes, and RLS policies were applied directly via Supabase
+--       MCP on 2026-05-16. This file documents what was applied.
+--       Run `supabase db pull` to regenerate from live schema if needed.

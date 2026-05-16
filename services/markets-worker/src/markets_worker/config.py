@@ -31,6 +31,10 @@ class Settings(BaseSettings):
     log_level:       str = "INFO"
 
     # ── MCP server ────────────────────────────────────────────────────────
+    # Broker credential encryption key (Fernet).
+    # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
+    broker_encryption_key: str = ""
+
     mcp_server_name:    str = "markets-data"
     mcp_server_version: str = "0.1.0"
 
