@@ -1,6 +1,15 @@
 #!/usr/bin/env sh
 
-# Block commits containing secrets
+# ── 1. Block staged .env files ────────────────────────────────────────────────
+if git diff --cached --name-only | grep -qE '(^|/)\.env($|\.)'; then
+  echo ""
+  echo "  ERROR: Staged file matches .env pattern."
+  echo "  Remove it from staging: git reset HEAD <file>"
+  echo ""
+  exit 1
+fi
+
+# ── 2. Secret scan (Gitleaks) ─────────────────────────────────────────────────
 if command -v gitleaks &> /dev/null; then
   gitleaks protect --staged --config .gitleaks.toml --redact
   if [ $? -ne 0 ]; then
@@ -14,3 +23,6 @@ if command -v gitleaks &> /dev/null; then
 else
   echo "Warning: gitleaks not found. Install it: brew install gitleaks"
 fi
+
+# ── 3. Lint staged files ──────────────────────────────────────────────────────
+npx lint-staged
