@@ -1363,4 +1363,630 @@ See section 12 for the consolidated findings of the two audits. Detailed audit r
 
 ---
 
+## 17. Extended Trading Modules & Broker API Infrastructure (2026-05-16)
+
+### 17.1 Scope addition
+
+This section extends the original §2 scope to include **active trading modules** — not just portfolio tracking and analysis but live order placement, position management, and real-time market data across all Indian exchange segments. It also formalises the broker API infrastructure required to support execution.
+
+**Trigger:** The import-holdings feature (§T2 — already shipped) demonstrated the value of multi-broker integration and surfaced the natural next step: going from read-only portfolio sync to live order execution. The platform already supports 10 broker CSV import formats (Zerodha, Groww, ICICI Direct, HDFC Securities, Angel One, Upstox, Kotak, CAMS MF, CDSL CAS, NSDL CAS). Live API connectivity is the logical progression.
+
+---
+
+### 17.2 Trading segment taxonomy
+
+India's capital markets are divided into exchange segments, each with distinct instruments, regulatory rules, margin requirements, and settlement cycles. The platform must model all of them.
+
+| Segment | Exchange | Instrument types | Product types | Settlement |
+|---|---|---|---|---|
+| **Equity Cash** | NSE / BSE | Stocks, ETFs, REITs, InvITs, SGBs | CNC (delivery), MIS (intraday), BO/CO | T+1 |
+| **Equity F&O** | NSE (NFO) | Index futures, stock futures, index options, stock options | NRML (carry forward), MIS (intraday) | Daily MTM; final T+1 |
+| **Currency Derivatives** | NSE (CDS) / BSE | USD-INR, EUR-INR, GBP-INR, JPY-INR; cross-currency pairs | NRML, MIS | T+2 (CDS) |
+| **Commodity** | MCX | Gold, Silver, Crude Oil, Natural Gas, Copper, Zinc, Lead; Agri (castor, cotton, etc.) | NRML, MIS | Varies by contract |
+| **Agri Commodity** | NCDEX | Guar seed, Chana, Maize, Soybean, Castor seed | NRML, MIS | Varies |
+| **Mutual Funds** | BSE StAR MF / AMFI / RTA | Equity MF, Debt MF, Liquid MF, ELSS, Index funds, ETFs | Lumpsum, SIP, STP, SWP | T+1 (liquid), T+2–3 (others) |
+| **IPO / New Issues** | NSE / BSE | Mainboard IPO, SME IPO, OFS, FPO | ASBA / UPI block | Allotment + T+6 listing |
+| **SGB** | NSE / BSE (secondary) | Sovereign Gold Bond | CNC (secondary market) | T+1 |
+| **Bonds / G-Secs** | NSE goBID / RBI Retail Direct | Government bonds, T-bills, SDL, OFCDs | Delivery | T+1 |
+
+#### Order types (cross-segment)
+
+| Order type | Description | Segments |
+|---|---|---|
+| Market (MKT) | Execute at best available price immediately | All |
+| Limit (L) | Execute only at specified price or better | All |
+| Stop-Loss Market (SL-M) | Trigger at stop price, fill at market | All |
+| Stop-Loss Limit (SL) | Trigger at stop price, fill at limit | All |
+| AMO | After-Market Order — queued for next session open | Equity, F&O |
+| GTT | Good-Till-Triggered — conditional order stored at broker | Zerodha, Dhan |
+| OCO | One-Cancels-the-Other — paired bracket | Dhan, Fyers |
+| Iceberg | Large order sliced into smaller visible quantities | Zerodha, Angel |
+| Basket | Multi-leg simultaneous order | All |
+
+#### Product type codes
+
+| Code | Meaning | Segments |
+|---|---|---|
+| CNC | Cash-and-Carry (delivery, no leverage) | Equity |
+| MIS | Margin Intraday Square-off (auto-exit before close) | Equity, F&O, Currency, Commodity |
+| NRML | Normal (positional, carry-forward F&O, margin required) | F&O, Currency, Commodity |
+| BO | Bracket Order (entry + SL + target in one shot) | Equity (deprecated by some brokers) |
+| CO | Cover Order (entry + compulsory SL) | Equity |
+
+---
+
+### 17.3 Broker API provider evaluation
+
+#### Tier 1 — Recommended for implementation
+
+| Provider | API name | Execution cost | Live data cost | Python SDK | WebSocket | Historical data | Algo registration |
+|---|---|---|---|---|---|---|---|
+| **Angel One** | SmartAPI | Free | **Free** | ✅ `smartapi-python` | ✅ | ✅ Free | Not required for personal use |
+| **Dhan** | DhanHQ API | Free | Free (≥25 trades/30d) or ₹499/mo | ✅ `dhanhq` | ✅ | ✅ | Not required for personal use |
+| **Zerodha** | Kite Connect | Free | **₹2,000/month** | ✅ `kiteconnect` | ✅ | ✅ (paid) | Required for automated execution |
+| **Fyers** | Fyers API v3 | Free | **Free** | ✅ `fyers-apiv3` | ✅ (100k req/day) | ✅ | Required for automated execution |
+| **ICICI Direct** | Breeze API | Free | **Free** | ✅ `breeze-connect` | ✅ | ✅ | Required for automated execution |
+
+#### Tier 2 — Add later
+
+| Provider | Notes |
+|---|---|
+| **Upstox** | v3 API; free; good WebSocket; Python SDK `upstox-python` |
+| **HDFC Securities** | Relatively newer API; `hsapi`; free |
+| **Kotak Neo** | Neo API; free; recently revamped |
+| **5paisa** | Open API; free; good for commodity focus |
+| **Groww** | No public trading API yet (import only today) |
+
+#### Recommendation
+
+**Start with Angel One SmartAPI** (primary) + **Zerodha Kite Connect** (secondary).
+
+Rationale:
+- Angel One is free end-to-end including live data, has the broadest language support, and an active developer community. Best for bootstrapping.
+- Zerodha has the most mature ecosystem, widest third-party integrations, best-documented algo trading compliance, and is India's largest broker. Worth the ₹2,000/month at commercial scale.
+- The adapter pattern (§17.4) means adding more brokers is plug-in work.
+
+**For market data without a brokerage account:** Dhan's ₹499/month flat-rate data feed is the cheapest standalone historical + live data source if the user doesn't trade on that broker.
+
+#### Auth flows
+
+| Broker | Auth method | Session TTL | Notes |
+|---|---|---|---|
+| Angel One | TOTP-based login → access token + refresh | 1 day | Needs user's TOTP secret; can be automated |
+| Zerodha | OAuth 2.0 with request token → access token | 1 day | Daily re-auth required; no refresh token |
+| Fyers | OAuth 2.0 with auth code → access token | 1 day | No refresh token; daily re-auth |
+| ICICI Breeze | Session-based (API key + secret + session token) | Configurable | Simpler flow |
+| Dhan | API key + Client ID (stateless) | No expiry | Simplest auth model |
+| Upstox | OAuth 2.0 | 1 day | Refresh token available |
+
+**Platform implication:** Daily access-token refresh must be automated via a scheduled job. The `platform.integration_credentials` table already supports this via `rotation_policy JSONB` and `expires_at`.
+
+---
+
+### 17.4 Extended data model — new tables
+
+These tables are additions to the existing `markets.*` schema. All have `tenant_id + franchise_id NOT NULL` per ADR-012.
+
+#### `markets.broker_connections`
+Stores per-user broker account links. One user can have multiple connections (Zerodha + Angel on same portfolio).
+
+```sql
+markets.broker_connections
+  id                UUID PK default gen_random_uuid()
+  tenant_id         UUID NOT NULL FK platform.tenants
+  franchise_id      UUID NOT NULL FK public.franchises
+  owner_user_id     UUID NOT NULL FK auth.users
+  portfolio_id      UUID NULLABLE FK markets.portfolios   -- if scoped to one portfolio
+  broker            TEXT NOT NULL                          -- 'zerodha' | 'angel' | 'fyers' | 'breeze' | 'dhan' | 'upstox'
+  broker_client_id  TEXT NOT NULL                          -- broker's account/client ID
+  display_name      TEXT                                   -- e.g. "Zerodha – Vimal"
+  status            TEXT NOT NULL DEFAULT 'pending'        -- 'pending' | 'active' | 'expired' | 'revoked'
+  access_token_enc  TEXT                                   -- encrypted; rotated daily by scheduler
+  refresh_token_enc TEXT                                   -- where available
+  token_expires_at  TIMESTAMPTZ
+  last_synced_at    TIMESTAMPTZ
+  scope             TEXT[]                                 -- ['orders', 'holdings', 'positions', 'mf', 'historical']
+  metadata          JSONB NOT NULL DEFAULT '{}'
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+#### `markets.orders`
+Full order lifecycle — from placement through fills to final state.
+
+```sql
+markets.orders
+  id                  UUID PK default gen_random_uuid()
+  tenant_id           UUID NOT NULL FK platform.tenants
+  franchise_id        UUID NOT NULL FK public.franchises
+  owner_user_id       UUID NOT NULL FK auth.users
+  portfolio_id        UUID NOT NULL FK markets.portfolios
+  broker_connection_id UUID NOT NULL FK markets.broker_connections
+  broker_order_id     TEXT                           -- broker's own order ID
+  exchange            TEXT NOT NULL                  -- NSE | BSE | MCX | NCDEX | CDS
+  segment             TEXT NOT NULL                  -- equity | fno | currency | commodity | mf
+  instrument_id       UUID FK markets.instruments    -- NULL for ad-hoc MF orders
+  tradingsymbol       TEXT NOT NULL                  -- broker-specific symbol (e.g. RELIANCE, NIFTY25JUNFUT)
+  order_type          TEXT NOT NULL                  -- MARKET | LIMIT | SL | SL-M | AMO | GTT
+  product             TEXT NOT NULL                  -- CNC | MIS | NRML
+  transaction_type    TEXT NOT NULL                  -- BUY | SELL
+  quantity            NUMERIC NOT NULL
+  price               NUMERIC                        -- NULL for market orders
+  trigger_price       NUMERIC                        -- for SL orders
+  disclosed_quantity  NUMERIC DEFAULT 0
+  validity            TEXT DEFAULT 'DAY'             -- DAY | IOC | TTL | GTC
+  status              TEXT NOT NULL DEFAULT 'open'   -- open | pending | complete | cancelled | rejected | modified
+  filled_quantity     NUMERIC DEFAULT 0
+  avg_fill_price      NUMERIC
+  pending_quantity    NUMERIC
+  cancelled_quantity  NUMERIC DEFAULT 0
+  status_message      TEXT
+  tag                 TEXT                           -- algo tag (SEBI algo_id requirement)
+  parent_order_id     UUID FK markets.orders         -- for bracket/OCO legs
+  placed_at           TIMESTAMPTZ
+  updated_at          TIMESTAMPTZ
+  exchange_timestamp  TIMESTAMPTZ
+  metadata            JSONB NOT NULL DEFAULT '{}'
+```
+
+#### `markets.positions`
+Open positions — intraday (MIS) and positional (NRML for F&O/currency/commodity).
+
+```sql
+markets.positions
+  id                  UUID PK default gen_random_uuid()
+  tenant_id           UUID NOT NULL FK platform.tenants
+  franchise_id        UUID NOT NULL FK public.franchises
+  owner_user_id       UUID NOT NULL FK auth.users
+  portfolio_id        UUID NOT NULL FK markets.portfolios
+  broker_connection_id UUID NOT NULL FK markets.broker_connections
+  exchange            TEXT NOT NULL
+  segment             TEXT NOT NULL
+  tradingsymbol       TEXT NOT NULL
+  instrument_id       UUID FK markets.instruments
+  product             TEXT NOT NULL                  -- MIS | NRML
+  quantity            NUMERIC NOT NULL               -- net qty; negative = short
+  overnight_quantity  NUMERIC DEFAULT 0
+  buy_quantity        NUMERIC NOT NULL DEFAULT 0
+  sell_quantity       NUMERIC NOT NULL DEFAULT 0
+  buy_price           NUMERIC
+  sell_price          NUMERIC
+  avg_price           NUMERIC NOT NULL
+  last_price          NUMERIC
+  pnl                 NUMERIC                        -- unrealised P&L
+  realised_pnl        NUMERIC DEFAULT 0
+  m2m                 NUMERIC                        -- mark-to-market P&L (F&O)
+  multiplier          NUMERIC DEFAULT 1              -- lot multiplier for F&O
+  close_price         NUMERIC                        -- previous close
+  value               NUMERIC                        -- abs qty × last_price × multiplier
+  day_buy_qty         NUMERIC DEFAULT 0
+  day_sell_qty        NUMERIC DEFAULT 0
+  synced_at           TIMESTAMPTZ NOT NULL DEFAULT now()
+  metadata            JSONB NOT NULL DEFAULT '{}'
+```
+
+#### `markets.option_chain_snapshots`
+Cached options chain data (polled from broker WebSocket or REST at intervals).
+
+```sql
+markets.option_chain_snapshots
+  id            UUID PK
+  underlying    TEXT NOT NULL           -- NIFTY | BANKNIFTY | FINNIFTY | stock symbol
+  expiry        DATE NOT NULL
+  ts            TIMESTAMPTZ NOT NULL    -- snapshot time
+  chain         JSONB NOT NULL          -- { strikes: [{strike, CE: {oi, volume, ltp, iv, delta, gamma, theta, vega}, PE: {...}}] }
+  metadata      JSONB
+  UNIQUE (underlying, expiry, date_trunc('minute', ts))
+```
+
+#### `markets.mf_orders`
+Mutual fund SIP and lumpsum orders via BSE StAR MF or direct RTA.
+
+```sql
+markets.mf_orders
+  id                  UUID PK
+  tenant_id           UUID NOT NULL
+  franchise_id        UUID NOT NULL
+  owner_user_id       UUID NOT NULL FK auth.users
+  portfolio_id        UUID NOT NULL FK markets.portfolios
+  broker_connection_id UUID FK markets.broker_connections  -- NULL = direct AMFI/RTA
+  folio_number        TEXT
+  isin                TEXT NOT NULL                        -- MF scheme ISIN
+  scheme_name         TEXT
+  order_type          TEXT NOT NULL                        -- PURCHASE | REDEMPTION | SIP | SWP | STP | SWITCH
+  amount              NUMERIC                              -- for amount-based orders
+  units               NUMERIC                              -- for unit-based redemption
+  nav                 NUMERIC                              -- at allotment
+  status              TEXT NOT NULL DEFAULT 'pending'      -- pending | submitted | allotted | cancelled | failed
+  bse_order_id        TEXT
+  rta_reference       TEXT
+  sip_id              UUID FK markets.mf_orders            -- parent SIP registration
+  sip_frequency       TEXT                                 -- monthly | weekly | daily (for SIP registration)
+  sip_amount          NUMERIC
+  sip_installments    INT
+  sip_start_date      DATE
+  sip_end_date        DATE
+  allotment_date      DATE
+  allotment_units     NUMERIC
+  allotment_nav       NUMERIC
+  metadata            JSONB NOT NULL DEFAULT '{}'
+  created_at          TIMESTAMPTZ NOT NULL DEFAULT now()
+```
+
+---
+
+### 17.5 Module-by-module feature specification
+
+#### 17.5.1 Equity trading (cash segment)
+
+**Delivery (CNC):**
+- Buy and hold stocks, ETFs, REITs, InvITs, SGBs
+- Corporate action handling: bonus, split, dividend (already tracked in `transactions`)
+- Tax P&L: STCG (<1 year) 15%, LTCG (>1 year) 10% on gains > ₹1 lakh
+- FIFO cost tracking (already in `tax_lots` per `transactions`)
+
+**Intraday (MIS):**
+- Auto-square-off before 3:20 PM (broker handles)
+- Margin utilisation tracking
+- Real-time P&L against entry price
+- Intraday-only strategies in the backtest engine
+
+**UI modules needed:**
+- Order placement form (symbol search → order type → qty/price → confirm)
+- Open orders management (modify, cancel)
+- Order book (today's orders with status timeline)
+- Trade book (today's fills)
+- Holdings page (already built — connect to broker sync)
+- Intraday positions panel
+- P&L dashboard (day P&L + unrealised P&L)
+
+#### 17.5.2 F&O — Futures & Options (NFO segment)
+
+**Futures:**
+- Index futures: NIFTY, BANKNIFTY, FINNIFTY, MIDCPNIFTY (monthly + weekly expiry)
+- Stock futures: rolling lot sizes per SEBI F&O eligible stocks (~200 stocks)
+- Margin: SPAN + Exposure margins calculated via broker API
+- Rollover tracker: suggest roll before expiry based on open interest
+
+**Options:**
+- Options chain viewer: all strikes for a given underlying + expiry
+- Greeks display: Delta, Gamma, Theta, Vega, IV (implied volatility)
+- Strategy builder: Bull/Bear spread, Iron Condor, Strangle, Straddle, Calendar spread
+- Payoff diagram: visualise P&L at expiry across strike range
+- OI (Open Interest) tracker: PCR (Put-Call Ratio), OI buildup, OI unwinding
+- IV chart: historical IV vs HV (historical volatility)
+
+**Risk controls:**
+- Max open positions per underlying
+- Max loss per day (kill switch)
+- Delta exposure limits
+
+**SEBI algo trading:**
+- Every system-generated order must carry an `algo_id` tag
+- Strategy-level algo registration with the exchange (via broker)
+- Not required for manual orders placed through the UI
+
+#### 17.5.3 Currency derivatives (CDS segment)
+
+**Instruments:**
+- USD-INR, EUR-INR, GBP-INR, JPY-INR (NSE CDS; lot size 1000 units)
+- Cross-currency: EUR-USD, GBP-USD, USD-JPY (NSE CDS; lot size 1000 units)
+- USDINR options (liquid; weekly and monthly expiry)
+
+**Use cases:**
+- Hedging forex exposure in import/export businesses (relevant to the logistics domain!)
+- Speculative currency directional plays
+- Carry trade monitoring
+
+**Data sources:** NSE CDS direct feed via broker WebSocket
+
+#### 17.5.4 Commodity (MCX / NCDEX)
+
+**MCX instruments (by category):**
+
+| Category | Instruments | Contract size |
+|---|---|---|
+| Precious metals | Gold (1kg), Gold Mini (100g), Gold Guinea (8g), Silver (30kg), Silver Mini (5kg) | Varies |
+| Energy | Crude Oil (100 bbl), Natural Gas (1250 mmBtu) | Varies |
+| Base metals | Copper (2.5MT), Zinc (5MT), Lead (5MT), Aluminium (5MT), Nickel (1.5MT) | Varies |
+| Agri | Cardamom, Cotton, CPO, Mentha Oil | Varies |
+
+**NCDEX (agri):** Guar seed/gum, Chana, Maize, Mustard seed, Castor seed, Soybean, Turmeric, Jeera
+
+**Key features:**
+- Commodity price tracker (live MCX prices)
+- Physical delivery flags (most contracts have physical delivery option at expiry)
+- Basis tracker: spot vs futures spread
+- Seasonal analysis for agri commodities
+
+#### 17.5.5 Mutual Funds
+
+**Order types:**
+- Lumpsum purchase
+- SIP (Systematic Investment Plan): weekly, monthly, quarterly
+- SWP (Systematic Withdrawal Plan)
+- STP (Systematic Transfer Plan)
+- Switch: between schemes within same AMC
+- Redemption: full or partial (in units or amount)
+
+**Data sources:**
+- AMFI: daily NAV, scheme master list (already integrated via `markets-ingest-mf-nav`)
+- BSE StAR MF: live order placement (requires BSE membership or routing through a broker)
+- CAMS / KFintech (Karvy): RTA data for folio consolidation
+
+**Tax implications:**
+- Equity MF: STCG 15% (<1yr), LTCG 10% (>1yr on gains > ₹1 lakh)
+- Debt MF: Slab rate (short + long term)
+- ELSS: 3-year lock-in, Section 80C deduction
+- Dividend: added to income
+
+**UI:**
+- MF screener (filter by category, AMC, 1y/3y/5y returns, AUM, expense ratio)
+- SIP calculator (target corpus → SIP amount → years)
+- Portfolio X-ray: underlying stock exposure across all MF holdings
+- SIP portfolio tracker: active SIPs, total invested, current value, XIRR
+
+#### 17.5.6 Research & Analysis (cross-segment)
+
+**Already built (T2):**
+- Signals (buy/sell/hold with confidence score and rationale)
+- Backtesting (rule-based and buy-and-hold strategies)
+- AI research threads (Claude over portfolio + news context)
+- Daily brief (AI-generated portfolio analysis from news)
+- Price history charts (OHLCV)
+
+**To add (T2.5):**
+- **Options analytics:** IV percentile, IV rank, skew chart, term structure
+- **FII/DII flow tracker:** Daily institutional activity on NSE (free public data)
+- **Sector rotation:** Map each holding to GICS sector; display overweight/underweight vs Nifty 500
+- **Earnings calendar:** Upcoming results with analyst estimates
+- **Corporate actions calendar:** Dividends, bonuses, splits, rights, buybacks
+- **Screener integration:** Pull data from Screener.in or Tickertape for fundamental analysis
+- **Technical chart view:** Full-screen chart with indicators (already have price data; add candlestick chart + overlay indicators from `backtest_engine.py`)
+- **Derivatives scanner:** Filter F&O strikes by OI, IV, PCR
+
+---
+
+### 17.6 Broker adapter protocol (Python)
+
+Extends the `BrokerAdapter` Protocol first sketched in §8.2. Full interface:
+
+```python
+from typing import Protocol, AsyncIterator
+from dataclasses import dataclass
+from datetime import date, datetime
+from decimal import Decimal
+
+@dataclass
+class Quote:
+    symbol:       str
+    exchange:     str
+    ltp:          Decimal          # last traded price
+    bid:          Decimal | None
+    ask:          Decimal | None
+    volume:       int
+    oi:           int | None       # open interest (F&O only)
+    change:       Decimal          # absolute change from prev close
+    change_pct:   Decimal
+    ts:           datetime
+
+@dataclass
+class OrderRequest:
+    tradingsymbol:   str
+    exchange:        str
+    transaction_type: str           # BUY | SELL
+    quantity:        int
+    order_type:      str           # MARKET | LIMIT | SL | SL-M
+    product:         str           # CNC | MIS | NRML
+    price:           Decimal | None
+    trigger_price:   Decimal | None
+    validity:        str = "DAY"
+    tag:             str = ""      # algo_id for SEBI compliance
+    disclosed_qty:   int = 0
+
+@dataclass
+class OrderResult:
+    broker_order_id: str
+    status:          str
+    message:         str | None
+
+@dataclass
+class Position:
+    tradingsymbol:   str
+    exchange:        str
+    product:         str
+    quantity:        int
+    avg_price:       Decimal
+    last_price:      Decimal
+    pnl:             Decimal
+    m2m:             Decimal
+
+@dataclass
+class Holding:
+    tradingsymbol:   str
+    exchange:        str
+    isin:            str
+    quantity:        int
+    avg_cost:        Decimal
+    last_price:      Decimal
+    pnl:             Decimal
+
+class BrokerAdapter(Protocol):
+    name:    str              # 'zerodha' | 'angel' | 'fyers' | 'breeze' | 'dhan'
+    version: str
+
+    # ── Auth ──────────────────────────────────────────────────────────────
+    def get_auth_url(self, redirect_uri: str) -> str: ...
+    def exchange_code(self, code: str) -> dict: ...          # returns token dict
+    def refresh_token(self, refresh_token: str) -> dict: ... # raises if not supported
+
+    # ── Market data ──────────────────────────────────────────────────────
+    async def get_quote(self, symbols: list[str]) -> list[Quote]: ...
+    async def stream_quotes(self, symbols: list[str]) -> AsyncIterator[Quote]: ...
+    async def get_ohlcv(self, symbol: str, exchange: str,
+                        interval: str, from_date: date, to_date: date) -> list[dict]: ...
+    async def get_option_chain(self, underlying: str, expiry: date) -> dict: ...
+
+    # ── Portfolio ─────────────────────────────────────────────────────────
+    async def get_holdings(self) -> list[Holding]: ...
+    async def get_positions(self) -> list[Position]: ...
+    async def get_orders(self) -> list[dict]: ...
+    async def get_trades(self, date: date | None = None) -> list[dict]: ...
+
+    # ── Order management ─────────────────────────────────────────────────
+    async def place_order(self, req: OrderRequest) -> OrderResult: ...
+    async def modify_order(self, broker_order_id: str, **kwargs) -> OrderResult: ...
+    async def cancel_order(self, broker_order_id: str) -> OrderResult: ...
+
+    # ── Mutual funds (optional — not all brokers support) ────────────────
+    async def place_mf_order(self, req: dict) -> dict: ...
+    async def get_mf_holdings(self) -> list[dict]: ...
+    async def get_mf_orders(self) -> list[dict]: ...
+```
+
+**SDK dependencies per adapter:**
+
+```toml
+# services/markets-worker/pyproject.toml additions
+kiteconnect = "^5.0.0"       # Zerodha
+smartapi-python = "^1.4.0"   # Angel One
+fyers-apiv3 = "^3.0.0"       # Fyers
+breeze-connect = "^1.0.0"    # ICICI Direct
+dhanhq = "^2.0.0"            # Dhan
+upstox-python = "^2.0.0"     # Upstox (Tier 2)
+```
+
+---
+
+### 17.7 Real-time data architecture
+
+#### WebSocket fan-out
+
+Broker WebSocket feeds provide tick-by-tick quotes during market hours. The architecture:
+
+```
+Broker WS (Kite/SmartAPI/Fyers)
+    ↓
+Python worker: BrokerWebSocketManager
+    ↓ subscribes to symbols from active portfolios + watchlists
+    ├── Writes latest tick to Redis hash (key: quote:{exchange}:{symbol})
+    ├── Publishes to Redis pub/sub channel (channel: ticks:{symbol})
+    ├── Persists OHLCV aggregations to markets.price_history every 1-min
+    └── Pushes to Supabase Realtime (for browser subscriptions)
+
+Browser (SPA)
+    ↓ subscribes via Supabase Realtime or direct SSE from Python worker
+    └── Updates live quote display, positions P&L, order status
+```
+
+**ADR-023 (from §16.5-H8)** already defines the three-lane real-time model:
+- **L-CDC**: Supabase Realtime for DB change propagation (order status, position updates)
+- **L-FAN**: Dedicated WebSocket service for high-frequency tick data
+- **L-STR**: SSE for progress bars, brief generation status
+
+For market hours tick data (L-FAN), the Python worker acts as the aggregator, converting broker WebSocket frames to Supabase Realtime events at ≤1-second granularity.
+
+#### Market data hierarchy (precedence)
+
+```
+1. Live broker WebSocket (market hours, 9:15–15:30 IST)
+2. Broker REST snapshot (every 30s fallback)
+3. Upstash Redis cache (sub-second read for quote display)
+4. markets.price_history (EOD and 1-min candles persisted)
+5. Yahoo Finance (historical OHLCV for non-broker-connected users)
+```
+
+---
+
+### 17.8 Regulatory overlay — extended
+
+Additions to §10, scoped to the new trading segments.
+
+| Segment | Regulation | Requirement | Platform hook |
+|---|---|---|---|
+| **F&O — Algo trading** | SEBI Circular SEBI/HO/MRD2/TE/P/CIR/2021/3 | Every API-generated order must carry a unique algo_id; strategy must be registered with exchange via broker | `orders.tag` field carries algo_id; broker adapter enforces tagging; `markets.strategies` stores registration metadata |
+| **F&O — Position limits** | SEBI F&O position limit rules | Client-level gross open position limits per underlying (e.g., 10% of market-wide position limit) | Position-limit check before order placement in broker adapter middleware |
+| **Commodity — PMLA** | PMLA 2002 + PMLA Amendment 2023 | KYC + transaction monitoring for commodity trading entities | `platform.consents` + transaction monitoring via `platform.audit_log` |
+| **MF — AMFI norms** | SEBI MF Regulations 1996 | ARN (AMFI Registration Number) required for distribution; direct plans don't need ARN | For direct MF orders, no ARN needed. Flag distributor flows explicitly. |
+| **Currency — RBI** | RBI Master Direction on Currency Derivatives | Trading must have underlying forex exposure for hedging; speculative limits apply | UI disclosure; position size warnings for large speculative positions |
+| **Intraday — Auto square-off** | Broker obligation | MIS positions auto-closed before market close; platform must not interfere with broker's square-off | Never send cancellation for MIS positions after 3:15 PM; mark as pending-sqoff |
+| **Tax — STT** | Securities Transaction Tax | 0.025% on intraday equity sell; 0.1% on delivery sell; 0.0625% on F&O sell (futures); 0.125% on options sell (on premium) | `commission_model` in backtests already models STT; same for live P&L calculation |
+
+---
+
+### 17.9 Updated sequencing — new T2.5 phase
+
+Insert between current T2 (Markets domain build) and T3 (Commercial enablement).
+
+#### T2.5 — Active trading & live connectivity (10–12 weeks)
+
+Prerequisite: T2 fully completed (✅ done as of 2026-05-16), T1 infra hardened.
+
+**Phase A — Broker connectivity (weeks 1–3)**
+- `markets.broker_connections` table + RLS + migration
+- `BrokerAdapter` abstract protocol in Python worker (`services/markets-worker/src/markets_worker/brokers/`)
+- Angel One SmartAPI adapter (primary — free live data)
+- Zerodha Kite Connect adapter (secondary — institutional grade)
+- Daily access-token refresh scheduler job (cron at 8:00 AM IST)
+- Frontend: Broker Settings page (connect account → OAuth/TOTP flow → test connection)
+- Edge function: `markets-broker-auth` (handle OAuth callback, store encrypted token)
+
+**Phase B — Live portfolio sync (weeks 2–4)**
+- `markets.orders`, `markets.positions` tables + RLS
+- `broker_sync` RQ job: pull holdings + orders + positions from broker API → upsert DB
+- Scheduled sync: every 30 min during market hours (9:00 AM–4:00 PM IST); on-demand via UI
+- Frontend: sync status indicator on Portfolio page; last-synced timestamp
+- Conflict resolution: broker data is authoritative for live mode; manual transactions kept for paper mode
+
+**Phase C — Order placement (weeks 3–6)**
+- Order placement form: symbol search (from `markets.instruments`) → segment/product selection → order type → qty/price → broker confirmation
+- Real-time order status via Supabase Realtime (L-CDC)
+- Order book + trade book pages
+- Risk gate: max order value, margin availability check before send
+- `markets.orders` lifecycle: open → pending → complete/cancelled/rejected
+- SEBI algo_id tagging for system-generated orders
+
+**Phase D — F&O module (weeks 5–8)**
+- Options chain UI: underlying selector → expiry selector → chain table with strikes + Greeks
+- `markets.option_chain_snapshots` table (cache; purge >2 days old)
+- Options strategy builder: payoff diagram (P&L curve from current price through expiry)
+- F&O position tracker: unrealised P&L, delta exposure, theta decay per day
+- Greeks calculation: Black-Scholes (use `mibian` or `py_vollib` Python libraries)
+- Margin calculator: SPAN + Exposure (via broker `margin_calculator` API)
+
+**Phase E — MF ordering (weeks 6–9)**
+- `markets.mf_orders` table
+- MF screener UI (filter AMFI scheme master by category, AMC, returns, expense ratio)
+- Lumpsum + SIP order placement via BSE StAR MF (Angel One supports this)
+- SIP tracker: active SIPs, upcoming instalment dates, total invested vs current value
+- XIRR calculator for MF portfolio returns
+
+**Phase F — Currency + Commodity (weeks 8–12)**
+- Currency derivatives: CDS segment order placement, USDINR options chain
+- MCX commodity: basic order placement for Gold, Silver, Crude Oil, Natural Gas
+- FII/DII flow dashboard: daily institutional activity table + chart (NSE public data)
+- Sector allocation chart: holding-level sector breakdown vs index weights
+
+---
+
+### 17.10 Open items added by this section
+
+Append to §13 deferred decisions table:
+
+| ID | Item | Defer to |
+|---|---|---|
+| D-12 | BSE StAR MF membership or routing via broker for live MF order placement | T2.5-E |
+| D-13 | SEBI algo registration workflow — which broker to register with first | T2.5-C |
+| D-14 | Real-time tick fan-out service (ADR-023 L-FAN lane) — implement as Python asyncio WS server or use Supabase Realtime for ≤1s granularity | T2.5-D |
+| D-15 | NCDEX (agri commodity) — low retail demand; add after MCX is proven | T3+ |
+| D-16 | Currency derivatives for hedging (logistics business forex exposure) — natural fit given existing logistics domain | T2.5-F |
+| D-17 | Bond / G-Sec trading via RBI Retail Direct — growing retail segment; assess demand | T3+ |
+| D-18 | IPO / NCD application flow via ASBA/UPI — requires banking integration | T3+ |
+| D-19 | Options Greeks server-side computation vs broker-provided values — broker values are faster but not always available; implement `py_vollib` as fallback | T2.5-D |
+| D-20 | Multi-broker order routing — place order on cheapest-execution broker automatically | T4 |
+
+---
+
+*Section added 2026-05-16. Authored: Vimal + Claude.*
+
 *End of design document.*
