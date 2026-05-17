@@ -1,5 +1,4 @@
 import { logger } from './logger';
-import { logger } from "@/lib/logger";
 
 /**
  * Initialize global error handlers to capture uncaught exceptions and unhandled rejections
