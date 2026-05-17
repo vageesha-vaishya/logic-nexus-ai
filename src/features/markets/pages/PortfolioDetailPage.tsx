@@ -10,7 +10,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useParams, Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
-  ArrowLeft, Brain, Download, Loader2, MoreVertical, Newspaper, Plus, Trash2, Upload,
+  ArrowLeft, Brain, Download, FlaskConical, Loader2, MoreVertical, Newspaper, Plus, Trash2, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -23,6 +23,10 @@ import {
 import { ImportHoldingsDialog } from "../components/ImportHoldingsDialog";
 import { NewsPanel } from "../components/NewsPanel";
 import { PortfolioPnLChart } from "../components/PortfolioPnLChart";
+import { PaperCapitalBadge } from "../components/PaperCapitalBadge";
+import { PaperOrderSheet } from "../components/PaperOrderSheet";
+import { SectorAllocationChart } from "../components/SectorAllocationChart";
+import { PortfolioAnalyticsPanel } from "../components/PortfolioAnalyticsPanel";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -121,6 +125,15 @@ export default function PortfolioDetailPage() {
   const [importOpen,   setImportOpen]   = useState(false);
   const [grouping,     setGrouping]     = useState<GroupingMode>("None");
 
+  // Paper trading state
+  const [paperOrderOpen,     setPaperOrderOpen]     = useState(false);
+  const [paperInstrQuery,    setPaperInstrQuery]    = useState("");
+  const [paperInstrOpen,     setPaperInstrOpen]     = useState(false);
+  const [paperSelectedInstr, setPaperSelectedInstr] = useState<{
+    id: string; symbol: string; exchange: string;
+  } | null>(null);
+  const instrSearch = useInstrumentSearch(paperInstrQuery);
+
   const latestBrief    = briefs.data?.[0];
   const previousBriefs = briefs.data?.slice(1) ?? [];
 
@@ -159,17 +172,79 @@ export default function PortfolioDetailPage() {
       {/* Header */}
       <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div className="min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h1 className="truncate text-2xl font-semibold tracking-tight">{p.name}</h1>
             <Badge variant={p.mode === "live" ? "default" : "secondary"} className="capitalize">{p.mode}</Badge>
             <Badge variant="outline" className="text-xs">{p.base_currency}</Badge>
+            {p.mode === "paper" && id && (
+              <PaperCapitalBadge portfolioId={id} />
+            )}
           </div>
           {p.description && <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{p.description}</p>}
         </div>
-        <Button onClick={onGenerate} disabled={generateBrief.isPending} size="lg">
-          <Brain className="mr-2 h-4 w-4" />
-          {generateBrief.isPending ? "Generating…" : "Generate AI brief"}
-        </Button>
+        <div className="flex items-center gap-2 flex-wrap">
+          {p.mode === "paper" && (
+            <div className="relative">
+              <Button
+                variant="outline"
+                size="lg"
+                onClick={() => { setPaperInstrQuery(""); setPaperInstrOpen((o) => !o); }}
+              >
+                <FlaskConical className="mr-2 h-4 w-4 text-amber-500" />
+                Paper Trade
+              </Button>
+              {/* Instrument picker popover */}
+              {paperInstrOpen && (
+                <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-lg border bg-popover shadow-xl">
+                  <div className="p-3 border-b">
+                    <p className="text-xs text-muted-foreground font-medium mb-2">Search instrument to trade</p>
+                    <div className="relative">
+                      <Input
+                        autoFocus
+                        placeholder="Search symbol or ISIN…"
+                        value={paperInstrQuery}
+                        onChange={(e) => setPaperInstrQuery(e.target.value)}
+                        className="h-8 text-sm"
+                      />
+                      {instrSearch.isFetching && (
+                        <Loader2 className="absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 animate-spin text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+                  <div className="max-h-52 overflow-auto p-1">
+                    {instrSearch.isSuccess && instrSearch.data.length === 0 && paperInstrQuery.length > 0 && (
+                      <p className="px-3 py-3 text-xs text-muted-foreground">No instruments found.</p>
+                    )}
+                    {instrSearch.isSuccess && instrSearch.data.map((ins) => (
+                      <button
+                        key={ins.id}
+                        type="button"
+                        className="flex w-full items-center gap-3 rounded px-3 py-2 text-left hover:bg-accent"
+                        onClick={() => {
+                          setPaperSelectedInstr(ins);
+                          setPaperInstrOpen(false);
+                          setPaperInstrQuery("");
+                          setPaperOrderOpen(true);
+                        }}
+                      >
+                        <span className="font-mono text-sm font-semibold">{ins.symbol}</span>
+                        <span className="text-xs text-muted-foreground">{ins.exchange}</span>
+                        <span className="ml-auto text-xs text-muted-foreground">{ins.instrument_type}</span>
+                      </button>
+                    ))}
+                    {paperInstrQuery.length === 0 && (
+                      <p className="px-3 py-3 text-xs text-muted-foreground">Type a symbol to search…</p>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          <Button onClick={onGenerate} disabled={generateBrief.isPending} size="lg">
+            <Brain className="mr-2 h-4 w-4" />
+            {generateBrief.isPending ? "Generating…" : "Generate AI brief"}
+          </Button>
+        </div>
       </header>
 
       {/* KPI strip */}
@@ -200,13 +275,21 @@ export default function PortfolioDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="holdings">
         <TabsList className="w-full justify-start border-b bg-transparent p-0 h-auto">
-          {(["holdings","transactions","briefs"] as const).map((t) => (
+          {(["holdings","transactions","briefs","sector","analytics"] as const).map((t) => (
             <TabsTrigger
               key={t}
               value={t}
               className="rounded-none border-b-2 border-transparent px-4 pb-3 pt-1 capitalize data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none"
             >
-              {t === "holdings" ? "Holdings" : t === "transactions" ? "Transactions" : "AI Briefs"}
+              {t === "holdings"
+                ? "Holdings"
+                : t === "transactions"
+                  ? "Transactions"
+                  : t === "briefs"
+                    ? "AI Briefs"
+                    : t === "sector"
+                      ? "Sector"
+                      : "Analytics"}
               {t === "transactions" && (transactions.data?.length ?? 0) > 0 && (
                 <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                   {transactions.data!.length}
@@ -364,6 +447,16 @@ export default function PortfolioDetailPage() {
             <aside><NewsPanel limit={8} /></aside>
           </div>
         </TabsContent>
+
+        {/* ── Sector tab ────────────────────────────────────────────────── */}
+        <TabsContent value="sector" className="mt-4">
+          <SectorAllocationChart holdings={holdings.data?.holdings ?? []} />
+        </TabsContent>
+
+        {/* ── Analytics tab ─────────────────────────────────────────────── */}
+        <TabsContent value="analytics" className="mt-4">
+          <PortfolioAnalyticsPanel portfolioId={id} />
+        </TabsContent>
       </Tabs>
 
       {/* Add transaction sheet */}
@@ -395,6 +488,21 @@ export default function PortfolioDetailPage() {
           portfolioName={p.name}
           open={importOpen}
           onOpenChange={setImportOpen}
+        />
+      )}
+
+      {/* Paper Order Sheet */}
+      {id && paperSelectedInstr && (
+        <PaperOrderSheet
+          symbol={paperSelectedInstr.symbol}
+          exchange={paperSelectedInstr.exchange}
+          instrumentId={paperSelectedInstr.id}
+          portfolioId={id}
+          open={paperOrderOpen}
+          onOpenChange={(o) => {
+            setPaperOrderOpen(o);
+            if (!o) setPaperSelectedInstr(null);
+          }}
         />
       )}
     </div>

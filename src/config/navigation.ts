@@ -231,6 +231,12 @@ export const APP_MENU: MenuModule[] = [
         description: 'Set LTP threshold alerts — get notified when prices cross your target',
       },
       {
+        name: 'Risk Controls',
+        path: '/dashboard/markets/risk',
+        icon: ShieldAlert,
+        description: 'Kill switch, daily loss limits, segment disable toggles',
+      },
+      {
         name: 'LLM Settings',
         path: '/dashboard/markets/settings/llm',
         icon: CandlestickChart,

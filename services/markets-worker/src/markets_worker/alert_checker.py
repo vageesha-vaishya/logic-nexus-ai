@@ -43,6 +43,7 @@ async def _check_once() -> None:
             .data
     )
     if not rows:
+        await _check_risk_controls(db, loop)
         return
 
     now = time.monotonic()
@@ -71,6 +72,7 @@ async def _check_once() -> None:
             to_trigger.append({"id": alert["id"], "ltp": ltp})
 
     if not to_trigger:
+        await _check_risk_controls(db, loop)
         return
 
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -88,3 +90,64 @@ async def _check_once() -> None:
                 .execute()
         )
         logger.info("alert.triggered", alert_id=t["id"], ltp=t["ltp"])
+
+    await _check_risk_controls(db, loop)
+
+
+async def _check_risk_controls(db, loop) -> None:
+    """Auto-activate kill switch if daily loss exceeds the limit."""
+    from datetime import date
+    today = date.today().isoformat()
+
+    # Get all active risk controls with a daily loss limit
+    controls = await loop.run_in_executor(
+        None,
+        lambda: db.schema("markets").from_("risk_controls")
+            .select("id, user_id, portfolio_id, daily_loss_limit_inr, kill_switch_active")
+            .not_.is_("daily_loss_limit_inr", "null")
+            .eq("kill_switch_active", False)
+            .execute()
+            .data
+    )
+
+    for ctrl in (controls or []):
+        if not ctrl.get("portfolio_id"):
+            continue
+        # Get today's P&L from transactions (sells - buys today)
+        # Simplified: check holdings change — if realised loss today > limit, activate kill switch
+        # This is a best-effort check; real implementation needs today's closed P&L
+        try:
+            txns = await loop.run_in_executor(
+                None,
+                lambda c=ctrl: db.schema("markets").from_("transactions")
+                    .select("txn_type, qty, price, charges")
+                    .eq("portfolio_id", c["portfolio_id"])
+                    .eq("txn_date", today)
+                    .execute()
+                    .data
+            )
+            if not txns:
+                continue
+            day_pnl = 0.0
+            for t in txns:
+                val = float(t["qty"]) * float(t["price"]) - float(t.get("charges") or 0)
+                if t["txn_type"] in ("sell", "redemption"):
+                    day_pnl += val
+                elif t["txn_type"] in ("buy", "sip"):
+                    day_pnl -= val
+
+            limit = float(ctrl["daily_loss_limit_inr"])
+            if day_pnl < -limit:
+                await loop.run_in_executor(
+                    None,
+                    lambda c=ctrl, pnl=day_pnl: db.schema("markets").from_("risk_controls")
+                        .update({
+                            "kill_switch_active": True,
+                            "kill_switch_reason": f"Auto: daily loss ₹{abs(pnl):.0f} exceeded limit ₹{ctrl['daily_loss_limit_inr']:.0f}",
+                        })
+                        .eq("id", c["id"])
+                        .execute()
+                )
+                logger.warning("risk.kill_switch.auto_activated", portfolio_id=ctrl["portfolio_id"], day_pnl=day_pnl, limit=limit)
+        except Exception as exc:
+            logger.warning("risk.check_error", exc=str(exc))

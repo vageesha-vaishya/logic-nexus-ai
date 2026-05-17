@@ -117,4 +117,9 @@ export const marketsKeys = {
       [...marketsKeys.backtests.all(), "list", filters ?? {}] as const,
     detail: (id: string) => [...marketsKeys.backtests.all(), "detail", id] as const,
   },
+
+  paper: {
+    all:     () => [...marketsKeys.all, "paper"] as const,
+    capital: (portfolioId: string) => [...marketsKeys.paper.all(), "capital", portfolioId] as const,
+  },
 } as const;

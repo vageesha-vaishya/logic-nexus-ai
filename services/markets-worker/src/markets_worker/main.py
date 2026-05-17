@@ -18,6 +18,7 @@ from markets_worker.routers import ltp as ltp_router
 from markets_worker.routers import fno as fno_router
 from markets_worker.routers import mf as mf_router
 from markets_worker.routers import portfolio_pnl as portfolio_pnl_router
+from markets_worker.routers import paper as paper_router
 
 
 def configure_logging() -> None:
@@ -77,6 +78,7 @@ def create_app() -> FastAPI:
     app.include_router(fno_router.router,      tags=["fno"])
     app.include_router(mf_router.router,           tags=["mf"])
     app.include_router(portfolio_pnl_router.router, tags=["portfolio"])
+    app.include_router(paper_router.router,         tags=["paper"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.
