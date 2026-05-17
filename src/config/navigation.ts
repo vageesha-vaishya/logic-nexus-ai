@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank, LayoutDashboard } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -207,6 +207,12 @@ export const APP_MENU: MenuModule[] = [
         description: 'AI-generated buy, sell, and hold signals across instruments',
       },
       {
+        name: 'Market Scanner',
+        path: '/dashboard/markets/scanner',
+        icon: Radar,
+        description: 'Real-time technical scan across NSE instruments',
+      },
+      {
         name: 'Broker Accounts',
         path: '/dashboard/markets/settings/brokers',
         icon: Wifi,
@@ -260,6 +266,18 @@ export const APP_MENU: MenuModule[] = [
         path: '/dashboard/markets/fii-dii',
         icon: BarChart3,
         description: 'Daily institutional buy/sell flow data',
+      },
+      {
+        name: 'Margin Calculator',
+        path: '/dashboard/markets/span',
+        icon: Calculator,
+        description: 'Estimate SPAN + exposure margins for F&O positions',
+      },
+      {
+        name: 'Trade Journal',
+        path: '/dashboard/markets/journal',
+        icon: BookOpen,
+        description: 'Record trades, track rationale, AI pattern analysis',
       },
     ],
   },

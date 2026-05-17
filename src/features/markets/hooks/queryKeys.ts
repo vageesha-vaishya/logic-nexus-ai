@@ -67,6 +67,8 @@ export const marketsKeys = {
       [...marketsKeys.signals.all(), "list", filters ?? {}] as const,
     summary: (symbols: string[], exchange: string) =>
       [...marketsKeys.signals.all(), "summary", [...symbols].sort().join(","), exchange] as const,
+    scanner: (filters: string[], match: string, exchange: string) =>
+      [...marketsKeys.signals.all(), "scanner", [...filters].sort().join(","), match, exchange] as const,
   },
 
   strategies: {
@@ -129,5 +131,12 @@ export const marketsKeys = {
     all:    () => [...marketsKeys.all, "rebalancing"] as const,
     rules:  (portfolioId: string) => [...marketsKeys.rebalancing.all(), "rules", portfolioId] as const,
     alerts: (portfolioId: string) => [...marketsKeys.rebalancing.all(), "alerts", portfolioId] as const,
+  },
+
+  journal: {
+    all:   () => [...marketsKeys.all, "journal"] as const,
+    list:  (filters?: { symbol?: string; portfolioId?: string; outcome?: string; tags?: string[] }) =>
+      [...marketsKeys.journal.all(), "list", filters ?? {}] as const,
+    stats: (userId: string) => [...marketsKeys.journal.all(), "stats", userId] as const,
   },
 } as const;

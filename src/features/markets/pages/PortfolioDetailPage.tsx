@@ -10,7 +10,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useParams, Link } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
-  ArrowLeft, Brain, Download, FlaskConical, Loader2, MoreVertical, Newspaper, Plus, Trash2, Upload,
+  ArrowLeft, Brain, Download, FlaskConical, Loader2, MoreVertical, Newspaper, Plus, Sparkles, Trash2, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -28,6 +28,7 @@ import { PaperOrderSheet } from "../components/PaperOrderSheet";
 import { SectorAllocationChart } from "../components/SectorAllocationChart";
 import { PortfolioAnalyticsPanel } from "../components/PortfolioAnalyticsPanel";
 import { RebalancingRulesPanel } from "../components/RebalancingRulesPanel";
+import { PortfolioAdvisorCard } from "../components/PortfolioAdvisorCard";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -253,7 +254,7 @@ export default function PortfolioDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="holdings">
         <TabsList className="w-full justify-start border-b bg-transparent p-0 h-auto">
-          {(["holdings","transactions","briefs","sector","analytics","rebalancing"] as const).map((t) => (
+          {(["holdings","transactions","briefs","sector","analytics","rebalancing","advisor"] as const).map((t) => (
             <TabsTrigger
               key={t}
               value={t}
@@ -269,7 +270,14 @@ export default function PortfolioDetailPage() {
                       ? "Sector"
                       : t === "analytics"
                         ? "Analytics"
-                        : "Rebalancing"}
+                        : t === "advisor"
+                          ? (
+                            <span className="flex items-center gap-1">
+                              <Sparkles className="h-3.5 w-3.5 text-violet-500" />
+                              AI Advisor
+                            </span>
+                          )
+                          : "Rebalancing"}
               {t === "transactions" && (transactions.data?.length ?? 0) > 0 && (
                 <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                   {transactions.data!.length}
@@ -446,6 +454,11 @@ export default function PortfolioDetailPage() {
               holdings={holdings.data?.holdings ?? []}
             />
           )}
+        </TabsContent>
+
+        {/* ── AI Advisor tab ─────────────────────────────────────────────── */}
+        <TabsContent value="advisor" className="mt-4">
+          {id && <PortfolioAdvisorCard portfolioId={id} />}
         </TabsContent>
       </Tabs>
 

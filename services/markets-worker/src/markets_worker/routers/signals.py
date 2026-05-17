@@ -511,6 +511,208 @@ async def backtest_signal(
         raise HTTPException(504, detail="Backtest timed out — try a shorter lookback period.")
 
 
+# ── Scanner ───────────────────────────────────────────────────────────────────
+
+# { "<filters_key>:<match>" : (cached_at_ts, response_dict) }
+_scanner_cache: dict[str, tuple[float, dict]] = {}
+_SCANNER_TTL = 300.0  # 5 minutes
+
+FILTER_DESCRIPTIONS: dict[str, str] = {
+    "rsi_oversold":    "RSI < 30 — oversold, potential bounce",
+    "rsi_overbought":  "RSI > 70 — overbought, potential correction",
+    "macd_bullish":    "MACD bullish crossover — momentum turning up",
+    "macd_bearish":    "MACD bearish crossover — momentum turning down",
+    "supertrend_buy":  "SuperTrend bullish — uptrend confirmed",
+    "supertrend_sell": "SuperTrend bearish — downtrend confirmed",
+    "strong_buy":      "2+ indicators bullish — strong signal",
+    "strong_sell":     "2+ indicators bearish — strong signal",
+    "near_52w_high":   "Within 5% of 52-week high",
+    "near_52w_low":    "Within 5% of 52-week low",
+}
+
+_VALID_FILTERS = set(FILTER_DESCRIPTIONS.keys())
+
+
+def _apply_filter(signal_data: dict, filter_name: str) -> bool:
+    inds = signal_data.get("indicators", {})
+    rsi = inds.get("rsi")
+    macd = inds.get("macd") or {}
+    st = inds.get("supertrend") or {}
+    direction = signal_data.get("direction", "neutral")
+
+    if filter_name == "rsi_oversold":   return rsi is not None and rsi < 30
+    if filter_name == "rsi_overbought": return rsi is not None and rsi > 70
+    if filter_name == "macd_bullish":   return macd.get("crossover") == "bullish"
+    if filter_name == "macd_bearish":   return macd.get("crossover") == "bearish"
+    if filter_name == "supertrend_buy": return st.get("signal") == "buy"
+    if filter_name == "supertrend_sell":return st.get("signal") == "sell"
+    if filter_name == "strong_buy":     return direction == "buy" and signal_data.get("score", 0) >= 75
+    if filter_name == "strong_sell":    return direction == "sell" and signal_data.get("score", 0) >= 75
+    # near_52w_high / near_52w_low require price history data in metadata
+    if filter_name == "near_52w_high":
+        meta = signal_data.get("meta", {}) or {}
+        high52 = meta.get("high_52w")
+        price  = signal_data.get("price_at_signal")
+        if high52 and price and high52 > 0:
+            return price >= high52 * 0.95
+        return False
+    if filter_name == "near_52w_low":
+        meta = signal_data.get("meta", {}) or {}
+        low52 = meta.get("low_52w")
+        price = signal_data.get("price_at_signal")
+        if low52 and price and low52 > 0:
+            return price <= low52 * 1.05
+        return False
+    return False
+
+
+@router.get("/scanner")
+async def scanner(
+    exchange: str = Query(default="NSE"),
+    filters:  str = Query(default="strong_buy", description="Comma-separated filter names"),
+    match:    str = Query(default="any", description="'any' (OR) or 'all' (AND)"),
+    limit:    int = Query(default=50, ge=1, le=200),
+) -> dict:
+    """
+    Scan all recent signals for NSE instruments and return those matching
+    the requested technical filters. Results are cached for 5 minutes.
+    """
+    from datetime import datetime, timezone, timedelta
+
+    filter_list = [f.strip() for f in filters.split(",") if f.strip() in _VALID_FILTERS]
+    if not filter_list:
+        raise HTTPException(
+            status_code=400,
+            detail=f"No valid filters. Valid options: {sorted(_VALID_FILTERS)}",
+        )
+
+    match_mode = "all" if match == "all" else "any"
+    cache_key = f"{','.join(sorted(filter_list))}:{match_mode}:{exchange.upper()}"
+
+    now = time.monotonic()
+    cached = _scanner_cache.get(cache_key)
+    if cached is not None and (now - cached[0]) < _SCANNER_TTL:
+        payload = dict(cached[1])
+        payload["results"] = cached[1]["results"][:limit]
+        return payload
+
+    # ── Query last-24h signals joined to instruments ──────────────────────
+    cutoff = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
+    db = get_supabase()
+    try:
+        rows_result = (
+            db.schema("markets")
+            .from_("signals")
+            .select(
+                "instrument_id, direction, confidence, score, rationale, "
+                "metadata, price_at_signal, ts, "
+                "instrument:instruments(symbol, exchange, instrument_type)"
+            )
+            .eq("instrument!inner.exchange", exchange.upper())
+            .gte("ts", cutoff)
+            .order("score", desc=True)
+            .limit(2000)
+            .execute()
+        )
+        rows = rows_result.data or []
+    except Exception as exc:
+        logger.warning("scanner_db_error", error=str(exc))
+        rows = []
+
+    # ── Enrich with live LTP from in-memory cache ─────────────────────────
+    from markets_worker.routers.ltp import _ltp_cache as ltp_cache  # type: ignore[import]
+
+    def _get_ltp(symbol: str) -> tuple[float | None, float | None]:
+        """Return (ltp, change_pct) from the ltp cache if fresh."""
+        for suffix in (".NS", ".BO", ""):
+            entry = ltp_cache.get(f"{symbol}{suffix}")
+            if entry is None:
+                entry = ltp_cache.get(symbol)
+            if entry is not None:
+                data = entry[1] if isinstance(entry, tuple) else entry
+                ltp_val     = data.get("ltp")
+                change_pct  = data.get("change_pct")
+                return ltp_val, change_pct
+        return None, None
+
+    # ── Apply filters + build result rows ────────────────────────────────
+    results: list[dict] = []
+    now_utc = datetime.now(timezone.utc)
+
+    for row in rows:
+        instr = row.get("instrument") or {}
+        symbol        = instr.get("symbol", "")
+        exch          = instr.get("exchange", exchange.upper())
+        instr_type    = instr.get("instrument_type", "equity")
+
+        meta = row.get("metadata") or {}
+        indicators = meta.get("indicators") or {}
+
+        signal_data = {
+            "direction":      row.get("direction", "neutral"),
+            "score":          round((row.get("score") or 0) * 100),
+            "confidence":     row.get("confidence") or 0,
+            "indicators":     indicators,
+            "price_at_signal": row.get("price_at_signal"),
+            "meta":           meta,
+        }
+
+        matched: list[str] = [f for f in filter_list if _apply_filter(signal_data, f)]
+
+        passes = (
+            len(matched) > 0 if match_mode == "any"
+            else len(matched) == len(filter_list)
+        )
+        if not passes:
+            continue
+
+        ltp_val, change_pct = _get_ltp(symbol)
+
+        rsi_val    = indicators.get("rsi")
+        macd_d     = indicators.get("macd") or {}
+        st_d       = indicators.get("supertrend") or {}
+
+        try:
+            ts = datetime.fromisoformat(row["ts"].replace("Z", "+00:00"))
+            age_minutes = int((now_utc - ts).total_seconds() / 60)
+        except Exception:
+            age_minutes = -1
+
+        results.append({
+            "symbol":             symbol,
+            "exchange":           exch,
+            "instrument_type":    instr_type,
+            "direction":          row.get("direction", "neutral"),
+            "score":              signal_data["score"],
+            "confidence":         round(float(signal_data["confidence"]), 2),
+            "rationale":          row.get("rationale") or "",
+            "ltp":                ltp_val,
+            "change_pct":         change_pct,
+            "rsi":                round(rsi_val, 2) if rsi_val is not None else None,
+            "macd_crossover":     macd_d.get("crossover"),
+            "supertrend":         st_d.get("signal"),
+            "signal_age_minutes": age_minutes,
+            "matched_filters":    matched,
+        })
+
+    # ── Sort by score desc, cache full result set ────────────────────────
+    results.sort(key=lambda r: r["score"], reverse=True)
+
+    response = {
+        "filters":        filter_list,
+        "match":          match_mode,
+        "results":        results,
+        "total_scanned":  len(rows),
+        "total_matched":  len(results),
+        "as_of":          now_utc.strftime("%Y-%m-%dT%H:%M:%SZ"),
+    }
+    _scanner_cache[cache_key] = (now, response)
+
+    paged = dict(response)
+    paged["results"] = results[:limit]
+    return paged
+
+
 @router.get("/summary")
 async def signals_summary(
     symbols:  str = Query(..., description="Comma-separated symbols, e.g. RELIANCE,TCS"),

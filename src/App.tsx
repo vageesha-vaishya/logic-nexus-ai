@@ -228,6 +228,9 @@ const MarketsAlerts       = lazy(() => import("./features/markets/pages/PriceAle
 const MarketsRisk         = lazy(() => import("./features/markets/pages/RiskControlsPage"));
 const MarketsCalendar     = lazy(() => import("./features/markets/pages/EconomicCalendarPage"));
 const MarketsFiiDii       = lazy(() => import("./features/markets/pages/FiiDiiPage"));
+const MarketsScanner        = lazy(() => import("./features/markets/pages/ScannerPage"));
+const MarketsSpan           = lazy(() => import("./features/markets/pages/SpanCalculatorPage"));
+const MarketsTradeJournal   = lazy(() => import("./features/markets/pages/TradeJournalPage"));
 // Platform-wide LLM provider settings — same component, reachable from main settings hub.
 const PlatformLlmSettings = MarketsLlmSettings;
 const FeatureFlagsAdmin = lazy(() => import("./pages/dashboard/settings/FeatureFlagsPage"));
@@ -989,6 +992,9 @@ const App = () => (
             <Route path="/dashboard/markets/risk" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRisk /></ProtectedRoute>} />
             <Route path="/dashboard/markets/calendar" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsCalendar /></ProtectedRoute>} />
             <Route path="/dashboard/markets/fii-dii" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsFiiDii /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/scanner" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsScanner /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/span" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSpan /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/journal" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsTradeJournal /></ProtectedRoute>} />
             <Route path="/dashboard/settings/feature-flags" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><FeatureFlagsAdmin /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}

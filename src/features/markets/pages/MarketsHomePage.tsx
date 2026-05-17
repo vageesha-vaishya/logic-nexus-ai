@@ -36,7 +36,9 @@ import {
   ChevronRight,
   Eye,
   GitBranch,
+  Keyboard,
   PiggyBank,
+  Radar,
   Search,
   ShieldAlert,
   TrendingDown,
@@ -44,6 +46,8 @@ import {
   Wallet,
   Wifi,
 } from "lucide-react";
+import { KeyboardShortcutsHelp } from "../components/KeyboardShortcutsHelp";
+import { useMarketKeyboardShortcuts } from "../hooks/useMarketKeyboardShortcuts";
 
 import { useLTP, type LTPQuote } from "../hooks/useLTP";
 import { useWatchlists, useWatchlist } from "../hooks/useWatchlists";
@@ -51,6 +55,7 @@ import { usePortfolios } from "../hooks/usePortfolios";
 import { useEconomicCalendar, type CalendarEvent } from "../hooks/useEconomicCalendar";
 import { usePriceAlerts, type PriceAlert } from "../hooks/usePriceAlerts";
 import { useFiiDii } from "../hooks/useFiiDii";
+import { useScanner } from "../hooks/useScanner";
 import { isMarketOpen, marketStatusLabel } from "../utils/market-hours";
 
 import {
@@ -121,10 +126,14 @@ function SkeletonLine({ className = "" }: { className?: string }) {
 export default function MarketsHomePage() {
   const marketOpen = isMarketOpen();
   const statusLabel = marketStatusLabel();
+  const { showHelp, setShowHelp } = useMarketKeyboardShortcuts();
 
   return (
     <DashboardLayout>
       <div className="mx-auto max-w-screen-xl space-y-6 p-4 sm:p-6">
+
+        {/* Keyboard shortcuts help modal */}
+        <KeyboardShortcutsHelp open={showHelp} onClose={() => setShowHelp(false)} />
 
         {/* ── Header ────────────────────────────────────────────────────── */}
         <header className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -153,6 +162,18 @@ export default function MarketsHomePage() {
                 <TrendingUp className="h-4 w-4" />
                 New Order
               </Link>
+            </Button>
+
+            {/* Keyboard shortcuts trigger */}
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setShowHelp(true)}
+              className="h-9 w-9 p-0"
+              title="Keyboard shortcuts (?)"
+              aria-label="Keyboard shortcuts"
+            >
+              <Keyboard className="h-4 w-4" />
             </Button>
 
             {/* Market status badge */}
@@ -614,8 +635,10 @@ function MiniSparkline({ values }: { values: number[] }) {
 function QuickAccessSection() {
   const { data: alerts } = usePriceAlerts();
   const { data: calData } = useEconomicCalendar();
+  const { data: scannerData } = useScanner(["strong_buy"]);
 
   const activeAlertCount = alerts?.filter((a) => a.status === "active").length ?? 0;
+  const activeBuySignals = scannerData?.total_matched ?? 0;
 
   const today = new Date().toISOString().slice(0, 10);
   const nextEvent = (calData?.events ?? [])
@@ -631,30 +654,42 @@ function QuickAccessSection() {
       description: "Holdings, NAV and AI briefs",
       path:        "/dashboard/markets/portfolios",
       Icon:        Wallet,
+      badge:       undefined as string | undefined,
     },
     {
       title:       "Watchlists",
       description: "Monitor instruments live",
       path:        "/dashboard/markets/watchlists",
       Icon:        Eye,
+      badge:       undefined as string | undefined,
+    },
+    {
+      title:       "Market Scanner",
+      description: activeBuySignals > 0 ? `${activeBuySignals} buy signals — Scan now` : "Scan NSE for setups",
+      path:        "/dashboard/markets/scanner",
+      Icon:        Radar,
+      badge:       activeBuySignals > 0 ? String(activeBuySignals) : undefined,
     },
     {
       title:       "F&O Chain",
       description: "Live option chain & greeks",
       path:        "/dashboard/markets/fno",
       Icon:        TrendingUp,
+      badge:       undefined as string | undefined,
     },
     {
       title:       "Strategy Builder",
       description: "Build and backtest strategies",
       path:        "/dashboard/markets/strategies",
       Icon:        GitBranch,
+      badge:       undefined as string | undefined,
     },
     {
       title:       "Mutual Funds",
       description: "Discover, invest & SIP",
       path:        "/dashboard/markets/mf",
       Icon:        PiggyBank,
+      badge:       undefined as string | undefined,
     },
     {
       title:       "Price Alerts",
@@ -668,26 +703,30 @@ function QuickAccessSection() {
       description: nextEventLabel ? `Next event ${nextEventLabel}` : "Macro events & earnings",
       path:        "/dashboard/markets/calendar",
       Icon:        CalendarDays,
+      badge:       undefined as string | undefined,
     },
     {
       title:       "FII/DII Flows",
       description: "Institutional flow analysis",
       path:        "/dashboard/markets/fii-dii",
       Icon:        BarChart3,
+      badge:       undefined as string | undefined,
     },
     {
       title:       "Risk Controls",
       description: "Position sizing & limits",
       path:        "/dashboard/markets/risk",
       Icon:        ShieldAlert,
+      badge:       undefined as string | undefined,
     },
     {
       title:       "Broker Accounts",
       description: "Connect brokers for sync",
       path:        "/dashboard/markets/settings/brokers",
       Icon:        Wifi,
+      badge:       undefined as string | undefined,
     },
-  ] as const;
+  ];
 
   return (
     <section aria-labelledby="quickaccess-heading">

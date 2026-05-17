@@ -22,6 +22,7 @@ from markets_worker.routers import paper as paper_router
 from markets_worker.routers import calendar as calendar_router
 from markets_worker.routers import fii_dii as fii_dii_router
 from markets_worker.routers import signals as signals_router
+from markets_worker.routers import span as span_router
 
 
 def configure_logging() -> None:
@@ -85,6 +86,7 @@ def create_app() -> FastAPI:
     app.include_router(calendar_router.router,      tags=["calendar"])
     app.include_router(fii_dii_router.router,       tags=["fii-dii"])
     app.include_router(signals_router.router,       tags=["signals"])
+    app.include_router(span_router.router,          tags=["span"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.
