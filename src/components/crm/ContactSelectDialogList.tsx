@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 type ContactSelectDialogProps = {
   open: boolean;
@@ -49,7 +50,7 @@ export default function ContactSelectDialogList({ open, onOpenChange, onSelect }
         setContacts(contactsData || []);
         setAccounts(accountsData || []);
       } catch (err: any) {
-        console.error('Load contacts failed:', err);
+        logger.error('Load contacts failed:', err);
         toast.error('Failed to load contacts');
       } finally {
         setLoading(false);

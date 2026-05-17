@@ -16,6 +16,7 @@ import { RoleService } from '@/lib/api/roles';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
+import { logger } from "@/lib/logger";
 
 export default function Users() {
   const navigate = useNavigate();
@@ -705,7 +706,7 @@ export default function Users() {
                         description: 'Copy and share the recovery link with the user.',
                       });
                       // Optionally show link in a separate UI; keeping minimal for now
-                      console.log('Recovery link:', data.recovery_link);
+                      logger.debug('Recovery link:', data.recovery_link);
                     } else {
                       toast({ title: 'Success', description: 'Password updated successfully' });
                     }

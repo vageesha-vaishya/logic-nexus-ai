@@ -19,6 +19,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { calculateScaledPrice } from '@/utils/subscriptionScaling';
 import { THEME_PRESETS } from '@/theme/themes';
+import { logger } from "@/lib/logger";
 
 const parsePositiveInteger = (value?: string | number | null) => {
   const parsed = Number.parseInt(String(value ?? '').trim(), 10);
@@ -779,7 +780,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
 
   useEffect(() => {
     if (!DomainService) {
-      console.error('DomainService is undefined');
+      logger.error('DomainService is undefined');
       return;
     }
     
@@ -790,7 +791,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
         setDomains(sorted);
       })
       .catch((err) => {
-        console.error('Failed to load domains', err);
+        logger.error('Failed to load domains', err);
         const message = err?.message || (err instanceof Error ? err.message : 'Unknown error loading domains');
         toast({ 
           title: 'Error Loading Domains', 
@@ -1200,7 +1201,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
             created_by: userId,
           } as any);
         if (actErr) {
-          console.warn('Activity logging failed:', actErr.message);
+          logger.warn('Activity logging failed:', actErr.message);
         }
 
         toast({
@@ -1279,7 +1280,7 @@ export function TenantForm({ tenant, onSuccess }: TenantFormProps) {
             created_by: userId,
           } as any);
         if (actErr) {
-          console.warn('Activity logging failed:', actErr.message);
+          logger.warn('Activity logging failed:', actErr.message);
         }
 
         toast({

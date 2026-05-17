@@ -12,6 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { TemplateSelector } from './TemplateSelector';
+import { logger } from "@/lib/logger";
 
 interface PDFGeneratorProps {
   versionId: string;
@@ -66,7 +67,7 @@ export function PDFGenerator({ versionId, versionNumber, quoteId }: PDFGenerator
       toast.success('PDF Generated successfully');
       setShowModal(false);
     } catch (error: any) {
-      console.error('Failed to generate PDF:', error);
+      logger.error('Failed to generate PDF:', error);
       toast.error('Failed to generate PDF', {
         description: error.message || 'Unknown error occurred',
       });

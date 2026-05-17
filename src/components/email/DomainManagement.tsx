@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { logger } from "@/lib/logger";
 
 type Domain = {
   id: string;
@@ -56,7 +57,7 @@ export function DomainManagement() {
       if (error) throw error;
       setDomains(data || []);
     } catch (error: any) {
-      console.error("Error fetching domains:", error);
+      logger.error("Error fetching domains:", error);
     } finally {
       setLoading(false);
     }

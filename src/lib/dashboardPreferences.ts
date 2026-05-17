@@ -1,4 +1,5 @@
 import { UserDashboardPreferences, WidgetInstance, UserRole } from '@/types/dashboardTemplates';
+import { logger } from "@/lib/logger";
 
 /**
  * Merge custom widgets with default widgets
@@ -61,7 +62,7 @@ export function importPreferences(json: string): UserDashboardPreferences | null
       lastModified: new Date(data.lastModified),
     };
   } catch (error) {
-    console.error('Failed to import preferences:', error);
+    logger.error('Failed to import preferences:', error);
     return null;
   }
 }

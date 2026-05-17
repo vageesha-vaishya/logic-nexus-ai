@@ -12,6 +12,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useQuoteTemplates } from './useQuoteTemplates';
 import { QuoteTemplate } from './types';
 import { VisualTemplateEditor } from './VisualTemplateEditor';
+import { logger } from "@/lib/logger";
 
 const templateSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -85,7 +86,7 @@ export function QuoteTemplateEditor({ template, open, onOpenChange }: QuoteTempl
       }
       onOpenChange(false);
     } catch (error) {
-      console.error('Error saving template:', error);
+      logger.error('Error saving template:', error);
     }
   };
 

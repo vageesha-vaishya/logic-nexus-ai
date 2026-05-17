@@ -287,7 +287,7 @@ export function LeadActivitiesTimeline({ leadId, eventBus }: LeadActivitiesTimel
       setActivities(activities.filter(a => a.id !== activityToDelete));
       toast.success('Activity deleted');
     } catch (error) {
-      console.error('Error deleting activity:', error);
+      logger.error('Error deleting activity:', error);
       toast.error('Failed to delete activity');
     } finally {
       setDeleteDialogOpen(false);

@@ -698,7 +698,7 @@ export default function QuoteDetail() {
             .abortSignal(signal);
           
           if (qError) {
-            console.error('[QuoteDetail] Error fetching quote tenant:', qError);
+            logger.error('[QuoteDetail] Error fetching quote tenant:', qError);
           }
           
           finalTenantId = (qRow as any)?.tenant_id ?? null;
@@ -812,7 +812,7 @@ export default function QuoteDetail() {
       toast.success('Version saved successfully');
       setVersionId(prev => prev + '_new'); // Force refresh
     } catch (err: any) {
-      console.error('Failed to save version:', err);
+      logger.error('Failed to save version:', err);
       toast.error('Failed to save version');
     }
   };
@@ -834,7 +834,7 @@ export default function QuoteDetail() {
         // For now, simple reload to ensure clean state
         window.location.reload();
     } catch (err: any) {
-        console.error('Failed to restore version:', err);
+        logger.error('Failed to restore version:', err);
         toast.error('Failed to restore version');
     }
   };

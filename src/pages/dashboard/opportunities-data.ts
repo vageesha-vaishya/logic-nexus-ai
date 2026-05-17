@@ -98,6 +98,7 @@ export const stageProbabilityMap: Record<OpportunityStage, number> = {
 };
 
 import type { Lead, LeadStatus } from './leads-data';
+import { logger } from "@/lib/logger";
 
 export const leadToOpportunityStageMap: Record<LeadStatus, OpportunityStage> = {
   new: 'prospecting',
@@ -112,7 +113,7 @@ export const leadToOpportunityStageMap: Record<LeadStatus, OpportunityStage> = {
 
 export const getOpportunityStageFromLead = (leadStatus: LeadStatus): OpportunityStage => {
   if (!Object.prototype.hasOwnProperty.call(leadToOpportunityStageMap, leadStatus)) {
-    console.warn(`Unknown lead status: ${leadStatus}, defaulting to prospecting`);
+    logger.warn(`Unknown lead status: ${leadStatus}, defaulting to prospecting`);
     return 'prospecting';
   }
   return leadToOpportunityStageMap[leadStatus];

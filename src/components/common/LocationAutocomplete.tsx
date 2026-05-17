@@ -19,6 +19,7 @@ import { useCRM } from "@/hooks/useCRM"
 import { Badge } from "@/components/ui/badge"
 import { useDebounce } from "@/hooks/useDebounce"
 import * as Sentry from "@sentry/react"
+import { logger } from "@/lib/logger";
 
 interface Location {
   id: string;
@@ -264,7 +265,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
           .order('location_name', { ascending: true })
           .range(0, PAGE_SIZE - 1)
         if (error) {
-          console.error('Initial ports load failed:', error)
+          logger.error('Initial ports load failed:', error)
           Sentry.captureException(error, { tags: { feature: 'quick_quote', component: 'LocationAutocomplete' } })
           setErrorMsg('Failed to load ports.')
           setLocations([])
@@ -276,7 +277,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
         setPage(1)
         setHasMore(list.length === PAGE_SIZE)
       } catch (err) {
-        console.error('Initial ports load error:', err)
+        logger.error('Initial ports load error:', err)
         Sentry.captureException(err as any, { tags: { feature: 'quick_quote', component: 'LocationAutocomplete' } })
         setErrorMsg('Network error while loading ports.')
         setLocations([])
@@ -337,7 +338,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
         const { data: fallbackData, error: fbError } = fallbackResponse;
 
         if (rpcError) {
-          console.error('Error fetching locations via RPC:', rpcError)
+          logger.error('Error fetching locations via RPC:', rpcError)
           // Don't fail completely if RPC fails, just rely on fallback
           Sentry.captureMessage('Location search RPC failed', {
             level: 'warning',
@@ -346,7 +347,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
         }
 
         if (fbError) {
-             console.error('Fallback query failed:', fbError)
+             logger.error('Fallback query failed:', fbError)
         }
 
         // Combine results
@@ -403,7 +404,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
         }
 
       } catch (err) {
-        console.error('Failed to fetch locations:', err)
+        logger.error('Failed to fetch locations:', err)
         setErrorMsg('Network error. Showing fallback results if available.')
         Sentry.captureException(err, {
           tags: { feature: 'quick_quote', component: 'LocationAutocomplete' },
@@ -598,7 +599,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
                         .order('location_name', { ascending: true })
                         .range(start, end)
                       if (error) {
-                        console.error('Load more ports failed:', error)
+                        logger.error('Load more ports failed:', error)
                         Sentry.captureException(error, { tags: { feature: 'quick_quote', component: 'LocationAutocomplete' } })
                         setHasMore(false)
                         return

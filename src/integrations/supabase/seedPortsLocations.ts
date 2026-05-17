@@ -1,4 +1,5 @@
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 type PortSeed = {
   location_name: string;
@@ -53,7 +54,7 @@ export async function seedPortsForTenant(scopedDb: any): Promise<number> {
     return toInsert.length;
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e);
-    console.warn('Seed ports/locations failed:', message);
+    logger.warn('Seed ports/locations failed:', message);
     toast.error('Failed to seed ports/locations', { description: message });
     return 0;
   }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Users, PieChart } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface DistributionItem {
   owner: string;
@@ -58,7 +59,7 @@ export function TeamLeadDistribution() {
           setDistribution(result);
         }
       } catch (error) {
-        console.error('Failed to fetch lead distribution:', error);
+        logger.error('Failed to fetch lead distribution:', error);
       } finally {
         setLoading(false);
       }

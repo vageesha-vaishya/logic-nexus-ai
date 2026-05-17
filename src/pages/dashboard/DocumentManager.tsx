@@ -16,6 +16,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from 'sonner';
 import { Loader2, Save, History, FileText, Split, Eye } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from "@/lib/logger";
 
 export default function DocumentManager() {
   const { scopedDb } = useCRM();
@@ -48,7 +49,7 @@ export default function DocumentManager() {
         setSelectedVersion(vers[0]);
       }
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       toast.error('Failed to load document');
     } finally {
       setLoading(false);
@@ -80,7 +81,7 @@ export default function DocumentManager() {
       setChangeType('patch');
       await loadDocument();
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       toast.error('Failed to save version');
     } finally {
       setSaving(false);
@@ -96,7 +97,7 @@ export default function DocumentManager() {
       toast.success(`Reverted to version ${version.version}`);
       await loadDocument();
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       toast.error('Failed to revert version');
     } finally {
       setSaving(false);

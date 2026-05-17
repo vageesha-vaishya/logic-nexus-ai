@@ -39,6 +39,7 @@ import { ToastAction } from "@/components/ui/toast";
 import { cn } from "@/lib/utils";
 
 import { Email } from "@/types/email";
+import { logger } from "@/lib/logger";
 
 export interface EmailDetailViewProps {
   email: Email;
@@ -137,7 +138,7 @@ function EmailMessage({
       link.click();
       document.body.removeChild(link);
     } catch (error: any) {
-      console.error("Download error:", error);
+      logger.error("Download error:", error);
       toast({
         title: "Download Failed",
         description: error.message,

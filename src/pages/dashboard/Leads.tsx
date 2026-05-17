@@ -1607,7 +1607,7 @@ export default function Leads() {
       setSelectedIds([]);
       fetchLeads();
     } catch (error) {
-      console.error('Error deleting leads:', error);
+      logger.error('Error deleting leads:', error);
       toast.error(t('leads.messages.deleteError'));
     }
   };

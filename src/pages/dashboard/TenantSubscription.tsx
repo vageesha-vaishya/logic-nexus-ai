@@ -10,6 +10,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Building2, CreditCard } from 'lucide-react';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 interface Tenant {
   id: string;
@@ -72,7 +73,7 @@ export default function TenantSubscription() {
       setPlans(plansData || []);
     } catch (error: any) {
       toast.error('Failed to load data');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -117,14 +118,14 @@ export default function TenantSubscription() {
           .update({ subscription_tier: derivedTier })
           .eq('id', tenantId);
       } catch (tierError) {
-        console.warn('Failed to sync tenant subscription_tier from plan:', tierError);
+        logger.warn('Failed to sync tenant subscription_tier from plan:', tierError);
       }
 
       toast.success('Plan assigned successfully');
       fetchData();
     } catch (error: any) {
       toast.error('Failed to assign plan: ' + error.message);
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

@@ -41,6 +41,8 @@ export default tseslint.config(
       "@typescript-eslint/no-unused-vars": "off",
       "@typescript-eslint/no-explicit-any": "off",
       "@typescript-eslint/ban-ts-comment": ["error", { "ts-ignore": "allow-with-description" }],
+      // P5 — log discipline: use logger from @/lib/logger, never raw console
+      "no-console": "error",
     },
     settings: {},
   },
@@ -86,6 +88,20 @@ export default tseslint.config(
       "@typescript-eslint/no-explicit-any": "off",
       "react-hooks/exhaustive-deps": "off"
     },
+  },
+  {
+    // logger.ts and test/story files may reference console directly
+    files: [
+      "src/lib/logger.ts",
+      "src/lib/global-error-handler.ts",
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "**/*.stories.ts",
+      "**/*.stories.tsx",
+    ],
+    rules: { "no-console": "off" },
   },
   {
     files: [

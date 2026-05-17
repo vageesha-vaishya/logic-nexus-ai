@@ -6,6 +6,7 @@ import { ArrowRight, Search } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 export function AssignmentHistory() {
   const { supabase, context, scopedDb } = useCRM();
@@ -55,7 +56,7 @@ export function AssignmentHistory() {
         }
       } catch (error: any) {
         toast.error('Failed to load history');
-        console.error('Error:', error);
+        logger.error('Error:', error);
       } finally {
         setLoading(false);
       }

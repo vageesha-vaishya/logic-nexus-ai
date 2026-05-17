@@ -258,7 +258,7 @@ const quotationConfigCache: Record<string, { config: any; cachedAt: number }> = 
 // ---------------------------------------------------------------------------
 
 export function UnifiedQuoteComposer(props: UnifiedQuoteComposerProps) {
-  // console.log('[UnifiedComposer] Rendering with props:', props);
+  // logger.debug('[UnifiedComposer] Rendering with props:', props);
   return (
     <QuoteStoreProvider>
       <UnifiedQuoteComposerContent {...props} />
@@ -3251,7 +3251,7 @@ function UnifiedQuoteComposerContent({
           };
       });
 
-      // console.log('[UnifiedComposer] quotePayload cargo_details:', JSON.stringify(quotePayload.cargo_details, null, 2));
+      // logger.debug('[UnifiedComposer] quotePayload cargo_details:', JSON.stringify(quotePayload.cargo_details, null, 2));
 
       const findBasisCodeById = (id: string) =>
         repoData?.chargeBases?.find((b: any) => b.id === id)?.code || '';
@@ -3373,7 +3373,7 @@ function UnifiedQuoteComposerContent({
             }
           }
         } else {
-             console.warn('[UnifiedComposer] draftCharges is not iterable for option', opt.id);
+             logger.warn('[UnifiedComposer] draftCharges is not iterable for option', opt.id);
         }
 
         const normalizedDraftLegs = normalizeLegContinuity(draftLegs, {
@@ -3516,7 +3516,7 @@ function UnifiedQuoteComposerContent({
               await scopedDb.from('quotes').update({ quote_number: manualNo, notes: newNotes }).eq('id', savedId);
             }
           } catch (e) {
-            console.error('Quote number override failed', e);
+            logger.error('Quote number override failed', e);
           }
         }
       }
@@ -3536,7 +3536,7 @@ function UnifiedQuoteComposerContent({
             displayQuoteNumber = q.quote_number;
           }
         } catch (e) {
-          console.warn('Failed to fetch quote number for toast', e);
+          logger.warn('Failed to fetch quote number for toast', e);
         }
       }
 
@@ -3912,7 +3912,7 @@ function UnifiedQuoteComposerContent({
             });
           }
         } catch (e) {
-          console.warn('Failed to fetch quote number for draft toast', e);
+          logger.warn('Failed to fetch quote number for draft toast', e);
         }
       }
 

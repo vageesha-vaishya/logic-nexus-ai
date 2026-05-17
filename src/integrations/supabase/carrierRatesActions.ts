@@ -1,6 +1,7 @@
 import { supabase as defaultClient } from '@/integrations/supabase/client';
 import { ScopedDataAccess } from '@/lib/db/access';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from "@/lib/logger";
 
 const isUuid = (v: any) => typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
 
@@ -302,7 +303,7 @@ export async function listCarrierRatesForQuote(
   }));
   if (import.meta.env.DEV) {
     try {
-      console.debug('[hydrate:rates]', { quoteId, rows: (rows || []).length, mapped: out.length });
+      logger.debug('[hydrate:rates]', { quoteId, rows: (rows || []).length, mapped: out.length });
     } catch {
       // ignore
     }

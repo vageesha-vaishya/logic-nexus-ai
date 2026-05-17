@@ -10,6 +10,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from "@/lib/logger";
 
 const accountSchema = z.object({
   name: z.string().min(1, 'Account name is required').max(200, 'Name too long'),
@@ -131,7 +132,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
           finalData.custom_fields = JSON.parse(finalData.custom_fields);
         }
       } catch (e) {
-        console.error("Invalid JSON for custom_fields");
+        logger.error("Invalid JSON for custom_fields");
         finalData.custom_fields = null;
       }
 

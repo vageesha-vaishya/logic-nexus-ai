@@ -6,6 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { invokeFunction } from "@/lib/supabase-functions";
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 interface Props {
   leadId: string;
@@ -49,7 +50,7 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
       setUsers(availableUsers);
     } catch (error: any) {
       toast.error('Failed to load users');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -115,10 +116,10 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
           .eq('activity_type', 'task');
 
         if (linkErr) {
-          console.warn('Auto-link tasks skipped:', linkErr.message || linkErr);
+          logger.warn('Auto-link tasks skipped:', linkErr.message || linkErr);
         }
       } catch (linkErr: any) {
-        console.warn('Auto-link tasks skipped:', linkErr?.message || linkErr);
+        logger.warn('Auto-link tasks skipped:', linkErr?.message || linkErr);
       }
 
       // Send email notification to the assignee (best-effort)
@@ -167,14 +168,14 @@ export function ManualAssignment({ leadId, currentOwnerId, onAssigned }: Props) 
           }
         }
       } catch (notifyErr) {
-        console.warn('Assignment email skipped:', (notifyErr as any)?.message || notifyErr);
+        logger.warn('Assignment email skipped:', (notifyErr as any)?.message || notifyErr);
       }
 
       toast.success('Lead assigned successfully');
       onAssigned?.();
     } catch (error: any) {
       toast.error('Failed to assign lead');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }

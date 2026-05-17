@@ -9,6 +9,7 @@ import { invokeFunction, invokeAnonymous } from "@/lib/supabase-functions";
 import { EmailAccountDialog } from "./EmailAccountDialog";
 import { EmailDelegationDialog } from "./EmailDelegationDialog";
 import { format } from "date-fns";
+import { logger } from "@/lib/logger";
 
 interface EmailAccount {
   id: string;
@@ -95,9 +96,9 @@ export function EmailAccounts() {
         if (msg.includes("non-2xx")) {
            const status = (error as any)?.context?.status;
            if (status === 401) {
-              console.error("Sync Unauthorized after retry. Full error:", error);
+              logger.error("Sync Unauthorized after retry. Full error:", error);
               if ((error as any)?.context) {
-                 console.error("Error context:", (error as any).context);
+                 logger.error("Error context:", (error as any).context);
               }
               toast({ title: "Sync Unauthorized", description: "Session expired. Please log out and log in again.", variant: "destructive" });
               return;

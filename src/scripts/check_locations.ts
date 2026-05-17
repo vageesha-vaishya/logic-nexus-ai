@@ -1,4 +1,5 @@
 import { supabase } from '../integrations/supabase/client';
+import { logger } from "@/lib/logger";
 
 async function checkLocations() {
   const { count, error } = await supabase
@@ -6,9 +7,9 @@ async function checkLocations() {
     .select('*', { count: 'exact', head: true });
 
   if (error) {
-    console.error('Error:', error);
+    logger.error('Error:', error);
   } else {
-    console.log('Total locations:', count);
+    logger.debug('Total locations:', count);
   }
 }
 

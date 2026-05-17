@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { CheckCircle, XCircle, Clock, Send, Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/components/ui/use-toast';
+import { logger } from "@/lib/logger";
 
 interface ApprovalWorkflowProps {
   versionId: string;
@@ -57,7 +58,7 @@ export function ApprovalWorkflow({ versionId, currentStatus, onStatusChange }: A
       setNotes('');
       setActionType(null);
     } catch (error) {
-      console.error('Failed to update status:', error);
+      logger.error('Failed to update status:', error);
       toast({
         title: 'Error',
         description: 'Failed to update version status',

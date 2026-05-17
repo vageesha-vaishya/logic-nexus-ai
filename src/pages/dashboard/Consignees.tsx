@@ -21,6 +21,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import type { Consignee } from '@/domain/common/types';
+import { logger } from "@/lib/logger";
 
 export default function Consignees() {
   const navigate = useNavigate();
@@ -88,7 +89,7 @@ export default function Consignees() {
             .order('company_name');
           setConsignees((refreshed || []) as Consignee[]);
         } catch (seedError) {
-          console.error('Auto-seed failed:', seedError);
+          logger.error('Auto-seed failed:', seedError);
           // If seeding fails, just show empty
           setConsignees([]);
         }
@@ -97,7 +98,7 @@ export default function Consignees() {
       }
     } catch (error: any) {
       toast.error('Failed to load consignees');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }

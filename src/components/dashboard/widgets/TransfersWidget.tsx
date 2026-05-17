@@ -9,6 +9,7 @@ import { TransferService } from '@/lib/transfer-service';
 import { WidgetProps } from '@/types/dashboard';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
+import { logger } from "@/lib/logger";
 
 export function TransfersWidget({ config }: WidgetProps) {
   const { t } = useTranslation();
@@ -22,7 +23,7 @@ export function TransfersWidget({ config }: WidgetProps) {
       const data = await TransferService.getTransfers(scopedDb, { status: 'pending' });
       setTransfers(data || []);
     } catch (error) {
-      console.error('Failed to load transfers', error);
+      logger.error('Failed to load transfers', error);
     } finally {
       setLoading(false);
     }

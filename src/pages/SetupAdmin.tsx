@@ -5,6 +5,7 @@ import { H2 } from '@/components/ui/Heading';
 import { toast } from 'sonner';
 import { Loader2, Shield, Eye, EyeOff, Copy, Check } from 'lucide-react';
 import { invokeAnonymous } from '@/lib/supabase-functions';
+import { logger } from "@/lib/logger";
 
 export default function SetupAdmin() {
   const [loading, setLoading] = useState(false);
@@ -38,7 +39,7 @@ export default function SetupAdmin() {
         toast.error(data?.error || 'Failed to create admin');
       }
     } catch (error: any) {
-      console.error('Setup error:', error);
+      logger.error('Setup error:', error);
       toast.error(error.message || 'Failed to create platform admin');
     } finally {
       setLoading(false);

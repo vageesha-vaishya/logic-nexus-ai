@@ -22,6 +22,7 @@ import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 import { useTheme } from "@/hooks/useTheme";
 import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
+import { logger } from "@/lib/logger";
 
 type ContactStage = 'new_contact' | 'verified' | 'key_decision_maker' | 'active' | 'inactive' | 'bounced_invalid';
 
@@ -90,7 +91,7 @@ export default function ContactsPipeline() {
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('ContactsPipeline: fetching with scopedDb', scopedDb.accessContext);
+      logger.debug('ContactsPipeline: fetching with scopedDb', scopedDb.accessContext);
       const { data: c, fallbackReason } = await PipelineService.listContacts(scopedDb, {
         page: 1,
         pageSize: 2000,
@@ -100,9 +101,9 @@ export default function ContactsPipeline() {
       setIsDbFallbackActive(Boolean(fallbackReason));
       setDbFallbackReason(fallbackReason);
       
-      console.log(`ContactsPipeline: fetched ${c?.length} records`);
+      logger.debug(`ContactsPipeline: fetched ${c?.length} records`);
       if (c && c.length > 0) {
-        console.log('ContactsPipeline: first record tenant_id:', (c[0] as any).tenant_id);
+        logger.debug('ContactsPipeline: first record tenant_id:', (c[0] as any).tenant_id);
       }
 
       setContacts((c as Contact[]) || []);

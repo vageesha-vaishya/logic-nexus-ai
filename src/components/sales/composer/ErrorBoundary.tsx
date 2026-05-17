@@ -24,7 +24,7 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Quotation Composer Error:', error, errorInfo);
+    logger.error('Quotation Composer Error:', error, errorInfo);
     
     // Log to platform system logs
     logger.error('Quotation Composer Error', {

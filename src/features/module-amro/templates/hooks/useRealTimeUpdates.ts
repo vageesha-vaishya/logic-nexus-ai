@@ -15,6 +15,7 @@ import { useEffect, useRef, useCallback, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { templateQueryKeys } from '../hooks/useTemplateQueries';
+import { logger } from "@/lib/logger";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -152,13 +153,13 @@ export function useRealTimeUpdates({
       
       // Validate required fields
       if (!event.type || !event.tenantId || !event.timestamp) {
-        console.warn('Invalid event received:', event);
+        logger.warn('Invalid event received:', event);
         return null;
       }
 
       return event as TemplateEvent;
     } catch (error) {
-      console.error('Failed to parse event:', error);
+      logger.error('Failed to parse event:', error);
       return null;
     }
   }, []);
@@ -174,7 +175,7 @@ export function useRealTimeUpdates({
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        logger.debug('WebSocket connected');
         setConnectionStatus('connected');
         reconnectCountRef.current = 0;
       };
@@ -187,25 +188,25 @@ export function useRealTimeUpdates({
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error:', error);
+        logger.error('WebSocket error:', error);
         setConnectionStatus('error');
       };
 
       ws.onclose = () => {
-        console.log('WebSocket disconnected');
+        logger.debug('WebSocket disconnected');
         setConnectionStatus('disconnected');
         
         // Attempt reconnection
         if (reconnectCountRef.current < reconnectAttempts) {
           const delay = getReconnectDelay();
-          console.log(`Reconnecting in ${delay}ms (attempt ${reconnectCountRef.current + 1}/${reconnectAttempts})`);
+          logger.debug(`Reconnecting in ${delay}ms (attempt ${reconnectCountRef.current + 1}/${reconnectAttempts})`);
           
           reconnectTimeoutRef.current = setTimeout(() => {
             reconnectCountRef.current++;
             connectWebSocket();
           }, delay);
         } else {
-          console.error('Max reconnection attempts reached');
+          logger.error('Max reconnection attempts reached');
           toast.error('Real-time updates disconnected', {
             description: 'Please refresh the page to reconnect.',
           });
@@ -214,7 +215,7 @@ export function useRealTimeUpdates({
 
       wsRef.current = ws;
     } catch (error) {
-      console.error('Failed to connect WebSocket:', error);
+      logger.error('Failed to connect WebSocket:', error);
       setConnectionStatus('error');
     }
   }, [accessToken, tenantId, parseEvent, handleEvent, reconnectAttempts, getReconnectDelay]);
@@ -231,7 +232,7 @@ export function useRealTimeUpdates({
       );
 
       eventSource.onopen = () => {
-        console.log('SSE connected');
+        logger.debug('SSE connected');
         setConnectionStatus('connected');
         reconnectCountRef.current = 0;
       };
@@ -244,7 +245,7 @@ export function useRealTimeUpdates({
       };
 
       eventSource.onerror = (error) => {
-        console.error('SSE error:', error);
+        logger.error('SSE error:', error);
         eventSource.close();
         setConnectionStatus('error');
         
@@ -260,7 +261,7 @@ export function useRealTimeUpdates({
 
       eventSourceRef.current = eventSource;
     } catch (error) {
-      console.error('Failed to connect SSE:', error);
+      logger.error('Failed to connect SSE:', error);
       setConnectionStatus('error');
     }
   }, [accessToken, tenantId, parseEvent, handleEvent, reconnectAttempts, getReconnectDelay]);
@@ -273,7 +274,7 @@ export function useRealTimeUpdates({
     } else if (typeof EventSource !== 'undefined') {
       connectSSE();
     } else {
-      console.warn('Real-time updates not supported in this browser');
+      logger.warn('Real-time updates not supported in this browser');
       setConnectionStatus('error');
     }
   }, [connectWebSocket, connectSSE]);

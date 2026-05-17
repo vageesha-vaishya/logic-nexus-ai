@@ -5,6 +5,7 @@ import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { MemoryRouter } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Mocks
@@ -272,7 +273,7 @@ describe.skip('UnifiedQuoteComposer Performance', () => {
     const endTime = performance.now();
     const duration = endTime - startTime;
     
-    console.log(`Reload duration: ${duration.toFixed(2)}ms`);
+    logger.debug(`Reload duration: ${duration.toFixed(2)}ms`);
     expect(duration).toBeLessThan(3000);
   });
 
@@ -296,7 +297,7 @@ describe.skip('UnifiedQuoteComposer Performance', () => {
     const endTime = performance.now();
     const duration = endTime - startTime;
 
-    console.log(`Initial render duration: ${duration.toFixed(2)}ms`);
+    logger.debug(`Initial render duration: ${duration.toFixed(2)}ms`);
     expect(duration).toBeLessThan(1000);
   });
 });

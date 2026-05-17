@@ -10,6 +10,7 @@ import { Loader2, AlertTriangle, CheckCircle, ArrowRight, XCircle } from 'lucide
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { BookingMappingEngine } from '@/lib/booking/booking-mapping-engine';
+import { logger } from "@/lib/logger";
 
 interface QuoteMappingPreviewProps {
   quote: any;
@@ -58,7 +59,7 @@ export function QuoteMappingPreview({ quote, onCancel }: QuoteMappingPreviewProp
       });
 
     } catch (error) {
-      console.error('Validation error:', error);
+      logger.error('Validation error:', error);
       // Fallback if RPC fails or not deployed yet
       setValidationResult({
         valid: quote.status === 'approved' || quote.status === 'accepted',
@@ -95,13 +96,13 @@ export function QuoteMappingPreview({ quote, onCancel }: QuoteMappingPreviewProp
         })
         .eq('id', bookingId);
 
-      if (updateError) console.warn('Failed to update overrides:', updateError);
+      if (updateError) logger.warn('Failed to update overrides:', updateError);
 
       toast.success('Booking created successfully');
       navigate(`/dashboard/bookings/${bookingId}`);
 
     } catch (error: any) {
-      console.error('Mapping error:', error);
+      logger.error('Mapping error:', error);
       toast.error('Failed to create booking: ' + error.message);
     } finally {
       setLoading(false);

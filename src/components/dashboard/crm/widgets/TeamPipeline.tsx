@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { BarChart3, ArrowRight } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface StageData {
   stage: string;
@@ -48,7 +49,7 @@ export function TeamPipeline() {
           setPipeline(result);
         }
       } catch (error) {
-        console.error('Failed to fetch team pipeline:', error);
+        logger.error('Failed to fetch team pipeline:', error);
       } finally {
         setLoading(false);
       }

@@ -5,6 +5,7 @@ import { LayoutDashboard, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { UserRole } from '@/types/dashboardTemplates';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function DashboardRoleSwitcher() {
   const { user, scopedDb } = useCRM();
@@ -27,7 +28,7 @@ export function DashboardRoleSwitcher() {
           setCurrentRole(data.dashboard_role as UserRole);
         }
       } catch (error) {
-        console.error('Failed to fetch dashboard role:', error);
+        logger.error('Failed to fetch dashboard role:', error);
       } finally {
         setLoading(false);
       }
@@ -57,7 +58,7 @@ export function DashboardRoleSwitcher() {
       setTimeout(() => window.location.reload(), 1000);
       
     } catch (error) {
-      console.error('Failed to update dashboard role:', error);
+      logger.error('Failed to update dashboard role:', error);
       toast.error('Failed to update dashboard view');
     } finally {
       setSaving(false);

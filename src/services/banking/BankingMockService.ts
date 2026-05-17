@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 
 export interface BankingAccount {
   accountId: string;
@@ -77,7 +78,7 @@ export class BankingMockService {
    * Simulates network delay and random failures
    */
   private static async simulateNetwork(tenantId: string): Promise<void> {
-    console.log(`[BankingMockService] Processing request for Tenant: ${tenantId}`);
+    logger.debug(`[BankingMockService] Processing request for Tenant: ${tenantId}`);
     const delay = Math.random() * 500 + 100; // 100-600ms delay
     await new Promise(resolve => setTimeout(resolve, delay));
 
@@ -109,7 +110,7 @@ export class BankingMockService {
 
     if (application.amount > config.riskThresholds.maxLoanAmount) {
       status = 'REJECTED';
-      console.warn(`[BankingMockService] Loan rejected: Amount ${application.amount} exceeds tenant limit ${config.riskThresholds.maxLoanAmount}`);
+      logger.warn(`[BankingMockService] Loan rejected: Amount ${application.amount} exceeds tenant limit ${config.riskThresholds.maxLoanAmount}`);
     } else {
       // Basic mock logic: Higher amount = higher rate
       interestRate += (application.amount / 10000) * 0.1;

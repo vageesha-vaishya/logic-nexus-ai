@@ -4,6 +4,7 @@ import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
 import { ShipmentStatus, stages, statusConfig } from '@/pages/dashboard/shipments-data';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function ShipmentsKanbanBoard() {
   const { scopedDb, context } = useCRM();
@@ -29,7 +30,7 @@ export function ShipmentsKanbanBoard() {
         .limit(50); // Limit to recent shipments for performance
 
       if (error) {
-        console.error('Failed to fetch shipments:', error);
+        logger.error('Failed to fetch shipments:', error);
         toast.error('Failed to load shipments');
       } else {
         const kanbanItems: KanbanItem[] = (data || []).map((shipment: any) => {
@@ -64,7 +65,7 @@ export function ShipmentsKanbanBoard() {
       .eq('id', activeId);
 
     if (error) {
-      console.error('Failed to update shipment status:', error);
+      logger.error('Failed to update shipment status:', error);
       toast.error('Failed to update status');
       // Revert logic could be added here
     }

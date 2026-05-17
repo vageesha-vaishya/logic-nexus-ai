@@ -10,6 +10,7 @@ import {
   resolveAndApplyAccessContext,
 } from '../../../../../_utils/http';
 import { getSupabaseAdminClient } from '../../../../../_utils/supabaseAdmin';
+import { logger } from "@/lib/logger";
 
 vi.mock('../../../../../_utils/http', () => ({
   applyCors: vi.fn(),
@@ -25,7 +26,7 @@ vi.mock('../../../../../_utils/http', () => ({
 
 vi.mock('../../../../../_utils/errorHandler', () => ({
   sendErrorResponse: vi.fn((res, error) => {
-    console.error('sendErrorResponse called with:', error instanceof Error ? error.message : error);
+    logger.error('sendErrorResponse called with:', error instanceof Error ? error.message : error);
   }),
 }));
 
@@ -173,7 +174,7 @@ describe('/api/v2/amro/stock-ledger/periods/[id]/reopen', () => {
     const res = createResponse();
     await handler(req, res);
     if (res.statusCode !== 200) {
-      console.log('Reopen test error:', JSON.stringify(res.jsonBody));
+      logger.debug('Reopen test error:', JSON.stringify(res.jsonBody));
     }
     expect(res.statusCode).toBe(200);
     expect((res.jsonBody as any)?.interface).toBe('amro-stock-ledger-period-reopen');

@@ -43,6 +43,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { logger } from "@/lib/logger";
 
 interface VersionHistoryPanelProps {
   quoteId: string;
@@ -75,7 +76,7 @@ export function VersionHistoryPanel({ quoteId, onRestore, onPreview }: VersionHi
       if (error) throw error;
       setVersions(data || []);
     } catch (error) {
-      console.error('Failed to load versions:', error);
+      logger.error('Failed to load versions:', error);
       toast.error('Failed to load version history');
     } finally {
       setLoading(false);
@@ -101,7 +102,7 @@ export function VersionHistoryPanel({ quoteId, onRestore, onPreview }: VersionHi
       if (error) throw error;
       toast.success('Version deleted successfully');
     } catch (error) {
-      console.error('Failed to delete version:', error);
+      logger.error('Failed to delete version:', error);
       toast.error('Failed to delete version');
       loadVersions(); // Revert
     }

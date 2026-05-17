@@ -75,6 +75,7 @@ import { Separator } from '@/components/ui/separator';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { cn } from '@/lib/utils';
 import { useDataGridStore } from './store/useDataGridStore';
+import { logger } from "@/lib/logger";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -519,7 +520,7 @@ export function AmroRecordDetail({
       setSaveSuccess(true);
       setTimeout(() => setSaveSuccess(false), 3000);
     } catch (error) {
-      console.error('Failed to save record:', error);
+      logger.error('Failed to save record:', error);
     } finally {
       setIsSaving(false);
     }
@@ -531,7 +532,7 @@ export function AmroRecordDetail({
       await onDelete?.(record.id);
       closeRecordDetail();
     } catch (error) {
-      console.error('Failed to delete record:', error);
+      logger.error('Failed to delete record:', error);
     }
   }, [onDelete, record.id, closeRecordDetail]);
 

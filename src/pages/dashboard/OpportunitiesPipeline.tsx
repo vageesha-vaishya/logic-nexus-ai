@@ -27,6 +27,7 @@ import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 import { useTheme } from "@/hooks/useTheme";
 import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
+import { logger } from "@/lib/logger";
 type OpportunityStage = Stage;
 
 export default function OpportunitiesPipeline() {
@@ -105,7 +106,7 @@ export default function OpportunitiesPipeline() {
     } catch (error) {
       setIsDbFallbackActive(false);
       setDbFallbackReason(null);
-      console.error("Error fetching opportunities:", error);
+      logger.error("Error fetching opportunities:", error);
       toast({
         title: "Error",
         description: "Failed to fetch opportunities",
@@ -133,7 +134,7 @@ export default function OpportunitiesPipeline() {
       if (error) throw error;
       setAccounts((data as unknown as { id: string; name: string }[]) || []);
     } catch (error) {
-      console.error("Error fetching accounts:", error);
+      logger.error("Error fetching accounts:", error);
     }
   }, [scopedDb]);
 
@@ -206,7 +207,7 @@ export default function OpportunitiesPipeline() {
           opportunity.id === opportunityId ? previousOpportunity : opportunity
         )
       );
-      console.error("Error updating opportunity stage:", error);
+      logger.error("Error updating opportunity stage:", error);
       toast({
         title: "Error",
         description: "Failed to update opportunity stage",
@@ -299,7 +300,7 @@ export default function OpportunitiesPipeline() {
         description: `Deleted ${selectedOpportunities.size} opportunity(ies)`,
       });
     } catch (error) {
-      console.error("Error deleting opportunities:", error);
+      logger.error("Error deleting opportunities:", error);
       toast({
         title: "Error",
         description: "Failed to delete opportunities",
@@ -329,7 +330,7 @@ export default function OpportunitiesPipeline() {
         description: `Updated ${selectedOpportunities.size} opportunity(ies)`,
       });
     } catch (error) {
-      console.error("Error updating opportunities:", error);
+      logger.error("Error updating opportunities:", error);
       toast({
         title: "Error",
         description: "Failed to update opportunities",

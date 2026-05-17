@@ -4,6 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ArrowRight, TrendingUp, Clock } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface Version {
   id: string;
@@ -108,7 +109,7 @@ export function VersionComparison({ open, onClose, version1Id, version2Id }: Ver
         service_type: o.service_type
       })) || []);
     } catch (error) {
-      console.error('Failed to load comparison data:', error);
+      logger.error('Failed to load comparison data:', error);
     } finally {
       setLoading(false);
     }

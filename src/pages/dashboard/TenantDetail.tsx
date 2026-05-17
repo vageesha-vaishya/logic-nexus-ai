@@ -32,6 +32,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
+import { logger } from "@/lib/logger";
 
 export default function TenantDetail() {
   const { id } = useParams();
@@ -135,7 +136,7 @@ export default function TenantDetail() {
       if (error) throw error;
       setTenant(data);
     } catch (error: any) {
-      console.error('Failed to fetch tenant:', error);
+      logger.error('Failed to fetch tenant:', error);
       toast({
         title: 'Error Fetching Tenant',
         description: error?.message || 'Unknown database error',

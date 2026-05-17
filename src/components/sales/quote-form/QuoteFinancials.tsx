@@ -14,6 +14,7 @@ import { PluginRegistry } from '@/services/plugins/PluginRegistry';
 import { useDomain } from '@/contexts/DomainContext';
 import { RequestContext, QuoteResult } from '@/services/quotation/types';
 import { PricingService } from '@/services/pricing.service';
+import { logger } from "@/lib/logger";
 
 export function QuoteFinancials() {
   const { control, setValue } = useFormContext();
@@ -154,14 +155,14 @@ export function QuoteFinancials() {
                  toast.success(`Calculated Estimate: $${result.totalAmount.toFixed(2)}`);
             }
         } catch (marginErr) {
-            console.error('Failed to apply margin rules:', marginErr);
+            logger.error('Failed to apply margin rules:', marginErr);
             toast.warning('Calculated base price, but failed to apply margin rules.');
         }
 
         setCalculationResult(result);
 
     } catch (err: any) {
-        console.error('Calculation failed:', err);
+        logger.error('Calculation failed:', err);
         toast.error(err.message || 'Failed to calculate estimate');
     } finally {
         setIsCalculating(false);
@@ -189,7 +190,7 @@ export function QuoteFinancials() {
       const cleanTax = String(taxPercent).replace(/[^0-9.-]+/g, '');
       const taxRate = cleanTax ? parseFloat(cleanTax) : 0;
       
-      console.log('Verifying financials:', { 
+      logger.debug('Verifying financials:', { 
         originalSubtotal: subtotal,
         originalTax: taxPercent,
         sentShipping: shippingAmountVal, 
@@ -213,7 +214,7 @@ export function QuoteFinancials() {
         toast.warning(`Server calculation differs: $${serverTotal}`);
       }
     } catch (err: any) {
-      console.error('Verification failed:', err);
+      logger.error('Verification failed:', err);
       toast.error(err.message || 'Failed to verify calculation');
     } finally {
       setIsVerifying(false);

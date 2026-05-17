@@ -21,6 +21,7 @@ import { AssignmentAnalytics } from '@/components/assignment/AssignmentAnalytics
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
+import { logger } from "@/lib/logger";
 
 export default function LeadAssignment() {
   const navigate = useNavigate();
@@ -145,7 +146,7 @@ export default function LeadAssignment() {
         territories: territoriesCount || 0,
       });
     } catch (error) {
-      console.error('Error fetching stats:', error);
+      logger.error('Error fetching stats:', error);
     } finally {
       setLoading(false);
     }
@@ -163,7 +164,7 @@ export default function LeadAssignment() {
       fetchStats();
     } catch (error: any) {
       toast.error('Failed to process queue');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

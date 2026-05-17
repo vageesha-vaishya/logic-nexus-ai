@@ -13,6 +13,7 @@ import { SmartCargoInput, CommoditySelection } from '@/components/logistics/Smar
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import type { Database, Json } from "@/integrations/supabase/types";
+import { logger } from "@/lib/logger";
 
 const cargoDetailsSchema = z.object({
   service_type: z.string().min(1, "Service type is required"),
@@ -101,7 +102,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
       .limit(20);
     
     if (error) {
-      console.error(error);
+      logger.error(error);
       return [];
     }
     
@@ -520,7 +521,7 @@ export function CargoDetailsForm({ initialData, onSuccess }: { initialData?: Par
                 setDutyResult(data as any);
                 toast.success("Duty calculated successfully");
               } catch (e: any) {
-                console.error(e);
+                logger.error(e);
                 toast.error(e.message || "Failed to calculate duty");
               } finally {
                 setCalculatingDuty(false);

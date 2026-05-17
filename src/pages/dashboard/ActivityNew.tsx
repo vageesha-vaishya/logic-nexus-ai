@@ -8,6 +8,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from "@/lib/supabase-functions";
 import { toast } from 'sonner';
 import { H1 } from '@/components/ui/Heading';
+import { logger } from "@/lib/logger";
 
 export default function ActivityNew() {
   const navigate = useNavigate();
@@ -242,7 +243,7 @@ export default function ActivityNew() {
 
       navigate(targetPath);
     } catch (error: any) {
-      console.error('Error creating activity:', error);
+      logger.error('Error creating activity:', error);
       toast.error('Failed to create activity', { description: error.message || 'Unknown error' });
     }
   };

@@ -28,6 +28,7 @@ import { Loader2, Plus, Trash2, Edit2 } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { logger } from "@/lib/logger";
 
 const clauseSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -117,7 +118,7 @@ export function ClauseLibraryDialog({ open, onOpenChange }: ClauseLibraryDialogP
       setEditingClause(null);
       fetchClauses();
     } catch (error) {
-      console.error('Error saving clause:', error);
+      logger.error('Error saving clause:', error);
       toast.error('Failed to save clause');
     } finally {
       setLoading(false);

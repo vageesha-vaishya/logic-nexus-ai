@@ -19,6 +19,7 @@ import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
+import { logger } from "@/lib/logger";
 
 interface Account {
   id: string;
@@ -52,14 +53,14 @@ export default function Accounts() {
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('Accounts: context updated', context);
-      console.log('Accounts: scopedDb context', scopedDb.accessContext);
+      logger.debug('Accounts: context updated', context);
+      logger.debug('Accounts: scopedDb context', scopedDb.accessContext);
     }
   }, [context, scopedDb]);
 
   const fetchAccounts = useCallback(async () => {
     try {
-      console.log('Accounts: fetching with scopedDb', scopedDb.accessContext);
+      logger.debug('Accounts: fetching with scopedDb', scopedDb.accessContext);
       const { data, fallbackReason } = await PipelineService.listAccounts(scopedDb, {
         page: 1,
         pageSize: 2000,
@@ -69,14 +70,14 @@ export default function Accounts() {
       setIsDbFallbackActive(Boolean(fallbackReason));
       setDbFallbackReason(fallbackReason);
       
-      console.log(`Accounts: fetched ${data?.length} records`);
+      logger.debug(`Accounts: fetched ${data?.length} records`);
       if (data && data.length > 0) {
-        console.log('Accounts: first record tenant_id:', (data[0] as any).tenant_id);
+        logger.debug('Accounts: first record tenant_id:', (data[0] as any).tenant_id);
       }
 
       setAccounts(data as Account[]);
     } catch (error) {
-      console.error('Accounts: fetch error', error);
+      logger.error('Accounts: fetch error', error);
       setIsDbFallbackActive(false);
       setDbFallbackReason(null);
       toast.error('Failed to load accounts');
@@ -156,7 +157,7 @@ export default function Accounts() {
       toast.success('Duplicates merged successfully');
       refreshAccounts();
     } catch (err: any) {
-      console.error('Accounts: merge error', err);
+      logger.error('Accounts: merge error', err);
       toast.error(err?.message || 'Failed to merge duplicates');
     }
   };

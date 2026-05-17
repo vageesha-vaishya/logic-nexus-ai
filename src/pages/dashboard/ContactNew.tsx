@@ -5,6 +5,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
 import { EnterpriseSheet } from '@/components/ui/enterprise/EnterpriseComponents';
+import { logger } from "@/lib/logger";
 
 export default function ContactNew() {
   const navigate = useNavigate();
@@ -66,7 +67,7 @@ export default function ContactNew() {
       toast.error('Failed to create contact', {
         description: error?.message || 'Unknown error',
       });
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

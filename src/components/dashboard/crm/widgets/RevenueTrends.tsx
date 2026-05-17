@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { TrendingUp, DollarSign } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface TrendData {
   month: string;
@@ -49,7 +50,7 @@ export function RevenueTrends() {
           setTrends(result.slice(-6)); // Last 6 months
         }
       } catch (error) {
-        console.error('Failed to fetch revenue trends:', error);
+        logger.error('Failed to fetch revenue trends:', error);
       } finally {
         setLoading(false);
       }

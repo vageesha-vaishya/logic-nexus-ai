@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/integrations/supabase/types';
 import fs from 'fs';
 import path from 'path';
+import { logger } from "@/lib/logger";
 
 // Helper to load env
 function loadEnv() {
@@ -22,7 +23,7 @@ function loadEnv() {
       });
     }
   } catch (e) {
-    console.warn('Failed to load .env file', e);
+    logger.warn('Failed to load .env file', e);
   }
 }
 
@@ -85,7 +86,7 @@ runTests('Container & Vessel Hierarchy Integration', () => {
       .select()
       .single();
 
-    if (error) console.error('Create Type Error:', error);
+    if (error) logger.error('Create Type Error:', error);
     expect(error).toBeNull();
     expect(data).toBeDefined();
     expect(data?.code).toBe(testVesselType.code);
@@ -100,7 +101,7 @@ runTests('Container & Vessel Hierarchy Integration', () => {
       .select()
       .single();
 
-    if (error) console.error('Create Class Error:', error);
+    if (error) logger.error('Create Class Error:', error);
     expect(error).toBeNull();
     expect(data).toBeDefined();
     expect(data?.type_id).toBe(typeId);
@@ -115,7 +116,7 @@ runTests('Container & Vessel Hierarchy Integration', () => {
       .select()
       .single();
 
-    if (error) console.error('Create Vessel Error:', error);
+    if (error) logger.error('Create Vessel Error:', error);
     expect(error).toBeNull();
     expect(data).toBeDefined();
     expect(data?.class_id).toBe(classId);
@@ -137,7 +138,7 @@ runTests('Container & Vessel Hierarchy Integration', () => {
       .eq('id', vesselId)
       .single();
 
-    if (error) console.error('Read Vessel Error:', error);
+    if (error) logger.error('Read Vessel Error:', error);
     expect(error).toBeNull();
     expect(data?.vessel_classes?.name).toBe(testVesselClass.name);
     // Supabase returns nested objects for relationships

@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/integrations/supabase/types';
 import fs from 'fs';
 import path from 'path';
+import { logger } from "@/lib/logger";
 
 // Helper to load env
 function loadEnv() {
@@ -22,7 +23,7 @@ function loadEnv() {
       });
     }
   } catch (e) {
-    console.warn('Failed to load .env file', e);
+    logger.warn('Failed to load .env file', e);
   }
 }
 
@@ -187,7 +188,7 @@ runTests('Container Hierarchy Integration (Type -> Size -> Tracking)', () => {
       .select()
       .single();
 
-    if (error) console.error('Create Type Error:', error);
+    if (error) logger.error('Create Type Error:', error);
     expect(error).toBeNull();
     expect(data).toBeDefined();
     expect(data?.code).toBe(testContainerType.code);
@@ -198,7 +199,7 @@ runTests('Container Hierarchy Integration (Type -> Size -> Tracking)', () => {
     expect(typeId).toBeDefined();
     const { data, error } = await createContainerSizeRecord();
 
-    if (error) console.error('Create Size Error:', error);
+    if (error) logger.error('Create Size Error:', error);
     expect(error).toBeNull();
     expect(data).toBeDefined();
     const row = data as { id: string; name?: string };
@@ -215,7 +216,7 @@ runTests('Container Hierarchy Integration (Type -> Size -> Tracking)', () => {
     const errorMessage = (error as { message?: string } | null)?.message ?? '';
     if (errorMessage.includes('teu_factor') && errorMessage.includes('does not exist')) return;
 
-    if (error) console.error('Create Tracking Error:', error);
+    if (error) logger.error('Create Tracking Error:', error);
     expect(error).toBeNull();
     expect(data).toBeDefined();
     const row = data as { id: string; quantity?: number; size_id?: string };
@@ -231,7 +232,7 @@ runTests('Container Hierarchy Integration (Type -> Size -> Tracking)', () => {
       .select('*')
       .eq('id', trackingId)
       .single();
-    if (trackingResult.error) console.error('Fetch Tracking Error:', trackingResult.error);
+    if (trackingResult.error) logger.error('Fetch Tracking Error:', trackingResult.error);
     expect(trackingResult.error).toBeNull();
     expect(trackingResult.data).toBeDefined();
     expect((trackingResult.data as { location_name?: string } | null)?.location_name).toBe(testTracking.location_name);
@@ -241,7 +242,7 @@ runTests('Container Hierarchy Integration (Type -> Size -> Tracking)', () => {
       .select('*')
       .eq('id', sizeId)
       .single();
-    if (sizeResult.error) console.error('Fetch Size Error:', sizeResult.error);
+    if (sizeResult.error) logger.error('Fetch Size Error:', sizeResult.error);
     expect(sizeResult.error).toBeNull();
     expect(sizeResult.data).toBeDefined();
 
@@ -250,7 +251,7 @@ runTests('Container Hierarchy Integration (Type -> Size -> Tracking)', () => {
       .select('*')
       .eq('id', typeId)
       .single();
-    if (typeResult.error) console.error('Fetch Type Error:', typeResult.error);
+    if (typeResult.error) logger.error('Fetch Type Error:', typeResult.error);
     expect(typeResult.error).toBeNull();
     expect(typeResult.data).toBeDefined();
     expect((typeResult.data as { code?: string } | null)?.code).toBe(testContainerType.code);

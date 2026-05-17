@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { logger } from "@/lib/logger";
 
 export function TerritoryManagement() {
   const { scopedDb, supabase, context } = useCRM();
@@ -79,7 +80,7 @@ export function TerritoryManagement() {
         setSelectedTenantId(data[0].id);
       }
     } catch (error) {
-      console.error('Error fetching tenants:', error);
+      logger.error('Error fetching tenants:', error);
       toast.error('Failed to load tenants');
     }
   };
@@ -107,7 +108,7 @@ export function TerritoryManagement() {
           setGeographyCounts({});
           const msg = (geoErr as any)?.message || '';
           const code = (geoErr as any)?.code || '';
-          console.error('Failed to load geography counts:', { code, msg });
+          logger.error('Failed to load geography counts:', { code, msg });
         } else {
           const counts: Record<string, number> = {};
           (geoRows || []).forEach((r: any) => {
@@ -120,7 +121,7 @@ export function TerritoryManagement() {
       }
     } catch (error: any) {
       toast.error('Failed to load territories');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -178,7 +179,7 @@ export function TerritoryManagement() {
       }
       fetchTerritories();
     } catch (error: any) {
-      console.error('Error saving territory:', error);
+      logger.error('Error saving territory:', error);
       let errorMessage = 'Failed to save territory';
       
       // Handle specific Supabase/Postgres error codes
@@ -207,7 +208,7 @@ export function TerritoryManagement() {
       fetchTerritories();
     } catch (error: any) {
       toast.error('Failed to delete territory');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

@@ -9,6 +9,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from "@/lib/logger";
 
 function useAuthHeaders(): HeadersInit | null {
   const { session } = useAuth();
@@ -50,7 +51,7 @@ async function fetchWorkOrderTemplates(
   const json = await response.json();
   // Parse master-data API response format
   const rows = json.output?.records || json.output?.data || json.data || json.output?.templates || [];
-  console.log('[API_MAP] raw template rows received', {
+  logger.debug('[API_MAP] raw template rows received', {
     count: Array.isArray(rows) ? rows.length : 0,
     sample: Array.isArray(rows) && rows.length > 0 ? rows[0] : null,
   });
@@ -69,7 +70,7 @@ async function fetchWorkOrderTemplates(
         version: Number(row.version || row.version_number || 1),
         status: String(row.status || 'draft'),
       };
-      console.log(`[API_MAP] Template ${parsed.id}: mapped models`, {
+      logger.debug(`[API_MAP] Template ${parsed.id}: mapped models`, {
         assembly_models_id: parsed.assembly_models_id,
         assembly_models: parsed.assembly_models,
         raw_assembly_models: row.assembly_models,
@@ -78,7 +79,7 @@ async function fetchWorkOrderTemplates(
         keys: Object.keys(row || {}),
       });
       if (!parsed.assembly_models_id && !parsed.assembly_models) {
-        console.warn(`[API_MAP] Template ${parsed.id} missing both assembly_models_id and assembly_models after mapping`);
+        logger.warn(`[API_MAP] Template ${parsed.id} missing both assembly_models_id and assembly_models after mapping`);
       }
       return parsed;
     });

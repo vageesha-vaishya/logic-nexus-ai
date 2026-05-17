@@ -4,6 +4,7 @@ import { HeaderInspector } from './classifiers/HeaderInspector';
 import { ContentScanner } from './classifiers/ContentScanner';
 import { MetadataProcessor } from './classifiers/MetadataProcessor';
 import { RuleEngine } from './classifiers/RuleEngine';
+import { logger } from "@/lib/logger";
 
 export class EmailCategorizer {
   private classifiers: IClassifier[] = [];
@@ -66,7 +67,7 @@ export class EmailCategorizer {
           }
         }
       } catch (error) {
-        console.error(`Error in classifier ${classifier.name}:`, error);
+        logger.error(`Error in classifier ${classifier.name}:`, error);
         allReasons.push(`Error in ${classifier.name}`);
       }
     }

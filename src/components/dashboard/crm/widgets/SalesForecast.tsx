@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { TrendingUp, Calendar } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface ForecastData {
   month: string;
@@ -77,7 +78,7 @@ export function SalesForecast() {
           setTotalForecast(result.reduce((sum, item) => sum + item.forecast, 0));
         }
       } catch (error) {
-        console.error('Failed to fetch sales forecast:', error);
+        logger.error('Failed to fetch sales forecast:', error);
       } finally {
         setLoading(false);
       }

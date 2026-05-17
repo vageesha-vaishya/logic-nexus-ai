@@ -25,6 +25,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 const riskSchema = z.object({
   risk_score: z.coerce.number().min(0).max(100),
@@ -80,7 +81,7 @@ export function VendorRiskDialog({ open, onOpenChange, vendorId, onSuccess }: Ve
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error recording risk assessment:', error);
+      logger.error('Error recording risk assessment:', error);
       const message = error instanceof Error ? error.message : 'Failed to record assessment';
       toast.error(message);
     } finally {

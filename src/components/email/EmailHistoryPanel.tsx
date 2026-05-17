@@ -10,6 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
+import { logger } from "@/lib/logger";
 
 interface EmailRecipient {
   email: string;
@@ -86,7 +87,7 @@ export function EmailHistoryPanel({ emailAddress, entityType, entityId, tenantId
       );
       setEmails(sorted);
     } catch (error: any) {
-      console.error("Error fetching emails:", error);
+      logger.error("Error fetching emails:", error);
       toast.error("Failed to load email history", {
         description: error.message || "Unknown error occurred"
       });

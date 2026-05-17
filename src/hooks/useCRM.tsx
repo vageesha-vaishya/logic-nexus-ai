@@ -148,7 +148,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         setContextVersion(v => v + 1);
       }
     } catch (error) {
-      console.error('Failed to set scope preference:', error);
+      logger.error('Failed to set scope preference:', error);
       throw error;
     }
   }, [user, pref?.admin_override_enabled, ownedTenantId, ownedFranchiseId, hasPlatformAdminAccess]);
@@ -212,7 +212,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         setContextVersion(v => v + 1);
       }
     } catch (error) {
-      console.error('Failed to set admin override:', error);
+      logger.error('Failed to set admin override:', error);
       throw error;
     }
   }, [user, pref?.tenant_id, pref?.franchise_id, ownedTenantId, hasPlatformAdminAccess, hasTenantAdminAccess]);

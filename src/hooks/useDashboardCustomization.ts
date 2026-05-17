@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { UserDashboardPreferences, WidgetInstance, UserRole } from '@/types/dashboardTemplates';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from "@/lib/logger";
 
 export function useDashboardCustomization(userRole: UserRole) {
   const { scopedDb, context } = useCRM();
@@ -35,7 +36,7 @@ export function useDashboardCustomization(userRole: UserRole) {
           });
         }
       } catch (error) {
-        console.error('Failed to load dashboard preferences:', error);
+        logger.error('Failed to load dashboard preferences:', error);
       } finally {
         setLoading(false);
       }
@@ -46,7 +47,7 @@ export function useDashboardCustomization(userRole: UserRole) {
 
   const savePreferences = async (widgets: WidgetInstance[]) => {
     if (!context?.userId) {
-      console.error('Cannot save preferences: user ID not available');
+      logger.error('Cannot save preferences: user ID not available');
       return;
     }
 
@@ -78,7 +79,7 @@ export function useDashboardCustomization(userRole: UserRole) {
         });
       }
     } catch (error) {
-      console.error('Failed to save preferences:', error);
+      logger.error('Failed to save preferences:', error);
     }
   };
 

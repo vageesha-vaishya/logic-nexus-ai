@@ -24,6 +24,7 @@ import {
   EnterpriseCard,
   type Column,
 } from '@/components/ui/enterprise';
+import { logger } from "@/lib/logger";
 
 // Column definitions moved outside component to prevent recreation on every render
 const contactColumns: Column<any>[] = [
@@ -114,7 +115,7 @@ export default function AccountDetailLegacy() {
       ]);
     } catch (error: any) {
       toast.error('Failed to load account');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -131,7 +132,7 @@ export default function AccountDetailLegacy() {
       if (error) throw error;
       setActivities(data || []);
     } catch (err) {
-      console.error('Failed to load activities', err);
+      logger.error('Failed to load activities', err);
     }
   };
 
@@ -148,7 +149,7 @@ export default function AccountDetailLegacy() {
 
       if (!error) setRelationships(data || []);
     } catch (e) {
-      console.log('Relationships module not active');
+      logger.debug('Relationships module not active');
     }
   };
 
@@ -165,7 +166,7 @@ export default function AccountDetailLegacy() {
         setActiveSegments(data.map((d: any) => d.segment));
       }
     } catch (e) {
-      console.log('Segments module not active');
+      logger.debug('Segments module not active');
     }
   };
 
@@ -180,7 +181,7 @@ export default function AccountDetailLegacy() {
       if (error) throw error;
       setRelatedContacts(data || []);
     } catch (err) {
-      console.error('Failed to load related contacts', err);
+      logger.error('Failed to load related contacts', err);
     }
   };
 
@@ -194,7 +195,7 @@ export default function AccountDetailLegacy() {
       if (error) throw error;
       setRelatedOpps(data || []);
     } catch (err) {
-      console.error('Failed to load related opportunities', err);
+      logger.error('Failed to load related opportunities', err);
     }
   };
 
@@ -208,7 +209,7 @@ export default function AccountDetailLegacy() {
       if (error) throw error;
       setChildAccounts(data || []);
     } catch (err) {
-      console.error('Failed to load child accounts', err);
+      logger.error('Failed to load child accounts', err);
     }
   };
 
@@ -242,7 +243,7 @@ export default function AccountDetailLegacy() {
       fetchAccount();
     } catch (error: any) {
       toast.error('Failed to update account');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -259,7 +260,7 @@ export default function AccountDetailLegacy() {
       navigate('/dashboard/accounts');
     } catch (error: any) {
       toast.error('Failed to delete account');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

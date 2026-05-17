@@ -3,6 +3,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 // Define status config for activities since it might not be exported
 const activityStages = ['planned', 'in_progress', 'completed', 'cancelled'];
@@ -37,7 +38,7 @@ export function ActivitiesKanbanBoard() {
         .limit(50);
 
       if (error) {
-        console.error('Failed to fetch activities:', error);
+        logger.error('Failed to fetch activities:', error);
         toast.error('Failed to load activities');
       } else {
         const kanbanItems: KanbanItem[] = (data || []).map((activity: any) => ({
@@ -67,7 +68,7 @@ export function ActivitiesKanbanBoard() {
       .eq('id', activeId);
 
     if (error) {
-      console.error('Failed to update activity status:', error);
+      logger.error('Failed to update activity status:', error);
       toast.error('Failed to update status');
       // Revert logic could be added here
     }

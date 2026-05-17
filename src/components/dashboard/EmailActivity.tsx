@@ -6,6 +6,7 @@ import { Mail, Clock } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
 import { formatDistanceToNow } from "date-fns";
+import { logger } from "@/lib/logger";
 
 export const EmailActivity = () => {
   const [emails, setEmails] = useState<any[]>([]);
@@ -27,7 +28,7 @@ export const EmailActivity = () => {
       if (error) throw error;
       setEmails(data || []);
     } catch (error) {
-      console.error("Error fetching emails:", error);
+      logger.error("Error fetching emails:", error);
     }
   };
 

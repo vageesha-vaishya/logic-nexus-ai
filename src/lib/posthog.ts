@@ -1,4 +1,5 @@
 import posthog from 'posthog-js';
+import { logger } from "@/lib/logger";
 
 export const initPostHog = () => {
   const apiKey = import.meta.env.VITE_POSTHOG_KEY;
@@ -13,11 +14,11 @@ export const initPostHog = () => {
           // Optional: You might want to keep it enabled in dev for testing, 
           // or disable it to avoid noise.
           // ph.opt_out_capturing(); 
-          console.log('PostHog loaded in development mode');
+          logger.debug('PostHog loaded in development mode');
         }
       },
     });
   } else {
-    console.warn("PostHog Key not found. PostHog is disabled.");
+    logger.warn("PostHog Key not found. PostHog is disabled.");
   }
 };

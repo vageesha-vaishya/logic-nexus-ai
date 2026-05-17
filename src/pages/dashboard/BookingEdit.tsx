@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { Loader2, ArrowLeft, Save } from 'lucide-react';
 import { Database } from '@/integrations/supabase/types';
+import { logger } from "@/lib/logger";
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   vessel_name?: string | null;
@@ -42,7 +43,7 @@ export default function BookingEdit() {
       if (error) throw error;
       setFormData(data);
     } catch (error) {
-      console.error('Error fetching booking:', error);
+      logger.error('Error fetching booking:', error);
       toast.error('Failed to load booking details');
       navigate('/dashboard/bookings');
     } finally {
@@ -72,7 +73,7 @@ export default function BookingEdit() {
       toast.success('Booking updated successfully');
       navigate(`/dashboard/bookings/${id}`);
     } catch (error: any) {
-      console.error('Error updating booking:', error);
+      logger.error('Error updating booking:', error);
       toast.error('Failed to update booking: ' + error.message);
     } finally {
       setSaving(false);

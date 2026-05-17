@@ -14,6 +14,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useCRM } from "./useCRM";
+import { logger } from "@/lib/logger";
 
 // ── Public types ──────────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ export function usePlanGate(feature: PlanFeature): PlanGateResult & { isLoading:
         .maybeSingle();
 
       if (error) {
-        console.warn("[usePlanGate] subscription fetch failed:", error.message);
+        logger.warn("[usePlanGate] subscription fetch failed:", error.message);
         return null;
       }
       return data as SubscriptionRow | null;

@@ -20,6 +20,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { invokeFunction } from "@/lib/supabase-functions";
 import { useCRM } from "@/hooks/useCRM";
+import { logger } from "@/lib/logger";
 
 const emailComposeSchema = z.object({
   accountId: z.string().min(1, "Please select an account"),
@@ -225,7 +226,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
             url: publicUrl
           }]);
         } catch (error: any) {
-          console.error("Upload error:", error);
+          logger.error("Upload error:", error);
           toast({
             title: "Upload Failed",
             description: `Failed to upload ${file.name}: ${error.message}`,
@@ -365,7 +366,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
               tenantId = entityData.tenant_id;
               franchiseId = entityData.franchise_id;
             } else if (entityError) {
-              console.warn("Could not fetch entity context for activity creation:", entityError);
+              logger.warn("Could not fetch entity context for activity creation:", entityError);
             }
           }
 
@@ -418,7 +419,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
              }
 
              if (activityError) {
-               console.error("Failed to create/update activity:", activityError);
+               logger.error("Failed to create/update activity:", activityError);
                toast({
                  title: "Warning",
                  description: "Email sent, but failed to update activity log.",
@@ -427,7 +428,7 @@ export function EmailComposeDialog({ open, onOpenChange, replyTo, initialTo, ini
              }
           }
         } catch (err) {
-          console.error("Error creating activity log:", err);
+          logger.error("Error creating activity log:", err);
         }
       }
 

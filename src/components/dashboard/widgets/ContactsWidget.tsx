@@ -5,6 +5,7 @@ import { User, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { Skeleton } from '@/components/ui/skeleton';
+import { logger } from "@/lib/logger";
 
 interface Contact {
   id: string;
@@ -33,7 +34,7 @@ export function ContactsWidget() {
         if (error) throw error;
         setContacts(data as Contact[]);
       } catch (error) {
-        console.error('Failed to load contacts widget:', error);
+        logger.error('Failed to load contacts widget:', error);
       } finally {
         setLoading(false);
       }

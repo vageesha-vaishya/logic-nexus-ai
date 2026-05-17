@@ -8,6 +8,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 export default function PackageSizes() {
   const { supabase, scopedDb, context } = useCRM();
@@ -23,7 +24,7 @@ export default function PackageSizes() {
       const { data, error } = await scopedDb.from("package_sizes").select("*").order("size_name");
 
       if (error) {
-        console.error("Error fetching package sizes:", error);
+        logger.error("Error fetching package sizes:", error);
         return;
       }
 
@@ -72,11 +73,11 @@ export default function PackageSizes() {
             .order("size_name");
           setSizes(seeded || []);
         } catch (seedErr: any) {
-          console.warn("Package sizes seed failed:", seedErr?.message || seedErr);
+          logger.warn("Package sizes seed failed:", seedErr?.message || seedErr);
         }
       }
     } catch (err) {
-      console.error("Unexpected error fetching package sizes:", err);
+      logger.error("Unexpected error fetching package sizes:", err);
     }
   };
 

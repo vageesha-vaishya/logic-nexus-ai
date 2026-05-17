@@ -9,6 +9,7 @@ import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -120,7 +121,7 @@ export function useCurrentSubscription(tenantId: string | null | undefined) {
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      if (error) console.warn("Subscription fetch:", error.message);
+      if (error) logger.warn("Subscription fetch:", error.message);
       return data as BillingSubscription | null;
     },
   });

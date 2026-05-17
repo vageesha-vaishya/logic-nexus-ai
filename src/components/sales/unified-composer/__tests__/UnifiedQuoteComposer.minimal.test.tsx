@@ -4,6 +4,7 @@ import { render } from '@testing-library/react';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { logger } from "@/lib/logger";
 
 // Mock FormZone to avoid inner dependencies like useIncoterms
 vi.mock('../FormZone', () => ({
@@ -89,7 +90,7 @@ vi.mock('@/services/quotation/QuotationConfigurationService', () => ({
 
 describe('UnifiedQuoteComposer Minimal', () => {
   it('renders without crashing', () => {
-    console.log('Starting minimal test');
+    logger.debug('Starting minimal test');
     const queryClient = new QueryClient();
     
     render(

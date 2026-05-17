@@ -1,6 +1,7 @@
 import { ContainerConfiguration, ContainerType, ContainerSize } from '@/types/container';
 import { useCRM } from '@/hooks/useCRM';
 import { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from "@/lib/logger";
 
 /**
  * Service for managing container configurations and retrieving specifications.
@@ -55,7 +56,7 @@ export class ContainerService {
         
         // If no size found (data integrity issue), return a partial or skip
         if (!size) {
-            console.warn(`No size specification found for container type: ${type.code}`);
+            logger.warn(`No size specification found for container type: ${type.code}`);
             // Return a safe fallback or filtered out later
             return null;
         }
@@ -70,7 +71,7 @@ export class ContainerService {
       return configurations;
 
     } catch (error) {
-      console.error('Error fetching container configurations:', error);
+      logger.error('Error fetching container configurations:', error);
       throw error;
     }
   }
@@ -108,7 +109,7 @@ export class ContainerService {
         } as ContainerConfiguration;
 
     } catch (error) {
-        console.error(`Error fetching container ${code}:`, error);
+        logger.error(`Error fetching container ${code}:`, error);
         return null;
     }
   }

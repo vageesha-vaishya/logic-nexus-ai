@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Activity, PhoneCall, Mail } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface Metrics {
   todayActivities: number;
@@ -60,14 +61,14 @@ export function HeroMetrics() {
             emailsSent: emailsCount || 0,
           });
         } else {
-          console.error('Failed to fetch metrics:', {
+          logger.error('Failed to fetch metrics:', {
             activitiesError,
             callsError,
             emailsError,
           });
         }
       } catch (error) {
-        console.error('Failed to fetch metrics:', error);
+        logger.error('Failed to fetch metrics:', error);
       } finally {
         setLoading(false);
       }

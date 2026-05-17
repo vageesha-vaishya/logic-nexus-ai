@@ -19,6 +19,7 @@ import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseAct
 import { EnterpriseTable, type Column, EnterpriseCard } from '@/components/ui/enterprise';
 import { Badge } from '@/components/ui/badge';
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
+import { logger } from "@/lib/logger";
 
 export default function AccountDetail() {
   const { id } = useParams();
@@ -77,7 +78,7 @@ export default function AccountDetail() {
         .limit(10);
       setRelatedContacts(data || []);
     } catch (err) {
-      console.error('Failed to load related contacts', err);
+      logger.error('Failed to load related contacts', err);
     }
   };
 
@@ -89,7 +90,7 @@ export default function AccountDetail() {
         .eq('account_id', accountId);
       setRelatedOpps(data || []);
     } catch (err) {
-      console.error('Failed to load related opportunities', err);
+      logger.error('Failed to load related opportunities', err);
     }
   };
 

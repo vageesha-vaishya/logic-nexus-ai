@@ -11,6 +11,7 @@ import TenantConfigForm from './data-management/TenantConfigForm';
 import FranchiseConfigForm from './data-management/FranchiseConfigForm';
 import SequencesAndPreview from './data-management/SequencesAndPreview';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from "@/lib/logger";
 
 type RemoteProfile = {
   id: string;
@@ -277,7 +278,7 @@ export default function DataManagement() {
 
       toast.success('Database exported successfully');
     } catch (error) {
-      console.error('Export failed:', error);
+      logger.error('Export failed:', error);
       toast.error('Failed to export database');
     } finally {
       setIsExporting(false);
@@ -305,7 +306,7 @@ export default function DataManagement() {
       setImportResult(data || null);
       toast.success('Import completed');
     } catch (e: any) {
-      console.error('Import failed:', e);
+      logger.error('Import failed:', e);
       toast.error('Failed to import data');
     } finally {
       setIsImporting(false);

@@ -12,6 +12,7 @@
 
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { logger } from "@/lib/logger";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -212,7 +213,7 @@ export const useTemplateGridStore = create<TemplateGridState>()(
       },
       selectAll: () => {
         // This will be called with all IDs from the parent component
-        console.warn('selectAll called without IDs - use setSelection instead');
+        logger.warn('selectAll called without IDs - use setSelection instead');
       },
       deselectAll: () => set({ selectedIds: new Set() }),
       setSelection: (ids) => set({ selectedIds: ids }),

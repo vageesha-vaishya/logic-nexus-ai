@@ -9,6 +9,7 @@ import { useDashboardData, ActivityItem } from '@/hooks/useDashboardData';
 import { CheckSquare, Phone, Calendar, Mail, StickyNote } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function ActivitiesWidget({ config, onRemove, onEdit }: WidgetProps) {
   const { t } = useTranslation();
@@ -50,7 +51,7 @@ export function ActivitiesWidget({ config, onRemove, onEdit }: WidgetProps) {
       });
       toast.success(t('Activity assignment updated'));
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       toast.error(err?.message || t('Failed to update assignment'));
     }
   };

@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from "@/lib/logger";
 
 interface CreateCarrierDialogProps {
   open: boolean;
@@ -77,7 +78,7 @@ export function CreateCarrierDialog({
       onOpenChange(false);
       resetForm();
     } catch (error: any) {
-      console.error('Error creating carrier:', error);
+      logger.error('Error creating carrier:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create carrier.",

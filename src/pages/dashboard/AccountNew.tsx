@@ -7,6 +7,7 @@ import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormL
 import { EnterpriseSheet } from '@/components/ui/enterprise/EnterpriseComponents';
 import { AccountService } from '@/services/account-service';
 import { AccountInput } from '@/lib/account-validation';
+import { logger } from "@/lib/logger";
 
 export default function AccountNew() {
   const navigate = useNavigate();
@@ -68,7 +69,7 @@ export default function AccountNew() {
 
     } catch (error: any) {
       toast.error(`Failed to create account: ${error.message}`);
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

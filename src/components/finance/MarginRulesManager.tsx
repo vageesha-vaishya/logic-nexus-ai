@@ -11,6 +11,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { MarginRule } from '@/services/pricing.service';
 import { Plus, Trash2, Loader2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function MarginRulesManager() {
   const { supabase, context } = useCRM();
@@ -43,7 +44,7 @@ export function MarginRulesManager() {
 
     if (error) {
       toast.error('Failed to load margin rules');
-      console.error(error);
+      logger.error(error);
     } else {
       setRules(data || []);
     }

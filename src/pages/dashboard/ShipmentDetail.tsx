@@ -65,7 +65,7 @@ export default function ShipmentDetail() {
       if (error) throw error;
       setCargoConfigs(data || []);
     } catch (error) {
-      console.error('Failed to load cargo configs:', error);
+      logger.error('Failed to load cargo configs:', error);
     }
   }, [id, scopedDb]);
 
@@ -87,7 +87,7 @@ export default function ShipmentDetail() {
       if (error) throw error;
       setCargoItems(data || []);
     } catch (error) {
-      console.error('Failed to load cargo:', error);
+      logger.error('Failed to load cargo:', error);
       // toast.error('Failed to load cargo details'); // Optional: don't spam toasts
     }
   }, [id, scopedDb]);
@@ -104,7 +104,7 @@ export default function ShipmentDetail() {
       setShipment(data as Shipment);
     } catch (error: unknown) {
       toast.error('Failed to load shipment');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -162,7 +162,7 @@ export default function ShipmentDetail() {
       });
       setAttachments(withUrls);
     } catch (error: unknown) {
-      console.warn('Failed to load attachments', error);
+      logger.warn('Failed to load attachments', error);
     }
   }, [supabase, context, id]);
 
@@ -240,7 +240,7 @@ export default function ShipmentDetail() {
       setPodFile(null);
       await Promise.all([fetchAttachments(), fetchShipment()]);
     } catch (error: unknown) {
-      console.error('POD upload failed:', error);
+      logger.error('POD upload failed:', error);
       const msg =
         typeof error === 'object' && error && 'message' in error
           ? String((error as { message: unknown }).message)

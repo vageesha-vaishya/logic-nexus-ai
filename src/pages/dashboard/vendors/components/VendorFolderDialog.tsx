@@ -129,7 +129,7 @@ export function VendorFolderDialog({ open, onOpenChange, vendorId, folder, onSuc
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error saving folder:', error);
+      logger.error('Error saving folder:', error);
       toast.error((error as Error).message || 'Failed to save folder');
     } finally {
       setLoading(false);

@@ -21,6 +21,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Loader2, AlertCircle, RefreshCw } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { logger } from "@/lib/logger";
 
 interface EmailForConversion {
   id: string;
@@ -118,18 +119,18 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
         if (data?.error) throw new Error(data.error);
 
         const text = (data?.text || "").trim();
-        console.log(`[InterestedService] Response: ${text}`);
+        logger.debug(`[InterestedService] Response: ${text}`);
         
         // Simple validation: ensure it's not too long
         if (text && text.length < 100) {
             setSuggestedService(text);
             if (CACHE_KEY) sessionStorage.setItem(CACHE_KEY, text);
         } else {
-            console.warn("[InterestedService] Response too long or empty, ignoring.");
+            logger.warn("[InterestedService] Response too long or empty, ignoring.");
         }
 
     } catch (err) {
-        console.error(`[InterestedService] Error:`, err);
+        logger.error(`[InterestedService] Error:`, err);
     } finally {
         setIsSuggestingService(false);
     }
@@ -177,7 +178,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
 
         // 2. Fallback to Client-Side OpenAI if Supabase Function fails (Auth/Network/Server Error)
         if (error) {
-             console.warn("[EmailToLead] Supabase Function failed. Attempting Client-Side OpenAI fallback...", error);
+             logger.warn("[EmailToLead] Supabase Function failed. Attempting Client-Side OpenAI fallback...", error);
              const clientSideKey = import.meta.env.VITE_OPENAI_API_KEY;
              
              // Only attempt if we have a key and it looks valid
@@ -205,13 +206,13 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
                              const parsed = JSON.parse(contentStr);
                              data = parsed;
                              error = null; // Clear error on success
-                             console.log("[EmailToLead] Client-Side OpenAI success.");
+                             logger.debug("[EmailToLead] Client-Side OpenAI success.");
                          }
                      } else {
-                         console.error("[EmailToLead] Client-Side OpenAI failed:", response.status);
+                         logger.error("[EmailToLead] Client-Side OpenAI failed:", response.status);
                      }
                  } catch (clientErr) {
-                     console.error("[EmailToLead] Client-Side OpenAI Exception:", clientErr);
+                     logger.error("[EmailToLead] Client-Side OpenAI Exception:", clientErr);
                  }
              }
         }
@@ -475,7 +476,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
             tenant_id: (sanitizeLeadDataForInsert(data) as any)?.tenant_id || context.tenantId || null,
           });
       } catch (err) {
-        console.error("Error recording lead email conversion activity", err);
+        logger.error("Error recording lead email conversion activity", err);
       }
       
       onOpenChange(false);
@@ -485,7 +486,7 @@ export function EmailToLeadDialog({ open, onOpenChange, email, onSuccess }: Emai
       if (error && typeof error === "object" && "message" in error && typeof (error as { message: unknown }).message === "string") {
         message = (error as { message: string }).message || message;
       }
-      console.error("Error creating lead from email", error);
+      logger.error("Error creating lead from email", error);
       toast.error(message);
     }
   };

@@ -18,6 +18,7 @@ import {
 } from '@/components/ui/popover';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 interface Template {
   id: string;
@@ -73,7 +74,7 @@ export function TemplateSelector({ value, onChange, disabled, tenantId }: Templa
           }
         }
       } catch (err: any) {
-        console.error('Error fetching templates:', err);
+        logger.error('Error fetching templates:', err);
         toast.error('Failed to load templates');
       } finally {
         setLoading(false);

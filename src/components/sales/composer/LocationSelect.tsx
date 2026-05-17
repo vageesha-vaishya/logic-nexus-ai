@@ -18,6 +18,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { logger } from "@/lib/logger";
 
 interface LocationSelectProps {
   value?: string;
@@ -77,7 +78,7 @@ export const LocationSelect = React.memo(function LocationSelect({
       
       if (found) {
         if (process.env.NODE_ENV === 'development') {
-          console.debug('[LocationSelect] Found location in preloaded data:', name);
+          logger.debug('[LocationSelect] Found location in preloaded data:', name);
         }
         setSelectedLocation({
           id: found.id,
@@ -93,14 +94,14 @@ export const LocationSelect = React.memo(function LocationSelect({
 
     // Fallback: Use RPC to search for the location to support both ports and cities
     try {
-      console.debug('[LocationSelect] Fetching location details via RPC for:', name);
+      logger.debug('[LocationSelect] Fetching location details via RPC for:', name);
       const { data, error } = await scopedDb.rpc('search_locations', {
         search_text: name,
         limit_count: 1
       });
       
       if (error) {
-        console.error('[LocationSelect] RPC Error fetching location details:', error);
+        logger.error('[LocationSelect] RPC Error fetching location details:', error);
         // Implement retry logic here if needed, or show toast
         return;
       }
@@ -119,7 +120,7 @@ export const LocationSelect = React.memo(function LocationSelect({
         });
       }
     } catch (e) {
-      console.error('Error fetching location details:', e);
+      logger.error('Error fetching location details:', e);
     }
   };
 
@@ -151,7 +152,7 @@ export const LocationSelect = React.memo(function LocationSelect({
         // Performance Monitoring: End timer
         const endTime = performance.now();
         if (process.env.NODE_ENV === 'development') {
-           console.debug(`[LocationSelect] Client-side search for "${search}" took ${endTime - startTime}ms. Found ${filtered.length} results.`);
+           logger.debug(`[LocationSelect] Client-side search for "${search}" took ${endTime - startTime}ms. Found ${filtered.length} results.`);
         }
 
         return filtered.map(loc => {
@@ -172,7 +173,7 @@ export const LocationSelect = React.memo(function LocationSelect({
       // Only skip very short searches (1 char) to avoid noise
       if (search && search.length < 2) return [];
       
-      console.log('LocationSelect searching for:', search);
+      logger.debug('LocationSelect searching for:', search);
       
       // Run both RPC and direct query in parallel for best results
       const [rpcResponse, fallbackResponse] = await Promise.all([
@@ -191,17 +192,17 @@ export const LocationSelect = React.memo(function LocationSelect({
       const { data: fallbackData, error: fallbackError } = fallbackResponse;
 
       if (process.env.NODE_ENV === 'development') {
-         console.log('LocationSelect loadLocations search:', search);
-         console.log('RPC Data:', rpcData, 'Error:', rpcError);
-         console.log('Fallback Data:', fallbackData, 'Error:', fallbackError);
+         logger.debug('LocationSelect loadLocations search:', search);
+         logger.debug('RPC Data:', rpcData, 'Error:', rpcError);
+         logger.debug('Fallback Data:', fallbackData, 'Error:', fallbackError);
       }
 
       if (rpcError) {
-        console.warn('LocationSelect RPC error:', rpcError);
+        logger.warn('LocationSelect RPC error:', rpcError);
       }
 
       if (fallbackError) {
-        console.error('LocationSelect fallback query error:', fallbackError);
+        logger.error('LocationSelect fallback query error:', fallbackError);
       }
 
       const combinedResults: any[] = [];
@@ -223,7 +224,7 @@ export const LocationSelect = React.memo(function LocationSelect({
                   if (item.country) locName += `, ${item.country}`;
               } else {
                   if (process.env.NODE_ENV === 'development') {
-                      console.warn('LocationSelect skipping invalid item:', item);
+                      logger.warn('LocationSelect skipping invalid item:', item);
                   }
                   return; // Skip invalid items
               }
@@ -260,7 +261,7 @@ export const LocationSelect = React.memo(function LocationSelect({
           fallbackData.forEach(addLocation);
       }
 
-      console.log('LocationSelect found results:', combinedResults.length);
+      logger.debug('LocationSelect found results:', combinedResults.length);
 
       return combinedResults.map(loc => {
         // Double check name before mapping
@@ -279,7 +280,7 @@ export const LocationSelect = React.memo(function LocationSelect({
         };
       });
     } catch (e) {
-      console.error('LocationSelect Exception in loadLocations:', e);
+      logger.error('LocationSelect Exception in loadLocations:', e);
       return [];
     }
   }, [scopedDb]);
@@ -319,7 +320,7 @@ export const LocationSelect = React.memo(function LocationSelect({
       setDisplayValue("");
       setSelectedLocation(null);
     } catch (error: any) {
-      console.error('Error deleting location:', error);
+      logger.error('Error deleting location:', error);
       toast({
         title: "Error",
         description: "Failed to delete location.",

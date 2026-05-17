@@ -8,6 +8,7 @@ import { Trash2, Plus, AlertTriangle, Globe, Map } from 'lucide-react';
 import { toast } from 'sonner';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { logger } from "@/lib/logger";
 
 interface Props {
   territoryId: string;
@@ -59,7 +60,7 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
         setStates(stateRes.data || []);
         setCities(cityRes.data || []);
       } catch (error) {
-        console.error('Error fetching master data:', error);
+        logger.error('Error fetching master data:', error);
         toast.error('Failed to load geographical data');
       }
     };
@@ -83,7 +84,7 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
       }
       setMappings(data || []);
     } catch (error) {
-      console.error('Error fetching mappings:', error);
+      logger.error('Error fetching mappings:', error);
       toast.error('Failed to load geography mappings');
     } finally {
       setLoading(false);
@@ -245,7 +246,7 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
       
       fetchMappings();
     } catch (error: any) {
-      console.error('Error adding geography:', error);
+      logger.error('Error adding geography:', error);
       toast.error(error.message || 'Failed to add geography');
     }
   };
@@ -273,7 +274,7 @@ export function TerritoryGeographyManager({ territoryId }: Props) {
       toast.success('Geography removed');
       fetchMappings();
     } catch (error) {
-      console.error('Error removing geography:', error);
+      logger.error('Error removing geography:', error);
       toast.error('Failed to remove geography');
     }
   };

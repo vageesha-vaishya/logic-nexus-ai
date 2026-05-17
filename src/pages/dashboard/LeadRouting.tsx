@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';
+import { logger } from "@/lib/logger";
 
 interface AssignmentRule {
   id: string;
@@ -103,7 +104,7 @@ export default function LeadRouting() {
       setRules(data || []);
     } catch (error: any) {
       toast.error('Failed to load assignment rules');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -118,7 +119,7 @@ export default function LeadRouting() {
       if (error) throw error;
       setUsers(data || []);
     } catch (error: any) {
-      console.error('Error fetching users:', error);
+      logger.error('Error fetching users:', error);
     }
   };
 
@@ -140,7 +141,7 @@ export default function LeadRouting() {
       }
       setQueues(data || []);
     } catch (error: any) {
-      console.error('Error fetching queues:', error);
+      logger.error('Error fetching queues:', error);
     }
   };
 
@@ -197,7 +198,7 @@ export default function LeadRouting() {
       fetchRules();
     } catch (error: any) {
       toast.error('Failed to create assignment rule');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -214,7 +215,7 @@ export default function LeadRouting() {
       fetchRules();
     } catch (error: any) {
       toast.error('Failed to update rule');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -231,7 +232,7 @@ export default function LeadRouting() {
       fetchRules();
     } catch (error: any) {
       toast.error('Failed to delete rule');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

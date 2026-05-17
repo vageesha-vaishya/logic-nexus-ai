@@ -7,6 +7,7 @@ import { WarehouseForm } from '@/components/logistics/WarehouseForm';
 import type { WarehouseFormData } from '@/components/logistics/WarehouseForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export default function WarehouseNew() {
   const navigate = useNavigate();
@@ -37,7 +38,7 @@ export default function WarehouseNew() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to create warehouse: ' + message);
-      console.error('Error:', message);
+      logger.error('Error:', message);
     }
   };
 

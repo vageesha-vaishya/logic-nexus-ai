@@ -42,6 +42,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 interface ADSBFeedItem {
   id: string;
@@ -109,20 +110,20 @@ export function EnterpriseComplianceEditor({
 
       const { data, error } = await q;
       
-      console.log('=== COMPLIANCE FEED ===');
-      console.log('Filter:', filter);
-      console.log('Results:', data?.length || 0, data);
-      console.log('Error:', error);
-      console.log('=======================');
+      logger.debug('=== COMPLIANCE FEED ===');
+      logger.debug('Filter:', filter);
+      logger.debug('Results:', data?.length || 0, data);
+      logger.debug('Error:', error);
+      logger.debug('=======================');
       
       if (error) {
-        console.error('Feed error:', error);
+        logger.error('Feed error:', error);
         setFeedItems([]);
       } else {
         setFeedItems(data || []);
       }
     } catch (error) {
-      console.error('Feed error:', error);
+      logger.error('Feed error:', error);
       setFeedItems([]);
     } finally {
       setLoading(false);
@@ -151,13 +152,13 @@ export function EnterpriseComplianceEditor({
     };
 
     const updatedReqs = [...requirements, newReq];
-    console.log('=== COMPLIANCE ADD ===');
-    console.log('Adding requirement:', item.directive_number);
-    console.log('Updated requirements array:', updatedReqs);
-    console.log('Calling onChange with:', updatedReqs);
+    logger.debug('=== COMPLIANCE ADD ===');
+    logger.debug('Adding requirement:', item.directive_number);
+    logger.debug('Updated requirements array:', updatedReqs);
+    logger.debug('Calling onChange with:', updatedReqs);
     onChange(updatedReqs);
-    console.log('onChange called successfully');
-    console.log('========================');
+    logger.debug('onChange called successfully');
+    logger.debug('========================');
     toast.success('Requirement added');
   }, [requirements, onChange]);
 

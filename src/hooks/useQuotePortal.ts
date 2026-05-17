@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export interface PortalToken {
   id: string;
@@ -38,7 +39,7 @@ export function useQuotePortal() {
       
       return data as PortalToken;
     } catch (error: any) {
-      console.error('Error generating portal token:', error);
+      logger.error('Error generating portal token:', error);
       toast.error('Failed to generate portal link');
       return null;
     } finally {
@@ -58,7 +59,7 @@ export function useQuotePortal() {
       if (error) throw error;
       return data as PortalToken[];
     } catch (error) {
-      console.error('Error fetching active tokens:', error);
+      logger.error('Error fetching active tokens:', error);
       return [];
     }
   };

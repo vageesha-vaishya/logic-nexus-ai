@@ -4,6 +4,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
 import { AIQuotationModal } from '@/components/sales/modals/AIQuotationModal';
+import { logger } from "@/lib/logger";
 
 interface SalesDashboardContextType {
   activeView: string;
@@ -42,7 +43,7 @@ export function SalesDashboardProvider({ children }: { children: ReactNode }) {
   };
 
   const handleAction = (action: string) => {
-    console.log(`Action triggered: ${action}`);
+    logger.debug(`Action triggered: ${action}`);
     switch (action) {
       case 'config':
         setShowConfig(true);

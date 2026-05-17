@@ -5,6 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Badge } from '@/components/ui/badge';
 import { Loader2, ArrowRight, CheckCircle2, XCircle, Activity } from 'lucide-react';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 interface TransferLog {
     id: string;
@@ -72,7 +73,7 @@ export function DataFlowMonitor() {
             setLogs(data as TransferLog[]);
             updateStats(data as TransferLog[]);
         } catch (err) {
-            console.error('Error fetching transfer logs:', err);
+            logger.error('Error fetching transfer logs:', err);
         } finally {
             setLoading(false);
         }

@@ -14,6 +14,7 @@ import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Separator } from '@/components/ui/separator';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function AdminScopeSwitcher() {
   const { context, preferences, setAdminOverride, setScopePreference, scopedDb } = useCRM();
@@ -44,7 +45,7 @@ export function AdminScopeSwitcher() {
       if (fError) throw fError;
       setFranchises(fData || []);
     } catch (e) {
-      console.error('[AdminScopeSwitcher] Failed to load franchises:', e);
+      logger.error('[AdminScopeSwitcher] Failed to load franchises:', e);
       toast.error("Failed to load franchises");
     }
   }, [scopedDb]);
@@ -66,7 +67,7 @@ export function AdminScopeSwitcher() {
         : (currentTenantId || scopeTenantId);
       await loadFranchises(effectiveTenantId);
     } catch (e) {
-      console.error('[AdminScopeSwitcher] Failed to load scope data:', e);
+      logger.error('[AdminScopeSwitcher] Failed to load scope data:', e);
       toast.error("Failed to load scope data");
     }
     setLoadingData(false);
@@ -74,7 +75,7 @@ export function AdminScopeSwitcher() {
 
   useEffect(() => {
     if (!canUseAdminOverride) {
-      console.debug('AdminScopeSwitcher: User is not eligible for admin override. Context:', context);
+      logger.debug('AdminScopeSwitcher: User is not eligible for admin override. Context:', context);
     }
   }, [canUseAdminOverride, context]);
 
@@ -100,14 +101,14 @@ export function AdminScopeSwitcher() {
     try {
       await setAdminOverride(checked);
       // Log the action for auditability
-      console.info(`[AdminScopeSwitcher] Admin override ${checked ? 'enabled' : 'disabled'}`);
+      logger.info(`[AdminScopeSwitcher] Admin override ${checked ? 'enabled' : 'disabled'}`);
       
       toast.success(checked ? "Scoped View Enabled" : (isPlatformAdmin ? "Global Admin View Restored" : "Tenant-wide View Restored"));
       if (checked) {
         loadData();
       }
     } catch (error: any) {
-      console.error('[AdminScopeSwitcher] Failed to toggle admin override:', error);
+      logger.error('[AdminScopeSwitcher] Failed to toggle admin override:', error);
       toast.error(`Failed to toggle admin override: ${error?.message || 'Unknown error'}`);
     }
   };
@@ -124,13 +125,13 @@ export function AdminScopeSwitcher() {
     try {
       await setScopePreference(newVal, null, adminOverride);
       // Log the action for auditability
-      console.info(`[AdminScopeSwitcher] Tenant scope changed to: ${newVal || 'All'}`);
+      logger.info(`[AdminScopeSwitcher] Tenant scope changed to: ${newVal || 'All'}`);
       
       // Update local franchises list immediately
       await loadFranchises(newVal);
       toast.success("Tenant Scope Updated");
     } catch (error: any) {
-      console.error('[AdminScopeSwitcher] Failed to update tenant scope:', error);
+      logger.error('[AdminScopeSwitcher] Failed to update tenant scope:', error);
       toast.error(`Failed to update tenant scope: ${error?.message || 'Unknown error'}`);
     }
   };
@@ -140,10 +141,10 @@ export function AdminScopeSwitcher() {
     const effectiveTenantId = currentTenantId || ownedTenantId || context.tenantId || null;
     try {
       await setScopePreference(effectiveTenantId, newVal, adminOverride);
-      console.info(`[AdminScopeSwitcher] Franchise scope changed to: ${newVal || 'All'} for tenant: ${effectiveTenantId || 'All'}`);
+      logger.info(`[AdminScopeSwitcher] Franchise scope changed to: ${newVal || 'All'} for tenant: ${effectiveTenantId || 'All'}`);
       toast.success("Franchise Scope Updated");
     } catch (error: any) {
-      console.error('[AdminScopeSwitcher] Failed to update franchise scope:', error);
+      logger.error('[AdminScopeSwitcher] Failed to update franchise scope:', error);
       toast.error(`Failed to update franchise scope: ${error?.message || 'Unknown error'}`);
     }
   };

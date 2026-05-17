@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { DollarSign, TrendingUp, Target } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface RevenueData {
   ytd: number;
@@ -73,7 +74,7 @@ export function RevenueYTD() {
           });
         }
       } catch (error) {
-        console.error('Failed to fetch revenue YTD:', error);
+        logger.error('Failed to fetch revenue YTD:', error);
       } finally {
         setLoading(false);
       }

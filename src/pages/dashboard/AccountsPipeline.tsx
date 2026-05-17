@@ -24,6 +24,7 @@ import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
 import { useTheme } from "@/hooks/useTheme";
 import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
+import { logger } from "@/lib/logger";
 
 type AccountStage = 'new_account' | 'kyc_pending' | 'active' | 'vip' | 'payment_issues' | 'inactive' | 'blocked';
 type AccountType = 'prospect' | 'customer' | 'partner' | 'vendor';
@@ -111,7 +112,7 @@ export default function AccountsPipeline() {
   const fetchAccounts = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('AccountsPipeline: fetching with scopedDb', scopedDb.accessContext);
+      logger.debug('AccountsPipeline: fetching with scopedDb', scopedDb.accessContext);
       const { data, fallbackReason } = await PipelineService.listAccounts(scopedDb, {
         page: 1,
         pageSize: 2000,
@@ -121,9 +122,9 @@ export default function AccountsPipeline() {
       setIsDbFallbackActive(Boolean(fallbackReason));
       setDbFallbackReason(fallbackReason);
 
-      console.log(`AccountsPipeline: fetched ${data?.length} records`);
+      logger.debug(`AccountsPipeline: fetched ${data?.length} records`);
       if (data && data.length > 0) {
-        console.log('AccountsPipeline: first record tenant_id:', (data[0] as any).tenant_id);
+        logger.debug('AccountsPipeline: first record tenant_id:', (data[0] as any).tenant_id);
       }
 
       setAccounts((data || []) as Account[]);

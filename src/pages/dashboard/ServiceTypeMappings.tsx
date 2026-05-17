@@ -12,6 +12,7 @@ import { Trash2, Plus, Pencil } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import type { Json } from '@/integrations/supabase/types';
+import { logger } from "@/lib/logger";
 
 type MappingRow = {
   id: string;
@@ -150,7 +151,7 @@ export default function ServiceTypeMappings() {
       setServices((data || []) as ServiceRow[]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch services:', message);
+      logger.error('Failed to fetch services:', message);
       toast.error('Failed to fetch services', { description: message });
     }
   };
@@ -184,7 +185,7 @@ export default function ServiceTypeMappings() {
       setMappings(rows);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch mappings:', message);
+      logger.error('Failed to fetch mappings:', message);
       toast.error('Failed to fetch mappings', { description: message });
     }
   };
@@ -200,7 +201,7 @@ export default function ServiceTypeMappings() {
       setTypeOptions((data || []) as { name: string; is_active: boolean }[]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch service types:', message);
+      logger.error('Failed to fetch service types:', message);
     }
   };
 
@@ -214,7 +215,7 @@ export default function ServiceTypeMappings() {
       setTenants((data || []) as { id: string; name?: string }[]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch tenants:', message);
+      logger.error('Failed to fetch tenants:', message);
       toast.error('Failed to fetch tenants', { description: message });
     }
   };
@@ -366,7 +367,7 @@ export default function ServiceTypeMappings() {
       fetchMappings();
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to create mapping:', message);
+      logger.error('Failed to create mapping:', message);
       toast.error('Failed to create mapping', { description: message });
     }
   };

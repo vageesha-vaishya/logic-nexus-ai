@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry, JournalEntryInsert } from './types';
 import { MockERPConnector } from './MockERPConnector';
+import { logger } from "@/lib/logger";
 
 type GLReferenceType = 'INVOICE' | 'PAYMENT';
 type GLConnectorInput = {
@@ -58,7 +59,7 @@ export class GLSyncService {
   }
 
   static async syncTransaction(tenantId: string, referenceId: string, type: GLReferenceType): Promise<void> {
-    console.log(`Syncing ${type} ${referenceId} for tenant ${tenantId} to GL...`);
+    logger.debug(`Syncing ${type} ${referenceId} for tenant ${tenantId} to GL...`);
     
     const entry: JournalEntryInsert = {
       tenant_id: tenantId,
@@ -76,7 +77,7 @@ export class GLSyncService {
       .single();
 
     if (insertError) {
-      console.error('Failed to create journal entry record', insertError);
+      logger.error('Failed to create journal entry record', insertError);
       throw insertError;
     }
 
@@ -99,10 +100,10 @@ export class GLSyncService {
         .eq('id', journalEntry.id);
 
       if (updateError) throw updateError;
-      console.log(`Successfully synced ${type} ${referenceId} to GL.`);
+      logger.debug(`Successfully synced ${type} ${referenceId} to GL.`);
 
     } catch (err: unknown) {
-      console.error('GL Sync failed', err);
+      logger.error('GL Sync failed', err);
       const message = err instanceof Error ? err.message : 'Unknown error';
       
       await supabase
@@ -162,7 +163,7 @@ export class GLSyncService {
     );
 
     worker.on('failed', (_job: any, error: Error) => {
-      console.error('GL queue job failed', error.message);
+      logger.error('GL queue job failed', error.message);
     });
 
     return { queue };
@@ -171,7 +172,7 @@ export class GLSyncService {
   private static async getQueueRuntime(): Promise<QueueRuntime | null> {
     if (!this.queueRuntimePromise) {
       this.queueRuntimePromise = this.buildQueueRuntime().catch((error) => {
-        console.error('GL queue runtime init failed', error);
+        logger.error('GL queue runtime init failed', error);
         this.queueRuntimePromise = null;
         return null;
       });

@@ -5,6 +5,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import userEvent from '@testing-library/user-event';
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Hoisted Mocks
@@ -821,7 +822,7 @@ describe('UnifiedQuoteComposer Integration (API-to-UI)', () => {
 
         // Mock initial load
         mockScopedDb.from.mockImplementation((table: string) => {
-            console.log(`[Test Mock DB] Querying table: ${table}`);
+            logger.debug(`[Test Mock DB] Querying table: ${table}`);
             if (table === 'quotes') {
                 return createMockChain({
                     id: QUOTE_ID,

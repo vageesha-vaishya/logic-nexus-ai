@@ -1,5 +1,6 @@
 import { ScopedDataAccess } from '@/lib/db/access';
 import { Database } from '@/integrations/supabase/types';
+import { logger } from "@/lib/logger";
 
 export type PortLocation = Database['public']['Tables']['ports_locations']['Row'];
 export type PortLocationInsert = Database['public']['Tables']['ports_locations']['Insert'];
@@ -18,7 +19,7 @@ export class PortsService {
    * Uses global scope bypass to ensure visibility across all contexts.
    */
   async getAllPorts(): Promise<PortLocation[]> {
-    console.log('[PortsService] Fetching all ports (global scope)...');
+    logger.debug('[PortsService] Fetching all ports (global scope)...');
     try {
       // Use scopedDb with global flag to ensure consistent access pattern
       // Select all necessary fields for LocationSelect and increase limit to ensure we get all ports
@@ -28,18 +29,18 @@ export class PortsService {
         .limit(5000);
 
       if (error) {
-        console.error('[PortsService] Error fetching ports:', error);
+        logger.error('[PortsService] Error fetching ports:', error);
         throw error;
       }
 
       const rows = Array.isArray(data) ? data : [];
       const active = rows.filter((p: PortLocation) => p.is_active !== false);
 
-      console.log(`[PortsService] Fetched ${active.length} ports.`);
+      logger.debug(`[PortsService] Fetched ${active.length} ports.`);
       return active;
     } catch (e: unknown) {
       const message = e instanceof Error ? e.message : String(e);
-      console.error('[PortsService] Exception during ports fetch:', message);
+      logger.error('[PortsService] Exception during ports fetch:', message);
       return [];
     }
   }
@@ -54,7 +55,7 @@ export class PortsService {
       .single();
 
     if (error) {
-      console.error(`Error fetching port ${id}:`, error);
+      logger.error(`Error fetching port ${id}:`, error);
       throw error;
     }
 
@@ -77,7 +78,7 @@ export class PortsService {
       .single();
 
     if (error) {
-      console.error('Error creating port:', error);
+      logger.error('Error creating port:', error);
       throw error;
     }
 
@@ -100,7 +101,7 @@ export class PortsService {
       .single();
 
     if (error) {
-      console.error(`Error updating port ${id}:`, error);
+      logger.error(`Error updating port ${id}:`, error);
       throw error;
     }
 
@@ -116,7 +117,7 @@ export class PortsService {
       .eq('id', id);
 
     if (error) {
-      console.error(`Error deleting port ${id}:`, error);
+      logger.error(`Error deleting port ${id}:`, error);
       throw error;
     }
   }

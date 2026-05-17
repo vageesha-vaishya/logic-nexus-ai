@@ -18,6 +18,7 @@ import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
+import { logger } from "@/lib/logger";
 
 interface Contact {
   id: string;
@@ -51,14 +52,14 @@ export default function Contacts() {
 
   useEffect(() => {
     if (process.env.NODE_ENV === 'development') {
-      console.log('Contacts: context updated', context);
-      console.log('Contacts: scopedDb context', scopedDb.accessContext);
+      logger.debug('Contacts: context updated', context);
+      logger.debug('Contacts: scopedDb context', scopedDb.accessContext);
     }
   }, [context, scopedDb]);
 
   const fetchContacts = useCallback(async () => {
     try {
-      console.log('Contacts: fetching with scopedDb', scopedDb.accessContext);
+      logger.debug('Contacts: fetching with scopedDb', scopedDb.accessContext);
       const { data, fallbackReason } = await PipelineService.listContacts(scopedDb, {
         page: 1,
         pageSize: 2000,
@@ -68,9 +69,9 @@ export default function Contacts() {
       setIsDbFallbackActive(Boolean(fallbackReason));
       setDbFallbackReason(fallbackReason);
 
-      console.log(`Contacts: fetched ${data?.length} records`);
+      logger.debug(`Contacts: fetched ${data?.length} records`);
       if (data && data.length > 0) {
-        console.log('Contacts: first record tenant_id:', (data[0] as any).tenant_id);
+        logger.debug('Contacts: first record tenant_id:', (data[0] as any).tenant_id);
       }
 
       setContacts((data as Contact[]) || []);
@@ -79,7 +80,7 @@ export default function Contacts() {
       setIsDbFallbackActive(false);
       setDbFallbackReason(null);
       toast.error('Failed to load contacts');
-      console.error('Error:', message);
+      logger.error('Error:', message);
     } finally {
       setLoading(false);
     }

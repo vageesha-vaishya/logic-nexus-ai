@@ -26,6 +26,7 @@ import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
+import { logger } from "@/lib/logger";
 
 interface Activity {
   id: string;
@@ -100,7 +101,7 @@ export default function Activities() {
   const fetchActivities = useCallback(async () => {
     try {
       setLoading(true);
-      console.log('Activities: fetching with scopedDb', scopedDb.accessContext);
+      logger.debug('Activities: fetching with scopedDb', scopedDb.accessContext);
       const { data, fallbackReason } = await PipelineService.listActivities(scopedDb, {
         page: 1,
         pageSize: 2000,
@@ -110,9 +111,9 @@ export default function Activities() {
       setIsDbFallbackActive(Boolean(fallbackReason));
       setDbFallbackReason(fallbackReason);
       
-      console.log(`Activities: fetched ${data?.length} records`);
+      logger.debug(`Activities: fetched ${data?.length} records`);
       if (data && data.length > 0) {
-        console.log('Activities: first record tenant_id:', (data[0] as any).tenant_id);
+        logger.debug('Activities: first record tenant_id:', (data[0] as any).tenant_id);
       }
 
       setActivities((data as Activity[]) || []);
@@ -146,7 +147,7 @@ export default function Activities() {
       setDbFallbackReason(null);
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Failed to load activities', { description: message });
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -184,7 +185,7 @@ export default function Activities() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
       toast.error('Failed to update activity', { description: message });
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -204,7 +205,7 @@ export default function Activities() {
       toast.success('Assignment updated');
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error(err);
+      logger.error(err);
       toast.error(message || 'Failed to update assignment');
     }
   };
@@ -223,7 +224,7 @@ export default function Activities() {
       if (error) throw error;
       toast.success('Activity status updated');
     } catch (error) {
-      console.error('Error updating status:', error);
+      logger.error('Error updating status:', error);
       toast.error('Failed to update status');
       setActivities(oldActivities); // Revert on error
     }

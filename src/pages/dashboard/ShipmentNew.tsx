@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { ShipmentForm } from '@/components/logistics/ShipmentForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export default function ShipmentNew() {
   const navigate = useNavigate();
@@ -103,7 +104,7 @@ export default function ShipmentNew() {
       navigate('/dashboard/shipments');
     } catch (error: any) {
       toast.error('Failed to create shipment: ' + error.message);
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

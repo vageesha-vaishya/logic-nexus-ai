@@ -16,6 +16,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
 import { matchText, TextOp } from '@/lib/utils';
 import type { Json } from '@/integrations/supabase/types';
+import { logger } from "@/lib/logger";
 
 interface Warehouse {
   id: string;
@@ -65,7 +66,7 @@ export default function Warehouses() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load warehouses');
-      console.error('Error:', message);
+      logger.error('Error:', message);
     } finally {
       setLoading(false);
     }

@@ -41,6 +41,7 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { logger } from "@/lib/logger";
 
 const formSchema = z.object({
   code: z.string().min(2, 'Code must be at least 2 characters'),
@@ -102,7 +103,7 @@ export default function TaxJurisdictionDetail() {
         setRules(rulesData);
       }
     } catch (error: any) {
-      console.error('Error fetching data:', error);
+      logger.error('Error fetching data:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to load data',

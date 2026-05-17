@@ -8,6 +8,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { WidgetProps } from '@/types/dashboard';
 import { useTranslation } from 'react-i18next';
 import { subDays, parseISO, differenceInDays } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 interface Insight {
   id: string;
@@ -88,7 +89,7 @@ export function InsightsWidget({ config }: WidgetProps) {
         
         setInsights(newInsights);
       } catch (error) {
-        console.error('Failed to generate insights', error);
+        logger.error('Failed to generate insights', error);
       } finally {
         setLoading(false);
       }

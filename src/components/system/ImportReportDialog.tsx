@@ -15,6 +15,7 @@ import { FileText, CheckCircle, XCircle, AlertTriangle, Clock, Download } from '
 import { supabase } from '@/integrations/supabase/client';
 import { ImportSession } from '@/lib/import-history-service';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 interface ImportReportDialogProps {
   session: ImportSession;
@@ -63,7 +64,7 @@ export function ImportReportDialog({ session, open, onOpenChange }: ImportReport
       setErrorStats(stats);
 
     } catch (e) {
-      console.error("Failed to fetch import errors", e);
+      logger.error("Failed to fetch import errors", e);
     } finally {
       setLoading(false);
     }

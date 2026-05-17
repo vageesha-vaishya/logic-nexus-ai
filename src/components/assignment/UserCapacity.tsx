@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { logger } from "@/lib/logger";
 
 interface UserCapacityData {
   id: string;
@@ -73,7 +74,7 @@ export function UserCapacity() {
       }
     } catch (error: any) {
       toast.error('Failed to load user capacities');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -91,7 +92,7 @@ export function UserCapacity() {
       fetchCapacities();
     } catch (error: any) {
       toast.error('Failed to update availability');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -110,7 +111,7 @@ export function UserCapacity() {
       fetchCapacities();
     } catch (error: any) {
       toast.error('Failed to update capacity');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

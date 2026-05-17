@@ -127,7 +127,7 @@ export function withScope<T>(query: T, context: DataAccessContext): T {
   if (context.isPlatformAdmin && context.adminOverrideEnabled) {
     // Debug logging for troubleshooting filtering issues
     if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
-      console.debug(`[ScopedDataAccess] Platform Admin Override: Tenant=${context.tenantId}, Franchise=${context.franchiseId}`);
+      logger.debug(`[ScopedDataAccess] Platform Admin Override: Tenant=${context.tenantId}, Franchise=${context.franchiseId}`);
     }
 
     if (context.tenantId) {
@@ -149,7 +149,7 @@ export function withScope<T>(query: T, context: DataAccessContext): T {
     // Allow Tenant Admin to filter by franchise if specified
     if (context.franchiseId) {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
-        console.debug(`[ScopedDataAccess] Applying franchise filter for Tenant Admin: ${context.franchiseId}`);
+        logger.debug(`[ScopedDataAccess] Applying franchise filter for Tenant Admin: ${context.franchiseId}`);
       }
       scopedQuery = scopedQuery.eq('franchise_id', context.franchiseId);
     }
@@ -220,7 +220,7 @@ export class ScopedDataAccess {
 
     // Fire and forget audit log to avoid blocking the UI
     this.supabase.from('audit_logs').insert(payload).then(({ error }) => {
-      if (error) console.warn('Audit log failed:', error);
+      if (error) logger.warn('Audit log failed:', error);
     });
   }
 
@@ -354,7 +354,7 @@ export class ScopedDataAccess {
     // Admin Override Logic - Platform Admin with override enabled
     if (ctx.isPlatformAdmin && ctx.adminOverrideEnabled) {
       if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
-        console.debug(`[ScopedDataAccess] Platform Admin Override applied: Tenant=${ctx.tenantId}, Franchise=${ctx.franchiseId}`);
+        logger.debug(`[ScopedDataAccess] Platform Admin Override applied: Tenant=${ctx.tenantId}, Franchise=${ctx.franchiseId}`);
       }
 
       if (ctx.tenantId) {
@@ -380,7 +380,7 @@ export class ScopedDataAccess {
       
       if (ctx.franchiseId && table !== 'franchises') {
         if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
-          console.debug(`[ScopedDataAccess] Applying franchise filter for Tenant Admin: ${ctx.franchiseId}`);
+          logger.debug(`[ScopedDataAccess] Applying franchise filter for Tenant Admin: ${ctx.franchiseId}`);
         }
         query = query.eq('franchise_id', ctx.franchiseId);
       }

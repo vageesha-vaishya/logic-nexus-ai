@@ -11,6 +11,7 @@ import {
 import { rewriteInsertsWithOnConflict } from '@/utils/pgDumpImportConflict';
 import { ExternalDbConnection, ConnectionTestResult } from '@/components/dashboard/data-management/migration/ExternalDbConnectionForm';
 import { ImportOptions } from '@/components/dashboard/data-management/migration/ImportOptionsPanel';
+import { logger } from "@/lib/logger";
 
 export enum PgDumpErrorCategory {
   CONNECTION_REFUSED = 101,
@@ -1836,7 +1837,7 @@ export function usePgDumpImport(): UsePgDumpImportReturn {
                  }
                }
              } catch (e) {
-               console.error('Orphan check failed', e);
+               logger.error('Orphan check failed', e);
              }
           }
         }

@@ -19,6 +19,7 @@ import { useFormDebug } from '@/hooks/useFormDebug';
 import { CatalogSaveDialog } from './CatalogSaveDialog';
 
 import { QuotePreviewModal } from '@/components/sales/QuotePreviewModal';
+import { logger } from "@/lib/logger";
 
 interface QuoteFormProps {
   quoteId?: string;
@@ -97,7 +98,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
   // Auto-save logic for Quick Quote conversion
   useEffect(() => {
     if (autoSave && !hasAutoSaved && !quoteId && initialData && !isSubmitting) {
-      console.log('[QuoteForm] Triggering auto-save from Quick Quote data...');
+      logger.debug('[QuoteForm] Triggering auto-save from Quick Quote data...');
       const timer = setTimeout(() => {
         form.handleSubmit(onSubmit)();
         setHasAutoSaved(true);
@@ -134,7 +135,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
   };
 
   const onInvalid = (errors: any) => {
-    console.error('Validation errors:', errors);
+    logger.error('Validation errors:', errors);
     const errorMessages = flattenErrors(errors);
     const errorCount = errorMessages.length;
     
@@ -183,7 +184,7 @@ function QuoteFormContent({ quoteId, quoteNumber, versionId, onSuccess, initialD
       return true;
     } catch (error: any) {
       const duration = performance.now() - startTime;
-      console.error('Submission error:', error);
+      logger.error('Submission error:', error);
       formDebug.logError(error, { duration: `${duration.toFixed(2)}ms` }); // Log error with metrics
       const description = error?.message || 'Unexpected error during save';
       toast.error('Failed to save quote', { description });

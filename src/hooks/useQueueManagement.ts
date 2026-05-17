@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from "@/lib/logger";
 
 export interface Queue {
   queue_id: string;
@@ -66,7 +67,7 @@ export function useQueueManagement() {
       
       setQueues((data as Queue[]) || []);
     } catch (error: any) {
-      console.error('Error fetching queues:', error);
+      logger.error('Error fetching queues:', error);
       toast({
         title: 'Error',
         description: 'Failed to load queues',
@@ -108,7 +109,7 @@ export function useQueueManagement() {
       
       setRules(mappedRules);
     } catch (error: any) {
-      console.error('Error fetching queue rules:', error);
+      logger.error('Error fetching queue rules:', error);
       toast({
         title: 'Error',
         description: 'Failed to load queue rules',
@@ -140,7 +141,7 @@ export function useQueueManagement() {
 
       return true;
     } catch (error: any) {
-      console.error('Error assigning email to queue:', error);
+      logger.error('Error assigning email to queue:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to assign email to queue',
@@ -183,7 +184,7 @@ export function useQueueManagement() {
       await fetchRules();
       return data;
     } catch (error: any) {
-      console.error('Error creating queue rule:', error);
+      logger.error('Error creating queue rule:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to create queue rule',
@@ -216,7 +217,7 @@ export function useQueueManagement() {
       await fetchRules();
       return true;
     } catch (error: any) {
-      console.error('Error updating queue rule:', error);
+      logger.error('Error updating queue rule:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to update queue rule',
@@ -243,7 +244,7 @@ export function useQueueManagement() {
       await fetchRules();
       return true;
     } catch (error: any) {
-      console.error('Error deleting queue rule:', error);
+      logger.error('Error deleting queue rule:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to delete queue rule',

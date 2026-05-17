@@ -24,6 +24,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '@/components/ui/popover';
+import { logger } from "@/lib/logger";
 
 interface HazmatWizardProps {
     open: boolean;
@@ -75,7 +76,7 @@ export function HazmatWizard({ open, onOpenChange, onComplete, initialData }: Ha
             });
             
             if (error) {
-                console.error('Search failed:', error);
+                logger.error('Search failed:', error);
                 return [];
             }
             return data || [];

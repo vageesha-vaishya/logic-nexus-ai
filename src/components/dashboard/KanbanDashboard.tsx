@@ -14,6 +14,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { ScopedDataAccess, DataAccessContext } from "@/lib/db/access";
 import { Input } from "@/components/ui/input";
 import { formatCurrency } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 interface KanbanStats {
   leads: { total: number; byStage: Record<string, number>; avgDays?: Record<string, number> };
@@ -188,7 +189,7 @@ export function KanbanDashboard() {
         },
       });
     } catch (error) {
-      console.error("Error fetching Kanban stats:", error);
+      logger.error("Error fetching Kanban stats:", error);
     } finally {
       setLoading(false);
     }

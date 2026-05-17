@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Save, Loader2 } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { logger } from "@/lib/logger";
 
 interface BrandingSettingsFormProps {
   initialSettings: BrandingSettings;
@@ -107,7 +108,7 @@ export function BrandingSettingsForm({ initialSettings, onSave, saving }: Brandi
       setUploadProgress(100);
       toast.success('Logo uploaded successfully');
     } catch (err: any) {
-      console.error('Upload failed:', err);
+      logger.error('Upload failed:', err);
       toast.error('Logo upload failed', { description: err.message });
       setLogoFile(null);
     } finally {

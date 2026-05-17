@@ -13,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
 import { ShieldAlert, CheckCircle, AlertTriangle, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import { logger } from "@/lib/logger";
 
 export default function SecurityIncidents() {
   const [incidents, setIncidents] = useState<any[]>([]);
@@ -31,7 +32,7 @@ export default function SecurityIncidents() {
       .order('created_at', { ascending: false });
     
     if (error) {
-      console.error('Error fetching incidents:', error);
+      logger.error('Error fetching incidents:', error);
     } else {
       setIncidents(data || []);
     }

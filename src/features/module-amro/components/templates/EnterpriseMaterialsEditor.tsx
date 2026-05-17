@@ -34,6 +34,7 @@ import {
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from "@/lib/logger";
 
 interface PartInventory {
   id: string;
@@ -99,13 +100,13 @@ export function EnterpriseMaterialsEditor({
       const { data, error } = await q;
 
       if (error) {
-        console.error('Search error:', error);
+        logger.error('Search error:', error);
         setSearchResults([]);
       } else {
         setSearchResults(data || []);
       }
     } catch (error) {
-      console.error('Search error:', error);
+      logger.error('Search error:', error);
       setSearchResults([]);
     } finally {
       setSearching(false);

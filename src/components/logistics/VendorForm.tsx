@@ -15,6 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 const vendorSchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -120,7 +121,7 @@ export function VendorForm({ initialData, onSuccess, onCancel }: VendorFormProps
       }
       onSuccess();
     } catch (error: any) {
-      console.error('Error saving vendor:', error);
+      logger.error('Error saving vendor:', error);
       toast.error(error.message || 'Failed to save vendor');
     } finally {
       setLoading(false);

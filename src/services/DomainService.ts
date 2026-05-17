@@ -749,7 +749,7 @@ export const DomainService = {
       .order('name');
 
     if (error) {
-      console.error('Error fetching domains:', error);
+      logger.error('Error fetching domains:', error);
       throw error;
     }
 

@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { useEffect, useState } from 'react';
 import { dashboardAnalyticsService } from '@/services/dashboardAnalytics';
 import { Loader2 } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 export function FinancialWidget({ config }: WidgetProps) {
   const [data, setData] = useState<FinancialMetric[]>([]);
@@ -15,7 +16,7 @@ export function FinancialWidget({ config }: WidgetProps) {
         const metrics = await dashboardAnalyticsService.getFinancialMetrics();
         setData(metrics);
       } catch (error) {
-        console.error('Failed to load financial data', error);
+        logger.error('Failed to load financial data', error);
       } finally {
         setLoading(false);
       }

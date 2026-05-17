@@ -1,6 +1,7 @@
 import { Calendar, FileText, Plane, Shield } from 'lucide-react';
 import type { WizardStepConfig } from '@/features/module-amro/components/data-grid/AmroRecordWizard';
 import { compareIsoDateStrings, isValidIsoDateString } from '@/features/module-amro/components/data-grid/wizardDateUtils';
+import { logger } from "@/lib/logger";
 
 type WizardOption = { value: string; label: string; [key: string]: unknown };
 
@@ -98,12 +99,12 @@ export function buildWorkOrderWizardSteps({
               || selectedTemplate?.assembly_models
               || '',
             ).trim();
-            console.log('[MODEL_COMPARE] Aircraft payload:', selectedAircraft || null);
-            console.log('[MODEL_COMPARE] Template payload:', selectedTemplate || null);
-            console.log(`[MODEL_COMPARE] Aircraft Model: ${aircraftModel}`);
-            console.log(`[MODEL_COMPARE] Template Model: ${templateModel}`);
+            logger.debug('[MODEL_COMPARE] Aircraft payload:', selectedAircraft || null);
+            logger.debug('[MODEL_COMPARE] Template payload:', selectedTemplate || null);
+            logger.debug(`[MODEL_COMPARE] Aircraft Model: ${aircraftModel}`);
+            logger.debug(`[MODEL_COMPARE] Template Model: ${templateModel}`);
             if (!templateModel) {
-              console.warn('[MODEL_COMPARE] template model key missing after mapping', {
+              logger.warn('[MODEL_COMPARE] template model key missing after mapping', {
                 selectedTemplateValue: value,
                 availableTemplateKeys: selectedTemplate ? Object.keys(selectedTemplate) : [],
               });

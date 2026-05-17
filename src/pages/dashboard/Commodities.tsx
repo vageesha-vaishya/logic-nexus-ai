@@ -40,7 +40,7 @@ export default function Commodities() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load commodities', { description: message });
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -282,3 +282,4 @@ function TableHead({ children, className, ...props }: React.ThHTMLAttributes<HTM
   )
 }
 import { cn } from '@/lib/utils';
+import { logger } from "@/lib/logger";

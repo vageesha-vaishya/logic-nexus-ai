@@ -6,6 +6,7 @@ import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
+import { logger } from "@/lib/logger";
 
 interface Shipment {
   id: string;
@@ -34,7 +35,7 @@ export function ShipmentsWidget() {
         if (error) throw error;
         setShipments(data as Shipment[]);
       } catch (error) {
-        console.error('Failed to load shipments widget:', error);
+        logger.error('Failed to load shipments widget:', error);
       } finally {
         setLoading(false);
       }

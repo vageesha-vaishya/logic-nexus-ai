@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Plus, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 type OppItem = {
   id?: string;
@@ -48,7 +49,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
           line_total: Number(d.line_total ?? 0),
         })));
       } catch (err: any) {
-        console.error('Failed to load opportunity items', err);
+        logger.error('Failed to load opportunity items', err);
       } finally {
         setLoading(false);
       }

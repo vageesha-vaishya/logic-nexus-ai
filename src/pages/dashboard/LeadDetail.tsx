@@ -194,7 +194,7 @@ export default function LeadDetail() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load lead', { description: message });
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -581,7 +581,7 @@ export default function LeadDetail() {
       if (!options?.silent) {
         toast.error('Failed to update lead', { description: message });
       }
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -614,7 +614,7 @@ export default function LeadDetail() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to delete lead', { description: message });
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

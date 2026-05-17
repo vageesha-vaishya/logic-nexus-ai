@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 type VersionStatus = 'draft' | 'sent' | 'internal_review' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
 
@@ -64,7 +65,7 @@ export function useVersionStatus() {
              .eq('id', versionData.quote_id);
            
            if (quoteError) {
-             console.error('Error updating parent quote status:', quoteError);
+             logger.error('Error updating parent quote status:', quoteError);
              toast.error('Failed to update parent quote status');
            }
         }
@@ -75,7 +76,7 @@ export function useVersionStatus() {
       });
       return true;
     } catch (error) {
-      console.error('Error updating version status:', error);
+      logger.error('Error updating version status:', error);
       toast.error('Failed to update status');
       return false;
     } finally {
@@ -97,7 +98,7 @@ export function useVersionStatus() {
       });
       return true;
     } catch (error) {
-      console.error('Error setting current version:', error);
+      logger.error('Error setting current version:', error);
       toast.error('Failed to set current version');
       return false;
     } finally {

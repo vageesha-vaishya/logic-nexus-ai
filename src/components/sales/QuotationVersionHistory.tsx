@@ -10,6 +10,7 @@ import { EmptyState } from './quotation-versions/EmptyState';
 import { VersionComparison } from './quotation-versions/VersionComparison';
 import { CustomerSelectionDialog } from './quotation-versions/CustomerSelectionDialog';
 import { Loader2 } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 type Version = {
   id: string;
@@ -360,7 +361,7 @@ export function QuotationVersionHistory({ quoteId }: { quoteId: string }) {
       // Navigate to the composer with the new option
       navigate(`/dashboard/quotes/${quoteId}?versionId=${versionId}&optionId=${optionId}`);
     } catch (error) {
-      console.error('Failed to create option:', error);
+      logger.error('Failed to create option:', error);
       toast({
         title: 'Error',
         description: 'Failed to create new option',

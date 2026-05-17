@@ -31,6 +31,7 @@ import { ImportReportDialog } from "@/components/system/ImportReportDialog";
 import ExportWorker from "@/workers/export.worker?worker";
 import JSZip from "jszip";
 import { Progress } from "@/components/ui/progress";
+import { logger } from "@/lib/logger";
 
 type TableInfo = {
   schema_name: string;
@@ -180,7 +181,7 @@ export default function DatabaseExport() {
       if (error) throw error;
       setRestoreHistoryData(data as ImportSession[]);
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       if (err?.code === 'PGRST205') {
         toast.error("Import history tables missing. Please run the migration.");
       } else {
@@ -218,7 +219,7 @@ export default function DatabaseExport() {
           osc2.stop(ctx.currentTime + 0.2);
       }, 200);
     } catch (e) {
-      console.error("Audio playback failed", e);
+      logger.error("Audio playback failed", e);
     }
   };
 
@@ -275,7 +276,7 @@ export default function DatabaseExport() {
             message.includes("Could not find the function"));
 
         if (error && isMissingFunctionError) {
-          console.warn(
+          logger.warn(
             "[DatabaseExport] get_all_database_tables not available, falling back to get_database_tables"
           );
           const legacy = await scopedDb.rpc("get_database_tables");
@@ -298,7 +299,7 @@ export default function DatabaseExport() {
               ));
 
           if (error && isSchemaCacheErrorForLegacy) {
-            console.warn(
+            logger.warn(
               "[DatabaseExport] get_database_tables missing from schema cache, attempting execute_sql_query fallback"
             );
             const fallbackSql = `
@@ -340,7 +341,7 @@ export default function DatabaseExport() {
         }
 
         if (error) {
-          console.error("[DatabaseExport] Failed to load tables", error);
+          logger.error("[DatabaseExport] Failed to load tables", error);
           let description =
             error.message || "Unknown error while loading database tables.";
           if (
@@ -359,7 +360,7 @@ export default function DatabaseExport() {
         const safeData = data || [];
         setTables(safeData);
 
-        console.log(
+        logger.debug(
           `[DatabaseExport] Loaded ${safeData.length} relations.`
         );
 
@@ -369,7 +370,7 @@ export default function DatabaseExport() {
         });
         setSelected(sel);
       } catch (err: any) {
-        console.error(
+        logger.error(
           "[DatabaseExport] Unexpected error while loading tables",
           err
         );
@@ -465,7 +466,7 @@ export default function DatabaseExport() {
         });
         setMatViewDeps(mvMap);
       } catch (e) {
-        console.warn("Dependency maps load failed", e);
+        logger.warn("Dependency maps load failed", e);
       }
     };
     if (tables.length > 0) {
@@ -1119,7 +1120,7 @@ END $$;\n\n`;
               addLog(`Exported ${counts.enums} enums`, 'success');
           }
         } catch (err: any) {
-          console.error("Error exporting enums:", err);
+          logger.error("Error exporting enums:", err);
           summary.push(`- Enums: FAILED (${err.message})`);
           validationErrors.push(`[Enums] Export failed: ${err.message}`);
           addLog(`Failed to export enums: ${err.message}`, 'error');
@@ -1150,7 +1151,7 @@ END $$;\n\n`;
           
           // Fallback if new RPC not available
           if (error && (error.message.includes("function") || error.message.includes("does not exist"))) {
-             console.warn("get_all_database_schema not found, falling back to public only");
+             logger.warn("get_all_database_schema not found, falling back to public only");
              const { data: oldData, error: oldError } = await scopedDb.rpc("get_database_schema");
              if (oldError) throw oldError;
              // Adapt old data to new format (add schema_name = 'public')
@@ -1290,7 +1291,7 @@ END $$;\n\n`;
             }
           }
         } catch (err: any) {
-          console.error("Error exporting tables:", err);
+          logger.error("Error exporting tables:", err);
           summary.push(`- Tables: FAILED (${err.message})`);
           validationErrors.push(`[Tables] Export failed: ${err.message}`);
           addLog(`Failed to export tables: ${err.message}`, 'error');
@@ -1340,7 +1341,7 @@ END $$;\n\n`;
             }
           }
         } catch (err: any) {
-          console.error("Error exporting primary keys:", err);
+          logger.error("Error exporting primary keys:", err);
           summary.push(`- Primary Keys: FAILED (${err.message})`);
           validationErrors.push(`[Primary Keys] Export failed: ${err.message}`);
           addLog(`Failed to export primary keys: ${err.message}`, 'error');
@@ -1399,7 +1400,7 @@ END $$;\n\n`;
             addLog(`Exported ${counts.functions} functions`, 'success');
           }
         } catch (err: any) {
-          console.error("Error exporting functions:", err);
+          logger.error("Error exporting functions:", err);
           summary.push(`- Functions: FAILED (${err.message})`);
           validationErrors.push(`[Functions] Export failed: ${err.message}`);
           addLog(`Failed to export functions: ${err.message}`, 'error');
@@ -1507,7 +1508,7 @@ END $$;\n\n`;
                       }
                           
                       if (error) {
-                          console.error(`Failed exporting ${table.table_name} (offset ${offset}):`, error.message);
+                          logger.error(`Failed exporting ${table.table_name} (offset ${offset}):`, error.message);
                           summary.push(`  - Table ${table.table_name}: Partial/Failed (${error.message})`);
                           validationErrors.push(`[Data: ${table.table_name}] Batch failed: ${error.message}`);
                           skippedTables.push({ name: table.table_name, reason: error.message });
@@ -1583,7 +1584,7 @@ END $$;\n\n`;
               summary.push(`- Tables Exported (data files): ${exportedTablesCount}/${chosen.length}`);
           }
         } catch (err: any) {
-          console.error("Error exporting data:", err);
+          logger.error("Error exporting data:", err);
           summary.push(`- Data: FAILED (${err.message})`);
           validationErrors.push(`[Data] Export failed: ${err.message}`);
           addLog(`Failed to export data: ${err.message}`, 'error');
@@ -1630,7 +1631,7 @@ END $$;\n\n`;
             addLog(`Exported ${counts.indexes} indexes`, 'success');
           }
         } catch (err: any) {
-          console.error("Error exporting indexes:", err);
+          logger.error("Error exporting indexes:", err);
           summary.push(`- Indexes: FAILED (${err.message})`);
           validationErrors.push(`[Indexes] Export failed: ${err.message}`);
           addLog(`Failed to export indexes: ${err.message}`, 'error');
@@ -1685,7 +1686,7 @@ END $$;\n\n`;
             }
           }
         } catch (err: any) {
-          console.error("Error exporting foreign keys:", err);
+          logger.error("Error exporting foreign keys:", err);
           summary.push(`- Foreign Keys: FAILED (${err.message})`);
           validationErrors.push(`[Foreign Keys] Export failed: ${err.message}`);
           addLog(`Failed to export foreign keys: ${err.message}`, 'error');
@@ -1714,7 +1715,7 @@ END $$;\n\n`;
           
           // Fallback to old RPC if new one not found
           if (error && (error.message.includes("function") || error.message.includes("does not exist"))) {
-             console.warn("get_all_rls_policies not found, falling back to get_rls_policies");
+             logger.warn("get_all_rls_policies not found, falling back to get_rls_policies");
              const res = await scopedDb.rpc("get_rls_policies");
              policiesData = res.data;
              error = res.error;
@@ -1785,7 +1786,7 @@ END $$;\n\n`;
             addLog(`Exported ${counts.policies} RLS policies`, 'success');
           }
         } catch (err: any) {
-          console.error("Error exporting RLS policies:", err);
+          logger.error("Error exporting RLS policies:", err);
           summary.push(`- RLS Policies: FAILED (${err.message})`);
           validationErrors.push(`[RLS Policies] Export failed: ${err.message}`);
           addLog(`Failed to export RLS policies: ${err.message}`, 'error');
@@ -1825,7 +1826,7 @@ END $$;\n\n`;
               }
           }
         } catch (err: any) {
-          console.error("Error exporting edge functions:", err);
+          logger.error("Error exporting edge functions:", err);
           summary.push(`- Edge Functions: FAILED (${err.message})`);
           // Don't fail the whole export for this
           addLog(`Failed to export edge functions: ${err.message}`, 'warning');
@@ -2163,7 +2164,7 @@ END $$;\n\n`;
         }
 
         if (error) {
-          console.error(`Failed to backup ${tableKey}:`, error.message);
+          logger.error(`Failed to backup ${tableKey}:`, error.message);
           continue;
         }
         
@@ -2237,7 +2238,7 @@ END $$;\n\n`;
         
         if (error) {
           // Don't fail completely on individual table errors, just log
-          console.error(`Failed to backup ${tableKey}:`, error.message);
+          logger.error(`Failed to backup ${tableKey}:`, error.message);
           continue;
         }
         
@@ -2611,7 +2612,7 @@ END $$;\n\n`;
                   ? 'Not authorized to run ZIP restore. Use a platform or tenant admin account.'
                   : rawMessage;
                 if (!firstError) firstError = displayMessage;
-                console.error("Batch execution error:", displayMessage);
+                logger.error("Batch execution error:", displayMessage);
                 if (restoreSession) {
                   const errs = batch.map((stmt, idx) => ({
                     rowNumber: i + idx + 1,
@@ -2638,7 +2639,7 @@ END $$;\n\n`;
                         }
                         firstError = msg;
                     }
-                    console.error("Batch partial errors:", errorRows);
+                    logger.error("Batch partial errors:", errorRows);
                 }
                 
                 if (restoreSession && errorRows.length > 0) {
@@ -2656,7 +2657,7 @@ END $$;\n\n`;
             } catch (err: any) {
               failedStatements += batch.length;
               if (!firstError) firstError = err.message;
-              console.error("Batch exception:", err);
+              logger.error("Batch exception:", err);
               if (restoreSession) {
                 const errs = batch.map((stmt, idx) => ({
                   rowNumber: i + idx + 1,
@@ -2712,7 +2713,7 @@ END $$;\n\n`;
               }
             });
           } catch (e) {
-            console.error("Failed to update restore session", e);
+            logger.error("Failed to update restore session", e);
           }
         }
 
@@ -2845,7 +2846,7 @@ END $$;\n\n`;
                     break;
                  } else if (error) {
                     lastError = error;
-                    console.error(`Dry run error for ${key} (attempt ${attempt}):`, error.message);
+                    logger.error(`Dry run error for ${key} (attempt ${attempt}):`, error.message);
                  } else {
                     // Unexpected: RPC returned without error? 
                     // This implies the RPC implementation might have changed to return JSON instead of raising exception.
@@ -2891,7 +2892,7 @@ END $$;\n\n`;
                     break;
                   }
                   lastError = error;
-                  console.error(`Error upserting batch to ${key} (attempt ${attempt}):`, error.message);
+                  logger.error(`Error upserting batch to ${key} (attempt ${attempt}):`, error.message);
                   if (attempt < 3) {
                     await new Promise((resolve) => setTimeout(resolve, attempt * 500));
                   }
@@ -2931,7 +2932,7 @@ END $$;\n\n`;
                     break;
                   }
                   lastError = error;
-                  console.error(`Error inserting batch to ${key} (attempt ${attempt}):`, error.message);
+                  logger.error(`Error inserting batch to ${key} (attempt ${attempt}):`, error.message);
                   if (attempt < 3) {
                     await new Promise((resolve) => setTimeout(resolve, attempt * 500));
                   }
@@ -2977,7 +2978,7 @@ END $$;\n\n`;
                   break;
                 }
                 lastError = error;
-                console.error(`Error restoring batch for ${key} via RPC (attempt ${attempt}):`, error.message);
+                logger.error(`Error restoring batch for ${key} via RPC (attempt ${attempt}):`, error.message);
                 if (attempt < 3) {
                   await new Promise((resolve) => setTimeout(resolve, attempt * 500));
                 }
@@ -3078,7 +3079,7 @@ END $$;\n\n`;
             }
           });
         } catch (e) {
-          console.error("Failed to update restore session", e);
+          logger.error("Failed to update restore session", e);
         }
       }
 

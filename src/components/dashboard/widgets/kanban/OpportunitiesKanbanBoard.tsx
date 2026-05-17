@@ -4,6 +4,7 @@ import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
 import { OpportunityStage, stages, stageLabels, stageColors } from '@/pages/dashboard/opportunities-data';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function OpportunitiesKanbanBoard() {
   const { scopedDb, context } = useCRM();
@@ -28,7 +29,7 @@ export function OpportunitiesKanbanBoard() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Failed to fetch opportunities:', error);
+        logger.error('Failed to fetch opportunities:', error);
         toast.error('Failed to load opportunities');
       } else {
         const kanbanItems: KanbanItem[] = (data || []).map((opp: any) => ({
@@ -58,7 +59,7 @@ export function OpportunitiesKanbanBoard() {
       .eq('id', activeId);
 
     if (error) {
-      console.error('Failed to update opportunity stage:', error);
+      logger.error('Failed to update opportunity stage:', error);
       toast.error('Failed to update stage');
       // Revert logic could be added here
     }

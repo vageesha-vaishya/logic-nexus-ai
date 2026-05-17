@@ -11,6 +11,7 @@ import { Trash2, Plus, Pencil } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 type ServiceTypeRow = {
   id: string;
@@ -68,7 +69,7 @@ export default function ServiceTypes() {
       if (catRes.data) setCategories(catRes.data);
       if (modeRes.data) setModes(modeRes.data);
     } catch (err) {
-      console.error('Failed to fetch metadata:', err);
+      logger.error('Failed to fetch metadata:', err);
     }
   };
 
@@ -86,7 +87,7 @@ export default function ServiceTypes() {
       setTypes((data || []) as ServiceTypeRow[]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch service types:', message);
+      logger.error('Failed to fetch service types:', message);
       toast.error('Failed to fetch service types', { description: message });
     }
   };

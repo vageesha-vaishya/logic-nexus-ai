@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils"
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { logger } from "@/lib/logger";
 
 export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
   const { control, setValue, register, watch, getValues } = useFormContext();
@@ -91,7 +92,7 @@ export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
       // But we must use the CURRENT 'opportunities' from context.
       const selectedOpp = opportunities.find((o: any) => String(o.id) === opportunityId);
       if (selectedOpp) {
-        console.log('Selected Opportunity:', selectedOpp); // Debugging
+        logger.debug('Selected Opportunity:', selectedOpp); // Debugging
         
         // Auto-populate Account if linked
         if (selectedOpp.account_id) {
@@ -143,7 +144,7 @@ export function QuoteHeader({ quoteNumber }: { quoteNumber?: string }) {
                     // Check if we are currently auto-populating (race condition check)
                     // If the accountId was just set by the OTHER useEffect, we might be fine.
                     // But if accountId is STABLE and doesn't match, then we clear.
-                    console.log('Clearing mismatched opportunity');
+                    logger.debug('Clearing mismatched opportunity');
                     setValue('opportunity_id', '', { shouldValidate: true });
                 }
           }

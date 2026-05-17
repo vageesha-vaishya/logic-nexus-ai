@@ -8,6 +8,7 @@
  */
 
 import { ColumnConfig } from './store/useDataGridStore';
+import { logger } from "@/lib/logger";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -268,6 +269,6 @@ export function exportData(
       exportToPDF(data, columns, options);
       break;
     default:
-      console.error(`Unsupported export format: ${options.format}`);
+      logger.error(`Unsupported export format: ${options.format}`);
   }
 }

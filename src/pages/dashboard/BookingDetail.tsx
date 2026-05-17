@@ -20,6 +20,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { logger } from "@/lib/logger";
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   carriers: { name: string } | null;
@@ -49,7 +50,7 @@ export default function BookingDetail() {
       if (error) throw error;
       setBooking(data as any);
     } catch (error) {
-      console.error('Error fetching booking:', error);
+      logger.error('Error fetching booking:', error);
       toast.error('Failed to load booking details');
       navigate('/dashboard/bookings');
     } finally {

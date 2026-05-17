@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { logger } from "@/lib/logger";
 
 export default function PortsLocations() {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export default function PortsLocations() {
             setPorts(seeded);
           }
         } catch (seedErr: any) {
-          console.warn('Ports/locations seed failed:', seedErr?.message || seedErr);
+          logger.warn('Ports/locations seed failed:', seedErr?.message || seedErr);
         }
       }
     } catch (error: any) {

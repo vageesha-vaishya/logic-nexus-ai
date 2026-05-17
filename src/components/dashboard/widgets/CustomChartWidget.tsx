@@ -20,6 +20,7 @@ import {
   Area,
 } from 'recharts';
 import { Loader2 } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -76,7 +77,7 @@ export function CustomChartWidget({ config }: WidgetProps) {
 
         setData(chartData);
       } catch (err: any) {
-        console.error('Failed to load chart data', err);
+        logger.error('Failed to load chart data', err);
         setError(err.message);
       } finally {
         setLoading(false);

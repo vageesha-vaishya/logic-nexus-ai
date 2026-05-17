@@ -42,7 +42,7 @@ describe('AI Quote Transfer Integration', () => {
 
         if (error || !tenant) throw new Error('Failed to fetch tenant');
         tenantId = tenant.id;
-        console.log('Using Tenant ID:', tenantId);
+        logger.debug('Using Tenant ID:', tenantId);
     });
 
     afterAll(async () => {

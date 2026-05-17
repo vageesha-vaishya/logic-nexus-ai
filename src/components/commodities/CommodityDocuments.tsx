@@ -19,6 +19,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { logger } from "@/lib/logger";
 
 interface CommodityDocumentsProps {
   commodityId: string;
@@ -125,7 +126,7 @@ export function CommodityDocuments({ commodityId }: CommodityDocumentsProps) {
         .remove([doc.file_path]);
 
       if (storageError) {
-        console.error('Storage delete error:', storageError);
+        logger.error('Storage delete error:', storageError);
         // Continue to DB delete even if storage fails (orphan cleanup)
       }
 

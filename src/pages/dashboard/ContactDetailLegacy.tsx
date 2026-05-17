@@ -23,6 +23,7 @@ import {
   EnterpriseTable,
   type Column,
 } from '@/components/ui/enterprise';
+import { logger } from "@/lib/logger";
 
 // Column definitions moved outside component to prevent recreation on every render
 const activityColumns: Column<any>[] = [
@@ -64,14 +65,14 @@ export default function ContactDetail() {
         .single();
 
       if (error) {
-        console.error('Supabase error fetching contact:', error);
+        logger.error('Supabase error fetching contact:', error);
         throw error;
       }
 
       setContact(data);
     } catch (error: any) {
       toast.error('Failed to load contact');
-      console.error('Error in fetchContact:', error);
+      logger.error('Error in fetchContact:', error);
     } finally {
       setLoading(false);
     }
@@ -88,7 +89,7 @@ export default function ContactDetail() {
       if (error) throw error;
       setActivities(data || []);
     } catch (err) {
-      console.error('Failed to load activities', err);
+      logger.error('Failed to load activities', err);
     }
   };
 
@@ -105,7 +106,7 @@ export default function ContactDetail() {
         setActiveSegments(data.map((d: any) => d.segment));
       }
     } catch (e) {
-      console.log('Segments module not active');
+      logger.debug('Segments module not active');
     }
   };
 
@@ -164,7 +165,7 @@ export default function ContactDetail() {
       fetchContact();
     } catch (error: any) {
       toast.error('Failed to update contact');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -181,7 +182,7 @@ export default function ContactDetail() {
       navigate('/dashboard/contacts');
     } catch (error: any) {
       toast.error('Failed to delete contact');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

@@ -9,6 +9,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { logger } from "@/lib/logger";
 
 export default function VesselTypes() {
   type VesselType = Database['public']['Tables']['vessel_types']['Row'];
@@ -23,7 +24,7 @@ export default function VesselTypes() {
     const { data, error } = await scopedDb.from('vessel_types').select('*').order('name');
     if (error) {
       toast.error('Failed to load vessel types');
-      console.error(error);
+      logger.error(error);
     } else {
       setTypes(data || []);
     }
@@ -40,7 +41,7 @@ export default function VesselTypes() {
     const { error } = await scopedDb.from('vessel_types').insert(newType);
     if (error) {
       toast.error('Failed to create vessel type');
-      console.error(error);
+      logger.error(error);
     } else {
       toast.success('Vessel type created');
       setIsDialogOpen(false);

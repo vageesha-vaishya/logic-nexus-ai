@@ -163,7 +163,7 @@ export function VendorContractDialog({ open, onOpenChange, vendorId, folders = [
           .upload(path, selectedFile);
 
         if (uploadError) {
-          console.error('File upload failed:', uploadError);
+          logger.error('File upload failed:', uploadError);
           toast.error('Contract created but file upload failed');
         } else {
           // Create Version Record
@@ -180,7 +180,7 @@ export function VendorContractDialog({ open, onOpenChange, vendorId, folders = [
             });
 
           if (versionError) {
-            console.error('Version creation failed:', versionError);
+            logger.error('Version creation failed:', versionError);
             toast.error('Contract created but version record failed');
           } else {
              // Update storage usage
@@ -220,7 +220,7 @@ export function VendorContractDialog({ open, onOpenChange, vendorId, folders = [
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error creating contract:', error);
+      logger.error('Error creating contract:', error);
       const message = error instanceof Error ? error.message : 'Failed to create contract';
       toast.error(message);
     } finally {

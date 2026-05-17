@@ -27,6 +27,7 @@ import {
 } from '@/components/ui/select';
 import { useQuery } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 // Schema Definition
 const cargoFormSchema = z.object({
@@ -118,7 +119,7 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
       .limit(20);
     
     if (error) {
-      console.error(error);
+      logger.error(error);
       return [];
     }
     
@@ -168,7 +169,7 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
         } else {
           // Fallback or error if tenant is mandatory and not nullable
           // In this system, tenant_id is NOT NULL usually.
-          console.warn("No tenant_id found for user");
+          logger.warn("No tenant_id found for user");
         }
 
         // We also need service_id and service_type as they are NOT NULL in schema
@@ -210,7 +211,7 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
       }
       onSuccess();
     } catch (error: any) {
-      console.error(error);
+      logger.error(error);
       toast.error(error.message || "Failed to save cargo");
     }
   };

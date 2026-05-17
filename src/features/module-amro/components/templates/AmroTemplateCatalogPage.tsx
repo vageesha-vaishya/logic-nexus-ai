@@ -38,6 +38,7 @@ import { TemplateCreateEditDialog } from '@/features/module-amro/templates/Templ
 import { TemplateVersionManager } from '@/features/module-amro/templates/TemplateVersionManager';
 import { TemplateCloneDialog } from '@/features/module-amro/templates/TemplateCloneDialog';
 import type { WorkOrderTemplate } from '@/features/module-amro/templates/AmroWorkOrderTemplatesPage';
+import { logger } from "@/lib/logger";
 
 // Use the shared WorkOrderTemplate type from the templates module
 type TemplateRecord = WorkOrderTemplate;
@@ -171,7 +172,7 @@ async function fetchTemplateVersions(
   if (!response.ok) {
     // Log the actual error for debugging
     const errorText = await response.text();
-    console.error('[TemplateVersions] API error:', response.status, errorText);
+    logger.error('[TemplateVersions] API error:', response.status, errorText);
     throw new Error(`Failed to load template versions: ${response.status}`);
   }
 
@@ -320,7 +321,7 @@ export function AmroTemplateCatalogPage() {
       const versions = await fetchTemplateVersions(accessToken, template.id, effectiveTenantId);
       setPreviewVersions(versions);
     } catch (err: any) {
-      console.error('[Preview] Error loading versions:', err);
+      logger.error('[Preview] Error loading versions:', err);
       toast.error(`Failed to load template versions: ${err.message || 'Unknown error'}`);
     } finally {
       setPreviewLoading(false);

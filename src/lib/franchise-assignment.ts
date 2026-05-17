@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 // Assuming you have a supabase client exported from here, or we use a generic one if not found.
 // Based on previous tool usage, likely src/lib/supabase.ts exists.
 import { supabase } from '@/integrations/supabase/client'; 
+import { logger } from "@/lib/logger";
 
 export interface AccountData {
   id?: string;
@@ -57,7 +58,7 @@ export async function assignAccountContactToFranchise(
   });
 
   if (error) {
-    console.error('Error assigning franchisee data:', error);
+    logger.error('Error assigning franchisee data:', error);
     throw new Error(error.message);
   }
 

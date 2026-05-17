@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Shield, ShieldAlert, ShieldCheck, RefreshCw, AlertTriangle } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 interface VendorComplianceProps {
   vendorId: string;
@@ -44,7 +45,7 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
       .order('screened_at', { ascending: false });
 
     if (error) {
-      console.error('Error fetching screenings:', error);
+      logger.error('Error fetching screenings:', error);
       toast.error('Failed to load compliance history');
     } else {
       setScreenings(data || []);
@@ -102,7 +103,7 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
       if (insertError) {
         // If it fails on tenant_id, I'll need to fetch it.
         // Let's try to get tenant_id from the user session in the component.
-        console.error('Insert error:', insertError);
+        logger.error('Insert error:', insertError);
         throw insertError;
       }
 
@@ -110,7 +111,7 @@ export function VendorCompliance({ vendorId, vendorName, vendorCountry }: Vendor
       await fetchScreenings();
 
     } catch (err) {
-      console.error('Screening failed:', err);
+      logger.error('Screening failed:', err);
       toast.error('Screening failed: ' + (err as Error).message);
     } finally {
       setScreeningLoading(false);

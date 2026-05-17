@@ -1,4 +1,5 @@
 import { IClassifier, EmailMetadata, ClassificationResult, QueueRule } from '../types';
+import { logger } from "@/lib/logger";
 
 export class RuleEngine implements IClassifier {
   name = 'RuleEngine';
@@ -24,7 +25,7 @@ export class RuleEngine implements IClassifier {
           };
         }
       } catch (error) {
-        console.error(`Error evaluating rule ${rule.name}:`, error);
+        logger.error(`Error evaluating rule ${rule.name}:`, error);
         // Continue to next rule
       }
     }

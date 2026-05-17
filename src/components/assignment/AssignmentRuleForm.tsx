@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 const ruleSchema = z.object({
   rule_name: z.string().min(1, 'Rule name is required'),
@@ -110,7 +111,7 @@ export function AssignmentRuleForm({ rule, tenantId, onSave, onCancel }: Props) 
       onSave();
     } catch (error: any) {
       toast.error('Failed to save rule');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }

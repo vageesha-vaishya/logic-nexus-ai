@@ -57,6 +57,7 @@ import { QuotationSidebar } from './QuotationSidebar';
 import { DomainSwitcher } from '@/components/navigation/DomainSwitcher';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { CRMModuleViewMode } from '@/hooks/useCRMModuleNavigationState';
+import { logger } from "@/lib/logger";
 
 interface QuotationManagerLayoutProps {
   children: ReactNode;
@@ -132,7 +133,7 @@ export function QuotationManagerLayout({
           setFranchises([]);
         }
       } catch (error) {
-        console.error("Failed to load scope data", error);
+        logger.error("Failed to load scope data", error);
       }
     };
     loadScopeData();

@@ -3,6 +3,7 @@ import { Database } from '@/integrations/supabase/types';
 import { Permission, ROLE_PERMISSIONS } from '@/config/permissions';
 import { ROLE_MATRIX, UserRole } from '@/lib/auth/RoleMatrix';
 import { ScopedDataAccess } from '@/lib/db/access';
+import { logger } from "@/lib/logger";
 
 export interface DbRole {
   id: string;
@@ -375,7 +376,7 @@ export class RoleService {
       .from('auth_roles')
       .upsert(roles, { onConflict: 'id' });
     
-    if (rolesError) console.error('Error seeding roles:', rolesError);
+    if (rolesError) logger.error('Error seeding roles:', rolesError);
 
     // 2. Collect all unique permissions
     const allPermissions = new Set<string>();
@@ -394,7 +395,7 @@ export class RoleService {
       .from('auth_permissions')
       .upsert(permsList, { onConflict: 'id' });
       
-    if (permsError) console.error('Error seeding permissions:', permsError);
+    if (permsError) logger.error('Error seeding permissions:', permsError);
 
     // 4. Upsert Role Permissions
     for (const [roleId, perms] of Object.entries(ROLE_PERMISSIONS)) {
@@ -407,7 +408,7 @@ export class RoleService {
         .from('auth_role_permissions')
         .upsert(links, { onConflict: 'role_id, permission_id' });
         
-      if (linkError) console.error(`Error seeding permissions for ${roleId}:`, linkError);
+      if (linkError) logger.error(`Error seeding permissions for ${roleId}:`, linkError);
     }
   }
 }

@@ -31,6 +31,7 @@ import { OpportunityHistoryTab } from '@/components/crm/OpportunityHistoryTab';
 import { Opportunity, OpportunityHistory, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 import type { Database } from '@/integrations/supabase/types';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
+import { logger } from "@/lib/logger";
 
 export default function OpportunityDetail() {
   const { id } = useParams();
@@ -105,7 +106,7 @@ export default function OpportunityDetail() {
       if (error) throw error;
       setHistory((data || []) as OpportunityHistory[]);
     } catch (error) {
-      console.error('Error fetching history:', error);
+      logger.error('Error fetching history:', error);
     } finally {
       setLoadingHistory(false);
     }
@@ -232,7 +233,7 @@ export default function OpportunityDetail() {
         setQuotes((data || []) as QuoteRow[]);
       } catch (err: unknown) {
         const message = err instanceof Error ? err.message : String(err);
-        console.error('Failed to load related quotes:', message);
+        logger.error('Failed to load related quotes:', message);
       } finally {
         setQuotesLoading(false);
       }

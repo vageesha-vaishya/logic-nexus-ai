@@ -4,6 +4,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { TrendingUp, Star, Activity, User, Truck, Clock, ChevronUp, ChevronDown } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from "@/lib/logger";
 
 interface LeadScoringCardProps {
   leadId: string;
@@ -112,7 +113,7 @@ export function LeadScoringCard({ leadId, score, status, estimatedValue, lastAct
       });
 
     } catch (error) {
-      console.error('Error calculating score breakdown:', error);
+      logger.error('Error calculating score breakdown:', error);
     }
   };
 

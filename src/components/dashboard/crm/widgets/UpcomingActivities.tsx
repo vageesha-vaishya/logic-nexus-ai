@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Calendar, CheckCircle2, Clock } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface Activity {
   id: string;
@@ -33,7 +34,7 @@ export function UpcomingActivities() {
           setActivities(data);
         }
       } catch (error) {
-        console.error('Failed to fetch upcoming activities:', error);
+        logger.error('Failed to fetch upcoming activities:', error);
       } finally {
         setLoading(false);
       }

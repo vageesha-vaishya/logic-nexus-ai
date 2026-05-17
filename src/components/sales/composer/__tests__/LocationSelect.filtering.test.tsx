@@ -1,11 +1,12 @@
 import { render, screen, fireEvent } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { LocationSelect } from '../LocationSelect';
+import { logger } from "@/lib/logger";
 
 // Mock AsyncCombobox since it's a complex component
 vi.mock('@/components/ui/async-combobox', () => ({
   AsyncCombobox: (props: any) => {
-    // console.log('AsyncCombobox props:', props);
+    // logger.debug('AsyncCombobox props:', props);
     const { loader, placeholder } = props;
     return (
       <div data-testid="async-combobox">
@@ -21,7 +22,7 @@ vi.mock('@/components/ui/async-combobox', () => ({
                 if (resultsDiv) resultsDiv.textContent = JSON.stringify(opts);
                 });
             } else {
-                console.error('loader is not a function', loader);
+                logger.error('loader is not a function', loader);
             }
           }}
         />

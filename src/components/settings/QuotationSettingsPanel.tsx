@@ -9,6 +9,7 @@ import { QuotationConfigurationService, BrandingSettings } from '@/services/quot
 import { Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { BrandingSettingsForm } from './BrandingSettingsForm';
+import { logger } from "@/lib/logger";
 
 export function QuotationSettingsPanel() {
   const { scopedDb, context } = useCRM();
@@ -25,7 +26,7 @@ export function QuotationSettingsPanel() {
         const data = await service.getConfiguration(context.tenantId);
         setConfig(data);
       } catch (err) {
-        console.error('Failed to load quotation config:', err);
+        logger.error('Failed to load quotation config:', err);
         toast.error('Failed to load settings');
       } finally {
         setLoading(false);
@@ -73,7 +74,7 @@ export function QuotationSettingsPanel() {
       setConfig(updated);
       toast.success('Branding settings saved');
     } catch (err: any) {
-      console.error('Save branding failed:', err);
+      logger.error('Save branding failed:', err);
       toast.error('Failed to save branding', { description: err?.message });
     } finally {
       setSaving(false);

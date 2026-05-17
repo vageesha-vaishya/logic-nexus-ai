@@ -9,6 +9,7 @@ import { PortsService } from '@/services/PortsService';
 import { Loader2, Upload, FileSpreadsheet, Download } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 interface Rate {
   id: string;
@@ -70,7 +71,7 @@ export function RateSheetsTab() {
 
       setRates(transformedRates);
     } catch (error: any) {
-      console.error('Error fetching rates:', error);
+      logger.error('Error fetching rates:', error);
       toast({
         title: "Error",
         description: "Failed to load rates: " + error.message,
@@ -185,7 +186,7 @@ export function RateSheetsTab() {
       }
 
       if (errors.length > 0) {
-        console.warn("Upload errors:", errors);
+        logger.warn("Upload errors:", errors);
         toast({
           title: "Partial Import Warning",
           description: `${errors.length} rows skipped. First error: ${errors[0]}`,
@@ -211,7 +212,7 @@ export function RateSheetsTab() {
       }
 
     } catch (error: any) {
-      console.error('Upload failed:', error);
+      logger.error('Upload failed:', error);
       toast({
         title: "Upload Failed",
         description: error.message,

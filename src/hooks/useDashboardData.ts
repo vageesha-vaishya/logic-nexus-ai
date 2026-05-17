@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { useCRM } from './useCRM';
 import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { useAssignableUsers } from './useAssignableUsers';
+import { logger } from "@/lib/logger";
 
 export interface LeadItem {
   id: string;
@@ -65,11 +66,11 @@ export function useDashboardData() {
         ]);
 
         if (leadsResult.error) {
-          console.error('Leads fetch error:', leadsResult.error);
+          logger.error('Leads fetch error:', leadsResult.error);
           throw new Error(`Failed to fetch leads: ${leadsResult.error.message}`);
         }
         if (activitiesResult.error) {
-          console.error('Activities fetch error:', activitiesResult.error);
+          logger.error('Activities fetch error:', activitiesResult.error);
           throw new Error(`Failed to fetch activities: ${activitiesResult.error.message}`);
         }
 
@@ -91,7 +92,7 @@ export function useDashboardData() {
             .in('id', leadIds);
 
           if (leadRefsErr) {
-             console.error('Lead refs fetch error:', leadRefsErr);
+             logger.error('Lead refs fetch error:', leadRefsErr);
              // Non-fatal error, just log it
           } else {
             const map: Record<string, string> = {};
@@ -106,7 +107,7 @@ export function useDashboardData() {
         }
 
       } catch (err: any) {
-        console.error('Dashboard fetch error:', err);
+        logger.error('Dashboard fetch error:', err);
         setError(err);
       } finally {
         setLoading(false);

@@ -20,6 +20,7 @@ import {
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { logger } from "@/lib/logger";
 
 // Design Tokens (mapped to Tailwind classes)
 // --nexus-primary-500: text-primary (using css var)
@@ -81,18 +82,18 @@ export function QuotationSidebar() {
       title: 'Quick Actions',
       items: [
         { label: 'New Quote', icon: Plus, action: () => navigate('/dashboard/quotes/new'), shortcut: '⌘+N' },
-        { label: 'Import CSV', icon: Upload, action: () => console.log('Import') },
-        { label: 'Export PDF', icon: FileDown, action: () => console.log('Export') },
-        { label: 'Send Bulk Email', icon: Mail, action: () => console.log('Email') },
+        { label: 'Import CSV', icon: Upload, action: () => logger.debug('Import') },
+        { label: 'Export PDF', icon: FileDown, action: () => logger.debug('Export') },
+        { label: 'Send Bulk Email', icon: Mail, action: () => logger.debug('Email') },
       ]
     },
     {
       title: 'Module Tools',
       items: [
-        { label: 'Discount Calculator', icon: Calculator, action: () => console.log('Calc') },
-        { label: 'Margin Analyzer', icon: TrendingUp, action: () => console.log('Margin') },
-        { label: 'Price History', icon: History, action: () => console.log('History') },
-        { label: 'Duplicate Checker', icon: Copy, action: () => console.log('Dedup') },
+        { label: 'Discount Calculator', icon: Calculator, action: () => logger.debug('Calc') },
+        { label: 'Margin Analyzer', icon: TrendingUp, action: () => logger.debug('Margin') },
+        { label: 'Price History', icon: History, action: () => logger.debug('History') },
+        { label: 'Duplicate Checker', icon: Copy, action: () => logger.debug('Dedup') },
       ]
     }
   ];

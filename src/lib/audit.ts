@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from "@/lib/logger";
 
 export interface AuditLogEntry {
   action: string;
@@ -28,7 +29,7 @@ class AuditService {
 
   async log(entry: AuditLogEntry) {
     if (!this.supabase) {
-      console.warn('AuditService not initialized with Supabase client');
+      logger.warn('AuditService not initialized with Supabase client');
       return;
     }
 
@@ -53,10 +54,10 @@ class AuditService {
         .insert(payload);
 
       if (error) {
-        console.error('Failed to write audit log:', error);
+        logger.error('Failed to write audit log:', error);
       }
     } catch (error) {
-      console.error('Error in AuditService:', error);
+      logger.error('Error in AuditService:', error);
     }
   }
 }

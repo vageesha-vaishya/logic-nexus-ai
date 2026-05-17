@@ -50,7 +50,7 @@ export class QuoteTransformService {
             });
         } catch (error) {
             // Fail silently to avoid interrupting the user flow, but log to console
-            console.error('Failed to write audit log', error);
+            logger.error('Failed to write audit log', error);
         }
     }
 

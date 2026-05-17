@@ -5,6 +5,7 @@ import { Building2, ArrowRight } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { useCRM } from '@/hooks/useCRM';
 import { Skeleton } from '@/components/ui/skeleton';
+import { logger } from "@/lib/logger";
 
 interface Account {
   id: string;
@@ -32,7 +33,7 @@ export function AccountsWidget() {
         if (error) throw error;
         setAccounts(data as Account[]);
       } catch (error) {
-        console.error('Failed to load accounts widget:', error);
+        logger.error('Failed to load accounts widget:', error);
       } finally {
         setLoading(false);
       }

@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 
 import { Input } from '@/components/ui/input';
+import { logger } from "@/lib/logger";
 
 const versionSchema = z.object({
   comments: z.string().optional(),
@@ -92,7 +93,7 @@ export function VendorDocumentVersionDialog({
       if (error) throw error;
       setVersions(data || []);
     } catch (error) {
-      console.error('Error fetching versions:', error);
+      logger.error('Error fetching versions:', error);
       toast.error('Failed to load version history');
     } finally {
       setLoadingVersions(false);
@@ -127,7 +128,7 @@ export function VendorDocumentVersionDialog({
         });
       }
     } catch (error) {
-      console.error('Error downloading version:', error);
+      logger.error('Error downloading version:', error);
       toast.error('Failed to access file');
     }
   };
@@ -200,7 +201,7 @@ export function VendorDocumentVersionDialog({
       fetchVersions();
       onSuccess();
     } catch (error) {
-      console.error('Error uploading version:', error);
+      logger.error('Error uploading version:', error);
       const message = error instanceof Error ? error.message : 'Failed to upload version';
       toast.error(message);
     } finally {

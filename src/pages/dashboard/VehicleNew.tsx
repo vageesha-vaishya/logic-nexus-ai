@@ -6,6 +6,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { VehicleForm } from '@/components/logistics/VehicleForm';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export default function VehicleNew() {
   const navigate = useNavigate();
@@ -30,7 +31,7 @@ export default function VehicleNew() {
       navigate('/dashboard/vehicles');
     } catch (error: any) {
       toast.error('Failed to create vehicle: ' + error.message);
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

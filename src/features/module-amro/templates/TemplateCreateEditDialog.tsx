@@ -33,6 +33,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { EnterpriseMaterialsEditor } from '../components/templates/EnterpriseMaterialsEditor';
 import { EnterpriseToolingEditor } from '../components/templates/EnterpriseToolingEditor';
 import { EnterpriseComplianceEditor } from '../components/templates/EnterpriseComplianceEditor';
+import { logger } from "@/lib/logger";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -318,10 +319,10 @@ export function TemplateCreateEditDialog({
       }
 
       // Debug: Log what we're about to save
-      console.log('=== SAVE DEBUG ===');
-      console.log('Using enterprise materials data:', form.materials_json.length > 0);
-      console.log('Using enterprise tooling data:', form.tooling_json.length > 0);
-      console.log('Using enterprise compliance data:', form.compliance_requirements_json.length > 0);
+      logger.debug('=== SAVE DEBUG ===');
+      logger.debug('Using enterprise materials data:', form.materials_json.length > 0);
+      logger.debug('Using enterprise tooling data:', form.tooling_json.length > 0);
+      logger.debug('Using enterprise compliance data:', form.compliance_requirements_json.length > 0);
 
       const payload: Record<string, unknown> = {
         tenant_id: tenantId || template?.tenant_id || '',
@@ -342,10 +343,10 @@ export function TemplateCreateEditDialog({
         aircraft_model: form.aircraft_model || 'All Models',
       };
 
-      console.log('Final payload materials_json:', payload.materials_json);
-      console.log('Final payload tooling_json:', payload.tooling_json);
-      console.log('Final payload compliance:', payload.compliance_requirements_json);
-      console.log('===================');
+      logger.debug('Final payload materials_json:', payload.materials_json);
+      logger.debug('Final payload tooling_json:', payload.tooling_json);
+      logger.debug('Final payload compliance:', payload.compliance_requirements_json);
+      logger.debug('===================');
 
       const url = isEditMode
         ? `/api/v2/amro/master-data/work_order_templates/${template!.id}`
@@ -362,16 +363,16 @@ export function TemplateCreateEditDialog({
         body: JSON.stringify(payload),
       });
 
-      console.log('API Response status:', response.status);
+      logger.debug('API Response status:', response.status);
       
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        console.error('API Error:', errorData);
+        logger.error('API Error:', errorData);
         throw new Error(errorData.error || errorData.message || `Save failed: ${response.status}`);
       }
 
       const responseData = await response.json();
-      console.log('API Response data:', responseData);
+      logger.debug('API Response data:', responseData);
 
       toast.success(isEditMode ? 'Template updated' : 'Template created');
       onOpenChange(false);

@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/popover';
 import { useCRM } from '@/hooks/useCRM';
 import { Badge } from '@/components/ui/badge';
+import { logger } from "@/lib/logger";
 
 export interface CommoditySelection {
   description: string;
@@ -83,7 +84,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
           .limit(5);
 
         if (fallbackError) {
-          console.error('Master commodity fallback failed:', fallbackError);
+          logger.error('Master commodity fallback failed:', fallbackError);
           throw fallbackError;
         }
 
@@ -98,7 +99,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
         p_limit: 5
       });
       if (error) {
-        console.warn('Master commodity RPC failed, falling back to table search:', error);
+        logger.warn('Master commodity RPC failed, falling back to table search:', error);
         return fetchMasterFallback();
       }
 
@@ -127,7 +128,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
           .limit(10);
 
         if (fallbackError) {
-          console.error('Fallback search failed:', fallbackError);
+          logger.error('Fallback search failed:', fallbackError);
           throw fallbackError;
         }
 
@@ -141,7 +142,7 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       });
 
       if (error) {
-        console.warn('Smart search failed, falling back to simple search:', error);
+        logger.warn('Smart search failed, falling back to simple search:', error);
         return fetchHtsFallback();
       }
 

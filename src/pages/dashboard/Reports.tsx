@@ -6,6 +6,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { dashboardAnalyticsService } from '@/services/dashboardAnalytics';
 import { FinancialMetric, CarrierVolume, DashboardStats } from '@/types/dashboard';
 import { Loader2 } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 export default function Reports() {
   const [loading, setLoading] = useState(true);
@@ -25,7 +26,7 @@ export default function Reports() {
         setVolumeData(volume);
         setStats(dashboardStats);
       } catch (error) {
-        console.error('Failed to load reports data', error);
+        logger.error('Failed to load reports data', error);
       } finally {
         setLoading(false);
       }

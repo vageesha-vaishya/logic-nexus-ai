@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Search, Loader2, Package, Users, FileText, Truck, Building2, User, Activity } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface EntitySelectorProps {
   tenantId: string;
@@ -54,7 +55,7 @@ export function EntitySelector({
         );
         setEntities(data);
       } catch (error) {
-        console.error('Error loading entities:', error);
+        logger.error('Error loading entities:', error);
       } finally {
         setLoading(false);
       }

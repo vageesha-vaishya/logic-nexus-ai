@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useCRM } from './useCRM';
 import { WidgetInstance } from '@/types/dashboardTemplates';
+import { logger } from "@/lib/logger";
 
 export function useDashboardPreferences(defaultWidgets: WidgetInstance[]) {
   const { scopedDb, user, context } = useCRM();
@@ -44,7 +45,7 @@ export function useDashboardPreferences(defaultWidgets: WidgetInstance[]) {
           setWidgets(defaultWidgets);
         }
       } catch (error) {
-        console.error('Failed to fetch dashboard preferences:', error);
+        logger.error('Failed to fetch dashboard preferences:', error);
       } finally {
         setLoading(false);
       }
@@ -72,7 +73,7 @@ export function useDashboardPreferences(defaultWidgets: WidgetInstance[]) {
 
       if (error) throw error;
     } catch (error) {
-      console.error('Failed to save dashboard preferences:', error);
+      logger.error('Failed to save dashboard preferences:', error);
       // Revert on error? Or show toast?
     }
   }, [user?.id, scopedDb, context?.tenantId, context?.franchiseId]);

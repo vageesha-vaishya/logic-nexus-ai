@@ -6,6 +6,7 @@ import { Loader2, ShieldCheck, ShieldAlert, Shield } from 'lucide-react';
 import { ComplianceScreeningService, QuoteScreeningResult, ScreeningMatch } from '@/services/compliance/ComplianceScreeningService';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 interface ScreeningButtonProps {
   quoteId?: string;
@@ -58,7 +59,7 @@ export function ScreeningButton({
                 matches = data.matched_json as any[];
             }
         } catch (e) {
-            console.error('Failed to parse matched_json', e);
+            logger.error('Failed to parse matched_json', e);
         }
 
         setResult({

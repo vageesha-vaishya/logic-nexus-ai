@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Calendar, PhoneCall, Mail, FileText, User } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface TimelineItem {
   id: string;
@@ -45,7 +46,7 @@ export function AccountTimeline() {
           setTimeline(items);
         }
       } catch (error) {
-        console.error('Failed to fetch account timeline:', error);
+        logger.error('Failed to fetch account timeline:', error);
       } finally {
         setLoading(false);
       }

@@ -15,6 +15,7 @@ import { Breadcrumb, BreadcrumbList, BreadcrumbItem, BreadcrumbLink, BreadcrumbS
 import { RoleService, DbRole, DbPermission } from '@/lib/api/roles';
 import { buildShipmentsMatrix, detectConflicts, isSensitiveChange } from '@/lib/auth/PermissionsValidator';
 import { useCRM } from '@/hooks/useCRM';
+import { logger } from "@/lib/logger";
 
 export default function RolesPermissions() {
 const { supabase, context, scopedDb } = useCRM();
@@ -69,7 +70,7 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
         setSelectedRole(rolesData[0].id);
       }
     } catch (error) {
-      console.error('Failed to load roles data:', error);
+      logger.error('Failed to load roles data:', error);
       toast.error('Failed to load roles and permissions');
     } finally {
       setIsLoading(false);
@@ -86,7 +87,7 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
       toast.success('Database seeded with default roles and permissions');
       loadData();
     } catch (error) {
-      console.error('Seeding failed:', error);
+      logger.error('Seeding failed:', error);
       toast.error('Failed to seed database');
     }
   };
@@ -120,7 +121,7 @@ const roleService = useMemo(() => new RoleService(scopedDb), [scopedDb]);
       }));
       setJustification('');
     } catch (error) {
-      console.error('Save failed:', error);
+      logger.error('Save failed:', error);
       toast.error('Failed to save permissions');
     } finally {
       setIsSaving(false);

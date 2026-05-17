@@ -7,6 +7,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { useAuth } from '@/hooks/useAuth';
+import { logger } from "@/lib/logger";
 
 export default function QuoteTemplates() {
   const [editingTemplate, setEditingTemplate] = useState<QuoteTemplate | null | undefined>(undefined);
@@ -68,7 +69,7 @@ export default function QuoteTemplates() {
       toast.success('Quote created from template');
       navigate(`/dashboard/quotes/${data.id}`);
     } catch (error: any) {
-      console.error('Error using template:', error);
+      logger.error('Error using template:', error);
       toast.error(`Failed to create quote: ${error.message}`);
     }
   };

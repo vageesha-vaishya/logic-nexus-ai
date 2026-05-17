@@ -1,5 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { invokeFunction } from '@/lib/supabase-functions';
+import { logger } from "@/lib/logger";
 
 export interface AiAdvisorResponse<T = any> {
   data: T | null;
@@ -26,7 +27,7 @@ export function useAiAdvisor() {
         return { data, error: null };
     }
 
-    console.error("AI Advisor Invocation Error:", error);
+    logger.error("AI Advisor Invocation Error:", error);
 
     // If it's a 401/403 that couldn't be resolved by refresh, return the error
     // so the UI can show the "Session Expired" message.
@@ -38,7 +39,7 @@ export function useAiAdvisor() {
     try {
         const clientSideKey = import.meta.env.VITE_OPENAI_API_KEY;
         if (action === 'generate_smart_quotes' && clientSideKey && clientSideKey.startsWith('sk-')) {
-            console.warn("[AI-Advisor] Network error or Supabase unreachable. Attempting Client-Side OpenAI Call...");
+            logger.warn("[AI-Advisor] Network error or Supabase unreachable. Attempting Client-Side OpenAI Call...");
             
                  const { origin, destination, mode, commodity, weight, volume, containerQty, containerSize, containerType } = payload;
                  
@@ -100,16 +101,16 @@ Requirements:
                      content.market_analysis = "[Client-Side AI Bypass] " + (content.market_analysis || "");
                      return { data: content, error: null };
                  } else {
-                     console.error("Client-Side OpenAI Failed:", await response.text());
+                     logger.error("Client-Side OpenAI Failed:", await response.text());
                  }
         }
     } catch (clientErr) {
-        console.error("Client-Side OpenAI Error:", clientErr);
+        logger.error("Client-Side OpenAI Error:", clientErr);
     }
 
     // Fallback 2: If network fails (e.g. "Failed to fetch") AND Client AI fails, return mock data
     if (action === 'generate_smart_quotes') {
-            console.warn("[AI-Advisor] Network error detected. Returning MOCK data for Smart Quotes.");
+            logger.warn("[AI-Advisor] Network error detected. Returning MOCK data for Smart Quotes.");
             const mockData = {
                 options: [
                     {

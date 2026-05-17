@@ -18,6 +18,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from "@/components/ui/use-toast";
 
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger";
 
 interface QuoteDetailViewProps {
     quote: any; // Ideally typed
@@ -53,7 +54,7 @@ export function QuoteDetailView({ quote, compact = false, defaultAnalysisView = 
                 navigate(`/dashboard/shipments/${shipmentId}`);
             }
         } catch (error: any) {
-            console.error('Conversion error:', error);
+            logger.error('Conversion error:', error);
             toast({
                 title: "Error",
                 description: error.message || "Failed to convert quote to shipment",

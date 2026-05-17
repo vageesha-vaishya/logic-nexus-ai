@@ -11,6 +11,7 @@ import { useLeadDuplicateCheck } from "@/hooks/useLeadDuplicateCheck";
 import { extractEmailAddress } from "./email-to-lead-helpers";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 interface Email {
   id: string;
@@ -97,7 +98,7 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
         setIsLocked(false);
       }
     } catch (error) {
-      console.error("Failed to check security requirements", error);
+      logger.error("Failed to check security requirements", error);
     }
   };
 
@@ -129,7 +130,7 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
         toast.success("Content Decrypted", { description: "Identity verified successfully." });
       }
     } catch (error: any) {
-      console.error("Decryption failed:", error);
+      logger.error("Decryption failed:", error);
       toast.error("Access Denied", { description: error.message });
     } finally {
       setIsDecrypting(false);
@@ -155,7 +156,7 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
       
       onRefresh();
     } catch (error: any) {
-      console.error('Scan failed:', error);
+      logger.error('Scan failed:', error);
       toast.error("Scan Failed", { description: error.message });
     } finally {
       setIsScanning(false);
@@ -190,7 +191,7 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
       URL.revokeObjectURL(url);
       toast.success("Download started");
     } catch (err: any) {
-      console.error('Download failed:', err);
+      logger.error('Download failed:', err);
       toast.error("Download failed", {
         description: err.message || "Could not download attachment"
       });

@@ -11,6 +11,7 @@ import { toast } from 'sonner';
 import { Loader2, ArrowRight } from 'lucide-react';
 import { H1 } from '@/components/ui/Heading';
 import { FormActions } from '@/components/ui/FormActions';
+import { logger } from "@/lib/logger";
 
 export default function BookingNew() {
   const navigate = useNavigate();
@@ -31,7 +32,7 @@ export default function BookingNew() {
   const { data: quotes = [], isLoading: quotesLoading } = useQuery({
     queryKey: ['quotes', 'approved'],
     queryFn: async () => {
-      console.log('Fetching approved quotes...');
+      logger.debug('Fetching approved quotes...');
       const { data, error } = await scopedDb
         .from('quotes')
         .select('id, quote_number, tenant_id, total_amount, currency, accounts(name)')
@@ -39,7 +40,7 @@ export default function BookingNew() {
         .order('created_at', { ascending: false });
       
       if (error) throw error;
-      console.log('Fetched approved quotes:', data?.length);
+      logger.debug('Fetched approved quotes:', data?.length);
       return data as any[];
     },
   });
@@ -54,7 +55,7 @@ export default function BookingNew() {
         // Check if we already have it
         if (quotes.find(q => q.id === selectedQuoteId)) return null;
 
-        console.log('Fetching fallback quote:', selectedQuoteId);
+        logger.debug('Fetching fallback quote:', selectedQuoteId);
         const { data, error } = await scopedDb
             .from('quotes')
             .select('id, quote_number, tenant_id, total_amount, currency, status, accounts(name)')
@@ -62,7 +63,7 @@ export default function BookingNew() {
             .single();
         
         if (error) {
-            console.error('Error fetching fallback quote:', error);
+            logger.error('Error fetching fallback quote:', error);
             return null;
         }
         return data;
@@ -89,7 +90,7 @@ export default function BookingNew() {
         toast.success('Booking created successfully');
         navigate(`/dashboard/bookings/${data.id}`);
     } catch (error: any) {
-        console.error('Error creating booking:', error);
+        logger.error('Error creating booking:', error);
         toast.error('Failed to create booking: ' + error.message);
     } finally {
         setLoading(false);
@@ -117,7 +118,7 @@ export default function BookingNew() {
         toast.success('Booking created from quote');
         navigate(`/dashboard/bookings/${bookingId}`);
     } catch (error: any) {
-        console.error('Error creating booking from quote:', error);
+        logger.error('Error creating booking from quote:', error);
         toast.error('Failed to create booking: ' + error.message);
     } finally {
         setLoading(false);

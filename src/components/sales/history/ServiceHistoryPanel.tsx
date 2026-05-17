@@ -6,6 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { format } from 'date-fns';
 import { History, ArrowRight, User } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface AuditLog {
   id: string;
@@ -66,7 +67,7 @@ export function ServiceHistoryPanel({ serviceId, resourceType = 'services' }: Se
       if (error) throw error;
       setHistory(data || []);
     } catch (error) {
-      console.error('Error fetching history:', error);
+      logger.error('Error fetching history:', error);
     } finally {
       setLoading(false);
     }

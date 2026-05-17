@@ -11,6 +11,7 @@ import { Switch } from '@/components/ui/switch';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 const carrierSchema = z.object({
   carrier_name: z.string().min(1, 'Carrier name is required'),
@@ -65,7 +66,7 @@ export function CarrierForm({ carrierId, onSuccess }: { carrierId?: string; onSu
         if (error) throw error;
         setTenants(data || []);
       } catch (err: any) {
-        console.warn('Failed to fetch tenants:', err?.message || err);
+        logger.warn('Failed to fetch tenants:', err?.message || err);
       }
     };
     fetchTenants();

@@ -1,4 +1,5 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from "@/lib/logger";
 
 export interface VersionMetadata {
   created_by: string;
@@ -104,7 +105,7 @@ export class QuotationVersionService {
       .eq('id', quoteId);
 
     if (updateError) {
-      console.warn('Failed to update current_version_id on quote', updateError);
+      logger.warn('Failed to update current_version_id on quote', updateError);
       // We don't throw here to avoid failing the version save, but it's an inconsistency.
     }
 

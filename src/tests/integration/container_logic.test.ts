@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { Database } from '@/integrations/supabase/types';
 import fs from 'fs';
 import path from 'path';
+import { logger } from "@/lib/logger";
 
 // Helper to load env
 function loadEnv() {
@@ -23,7 +24,7 @@ function loadEnv() {
       });
     }
   } catch (e) {
-    console.warn('Failed to load .env file', e);
+    logger.warn('Failed to load .env file', e);
   }
 }
 
@@ -83,7 +84,7 @@ runTests('Enhanced Container Logic Integration', () => {
     } else {
       // Create a dummy tenant if allowed, or skip
       // For this test suite to work, we assume a tenant exists or foreign key checks might fail
-      console.warn('No tenant found. Tests requiring tenant_id might fail.');
+      logger.warn('No tenant found. Tests requiring tenant_id might fail.');
       tenantId = '00000000-0000-0000-0000-000000000000';
     }
 

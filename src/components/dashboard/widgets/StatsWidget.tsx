@@ -3,6 +3,7 @@ import { WidgetProps } from '@/types/dashboard';
 import { StatsCards, StatItem } from '@/components/dashboard/StatsCards';
 import { dashboardAnalyticsService } from '@/services/dashboardAnalytics';
 import { Ship, DollarSign, Activity, AlertCircle } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 export function StatsWidget({ config }: WidgetProps) {
   const [stats, setStats] = useState<StatItem[]>([]);
@@ -64,7 +65,7 @@ export function StatsWidget({ config }: WidgetProps) {
         ];
         setStats(newStats);
       } catch (error) {
-        console.error("Failed to load dashboard stats", error);
+        logger.error("Failed to load dashboard stats", error);
       } finally {
         setLoading(false);
       }

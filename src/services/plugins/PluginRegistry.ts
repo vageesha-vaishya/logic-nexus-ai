@@ -1,5 +1,6 @@
 import { IPlugin } from './IPlugin';
 import { CoreQuoteService } from '../quotation/CoreQuoteService';
+import { logger } from "@/lib/logger";
 
 export class PluginRegistry {
   private static plugins: Map<string, IPlugin> = new Map();
@@ -13,7 +14,7 @@ export class PluginRegistry {
       CoreQuoteService.registerEngine(plugin.domainCode, plugin.getQuotationEngine());
     }
     
-    console.log(`[PluginRegistry] Registered: ${plugin.name} (${plugin.id})`);
+    logger.debug(`[PluginRegistry] Registered: ${plugin.name} (${plugin.id})`);
   }
 
   static getPlugin(id: string): IPlugin | undefined {

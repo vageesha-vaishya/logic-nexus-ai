@@ -5,6 +5,7 @@ import { SharedCargoInput } from './SharedCargoInput';
 import { CargoItem } from '@/types/cargo';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
 import React from 'react';
+import { logger } from "@/lib/logger";
 
 // Mock useContainerRefs
 const mockContainerTypes = [
@@ -128,23 +129,23 @@ describe('SharedCargoInput', () => {
   };
 
   it('initializes container combos when type is container', async () => {
-    console.log('Test starting: initializes container combos');
+    logger.debug('Test starting: initializes container combos');
     const onChange = vi.fn();
     const { rerender } = render(<SharedCargoInput value={defaultValue} onChange={onChange} />);
 
-    console.log('Rendered component');
+    logger.debug('Rendered component');
 
     // Should trigger useEffect to initialize combo
     await waitFor(() => {
-      console.log('Waiting for onChange...');
+      logger.debug('Waiting for onChange...');
       expect(onChange).toHaveBeenCalled();
     }, { timeout: 2000 });
 
-    console.log('onChange called');
+    logger.debug('onChange called');
 
     // Check the payload of the first call
     const callArgs = onChange.mock.calls[0][0];
-    console.log('Call args:', JSON.stringify(callArgs, null, 2));
+    logger.debug('Call args:', JSON.stringify(callArgs, null, 2));
     
     expect(callArgs.containerCombos).toHaveLength(1);
     expect(callArgs.containerCombos[0].typeId).toBe(''); // Explicit selection required

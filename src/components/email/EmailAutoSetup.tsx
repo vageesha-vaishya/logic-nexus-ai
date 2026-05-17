@@ -8,6 +8,7 @@ import { Loader2, Mail, CheckCircle2, AlertCircle, ArrowRight } from "lucide-rea
 import { initiateGoogleOAuth, initiateMicrosoftOAuth } from "@/lib/oauth";
 import { useCRM } from "@/hooks/useCRM";
 import { supabase } from "@/integrations/supabase/client";
+import { logger } from "@/lib/logger";
 
 interface EmailAutoSetupProps {
   onSuccess: () => void;
@@ -39,7 +40,7 @@ export function EmailAutoSetup({ onSuccess, onManual, onClose }: EmailAutoSetupP
       // Use invokeAnonymous to bypass potentially broken User Session for public discovery
       const data = await invokeAnonymous("discover-email-settings", { email });
 
-      console.log("Discovery Result:", data);
+      logger.debug("Discovery Result:", data);
 
       if (data.provider === 'unknown') {
         toast({
@@ -59,7 +60,7 @@ export function EmailAutoSetup({ onSuccess, onManual, onClose }: EmailAutoSetupP
         setStep('password');
       }
     } catch (err: any) {
-      console.error("Discovery failed:", err);
+      logger.error("Discovery failed:", err);
       let message = err.message || "Failed to discover settings";
       if (message === "Failed to fetch") {
         message = "Network error. Please check your internet connection or try again.";
@@ -152,7 +153,7 @@ export function EmailAutoSetup({ onSuccess, onManual, onClose }: EmailAutoSetupP
       }, 1500);
 
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       setError(err.message || "Failed to connect account");
       setStep('password'); // Go back to password step
     }

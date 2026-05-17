@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { logger } from "@/lib/logger";
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884d8', '#82ca9d'];
 
@@ -90,7 +91,7 @@ export default function ContainerAnalytics() {
         setKpis({ totalContainers, totalTeu, distinctTypes });
 
       } catch (err) {
-        console.error('Failed to load container analytics:', err);
+        logger.error('Failed to load container analytics:', err);
       } finally {
         setLoading(false);
       }

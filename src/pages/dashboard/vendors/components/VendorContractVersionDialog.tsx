@@ -91,7 +91,7 @@ export function VendorContractVersionDialog({
       if (error) throw error;
       setVersions(data || []);
     } catch (error) {
-      console.error('Error fetching versions:', error);
+      logger.error('Error fetching versions:', error);
       toast.error('Failed to load version history');
     } finally {
       setLoadingVersions(false);
@@ -126,7 +126,7 @@ export function VendorContractVersionDialog({
         });
       }
     } catch (error) {
-      console.error('Error downloading version:', error);
+      logger.error('Error downloading version:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to download file');
     }
   };
@@ -209,7 +209,7 @@ export function VendorContractVersionDialog({
       fetchVersions(); // Refresh list
       onSuccess();
     } catch (error) {
-      console.error('Error uploading version:', error);
+      logger.error('Error uploading version:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to upload version');
     } finally {
       setLoading(false);

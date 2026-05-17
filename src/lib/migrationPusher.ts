@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { invokeFunction } from "@/lib/supabase-functions";
+import { logger } from "@/lib/logger";
 
 export interface MigrationFile {
   name: string;
@@ -32,7 +33,7 @@ export async function pushMigrationsToTarget(
   dryRun: boolean = false,
   onProgress?: (current: number, total: number, name: string) => void
 ): Promise<PushResponse> {
-  console.log(`[pushMigrationsToTarget] Pushing ${migrations.length} migrations (dryRun: ${dryRun})`);
+  logger.debug(`[pushMigrationsToTarget] Pushing ${migrations.length} migrations (dryRun: ${dryRun})`);
   
   const { data, error } = await invokeFunction('push-migrations-to-target', {
     body: {
@@ -42,7 +43,7 @@ export async function pushMigrationsToTarget(
   });
 
   if (error) {
-    console.error('[pushMigrationsToTarget] Error:', error);
+    logger.error('[pushMigrationsToTarget] Error:', error);
     throw error;
   }
 
@@ -56,7 +57,7 @@ export async function pushMigrationsToTarget(
 export async function fetchMigrationContent(fileName: string): Promise<string | null> {
   // This would typically fetch from the repository
   // For now, return null to indicate not found
-  console.log(`[fetchMigrationContent] Fetching: ${fileName}`);
+  logger.debug(`[fetchMigrationContent] Fetching: ${fileName}`);
   return null;
 }
 

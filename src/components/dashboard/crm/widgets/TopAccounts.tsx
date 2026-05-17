@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { EnterpriseTable, type Column } from '@/components/ui/enterprise';
+import { logger } from "@/lib/logger";
 
 interface Account {
   id: string;
@@ -30,7 +31,7 @@ export function TopAccounts() {
         setAccounts(data || []);
         setError(null);
       } catch (err) {
-        console.error('Failed to fetch accounts:', err);
+        logger.error('Failed to fetch accounts:', err);
         setError('Failed to load accounts');
       } finally {
         setLoading(false);
@@ -66,7 +67,7 @@ export function TopAccounts() {
       columns={columns}
       data={accounts}
       rowKey={(row) => row.id}
-      onRowClick={(row) => console.log('Selected:', row)}
+      onRowClick={(row) => logger.debug('Selected:', row)}
       emptyState={
         <p className="text-center py-8 text-gray-500">No accounts found</p>
       }

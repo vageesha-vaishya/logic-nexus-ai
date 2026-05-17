@@ -3,6 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, Train, Ship, Plane, Truck } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface VendorPreferredCarriersProps {
   vendorId: string;
@@ -35,7 +36,7 @@ export function VendorPreferredCarriers({ vendorId }: VendorPreferredCarriersPro
       // Use type assertion compatible with the expected data structure
       setCarriers((data as unknown as PreferredCarrier[]) || []);
       } catch (err) {
-        console.error('Failed to fetch preferred carriers:', err);
+        logger.error('Failed to fetch preferred carriers:', err);
       } finally {
         setLoading(false);
       }

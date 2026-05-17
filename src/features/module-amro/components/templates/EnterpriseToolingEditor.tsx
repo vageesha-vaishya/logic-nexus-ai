@@ -30,6 +30,7 @@ import {
 } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { logger } from "@/lib/logger";
 
 interface ToolingRegistry {
   id: string;
@@ -74,14 +75,14 @@ export function EnterpriseToolingEditor({
   const searchTools = useCallback(async (query: string) => {
     setSearching(true);
     try {
-      console.log('[TOOLING SEARCH] Starting search...');
+      logger.debug('[TOOLING SEARCH] Starting search...');
       
       // First check if we can query the table at all
       const { data: countData, error: countError } = await supabase
         .from('amro_tooling_registry')
         .select('*', { count: 'exact', head: true });
       
-      console.log('[TOOLING SEARCH] Table check:', { count: countData?.length, error: countError });
+      logger.debug('[TOOLING SEARCH] Table check:', { count: countData?.length, error: countError });
 
       let q = supabase
         .from('amro_tooling_registry')
@@ -94,14 +95,14 @@ export function EnterpriseToolingEditor({
 
       const { data, error } = await q;
 
-      console.log('[TOOLING SEARCH] Query result:', { 
+      logger.debug('[TOOLING SEARCH] Query result:', { 
         rowCount: data?.length || 0, 
         error: error?.message || null,
         firstRow: data?.[0] || null
       });
 
       if (error) {
-        console.error('[TOOLING SEARCH] Error:', error);
+        logger.error('[TOOLING SEARCH] Error:', error);
         setSearchResults([]);
         toast.error(`Failed to search tools: ${error.message}`);
       } else {
@@ -111,7 +112,7 @@ export function EnterpriseToolingEditor({
         }
       }
     } catch (error: any) {
-      console.error('[TOOLING SEARCH] Exception:', error);
+      logger.error('[TOOLING SEARCH] Exception:', error);
       setSearchResults([]);
       toast.error(`Search exception: ${error.message}`);
     } finally {
@@ -123,7 +124,7 @@ export function EnterpriseToolingEditor({
   const addTool = useCallback((tool: ToolingRegistry) => {
     const exists = tools.find((t) => t.tool_id === tool.id);
     if (exists) {
-      console.log('Tool already exists:', tool.tool_code);
+      logger.debug('Tool already exists:', tool.tool_code);
       return;
     }
 
@@ -139,13 +140,13 @@ export function EnterpriseToolingEditor({
     };
 
     const updatedTools = [...tools, newTool];
-    console.log('=== TOOLING ADD ===');
-    console.log('Adding tool:', tool.tool_code);
-    console.log('Updated tools array:', updatedTools);
-    console.log('Calling onChange with:', updatedTools);
+    logger.debug('=== TOOLING ADD ===');
+    logger.debug('Adding tool:', tool.tool_code);
+    logger.debug('Updated tools array:', updatedTools);
+    logger.debug('Calling onChange with:', updatedTools);
     onChange(updatedTools);
-    console.log('onChange called successfully');
-    console.log('====================');
+    logger.debug('onChange called successfully');
+    logger.debug('====================');
   }, [tools, onChange]);
 
   // Update tool

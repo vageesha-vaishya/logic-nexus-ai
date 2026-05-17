@@ -4,6 +4,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useDebug } from '@/hooks/useDebug';
+import { logger } from "@/lib/logger";
 
 class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError: boolean; error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {
@@ -16,7 +17,7 @@ class ErrorBoundary extends Component<{ children: React.ReactNode }, { hasError:
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("LogTestPage Error Boundary caught error:", error, errorInfo);
+    logger.error("LogTestPage Error Boundary caught error:", error, errorInfo);
   }
 
   render() {

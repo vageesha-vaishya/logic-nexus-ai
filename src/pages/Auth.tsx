@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import sosLogo from '@/assets/sos-logo.png';
+import { logger } from "@/lib/logger";
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -125,12 +126,12 @@ export default function Auth() {
       const { error } = result;
 
       if (error) {
-        console.error('Sign in error:', error);
+        logger.error('Sign in error:', error);
 
         const isAdminEmail = email.trim().toLowerCase() === 'bahuguna.vimal@gmail.com';
         if (error.message.includes('Invalid login credentials') && isAdminEmail) {
           try {
-            console.log('Attempting to seed admin account...');
+            logger.debug('Attempting to seed admin account...');
             const seedResult = await Promise.race([
               invokeFunction('seed-platform-admin', {
                 body: { email, password }
@@ -141,7 +142,7 @@ export default function Auth() {
             const { data, error: seedError } = seedResult;
 
             if (seedError) {
-              console.error('Seeding error:', seedError);
+              logger.error('Seeding error:', seedError);
               toast.error('Admin account not found. Use Setup to create it.');
             } else if (data?.success) {
               toast.success('Admin created. Signing you in...');
@@ -153,7 +154,7 @@ export default function Auth() {
               }
             }
           } catch (e: any) {
-            console.error('Seeding failed:', e);
+            logger.error('Seeding failed:', e);
             toast.error('Setup required. Please run Platform Setup.');
           }
         } else if (error.message.includes('Email not confirmed')) {
@@ -172,7 +173,7 @@ export default function Auth() {
       toast.success('Welcome back!');
       navigate(from, { replace: true });
     } catch (err: any) {
-      console.error('Login process error:', err);
+      logger.error('Login process error:', err);
       toast.error(err.message || 'An unexpected error occurred');
       setLoading(false);
     }

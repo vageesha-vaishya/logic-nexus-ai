@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 interface RecentItem {
   id: string;
@@ -28,7 +29,7 @@ export function RecentlyViewed({ className }: { className?: string }) {
       try {
         setRecentItems(JSON.parse(stored));
       } catch (error) {
-        console.error("Failed to parse recent items:", error);
+        logger.error("Failed to parse recent items:", error);
       }
     }
   }, []);
@@ -109,7 +110,7 @@ export function useRecentlyViewed() {
       try {
         items = JSON.parse(stored);
       } catch (error) {
-        console.error("Failed to parse recent items:", error);
+        logger.error("Failed to parse recent items:", error);
       }
     }
 

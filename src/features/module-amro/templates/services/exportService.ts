@@ -13,6 +13,7 @@
 import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
+import { logger } from "@/lib/logger";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -226,7 +227,7 @@ export async function exportToCSV(
       rowCount: templates.length,
     };
   } catch (error: any) {
-    console.error('CSV export failed:', error);
+    logger.error('CSV export failed:', error);
     return {
       success: false,
       fileName: '',
@@ -288,7 +289,7 @@ export async function exportToExcel(
       rowCount: templates.length,
     };
   } catch (error: any) {
-    console.error('Excel export failed:', error);
+    logger.error('Excel export failed:', error);
     return {
       success: false,
       fileName: '',
@@ -312,7 +313,7 @@ export async function exportToPDF(
   try {
     // For large datasets, warn user
     if (templates.length > 1000) {
-      console.warn('PDF export for large datasets may be slow. Consider using CSV or Excel.');
+      logger.warn('PDF export for large datasets may be slow. Consider using CSV or Excel.');
     }
 
     // Transform data to rows
@@ -421,7 +422,7 @@ export async function exportToPDF(
       rowCount: templates.length,
     };
   } catch (error: any) {
-    console.error('PDF export failed:', error);
+    logger.error('PDF export failed:', error);
     return {
       success: false,
       fileName: '',

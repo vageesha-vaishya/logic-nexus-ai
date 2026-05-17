@@ -24,6 +24,7 @@ import { useAiAdvisor } from '@/hooks/useAiAdvisor';
 import { useToast } from '@/hooks/use-toast';
 import { RateSheetsTab } from '@/components/rates/RateSheetsTab';
 import { useTransportModes, getTransportModeIcon } from '@/hooks/useTransportModes';
+import { logger } from "@/lib/logger";
 
 export default function RateManagement() {
   const [activeTab, setActiveTab] = useState('analysis');
@@ -89,7 +90,7 @@ export default function RateManagement() {
         });
       }
     } catch (err: any) {
-      console.error("Analysis Error:", err);
+      logger.error("Analysis Error:", err);
       toast({
         title: "Analysis Failed",
         description: err.message || "Could not generate analysis.",

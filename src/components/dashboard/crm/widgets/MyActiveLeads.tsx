@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { EnterpriseTable, type Column } from '@/components/ui/enterprise';
+import { logger } from "@/lib/logger";
 
 interface Contact {
   id: string;
@@ -32,7 +33,7 @@ export function MyActiveLeads() {
         setLeads(data || []);
         setError(null);
       } catch (err) {
-        console.error('Failed to fetch leads:', err);
+        logger.error('Failed to fetch leads:', err);
         setError('Failed to load leads');
       } finally {
         setLoading(false);
@@ -63,7 +64,7 @@ export function MyActiveLeads() {
       columns={columns}
       data={leads}
       rowKey={(row) => row.id}
-      onRowClick={(row) => console.log('Selected:', row)}
+      onRowClick={(row) => logger.debug('Selected:', row)}
       emptyState={
         <p className="text-center py-8 text-gray-500">No leads found</p>
       }

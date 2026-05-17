@@ -22,6 +22,7 @@ import {
 } from 'recharts';
 import { Loader2, TrendingUp, DollarSign, Activity, Calendar } from "lucide-react";
 import { computeComposerCompleteness } from '../composer/completeness';
+import { logger } from "@/lib/logger";
 
 interface QuoteAnalyticsProps {
   quotes: Quote[];
@@ -136,7 +137,7 @@ export function QuoteAnalytics({ quotes }: QuoteAnalyticsProps) {
           setHistoryData(processed);
         }
       } catch (err) {
-        console.error("Failed to fetch history", err);
+        logger.error("Failed to fetch history", err);
       } finally {
         setLoadingHistory(false);
       }

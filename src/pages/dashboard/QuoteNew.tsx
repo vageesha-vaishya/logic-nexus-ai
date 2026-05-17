@@ -47,7 +47,7 @@ function QuoteNewInner() {
                 navigate('/dashboard/quotes/new-legacy', { replace: true });
             }
         } catch (e) {
-            console.error('Failed to check quote config', e);
+            logger.error('Failed to check quote config', e);
         }
     };
     checkConfig();

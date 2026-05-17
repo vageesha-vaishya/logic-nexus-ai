@@ -1,6 +1,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { createDebugLogger } from '@/lib/debug-logger';
+import { logger } from "@/lib/logger";
 
 export interface PricingRequest {
   service_id: string;
@@ -213,7 +214,7 @@ export class PricingService {
 
       } catch (err) {
         lastError = err;
-        console.warn(`Pricing RPC attempt ${attempt + 1} failed:`, err);
+        logger.warn(`Pricing RPC attempt ${attempt + 1} failed:`, err);
         if (attempt < retries) {
           // Exponential backoff: 200ms, 400ms, 800ms
           await wait(200 * Math.pow(2, attempt));
@@ -223,7 +224,7 @@ export class PricingService {
     }
 
     // 2. Fallback: Client-side Calculation (if RPC fails or logic is too complex for SQL)
-    console.warn('RPC failed or returned no data after retries, falling back to client-side calculation', lastError);
+    logger.warn('RPC failed or returned no data after retries, falling back to client-side calculation', lastError);
     
     // Fetch Service & Tiers
     const { data: service } = await this.supabase
@@ -324,7 +325,7 @@ export class PricingService {
 
       return result;
     } catch (error) {
-      console.error('Pricing calculation failed, falling back to safe defaults', error);
+      logger.error('Pricing calculation failed, falling back to safe defaults', error);
       return { sellPrice: safeCost, buyPrice: safeCost, marginAmount: 0, marginPercent: 0 };
     }
   }

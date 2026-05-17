@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart3, TrendingUp, Users, Clock } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function AssignmentAnalytics() {
   const { supabase, context } = useCRM();
@@ -74,7 +75,7 @@ export function AssignmentAnalytics() {
       });
     } catch (error: any) {
       toast.error('Failed to load analytics');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }

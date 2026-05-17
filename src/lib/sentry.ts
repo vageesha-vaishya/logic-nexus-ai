@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/react";
+import { logger } from "@/lib/logger";
 
 // Sampling tuned per §16.11 G-4 (2026-05-15). Production economics:
 //   tracesSampleRate 1.0 → blows Sentry quota at >10k users
@@ -28,6 +29,6 @@ export const initSentry = () => {
       replaysOnErrorSampleRate: 1.0,
     });
   } else {
-    console.warn("Sentry DSN not found. Sentry is disabled.");
+    logger.warn("Sentry DSN not found. Sentry is disabled.");
   }
 };

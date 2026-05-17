@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { invokeFunction, emitEvent } from '@/lib/supabase-functions';
 import { EmitEventSchema } from '@/lib/schemas/events';
 import { TemplateSelector } from './quotation-versions/TemplateSelector';
+import { logger } from "@/lib/logger";
 
 interface SendQuoteDialogProps {
   quoteId: string;
@@ -37,7 +38,7 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
 
     try {
       // 1. Generate PDF
-      console.log('[SendQuote] Generating PDF...');
+      logger.debug('[SendQuote] Generating PDF...');
       const { data: pdfData, error: pdfError } = await invokeFunction('generate-quote-pdf', {
         body: {
           quoteId,
@@ -61,7 +62,7 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
       }
 
       // 2. Send Email
-      console.log('[SendQuote] Sending email...');
+      logger.debug('[SendQuote] Sending email...');
       const { data: emailData, error: emailError } = await invokeFunction('send-email', {
         body: {
           to: recipient,
@@ -94,7 +95,7 @@ export function SendQuoteDialog({ quoteId, quoteNumber, versionId, customerEmail
       if (onSuccess) onSuccess();
 
     } catch (error: any) {
-      console.error('[SendQuote] Error:', error);
+      logger.error('[SendQuote] Error:', error);
       toast.error('Failed to send quote', { 
         id: toastId,
         description: error.message 

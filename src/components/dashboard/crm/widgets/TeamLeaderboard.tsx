@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Users, TrendingUp } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface TeamMember {
   id: string;
@@ -69,7 +70,7 @@ export function TeamLeaderboard() {
           setTeamMembers(teamData.slice(0, 5)); // Top 5
         }
       } catch (error) {
-        console.error('Failed to fetch team performance:', error);
+        logger.error('Failed to fetch team performance:', error);
       } finally {
         setLoading(false);
       }

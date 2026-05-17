@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 
 export interface TelecomPlan {
   id: string;
@@ -51,7 +52,7 @@ const TENANT_SUBSCRIBERS: Record<string, Subscriber[]> = {
 
 export class TelecomMockService {
   private static async simulateNetwork(tenantId: string): Promise<void> {
-    console.log(`[TelecomMockService] Processing request for Tenant: ${tenantId}`);
+    logger.debug(`[TelecomMockService] Processing request for Tenant: ${tenantId}`);
     const delay = Math.random() * 300 + 50; 
     await new Promise(resolve => setTimeout(resolve, delay));
     
@@ -82,7 +83,7 @@ export class TelecomMockService {
     const plan = plans.find(p => p.id === planId);
     if (!plan) throw new Error('Invalid Plan ID for this Tenant');
 
-    console.log(`[TelecomMockService] Activating Plan ${plan.name} for ${msisdn}`);
+    logger.debug(`[TelecomMockService] Activating Plan ${plan.name} for ${msisdn}`);
     return true;
   }
 }

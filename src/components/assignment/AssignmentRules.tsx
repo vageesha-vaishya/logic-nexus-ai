@@ -17,6 +17,7 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog';
 import { AssignmentRuleForm } from './AssignmentRuleForm';
+import { logger } from "@/lib/logger";
 
 interface AssignmentRule {
   id: string;
@@ -74,7 +75,7 @@ export function AssignmentRules({ onUpdate }: Props) {
         setSelectedTenantId(data[0].id);
       }
     } catch (error) {
-      console.error('Error fetching tenants:', error);
+      logger.error('Error fetching tenants:', error);
       toast.error('Failed to load tenants');
     }
   };
@@ -94,7 +95,7 @@ export function AssignmentRules({ onUpdate }: Props) {
       setRules(data || []);
     } catch (error: any) {
       toast.error('Failed to load rules');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -113,7 +114,7 @@ export function AssignmentRules({ onUpdate }: Props) {
       onUpdate?.();
     } catch (error: any) {
       toast.error('Failed to update rule');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -132,7 +133,7 @@ export function AssignmentRules({ onUpdate }: Props) {
       onUpdate?.();
     } catch (error: any) {
       toast.error('Failed to delete rule');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -153,7 +154,7 @@ export function AssignmentRules({ onUpdate }: Props) {
       onUpdate?.();
     } catch (error: any) {
       toast.error('Failed to update priority');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

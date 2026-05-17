@@ -440,7 +440,7 @@ export default function LeadsPipeline() {
       }));
       setTasks(mappedTasks);
     } catch (e) {
-      console.error('Error fetching tasks', e);
+      logger.error('Error fetching tasks', e);
     }
   }, [scopedDb, isContextReady]);
 
@@ -531,7 +531,7 @@ export default function LeadsPipeline() {
       if (error) throw error;
       toast.success(`Task marked as ${newStatus}`);
     } catch (error) {
-      console.error('Failed to update task', error);
+      logger.error('Failed to update task', error);
       toast.error('Failed to update task status');
       setTasks(prev => prev.map(t => t.id === taskId ? task : t));
     }
@@ -571,7 +571,7 @@ export default function LeadsPipeline() {
       toast.success('Task created successfully');
       setIsCreateTaskOpen(false);
     } catch (error) {
-      console.error('Failed to create task', error);
+      logger.error('Failed to create task', error);
       toast.error('Failed to create task');
     } finally {
       setIsSavingTask(false);
@@ -619,7 +619,7 @@ export default function LeadsPipeline() {
       setLeads((prev) => prev.map((l) => (l.id === leadId ? result.data : l)));
       toast.success(`Lead moved to ${statusConfig[newStatus].label}`);
     } catch (error) {
-      console.error('Error updating status:', error);
+      logger.error('Error updating status:', error);
       toast.error('Failed to update status');
       fetchLeads();
     }
@@ -695,7 +695,7 @@ export default function LeadsPipeline() {
       setLeads((prev) => prev.map((lead) => (lead.id === id ? result.data : lead)));
       toast.success("Lead updated");
     } catch (error) {
-      console.error('Error updating lead:', error);
+      logger.error('Error updating lead:', error);
       toast.error('Failed to update lead');
       fetchLeads();
     }
@@ -720,7 +720,7 @@ export default function LeadsPipeline() {
       await PipelineService.deleteLead(scopedDb, id, crmApiContext);
       toast.success(t('leads.messages.deleteSingleSuccess', 'Lead deleted'));
     } catch (error) {
-      console.error('Error deleting lead:', error);
+      logger.error('Error deleting lead:', error);
       setLeads(previousLeads);
       toast.error(t('leads.messages.deleteError', 'Failed to delete lead'));
     }
@@ -750,7 +750,7 @@ export default function LeadsPipeline() {
         })
       );
     } catch (error) {
-      console.error('Error deleting leads:', error);
+      logger.error('Error deleting leads:', error);
       setLeads(previousLeads);
       toast.error(t('leads.messages.deleteError', 'Failed to delete lead'));
     }

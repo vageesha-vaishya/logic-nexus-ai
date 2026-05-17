@@ -19,6 +19,7 @@ import { extractMaxPrice } from '@/components/email/email-to-lead-helpers';
 import { ROLE_PERMISSIONS } from '@/config/permissions';
 import { sanitizeRichTextHtml, stripHtmlTags } from '@/lib/utils/sanitizer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { logger } from "@/lib/logger";
 
 export const leadSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
@@ -202,19 +203,19 @@ export function LeadForm({
 
   // Debug: Log when LeadForm mounts/unmounts or receives new props
   useEffect(() => {
-    console.log("LeadForm Mounted. Initial Service:", (initialData as any)?.custom_fields?.service_id);
-    return () => console.log("LeadForm Unmounted");
+    logger.debug("LeadForm Mounted. Initial Service:", (initialData as any)?.custom_fields?.service_id);
+    return () => logger.debug("LeadForm Unmounted");
   }, []);
 
   useEffect(() => {
     if (suggestedService) {
-      console.log("LeadForm received suggestedService update:", suggestedService);
+      logger.debug("LeadForm received suggestedService update:", suggestedService);
       // Clean the suggestion (remove brackets if present)
       const term = suggestedService.replace(/[[\]]/g, '').trim();
       
       // Set the free-text value directly
       if (term) {
-        console.log("Setting service_id to:", term);
+        logger.debug("Setting service_id to:", term);
         // Use setValue with options to ensure it sticks
         form.setValue('service_id', term, { 
           shouldValidate: true, 
@@ -237,7 +238,7 @@ export function LeadForm({
         // Double check the value was set
         const currentVal = form.getValues('service_id');
         if (currentVal !== term) {
-            console.warn("Warning: service_id mismatch after setValue!", { expected: term, actual: currentVal });
+            logger.warn("Warning: service_id mismatch after setValue!", { expected: term, actual: currentVal });
         } else {
             toast.success(`AI suggested service: ${term}`);
         }
@@ -271,7 +272,7 @@ export function LeadForm({
   // Debug: Monitor service_id changes
   const currentServiceId = form.watch('service_id');
   useEffect(() => {
-    console.log("Current service_id value:", currentServiceId);
+    logger.debug("Current service_id value:", currentServiceId);
   }, [currentServiceId]);
 
   const fetchTenants = async () => {

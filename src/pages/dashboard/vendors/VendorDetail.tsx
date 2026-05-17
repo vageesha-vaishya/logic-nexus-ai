@@ -162,7 +162,7 @@ export default function VendorDetail() {
           zip.file(doc.name, blob);
           processed++;
         } catch (err) {
-          console.error(`Failed to download ${doc.name}:`, err);
+          logger.error(`Failed to download ${doc.name}:`, err);
         }
       }
 
@@ -189,7 +189,7 @@ export default function VendorDetail() {
 
       toast.success(`Downloaded ${processed} documents`);
     } catch (error) {
-      console.error('Bulk download error:', error);
+      logger.error('Bulk download error:', error);
       toast.error('Failed to create zip file');
     } finally {
       setIsBulkDownloading(false);
@@ -248,7 +248,7 @@ export default function VendorDetail() {
       setSelectedDocs(new Set());
       fetchVendorDetails();
     } catch (error) {
-      console.error('Bulk delete error:', error);
+      logger.error('Bulk delete error:', error);
       toast.error('Failed to delete documents');
     } finally {
       toast.dismiss(toastId);
@@ -333,7 +333,7 @@ export default function VendorDetail() {
         toast.success('Score updated');
         fetchVendorDetails();
     } catch (e: any) {
-        console.error('Error refreshing score:', e);
+        logger.error('Error refreshing score:', e);
         toast.error('Failed to calculate score');
     } finally {
         toast.dismiss();
@@ -392,7 +392,7 @@ export default function VendorDetail() {
       }
 
     } catch (error: any) {
-      console.error('Error fetching vendor details:', error);
+      logger.error('Error fetching vendor details:', error);
       toast.error('Failed to load vendor details');
     } finally {
       setLoading(false);
@@ -406,7 +406,7 @@ export default function VendorDetail() {
         resource_type: 'vendor_document',
         resource_id: doc.id,
         details: { vendor_id: id, document_name: doc.name }
-    }).catch(console.error);
+    }).catch(e => logger.error(String(e)));
 
     try {
       let url = doc.url;
@@ -430,7 +430,7 @@ export default function VendorDetail() {
         toast.info('No file or URL to preview');
       }
     } catch (error: any) {
-      console.error('Error previewing document:', error);
+      logger.error('Error previewing document:', error);
       toast.error('Failed to preview document');
     }
   };
@@ -442,7 +442,7 @@ export default function VendorDetail() {
         resource_type: 'vendor_document',
         resource_id: doc.id,
         details: { vendor_id: id, document_name: doc.name }
-    }).catch(console.error);
+    }).catch(e => logger.error(String(e)));
 
     try {
       if (doc.file_path) {
@@ -460,7 +460,7 @@ export default function VendorDetail() {
         toast.info('No file or URL attached to this document');
       }
     } catch (error: any) {
-      console.error('Error downloading document:', error);
+      logger.error('Error downloading document:', error);
       toast.error('Failed to access document');
     }
   };
@@ -475,7 +475,7 @@ export default function VendorDetail() {
           .from('vendor-documents')
           .remove([doc.file_path]);
         
-        if (storageError) console.error('Error deleting file from storage:', storageError);
+        if (storageError) logger.error('Error deleting file from storage:', storageError);
       }
 
       // 2. Delete record from DB
@@ -501,7 +501,7 @@ export default function VendorDetail() {
 
       fetchVendorDetails();
     } catch (error: any) {
-      console.error('Error deleting document:', error);
+      logger.error('Error deleting document:', error);
       toast.error('Failed to delete document');
     }
   };
@@ -528,7 +528,7 @@ export default function VendorDetail() {
         toast.info('No file attached to this contract');
       }
     } catch (error: any) {
-      console.error('Error viewing contract:', error);
+      logger.error('Error viewing contract:', error);
       toast.error('Failed to access contract file');
     }
   };
@@ -588,7 +588,7 @@ export default function VendorDetail() {
 
       fetchVendorDetails();
     } catch (error: any) {
-      console.error('Error deleting folder:', error);
+      logger.error('Error deleting folder:', error);
       toast.error('Failed to delete folder');
     }
   };
@@ -616,7 +616,7 @@ export default function VendorDetail() {
 
       fetchVendorDetails();
     } catch (error: any) {
-      console.error('Error verifying document:', error);
+      logger.error('Error verifying document:', error);
       toast.error('Failed to verify document');
     }
   };
@@ -640,7 +640,7 @@ export default function VendorDetail() {
 
       fetchVendorDetails();
     } catch (error: any) {
-      console.error('Error rejecting document:', error);
+      logger.error('Error rejecting document:', error);
       toast.error('Failed to reject document');
     }
   };

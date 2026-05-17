@@ -6,6 +6,7 @@ import { RefreshCw, AlertCircle, CheckCircle, Clock } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 interface Props {
   onUpdate?: () => void;
@@ -51,11 +52,11 @@ export function AssignmentQueue({ onUpdate }: Props) {
 
       if (error) throw error;
       
-      console.log('Queue fetched:', data?.length, 'items');
+      logger.debug('Queue fetched:', data?.length, 'items');
       setQueue(data || []);
     } catch (error: any) {
       toast.error('Failed to load queue');
-      console.error('Error fetching queue:', error);
+      logger.error('Error fetching queue:', error);
     } finally {
       setLoading(false);
     }
@@ -74,7 +75,7 @@ export function AssignmentQueue({ onUpdate }: Props) {
       onUpdate?.();
     } catch (error: any) {
       toast.error('Failed to retry');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

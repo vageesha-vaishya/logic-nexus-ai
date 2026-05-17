@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { logger } from "@/lib/logger";
 
 type PackageCategoryRow = Database["public"]["Tables"]["package_categories"]["Row"];
 
@@ -30,14 +31,14 @@ export default function PackageCategories() {
       const { data, error } = await query.order("category_name");
 
       if (error) {
-        console.error("Error fetching package categories:", error);
+        logger.error("Error fetching package categories:", error);
         return;
       }
 
       const rows = (data as PackageCategoryRow[]) || [];
       setCategories(rows);
     } catch (err) {
-      console.error("Error in fetchCategories:", err);
+      logger.error("Error in fetchCategories:", err);
     } finally {
       setLoading(false);
     }

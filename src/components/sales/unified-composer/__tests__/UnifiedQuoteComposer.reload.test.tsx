@@ -5,6 +5,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 import { useCRM } from '@/hooks/useCRM';
 import { useQuoteStore } from '@/components/sales/composer/store/QuoteStore';
+import { logger } from "@/lib/logger";
 
 // Hoist mocks to ensure stability
 const { 
@@ -43,7 +44,7 @@ const createMockQuery = (data: any = []) => {
   
   // Chain method returns the SAME builder instance
   const chain = (...args: any[]) => {
-    // console.log('Chain called');
+    // logger.debug('Chain called');
     return builder;
   };
   

@@ -14,6 +14,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
 import { Pagination, PaginationContent, PaginationItem, PaginationPrevious, PaginationNext, PaginationFirst, PaginationLast, PaginationLink } from '@/components/ui/pagination';
 import { usePagination } from '@/hooks/usePagination';
+import { logger } from "@/lib/logger";
 
 interface Vehicle {
   id: string;
@@ -48,7 +49,7 @@ export default function Vehicles() {
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
       toast.error('Failed to load vehicles', { description: message });
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }

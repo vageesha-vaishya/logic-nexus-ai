@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { QuoteItem } from './types';
+import { logger } from "@/lib/logger";
 
 interface CatalogSaveDialogProps {
     open: boolean;
@@ -33,7 +34,7 @@ export function CatalogSaveDialog({ open, onOpenChange, items, onSaved }: Catalo
             setSavedIds(prev => new Set(prev).add(index));
             toast.success(`Saved "${item.product_name}" to catalog`);
         } catch (error: any) {
-            console.error('Error saving commodity:', error);
+            logger.error('Error saving commodity:', error);
             toast.error(`Failed to save ${item.product_name}: ${error.message}`);
         } finally {
             setSaving(prev => ({ ...prev, [index]: false }));

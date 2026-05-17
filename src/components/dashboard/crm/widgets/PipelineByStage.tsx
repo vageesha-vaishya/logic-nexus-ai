@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { BarChart3, Target } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface PipelineStage {
   name: string;
@@ -52,7 +53,7 @@ export function PipelineByStage() {
           setTotalPipeline(stagesArray.reduce((sum, s) => sum + s.amount, 0));
         }
       } catch (error) {
-        console.error('Failed to fetch pipeline:', error);
+        logger.error('Failed to fetch pipeline:', error);
       } finally {
         setLoading(false);
       }

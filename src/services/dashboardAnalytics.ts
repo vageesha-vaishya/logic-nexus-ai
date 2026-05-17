@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { FinancialMetric, CarrierVolume, DashboardStats, DailyStats } from '@/types/dashboard';
+import { logger } from "@/lib/logger";
 
 export const dashboardAnalyticsService = {
   async getDailyStats(days: number = 30): Promise<DailyStats> {
@@ -8,7 +9,7 @@ export const dashboardAnalyticsService = {
     const { data, error } = await supabase.rpc('get_daily_stats' as any, { p_days: days });
     
     if (error) {
-      console.error('Error fetching daily stats:', error);
+      logger.error('Error fetching daily stats:', error);
       throw error;
     }
     
@@ -26,7 +27,7 @@ export const dashboardAnalyticsService = {
     const { data, error } = await supabase.rpc('get_financial_metrics' as any, { period });
     
     if (error) {
-      console.error('Error fetching financial metrics:', error);
+      logger.error('Error fetching financial metrics:', error);
       throw error;
     }
     
@@ -39,7 +40,7 @@ export const dashboardAnalyticsService = {
     const { data, error } = await supabase.rpc('get_carrier_volume' as any, { period });
     
     if (error) {
-      console.error('Error fetching carrier volume:', error);
+      logger.error('Error fetching carrier volume:', error);
       throw error;
     }
     
@@ -52,7 +53,7 @@ export const dashboardAnalyticsService = {
     const { data, error } = await supabase.rpc('get_dashboard_stats' as any);
     
     if (error) {
-      console.error('Error fetching dashboard stats:', error);
+      logger.error('Error fetching dashboard stats:', error);
       throw error;
     }
     

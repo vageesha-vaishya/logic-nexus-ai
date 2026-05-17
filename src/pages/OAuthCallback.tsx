@@ -6,6 +6,7 @@ import { invokeFunction } from "@/lib/supabase-functions";
 import { Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { H2 } from "@/components/ui/Heading";
+import { logger } from "@/lib/logger";
 
 export default function OAuthCallback() {
   const navigate = useNavigate();
@@ -62,7 +63,7 @@ export default function OAuthCallback() {
           navigate("/dashboard/email-management");
         }, 1200);
       } catch (error: any) {
-        console.error("OAuth callback error:", error);
+        logger.error("OAuth callback error:", error);
         setStatus("error");
         toast({
           title: "Connection Failed",

@@ -11,6 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Plus, Trash2, Users, Edit, RefreshCw } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 interface Queue {
   id: string;
@@ -85,7 +86,7 @@ export default function QueueManagement() {
       setTenants((data || []) as { id: string; name: string }[]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch tenants:', message);
+      logger.error('Failed to fetch tenants:', message);
       toast.error('Failed to fetch tenants', { description: message });
     }
   };
@@ -102,7 +103,7 @@ export default function QueueManagement() {
       setFranchises((data || []) as { id: string; name: string }[]);
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
-      console.error('Failed to fetch franchises:', message);
+      logger.error('Failed to fetch franchises:', message);
       toast.error('Failed to fetch franchises', { description: message });
     }
   };
@@ -161,7 +162,7 @@ export default function QueueManagement() {
           return;
         } catch (e: any) {
           toast.error('Failed to load queues');
-          console.error('Error:', e);
+          logger.error('Error:', e);
         } finally {
           setLoading(false);
         }
@@ -173,7 +174,7 @@ export default function QueueManagement() {
       } else {
         toast.error('Failed to load queues');
       }
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -210,7 +211,7 @@ export default function QueueManagement() {
       if (error) throw error;
       setUsers(data || []);
     } catch (error: any) {
-      console.error('Error fetching users:', error);
+      logger.error('Error fetching users:', error);
     }
   };
 
@@ -224,7 +225,7 @@ export default function QueueManagement() {
       if (error) throw error;
       setQueueMembers(data?.map(m => m.user_id) || []);
     } catch (error: any) {
-      console.error('Error fetching members:', error);
+      logger.error('Error fetching members:', error);
     }
   };
 
@@ -278,7 +279,7 @@ export default function QueueManagement() {
       fetchQueues();
     } catch (error: any) {
       toast.error('Failed to create queue');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -336,7 +337,7 @@ export default function QueueManagement() {
       fetchQueues(); // Refresh counts
     } catch (error: any) {
       toast.error('Failed to update members');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

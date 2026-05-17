@@ -4,6 +4,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 export default function ShipmentDocumentViewer() {
   const { id, type } = useParams();
@@ -51,7 +52,7 @@ export default function ShipmentDocumentViewer() {
           containers: containers || []
         });
       } catch (error) {
-        console.error('Error fetching document data:', error);
+        logger.error('Error fetching document data:', error);
       } finally {
         setLoading(false);
       }

@@ -7,6 +7,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
+import { logger } from "@/lib/logger";
 
 interface Quote {
   id: string;
@@ -40,7 +41,7 @@ export function QuotesWidget() {
         }));
         setQuotes(transformed);
       } catch (error) {
-        console.error('Failed to load quotes widget:', error);
+        logger.error('Failed to load quotes widget:', error);
       } finally {
         setLoading(false);
       }

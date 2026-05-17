@@ -552,7 +552,7 @@ export default function Quotes() {
       link.click();
       document.body.removeChild(link);
     } catch (err) {
-      console.error('Export failed', err);
+      logger.error('Export failed', err);
       toast.error('Failed to export quotes');
     }
   }, [quotes]);

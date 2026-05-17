@@ -16,6 +16,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 const performanceSchema = z.object({
   review_period_start: z.string().min(1, 'Start date is required'),
@@ -75,7 +76,7 @@ export function VendorPerformanceDialog({ open, onOpenChange, vendorId, onSucces
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error recording performance review:', error);
+      logger.error('Error recording performance review:', error);
       const message = error instanceof Error ? error.message : 'Failed to record review';
       toast.error(message);
     } finally {

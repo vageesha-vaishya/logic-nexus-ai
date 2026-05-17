@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
+import { logger } from "@/lib/logger";
 
 export default function Carriers() {
   const navigate = useNavigate();
@@ -198,7 +199,7 @@ export default function Carriers() {
       });
       setTenantNameById(map);
     } catch (err: any) {
-      console.warn('Failed to fetch tenants:', err?.message || err);
+      logger.warn('Failed to fetch tenants:', err?.message || err);
     }
   };
 

@@ -13,6 +13,7 @@ import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 import { validateHostname, validatePort, parseHostPort } from '@/utils/validationUtils';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { logger } from "@/lib/logger";
 
 export interface ExternalDbConnection {
   host: string;
@@ -153,7 +154,7 @@ export function ExternalDbConnectionForm({
       
       onConnectionTested?.(result);
     } catch (err: any) {
-      console.error('[ExternalDbConnectionForm] Connection test failed', err);
+      logger.error('[ExternalDbConnectionForm] Connection test failed', err);
       const rawMessage = err?.message as string | undefined;
       let message = 'Connection test failed';
 

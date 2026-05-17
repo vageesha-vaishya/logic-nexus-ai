@@ -3,6 +3,7 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Check, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { logger } from "@/lib/logger";
 
 interface EditableTextProps {
   value: string | number;
@@ -52,7 +53,7 @@ export function EditableText({
       await onSave(type === "number" || type === "currency" ? Number(value) : value);
       setIsEditing(false);
     } catch (error) {
-      console.error("Failed to save", error);
+      logger.error("Failed to save", error);
       // Optional: Toast error here or let parent handle it
       setValue(initialValue); // Revert on error
     } finally {

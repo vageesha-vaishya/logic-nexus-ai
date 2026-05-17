@@ -1,3 +1,4 @@
+import { logger } from "@/lib/logger";
 export type Span = { id: string; name: string; start: number; attrs: Record<string, any>; end: () => void }
 
 export function startSpan(name: string, attrs: Record<string, any> = {}): Span {
@@ -12,7 +13,7 @@ export function startSpan(name: string, attrs: Record<string, any> = {}): Span {
       const duration = Date.now() - start
       // Hook this to real OpenTelemetry SDK later
       // For now, emit a console log for observability
-      try { console.log(`[otel-lite] span ${name} (${id})`, { duration, ...attrs }) } catch { /* ignore */ }
+      try { logger.debug(`[otel-lite] span ${name} (${id})`, { duration, ...attrs }) } catch { /* ignore */ }
     }
   }
   return span

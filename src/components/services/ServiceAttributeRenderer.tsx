@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import { Loader2 } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 export type ServiceAttributeDefinition = {
   id: string;
@@ -52,7 +53,7 @@ export function ServiceAttributeRenderer({
         if (error) throw error;
         setDefinitions(data as ServiceAttributeDefinition[]);
       } catch (err) {
-        console.error('Failed to fetch attribute definitions:', err);
+        logger.error('Failed to fetch attribute definitions:', err);
       } finally {
         setLoading(false);
       }

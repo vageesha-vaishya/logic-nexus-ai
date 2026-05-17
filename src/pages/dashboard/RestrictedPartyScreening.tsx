@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, Search, AlertTriangle, CheckCircle } from "lucide-react";
 import { RestrictedPartyScreeningService, type ScreeningMatch } from "@/services/compliance/RestrictedPartyScreeningService";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 interface ScreeningFormValues {
   name: string;
@@ -39,7 +40,7 @@ export default function RestrictedPartyScreening() {
         toast.success("No matches found.");
       }
     } catch (error) {
-      console.error("Screening error:", error);
+      logger.error("Screening error:", error);
       toast.error("Failed to perform screening. See console for details.");
     } finally {
       setLoading(false);

@@ -38,6 +38,7 @@ interface ImportData {
 
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
+import { logger } from "@/lib/logger";
 
 export function ImportFranchiseModal({
   open,
@@ -131,7 +132,7 @@ export function ImportFranchiseModal({
       toast.success('Data processed successfully by AI');
 
     } catch (err: any) {
-      console.error('Processing error:', err);
+      logger.error('Processing error:', err);
       setError(err.message || 'Failed to process data with AI');
       setIsLoading(false);
       setStep('preview');
@@ -167,7 +168,7 @@ export function ImportFranchiseModal({
       onOpenChange(false);
       resetState();
     } catch (err: any) {
-      console.error('Import error:', err);
+      logger.error('Import error:', err);
       setError(err.message || 'Failed to save data to database');
     } finally {
       setIsLoading(false);

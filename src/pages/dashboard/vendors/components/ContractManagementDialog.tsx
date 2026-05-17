@@ -30,6 +30,7 @@ import { Badge } from '@/components/ui/badge';
 import { generateContractPDF, Clause } from '@/services/contractPdfService';
 import { eSignatureService } from '@/services/eSignatureService';
 import { Vendor, VendorContract } from '@/types/vendor';
+import { logger } from "@/lib/logger";
 
 interface Comment {
   id: string;
@@ -88,7 +89,7 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
       
       setComments(formattedComments);
     } catch (error) {
-      console.error('Error fetching comments:', error);
+      logger.error('Error fetching comments:', error);
     }
   }, [contract, supabase]);
 
@@ -102,7 +103,7 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
       if (error) throw error;
       setClauses(data || []);
     } catch (error) {
-      console.error('Error fetching clauses:', error);
+      logger.error('Error fetching clauses:', error);
     }
   }, [supabase]);
 
@@ -140,7 +141,7 @@ export function ContractManagementDialog({ open, onOpenChange, contract, vendor,
       doc.save(`${contract.title.replace(/\s+/g, '_')}_contract.pdf`);
       toast.success('Contract PDF generated successfully');
     } catch (error) {
-      console.error(error);
+      logger.error(error);
       toast.error('Failed to generate PDF');
     } finally {
       setGeneratingPdf(false);

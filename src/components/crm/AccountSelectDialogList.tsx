@@ -7,6 +7,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 type AccountSelectDialogProps = {
   open: boolean;
@@ -39,7 +40,7 @@ export default function AccountSelectDialogList({ open, onOpenChange, onSelect }
         if (error) throw error;
         setAccounts(data || []);
       } catch (err: any) {
-        console.error('Load accounts failed:', err);
+        logger.error('Load accounts failed:', err);
         toast.error('Failed to load accounts');
       } finally {
         setLoading(false);

@@ -3,6 +3,7 @@ import { EmitEventSchema } from '@/lib/schemas/events';
 import { validateAvro } from '@/lib/avro/validate';
 import { schemaForEvent } from '@/lib/schemas/avro/events';
 import { ensureSchemaId } from '@/lib/avro/registry';
+import { logger } from "@/lib/logger";
 
 function getSupabaseProjectUrl(): string {
   const runtimeEnv =
@@ -69,7 +70,7 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
         functionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
     }
 
-    console.log(`[invokeAnonymous] Calling ${functionName} at ${functionUrl}`);
+    logger.debug(`[invokeAnonymous] Calling ${functionName} at ${functionUrl}`);
 
     const key = `cb:${functionName}`;
     const now = Date.now();
@@ -106,7 +107,7 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
             if (parsed) {
                 errorMsg = parsed.error || parsed.message || text;
             }
-            console.error(`[invokeAnonymous] Failed: ${errorMsg}`);
+            logger.error(`[invokeAnonymous] Failed: ${errorMsg}`);
             updateCircuit(key, false);
             throw new Error(errorMsg);
         }
@@ -125,7 +126,7 @@ export async function invokeAnonymous<T = any>(functionName: string, body: any):
     const base64 = btoa(binary);
     return { content: base64, contentType } as any;
     } catch (error: any) {
-        console.error(`[invokeAnonymous] Fetch error:`, error);
+        logger.error(`[invokeAnonymous] Fetch error:`, error);
         updateCircuit(key, false);
         // If we failed with relative URL in dev, maybe try absolute as fallback? 
         // Or just return clearer error.
@@ -174,7 +175,7 @@ export async function invokeFunction<T = any>(
     }, {} as Record<string, string>);
     const publicKey = getSupabasePublicKey();
     if (!publicKey) {
-        console.error('Missing VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY fallback)');
+        logger.error('Missing VITE_SUPABASE_PUBLISHABLE_KEY (or VITE_SUPABASE_ANON_KEY fallback)');
         return { data: null, error: new Error('Missing Supabase configuration') };
     }
     const projectUrl = getSupabaseProjectUrl();
@@ -216,7 +217,7 @@ export async function invokeFunction<T = any>(
 
     // Check for "Failed to send a request" error (FunctionsFetchError) -> Manual Fetch Fallback
     if (error && (error.name === 'FunctionsFetchError' || error.message === 'Failed to send a request to the Edge Function')) {
-      console.warn(`[Supabase Function] Fetch failed for ${functionName}. Attempting manual fetch fallback...`);
+      logger.warn(`[Supabase Function] Fetch failed for ${functionName}. Attempting manual fetch fallback...`);
       try {
           // Ensure we have a token (refresh if needed)
           if (!token) {
@@ -265,7 +266,7 @@ export async function invokeFunction<T = any>(
               error = null;
           }
       } catch (manualError: any) {
-           console.error(`[Supabase Function] Manual fetch fallback failed:`, manualError);
+           logger.error(`[Supabase Function] Manual fetch fallback failed:`, manualError);
            error.message = `${error.message} (Check for Ad Blockers or Network Firewall)`;
       }
     }
@@ -279,14 +280,14 @@ export async function invokeFunction<T = any>(
                       /unauthorized/i.test(String(error.message || error));
 
         if (is401) {
-            console.error('[Supabase Function] JWT validation failure detected', createJwtErrorLog(error, { functionName, stage: 'initial-invoke' }));
-            console.warn(`[Supabase Function] 401/Invalid JWT for ${functionName}. Refreshing session and retrying...`);
+            logger.error('[Supabase Function] JWT validation failure detected', createJwtErrorLog(error, { functionName, stage: 'initial-invoke' }));
+            logger.warn(`[Supabase Function] 401/Invalid JWT for ${functionName}. Refreshing session and retrying...`);
             
             const { data: refreshData, error: refreshError } = await supabase.auth.refreshSession();
             
             if (!refreshError && refreshData.session) {
                  const newToken = refreshData.session.access_token;
-                 console.log('[Supabase Function] Session refreshed. Retrying...');
+                 logger.debug('[Supabase Function] Session refreshed. Retrying...');
                  
                  // Retry with new token via Client
                  const retryResult = await supabase.functions.invoke(functionName, {
@@ -299,13 +300,13 @@ export async function invokeFunction<T = any>(
 
                  // If client retry still fails, try raw fetch (handles some CORS/Client issues)
                  if (error) {
-                     console.error('[Supabase Function] JWT retry failed', createJwtErrorLog(error, { functionName, stage: 'post-refresh-invoke' }));
-                     console.warn(`[Supabase Function] Client retry failed. Attempting raw fetch fallback for ${functionName}...`);
+                     logger.error('[Supabase Function] JWT retry failed', createJwtErrorLog(error, { functionName, stage: 'post-refresh-invoke' }));
+                     logger.warn(`[Supabase Function] Client retry failed. Attempting raw fetch fallback for ${functionName}...`);
                      try {
                         const projectUrl = getSupabaseProjectUrl();
                         if (!projectUrl) throw new Error('VITE_SUPABASE_URL is not defined');
                         const functionUrl = `${projectUrl}/functions/v1/${functionName}`;
-                        console.log(`[Supabase Function] Fetching ${functionUrl} with token length ${newToken.length} and publishable key present ${Boolean(publicKey)}...`);
+                        logger.debug(`[Supabase Function] Fetching ${functionUrl} with token length ${newToken.length} and publishable key present ${Boolean(publicKey)}...`);
 
                         const response = await fetch(functionUrl, {
                             method: options.method || 'POST',
@@ -328,7 +329,7 @@ export async function invokeFunction<T = any>(
                         data = await response.json();
                         error = null;
                      } catch (fetchErr: any) {
-                         console.error(`[Supabase Function] Raw fetch retry failed:`, fetchErr);
+                         logger.error(`[Supabase Function] Raw fetch retry failed:`, fetchErr);
                          // Keep the original error if fetch fails, or overwrite? 
                          // Overwrite allows us to see the fetch error which might be more descriptive
                          error = fetchErr;
@@ -336,7 +337,7 @@ export async function invokeFunction<T = any>(
                  }
 
             } else {
-                 console.error(`[Supabase Function] Session refresh failed:`, refreshError);
+                 logger.error(`[Supabase Function] Session refresh failed:`, refreshError);
                  error = {
                   ...(typeof error === 'object' ? error : { message: String(error || 'Unauthorized') }),
                   message: 'Unauthorized: no active Supabase user session found. Please sign in again.',
@@ -375,7 +376,7 @@ export async function invokeFunction<T = any>(
     updateCircuit(key, true);
     return { data, error: null };
   } catch (err: any) {
-    console.error(`[Supabase Function] Unexpected error invoking ${functionName}:`, err);
+    logger.error(`[Supabase Function] Unexpected error invoking ${functionName}:`, err);
     return { data: null, error: err };
   }
 }
@@ -453,7 +454,7 @@ export async function emitEvent(eventName: string, payload: any) {
     }
   });
   if (error) {
-    console.warn('[emitEvent] Failed', error);
+    logger.warn('[emitEvent] Failed', error);
     return { ok: false, error };
   }
   return { ok: true, data };

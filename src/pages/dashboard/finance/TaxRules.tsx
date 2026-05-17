@@ -30,6 +30,7 @@ import { TaxRule, TaxJurisdiction } from '@/services/taxation/types';
 import { TaxRuleDialog } from './TaxRuleDialog';
 import { format } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from "@/lib/logger";
 
 export default function TaxRules() {
   const [rules, setRules] = useState<TaxRule[]>([]);
@@ -54,7 +55,7 @@ export default function TaxRules() {
       const data = await TaxManagementService.getJurisdictions();
       setJurisdictions(data);
     } catch (error) {
-      console.error('Error loading jurisdictions:', error);
+      logger.error('Error loading jurisdictions:', error);
       toast({
         title: 'Error',
         description: 'Failed to load jurisdictions',
@@ -70,7 +71,7 @@ export default function TaxRules() {
       const data = await TaxManagementService.getTaxRules(jurisdictionId);
       setRules(data);
     } catch (error) {
-      console.error('Error loading tax rules:', error);
+      logger.error('Error loading tax rules:', error);
       toast({
         title: 'Error',
         description: 'Failed to load tax rules',

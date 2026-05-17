@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { logger } from "@/lib/logger";
 
 const activitySchema = z.object({
   activity_type: z.enum(['call', 'email', 'meeting', 'task', 'note']),
@@ -79,7 +80,7 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
   });
 
   const { isSubmitting, isValid, errors } = form.formState;
-  console.log('ActivityForm State:', { isSubmitting, isValid, errors, step });
+  logger.debug('ActivityForm State:', { isSubmitting, isValid, errors, step });
   const activityType = form.watch('activity_type');
 
   // Smart defaults based on type

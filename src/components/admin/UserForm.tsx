@@ -15,6 +15,7 @@ import { ROLE_MATRIX, UserRole, canManageRole, validateHierarchy } from '@/lib/a
 import { RoleService } from '@/lib/api/roles';
 import { ScopedDataAccess, DataAccessContext } from '@/lib/db/access';
 import { invokeFunction } from '@/lib/supabase-functions';
+import { logger } from "@/lib/logger";
 
 const userSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -80,7 +81,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
   // Debug: Log validation errors whenever they change
   useEffect(() => {
     if (Object.keys(form.formState.errors).length > 0) {
-      console.error('[UserForm] Form Validation Errors:', form.formState.errors);
+      logger.error('[UserForm] Form Validation Errors:', form.formState.errors);
       toast({
         title: 'Validation Error',
         description: 'Please check the form fields for errors.',
@@ -125,7 +126,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       if (error) throw error;
       setTenants(data || []);
     } catch (error: any) {
-      console.error('Error fetching tenants:', error);
+      logger.error('Error fetching tenants:', error);
     }
   };
 
@@ -146,7 +147,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
       if (error) throw error;
       setFranchises(data || []);
     } catch (error: any) {
-      console.error('Error fetching franchises:', error);
+      logger.error('Error fetching franchises:', error);
     }
   };
 
@@ -234,14 +235,14 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
         });
 
         if (error) {
-          console.error('Create User Error Details:', error);
+          logger.error('Create User Error Details:', error);
           // If the error object has details/context, try to show it
           const detailMsg = error.context?.error || error.message || JSON.stringify(error);
           throw new Error(`Edge Function Error: ${detailMsg}`);
         }
         
         if (data?.error) {
-           console.error('Create User Data Error:', data);
+           logger.error('Create User Data Error:', data);
            throw new Error(data.error);
         }
 
@@ -269,7 +270,7 @@ export function UserForm({ user, onSuccess }: UserFormProps) {
             await roleService.assignRolesToUser(created.id, assignedRoles, false);
           }
         } catch (e) {
-          console.warn('Failed to assign additional roles on creation', e);
+          logger.warn('Failed to assign additional roles on creation', e);
         }
         navigate('/dashboard/users');
       }

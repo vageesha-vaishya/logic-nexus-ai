@@ -4,6 +4,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList, CommandSeparator } from "@/components/ui/command";
 import { ChevronsUpDown, Check, Loader2, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 export type ComboOption = { label: string; value: string; original?: any };
 export type AsyncComboLoader = (search: string) => Promise<ComboOption[]>;
@@ -64,7 +65,7 @@ export function AsyncCombobox({
           initialLoadDone.current = true;
         }
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       } finally {
         if (!cancelled) setLoading(false);
       }

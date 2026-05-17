@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 interface CacheItem<T> {
   data: T[];
@@ -70,7 +71,7 @@ export function useRelatedData<T extends { id: string }>(
         }
       }
     } catch (e) {
-      console.warn('Failed to load cache from local storage', e);
+      logger.warn('Failed to load cache from local storage', e);
     }
   }, [table, staleTime]);
 
@@ -84,7 +85,7 @@ export function useRelatedData<T extends { id: string }>(
           cache: cacheObj
         }));
       } catch (e) {
-        console.warn('Failed to save cache to local storage', e);
+        logger.warn('Failed to save cache to local storage', e);
       }
     }, 60000); // Save every minute
 
@@ -172,10 +173,10 @@ export function useRelatedData<T extends { id: string }>(
     } catch (err: any) {
       if (err.name === 'AbortError') return;
       
-      console.error(`Error fetching ${table}:`, err);
+      logger.error(`Error fetching ${table}:`, err);
       
       if (retryCount < 2) {
-        console.log(`Retrying... (${retryCount + 1}/2)`);
+        logger.debug(`Retrying... (${retryCount + 1}/2)`);
         setTimeout(() => {
           fetchData(pageNum, query, isLoadMore, retryCount + 1);
         }, 1000 * (retryCount + 1));

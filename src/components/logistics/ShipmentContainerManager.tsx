@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Container, Trash2, Plus, AlertCircle, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
+import { logger } from "@/lib/logger";
 
 interface ShipmentContainerManagerProps {
   shipmentId: string;
@@ -34,13 +35,13 @@ export function ShipmentContainerManager({ shipmentId, cargoConfigs }: ShipmentC
         const { data: types } = await supabase.from('container_types').select('id, name, code').order('name');
         setContainerTypes(types || []);
       } catch (err) {
-        console.error('Failed to load container types', err);
+        logger.error('Failed to load container types', err);
       }
       try {
         const { data: sizes } = await supabase.from('container_sizes').select('id, name, iso_code, type_id').order('name');
         setContainerSizes(sizes || []);
       } catch (err) {
-        console.error('Failed to load container sizes', err);
+        logger.error('Failed to load container sizes', err);
       }
     };
     loadRefs();
@@ -74,7 +75,7 @@ export function ShipmentContainerManager({ shipmentId, cargoConfigs }: ShipmentC
       if (error) throw error;
       setContainers(data || []);
     } catch (error: any) {
-      console.error('Error fetching containers:', error);
+      logger.error('Error fetching containers:', error);
       toast.error('Failed to load containers');
     } finally {
       setLoading(false);
@@ -154,7 +155,7 @@ export function ShipmentContainerManager({ shipmentId, cargoConfigs }: ShipmentC
       });
       fetchContainers();
     } catch (error: any) {
-      console.error('Error saving container:', error);
+      logger.error('Error saving container:', error);
       toast.error('Failed to save container: ' + error.message);
     } finally {
       setSaving(false);

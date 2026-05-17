@@ -31,6 +31,7 @@ import { toast } from 'sonner';
 import { useCRM } from '@/hooks/useCRM';
 import { PgDumpOptionsPanel, PgDumpCategoryOptions, PgDumpGeneralOptions } from '@/components/dashboard/data-management/PgDumpOptionsPanel';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { logger } from "@/lib/logger";
 
 type WizardStep = 'file' | 'connection' | 'options' | 'execute' | 'summary';
 
@@ -230,7 +231,7 @@ export function PgDumpImportWizard() {
           }
         );
       } catch (err) {
-        console.error('Failed to log override', err);
+        logger.error('Failed to log override', err);
       }
     }
   };
@@ -431,7 +432,7 @@ export function PgDumpImportWizard() {
       return;
     }
 
-    console.log('[PgDumpImportWizard] Starting import with parsed file:', {
+    logger.debug('[PgDumpImportWizard] Starting import with parsed file:', {
       totalStatements: parsed.metadata.totalStatements,
       dataStatementsCount: parsed.dataStatements.length,
       tableStatementsCount: parsed.tableStatements.length,

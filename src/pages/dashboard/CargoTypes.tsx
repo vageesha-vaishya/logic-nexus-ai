@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { CheckCircle, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { logger } from "@/lib/logger";
 
 export default function CargoTypes() {
   const { supabase, scopedDb, context } = useCRM();
@@ -25,7 +26,7 @@ export default function CargoTypes() {
         .order("cargo_type_name");
 
       if (error) {
-        console.error("Error fetching cargo types:", error);
+        logger.error("Error fetching cargo types:", error);
         return;
       }
 
@@ -84,11 +85,11 @@ export default function CargoTypes() {
           setCargoTypes((seeded || []) as CargoTypeRow[]);
         } catch (seedErr: unknown) {
           const message = seedErr instanceof Error ? seedErr.message : String(seedErr);
-          console.warn("Cargo types seed failed:", message);
+          logger.warn("Cargo types seed failed:", message);
         }
       }
     } catch (err) {
-      console.error("Unexpected error fetching cargo types:", err);
+      logger.error("Unexpected error fetching cargo types:", err);
     }
   }, [context.isPlatformAdmin, context.tenantId, scopedDb, supabase]);
 

@@ -57,6 +57,7 @@ import { useQuoteStore } from './store/QuoteStore';
 import { formatCurrency } from '@/lib/utils';
 import { getSafeName } from './utils';
 import { normalizeModeCode } from '@/lib/mode-utils';
+import { logger } from "@/lib/logger";
 
 interface OptionOverviewProps {
   onGenerateSmartOptions?: () => void;
@@ -120,7 +121,7 @@ export function QuoteOptionsOverview({
                         markupPercent: opt.markupPercent || Number(markup.toFixed(2))
                     };
                 } catch (err) {
-                    console.warn('Pricing enrichment failed for option:', opt.id);
+                    logger.warn('Pricing enrichment failed for option:', opt.id);
                 }
             }
             return opt;

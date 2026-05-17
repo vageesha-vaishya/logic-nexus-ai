@@ -20,6 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { KanbanFunnel } from "@/components/kanban/KanbanFunnel";
 import { Carrier, Shipment, ShipmentStatus, statusConfig, stages, Address } from "./shipments-data";
+import { logger } from "@/lib/logger";
 
 export default function ShipmentsPipeline() {
   const navigate = useNavigate();
@@ -99,7 +100,7 @@ export default function ShipmentsPipeline() {
       if (carriersError) throw carriersError;
       setCarriers(carriersData || []);
     } catch (error) {
-      console.error("Error fetching data:", error);
+      logger.error("Error fetching data:", error);
       toast({
         title: "Error",
         description: "Failed to fetch shipments",
@@ -157,7 +158,7 @@ export default function ShipmentsPipeline() {
         description: "Shipment status updated",
       });
     } catch (error) {
-      console.error("Error updating shipment status:", error);
+      logger.error("Error updating shipment status:", error);
       toast({
         title: "Error",
         description: "Failed to update shipment status",
@@ -255,7 +256,7 @@ export default function ShipmentsPipeline() {
         description: `Deleted ${selectedShipments.size} shipment(s)`,
       });
     } catch (error) {
-      console.error("Error deleting shipments:", error);
+      logger.error("Error deleting shipments:", error);
       toast({
         title: "Error",
         description: "Failed to delete shipments",
@@ -285,7 +286,7 @@ export default function ShipmentsPipeline() {
         description: `Updated ${selectedShipments.size} shipment(s)`,
       });
     } catch (error) {
-      console.error("Error updating shipments:", error);
+      logger.error("Error updating shipments:", error);
       toast({
         title: "Error",
         description: "Failed to update shipments",
@@ -309,7 +310,7 @@ export default function ShipmentsPipeline() {
       setSelectedShipments(new Set());
       toast({ title: "Success", description: "Marked POD received for selected shipments" });
     } catch (error) {
-      console.error("Error marking POD received:", error);
+      logger.error("Error marking POD received:", error);
       toast({ title: "Error", description: "Failed to mark POD received", variant: "destructive" });
     }
   };
@@ -325,7 +326,7 @@ export default function ShipmentsPipeline() {
       setShipments(prev => prev.map(s => s.id === shipmentId ? { ...s, pod_received: true, pod_received_at: now } : s));
       toast({ title: "Success", description: "POD marked received" });
     } catch (error) {
-      console.error("Error marking POD received:", error);
+      logger.error("Error marking POD received:", error);
       toast({ title: "Error", description: "Failed to mark POD received", variant: "destructive" });
     }
   };

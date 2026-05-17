@@ -19,6 +19,7 @@ import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { matchText, TextOp } from '@/lib/utils';
 import { Shipment, ShipmentStatus, statusConfig, normalizeShipmentType, formatShipmentType } from './shipments-data';
+import { logger } from "@/lib/logger";
 
 export default function Shipments() {
   const navigate = useNavigate();
@@ -57,7 +58,7 @@ export default function Shipments() {
       setShipments(data as unknown as Shipment[]);
     } catch (error: unknown) {
       toast.error('Failed to load shipments');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }

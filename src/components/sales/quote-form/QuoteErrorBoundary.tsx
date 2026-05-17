@@ -23,7 +23,7 @@ export class QuoteErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('Uncaught error in Quote Form:', error, errorInfo);
+    logger.error('Uncaught error in Quote Form:', error, errorInfo);
     
     // Log to platform system logs
     logger.error('Uncaught error in Quote Form', {

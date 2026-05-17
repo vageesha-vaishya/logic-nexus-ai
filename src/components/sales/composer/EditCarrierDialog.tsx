@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from "@/lib/logger";
 
 interface EditCarrierDialogProps {
   open: boolean;
@@ -70,7 +71,7 @@ export function EditCarrierDialog({
       onCarrierUpdated();
       onOpenChange(false);
     } catch (error: any) {
-      console.error('Error updating carrier:', error);
+      logger.error('Error updating carrier:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to update carrier.",

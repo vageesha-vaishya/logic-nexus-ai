@@ -19,6 +19,7 @@ import { QuoteDetailView } from './QuoteDetailView';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
 import { useCRM } from '@/hooks/useCRM';
 import { PricingService } from '@/services/pricing.service';
+import { logger } from "@/lib/logger";
 
 interface QuoteComparisonViewProps {
     options: RateOption[];
@@ -76,14 +77,14 @@ export function QuoteComparisonView({
                             marginPercent: mapped.marginPercent || calc.marginPercent
                         };
                     } catch (e) {
-                        console.warn('Pricing enrichment failed', e);
+                        logger.warn('Pricing enrichment failed', e);
                         return mapped;
                     }
                 }
                 return mapped;
             }));
             
-            // console.log('Enriched options:', enriched.length);
+            // logger.debug('Enriched options:', enriched.length);
             setOptions(enriched.filter(Boolean) as RateOption[]);
         };
         

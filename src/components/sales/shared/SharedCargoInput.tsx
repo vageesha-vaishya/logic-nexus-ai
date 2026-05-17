@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
 import { HazmatWizard } from './HazmatWizard';
 import { v4 as uuidv4 } from 'uuid';
+import { logger } from "@/lib/logger";
 
 export interface SharedCargoInputProps {
   value: CargoItem;
@@ -58,7 +59,7 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
   };
 
   const handleCommoditySelect = (selection: CommoditySelection) => {
-    console.log('[SharedCargoInput] Commodity selected:', selection);
+    logger.debug('[SharedCargoInput] Commodity selected:', selection);
     const nextDescription = selection.description || '';
     const currentDescription = value.commodity?.description || '';
     const updated = {
@@ -81,7 +82,7 @@ export function SharedCargoInput({ value, onChange, onCommodityChange, onRemove,
       setShowHazmat(true);
     }
 
-    console.log('[SharedCargoInput] Calling onChange with updated cargo item:', updated);
+    logger.debug('[SharedCargoInput] Calling onChange with updated cargo item:', updated);
     onChange(updated);
     if (nextDescription !== currentDescription) {
       onCommodityChange?.(nextDescription);

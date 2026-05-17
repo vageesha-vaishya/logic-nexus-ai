@@ -15,6 +15,7 @@ import { EmailList, AdvancedSearchFilters, EmailSortDirection, EmailSortField } 
 import { cn } from "@/lib/utils";
 import { Email } from "@/types/email";
 import { invokeFunction } from "@/lib/supabase-functions";
+import { logger } from "@/lib/logger";
 
 interface EmailClientProps {
   entityType?: string;
@@ -181,7 +182,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
         }
       }
     } catch (error) {
-      console.error("Error fetching emails:", error);
+      logger.error("Error fetching emails:", error);
       toast({
         title: "Error fetching emails",
         description: (error as any)?.message || "Could not load emails. Please try again.",
@@ -225,7 +226,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
 
       setQueueCounts(mergedCounts);
     } catch (err) {
-      console.error("Error fetching queue counts:", err);
+      logger.error("Error fetching queue counts:", err);
       // Fallback to defaults
       setQueueCounts({
         'support_general': 0,
@@ -306,7 +307,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
       try {
         setCustomFolders(JSON.parse(saved));
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       }
     }
     const notif = localStorage.getItem('email_notifications_enabled');
@@ -314,7 +315,7 @@ export function EmailClient({ entityType, entityId, emailAddress, className }: E
       try {
         setNotificationsEnabled(JSON.parse(notif));
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       }
     }
   }, []);
@@ -373,7 +374,7 @@ const handleSync = async () => {
           });
           
           if (error || (data && data.success === false)) {
-              console.error(`Sync failed for account ${acc.id}:`, error || data?.error);
+              logger.error(`Sync failed for account ${acc.id}:`, error || data?.error);
               errorCount++;
           } else {
               syncedCount++;
@@ -390,7 +391,7 @@ const handleSync = async () => {
       
       await fetchEmails();
     } catch (error: any) {
-      console.error("Sync error:", error);
+      logger.error("Sync error:", error);
       toast({ title: "Sync failed", description: error.message, variant: "destructive" });
     } finally {
       setLoading(false);
@@ -500,7 +501,7 @@ const handleSync = async () => {
           }
         }
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       }
       const by = (folder: string) => emails.filter(e => e.folder === folder);
       setUnreadStats({
@@ -552,7 +553,7 @@ const handleSync = async () => {
       
       toast({ title: "Moved", description: `Email moved to ${folder}` });
     } catch (error) {
-      console.error("Error moving email:", error);
+      logger.error("Error moving email:", error);
       toast({ title: "Error", description: "Failed to move email", variant: "destructive" });
     }
   };

@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHeader, TableRow } from '@/components
 import { Badge } from '@/components/ui/badge';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 type OpportunitySelectDialogProps = {
   open: boolean;
@@ -69,7 +70,7 @@ export default function OpportunitySelectDialogList({ open, onOpenChange, onSele
         if (error) throw error;
         setOpportunities(data || []);
       } catch (err: any) {
-        console.error('Load opportunities failed:', err);
+        logger.error('Load opportunities failed:', err);
         toast.error('Failed to load opportunities');
       } finally {
         setLoading(false);

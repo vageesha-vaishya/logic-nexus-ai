@@ -10,6 +10,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { Plus, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { logger } from "@/lib/logger";
 
 export default function VesselClasses() {
   type VesselClass = Database['public']['Tables']['vessel_classes']['Row'];
@@ -61,7 +62,7 @@ export default function VesselClasses() {
 
     if (error) {
       toast.error('Failed to create vessel class');
-      console.error(error);
+      logger.error(error);
     } else {
       toast.success('Vessel class created');
       setIsDialogOpen(false);

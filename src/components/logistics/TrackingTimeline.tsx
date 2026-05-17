@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useCRM } from '@/hooks/useCRM';
 import { format } from 'date-fns';
+import { logger } from "@/lib/logger";
 
 interface TrackingEvent {
   id: string;
@@ -38,7 +39,7 @@ export function TrackingTimeline({ shipmentId }: TrackingTimelineProps) {
       if (error) throw error;
       setEvents(data || []);
     } catch (error) {
-      console.error('Error fetching tracking events:', error);
+      logger.error('Error fetching tracking events:', error);
     } finally {
       setLoading(false);
     }

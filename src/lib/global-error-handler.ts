@@ -1,4 +1,5 @@
 import { logger } from './logger';
+import { logger } from "@/lib/logger";
 
 /**
  * Initialize global error handlers to capture uncaught exceptions and unhandled rejections
@@ -44,5 +45,5 @@ export const initGlobalErrorHandlers = () => {
     }
   }, true); // true = capture phase
   
-  console.log('Global error handlers initialized');
+  logger.debug('Global error handlers initialized');
 };

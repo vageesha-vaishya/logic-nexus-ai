@@ -15,6 +15,7 @@ import { Search, Filter, Loader2, ArrowRight } from 'lucide-react';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { logger } from "@/lib/logger";
 
 interface QuoteSelectionGridProps {
   onSelectQuote: (quote: any) => void;
@@ -93,7 +94,7 @@ export function QuoteSelectionGrid({ onSelectQuote }: QuoteSelectionGridProps) {
       setQuotes(data || []);
       setTotalCount(count || 0);
     } catch (error) {
-      console.error('Error fetching quotes:', error);
+      logger.error('Error fetching quotes:', error);
     } finally {
       setLoading(false);
     }

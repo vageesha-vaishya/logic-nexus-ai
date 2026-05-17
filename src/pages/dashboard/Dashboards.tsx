@@ -50,6 +50,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { DashboardService } from '@/lib/dashboard-service';
 import { useToast } from '@/components/ui/use-toast';
 import { WidgetSkeleton } from '@/components/dashboard/widgets/WidgetSkeleton';
+import { logger } from "@/lib/logger";
 
 const DEFAULT_WIDGETS: WidgetConfig[] = [
   { id: 'kanban-1', type: 'kanban', title: 'Pipelines Overview', size: 'full', order: 0 },
@@ -92,7 +93,7 @@ export default function Dashboards() {
         const members = await DashboardService.getTeamMembers(scopedDb);
         setTeamMembers(members || []);
       } catch (err) {
-        console.error('Failed to load team members:', err);
+        logger.error('Failed to load team members:', err);
       }
     };
     loadTeam();
@@ -146,7 +147,7 @@ export default function Dashboards() {
           }
         }
       } catch (err) {
-        console.error('Failed to load dashboard preferences:', err);
+        logger.error('Failed to load dashboard preferences:', err);
         toast({
           title: t('Error'),
           description: t('Failed to load dashboard preferences') + (err instanceof Error ? ': ' + err.message : ''),
@@ -172,7 +173,7 @@ export default function Dashboards() {
       try {
         await DashboardService.savePreferences(scopedDb, widgets);
       } catch (err) {
-        console.error('Failed to save dashboard preferences:', err);
+        logger.error('Failed to save dashboard preferences:', err);
       }
     };
 

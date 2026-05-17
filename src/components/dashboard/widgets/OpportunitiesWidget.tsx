@@ -7,6 +7,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
 import { formatCurrency } from '@/lib/utils';
+import { logger } from "@/lib/logger";
 
 interface Opportunity {
   id: string;
@@ -39,7 +40,7 @@ export function OpportunitiesWidget() {
         }));
         setOpportunities(transformed);
       } catch (error) {
-        console.error('Failed to load opportunities widget:', error);
+        logger.error('Failed to load opportunities widget:', error);
       } finally {
         setLoading(false);
       }

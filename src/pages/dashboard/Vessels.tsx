@@ -10,6 +10,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { Plus, Trash2, Ship } from "lucide-react";
 import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
+import { logger } from "@/lib/logger";
 
 export default function Vessels() {
   type Vessel = Database['public']['Tables']['vessels']['Row'];
@@ -40,7 +41,7 @@ export default function Vessels() {
       scopedDb.from('carriers').select('*').order('name')
     ]);
 
-    if (vesselsRes.error) console.error(vesselsRes.error);
+    if (vesselsRes.error) logger.error(vesselsRes.error);
     
     setVessels(vesselsRes.data || []);
     setClasses(classesRes.data || []);

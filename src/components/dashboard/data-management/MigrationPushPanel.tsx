@@ -24,6 +24,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
 import { fixAllMigrations, analyzeMigrations, type MigrationFile, type MigrationIssue } from '@/utils/migrationFixer';
+import { logger } from "@/lib/logger";
 
 interface MigrationResult {
   name: string;
@@ -113,7 +114,7 @@ export default function MigrationPushPanel() {
       toast.success(`Loaded ${loadedMigrations.length} migration files`);
       setActiveTab('analyze');
     } catch (error) {
-      console.error('Error loading migrations:', error);
+      logger.error('Error loading migrations:', error);
       toast.error('Failed to load migration files');
     } finally {
       setIsLoading(false);
@@ -139,7 +140,7 @@ export default function MigrationPushPanel() {
         toast.success('No issues found');
       }
     } catch (error) {
-      console.error('Error analyzing migrations:', error);
+      logger.error('Error analyzing migrations:', error);
       toast.error('Failed to analyze migrations');
     } finally {
       setIsAnalyzing(false);
@@ -160,7 +161,7 @@ export default function MigrationPushPanel() {
       // Fix all migrations before pushing
       const { fixed, issues } = fixAllMigrations(migrations);
 
-      console.log(`Pushing ${fixed.length} migrations (${issues.length} issues auto-fixed)`);
+      logger.debug(`Pushing ${fixed.length} migrations (${issues.length} issues auto-fixed)`);
 
       // Large exports can exceed backend CPU limits; push in chunks.
       const batchSize = 50;
@@ -219,7 +220,7 @@ export default function MigrationPushPanel() {
       setActiveTab('results');
     } catch (error) {
       const msg = error instanceof Error ? error.message : String(error);
-      console.error('Error pushing migrations:', error);
+      logger.error('Error pushing migrations:', error);
       toast.error('Failed to push migrations', {
         description: msg,
       });

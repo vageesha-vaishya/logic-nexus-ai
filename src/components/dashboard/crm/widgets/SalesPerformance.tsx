@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Users, TrendingUp } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface SalesRepPerformance {
   id: string;
@@ -62,7 +63,7 @@ export function SalesPerformance() {
           setPerformance(result);
         }
       } catch (error) {
-        console.error('Failed to fetch sales performance:', error);
+        logger.error('Failed to fetch sales performance:', error);
       } finally {
         setLoading(false);
       }

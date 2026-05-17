@@ -34,6 +34,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { logger } from "@/lib/logger";
 
 interface CarrierSelectProps {
   mode?: string | null;
@@ -125,7 +126,7 @@ export const CarrierSelect = React.memo(function CarrierSelect({
       onChange(null, null); // Clear selection
       if (refetch) refetch();
     } catch (error: any) {
-      console.error('Error deleting carrier:', error);
+      logger.error('Error deleting carrier:', error);
       toast({
         title: "Error",
         description: "Failed to delete carrier.",

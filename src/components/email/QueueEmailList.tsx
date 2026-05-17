@@ -18,6 +18,7 @@ import { useQueueManagement } from '@/hooks/useQueueManagement';
 import { QueueEmailAssigner } from './QueueEmailAssigner';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { logger } from "@/lib/logger";
 
 interface QueueEmail {
   id: string;
@@ -73,7 +74,7 @@ export function QueueEmailList({ onSelectEmail, selectedEmailId }: QueueEmailLis
       
       setEmails((data as QueueEmail[]) || []);
     } catch (error: any) {
-      console.error('Error fetching queue emails:', error);
+      logger.error('Error fetching queue emails:', error);
       toast({
         title: 'Error',
         description: 'Failed to load queue emails',

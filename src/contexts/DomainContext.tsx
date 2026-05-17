@@ -99,7 +99,7 @@ export function DomainContextProvider({ children }: { children: React.ReactNode 
       localStorage.setItem('active_domain_code', code);
       toast.success(`Switched to ${domain.name}`);
     } else {
-      console.warn(`Domain ${code} not found`);
+      logger.warn(`Domain ${code} not found`);
     }
   }, [availableDomains, loadDomains]);
 

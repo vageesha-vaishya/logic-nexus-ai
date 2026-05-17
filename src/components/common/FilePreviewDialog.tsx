@@ -4,6 +4,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Button } from '@/components/ui/button';
 import { Download, ExternalLink, FileText, X, AlertTriangle, Shield, Activity, FileCode, FileAudio, FileVideo } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { logger } from "@/lib/logger";
 
 interface FilePreviewDialogProps {
   open: boolean;
@@ -39,7 +40,7 @@ export function FilePreviewDialog({ open, onOpenChange, file }: FilePreviewDialo
             throw new Error('Failed to fetch');
         })
         .then(text => setContent(text.slice(0, 50000))) // Limit to 50KB for preview
-        .catch(err => console.error('Failed to load text content:', err))
+        .catch(err => logger.error('Failed to load text content:', err))
         .finally(() => setLoading(false));
     } else {
       setContent(null);

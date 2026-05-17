@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { AlertCircle } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 interface UsageRecord {
   feature_key: string;
@@ -40,7 +41,7 @@ export function UsageMetrics({ tenantId }: UsageMetricsProps) {
       setUsageRecords(data || []);
     } catch (error: any) {
       toast.error('Failed to load usage data');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }

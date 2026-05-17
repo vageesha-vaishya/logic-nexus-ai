@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { leadConversionSchema, LeadConversionValues } from './schema';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Separator } from '@/components/ui/separator';
+import { logger } from "@/lib/logger";
 
 interface LeadConversionDialogProps {
   open: boolean;
@@ -267,7 +268,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
         .eq('lead_id', lead.id);
 
       if (actError) {
-          console.warn('Failed to transfer activities:', actError);
+          logger.warn('Failed to transfer activities:', actError);
           // Don't fail the whole process for activities, just log warning
       }
 
@@ -303,7 +304,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
       }
 
     } catch (error: any) {
-      console.error('Conversion failed:', error);
+      logger.error('Conversion failed:', error);
       toast.error('Failed to convert lead: ' + (error.message || 'Unknown error'));
     } finally {
       setLoading(false);

@@ -3,6 +3,7 @@ import { AdvancedFilter, FilterField } from '../../components/crm/AdvancedFilter
 import { useState } from 'react';
 import { SkeletonForm } from '@/components/ui/skeleton-table';
 import { EmptyState, emptyStates } from '@/components/ui/empty-state';
+import { logger } from "@/lib/logger";
 
 const meta: Meta<typeof AdvancedFilter> = {
   title: 'CRM/AdvancedFilter',
@@ -84,8 +85,8 @@ const RenderWithState = (args: React.ComponentProps<typeof AdvancedFilter>) => {
 export const Default: Story = {
   args: {
     fields: filterFields,
-    onApply: (c) => console.log('Filters applied:', c),
-    onSavePreset: (n, c) => console.log('Preset saved:', n, c),
+    onApply: (c) => logger.debug('Filters applied:', c),
+    onSavePreset: (n, c) => logger.debug('Preset saved:', n, c),
   },
   render: RenderWithState,
 };
@@ -111,7 +112,7 @@ export const RTL: Story = {
     <div dir="rtl" className="w-[800px] h-[400px] p-4 border rounded-lg bg-white">
       <AdvancedFilter
         fields={filterFields}
-        onApply={(c) => console.log('Filters applied:', c)}
+        onApply={(c) => logger.debug('Filters applied:', c)}
       />
     </div>
   )

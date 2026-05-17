@@ -18,6 +18,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import { logger } from "@/lib/logger";
 
 export default function ActivityDetail() {
   const { id } = useParams();
@@ -54,7 +55,7 @@ export default function ActivityDetail() {
       setActivity(flattened);
     } catch (error: any) {
       toast.error('Failed to load activity');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     } finally {
       setLoading(false);
     }
@@ -139,7 +140,7 @@ export default function ActivityDetail() {
       navigate('/dashboard/activities');
     } catch (error: any) {
       toast.error('Failed to update activity');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 
@@ -156,7 +157,7 @@ export default function ActivityDetail() {
       navigate('/dashboard/activities');
     } catch (error: any) {
       toast.error('Failed to delete activity');
-      console.error('Error:', error);
+      logger.error('Error:', error);
     }
   };
 

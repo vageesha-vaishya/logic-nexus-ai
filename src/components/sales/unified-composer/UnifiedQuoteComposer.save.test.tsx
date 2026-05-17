@@ -3,6 +3,7 @@ import { render, screen, waitFor, fireEvent } from '@testing-library/react';
 import { UnifiedQuoteComposer, getSaveErrorMessage } from './UnifiedQuoteComposer';
 /* import { UnifiedQuoteComposer } from './UnifiedQuoteComposer'; */
 import { MemoryRouter } from 'react-router-dom';
+import { logger } from "@/lib/logger";
 
 // Mock dependencies
 const { 
@@ -149,10 +150,10 @@ const createSafeChain = (_name: string, data: any = [], error: any = null) => {
 // Mock logger
 vi.mock('@/lib/logger', () => ({
     logger: {
-        info: vi.fn((msg, ...args) => console.log('LOGGER INFO:', msg, ...args)),
-        error: vi.fn((msg, ...args) => console.error('LOGGER ERROR:', msg, ...args)),
-        warn: vi.fn((msg, ...args) => console.warn('LOGGER WARN:', msg, ...args)),
-        debug: vi.fn((msg, ...args) => console.log('LOGGER DEBUG:', msg, ...args)),
+        info: vi.fn((msg, ...args) => logger.debug('LOGGER INFO:', msg, ...args)),
+        error: vi.fn((msg, ...args) => logger.error('LOGGER ERROR:', msg, ...args)),
+        warn: vi.fn((msg, ...args) => logger.warn('LOGGER WARN:', msg, ...args)),
+        debug: vi.fn((msg, ...args) => logger.debug('LOGGER DEBUG:', msg, ...args)),
     },
 }));
 
@@ -379,7 +380,7 @@ vi.mock('./ResultsZone', () => ({
             <button
                 data-testid="select-option-btn"
                 onClick={() => {
-                    console.log('DEBUG: Clicking Select Option');
+                    logger.debug('DEBUG: Clicking Select Option');
                     if (onSelect) {
                         onSelect({ 
                             id: 'opt-1', 
@@ -389,7 +390,7 @@ vi.mock('./ResultsZone', () => ({
                             ai_generated: true // Simulate AI option
                         });
                     } else {
-                        console.log('DEBUG: onSelect is undefined');
+                        logger.debug('DEBUG: onSelect is undefined');
                     }
                 }}
             >

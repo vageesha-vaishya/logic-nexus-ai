@@ -9,6 +9,7 @@ import { EmitEventSchema } from '@/lib/schemas/events';
 import { TemplateSelector } from './quotation-versions/TemplateSelector';
 import { useCRM } from '@/hooks/useCRM';
 import { QuoteActionIcon } from '@/components/sales/QuoteActionIcon';
+import { logger } from "@/lib/logger";
 
 interface QuotePreviewModalProps {
   quoteId: string;
@@ -54,7 +55,7 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
         setPdfUrl(null);
       }
 
-      console.log('[QuotePreview] Generating PDF for:', { quoteId, versionId, templateId: selectedTemplateId });
+      logger.debug('[QuotePreview] Generating PDF for:', { quoteId, versionId, templateId: selectedTemplateId });
       const basePayload = { 
         quoteId, 
         versionId, 
@@ -97,7 +98,7 @@ export function QuotePreviewModal({ quoteId, quoteNumber, versionId, disabled }:
       }
       span.end();
     } catch (err: any) {
-      console.error('PDF Preview Error:', err);
+      logger.error('PDF Preview Error:', err);
       setError(err.message || 'Failed to generate PDF preview');
       toast.error('Preview Generation Failed', { description: err.message });
     } finally {

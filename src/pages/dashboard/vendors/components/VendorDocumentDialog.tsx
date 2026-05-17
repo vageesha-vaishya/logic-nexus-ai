@@ -187,7 +187,7 @@ export function VendorDocumentDialog({ open, onOpenChange, vendorId, folders = [
               onSuccess();
             }
           } catch (e) {
-            console.error('Virus scan simulation failed', e);
+            logger.error('Virus scan simulation failed', e);
           }
         }, 3000);
       }
@@ -213,7 +213,7 @@ export function VendorDocumentDialog({ open, onOpenChange, vendorId, folders = [
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error('Error adding document:', error);
+      logger.error('Error adding document:', error);
       const message = error instanceof Error ? error.message : 'Failed to add document';
       toast.error(message);
     } finally {

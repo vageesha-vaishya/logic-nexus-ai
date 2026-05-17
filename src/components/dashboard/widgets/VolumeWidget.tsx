@@ -4,6 +4,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { useEffect, useState } from 'react';
 import { dashboardAnalyticsService } from '@/services/dashboardAnalytics';
 import { Loader2 } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 export function VolumeWidget({ config }: WidgetProps) {
   const [data, setData] = useState<CarrierVolume[]>([]);
@@ -15,7 +16,7 @@ export function VolumeWidget({ config }: WidgetProps) {
         const volume = await dashboardAnalyticsService.getCarrierVolume();
         setData(volume);
       } catch (error) {
-        console.error('Failed to load volume data', error);
+        logger.error('Failed to load volume data', error);
       } finally {
         setLoading(false);
       }

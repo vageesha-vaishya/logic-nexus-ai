@@ -1,4 +1,5 @@
 import { ScopedDataAccess } from '@/lib/db/access';
+import { logger } from "@/lib/logger";
 
 export interface ImportSession {
   id: string;
@@ -101,7 +102,7 @@ export const ImportHistoryService = {
         
       if (error) throw error;
     } catch (err) {
-      console.warn('Failed to log import errors (import_errors table might be missing):', err);
+      logger.warn('Failed to log import errors (import_errors table might be missing):', err);
     }
   },
 
@@ -146,10 +147,10 @@ export const ImportHistoryService = {
 
       if (error) {
         // If table doesn't exist, we might get a 404 or 42P01
-        console.warn('Failed to log override action:', error);
+        logger.warn('Failed to log override action:', error);
       }
     } catch (err) {
-      console.warn('Failed to log override action:', err);
+      logger.warn('Failed to log override action:', err);
     }
   },
 

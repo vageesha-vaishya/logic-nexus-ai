@@ -6,6 +6,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from '@
 import { Button } from '@/components/ui/button';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 type ResetPolicy = 'none' | 'daily' | 'monthly' | 'yearly';
 
@@ -51,7 +52,7 @@ export default function QuoteNumberSettings() {
       });
       if (!previewErr) setPreviewNext(typeof previewRes === 'string' ? previewRes : String(previewRes ?? ''));
     } catch (e: any) {
-      console.error('Load config failed', e);
+      logger.error('Load config failed', e);
     }
   };
 

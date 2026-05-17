@@ -2,6 +2,7 @@ import React from 'react';
 import { render, waitFor, act } from '@testing-library/react';
 import { vi, describe, it, expect, beforeEach } from 'vitest';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
+import { logger } from "@/lib/logger";
 
 // Helper for mocking Supabase query chains - Memory Efficient Version
 const createMockQuery = (data: any = []) => {
@@ -167,7 +168,7 @@ describe('UnifiedQuoteComposer V3', () => {
     
     // Default mock implementation
     mockFrom.mockImplementation((table: string) => {
-      // console.log('mockFrom called for table:', table);
+      // logger.debug('mockFrom called for table:', table);
       return createMockQuery([]);
     });
   });

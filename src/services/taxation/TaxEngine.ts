@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { TaxCalculationRequest, TaxCalculationResult, NexusDeterminationRequest, NexusDeterminationResult } from './types';
+import { logger } from "@/lib/logger";
 
 export class TaxEngine {
   /**
@@ -41,7 +42,7 @@ export class TaxEngine {
    */
   static async calculate(request: TaxCalculationRequest): Promise<TaxCalculationResult> {
     const { jurisdictionCode, items } = request;
-    console.log(`Calculating tax for jurisdiction: ${jurisdictionCode}`);
+    logger.debug(`Calculating tax for jurisdiction: ${jurisdictionCode}`);
     
     // 1. Fetch effective tax rules for this jurisdiction
     const { data: rules, error } = await supabase
@@ -63,7 +64,7 @@ export class TaxEngine {
       .order('priority', { ascending: false });
 
     if (error) {
-      console.error('Error fetching tax rules:', error);
+      logger.error('Error fetching tax rules:', error);
       throw error;
     }
 
@@ -142,7 +143,7 @@ export class TaxEngine {
       .or(`effective_to.is.null,effective_to.gte.${today}`);
 
     if (error) {
-      console.error('Error fetching tenant nexus:', error);
+      logger.error('Error fetching tenant nexus:', error);
       return [];
     }
 

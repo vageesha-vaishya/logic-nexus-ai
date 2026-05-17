@@ -23,6 +23,7 @@ import { cleanEmail } from "@/lib/data-cleaning";
 import { EmailComposeDialog } from "./EmailComposeDialog";
 import { EmailDetailDialog } from "./EmailDetailDialog";
 import { format } from "date-fns";
+import { logger } from "@/lib/logger";
 
 interface Email {
   id: string;
@@ -184,7 +185,7 @@ export function EmailInbox() {
       }
     } catch (error: any) {
       if (error.message?.includes("non-2xx") && (error as any)?.context?.status === 401) {
-          console.error("Fetch Emails Unauthorized. Full error:", error);
+          logger.error("Fetch Emails Unauthorized. Full error:", error);
           toast({ title: "Session Expired", description: "Please log out and log in again to view emails.", variant: "destructive" });
       } else {
           toast({
@@ -341,9 +342,9 @@ export function EmailInbox() {
            const status = (error as any)?.context?.status;
            if (status === 401) {
               // If we get here, the retry logic in invokeFunction also failed
-              console.error("Sync Unauthorized after retry. Full error:", error);
+              logger.error("Sync Unauthorized after retry. Full error:", error);
               if ((error as any)?.context) {
-                  console.error("Debug info (context):", (error as any).context);
+                  logger.error("Debug info (context):", (error as any).context);
               }
               toast({ title: "Sync Unauthorized", description: "Session expired. Please log out and log in again.", variant: "destructive" });
               return;
@@ -401,9 +402,9 @@ export function EmailInbox() {
           body: { accountId: acc.id },
         });
         if (error) {
-          console.error("Sync error for account", acc.id, error);
+          logger.error("Sync error for account", acc.id, error);
           if ((error as any)?.context) {
-             console.error("Sync error context:", (error as any).context);
+             logger.error("Sync error context:", (error as any).context);
           }
           continue;
         }

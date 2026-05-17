@@ -195,7 +195,7 @@ export function ServiceVendorsPanel({ serviceId }: ServiceVendorsPanelProps) {
         throw error;
       }
     } catch (err: any) {
-      console.error('Error updating preference:', err);
+      logger.error('Error updating preference:', err);
       toast.error('Failed to update preference');
     }
   };
@@ -231,7 +231,7 @@ export function ServiceVendorsPanel({ serviceId }: ServiceVendorsPanelProps) {
       toast.success('Cost structure updated');
       setEditingCostLink(null);
     } catch (err: any) {
-      console.error('Error saving cost:', err);
+      logger.error('Error saving cost:', err);
       toast.error('Failed to save cost structure');
     } finally {
       setSavingCost(false);

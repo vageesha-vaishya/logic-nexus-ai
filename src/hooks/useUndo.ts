@@ -1,6 +1,7 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
 import { useCRM } from './useCRM';
+import { logger } from "@/lib/logger";
 
 interface UndoOptions<T> {
   table: string;
@@ -42,7 +43,7 @@ export function useUndo() {
               if (onUndo) onUndo(data);
               if (onSuccess) onSuccess();
             } catch (err: any) {
-              console.error(`Failed to undo delete for ${table}:`, err);
+              logger.error(`Failed to undo delete for ${table}:`, err);
               toast.error(`Failed to restore ${label}`);
             }
           }
@@ -52,7 +53,7 @@ export function useUndo() {
 
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      console.error(`Failed to delete ${table}:`, err);
+      logger.error(`Failed to delete ${table}:`, err);
       toast.error(`Failed to delete ${label}`);
     }
   }, [scopedDb]);

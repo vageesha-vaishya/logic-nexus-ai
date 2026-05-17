@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { BarChart3, CheckCircle, XCircle, TrendingUp } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface WinLossData {
   wins: number;
@@ -52,7 +53,7 @@ export function WinLossMetrics() {
           avgDealSize,
         });
       } catch (error) {
-        console.error('Failed to fetch win/loss metrics:', error);
+        logger.error('Failed to fetch win/loss metrics:', error);
       } finally {
         setLoading(false);
       }

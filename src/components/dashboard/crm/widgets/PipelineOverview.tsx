@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { BarChart3, List, DollarSign } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface PipelineStage {
   name: string;
@@ -48,7 +49,7 @@ export function PipelineOverview() {
           setPipeline(result);
         }
       } catch (error) {
-        console.error('Failed to fetch pipeline overview:', error);
+        logger.error('Failed to fetch pipeline overview:', error);
       } finally {
         setLoading(false);
       }

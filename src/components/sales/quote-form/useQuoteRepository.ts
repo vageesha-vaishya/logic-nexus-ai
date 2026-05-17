@@ -22,6 +22,7 @@ import { parseTransitTimeToHours } from '@/lib/transit-time';
 import { dbField } from '@/lib/schemas/field-registry';
 import { useAppFeatureFlag, FEATURE_FLAGS } from '@/lib/feature-flags';
 import { sanitizePayload } from '@/lib/utils/sanitizer';
+import { logger } from "@/lib/logger";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -153,7 +154,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
       const portsService = new PortsService(scopedDb);
       try {
         const data = await portsService.getAllPorts();
-        console.log(`[useQuoteRepository] Ports loaded: ${data.length}`);
+        logger.debug(`[useQuoteRepository] Ports loaded: ${data.length}`);
         return data.map((p: any) => ({
           id: p.id,
           name: p.location_name,
@@ -161,7 +162,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
           country_code: p.country,
         }));
       } catch (err: any) {
-        console.error('[useQuoteRepository] Failed to load ports', err);
+        logger.error('[useQuoteRepository] Failed to load ports', err);
         return [];
       }
     },
@@ -182,7 +183,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return (data || []) as CarrierOption[];
       } catch (e: any) {
         debug.error('Failed to load carriers', { error: e });
-        console.error('[useQuoteRepository] Failed to load carriers', e);
+        logger.error('[useQuoteRepository] Failed to load carriers', e);
         return [];
       }
     },
@@ -204,7 +205,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return (data || []) as AccountOption[];
       } catch (e: any) {
         debug.error('Failed to load accounts', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load accounts', e);
+        logger.error('[useQuoteRepository] Failed to load accounts', e);
         return [];
       }
     },
@@ -226,7 +227,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return (data || []) as OpportunityOption[];
       } catch (e: any) {
         debug.error('Failed to load opportunities', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load opportunities', e);
+        logger.error('[useQuoteRepository] Failed to load opportunities', e);
         return [];
       }
     },
@@ -320,7 +321,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return { services: servicesForDropdown, serviceTypes: serviceTypesForDropdown };
       } catch (e: any) {
         debug.error('Failed to load services/types', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load services/types', e);
+        logger.error('[useQuoteRepository] Failed to load services/types', e);
         return { services: [], serviceTypes: [] };
       }
     },
@@ -343,7 +344,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return (data || []) as ContactOption[];
       } catch (e: any) {
         debug.error('Failed to load contacts', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load contacts', e);
+        logger.error('[useQuoteRepository] Failed to load contacts', e);
         return [];
       }
     },
@@ -364,7 +365,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load shipping terms', { error: e });
-        console.error('[useQuoteRepository] Failed to load shipping terms', e);
+        logger.error('[useQuoteRepository] Failed to load shipping terms', e);
         return [];
       }
     },
@@ -385,7 +386,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load currencies', { error: e });
-        console.error('[useQuoteRepository] Failed to load currencies', e);
+        logger.error('[useQuoteRepository] Failed to load currencies', e);
         return [];
       }
     },
@@ -404,7 +405,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load charge categories', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load charge categories', e);
+        logger.error('[useQuoteRepository] Failed to load charge categories', e);
         return [];
       }
     },
@@ -424,7 +425,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load charge sides', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load charge sides', e);
+        logger.error('[useQuoteRepository] Failed to load charge sides', e);
         return [];
       }
     },
@@ -444,7 +445,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load charge bases', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load charge bases', e);
+        logger.error('[useQuoteRepository] Failed to load charge bases', e);
         return [];
       }
     },
@@ -464,7 +465,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load service modes', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load service modes', e);
+        logger.error('[useQuoteRepository] Failed to load service modes', e);
         return [];
       }
     },
@@ -484,7 +485,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load trade directions', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load trade directions', e);
+        logger.error('[useQuoteRepository] Failed to load trade directions', e);
         return [];
       }
     },
@@ -504,7 +505,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load service leg categories', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load service leg categories', e);
+        logger.error('[useQuoteRepository] Failed to load service leg categories', e);
         return [];
       }
     },
@@ -524,7 +525,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load container types', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load container types', e);
+        logger.error('[useQuoteRepository] Failed to load container types', e);
         return [];
       }
     },
@@ -544,7 +545,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
         return data || [];
       } catch (e: any) {
         debug.error('Failed to load container sizes', { error: e, tenantId });
-        console.error('[useQuoteRepository] Failed to load container sizes', e);
+        logger.error('[useQuoteRepository] Failed to load container sizes', e);
         return [];
       }
     },
@@ -630,9 +631,9 @@ export function useQuoteRepositoryForm(opts: {
 
       const duration = performance.now() - start;
       if (duration > 1000) {
-        console.warn(`[useQuoteRepository] Slow hydration: ${duration.toFixed(2)}ms`);
+        logger.warn(`[useQuoteRepository] Slow hydration: ${duration.toFixed(2)}ms`);
       } else {
-        console.log(`[useQuoteRepository] Hydration took: ${duration.toFixed(2)}ms`);
+        logger.debug(`[useQuoteRepository] Hydration took: ${duration.toFixed(2)}ms`);
       }
 
       return {
@@ -704,9 +705,9 @@ export function useQuoteRepositoryForm(opts: {
       
       const duration = performance.now() - start;
       if (duration > 1000) {
-        console.warn(`[useQuoteRepository] Slow versions hydration: ${duration.toFixed(2)}ms`);
+        logger.warn(`[useQuoteRepository] Slow versions hydration: ${duration.toFixed(2)}ms`);
       } else {
-        console.log(`[useQuoteRepository] Versions hydration took: ${duration.toFixed(2)}ms`);
+        logger.debug(`[useQuoteRepository] Versions hydration took: ${duration.toFixed(2)}ms`);
       }
       
       return data;
@@ -721,7 +722,7 @@ export function useQuoteRepositoryForm(opts: {
   // Log hydration data for debugging
   useEffect(() => {
     if (coreQuery.data) {
-        console.log('[useQuoteRepository] Core Data Loaded:', {
+        logger.debug('[useQuoteRepository] Core Data Loaded:', {
             quoteId,
             itemsCount: coreQuery.data.items?.length,
             cargoCount: coreQuery.data.cargo?.length
@@ -804,7 +805,7 @@ export function useQuoteRepositoryForm(opts: {
 
     // Case 1: Progressive Injection (Dirty form, but options just arrived)
     if (isDirty && !hasOptions && mappedOptions.length > 0) {
-        console.log('[useQuoteRepository] Progressive hydration: Injecting late-arriving options');
+        logger.debug('[useQuoteRepository] Progressive hydration: Injecting late-arriving options');
         form.reset({
             ...form.getValues(),
             options: mappedOptions
@@ -1068,7 +1069,7 @@ export function useQuoteRepositoryForm(opts: {
     };
 
     injectMissingEntities().catch((err) => {
-      console.error('[QuoteRepository] Error injecting CRM entities:', err);
+      logger.error('[QuoteRepository] Error injecting CRM entities:', err);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [coreQuery.data, versionsQuery.data]);
@@ -1292,7 +1293,7 @@ export function useQuoteRepositoryForm(opts: {
       const { data: savedId, error } = await scopedDb.rpc('save_quote_atomic', { p_payload: sanitizePayload(payload) });
 
       if (error) {
-          console.error('[QuoteRepository] RPC save failed:', error);
+          logger.error('[QuoteRepository] RPC save failed:', error);
           throw error;
       }
       

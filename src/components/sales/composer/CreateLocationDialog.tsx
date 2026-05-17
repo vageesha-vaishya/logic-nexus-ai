@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { logger } from "@/lib/logger";
 
 interface CreateLocationDialogProps {
   open: boolean;
@@ -68,7 +69,7 @@ export function CreateLocationDialog({
       onOpenChange(false);
       resetForm();
     } catch (error: any) {
-      console.error('Error creating location:', error);
+      logger.error('Error creating location:', error);
       toast({
         title: "Error",
         description: error.message || "Failed to create location.",

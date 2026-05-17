@@ -16,6 +16,7 @@ import { CrudFormLayout } from '@/components/system/CrudFormLayout';
 import { FormSection } from '@/components/system/FormSection';
 import { FormStepper } from '@/components/system/FormStepper';
 import { invokeFunction } from '@/lib/supabase-functions';
+import { logger } from "@/lib/logger";
 
 const parsePositiveInteger = (value?: string | number | null) => {
   const parsed = Number.parseInt(String(value ?? '').trim(), 10);
@@ -203,7 +204,7 @@ export function FranchiseForm({ franchise, onSuccess }: FranchiseFormProps) {
         .in('id', uniqueUserIds);
         
       if (error) {
-        console.error('Failed to fetch managers:', error);
+        logger.error('Failed to fetch managers:', error);
         toast({
           title: 'Error Loading Managers',
           description: error.message,

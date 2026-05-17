@@ -4,6 +4,7 @@ import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
 import { QuoteStatus, stages, statusConfig } from '@/pages/dashboard/quotes-data';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function QuotesKanbanBoard() {
   const { scopedDb, context } = useCRM();
@@ -28,7 +29,7 @@ export function QuotesKanbanBoard() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Failed to fetch quotes:', error);
+        logger.error('Failed to fetch quotes:', error);
         // Fallback to fetching without owner_id if column doesn't exist or filtering differently
         // But for now, let's assume filtering by tenant/franchise via scopedDb is enough if owner_id is missing
         // Wait, scopedDb handles tenant/franchise automatically.
@@ -63,7 +64,7 @@ export function QuotesKanbanBoard() {
       .eq('id', activeId);
 
     if (error) {
-      console.error('Failed to update quote status:', error);
+      logger.error('Failed to update quote status:', error);
       toast.error('Failed to update status');
       // Revert logic could be added here
     }

@@ -9,6 +9,7 @@
  */
 
 import { WorkOrderTemplate } from '../AmroWorkOrderTemplatesPage';
+import { logger } from "@/lib/logger";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -436,7 +437,7 @@ export async function fetchAircraftModels(
       code: String(r.code || r.model_code || ''),
     }));
   } catch (error) {
-    console.error('Failed to fetch aircraft models:', error);
+    logger.error('Failed to fetch aircraft models:', error);
     return [];
   }
 }

@@ -5,6 +5,7 @@ import { ScopedDataAccess } from '@/lib/db/access';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Loader2, Building2, Users } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface DestinationSelectorProps {
   transferType: TransferType;
@@ -40,7 +41,7 @@ export function DestinationSelector({
         const data = await TransferService.getAvailableTenants(dao);
         setTenants(data);
       } catch (error) {
-        console.error('Error loading tenants:', error);
+        logger.error('Error loading tenants:', error);
       } finally {
         setLoadingTenants(false);
       }
@@ -70,7 +71,7 @@ export function DestinationSelector({
           setFranchises(data);
         }
       } catch (error) {
-        console.error('Error loading franchises:', error);
+        logger.error('Error loading franchises:', error);
       } finally {
         setLoadingFranchises(false);
       }

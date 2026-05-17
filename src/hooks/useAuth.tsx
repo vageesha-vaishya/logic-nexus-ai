@@ -90,7 +90,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .eq('user_id', userId);
 
     if (error) {
-      console.error('Error fetching roles:', error);
+      logger.error('Error fetching roles:', error);
       return [];
     }
     
@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .rpc('get_user_custom_permissions', { check_user_id: userId });
 
     if (error) {
-      console.error('Error fetching custom permissions:', error);
+      logger.error('Error fetching custom permissions:', error);
       return { granted: [], denied: [] };
     }
     
@@ -133,7 +133,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       .single();
 
     if (error) {
-      console.error('Error fetching profile:', error);
+      logger.error('Error fetching profile:', error);
       return null;
     }
     return data;
@@ -422,13 +422,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Use scope: 'local' to avoid CORS/network issues with global sign out
       const { error } = await supabase.auth.signOut({ scope: 'local' });
       if (error) {
-        console.error('Error signing out:', error);
+        logger.error('Error signing out:', error);
         // Still navigate even if there's an error - user is already logged out locally
       }
       navigate('/auth');
       return { error };
     } catch (error) {
-      console.error('Unexpected error during sign out:', error);
+      logger.error('Unexpected error during sign out:', error);
       navigate('/auth');
       return { error: error as any };
     }

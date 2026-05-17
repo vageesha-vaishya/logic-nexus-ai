@@ -11,6 +11,7 @@ import { Plus, Search } from 'lucide-react';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Database } from '@/integrations/supabase/types';
+import { logger } from "@/lib/logger";
 
 type Booking = Database['public']['Tables']['bookings']['Row'] & {
   carriers: { name: string } | null;
@@ -40,7 +41,7 @@ export default function Bookings() {
       if (error) throw error;
       setBookings(data as any);
     } catch (error) {
-      console.error('Error fetching bookings:', error);
+      logger.error('Error fetching bookings:', error);
       toast.error('Failed to load bookings');
     } finally {
       setLoading(false);

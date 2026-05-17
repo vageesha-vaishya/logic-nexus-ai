@@ -15,6 +15,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { CommandCenterNav } from '@/components/navigation/CommandCenterNav';
 import { motion } from 'framer-motion';
+import { logger } from "@/lib/logger";
 
 export function AppSidebar() {
   const { state, setOpen, isMobile, setOpenMobile, toggleSidebar } = useSidebar();
@@ -44,7 +45,7 @@ export function AppSidebar() {
         toast.error("Sign out failed, but you have been logged out locally.");
       }
     } catch (e) {
-      console.error(e);
+      logger.error(e);
       toast.error("An unexpected error occurred during sign out.");
     } finally {
       setIsSigningOut(false);

@@ -4,6 +4,7 @@ import { KanbanBoard, ColumnType } from '@/components/kanban/KanbanBoard';
 import { KanbanItem } from '@/components/kanban/KanbanCard';
 import { LeadStatus, stages, statusConfig } from '@/pages/dashboard/leads-data';
 import { toast } from 'sonner';
+import { logger } from "@/lib/logger";
 
 export function LeadsKanbanBoard() {
   const { scopedDb, context } = useCRM();
@@ -28,7 +29,7 @@ export function LeadsKanbanBoard() {
         .order('created_at', { ascending: false });
 
       if (error) {
-        console.error('Failed to fetch leads:', error);
+        logger.error('Failed to fetch leads:', error);
         toast.error('Failed to load leads');
       } else {
         const kanbanItems: KanbanItem[] = (data || []).map((lead: any) => ({
@@ -59,7 +60,7 @@ export function LeadsKanbanBoard() {
       .eq('id', activeId);
 
     if (error) {
-      console.error('Failed to update lead status:', error);
+      logger.error('Failed to update lead status:', error);
       toast.error('Failed to update status');
       // Revert logic could be added here
     }

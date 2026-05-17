@@ -13,6 +13,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { Loader2, Save, FileText, Plus, GripVertical, Trash2, Eye, Check } from 'lucide-react';
 import { useNavigate, useParams } from 'react-router-dom';
+import { logger } from "@/lib/logger";
 
 export interface TemplateSection {
   id: string;
@@ -263,7 +264,7 @@ export function TemplateBuilder() {
         if (tenantData) {
           setTenantProfile(tenantData);
         } else if (tenantError) {
-          console.error('Error loading tenant profile:', tenantError);
+          logger.error('Error loading tenant profile:', tenantError);
         } else {
            // Fallback if tenant_profile doesn't exist yet, try tenants table
            const { data: tenantBase } = await supabase
@@ -286,7 +287,7 @@ export function TemplateBuilder() {
           });
         }
       } catch (err) {
-        console.error('Error loading context data:', err);
+        logger.error('Error loading context data:', err);
       }
     };
 
@@ -420,7 +421,7 @@ export function TemplateBuilder() {
         toast.success('Template saved successfully');
       }
     } catch (err: any) {
-      console.error('Error saving template:', err);
+      logger.error('Error saving template:', err);
       toast.error(`Failed to save: ${err.message}`);
     } finally {
       setSaving(false);

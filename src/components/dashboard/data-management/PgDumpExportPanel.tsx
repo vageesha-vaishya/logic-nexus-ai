@@ -40,6 +40,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { PgDumpOptionsPanel, PgDumpCategoryOptions, PgDumpGeneralOptions } from "./PgDumpOptionsPanel";
+import { logger } from "@/lib/logger";
 
 interface ExportProgress {
   phase: string;
@@ -115,11 +116,11 @@ export function PgDumpExportPanel() {
   };
 
   const downloadSqlFile = async (content: string, filename: string): Promise<boolean> => {
-    console.log(`[pg_dump export] Starting download of ${filename} (${content.length} bytes)`);
+    logger.debug(`[pg_dump export] Starting download of ${filename} (${content.length} bytes)`);
     
     // Check if content is valid
     if (!content || content.length === 0) {
-      console.error("[pg_dump export] No content to download");
+      logger.error("[pg_dump export] No content to download");
       toast.error("Export failed", {
         description: "No content was generated for the export file.",
       });
@@ -130,7 +131,7 @@ export function PgDumpExportPanel() {
     let usedFilePicker = false;
     try {
       if (typeof window !== "undefined" && "showSaveFilePicker" in window) {
-        console.log("[pg_dump export] Attempting File System Access API...");
+        logger.debug("[pg_dump export] Attempting File System Access API...");
         const handle = await (window as any).showSaveFilePicker({
           suggestedName: filename,
           types: [
@@ -143,22 +144,22 @@ export function PgDumpExportPanel() {
         const writable = await handle.createWritable();
         await writable.write(content);
         await writable.close();
-        console.log("[pg_dump export] File saved via File System Access API");
+        logger.debug("[pg_dump export] File saved via File System Access API");
         usedFilePicker = true;
         return true;
       }
     } catch (e: any) {
       if (e?.name === "AbortError") {
-        console.log("[pg_dump export] User cancelled save dialog");
+        logger.debug("[pg_dump export] User cancelled save dialog");
         toast.message("Save cancelled");
         return false;
       }
-      console.warn("[pg_dump export] File System Access API failed, falling back to download link", e);
+      logger.warn("[pg_dump export] File System Access API failed, falling back to download link", e);
     }
 
     // Fallback: Use standard blob download
     if (!usedFilePicker) {
-      console.log("[pg_dump export] Using blob download fallback...");
+      logger.debug("[pg_dump export] Using blob download fallback...");
       try {
         const blob = new Blob([content], { type: "application/sql;charset=utf-8" });
         const url = URL.createObjectURL(blob);
@@ -182,10 +183,10 @@ export function PgDumpExportPanel() {
           }, 100);
         });
         
-        console.log("[pg_dump export] Blob download triggered successfully");
+        logger.debug("[pg_dump export] Blob download triggered successfully");
         return true;
       } catch (e: any) {
-        console.error("[pg_dump export] Failed to trigger browser download", e);
+        logger.error("[pg_dump export] Failed to trigger browser download", e);
         toast.error("Export failed", {
           description: "The browser blocked the file download. Please check popup/download settings and try again.",
         });
@@ -797,7 +798,7 @@ export function PgDumpExportPanel() {
           }
           
           if (error) {
-            console.warn(`Error fetching ${tableKey}:`, error);
+            logger.warn(`Error fetching ${tableKey}:`, error);
             warningMessages.push(`Error fetching data for ${tableKey}: ${error.message || String(error)}`);
             continue;
           }
@@ -837,7 +838,7 @@ export function PgDumpExportPanel() {
             );
           }
         } catch (err) {
-          console.warn(`Error exporting ${tableKey}:`, err);
+          logger.warn(`Error exporting ${tableKey}:`, err);
           warningMessages.push(`Error exporting data for ${tableKey}: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
@@ -971,20 +972,20 @@ export function PgDumpExportPanel() {
       }
       
       if (allErrors.length > 0) {
-        console.warn('pg_dump export validation warnings:', allErrors);
+        logger.warn('pg_dump export validation warnings:', allErrors);
         
         // Attempt auto-repair
         updateProgress('Repairing', 97, 'Attempting to repair SQL issues...');
         const { repairedSql, repairs } = repairSqlSyntax(fullSql);
         
         if (repairs.length > 0) {
-          console.log('Applied SQL repairs:', repairs);
+          logger.debug('Applied SQL repairs:', repairs);
           sqlContent = repairedSql;
           
           // Re-validate after repair
           const revalidation = validateAndRepairSql(sqlContent);
           if (revalidation.errors.length > 0) {
-            console.error('Errors remain after repair:', revalidation.errors);
+            logger.error('Errors remain after repair:', revalidation.errors);
             revalidation.errors.forEach(e => errorMessages.push(e));
             toast.warning('Export completed with warnings', {
               description: `${revalidation.errors.length} syntax issues could not be auto-repaired. The file may need manual review.`
@@ -1091,7 +1092,7 @@ export function PgDumpExportPanel() {
       if (err.message === 'Export cancelled') {
         toast.message('Export cancelled');
       } else {
-        console.error('Export error:', err);
+        logger.error('Export error:', err);
         toast.error('Export failed', { description: err.message });
       }
     } finally {

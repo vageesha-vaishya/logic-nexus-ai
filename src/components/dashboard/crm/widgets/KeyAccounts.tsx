@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { Building2, DollarSign, Globe } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface KeyAccount {
   id: string;
@@ -37,7 +38,7 @@ export function KeyAccounts() {
           setAccounts(result);
         }
       } catch (error) {
-        console.error('Failed to fetch key accounts:', error);
+        logger.error('Failed to fetch key accounts:', error);
       } finally {
         setLoading(false);
       }

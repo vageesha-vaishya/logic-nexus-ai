@@ -6,6 +6,7 @@ import { useNavigate } from "react-router-dom";
 import { useCRM } from "../../hooks/useCRM";
 import { cn } from "@/lib/utils";
 import { APP_MENU } from "@/config/navigation";
+import { logger } from "@/lib/logger";
 
 interface SearchResult {
   id: string;
@@ -182,7 +183,7 @@ export function GlobalSearch() {
       setResults(limitedResults);
       setHasMoreResults(totalMatched > limitedResults.length);
     } catch (error) {
-      console.error("Search error:", error);
+      logger.error("Search error:", error);
       setResults(moduleResults);
       setHasMoreResults(APP_MENU.flatMap((section) => section.items).length > moduleResults.length);
     } finally {

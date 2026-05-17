@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { sanitizeBrandingCss, sanitizePayload, sanitizeRichTextHtml, stripHtmlTags } from './sanitizer';
+import { logger } from "@/lib/logger";
 
 describe('sanitizePayload', () => {
   it('should return simple objects unchanged', () => {
@@ -87,7 +88,7 @@ describe('sanitizePayload', () => {
   it('should remove event handler functions (starting with on)', () => {
     const input = {
       data: 'valid',
-      onClick: () => console.log('clicked'),
+      onClick: () => logger.debug('clicked'),
       onChange: function() {}
     };
     

@@ -25,6 +25,7 @@ import { Loader2, Building2, User } from 'lucide-react';
 import { H5 } from '@/components/ui/Heading';
 import { useCRM } from '@/hooks/useCRM';
 import { cn } from '@/lib/utils';
+import { logger } from "@/lib/logger";
 
 // --- Zod Schemas ---
 
@@ -183,7 +184,7 @@ export function UnifiedPartnerForm({
         if (error) throw error;
         setAccounts(data || []);
       } catch (err) {
-        console.error('Error fetching accounts:', err);
+        logger.error('Error fetching accounts:', err);
       }
     }
     fetchAccounts();

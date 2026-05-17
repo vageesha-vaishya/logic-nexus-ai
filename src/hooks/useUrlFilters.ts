@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { logger } from "@/lib/logger";
 
 /**
  * A hook to sync state with URL search parameters for filtering and pagination.
@@ -29,7 +30,7 @@ export function useUrlFilters<T extends Record<string, any>>(
           });
           setSearchParams(newParams, { replace: true });
         } catch (e) {
-          console.error('Failed to parse saved filters', e);
+          logger.error('Failed to parse saved filters', e);
         }
       }
     }

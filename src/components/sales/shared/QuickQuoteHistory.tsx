@@ -48,7 +48,7 @@ export function QuickQuoteHistory({ onSelect, className }: QuickQuoteHistoryProp
       if (error) throw error;
       setHistory(data || []);
     } catch (err) {
-      console.error('Failed to fetch AI quote history:', err);
+      logger.error('Failed to fetch AI quote history:', err);
     } finally {
       setLoading(false);
     }

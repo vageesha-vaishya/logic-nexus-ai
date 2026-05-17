@@ -9,6 +9,7 @@ import { useCRM } from "@/hooks/useCRM";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 export default function Incoterms() {
   const { supabase, scopedDb, context } = useCRM();
@@ -24,7 +25,7 @@ export default function Incoterms() {
       const { data, error } = await scopedDb.from("incoterms").select("*").order("incoterm_code");
 
       if (error) {
-        console.error("Error fetching incoterms:", error);
+        logger.error("Error fetching incoterms:", error);
         return;
       }
 
@@ -64,11 +65,11 @@ export default function Incoterms() {
             .order("incoterm_code");
           setIncoterms(seeded || []);
         } catch (seedErr: any) {
-          console.warn("Incoterms seed failed:", seedErr?.message || seedErr);
+          logger.warn("Incoterms seed failed:", seedErr?.message || seedErr);
         }
       }
     } catch (err) {
-      console.error("Unexpected error fetching incoterms:", err);
+      logger.error("Unexpected error fetching incoterms:", err);
     }
   };
 

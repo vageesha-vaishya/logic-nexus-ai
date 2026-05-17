@@ -23,6 +23,7 @@ import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { processImportRow, ImportLog } from '@/lib/import-processor';
 import { ImportHistoryService, ImportDetail, ImportSession } from '@/lib/import-history-service';
 import { ImportReportDialog } from './ImportReportDialog';
+import { logger } from "@/lib/logger";
 
 // --- Types ---
 
@@ -540,7 +541,7 @@ export default function DataImportExport({
         });
         importSessionId = session.id;
     } catch (e) {
-        console.error("Failed to create import session", e);
+        logger.error("Failed to create import session", e);
         toast.error("Failed to initialize import session");
         setImporting(false);
         return;
@@ -1078,7 +1079,7 @@ export default function DataImportExport({
       toast.success("Export completed successfully");
       
       // Audit Log (Mock)
-      console.log(`[AUDIT] User ${context.userId} exported ${data.length} ${entityName} records at ${new Date().toISOString()}`);
+      logger.debug(`[AUDIT] User ${context.userId} exported ${data.length} ${entityName} records at ${new Date().toISOString()}`);
       
     } catch (e: any) {
       toast.error(`Export failed: ${e.message}`);
@@ -1128,7 +1129,7 @@ export default function DataImportExport({
       if (error) throw error;
       setHistoryData(data as ImportSession[]);
     } catch (err: any) {
-      console.error(err);
+      logger.error(err);
       if (err?.code === 'PGRST205') {
         toast.error("Import history tables missing. Please run the migration.");
       } else {

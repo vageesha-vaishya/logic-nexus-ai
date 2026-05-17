@@ -32,6 +32,7 @@ import {
   ArrowUp
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { logger } from "@/lib/logger";
 
 // Error Boundary for Debug Console to prevent UI disappearance
 class DebugErrorBoundary extends React.Component<{ children: React.ReactNode, onReset: () => void }, { hasError: boolean, error: Error | null }> {
@@ -45,7 +46,7 @@ class DebugErrorBoundary extends React.Component<{ children: React.ReactNode, on
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    console.error("DebugConsole Render Error:", error, errorInfo);
+    logger.error("DebugConsole Render Error:", error, errorInfo);
   }
 
   render() {

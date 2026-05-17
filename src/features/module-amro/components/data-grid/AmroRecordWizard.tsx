@@ -56,6 +56,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '@/components/ui/command';
 import { useDebounce } from '@/hooks/useDebounce';
 import { formatDateToIso, isValidIsoDateString, normalizeIsoDateInput } from './wizardDateUtils';
+import { logger } from "@/lib/logger";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -844,7 +845,7 @@ export function AmroRecordWizard({
       await onDraftSave?.(formData);
       saveWizardDraft();
     } catch (error) {
-      console.error('Failed to save draft:', error);
+      logger.error('Failed to save draft:', error);
     } finally {
       setIsSavingDraft(false);
     }
@@ -860,7 +861,7 @@ export function AmroRecordWizard({
       closeWizard();
       onClose();
     } catch (error) {
-      console.error('Failed to submit:', error);
+      logger.error('Failed to submit:', error);
     } finally {
       setIsSubmitting(false);
     }

@@ -13,6 +13,7 @@ import * as z from "zod";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { toast } from "sonner";
+import { logger } from "@/lib/logger";
 
 const schema = z.object({
   shipmentName: z.string().min(1, "Required"),
@@ -66,7 +67,7 @@ export default function UIDemoAdvanced() {
 
   const shipmentSnippet = `// Advanced fields example\n<FormGrid columns={2}>\n  <TextField control={form.control} name="shipmentName" label="Shipment Name" />\n  <DateField control={form.control} name="shipmentDate" label="Shipment Date" />\n  <CurrencyField control={form.control} name="amount" label="Amount" />\n  <SelectField control={form.control} name="currency" label="Currency" options={[{ label: 'USD', value: 'USD' }]} />\n  <AsyncComboboxField control={form.control} name="serviceId" label="Service" placeholder="Search services..." />\n  <ComboboxField control={form.control} name="destinationCountry" label="Destination Country" options={countryOptions} />\n  <SwitchField control={form.control} name="isHazardous" label="Hazardous Cargo" />\n</FormGrid>`;
 
-  const attachmentsSnippet = `// Signed URL toggle demo (Supabase Storage)\n// Assume files are uploaded to a \`documents\` bucket under paths derived from file names\nconst enableSignedUrl = true;\nif (enableSignedUrl) {\n  // Example: create a 60-minute signed URL for a stored file\n  const { data, error } = await supabase.storage.from('documents').createSignedUrl('invoices/INV-123.pdf', 3600);\n  if (!error) {\n    console.log('Signed URL:', data.signedUrl);\n  }\n}`;
+  const attachmentsSnippet = `// Signed URL toggle demo (Supabase Storage)\n// Assume files are uploaded to a \`documents\` bucket under paths derived from file names\nconst enableSignedUrl = true;\nif (enableSignedUrl) {\n  // Example: create a 60-minute signed URL for a stored file\n  const { data, error } = await supabase.storage.from('documents').createSignedUrl('invoices/INV-123.pdf', 3600);\n  if (!error) {\n    logger.debug('Signed URL:', data.signedUrl);\n  }\n}`;
 
   const onSubmit = (values: Schema) => {
     toast.success("Advanced form submitted", {

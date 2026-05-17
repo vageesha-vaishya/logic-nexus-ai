@@ -33,6 +33,7 @@ import { TaxManagementService } from '@/services/taxation/TaxManagementService';
 import { TaxCode, TaxRule } from '@/services/taxation/types';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 const formSchema = z.object({
   taxCodeId: z.string().optional().nullable(),
@@ -112,7 +113,7 @@ export function TaxRuleDialog({
       const codes = await TaxManagementService.getTaxCodes();
       setTaxCodes(codes);
     } catch (error) {
-      console.error('Failed to load tax codes', error);
+      logger.error('Failed to load tax codes', error);
     }
   };
 

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { PhoneCall, Mail, MessageSquare, CheckCircle } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface ActivityStats {
   calls: number;
@@ -42,7 +43,7 @@ export function TeamActivity() {
           setStats(counts);
         }
       } catch (error) {
-        console.error('Failed to fetch team activity:', error);
+        logger.error('Failed to fetch team activity:', error);
       } finally {
         setLoading(false);
       }

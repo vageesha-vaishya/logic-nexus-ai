@@ -11,6 +11,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { useToast } from '@/hooks/use-toast';
 import { Progress } from '@/components/ui/progress';
 import { ArrowLeft, ArrowRight, Loader2, Send } from 'lucide-react';
+import { logger } from "@/lib/logger";
 
 interface TransferWizardProps {
   open: boolean;
@@ -52,7 +53,7 @@ export function TransferWizard({ open, onOpenChange, onSuccess }: TransferWizard
         const data = await TransferService.getAvailableTenants(dao);
         setTenants(data);
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       }
     };
     if (open) load();
@@ -66,7 +67,7 @@ export function TransferWizard({ open, onOpenChange, onSuccess }: TransferWizard
         const data = await TransferService.getFranchisesForTenant(dao, targetTenantId);
         setFranchises(data);
       } catch (e) {
-        console.error(e);
+        logger.error(e);
       }
     };
     load();
@@ -97,7 +98,7 @@ export function TransferWizard({ open, onOpenChange, onSuccess }: TransferWizard
           setValidation(result);
         }
       } catch (error) {
-        console.error('Validation error:', error);
+        logger.error('Validation error:', error);
       } finally {
         setValidating(false);
       }

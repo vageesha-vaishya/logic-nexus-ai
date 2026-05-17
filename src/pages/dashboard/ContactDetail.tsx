@@ -18,6 +18,7 @@ import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseAct
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
+import { logger } from "@/lib/logger";
 
 export default function ContactDetail() {
   const { id } = useParams();
@@ -59,7 +60,7 @@ export default function ContactDetail() {
     try {
       const { data } = await scopedDb.from('activities').select('*').eq('contact_id', contactId);
       setActivities(data || []);
-    } catch (err) { console.error(err); }
+    } catch (err) { logger.error(err); }
   };
 
   const fetchSegments = async (contactId: string) => {
