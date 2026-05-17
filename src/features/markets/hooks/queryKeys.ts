@@ -62,9 +62,11 @@ export const marketsKeys = {
   },
 
   signals: {
-    all:  () => [...marketsKeys.all, "signals"] as const,
-    list: (filters?: { portfolioId?: string | null; limit?: number }) =>
+    all:     () => [...marketsKeys.all, "signals"] as const,
+    list:    (filters?: { portfolioId?: string | null; limit?: number }) =>
       [...marketsKeys.signals.all(), "list", filters ?? {}] as const,
+    summary: (symbols: string[], exchange: string) =>
+      [...marketsKeys.signals.all(), "summary", [...symbols].sort().join(","), exchange] as const,
   },
 
   strategies: {

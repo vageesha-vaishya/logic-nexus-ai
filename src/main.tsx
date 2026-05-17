@@ -1,6 +1,17 @@
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
+
+// Apply dark mode before first render to prevent flash
+{
+  const storedDark = localStorage.getItem("lnai_dark_mode");
+  if (
+    storedDark === "true" ||
+    (!storedDark && window.matchMedia("(prefers-color-scheme: dark)").matches)
+  ) {
+    document.documentElement.classList.add("dark");
+  }
+}
 import "./lib/i18n";
 import { initSentry } from "./lib/sentry";
 import { initPostHog } from "./lib/posthog";

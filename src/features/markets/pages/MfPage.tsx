@@ -45,6 +45,7 @@ import {
   type MfHolding,
 } from "../hooks/useMf";
 import { MfOrderSheet }       from "../components/MfOrderSheet";
+import { MfScreener }         from "../components/MfScreener";
 import { SipTrackerPanel }    from "../components/SipTrackerPanel";
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -290,6 +291,7 @@ export default function MfPage() {
         <Tabs defaultValue="discover">
           <TabsList>
             <TabsTrigger value="discover">Discover</TabsTrigger>
+            <TabsTrigger value="screener">Screener</TabsTrigger>
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
             <TabsTrigger value="sips">SIPs</TabsTrigger>
           </TabsList>
@@ -353,6 +355,11 @@ export default function MfPage() {
                 ))}
               </div>
             )}
+          </TabsContent>
+
+          {/* ── Screener tab ────────────────────────────────────────── */}
+          <TabsContent value="screener" className="mt-4">
+            <MfScreener />
           </TabsContent>
 
           {/* ── Portfolio tab ───────────────────────────────────────── */}

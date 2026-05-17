@@ -28,7 +28,9 @@ import {
   TrendingUp,
 } from "lucide-react";
 import { PriceAlertSheet } from "../components/PriceAlertSheet";
+import { SignalBadge } from "../components/SignalBadge";
 import { useLTP, type LTPQuote } from "../hooks/useLTP";
+import { useSignalSummary } from "../hooks/useSignals";
 import { isMarketOpen } from "../utils/market-hours";
 
 import {
@@ -187,6 +189,7 @@ function ItemsTable({
     .filter((s): s is string => Boolean(s));
 
   const { data: ltpMap, isFetching } = useLTP(nseSymbols);
+  const { data: signalMap } = useSignalSummary(nseSymbols);
 
   if (items.length === 0) {
     return (
@@ -242,6 +245,7 @@ function ItemsTable({
               <TableHead>Symbol</TableHead>
               <TableHead className="text-right">LTP</TableHead>
               <TableHead className="text-right">Change</TableHead>
+              <TableHead className="hidden xl:table-cell">Signal</TableHead>
               <TableHead className="text-right hidden md:table-cell">High</TableHead>
               <TableHead className="text-right hidden md:table-cell">Low</TableHead>
               <TableHead className="hidden lg:table-cell">Type</TableHead>
@@ -273,6 +277,9 @@ function ItemsTable({
                   </TableCell>
                   <PriceCell quote={quote} />
                   <ChangeCell quote={quote} />
+                  <TableCell className="hidden xl:table-cell">
+                    <SignalBadge signal={inst?.symbol ? signalMap?.[inst.symbol] : undefined} size="sm" />
+                  </TableCell>
                   <TableCell className="text-right font-mono text-xs text-muted-foreground hidden md:table-cell">
                     {quote?.high != null ? `₹${fmtINR(quote.high)}` : "—"}
                   </TableCell>

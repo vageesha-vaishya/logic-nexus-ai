@@ -72,13 +72,27 @@ export interface MALine {
   value: number;
 }
 
+export interface ChartPoint {
+  time:  string | number;
+  value: number;
+}
+
+export interface SuperTrendPoint {
+  time:      string | number;
+  value:     number;
+  direction: "up" | "down";
+}
+
 export interface ChartData {
-  symbol:   string;
-  exchange: string;
-  interval: string;
-  bars:     OHLCVBar[];
-  ma:       Record<string, MALine[]>;  // e.g. { "20": [...], "50": [...], "200": [...] }
-  count:    number;
+  symbol:     string;
+  exchange:   string;
+  interval:   string;
+  bars:       OHLCVBar[];
+  ma:         Record<string, MALine[]>;  // e.g. { "20": [...], "50": [...], "200": [...] }
+  count:      number;
+  bollinger?: { upper: ChartPoint[]; middle: ChartPoint[]; lower: ChartPoint[] };
+  vwap?:      ChartPoint[];
+  supertrend?: SuperTrendPoint[];
 }
 
 export type ChartInterval = "1m" | "5m" | "15m" | "1h" | "1d" | "1w";
@@ -87,12 +101,17 @@ const INTRADAY: ChartInterval[] = ["1m", "5m", "15m", "1h"];
 
 // ── Hook ──────────────────────────────────────────────────────────────────────
 
+export interface UseChartDataOptions {
+  indicators?: string;  // e.g. "bb,vwap,supertrend" or "ha"
+}
+
 export function useChartData(
   symbol:   string | null,
   exchange: string = "NSE",
   interval: ChartInterval = "1d",
   lookback: number = 365,
   ma:       string = "",         // e.g. "20,50,200"
+  options:  UseChartDataOptions = {},
 ): UseQueryResult<ChartData> {
   const { tenantId, franchiseId } = useActiveScope();
 
@@ -111,6 +130,7 @@ export function useChartData(
         lookback: String(lookback),
       });
       if (ma) params.set("ma", ma);
+      if (options.indicators) params.set("indicators", options.indicators);
 
       const data = await workerFetch(
         "GET",

@@ -2,9 +2,13 @@
  * TradingChart — TradingView Lightweight Charts v5 candlestick chart.
  *
  * Features:
- *   • Candlestick series (green up / red down)
+ *   • Candlestick series (green up / red down) or Heikin Ashi mode
  *   • Volume histogram on a separate (hidden) price scale
  *   • Optional MA lines (20, 50, 200) toggled via "MA" button
+ *   • Bollinger Bands (upper/lower dashed blue, middle solid thin blue)
+ *   • VWAP line (purple dashed)
+ *   • SuperTrend overlay (green when up, red when down)
+ *   • Heikin Ashi chart type toggle
  *   • Timeframe toolbar: 1D · 5D · 1M · 3M · 6M · 1Y · All
  *   • Responsive via ResizeObserver
  *   • Loading / error overlay
@@ -33,14 +37,15 @@ import type { ChartInterval } from "../hooks/useChartData";
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 export interface TradingChartProps {
-  symbol:           string;
-  exchange?:        string;        // default "NSE"
-  height?:          number;        // default 420
-  showVolume?:      boolean;       // default true
-  showMA?:          boolean;       // default false — toggleable
-  defaultInterval?: ChartInterval; // default "1d"
-  className?:       string;
-  title?:           string;        // shown in top-left corner
+  symbol:             string;
+  exchange?:          string;        // default "NSE"
+  height?:            number;        // default 420
+  showVolume?:        boolean;       // default true
+  showMA?:            boolean;       // default false — toggleable
+  defaultInterval?:   ChartInterval; // default "1d"
+  defaultIndicators?: string[];      // e.g. ["bb", "vwap", "supertrend"]
+  className?:         string;
+  title?:             string;        // shown in top-left corner
 }
 
 // ── Timeframe presets ─────────────────────────────────────────────────────────
@@ -61,31 +66,56 @@ const MA_COLORS: Record<string, string> = {
   "200": "#8B5CF6",   // purple
 };
 
+// ── Indicator series refs shape ───────────────────────────────────────────────
+
+interface IndicatorSeriesRefs {
+  bbUpper?:   ISeriesApi<"Line">;
+  bbMiddle?:  ISeriesApi<"Line">;
+  bbLower?:   ISeriesApi<"Line">;
+  vwap?:      ISeriesApi<"Line">;
+  stUp?:      ISeriesApi<"Line">;
+  stDown?:    ISeriesApi<"Line">;
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function TradingChart({
   symbol,
-  exchange    = "NSE",
-  height      = 420,
-  showVolume  = true,
-  showMA      = false,
+  exchange          = "NSE",
+  height            = 420,
+  showVolume        = true,
+  showMA            = false,
   defaultInterval,
+  defaultIndicators = [],
   className,
   title,
 }: TradingChartProps) {
-  const [selectedTF, setSelectedTF] = useState("1Y");
-  const [tfState, setTfState] = useState<{ interval: ChartInterval; lookback: number }>({
+  const [selectedTF, setSelectedTF]   = useState("1Y");
+  const [tfState, setTfState]         = useState<{ interval: ChartInterval; lookback: number }>({
     interval: defaultInterval ?? "1d",
     lookback: 365,
   });
   const [showMaLines, setShowMaLines] = useState(showMA ?? false);
+  const [chartType, setChartType]     = useState<"candle" | "heikin_ashi">("candle");
+  const [indicators, setIndicators]   = useState<Set<string>>(
+    () => new Set(defaultIndicators),
+  );
 
   // ── Refs ──────────────────────────────────────────────────────────────────
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartRef          = useRef<IChartApi | null>(null);
-  const candleSeriesRef   = useRef<ISeriesApi<"Candlestick"> | null>(null);
-  const volumeSeriesRef   = useRef<ISeriesApi<"Histogram"> | null>(null);
-  const maSeriesRefs      = useRef<Record<string, ISeriesApi<"Line">>>({});
+  const chartContainerRef   = useRef<HTMLDivElement>(null);
+  const chartRef            = useRef<IChartApi | null>(null);
+  const candleSeriesRef     = useRef<ISeriesApi<"Candlestick"> | null>(null);
+  const volumeSeriesRef     = useRef<ISeriesApi<"Histogram"> | null>(null);
+  const maSeriesRefs        = useRef<Record<string, ISeriesApi<"Line">>>({});
+  const indicatorSeriesRefs = useRef<IndicatorSeriesRefs>({});
+
+  // ── Derive query params ───────────────────────────────────────────────────
+  const indicatorParam = (() => {
+    const parts: string[] = [];
+    if (chartType === "heikin_ashi") parts.push("ha");
+    indicators.forEach(ind => parts.push(ind));
+    return parts.join(",");
+  })();
 
   // ── Data ──────────────────────────────────────────────────────────────────
   const { data, isLoading, isError, error } = useChartData(
@@ -94,6 +124,7 @@ export function TradingChart({
     tfState.interval,
     tfState.lookback,
     showMaLines ? "20,50,200" : "",
+    { indicators: indicatorParam },
   );
 
   // ── Chart init (mount only) ───────────────────────────────────────────────
@@ -159,12 +190,26 @@ export function TradingChart({
     return () => {
       observer.disconnect();
       chart.remove();
-      chartRef.current        = null;
-      candleSeriesRef.current = null;
-      volumeSeriesRef.current = null;
-      maSeriesRefs.current    = {};
+      chartRef.current            = null;
+      candleSeriesRef.current     = null;
+      volumeSeriesRef.current     = null;
+      maSeriesRefs.current        = {};
+      indicatorSeriesRefs.current = {};
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Helper: remove all indicator series ──────────────────────────────────
+  function _removeIndicatorSeries(chart: IChartApi) {
+    const refs = indicatorSeriesRefs.current;
+    const keys: (keyof IndicatorSeriesRefs)[] = ["bbUpper", "bbMiddle", "bbLower", "vwap", "stUp", "stDown"];
+    for (const key of keys) {
+      const s = refs[key];
+      if (s) {
+        try { chart.removeSeries(s); } catch { /* already removed */ }
+        delete refs[key];
+      }
+    }
+  }
 
   // ── Data update effect ────────────────────────────────────────────────────
   useEffect(() => {
@@ -183,38 +228,169 @@ export function TradingChart({
     }
 
     const chart = chartRef.current;
-    if (chart) {
-      if (showMaLines && data.ma) {
-        // Remove old MA series
-        Object.values(maSeriesRefs.current).forEach(s => {
-          try { chart.removeSeries(s); } catch { /* series may already be gone */ }
-        });
-        maSeriesRefs.current = {};
+    if (!chart) return;
 
-        // Add new MA series
-        Object.entries(data.ma).forEach(([period, points]) => {
-          const lineSeries = chart.addSeries(LineSeries, {
-            color:                   MA_COLORS[period] ?? "#9CA3AF",
-            lineWidth:               1,
-            priceLineVisible:        false,
-            lastValueVisible:        false,
-            crosshairMarkerVisible:  false,
-          });
-          lineSeries.setData(points);
-          maSeriesRefs.current[period] = lineSeries;
+    // ── MA lines ───────────────────────────────────────────────────────────
+    if (showMaLines && data.ma) {
+      Object.values(maSeriesRefs.current).forEach(s => {
+        try { chart.removeSeries(s); } catch { /* series may already be gone */ }
+      });
+      maSeriesRefs.current = {};
+
+      Object.entries(data.ma).forEach(([period, points]) => {
+        const lineSeries = chart.addSeries(LineSeries, {
+          color:                   MA_COLORS[period] ?? "#9CA3AF",
+          lineWidth:               1,
+          priceLineVisible:        false,
+          lastValueVisible:        false,
+          crosshairMarkerVisible:  false,
         });
-      } else if (!showMaLines) {
-        // Remove MA series when toggled off
-        Object.values(maSeriesRefs.current).forEach(s => {
-          try { chart.removeSeries(s); } catch { /* ignore */ }
+        lineSeries.setData(points);
+        maSeriesRefs.current[period] = lineSeries;
+      });
+    } else if (!showMaLines) {
+      Object.values(maSeriesRefs.current).forEach(s => {
+        try { chart.removeSeries(s); } catch { /* ignore */ }
+      });
+      maSeriesRefs.current = {};
+    }
+
+    // ── Indicator overlay series — always rebuild from scratch ─────────────
+    _removeIndicatorSeries(chart);
+
+    // Bollinger Bands
+    if (data.bollinger && indicators.has("bb")) {
+      const bbUpper = chart.addSeries(LineSeries, {
+        color:                  "#93c5fd",
+        lineWidth:              1,
+        lineStyle:              2, // dashed
+        lastValueVisible:       false,
+        priceLineVisible:       false,
+        crosshairMarkerVisible: false,
+      });
+      bbUpper.setData(data.bollinger.upper);
+      indicatorSeriesRefs.current.bbUpper = bbUpper;
+
+      const bbMiddle = chart.addSeries(LineSeries, {
+        color:                  "#3b82f6",
+        lineWidth:              1,
+        lineStyle:              0, // solid
+        lastValueVisible:       false,
+        priceLineVisible:       false,
+        crosshairMarkerVisible: false,
+      });
+      bbMiddle.setData(data.bollinger.middle);
+      indicatorSeriesRefs.current.bbMiddle = bbMiddle;
+
+      const bbLower = chart.addSeries(LineSeries, {
+        color:                  "#93c5fd",
+        lineWidth:              1,
+        lineStyle:              2, // dashed
+        lastValueVisible:       false,
+        priceLineVisible:       false,
+        crosshairMarkerVisible: false,
+      });
+      bbLower.setData(data.bollinger.lower);
+      indicatorSeriesRefs.current.bbLower = bbLower;
+    }
+
+    // VWAP
+    if (data.vwap && indicators.has("vwap")) {
+      const vwapSeries = chart.addSeries(LineSeries, {
+        color:                  "#a855f7",
+        lineWidth:              1,
+        lineStyle:              2, // dashed
+        lastValueVisible:       false,
+        priceLineVisible:       false,
+        crosshairMarkerVisible: false,
+      });
+      vwapSeries.setData(data.vwap);
+      indicatorSeriesRefs.current.vwap = vwapSeries;
+    }
+
+    // SuperTrend — split into up (green) and down (red) segments
+    if (data.supertrend && indicators.has("supertrend") && data.supertrend.length > 0) {
+      // Build contiguous runs for each direction
+      type STSegment = { time: string | number; value: number }[];
+      const upSegments:   STSegment[] = [];
+      const downSegments: STSegment[] = [];
+
+      let currentUp:   STSegment = [];
+      let currentDown: STSegment = [];
+      let prevDirection: "up" | "down" | null = null;
+
+      for (const pt of data.supertrend) {
+        if (pt.direction === "up") {
+          if (prevDirection === "down" && currentDown.length > 0) {
+            // Bridge: carry last down point into up segment for continuity
+            currentDown.push({ time: pt.time, value: pt.value });
+            downSegments.push(currentDown);
+            currentDown = [];
+            currentUp = [{ time: pt.time, value: pt.value }];
+          } else {
+            currentUp.push({ time: pt.time, value: pt.value });
+          }
+        } else {
+          if (prevDirection === "up" && currentUp.length > 0) {
+            // Bridge: carry last up point into down segment for continuity
+            currentUp.push({ time: pt.time, value: pt.value });
+            upSegments.push(currentUp);
+            currentUp = [];
+            currentDown = [{ time: pt.time, value: pt.value }];
+          } else {
+            currentDown.push({ time: pt.time, value: pt.value });
+          }
+        }
+        prevDirection = pt.direction;
+      }
+      if (currentUp.length > 0)   upSegments.push(currentUp);
+      if (currentDown.length > 0) downSegments.push(currentDown);
+
+      // Merge all up segments into one series (they share color)
+      const allUpPoints   = upSegments.flat();
+      const allDownPoints = downSegments.flat();
+
+      if (allUpPoints.length > 0) {
+        const stUpSeries = chart.addSeries(LineSeries, {
+          color:                  "#10b981",
+          lineWidth:              2,
+          lastValueVisible:       false,
+          priceLineVisible:       false,
+          crosshairMarkerVisible: false,
         });
-        maSeriesRefs.current = {};
+        stUpSeries.setData(allUpPoints);
+        indicatorSeriesRefs.current.stUp = stUpSeries;
+      }
+
+      if (allDownPoints.length > 0) {
+        const stDownSeries = chart.addSeries(LineSeries, {
+          color:                  "#ef4444",
+          lineWidth:              2,
+          lastValueVisible:       false,
+          priceLineVisible:       false,
+          crosshairMarkerVisible: false,
+        });
+        stDownSeries.setData(allDownPoints);
+        indicatorSeriesRefs.current.stDown = stDownSeries;
       }
     }
 
     // Fit content after data load
-    chartRef.current?.timeScale().fitContent();
-  }, [data, showMaLines]);
+    chart.timeScale().fitContent();
+  }, [data, showMaLines, indicators]);
+
+  // ── Toggle a named indicator ──────────────────────────────────────────────
+  function toggleIndicator(name: string) {
+    setIndicators(prev => {
+      const next = new Set(prev);
+      if (next.has(name)) {
+        next.delete(name);
+      } else {
+        next.add(name);
+      }
+      return next;
+    });
+  }
 
   // ── Handlers ──────────────────────────────────────────────────────────────
   function selectTimeframe(tf: typeof TIMEFRAME_PRESETS[number]) {
@@ -222,15 +398,19 @@ export function TradingChart({
     setSelectedTF(tf.label);
   }
 
+  function toggleChartType() {
+    setChartType(prev => prev === "candle" ? "heikin_ashi" : "candle");
+  }
+
   // ── Render ────────────────────────────────────────────────────────────────
   return (
     <div className={cn("flex flex-col gap-2", className)}>
       {/* Toolbar */}
-      <div className="flex items-center justify-between gap-2">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
         {title && (
           <span className="text-sm font-medium text-muted-foreground">{title}</span>
         )}
-        <div className="flex items-center gap-1 ml-auto">
+        <div className="flex items-center gap-1 ml-auto flex-wrap">
           {/* Timeframe buttons */}
           {TIMEFRAME_PRESETS.map(tf => (
             <button
@@ -261,6 +441,65 @@ export function TradingChart({
             )}
           >
             MA
+          </button>
+
+          {/* Divider */}
+          <div className="w-px h-4 bg-border mx-1" />
+
+          {/* Heikin Ashi toggle */}
+          <button
+            onClick={toggleChartType}
+            title="Heikin Ashi"
+            className={cn(
+              "h-6 px-2 rounded text-xs font-medium transition-colors",
+              chartType === "heikin_ashi"
+                ? "bg-primary text-primary-foreground"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            HA
+          </button>
+
+          {/* Bollinger Bands toggle */}
+          <button
+            onClick={() => toggleIndicator("bb")}
+            title="Bollinger Bands"
+            className={cn(
+              "h-6 px-2 rounded text-xs font-medium transition-colors",
+              indicators.has("bb")
+                ? "bg-blue-500 text-white"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            BB
+          </button>
+
+          {/* VWAP toggle */}
+          <button
+            onClick={() => toggleIndicator("vwap")}
+            title="VWAP"
+            className={cn(
+              "h-6 px-2 rounded text-xs font-medium transition-colors",
+              indicators.has("vwap")
+                ? "bg-purple-500 text-white"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            VWAP
+          </button>
+
+          {/* SuperTrend toggle */}
+          <button
+            onClick={() => toggleIndicator("supertrend")}
+            title="SuperTrend"
+            className={cn(
+              "h-6 px-2 rounded text-xs font-medium transition-colors",
+              indicators.has("supertrend")
+                ? "bg-emerald-500 text-white"
+                : "text-muted-foreground hover:bg-muted",
+            )}
+          >
+            ST
           </button>
         </div>
       </div>

@@ -1,14 +1,15 @@
 """
 Chart data endpoints.
 
-GET /v1/chart/{symbol}   — OHLCV + optional MA for a symbol
+GET /v1/chart/{symbol}   — OHLCV + optional MA + optional indicators for a symbol
   Query params:
-    exchange  (str, default "NSE")
-    interval  (str, default "1d") — 1m | 5m | 15m | 1h | 1d | 1w
-    lookback  (int, default 365)  — calendar days to look back (daily); ignored for intraday
-    from_date (str, optional)     — ISO date e.g. 2025-01-01 (overrides lookback)
-    to_date   (str, optional)     — ISO date (default today)
-    ma        (str, default "")   — comma-separated MA periods e.g. "20,50,200"
+    exchange   (str, default "NSE")
+    interval   (str, default "1d") — 1m | 5m | 15m | 1h | 1d | 1w
+    lookback   (int, default 365)  — calendar days to look back (daily); ignored for intraday
+    from_date  (str, optional)     — ISO date e.g. 2025-01-01 (overrides lookback)
+    to_date    (str, optional)     — ISO date (default today)
+    ma         (str, default "")   — comma-separated MA periods e.g. "20,50,200"
+    indicators (str, default "")   — comma-separated: bb,vwap,supertrend,ha
 """
 from __future__ import annotations
 
@@ -52,13 +53,14 @@ _YF_INTRADAY_PERIOD = {
 
 @router.get("/{symbol}")
 async def get_chart(
-    symbol:    str,
-    exchange:  str = Query("NSE"),
-    interval:  str = Query("1d"),
-    lookback:  int = Query(365, ge=1, le=1825),
-    from_date: str = Query(""),
-    to_date:   str = Query(""),
-    ma:        str = Query(""),
+    symbol:     str,
+    exchange:   str = Query("NSE"),
+    interval:   str = Query("1d"),
+    lookback:   int = Query(365, ge=1, le=1825),
+    from_date:  str = Query(""),
+    to_date:    str = Query(""),
+    ma:         str = Query(""),
+    indicators: str = Query("", description="Comma-separated: bb,vwap,supertrend,ha"),
 ):
     """
     Return OHLCV bars for a symbol.
@@ -78,7 +80,10 @@ async def get_chart(
         "50":  [...],
         "200": [...],
       },
-      "count": 365
+      "count": 365,
+      "bollinger": {"upper": [...], "middle": [...], "lower": [...]},  // if bb requested
+      "vwap": [...],                                                     // if vwap requested
+      "supertrend": [{"time": ..., "value": ..., "direction": "up"|"down"}, ...],  // if supertrend
     }
     """
     sym = symbol.upper().strip()
@@ -117,6 +122,14 @@ async def get_chart(
             except ValueError:
                 pass
 
+    # Parse requested indicators
+    requested: set[str] = set()
+    if indicators:
+        for ind in indicators.split(","):
+            stripped = ind.strip().lower()
+            if stripped:
+                requested.add(stripped)
+
     # Fetch bars
     if is_intraday:
         bars = await _fetch_intraday(sym, exch, interval)
@@ -129,7 +142,15 @@ async def get_chart(
             detail=f"No chart data found for {sym} ({exch}). Try running a price sync first.",
         )
 
-    # Compute MAs
+    # Heikin Ashi — transform bars before all other computations
+    ha_bars: list[dict] | None = None
+    if "ha" in requested:
+        ha_bars = _heikin_ashi(bars)
+
+    # Use HA bars as the response bars when HA is requested
+    response_bars = ha_bars if ha_bars is not None else bars
+
+    # Compute MAs (always on original bars for accuracy)
     ma_data: dict[str, list[dict]] = {}
     if ma_periods and bars:
         closes = [b["close"] for b in bars]
@@ -143,14 +164,43 @@ async def get_chart(
                     if v is not None
                 ]
 
-    return {
+    # Build response
+    response: dict[str, Any] = {
         "symbol":   sym,
         "exchange": exch,
         "interval": interval,
-        "bars":     bars,
+        "bars":     response_bars,
         "ma":       ma_data,
-        "count":    len(bars),
+        "count":    len(response_bars),
     }
+
+    # Bollinger Bands
+    if "bb" in requested and bars:
+        closes = [b["close"] for b in bars]
+        times  = [b["time"]  for b in bars]
+        bb = _bollinger_bands(closes)
+        period = 20
+        offset_times = times[period - 1:]
+        response["bollinger"] = {
+            "upper":  [{"time": t, "value": v} for t, v in zip(offset_times, bb["upper"])],
+            "middle": [{"time": t, "value": v} for t, v in zip(offset_times, bb["middle"])],
+            "lower":  [{"time": t, "value": v} for t, v in zip(offset_times, bb["lower"])],
+        }
+
+    # VWAP
+    if "vwap" in requested and bars:
+        vwap_vals = _vwap(bars)
+        response["vwap"] = [
+            {"time": b["time"], "value": v}
+            for b, v in zip(bars, vwap_vals)
+            if v is not None
+        ]
+
+    # SuperTrend
+    if "supertrend" in requested and bars:
+        response["supertrend"] = _supertrend_overlay(bars)
+
+    return response
 
 
 # ── Internal helpers ──────────────────────────────────────────────────────────
@@ -332,6 +382,99 @@ async def _fetch_yfinance(sym: str, exch: str, interval: str, dt_from: date, dt_
         except Exception:
             continue
     return bars
+
+
+def _bollinger_bands(closes: list[float], period: int = 20, num_std: float = 2.0) -> dict[str, list[float]]:
+    """Returns upper, middle, lower band series."""
+    upper, middle, lower = [], [], []
+    for i in range(period - 1, len(closes)):
+        window = closes[i - period + 1 : i + 1]
+        mean = sum(window) / period
+        variance = sum((x - mean) ** 2 for x in window) / period
+        std = variance ** 0.5
+        upper.append(round(mean + num_std * std, 2))
+        middle.append(round(mean, 2))
+        lower.append(round(mean - num_std * std, 2))
+    return {"upper": upper, "middle": middle, "lower": lower}
+
+
+def _vwap(bars: list[dict]) -> list[float | None]:
+    """Volume Weighted Average Price — resets daily (session VWAP for intraday, cumulative for daily)."""
+    result: list[float | None] = []
+    cum_pv = 0.0
+    cum_vol = 0.0
+    for bar in bars:
+        vol = bar.get("volume") or 0
+        typical = (bar["high"] + bar["low"] + bar["close"]) / 3
+        cum_pv += typical * vol
+        cum_vol += vol
+        result.append(round(cum_pv / cum_vol, 2) if cum_vol > 0 else None)
+    return result
+
+
+def _supertrend_overlay(bars: list[dict], period: int = 10, multiplier: float = 3.0) -> list[dict]:
+    """Returns {time, value, direction} series for SuperTrend line."""
+    if len(bars) < period + 1:
+        return []
+    closes = [b["close"] for b in bars]
+    highs  = [b["high"]  for b in bars]
+    lows   = [b["low"]   for b in bars]
+
+    # ATR (Wilder)
+    tr_list = [
+        max(highs[i] - lows[i], abs(highs[i] - closes[i - 1]), abs(lows[i] - closes[i - 1]))
+        for i in range(1, len(closes))
+    ]
+    atr_vals = [sum(tr_list[:period]) / period]
+    for t in tr_list[period:]:
+        atr_vals.append((atr_vals[-1] * (period - 1) + t) / period)
+
+    result: list[dict] = []
+    direction = 1
+    upper_band = 0.0
+    lower_band = 0.0
+
+    for i, atr in enumerate(atr_vals):
+        idx = i + period
+        if idx >= len(closes):
+            break
+        hl2 = (highs[idx] + lows[idx]) / 2
+        upper = hl2 + multiplier * atr
+        lower = hl2 - multiplier * atr
+        upper_band = upper if upper < upper_band or closes[idx - 1] > upper_band else upper_band
+        lower_band = lower if lower > lower_band or closes[idx - 1] < lower_band else lower_band
+        if closes[idx] > upper_band:
+            direction = 1
+        elif closes[idx] < lower_band:
+            direction = -1
+        result.append({
+            "time":      bars[idx]["time"],
+            "value":     round(lower_band if direction == 1 else upper_band, 2),
+            "direction": "up" if direction == 1 else "down",
+        })
+    return result
+
+
+def _heikin_ashi(bars: list[dict]) -> list[dict]:
+    """Transform standard OHLC to Heikin Ashi candles."""
+    ha_bars: list[dict] = []
+    for i, bar in enumerate(bars):
+        ha_close = round((bar["open"] + bar["high"] + bar["low"] + bar["close"]) / 4, 2)
+        if i == 0:
+            ha_open = round((bar["open"] + bar["close"]) / 2, 2)
+        else:
+            ha_open = round((ha_bars[-1]["open"] + ha_bars[-1]["close"]) / 2, 2)
+        ha_high = round(max(bar["high"], ha_open, ha_close), 2)
+        ha_low  = round(min(bar["low"],  ha_open, ha_close), 2)
+        ha_bars.append({
+            "time":   bar["time"],
+            "open":   ha_open,
+            "high":   ha_high,
+            "low":    ha_low,
+            "close":  ha_close,
+            "volume": bar.get("volume", 0),
+        })
+    return ha_bars
 
 
 def _simple_ma(closes: list[float], period: int) -> list[float | None]:

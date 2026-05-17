@@ -2,6 +2,7 @@
  * Markets — signals hooks.
  *
  *   useSignals(filters?)          → react-query list from markets.signals
+ *   useSignalSummary(symbols)     → batch technical-indicator signals from worker
  *   useRunPortfolioSignals()      → mutation: POST /v1/jobs/signals/portfolio
  *                                    to the Python worker (markets-worker)
  */
@@ -74,6 +75,52 @@ export function useSignals(filters?: { portfolioId?: string | null; limit?: numb
       const { data, error } = await q;
       if (error) throw new Error(error.message ?? "Failed to load signals");
       return (data ?? []) as Signal[];
+    },
+  });
+}
+
+// ── Signal summary (technical indicators — batch) ─────────────────────────
+
+export interface SignalSummary {
+  symbol:        string;
+  direction:     "buy" | "sell" | "neutral";
+  confidence:    number;
+  score:         number;
+  rationale:     string;
+  indicators: {
+    rsi:         number | null;
+    macd:        { macd: number; signal: number; histogram: number; crossover: string } | null;
+    supertrend:  { direction: string; upper_band: number; lower_band: number; signal: string } | null;
+  };
+  computed_at:   string;
+}
+
+interface SignalSummaryResponse {
+  results:  SignalSummary[];
+  errors:   Array<{ symbol: string; error: string }>;
+  total:    number;
+  computed: number;
+}
+
+export function useSignalSummary(symbols: string[], exchange = "NSE") {
+  return useQuery({
+    queryKey:  marketsKeys.signals.summary(symbols, exchange),
+    staleTime: 15 * 60_000,   // 15 minutes — matches worker cache TTL
+    gcTime:    20 * 60_000,
+    enabled:   symbols.length > 0,
+    queryFn:   async (): Promise<Record<string, SignalSummary>> => {
+      const params = new URLSearchParams({
+        symbols:  symbols.join(","),
+        exchange,
+      });
+      const res = await fetch(`${WORKER_URL}/v1/signals/summary?${params.toString()}`);
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText);
+        throw new Error(`Signal summary error ${res.status}: ${text}`);
+      }
+      const body: SignalSummaryResponse = await res.json();
+      // Return a map keyed by symbol for O(1) lookup in the table
+      return Object.fromEntries(body.results.map((r) => [r.symbol, r]));
     },
   });
 }
