@@ -44,13 +44,13 @@ dependencies = [
     "dhanhq>=2.0.0",               # Dhan HQ API
     "fyers-apiv3>=3.0.0",          # Fyers API v3
     "kiteconnect>=5.0.0",          # Zerodha Kite Connect
-    "neo-api-client>=1.0.0",       # Kotak Securities Neo API
+    # neo-api-client (Kotak Neo) is NOT on PyPI — Kotak adapter uses lazy import
     # ── Credential encryption ─────────────────────────────────────────────────
     "cryptography>=42.0.0",        # Fernet encryption for broker credentials
 ]
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "ruff>=0.7",
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
