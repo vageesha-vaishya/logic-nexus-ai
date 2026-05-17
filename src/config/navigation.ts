@@ -219,6 +219,12 @@ export const APP_MENU: MenuModule[] = [
         description: 'NSE-style live option chain with greeks and quick order placement',
       },
       {
+        name: 'Strategy Builder',
+        path: '/dashboard/markets/strategy-builder',
+        icon: GitBranch,
+        description: 'Multi-leg option strategy with payoff graph',
+      },
+      {
         name: 'Mutual Funds',
         path: '/dashboard/markets/mf',
         icon: PiggyBank,
@@ -242,6 +248,18 @@ export const APP_MENU: MenuModule[] = [
         icon: CandlestickChart,
         description: 'Configure AI providers for market analysis',
         roles: ['platform_admin', 'tenant_admin'],
+      },
+      {
+        name: 'Economic Calendar',
+        path: '/dashboard/markets/calendar',
+        icon: CalendarDays,
+        description: 'RBI MPC dates, earnings, macro data releases',
+      },
+      {
+        name: 'FII / DII Flows',
+        path: '/dashboard/markets/fii-dii',
+        icon: BarChart3,
+        description: 'Daily institutional buy/sell flow data',
       },
     ],
   },

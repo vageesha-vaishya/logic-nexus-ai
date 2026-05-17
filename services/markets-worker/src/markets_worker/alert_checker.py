@@ -44,6 +44,7 @@ async def _check_once() -> None:
     )
     if not rows:
         await _check_risk_controls(db, loop)
+        await _check_rebalancing(db, loop)
         return
 
     now = time.monotonic()
@@ -73,6 +74,7 @@ async def _check_once() -> None:
 
     if not to_trigger:
         await _check_risk_controls(db, loop)
+        await _check_rebalancing(db, loop)
         return
 
     now_iso = datetime.now(timezone.utc).isoformat()
@@ -92,6 +94,7 @@ async def _check_once() -> None:
         logger.info("alert.triggered", alert_id=t["id"], ltp=t["ltp"])
 
     await _check_risk_controls(db, loop)
+    await _check_rebalancing(db, loop)
 
 
 async def _check_risk_controls(db, loop) -> None:
@@ -151,3 +154,89 @@ async def _check_risk_controls(db, loop) -> None:
                 logger.warning("risk.kill_switch.auto_activated", portfolio_id=ctrl["portfolio_id"], day_pnl=day_pnl, limit=limit)
         except Exception as exc:
             logger.warning("risk.check_error", exc=str(exc))
+
+
+async def _check_rebalancing(db, loop) -> None:
+    """Check portfolio weights against rebalancing rules and insert alerts."""
+    from collections import defaultdict
+
+    # Get all active rebalancing rules
+    rules = await loop.run_in_executor(None, lambda:
+        db.schema("markets").from_("rebalancing_rules")
+          .select("id, portfolio_id, instrument_id, symbol, target_weight, min_weight, max_weight")
+          .eq("alert_enabled", True)
+          .execute().data
+    )
+    if not rules:
+        return
+
+    # Group by portfolio
+    by_portfolio: dict = defaultdict(list)
+    for r in rules:
+        by_portfolio[r["portfolio_id"]].append(r)
+
+    for portfolio_id, port_rules in by_portfolio.items():
+        # Get holdings for this portfolio
+        holdings = await loop.run_in_executor(None, lambda p=portfolio_id:
+            db.schema("markets").from_("holdings")
+              .select("instrument_id, qty, avg_cost")
+              .eq("portfolio_id", p)
+              .gt("qty", 0)
+              .execute().data
+        )
+        if not holdings:
+            continue
+
+        # Estimate total value using avg_cost (simplified — real implementation uses LTP)
+        total = sum(float(h["qty"]) * float(h["avg_cost"]) for h in holdings)
+        if total <= 0:
+            continue
+
+        holding_map = {h["instrument_id"]: h for h in holdings}
+
+        for rule in port_rules:
+            h = holding_map.get(rule["instrument_id"])
+            if not h:
+                continue
+            current_value = float(h["qty"]) * float(h["avg_cost"])
+            current_weight = (current_value / total) * 100
+
+            min_w = float(rule["min_weight"] or 0)
+            max_w = float(rule["max_weight"] or 100)
+
+            direction = None
+            if current_weight > max_w:
+                direction = "over"
+            elif current_weight < min_w and min_w > 0:
+                direction = "under"
+
+            if direction:
+                # Check if we already sent this alert recently (unacknowledged)
+                existing = await loop.run_in_executor(None, lambda r=rule, d=direction:
+                    db.schema("markets").from_("rebalancing_alerts")
+                      .select("id")
+                      .eq("rule_id", r["id"])
+                      .eq("direction", d)
+                      .eq("acknowledged", False)
+                      .execute().data
+                )
+                if existing:
+                    continue  # already alerted — skip until acknowledged
+
+                await loop.run_in_executor(None, lambda r=rule, cw=current_weight, d=direction:
+                    db.schema("markets").from_("rebalancing_alerts").insert({
+                        "rule_id": r["id"],
+                        "portfolio_id": portfolio_id,
+                        "symbol": r.get("symbol", ""),
+                        "current_weight": round(cw, 2),
+                        "target_weight": r.get("target_weight"),
+                        "direction": d,
+                    }).execute()
+                )
+                logger.info(
+                    "rebalancing.alert",
+                    portfolio_id=portfolio_id,
+                    symbol=rule.get("symbol"),
+                    direction=direction,
+                    weight=current_weight,
+                )

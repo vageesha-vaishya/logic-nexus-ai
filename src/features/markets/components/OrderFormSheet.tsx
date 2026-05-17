@@ -3,10 +3,15 @@
  *
  * Supports BUY / SELL for MARKET, LIMIT, SL, SL-M order types with
  * real-time margin display and client-side validation.
+ *
+ * Order modes:
+ *   Regular — standard single-leg order (original behaviour)
+ *   Bracket — entry + target (take-profit) + stop-loss in one ticket
+ *   Cover   — market entry with mandatory stop-loss
  */
 
 import { useState, useEffect } from "react";
-import { Loader2, AlertTriangle, Lock } from "lucide-react";
+import { Loader2, AlertTriangle, Lock, TrendingUp, TrendingDown } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { usePlanGate } from "@/hooks/usePlanGate";
@@ -43,6 +48,7 @@ import { Separator } from "@/components/ui/separator";
 import {
   usePlaceOrder,
   useConnectionMargins,
+  type OrderMode,
 } from "../hooks/useBrokerPortfolio";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -80,6 +86,12 @@ const PRODUCT_TOOLTIPS: Record<ProductType, string> = {
   NRML: "F&O positions held overnight",
 };
 
+const ORDER_MODE_LABELS: Record<OrderMode, string> = {
+  regular: "Regular",
+  bracket: "Bracket",
+  cover:   "Cover",
+};
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function OrderFormSheet({
@@ -103,12 +115,20 @@ export function OrderFormSheet({
   const [triggerPrice,   setTriggerPrice]     = useState<string>("");
   const [validity,       setValidity]         = useState<Validity>("DAY");
 
+  // Bracket / Cover extension fields
+  const [orderMode,      setOrderMode]        = useState<OrderMode>("regular");
+  const [bracketTarget,  setBracketTarget]    = useState<string>("");
+  const [bracketSl,      setBracketSl]        = useState<string>("");
+
   // Re-seed when defaults change (e.g. clicking Buy on a holdings row)
   useEffect(() => {
     if (open) {
       setTransactionType(defaultTransactionType);
       setSymbol(defaultSymbol.toUpperCase());
       setExchange(defaultExchange);
+      setOrderMode("regular");
+      setBracketTarget("");
+      setBracketSl("");
     }
   }, [open, defaultSymbol, defaultExchange, defaultTransactionType]);
 
@@ -118,26 +138,66 @@ export function OrderFormSheet({
   const tradingGate  = usePlanGate("live_trading");
   const navigate     = useNavigate();
 
-  // ── Validation ──────────────────────────────────────────────────────────────
-  const showPrice        = orderType === "LIMIT" || orderType === "SL";
-  const showTriggerPrice = orderType === "SL" || orderType === "SL-M";
+  // ── Derived values ───────────────────────────────────────────────────────
+  const showPrice        = orderMode === "regular" && (orderType === "LIMIT" || orderType === "SL");
+  const showTriggerPrice = orderMode === "regular" && (orderType === "SL" || orderType === "SL-M");
 
+  const entryPrice = Number(price) > 0 ? Number(price) : null;
+  const qty        = Number(quantity) >= 1 ? Number(quantity) : null;
+  const target     = Number(bracketTarget) > 0 ? Number(bracketTarget) : null;
+  const sl         = Number(bracketSl) > 0 ? Number(bracketSl) : null;
+
+  // P&L preview (bracket mode)
+  const maxProfit = qty && target && entryPrice
+    ? qty * (transactionType === "BUY" ? target - entryPrice : entryPrice - target)
+    : null;
+  const maxLoss = qty && sl && entryPrice
+    ? qty * Math.abs(entryPrice - sl)
+    : null;
+  const rrRatio = maxProfit && maxLoss && maxLoss > 0
+    ? (maxProfit / maxLoss).toFixed(2)
+    : null;
+
+  // Cover risk
+  const coverRisk = qty && sl && entryPrice
+    ? qty * Math.abs(entryPrice - sl)
+    : null;
+
+  // ── Validation ──────────────────────────────────────────────────────────────
   const validationErrors: string[] = [];
-  if (!symbol.trim())                                             validationErrors.push("Symbol is required.");
-  if (!quantity || Number(quantity) < 1)                          validationErrors.push("Quantity must be at least 1.");
-  if (showPrice && (!price || Number(price) <= 0))                validationErrors.push("Price must be greater than 0.");
-  if (showTriggerPrice && (!triggerPrice || Number(triggerPrice) <= 0))
-                                                                  validationErrors.push("Trigger price must be greater than 0.");
+  if (!symbol.trim())                                                       validationErrors.push("Symbol is required.");
+  if (!quantity || Number(quantity) < 1)                                    validationErrors.push("Quantity must be at least 1.");
+  if (showPrice && (!price || Number(price) <= 0))                          validationErrors.push("Price must be greater than 0.");
+  if (showTriggerPrice && (!triggerPrice || Number(triggerPrice) <= 0))     validationErrors.push("Trigger price must be greater than 0.");
+
+  if (orderMode === "bracket") {
+    if (!price || Number(price) <= 0)                                       validationErrors.push("Entry price is required for Bracket orders.");
+    if (!bracketTarget || Number(bracketTarget) <= 0)                       validationErrors.push("Target price is required.");
+    if (!bracketSl || Number(bracketSl) <= 0)                               validationErrors.push("Stop loss is required.");
+    if (entryPrice && target && sl) {
+      if (transactionType === "BUY") {
+        if (target <= entryPrice)  validationErrors.push("BUY bracket: Target must be above entry price.");
+        if (sl >= entryPrice)      validationErrors.push("BUY bracket: Stop loss must be below entry price.");
+      } else {
+        if (target >= entryPrice)  validationErrors.push("SELL bracket: Target must be below entry price.");
+        if (sl <= entryPrice)      validationErrors.push("SELL bracket: Stop loss must be above entry price.");
+      }
+    }
+  }
+
+  if (orderMode === "cover") {
+    if (!bracketSl || Number(bracketSl) <= 0) validationErrors.push("Stop loss is required for Cover orders.");
+  }
 
   const isValid = validationErrors.length === 0 && canTrade && tradingGate.allowed;
 
   // ── Margin / cost display ───────────────────────────────────────────────────
   const availableCash = margins.data?.available_cash ?? null;
   const estimatedCost: number | null = (() => {
-    const qty = Number(quantity);
     if (!qty || qty < 1) return null;
+    if (orderMode === "bracket" && entryPrice) return qty * entryPrice;
     if (showPrice && price && Number(price) > 0) return qty * Number(price);
-    return null; // MARKET — unknown without LTP
+    return null;
   })();
 
   // ── Reset helpers ───────────────────────────────────────────────────────────
@@ -151,23 +211,38 @@ export function OrderFormSheet({
     setTriggerPrice("");
     setValidity("DAY");
     setTransactionType("BUY");
+    setOrderMode("regular");
+    setBracketTarget("");
+    setBracketSl("");
   }
 
   // ── Submit ──────────────────────────────────────────────────────────────────
   function handleSubmit() {
     if (!isValid) return;
 
+    const isBracket = orderMode === "bracket";
+    const isCover   = orderMode === "cover";
+
     placeOrder.mutate(
       {
         tradingsymbol:    symbol.trim().toUpperCase(),
         exchange,
         transaction_type: transactionType,
-        order_type:       orderType,
+        // Bracket forces LIMIT entry; Cover forces MARKET
+        order_type:       isBracket ? "LIMIT" : isCover ? "MARKET" : orderType,
         product,
         quantity:         Number(quantity),
-        price:            showPrice ? Number(price) : null,
+        price:            isBracket ? Number(price) : showPrice ? Number(price) : null,
         trigger_price:    showTriggerPrice ? Number(triggerPrice) : null,
         validity,
+        order_mode:       orderMode,
+        ...(isBracket && {
+          bracket_target: Number(bracketTarget),
+          bracket_sl:     Number(bracketSl),
+        }),
+        ...(isCover && {
+          bracket_sl: Number(bracketSl),
+        }),
       },
       {
         onSuccess: (result) => {
@@ -252,6 +327,41 @@ export function OrderFormSheet({
                 </button>
               </div>
 
+              {/* ── Order mode toggle: Regular | Bracket | Cover ───────── */}
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Order Mode</Label>
+                <div className="flex gap-1.5">
+                  {(["regular", "bracket", "cover"] as OrderMode[]).map((mode) => (
+                    <button
+                      key={mode}
+                      type="button"
+                      onClick={() => {
+                        setOrderMode(mode);
+                        setBracketTarget("");
+                        setBracketSl("");
+                      }}
+                      className={`flex-1 rounded-md py-2 text-xs font-semibold border transition-colors ${
+                        orderMode === mode
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-muted text-muted-foreground border-transparent hover:border-muted-foreground/30"
+                      }`}
+                    >
+                      {ORDER_MODE_LABELS[mode]}
+                    </button>
+                  ))}
+                </div>
+                {orderMode === "bracket" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Single ticket: entry limit + take-profit + stop-loss legs.
+                  </p>
+                )}
+                {orderMode === "cover" && (
+                  <p className="text-[11px] text-muted-foreground">
+                    Market entry with a mandatory stop-loss. Higher leverage allowed.
+                  </p>
+                )}
+              </div>
+
               <Separator />
 
               {/* ── Section 2: Symbol & Exchange ──────────────────────── */}
@@ -316,21 +426,23 @@ export function OrderFormSheet({
                   </div>
                 </div>
 
-                {/* Order type */}
-                <div className="space-y-1.5">
-                  <Label htmlFor="order-type">Order Type</Label>
-                  <Select value={orderType} onValueChange={(v) => setOrderType(v as OrderType)}>
-                    <SelectTrigger id="order-type">
-                      <SelectValue placeholder="Select order type" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="MARKET">MARKET</SelectItem>
-                      <SelectItem value="LIMIT">LIMIT</SelectItem>
-                      <SelectItem value="SL">SL</SelectItem>
-                      <SelectItem value="SL-M">SL-M</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+                {/* Order type — hidden for bracket/cover (forced by mode) */}
+                {orderMode === "regular" && (
+                  <div className="space-y-1.5">
+                    <Label htmlFor="order-type">Order Type</Label>
+                    <Select value={orderType} onValueChange={(v) => setOrderType(v as OrderType)}>
+                      <SelectTrigger id="order-type">
+                        <SelectValue placeholder="Select order type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="MARKET">MARKET</SelectItem>
+                        <SelectItem value="LIMIT">LIMIT</SelectItem>
+                        <SelectItem value="SL">SL</SelectItem>
+                        <SelectItem value="SL-M">SL-M</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {/* Quantity */}
                 <div className="space-y-1.5">
@@ -345,10 +457,12 @@ export function OrderFormSheet({
                   />
                 </div>
 
-                {/* Price — only for LIMIT and SL */}
-                {showPrice && (
+                {/* Entry price — LIMIT for regular LIMIT/SL, or bracket entry */}
+                {(showPrice || orderMode === "bracket") && (
                   <div className="space-y-1.5">
-                    <Label htmlFor="order-price">Price (₹)</Label>
+                    <Label htmlFor="order-price">
+                      {orderMode === "bracket" ? "Entry Price (₹)" : "Price (₹)"}
+                    </Label>
                     <Input
                       id="order-price"
                       type="number"
@@ -361,7 +475,7 @@ export function OrderFormSheet({
                   </div>
                 )}
 
-                {/* Trigger price — only for SL and SL-M */}
+                {/* Trigger price — only for regular SL and SL-M */}
                 {showTriggerPrice && (
                   <div className="space-y-1.5">
                     <Label htmlFor="order-trigger">Trigger Price (₹)</Label>
@@ -375,6 +489,130 @@ export function OrderFormSheet({
                       onChange={(e) => setTriggerPrice(e.target.value)}
                     />
                   </div>
+                )}
+
+                {/* ── Bracket-only: Target + SL ────────────────────────── */}
+                {orderMode === "bracket" && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="bracket-target">
+                        Target Price (₹){" "}
+                        <span className="text-xs text-muted-foreground">
+                          {isBuy ? "above entry" : "below entry"}
+                        </span>
+                      </Label>
+                      <Input
+                        id="bracket-target"
+                        type="number"
+                        min={0}
+                        step="0.05"
+                        placeholder="0.00"
+                        value={bracketTarget}
+                        onChange={(e) => setBracketTarget(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="bracket-sl">
+                        Stop Loss (₹){" "}
+                        <span className="text-xs text-muted-foreground">
+                          {isBuy ? "below entry" : "above entry"}
+                        </span>
+                      </Label>
+                      <Input
+                        id="bracket-sl"
+                        type="number"
+                        min={0}
+                        step="0.05"
+                        placeholder="0.00"
+                        value={bracketSl}
+                        onChange={(e) => setBracketSl(e.target.value)}
+                      />
+                    </div>
+
+                    {/* P&L preview card */}
+                    {(maxProfit !== null || maxLoss !== null) && (
+                      <Card className="border-0 bg-muted/50">
+                        <CardContent className="p-3 space-y-1.5">
+                          <p className="text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">
+                            Risk / Reward Preview
+                          </p>
+                          {maxProfit !== null && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                                <TrendingUp className="h-3 w-3" />
+                                Max Profit
+                              </span>
+                              <span className="font-semibold tabular-nums text-emerald-600 dark:text-emerald-400">
+                                {fmtINR(maxProfit)}{" "}
+                                <span className="text-[10px] text-muted-foreground">
+                                  ↑ to {fmtINR(target)}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {maxLoss !== null && (
+                            <div className="flex items-center justify-between text-xs">
+                              <span className="flex items-center gap-1 text-red-500 dark:text-red-400">
+                                <TrendingDown className="h-3 w-3" />
+                                Max Loss
+                              </span>
+                              <span className="font-semibold tabular-nums text-red-500 dark:text-red-400">
+                                {fmtINR(maxLoss)}{" "}
+                                <span className="text-[10px] text-muted-foreground">
+                                  ↓ to {fmtINR(sl)}
+                                </span>
+                              </span>
+                            </div>
+                          )}
+                          {rrRatio !== null && (
+                            <div className="flex items-center justify-between text-xs border-t pt-1.5 mt-1.5">
+                              <span className="text-muted-foreground font-medium">R:R Ratio</span>
+                              <span className={`font-bold tabular-nums ${
+                                Number(rrRatio) >= 2
+                                  ? "text-emerald-600 dark:text-emerald-400"
+                                  : Number(rrRatio) >= 1
+                                    ? "text-amber-500"
+                                    : "text-red-500"
+                              }`}>
+                                {rrRatio} : 1
+                              </span>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    )}
+                  </>
+                )}
+
+                {/* ── Cover-only: SL ────────────────────────────────────── */}
+                {orderMode === "cover" && (
+                  <>
+                    <div className="space-y-1.5">
+                      <Label htmlFor="cover-sl">
+                        Stop Loss (₹) <span className="text-destructive text-xs">required</span>
+                      </Label>
+                      <Input
+                        id="cover-sl"
+                        type="number"
+                        min={0}
+                        step="0.05"
+                        placeholder="0.00"
+                        value={bracketSl}
+                        onChange={(e) => setBracketSl(e.target.value)}
+                      />
+                    </div>
+                    {coverRisk !== null && (
+                      <div className="flex items-center justify-between rounded-md bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 px-3 py-2 text-xs">
+                        <span className="flex items-center gap-1 text-red-600 dark:text-red-400">
+                          <TrendingDown className="h-3 w-3" />
+                          Max Risk
+                        </span>
+                        <span className="font-semibold tabular-nums text-red-600 dark:text-red-400">
+                          {fmtINR(coverRisk)}
+                        </span>
+                      </div>
+                    )}
+                  </>
                 )}
 
                 {/* Validity */}
@@ -465,7 +703,7 @@ export function OrderFormSheet({
                   >
                     {transactionType}
                   </Badge>
-                  Place Order
+                  Place {orderMode !== "regular" ? ORDER_MODE_LABELS[orderMode] : ""} Order
                 </>
               )}
             </Button>

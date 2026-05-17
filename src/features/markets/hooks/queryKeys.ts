@@ -122,4 +122,10 @@ export const marketsKeys = {
     all:     () => [...marketsKeys.all, "paper"] as const,
     capital: (portfolioId: string) => [...marketsKeys.paper.all(), "capital", portfolioId] as const,
   },
+
+  rebalancing: {
+    all:    () => [...marketsKeys.all, "rebalancing"] as const,
+    rules:  (portfolioId: string) => [...marketsKeys.rebalancing.all(), "rules", portfolioId] as const,
+    alerts: (portfolioId: string) => [...marketsKeys.rebalancing.all(), "alerts", portfolioId] as const,
+  },
 } as const;

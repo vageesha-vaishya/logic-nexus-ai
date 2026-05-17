@@ -193,6 +193,8 @@ export function useConnectionOrders(
 
 // ── Order mutations + margins ─────────────────────────────────────────────────
 
+export type OrderMode = "regular" | "bracket" | "cover";
+
 export interface PlaceOrderInput {
   tradingsymbol:    string;
   exchange:         string;
@@ -205,6 +207,10 @@ export interface PlaceOrderInput {
   validity?:        "DAY" | "IOC";
   disclosed_qty?:   number;
   tag?:             string;
+  // Bracket / Cover order extensions (forwarded to broker adapter; ignored if unsupported)
+  order_mode?:      OrderMode;
+  bracket_target?:  number;
+  bracket_sl?:      number;
 }
 
 export interface PlaceOrderResult {

@@ -221,10 +221,13 @@ const MarketsResearch = lazy(() => import("./features/markets/pages/ResearchThre
 const MarketsStrategies = lazy(() => import("./features/markets/pages/StrategiesPage"));
 const MarketsBacktests = lazy(() => import("./features/markets/pages/BacktestsPage"));
 const MarketsSignals = lazy(() => import("./features/markets/pages/SignalsPage"));
-const MarketsFno     = lazy(() => import("./features/markets/pages/FnoPage"));
+const MarketsFno             = lazy(() => import("./features/markets/pages/FnoPage"));
+const MarketsStrategyBuilder = lazy(() => import("./features/markets/pages/StrategyBuilderPage"));
 const MarketsMf      = lazy(() => import("./features/markets/pages/MfPage"));
-const MarketsAlerts  = lazy(() => import("./features/markets/pages/PriceAlertsPage"));
-const MarketsRisk    = lazy(() => import("./features/markets/pages/RiskControlsPage"));
+const MarketsAlerts       = lazy(() => import("./features/markets/pages/PriceAlertsPage"));
+const MarketsRisk         = lazy(() => import("./features/markets/pages/RiskControlsPage"));
+const MarketsCalendar     = lazy(() => import("./features/markets/pages/EconomicCalendarPage"));
+const MarketsFiiDii       = lazy(() => import("./features/markets/pages/FiiDiiPage"));
 // Platform-wide LLM provider settings — same component, reachable from main settings hub.
 const PlatformLlmSettings = MarketsLlmSettings;
 const FeatureFlagsAdmin = lazy(() => import("./pages/dashboard/settings/FeatureFlagsPage"));
@@ -980,9 +983,12 @@ const App = () => (
             <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerConnections /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/brokers/:connectionId" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerPortfolio /></ProtectedRoute>} />
             <Route path="/dashboard/markets/fno" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsFno /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/strategy-builder" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsStrategyBuilder /></ProtectedRoute>} />
             <Route path="/dashboard/markets/mf" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsMf /></ProtectedRoute>} />
             <Route path="/dashboard/markets/alerts" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsAlerts /></ProtectedRoute>} />
             <Route path="/dashboard/markets/risk" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRisk /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/calendar" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsCalendar /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/fii-dii" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsFiiDii /></ProtectedRoute>} />
             <Route path="/dashboard/settings/feature-flags" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><FeatureFlagsAdmin /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}

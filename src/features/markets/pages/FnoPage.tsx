@@ -6,7 +6,8 @@
  */
 
 import { useState, useEffect } from "react";
-import { RefreshCw, TrendingUp, AlertCircle, Clock } from "lucide-react";
+import { Link } from "react-router-dom";
+import { RefreshCw, TrendingUp, AlertCircle, Clock, GitBranch } from "lucide-react";
 import { TradingChart } from "../components/TradingChart";
 import { toast } from "sonner";
 
@@ -152,6 +153,12 @@ export default function FnoPage() {
             </h1>
             <p className="text-sm text-muted-foreground">NSE live data · updated every 60s</p>
           </div>
+          <Link to="/dashboard/markets/strategy-builder">
+            <Button variant="outline" size="sm" className="gap-1.5">
+              <GitBranch className="h-4 w-4" />
+              Strategy Builder
+            </Button>
+          </Link>
         </header>
 
         {/* ── Control bar ──────────────────────────────────────────────── */}

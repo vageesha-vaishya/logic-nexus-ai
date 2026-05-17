@@ -27,6 +27,7 @@ import { PaperCapitalBadge } from "../components/PaperCapitalBadge";
 import { PaperOrderSheet } from "../components/PaperOrderSheet";
 import { SectorAllocationChart } from "../components/SectorAllocationChart";
 import { PortfolioAnalyticsPanel } from "../components/PortfolioAnalyticsPanel";
+import { RebalancingRulesPanel } from "../components/RebalancingRulesPanel";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -275,7 +276,7 @@ export default function PortfolioDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="holdings">
         <TabsList className="w-full justify-start border-b bg-transparent p-0 h-auto">
-          {(["holdings","transactions","briefs","sector","analytics"] as const).map((t) => (
+          {(["holdings","transactions","briefs","sector","analytics","rebalancing"] as const).map((t) => (
             <TabsTrigger
               key={t}
               value={t}
@@ -289,7 +290,9 @@ export default function PortfolioDetailPage() {
                     ? "AI Briefs"
                     : t === "sector"
                       ? "Sector"
-                      : "Analytics"}
+                      : t === "analytics"
+                        ? "Analytics"
+                        : "Rebalancing"}
               {t === "transactions" && (transactions.data?.length ?? 0) > 0 && (
                 <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                   {transactions.data!.length}
@@ -456,6 +459,16 @@ export default function PortfolioDetailPage() {
         {/* ── Analytics tab ─────────────────────────────────────────────── */}
         <TabsContent value="analytics" className="mt-4">
           <PortfolioAnalyticsPanel portfolioId={id} />
+        </TabsContent>
+
+        {/* ── Rebalancing tab ────────────────────────────────────────────── */}
+        <TabsContent value="rebalancing" className="mt-4">
+          {id && (
+            <RebalancingRulesPanel
+              portfolioId={id}
+              holdings={holdings.data?.holdings ?? []}
+            />
+          )}
         </TabsContent>
       </Tabs>
 
