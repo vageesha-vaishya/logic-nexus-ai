@@ -606,15 +606,19 @@ async def scanner(
             .select(
                 "instrument_id, direction, confidence, score, rationale, "
                 "metadata, price_at_signal, ts, "
-                "instrument:instruments(symbol, exchange, instrument_type)"
+                "instruments!instrument_id(symbol, exchange, instrument_type)"
             )
-            .eq("instrument!inner.exchange", exchange.upper())
             .gte("ts", cutoff)
             .order("score", desc=True)
             .limit(2000)
             .execute()
         )
-        rows = rows_result.data or []
+        raw_rows = rows_result.data or []
+        # Filter by exchange in Python to avoid PostgREST embedded-resource filter issues
+        rows = [
+            r for r in raw_rows
+            if (r.get("instruments") or {}).get("exchange", "").upper() == exchange.upper()
+        ]
     except Exception as exc:
         logger.warning("scanner_db_error", error=str(exc))
         rows = []
@@ -640,7 +644,7 @@ async def scanner(
     now_utc = datetime.now(timezone.utc)
 
     for row in rows:
-        instr = row.get("instrument") or {}
+        instr = row.get("instruments") or row.get("instrument") or {}
         symbol        = instr.get("symbol", "")
         exch          = instr.get("exchange", exchange.upper())
         instr_type    = instr.get("instrument_type", "equity")
