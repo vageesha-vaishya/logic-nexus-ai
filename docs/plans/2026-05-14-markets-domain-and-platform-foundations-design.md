@@ -1989,4 +1989,1259 @@ Append to §13 deferred decisions table:
 
 *Section added 2026-05-16. Authored: Vimal + Claude.*
 
+---
+
+## 18. Platform Intelligence & UX Parity Initiative (2026)
+
+*(Research conducted: May 2026)*
+
+---
+
+### 18.1 Research Methodology & Scope
+
+**Sources consulted:** Official product pages and blogs (Zerodha Z-Connect, Upstox, Dhan, Angel One, Groww, 5paisa, Fyers, ICICI Direct, HDFC Sky, Kotak Neo), App Store and Play Store listings, SEBI circulars and investor surveys, NSE/BSE public data, industry analysis from Business Standard, CNBC India, Analytics Vidhya, StockBrokers.com, TradingView documentation, and third-party broker comparison platforms (InvestorGain, OneTradeJournal, Chittorgarh).
+
+**Date of research:** May 2026.
+
+**Platforms covered:** 10 India-first retail and professional brokers; 5 global benchmark platforms; India-specific regulatory context (SEBI, NSE, BSE, RBI).
+
+**Regulatory baseline:**
+- SEBI F&O study FY2025: 91% of retail F&O traders lost money; aggregate retail losses ₹1.05 lakh crore in FY25, up 41% YoY.
+- SEBI Circular Feb 2025 on algo trading for retail (effective April 2026): every algo order must carry an exchange-assigned Algo-ID; threshold set at 10 OPS.
+- Total demat accounts: 21.28 crore (Nov 2025); unique investors: 13.6 crore (SEBI 2025); Groww surpassed Zerodha as largest broker by active NSE clients as of June 2025 (1.4 crore active customers).
+- India now accounts for ~60% of global equity derivatives volumes by contract count (FIA data).
+- Mutual fund industry AUM: ₹73.73 lakh crore (March 2026); 27.39 crore investor accounts.
+
+**Purpose of this section:** Inform the T2.5 active-trading feature roadmap with concrete, research-backed decisions on which features to build, in what sequence, and to what quality bar — benchmarked against the platforms our users already know.
+
+---
+
+### 18.2 Comparative Platform Analysis — Top 10 Indian Platforms
+
+---
+
+#### Zerodha Kite
+
+**Tier:** Retail / Professional hybrid
+**Active clients:** ~1.55 crore (NSE, 2025); historically India's largest by active count before Groww overtook on volume
+**Monthly active users:** ~1.3–1.5 crore estimated
+
+**Strengths:**
+- Best-in-class charting via embedded TradingView (100+ indicators, 9+ chart types, drawing tools, multi-timeframe)
+- Terminal Mode (beta, 2026): fully customisable multi-panel workspace; drag-and-drop charts, option chain, watchlist, orders, positions into configurable layouts; 10 saved workspaces; 4 presets (Trade, Invest, Scalper, Blank)
+- Redesigned option chain (2025): At-The-Money highlighted, full Greeks (Delta, Gamma, Theta, Vega), PCR, Max Pain, IV; multi-strike basket add
+- Order window enhancements: order slicing (freeze-quantity auto-split), market protection (price bands), available margin inline, market depth inline, F&O quantity memory, auto-AMO
+- Kite Connect API + Kite Connect Personal (free tier, 2025) — best developer ecosystem of any Indian broker
+- Varsity: most comprehensive free financial education platform in India; 13+ modules, multi-language, now on government platforms
+
+**Weaknesses:**
+- No native paper trading mode inside Kite; users redirected to third-party tools (Streak, Sensibull)
+- AI/recommendation layer absent from the main product; ARQ equivalent not offered
+- Mobile Terminal Mode not yet released (web-only beta as of early 2026)
+- MF portfolio tracking via Coin/Console — not unified in Kite (partially addressed in March 2025 update)
+
+**Standout Features:**
+- Kite Terminal Mode: the most sophisticated customisable workspace any Indian retail broker has launched
+- Option chain basket builder: add multiple strikes from option chain to a single basket order in one flow
+- Quick launcher floating icon: single tap to return to last chart from anywhere in the app
+- Free Personal API tier: enables retail users to automate without paying monthly API fees
+
+**UI/UX Signature:** Clean dark-on-white minimalism. Functional density without visual clutter. Chart-first layout; order entry is secondary. The Terminal Mode is a deliberate pivot toward a Bloomberg Terminal aesthetic for retail.
+
+---
+
+#### Upstox Pro
+
+**Tier:** Retail / Tech-forward
+**Active clients:** ~0.7–0.9 crore estimated (2025)
+
+**Strengths:**
+- Three charting engines: TradingView, Scalper (ultra-low-latency tick chart), Chart 360 (rotatable multi-axis perspective)
+- Options Strategy Chain: preset strategy templates with Greeks, PCR, Max Pain, India VIX at a glance
+- Futures Heatmap: sector-wise futures trend spotting in heat-map format
+- Smartlists: curated live lists — Most Active, Top Traded, OI Gainers, IV Gainers — updated in real time
+- FII/DII flows + global indices dashboard (US30, Dow Jones, S&P 500) natively integrated
+- Order slicing for freeze-quantity trades; GTT till expiry; trailing SL
+- Basket orders up to 20 legs with hedging margin benefit
+
+**Weaknesses:**
+- No native paper trading; algo users must use third-party connectors
+- UI complexity increases sharply between beginner and pro modes — intermediate users often lost
+- Fundamental data quality weaker than ICICI Direct or HDFC Sky
+- Customer support response time below industry average based on user reviews
+
+**Standout Features:**
+- Chart 360: genuinely novel visual angle for understanding price-volume relationships
+- Scalper view: tick-by-tick display optimised for sub-minute decision making
+- Margin indicator on intraday order forms showing real-time leverage utilisation
+- Loans inside the app (2025 addition): NBFC-linked margin loans accessible from trading UI
+
+**UI/UX Signature:** Dark-by-default. High information density. Options traders as primary design persona. Colour-coded heatmaps used liberally across the interface.
+
+---
+
+#### Angel One
+
+**Tier:** Retail / Full-service hybrid
+**Active clients:** ~0.75 crore estimated (2025)
+
+**Strengths:**
+- SmartAPI: free developer API (REST + WebSocket); live market data, order placement, historical OHLCV; up to 10 orders/second; widely used as primary data source for algo community
+- ARQ Prime: AI-based stock advisory engine delivering data-backed investment suggestions; one of the few Indian brokers with an in-app AI recommendation feature
+- SmartTrade terminal with multiple chart layouts
+- Research reports, SWOT analysis, and analyst recommendations natively integrated into stock detail pages
+- Basket orders, GTT, cover orders, BO (bracket orders) across all segments
+- MCP server for Angel One API (2025): enables Claude and other AI tools to interact directly with Angel One account
+
+**Weaknesses:**
+- SmartAPI authentication tightened (2025): daily token expiry at midnight, static IP allowlisting required — operationally burdensome for casual algo users
+- App UI older and more cluttered than Zerodha/Dhan/Upstox; UX modernisation ongoing
+- ARQ Prime recommendations quality inconsistent per user reviews; lacks explainability/backtesting evidence
+- Order execution speed occasionally slower than pure-play discount brokers
+
+**Standout Features:**
+- SmartAPI MCP Server: direct AI-to-broker integration — the most developer-native broker API in India
+- ARQ Prime: in-product AI recommendation engine (the benchmark to beat for our own recommendation layer)
+- Combo of free live data + order API: unique value for algo/research users
+
+**UI/UX Signature:** Traditional full-service feel with modern overlay. Research-heavy stock pages. Two-column layout: charts on left, fundamental/research data on right.
+
+---
+
+#### Groww
+
+**Tier:** Retail (beginner-first)
+**Active clients:** 1.4 crore (NSE, June 2025) — India's largest by active client count
+**Monthly downloads:** 5 crore+ cumulative; largest trading app by download count
+
+**Strengths:**
+- Simplest onboarding in India: account opening < 10 minutes with Aadhaar-based eKYC; zero friction
+- Beginner UX: single-scroll stock pages with returns, news, SWOT, and buy/sell CTA — minimal cognitive load
+- F&O terminal: charts, indicators, order book, P&L and watchlist in one unified workspace
+- Commodity derivatives: Gold, Silver, Crude Oil, Natural Gas, Zinc, Aluminium, Copper — fast execution (< 0.05s)
+- Payoff graphs for options strategies: simple visualiser available to all users
+- Stop-loss, GTT, target orders; order placement in 0.2 seconds per official benchmarks
+- Basket orders; freeze-quantity order splitting
+
+**Weaknesses:**
+- Charting depth weaker than Zerodha/Upstox; fewer indicators; no TradingView integration as of research date
+- No paper trading
+- No AI/recommendation layer beyond basic SWOT
+- Portfolio analytics limited; no attribution, sector breakdown, or peer comparison
+- Mutual fund interface strong (original product) but stock research tools thin
+
+**Standout Features:**
+- Onboarding UX: the gold standard for zero-friction account opening + first trade in India
+- Payoff graphs accessible to all F&O users without expert mode toggle
+- Speed: consistently among fastest order execution and app responsiveness in India per independent benchmarks
+
+**UI/UX Signature:** Minimal white-background card UI. Green as primary action colour (aligned to positive market mood). Optimised for one-thumb mobile use. Information progressively disclosed — beginners see simplified view; expert data one tap deeper.
+
+---
+
+#### 5paisa
+
+**Tier:** Retail / Value-focused
+**Active clients:** ~0.25–0.35 crore estimated (2025)
+
+**Strengths:**
+- Trade Station 2.0 (2024 launch): revamped web platform with enhanced UI
+- FnO 360 (FY25 launch): dedicated F&O dashboard for derivative traders with Greeks, OI analysis, strategy builder
+- IntraEdge: AI-powered intraday trading recommendation tool — one of the few brokers with an explicit AI recommendation product
+- US equities trading + digital gold within the same account
+- Robo Advisory: automated portfolio construction and rebalancing
+- Stock screeners, portfolio analysis, research reports bundled in
+
+**Weaknesses:**
+- Smaller user base limits social/network features
+- Customer service quality below average per review sites
+- Mobile app rated lower than Zerodha/Groww/Dhan on app stores
+- Brand recognition and trust lower vs legacy full-service brokers
+
+**Standout Features:**
+- IntraEdge AI: explicit AI-generated intraday trade calls with risk parameters — benchmark for our own intraday signal surface
+- Robo Advisory: goal-based automated portfolio builder — relevant for our MF/ETF recommendation layer
+- FnO 360: F&O-specialist dashboard worth studying as UX reference
+
+**UI/UX Signature:** Dense information layout. Aimed at value-conscious, research-driven retail traders. Less design investment than Zerodha/Dhan but functionally comprehensive.
+
+---
+
+#### Dhan
+
+**Tier:** Modern retail / Options-specialist
+**Active clients:** ~0.3–0.5 crore estimated (2025)
+
+**Strengths:**
+- Standalone Options Trader App (separate from main app): dedicated options-only interface with Glass UI design language; most polished options UX in India by design standards
+- Super Orders (2025): single order entry for Entry + Target + Stop-Loss — eliminates the 3-order workflow
+- TradingView integration on tv.dhan.co: direct execution from TradingView charts across equities, F&O, commodity
+- Full market depth on charts with one-drag SL/Target placement on chart price axis
+- Flash Trade: rapid-entry options trading for directional trades in volatile markets
+- Trader's Controls: loss alerts, segment toggle (disable futures/options during high-risk periods), daily loss limit
+- DhanHQ API platform: webhooks, basket orders with API, algo integration
+- 100+ free pre-built indicators; Renko, Kagi, Heikin-Ashi chart types
+
+**Weaknesses:**
+- No paper trading (SEBI regulatory restriction cited by Dhan)
+- Smaller broker — operational reliability during peak market stress not as proven as Zerodha/Upstox
+- MF and equity delivery features less polished than F&O-focused tools
+- Less brand recognition than incumbents; ongoing trust-building
+
+**Standout Features:**
+- Super Orders: the best single-screen trade management UX in India — this is the reference implementation for our order entry
+- Glass UI in Options Trader App: modern translucent design that differentiates from flat-colour competitors
+- One-drag SL/Target on charts: the most intuitive risk management UI available on any Indian platform
+
+**UI/UX Signature:** Modern, dark, glass-morphism aesthetic. Mobile-native design thinking applied to web. F&O trader as primary persona. Speed and precision over feature breadth.
+
+---
+
+#### Fyers
+
+**Tier:** Professional / Algo-focused
+**Active clients:** ~0.15–0.25 crore estimated (2025); top-10 discount broker by volume
+
+**Strengths:**
+- Free API bridge: integrate with Amibroker, TradingView, MetaTrader, NinjaTrader, Excel VBA, Python, C# — widest third-party tool compatibility of any Indian broker
+- Low latency execution: < 100ms order placement; up to 10,000 API requests/day
+- NSE/BSE data feed with WebSocket streaming
+- TradingView native integration: trade from TradingView charts directly via Fyers
+- SEBI algo registration support: platform-level assistance for algo traders to comply with Feb 2025 circular
+- Zero brokerage for equity delivery; flat ₹20 for F&O/intraday
+
+**Weaknesses:**
+- UI dated and less intuitive than Dhan/Zerodha for non-algo retail users
+- No AI/recommendation layer
+- Smaller customer base; fewer community features
+- App quality weaker than competitors; most users prefer web
+
+**Standout Features:**
+- Broadest third-party tool compatibility: the reference for our broker adapter's integration testing matrix
+- TradingView execution integration: direct model for how our platform should connect execution to external charting tools
+- API reliability for algo usage: the most stable in India per algo trader community forums
+
+**UI/UX Signature:** Utilitarian. Data-dense. Designed for developers and systematic traders who never look at the app UI — they interact via API. Consumer UI is secondary.
+
+---
+
+#### ICICI Direct
+
+**Tier:** Full-service / Institutional-retail
+**Active clients:** ~0.6–0.8 crore estimated (2025)
+
+**Strengths:**
+- iClick2Gain: live intraday trading recommendations with entry, target, and stop-loss; one of India's oldest AI-assisted trade call systems
+- ICICI Direct Prime: subscription plans (₹900/₹4,500/₹9,500/year) unlocking lower brokerage (≤0.07%), priority payout (5 min on sell), advanced platform access
+- 3-in-1 account (Demat + Trading + Bank): seamless fund transfer; integrated with ICICI Bank savings account
+- Comprehensive research: SWOT analysis, analyst ratings, fundamental data, management commentary summaries
+- Trade Racer platform: professional-grade desktop trading terminal
+- US equities, IPOs, NCD, bonds, FDs — broadest product coverage of any Indian broker
+- Smart Trading features: One Click Equity, Systematic Equity Plan (SIP for stocks)
+
+**Weaknesses:**
+- Brokerage higher than discount brokers unless on Prime plan; % pricing model vs flat fee
+- App UI lags behind Zerodha/Dhan/Groww in modernity; complex navigation hierarchy
+- Option chain and F&O tools less polished than Dhan or Upstox
+- Algo API capability limited vs Angel One SmartAPI
+
+**Standout Features:**
+- iClick2Gain: benchmark for in-product intraday call delivery with risk parameters (our IntraEdge equivalent)
+- 3-in-1 integration: demonstrates the value of tight bank-broker integration (relevant when we integrate with banking domain)
+- Prime subscription tiers: pricing model reference for our own platform's subscription structure
+
+**UI/UX Signature:** Traditional banking aesthetic. Trust and depth over speed. Research-heavy pages. Desktop-first history, with responsive mobile layer added progressively.
+
+---
+
+#### HDFC Sky
+
+**Tier:** Full-service / Bank-integrated
+**Active clients:** ~0.2–0.4 crore estimated (2025)
+
+**Strengths:**
+- Covers equities, F&O, commodities, currencies, and US stocks in a single account
+- Advisory services + in-depth research reports backed by HDFC Bank's research division
+- Seamless HDFC Bank account integration: instant fund transfers, margin against FDs and securities
+- Fixed pricing: ₹20 max per order across all segments
+- Margin Trading Facility (MTF) up to 4x with HDFC Bank-grade security infrastructure
+
+**Weaknesses:**
+- Relatively new platform (2022 launch); smaller user base; trust still being established
+- App UX rated below Zerodha/Groww; complex onboarding for non-HDFC Bank customers
+- Limited algo/API capabilities vs Angel One or Fyers
+- F&O tools less sophisticated than Dhan or Upstox
+
+**Standout Features:**
+- Bank-integrated trust layer: single KYC linking trading account to full banking relationship
+- US stocks + India F&O + commodities in one unified account: multi-asset breadth reference
+
+**UI/UX Signature:** Clean blue-on-white consistent with HDFC Bank branding. Trust-first visual language. Less distinctive than Dhan/Zerodha; prioritises brand consistency over UX innovation.
+
+---
+
+#### Kotak Securities Neo
+
+**Tier:** Full-service / Zero-brokerage push
+**Active clients:** ~0.4–0.6 crore estimated (2025)
+**Note:** Kotak Neo is the discount/zero-brokerage sub-brand of Kotak Securities
+
+**Strengths:**
+- Trade Free plan: zero brokerage on intraday equity trades; differentiating vs Zerodha's ₹20/trade
+- Equity, F&O, commodities, currencies under a unified account
+- Kotak Neo Algo Trading: pre-specified condition-based automated trading; real-time data analysis; HFT support
+- Kotak Bank integration: full banking suite alongside trading (margin, FD-backed collateral, instant fund transfer)
+- Customer support via Kotak Bank branch network — highest physical touchpoint density of any broker in this list
+
+**Weaknesses:**
+- Kotak Neo API was discontinued per one reference (as of 2025 — verify before relying on this for integration)
+- UI is functional but lacks the design polish of Dhan or Zerodha
+- Algo and API ecosystem smaller than Angel One or Fyers
+- Heavy bank-integration means higher friction for non-Kotak Bank customers
+
+**Standout Features:**
+- Zero-brokerage intraday: pricing model that forces competitive response
+- Physical + digital hybrid: only broker in this list with meaningful branch support alongside full digital capability
+
+**UI/UX Signature:** Banking-first aesthetic. Kotak brand colours (red). Conservative but full-featured. Similar positioning to ICICI Direct but with more aggressive pricing.
+
+---
+
+### 18.3 Global Benchmark Analysis
+
+---
+
+#### Robinhood (US)
+
+**Tier:** Retail / Mass-market
+**MAU:** ~25 million (2025, US)
+
+**Strengths:**
+- Mobile-first design excellence: the reference implementation for "investing should feel accessible to everyone"; every financial concept de-jargonised
+- Progressive disclosure mastered: beginner sees simplified buy/sell; options requires explicit upgrade with micro-education embedded in the flow
+- Onboarding UX: one-screen-at-a-time progressive form; reduce cognitive load at every step; confetti on first trade
+- Colour as communication: green/red as universal portfolio-state signals; became the industry standard
+- Card-based UI blocks: each stock/ETF is a self-contained card with chart, news, and CTA — copied by Groww
+- Biometric authentication + one-tap execute: sub-3-tap trade workflow on mobile
+
+**Weaknesses:**
+- Limited professional tools: no advanced option strategies, no bracket orders, no conditional orders (vs IBKR)
+- No India market support; US equities only
+- Gamification criticism: UI patterns accused of encouraging over-trading (confetti, streaks)
+- No paper trading / simulation mode
+
+**Standout Features:**
+- Options micro-education within option activation flow: users cannot enable options without completing a contextual quiz — regulatory-friendly
+- Fractional shares: enables any-rupee-amount investment regardless of stock price
+- The "learn by doing" onboarding philosophy is directly applicable to our novice user mode
+
+**UI/UX Signature:** White background, ultra-minimal. Gradients to communicate market open/close state. Large numbers for portfolio value. Everything secondary is visually subordinated.
+
+---
+
+#### Interactive Brokers (IBKR)
+
+**Tier:** Professional / Institutional
+**Active accounts:** ~3.4 million globally (2025)
+
+**Strengths:**
+- 160+ global exchanges from a single account: stocks, options, futures, currencies, bonds, funds
+- Trader Workstation (TWS): the most feature-complete professional desktop terminal in the market; customisable to extreme depth
+- IBKR Desktop v1.2 (Oct 2025): one-click instant order transmission; next-gen platform targeting active traders
+- Option Analytics Window: Greeks visualisation, volatility snapshot, peer IV comparison
+- Option Strategy Lab: multi-leg complex order construction + submission in one workflow
+- 100+ conditional order algos; VWAP, TWAP, adaptive algos, smart routing
+- Comprehensive reporting: tax statements, performance attribution, margin reporting; professional-grade audit trail
+- IBKR Lite vs Pro: tiered offering for casual vs professional users on the same platform
+
+**Weaknesses:**
+- UX complexity overwhelming for retail beginners; steep learning curve intentional
+- India access limited; local broker required for NSE/BSE; not a direct competitor to Indian brokers
+- High margin requirements vs Indian brokers
+- Mobile app functional but not mobile-native in design philosophy
+
+**Standout Features:**
+- Option Strategy Lab: the professional reference for our options strategy builder
+- Conditional orders + algorithmic order types: the benchmark for our advanced order infrastructure
+- Tiered platform (Lite vs Pro) on the same codebase: the architecture model for our Novice/Expert mode toggle
+
+**UI/UX Signature:** Dense, functional, Bloomberg-like. Every pixel serves a data purpose. Dark theme by default in TWS. Power users customise to the point where no two TWS installations look alike.
+
+---
+
+#### TradingView
+
+**Tier:** Charting / Social / Research (broker-agnostic)
+**MAU:** ~100 million globally (2025 estimate)
+**India integration:** Dhan, Fyers, Alice Blue, Zerodha (via Kite Connect read-only)
+
+**Strengths:**
+- Best-in-class browser-based charting: 100+ built-in indicators, 50+ drawing tools, multi-pane, multi-timeframe, alerts on any indicator condition
+- Pine Script: custom indicator and strategy scripting language; 100,000+ community-published scripts
+- Social layer: idea publishing, comment threads on chart snapshots, following analysts — the LinkedIn/Twitter of technical analysis
+- Advanced Charts library (embeddable): used by Dhan, Kotak, and dozens of other brokers globally; Apache 2.0 licensed Lightweight Charts for simpler embedding
+- Lightweight Charts v5 (2025): multi-pane support added; 35kB bundle; used by Binance, Coinbase
+- Paper trading mode: built-in virtual trading with customisable virtual balance; supports Indian instruments via broker data feed
+- Screeners: filter NSE/BSE instruments by 100+ technical and fundamental criteria
+- Replay mode: rewind price history and practice trading on historical bars
+
+**Weaknesses:**
+- Execution requires broker integration; TradingView itself is not a broker
+- Premium features (extra indicators, more alerts, intraday data) locked behind subscriptions ($14.95–$59.95/month)
+- Social features primarily English-language; limited Hindi/regional language content
+- Data quality for Indian instruments varies by broker data feed quality
+
+**Standout Features:**
+- Pine Script + community scripts: the single most powerful democratisation of custom indicators
+- Chart Replay: the gold standard for paper trading / backtesting with visual feedback
+- Social idea sharing: the model for our social/community trading layer
+- Lightweight Charts: **our recommended charting library** for the frontend (see §18.11)
+
+**UI/UX Signature:** Dark-first, data-forward. Chart occupies 70% of screen area. Sidebar for indicators/drawing tools. Social ideas as a third panel. Familiar to every technical analyst globally.
+
+---
+
+#### Webull (US/Global)
+
+**Tier:** Retail / Tech-forward
+**Markets:** US, HK, SG, AU, JP, UK, BR, CA, and 7 more as of March 2025
+
+**Strengths:**
+- Commission-free stocks, ETFs, options, margins, futures, crypto in one app
+- Advanced charting: candlestick, Heikin Ashi, multiple chart types; 50+ indicators (RSI, MACD, Bollinger, VWAP); Fibonacci, trendlines
+- Level 2 data (NBBO, Nasdaq Total View) built into free tier
+- Research data breadth: S&P, Benzinga, Dow Jones, CBOE, Trading Central, LSEG — professional data in a retail interface
+- Multi-leg options: commission-free equity/ETF options; $0.55 for index options
+- GRPC real-time order streaming (Q2 2025 API update): lower latency than REST polling
+- Paper trading via Paper Trading account: full simulation before live deployment
+
+**Weaknesses:**
+- Not available in India (no NSE/BSE broker integration)
+- Crypto reintegrated into main app late 2025 — product direction somewhat inconsistent
+- US-centric research and news; limited applicability for India focus
+
+**Standout Features:**
+- Level 2 data free tier: normalises professional market depth data for retail — reference for our market depth display
+- GRPC for real-time streaming: technical reference for our WebSocket / streaming infrastructure
+- Paper trading integration: seamless simulation within the live platform — the model for our paper mode
+
+**UI/UX Signature:** Dark, modern, data-rich but readable. Tabbed navigation between chart, fundamentals, options, and news. Higher information density than Robinhood; lighter than IBKR.
+
+---
+
+#### eToro (Social Trading / Copy Trading)
+
+**Tier:** Retail / Social
+**Registered users:** ~38 million globally (2025); listed on Nasdaq (IPO May 2025)
+
+**Strengths:**
+- CopyTrader: copy up to 100 investors simultaneously; automatically mirror portfolios; start/stop/adjust anytime; zero management fees
+- Popular Investors programme: top traders earn additional income when copied; creates incentive for quality signal publishing
+- Detailed trader profiles: historical returns by month/year, risk score (1–7), average hold time, number of trades, portfolio composition, social feed
+- News Feed: social-media-style stream for instruments and traders; follow, comment, share, post market ideas
+- Public APIs (2025 launch): free real-time market data, portfolio analytics, social features for external developers
+- AI tools (2025): community-built marketplace on top of eToro's public API; AI-to-AI social investing features
+- CopyTrader expanded to US market (Oct 2025): signals scale of ambition
+
+**Weaknesses:**
+- Not available for Indian users with INR accounts / NSE instruments (regulated as overseas broker)
+- Copy trading carries undisclosed third-party risk; regulatory concerns in some jurisdictions
+- Spread-based pricing model less transparent than flat-fee brokers
+- No paper trading / simulation mode
+
+**Standout Features:**
+- CopyTrader: the definitive reference implementation for social/copy trading — directly relevant to our Phase 3 social features
+- Risk score 1–7 per trader: quantified risk communication model reference for our recommendation cards
+- Popular Investors programme: economic incentive layer for top contributors — the model for our future community analytics programme
+
+**UI/UX Signature:** Social-first. Feed-oriented layout with trading instruments embedded. Trader profiles visually similar to social network profiles. Green/warm colour palette emphasising community over analytics.
+
+---
+
+### 18.4 Feature Gap Analysis — Logic Nexus vs Market Leaders
+
+The table below scores the **current gap** between Logic Nexus's present state (T2 completed per §17) and the market leader benchmark for each feature. Gap Score: 1 = near-parity, 5 = significant gap. Priority: P1 = T2.5 must-have, P2 = Phase 2 (Q4 2026), P3 = Phase 3 (Q1 2027), P4 = Phase 4 / future.
+
+| # | Feature Category | Market Leader | Their Implementation | Our Current State | Gap Score | Priority |
+|---|---|---|---|---|---|---|
+| 1 | **Interactive charting** | TradingView / Zerodha Kite | 100+ indicators, drawing tools, multi-pane, multi-timeframe, alerts on conditions | Basic price display; no interactive chart library integrated | 5 | P1 |
+| 2 | **Option chain** | Dhan / Zerodha | Greeks, PCR, Max Pain, IV, OI, strikes, expiry selector; basket add; all on one screen | `option_chain_snapshots` table designed (§17.9-D); no UI yet | 4 | P1 |
+| 3 | **Order entry form** | Dhan (Super Orders) | Entry + Target + SL in one ticket; margin inline; market depth inline | Designed in §17.9-C; not yet built | 5 | P1 |
+| 4 | **Watchlist** | Zerodha Kite / Upstox | Multi-list, 50 symbols/list; real-time LTP; colour-coded change; one-tap to chart; sort/filter | `markets.watchlists` table designed; no real-time UI | 4 | P1 |
+| 5 | **Real-time P&L** | All top brokers | Live MTM on positions, unrealised P&L per holding, day P&L vs total P&L | Schema designed; no live feed wired to UI | 5 | P1 |
+| 6 | **Price alerts** | Zerodha / Dhan | Alert on price, volume, indicator value; push notification + in-app; SMS optional | Not designed or built | 4 | P1 |
+| 7 | **GTT (Good Till Triggered)** | Zerodha / Upstox | Multi-condition trigger: price ≥/≤ threshold + secondary SL/target; persist across sessions | Not designed | 4 | P1 |
+| 8 | **Bracket / Cover orders** | Angel One / Zerodha | Single order with SL and target legs; auto-cancel other leg on execution | Not designed | 4 | P1 |
+| 9 | **Options strategy builder** | Upstox / Sensibull | Payoff graph, P&L curve, max profit/loss, breakeven, Greeks aggregation across legs | Not designed | 5 | P2 |
+| 10 | **Options IV surface** | TradingView / Dhan | Implied volatility surface across strikes and expiries; historical IV percentile | Not designed | 5 | P2 |
+| 11 | **Paper trading** | TradingView / Webull | Full order simulation with virtual capital; realistic fills; P&L tracking | Not designed; noted as gap | 5 | P1 |
+| 12 | **Portfolio analytics** | IBKR / ICICI Direct | P&L attribution by stock/sector/time; return vs benchmark; XIRR; Sharpe; drawdown chart | Partial: `markets.holdings` schema; no analytics UI | 4 | P2 |
+| 13 | **Sector allocation** | Zerodha Kite (March 2025) / Upstox | Pie/treemap of holdings by sector; vs index weight; overweight/underweight signals | Not designed | 4 | P2 |
+| 14 | **SIP tracker (MF)** | Zerodha Coin / Groww | Active SIPs, upcoming instalments, total invested vs current value, XIRR per SIP | `markets.mf_orders` schema designed (§17.9-E); no UI | 4 | P1 |
+| 15 | **MF screener** | Zerodha Coin / Groww | Filter by category (equity/debt/hybrid), AMC, 1Y/3Y/5Y returns, expense ratio, AUM | Not designed | 4 | P2 |
+| 16 | **AI trade recommendations** | Angel One ARQ / 5paisa IntraEdge | In-app AI-generated trade calls with entry/target/SL, confidence score, rationale | Not designed; Python worker has ML scaffolding | 5 | P2 |
+| 17 | **FII/DII flow dashboard** | Upstox / Dhan | Daily institutional buy/sell data; chart + table; provisional + final; NSE public data | Not designed | 3 | P2 |
+| 18 | **Social / copy trading** | eToro | Copy top traders; follow portfolios; social feed; idea sharing | Not designed | 5 | P3 |
+| 19 | **Terminal / multi-panel workspace** | Zerodha Terminal Mode | Drag-and-drop panels; saved workspaces; linked chart-order-option-chain panels | Not designed | 4 | P3 |
+| 20 | **Backtesting** | Streak / Zerodha (via Streak) | Visual backtest on chart; parameter sweep; performance metrics (CAGR, MDD, Sharpe) | `markets.backtests` schema designed; Python worker scaffold | 3 | P2 |
+| 21 | **Performance analytics** | IBKR / Streak | Trade journal; win rate; avg R:R; best/worst periods; drawdown analysis | Not designed | 4 | P2 |
+| 22 | **Mobile app — one-tap order** | Dhan / Groww | Single-tap order confirmation with biometric; swipe to confirm | Web-only; no mobile app yet | 5 | P3 |
+| 23 | **Novice / expert mode toggle** | IBKR Lite–Pro / Robinhood | Same platform; progressive disclosure; beginner hides advanced fields | Not designed | 4 | P2 |
+| 24 | **Dark mode** | All modern brokers | Full dark theme; OLED-optimised; persists preference | Not implemented (standard Tailwind; no theme switching) | 3 | P2 |
+| 25 | **Keyboard shortcuts** | Dhan / TradingView | Full keybindings for watchlist switch, order entry, chart timeframe, position exit | Not implemented | 2 | P3 |
+| 26 | **Economic calendar** | Zerodha Terminal / Upstox | Macro events (RBI MPC, inflation, earnings) with expected vs actual; chart overlay | Not designed | 3 | P2 |
+| 27 | **Margin calculator** | Upstox / Angel One | SPAN + exposure margin estimate before order placement; across legs | Not designed | 4 | P1 |
+| 28 | **Risk controls / kill switch** | Dhan (Trader's Controls) | Per-segment on/off toggle; daily loss limit; position size cap | Not designed | 5 | P1 |
+| 29 | **Push notifications** | All modern brokers | Price alerts, order fills, SIP triggers, market open/close via FCM/APNs | Not implemented | 4 | P2 |
+| 30 | **Accessibility (WCAG 2.1 AA)** | Robinhood / Groww | Colour-blind safe palettes; screen-reader support; minimum contrast ratios | Not audited; assumed partial compliance | 3 | P2 |
+
+---
+
+### 18.5 High-Impact Features for Integration
+
+Features are scored by User Impact (1–10) and estimated Effort (S = ≤1 week, M = 1–3 weeks, L = 3–6 weeks, XL = 6–12 weeks).
+
+---
+
+#### Equity / Intraday (top 8)
+
+| # | Feature | What It Does | Market Leader | Effort | User Impact |
+|---|---|---|---|---|---|
+| 1 | **Interactive chart with drawing tools** | Candlestick, OHLCV bar, line; 50+ indicators; trendlines, Fibonacci, support/resistance; alerts on indicators; multi-timeframe | TradingView Lightweight Charts v5 | XL | 10 |
+| 2 | **Real-time watchlist** | Live LTP, change%, volume; colour flash on tick; multi-list; one-tap to chart; sort by change | Zerodha Kite | L | 9 |
+| 3 | **Intraday super order** | Entry + Target + SL as a single ticket; bracket-order style; SL auto-follow on trigger | Dhan Super Orders | M | 9 |
+| 4 | **GTT order** | Good-Till-Triggered: persist order intent across sessions; trigger on price breach; two-leg (entry + SL) | Zerodha / Upstox | M | 8 |
+| 5 | **Paper trading mode** | Virtual ₹10 lakh; simulate all order types with realistic fills; live P&L; reset at any time | TradingView / Webull | L | 9 |
+| 6 | **Real-time position P&L** | MTM per position and total; day P&L vs overall; brokerage/STT deducted; realised + unrealised | All brokers | M | 9 |
+| 7 | **Risk kill switch** | Daily loss limit (absolute INR); segment disable toggle; auto-square-off trigger at threshold | Dhan Trader's Controls | S | 8 |
+| 8 | **AI intraday signals** | Pattern detection (supertrend, RSI divergence, volume spikes); display as watchlist nudges or trade cards with entry/target/SL | 5paisa IntraEdge / Angel One ARQ | XL | 7 |
+
+---
+
+#### F&O — Options + Futures (top 8)
+
+| # | Feature | What It Does | Market Leader | Effort | User Impact |
+|---|---|---|---|---|---|
+| 1 | **Option chain with Greeks** | Full chain: all strikes and expiries; Delta, Gamma, Theta, Vega, OI, Volume, IV per strike; PCR, Max Pain, India VIX | Dhan / Zerodha | L | 10 |
+| 2 | **Strategy builder with payoff graph** | Drag strikes onto a payoff canvas; auto-calculate P&L curve, breakevens, max profit/loss, aggregate Greeks at current IV | Upstox / Sensibull | XL | 9 |
+| 3 | **IV surface display** | 3D or 2D heatmap of IV across strikes and expiries; IV percentile rank vs 1Y history | TradingView / Dhan | L | 8 |
+| 4 | **Options basket order** | Add multiple strikes to a basket from the chain; calculate combined margin; place all legs in one submit | Zerodha Kite (March 2025) | M | 9 |
+| 5 | **Theta decay tracker** | Per-position daily theta in INR; time-to-expiry countdown; premium erosion chart | Dhan / Upstox | S | 7 |
+| 6 | **SPAN + exposure margin calculator** | Estimate margin requirement before order; across multi-leg strategies; show available vs required | Upstox / Angel One | M | 8 |
+| 7 | **F&O P&L attribution** | Realised + unrealised per contract; grouped by underlying; delta-adjusted exposure per underlying | IBKR / Zerodha Console | M | 7 |
+| 8 | **Futures heatmap** | Sector-wise futures OI, basis, and price change in a heat-map grid; spot trend divergence by sector | Upstox | M | 6 |
+
+---
+
+#### Mutual Funds (top 5)
+
+| # | Feature | What It Does | Market Leader | Effort | User Impact |
+|---|---|---|---|---|---|
+| 1 | **MF screener** | Filter by category, AMC, 1Y/3Y/5Y CAGR, expense ratio, AUM, Sharpe, sortino, Morningstar/CRISIL rating | Zerodha Coin / Groww | L | 8 |
+| 2 | **SIP tracker** | Active SIPs list; next debit date; total invested vs current value; XIRR per SIP; pause/cancel from UI | Zerodha Coin | M | 9 |
+| 3 | **XIRR calculator** | True annualised return accounting for all cash flows (SIP instalments + redemptions) | Zerodha Console | S | 7 |
+| 4 | **AI fund recommendation** | Risk profile → goal → horizon → recommended fund shortlist with rationale; robo-advisory lite | 5paisa Robo / Fisdom | XL | 7 |
+| 5 | **STP / Switch manager** | Systematic Transfer Plan setup and tracking; switch between funds of same AMC; UI to set frequency | Zerodha Coin (March 2025) | M | 6 |
+
+---
+
+#### Commodity / Currency (top 5)
+
+| # | Feature | What It Does | Market Leader | Effort | User Impact |
+|---|---|---|---|---|---|
+| 1 | **MCX commodity order entry** | Gold, Silver, Crude Oil, Natural Gas, Zinc; lot size calculator; margin estimate; contract specifications inline | Groww / Dhan | M | 6 |
+| 2 | **Currency derivatives (CDS)** | USDINR, EURINR, GBPINR options and futures; RBI reference rate display; speculation limit warning | Upstox / Angel One | M | 5 |
+| 3 | **Commodity price dashboard** | Global reference prices (LME, COMEX, NYMEX) vs MCX; basis display; roll schedule | Upstox / 5paisa | S | 5 |
+| 4 | **NCDEX agri commodities** | Soybean, Guar, Turmeric, Castor Seed — for agriculture-adjacent logistics customers | Deferred to T3 (low retail demand) | L | 3 |
+| 5 | **Logistics FX hedging widget** | USDINR exposure from logistics invoices (cross-domain) → suggested hedge size → CDS order pre-filled | Unique to Logic Nexus | XL | 8 |
+
+---
+
+#### Cross-instrument / Portfolio (top 5)
+
+| # | Feature | What It Does | Market Leader | Effort | User Impact |
+|---|---|---|---|---|---|
+| 1 | **Unified portfolio dashboard** | All holdings (equity, MF, ETF, bonds) in one view; total invested, current value, day P&L, XIRR; sector breakdown | ICICI Direct / Zerodha Console | L | 10 |
+| 2 | **Sector allocation treemap** | Holdings visualised as a treemap by sector weight; vs Nifty 50 weights; over/underweight by colour | Zerodha Kite (March 2025) | M | 7 |
+| 3 | **Portfolio rebalancing alerts** | Notify when a position exceeds a configured % of portfolio; suggest sell to rebalance | IBKR / Robo-advisors | M | 6 |
+| 4 | **Performance attribution** | Return decomposition: which stocks/sectors drove alpha vs benchmark; rolling 30/90/365d charts | IBKR / Trendlyne | XL | 7 |
+| 5 | **Trade journal (AI-assisted)** | Capture trade rationale; auto-tag entry/exit; AI summarises patterns in wins/losses; weekly review | Streak / custom | L | 8 |
+
+---
+
+### 18.6 UI/UX Design Recommendations
+
+---
+
+#### 18.6.1 Mobile-First Trading UX
+
+India's retail trading is overwhelmingly mobile: > 80% of Groww's and Dhan's active sessions originate from mobile. The following patterns should guide our mobile implementation (Phase 3, React Native or PWA).
+
+**Gesture patterns:**
+- Swipe left on a position → quick exit confirmation sheet (half-screen modal, not full navigation)
+- Swipe right on a watchlist item → add to basket / set alert
+- Two-finger pinch on chart → zoom timeframe (standard but must be implemented correctly; common failure point)
+- Long press on chart price axis → place horizontal alert line inline
+- Pull-down on portfolio view → force-refresh positions from broker
+
+**Order entry:**
+- The "Super Order" model (Dhan) is the target: entry, target, and SL in a single modal. No multi-tab navigation.
+- Numeric keyboard should auto-appear on quantity and price fields. Avoid custom numeric pickers.
+- Show available margin in the order form in real time; not after tap-to-check.
+- Segment selector (MIS/CNC/NRML) must be visually prominent; default per instrument type (intraday → MIS for equity).
+
+**Confirmation and authentication:**
+- For orders below a configured threshold (e.g., ₹50,000 notional): biometric confirm (FaceID/fingerprint) with zero-friction confirm sheet.
+- For orders above threshold or in F&O: explicit "Swipe to confirm" gesture with order summary visible.
+- Do not use PIN-entry on every order — this is the primary friction point users cite for abandoning mobile trade apps.
+
+**Speed targets:**
+- Watchlist load: < 200ms (cached LTP from Redis + WebSocket delta)
+- Order confirmation modal open: < 100ms
+- Trade confirmation notification: < 500ms after broker ACK
+
+---
+
+#### 18.6.2 Option Chain UX
+
+The option chain is the highest-stakes UI surface on the platform — F&O traders will judge the platform's quality primarily by this screen.
+
+**Layout (desktop):**
+```
+[Underlying selector] [Expiry selector: weekly/monthly tabs] [IV: 48.2%] [PCR: 0.87] [Max Pain: 23,500]
+──────────────────────────────────────────────────────────────────────────────────────────
+  CALLS                                          STRIKE       PUTS
+  OI    Chg%  LTP   IV   Delta  Theta  Gamma  |  23,000  |  OI    Chg%  LTP   IV   Delta  Theta  Gamma
+──────────────────────────────────────────────────────────────────────────────────────────
+  [ATM row highlighted in amber background]
+```
+
+**Interaction patterns:**
+- Click any call/put cell → pre-fill order form with that strike/expiry/type
+- Checkbox on row → add to basket (multi-select supported)
+- OI bar chart inline beside OI number (mini-bar, 40px wide) — visual OI distribution at a glance
+- IV colour coding: green (IV percentile < 30%), yellow (30–70%), red (> 70%)
+- Sticky header: underlying price + change% stays visible while scrolling strikes
+- PCR heatmap row at top: put/call ratio by strike displayed as colour gradient
+
+**Mobile option chain:**
+- Horizontal scroll for Greeks columns (Delta, Gamma, Theta, Vega shown; others accessible via column toggle)
+- Swipe left on a strike row → add to basket
+- Long press → show full Greeks + OI change vs yesterday
+
+---
+
+#### 18.6.3 Charting Standards
+
+Use **TradingView Lightweight Charts v5** for all chart surfaces (see §18.11 for justification). For the advanced chart page (full-screen, multi-indicator), evaluate licensing TradingView Advanced Charts (the free charting library — formerly Charting Library, Apache 2.0 for qualifying open-source/free tiers; commercial licence required if we charge).
+
+**Minimum indicator set for Phase 1 (P1):**
+- Moving averages: SMA (20, 50, 200), EMA (9, 21)
+- MACD (12, 26, 9)
+- RSI (14) with overbought/oversold zones
+- Bollinger Bands (20, 2)
+- Volume bars coloured by up/down candle
+
+**Phase 2 additions:**
+- SuperTrend (7, 3) — India's most widely used intraday trend indicator
+- VWAP with upper/lower bands (critical for intraday traders)
+- ATR (14) for volatility-based SL calculation
+- Ichimoku Cloud
+- OI overlay on F&O charts (OI as histogram below price candles)
+- Delivery % volume (equity delivery trading signal)
+
+**Drawing tools (P1):** Trendline, horizontal line (support/resistance), Fibonacci retracement, rectangle (zone marking).
+
+**Alerts on chart (P2):** Click price axis → set alert → notification when LTP crosses that level.
+
+**Multi-pane (P2):** Volume, MACD, RSI, OI as separate panes below main price pane. Lightweight Charts v5 supports multi-pane natively.
+
+**Chart types (P1):** Candlestick, OHLC bar, Line. **Phase 2:** Heikin Ashi, Renko (for trend-following traders).
+
+---
+
+#### 18.6.4 Portfolio Dashboard
+
+The portfolio dashboard is the landing page for all non-intraday users (investors, SIP holders, swing traders). It must communicate health at a glance and not require any calculation by the user.
+
+**Above-the-fold (viewport 1):**
+```
+Total Portfolio Value:  ₹8,42,310.45   (+₹12,840.20 today, +1.55%)
+Invested:               ₹7,10,000.00   |   Overall P&L:  +₹1,32,310.45 (+18.6%)   XIRR: 14.2%
+[Equity ██████ 68%]   [MF ████ 22%]   [Gold ██ 7%]   [Cash ███ 3%]
+```
+
+**Below-the-fold components:**
+- **Holdings table:** symbol, qty, avg cost, LTP, day P&L, total P&L% — sortable; one-tap to chart; quick exit
+- **Sector treemap:** 8–12 sectors; cell size = portfolio weight; colour = day change
+- **P&L curve:** cumulative portfolio value over time; toggle: 1W/1M/3M/1Y/All; cash-flow-adjusted (like Zerodha Console Portfolio Performance Curve)
+- **Top movers:** 3 best + 3 worst performers today (mini cards with symbol, LTP change%)
+- **Upcoming events:** Next earnings, ex-dividend dates for held stocks; macro events (RBI MPC, CPI)
+
+---
+
+#### 18.6.5 Novice vs Expert Modes
+
+Use progressive disclosure — the same platform, different information density. The mode switch is a persistent user preference stored in `platform.profiles`.
+
+**Novice mode (default for new users):**
+- Watchlist shows: symbol, company name, LTP, change% — nothing else visible
+- Order form: MIS/CNC selector simplified to "Intraday" / "Delivery"; lot/qty auto-filled to 1; no trigger price; no disclosed qty
+- Portfolio: total value, overall gain/loss%, list of holdings — no Greeks, no IV, no OI
+- Option chain: hidden by default; user must tap "Activate F&O" + read a SEBI risk disclosure
+- Chart: 5 default indicators only; drawing tools hidden; one-click presets ("View Trend", "View Momentum")
+- AI recommendations: displayed as "Idea cards" with simple rationale; no raw scores visible
+
+**Expert mode (user-selectable after 30 days or explicit toggle):**
+- All watchlist columns visible including OI, volume, 52W high/low, circuit filter status
+- Order form: all fields exposed; bracket order, cover order, AMO, iceberg order options visible
+- Portfolio: full Greeks on F&O, SPAN margin used, delivery % exposure, attribution chart
+- Option chain: full display by default with Greek columns, IV surface link
+- Chart: full indicator library; Pine Script equivalents (custom indicator upload — Phase 4)
+- AI recommendations: full signal card with confidence score, backtest performance, supporting data
+
+**Robinhood principle applied:** Even in novice mode, every feature is learnable. Options activation requires completing a 5-question contextual quiz (SEBI-friendly; demonstrates informed consent).
+
+---
+
+#### 18.6.6 Dark Mode & Accessibility
+
+**Dark mode:**
+- Implement via CSS custom properties (Tailwind `dark:` variant); system-preference auto-detect via `prefers-color-scheme`; manual toggle stored in user profile
+- Default palette (dark): background `#0F1117`, surface `#1A1D27`, primary text `#E8EAED`, secondary text `#9AA0B4`
+- Chart colours: bullish candle `#26A69A` (teal-green), bearish candle `#EF5350` (teal-red) — distinct in deuteranopia
+- Positive P&L: `#00C853` (green); negative: `#FF1744` (red). Both must pass WCAG AA contrast (4.5:1 minimum)
+
+**WCAG 2.1 AA compliance targets:**
+- All text against background: minimum 4.5:1 contrast ratio
+- UI components (buttons, input borders): 3:1 contrast ratio against adjacent colour
+- Focus indicators: visible 3px outline on all interactive elements (keyboard navigation critical for desktop traders)
+- Alternative text on all chart images / screenshots shared via social
+- Screen reader: ARIA labels on all dynamic values (LTP, P&L) that update via WebSocket — announce changes on significant moves only (prevent screen reader noise)
+
+**Colour-blind safe palettes:**
+- Never use red/green alone to communicate gain/loss; supplement with up/down arrows and explicit `+`/`-` signs
+- Deuteranopia simulation test all key screens using browser DevTools colour-blind emulation before release
+- Substitutes: use blue (gain) vs orange (loss) as an optional colour-blind mode in accessibility settings
+
+---
+
+### 18.7 Intelligent Recommendation Engine Architecture
+
+This section specifies the architecture for Logic Nexus's AI-driven recommendation layer. All signal outputs are advisory only; the platform is not a SEBI-registered Research Analyst; disclosures must be prominent.
+
+---
+
+#### 18.7.1 Data Inputs
+
+| Source | Data | Frequency | Storage |
+|---|---|---|---|
+| Broker WebSocket (Angel One SmartAPI) | Live LTP, bid/ask, volume | Real-time tick | Redis (ephemeral, 24h rolling) |
+| NSE/BSE bulk download | EOD OHLCV, delivery %, circuit limit | Daily 18:00 IST | `markets.price_history` |
+| NSE OI data | Strike-wise OI, change in OI, PCR | Real-time during market hours | `markets.option_chain_snapshots` |
+| NSE FII/DII flows | Daily institutional buy/sell provisional + final | Daily 17:00 IST | `markets.fii_dii_flows` (new table) |
+| AMFI daily NAV | Fund NAV, AUM | Daily 23:00 IST | `markets.mf_nav_history` |
+| NSE corporate actions | Dividends, splits, bonuses, earnings dates | On announcement | `markets.corporate_actions` |
+| Macro calendar | RBI MPC dates, CPI release, GDP, PMI | Scheduled + live scrape | `markets.macro_events` |
+| News sentiment | Financial news NLP; SEBI announcements; management commentary | Near-real-time | `markets.news_sentiment` (new table) |
+| User portfolio | Holdings, average cost, unrealised P&L | On sync | `markets.holdings`, `markets.positions` |
+| User trade history | Entry/exit prices, instruments, timestamps | On execution | `markets.orders` |
+| Market breadth | Advance-decline ratio, new 52W highs/lows, VIX | Derived from tick data | In-memory worker cache |
+
+---
+
+#### 18.7.2 Signal Generation
+
+**Technical signals (rule-based, implemented first — Python `pandas_ta` or equivalent):**
+
+| Signal | Logic | Instrument |
+|---|---|---|
+| RSI oversold/overbought | RSI(14) < 30 → oversold buy signal; > 70 → overbought sell signal; confirm with volume | Equity intraday + delivery |
+| MACD crossover | Fast EMA crosses above slow EMA + positive histogram → buy; reverse → sell | All equity |
+| SuperTrend buy/sell | Price crosses SuperTrend line (7,3) with strong candle volume | Intraday |
+| Bollinger squeeze | Band width contracting to 6-month low → anticipate breakout direction | Delivery |
+| OI build + price rise | Rising OI + rising price → long build-up (bullish); rising OI + falling price → short build-up (bearish) | F&O |
+| Max Pain proximity | Spot within 1% of max pain level near expiry → directional signal | Weekly expiry options |
+| PCR extreme | PCR < 0.6 → potential reversal up; PCR > 1.5 → potential reversal down | Index options |
+| FII contra-signal | FII net sell > ₹2000 crore for 3 consecutive days → oversold market signal | Portfolio-level |
+| Volume spike | Volume > 3× 20-day average with price > 1.5% up → momentum breakout | Intraday equity |
+| Delivery % anomaly | Delivery% > 80% on high-volume day → accumulation signal | Equity delivery |
+
+**ML models (Phase 2, Python `scikit-learn` / `xgboost` workers):**
+- Features: 20-day OHLCV patterns, RSI, MACD histogram, volume z-score, sector momentum, FII/DII net flow, VIX level, days-to-expiry (for options)
+- Target: probability of price being +2% above entry within 3 trading sessions
+- Model type: XGBoost classifier; retrain weekly on rolling 3-year data
+- Backtested walk-forward validation: avoid look-ahead bias using `TimeSeriesSplit`
+- Separate model for each segment: equity intraday, equity delivery, index options
+
+**NLP signals (Phase 3):**
+- Earnings call transcript sentiment (BSE XML filings → parse → BERT-based sentiment)
+- SEBI announcement impact classifier (positive/negative/neutral for affected symbols)
+- Social media sentiment via public APIs (Twitter/X, StockTwits India — within rate limits)
+
+---
+
+#### 18.7.3 Risk-Adjusted Scoring
+
+Every signal must be scored before display. Raw signals with no risk context cause harm.
+
+**Kelly Criterion (fractional Kelly, 0.25× to cap max position size):**
+```
+Kelly fraction = (p × b − q) / b
+where:
+  p = estimated win probability (from ML model confidence)
+  b = ratio of profit to loss (target / SL distance)
+  q = 1 − p
+Recommended position size = 0.25 × Kelly fraction × portfolio_value
+```
+
+**Maximum drawdown guardrail:**
+- Never recommend a position where SL would contribute > 2% portfolio loss from a single trade
+- Cap aggregate recommended exposure per sector at 30% of portfolio
+- Flag if a recommendation is in the same underlying as an existing open position > 3% of portfolio
+
+**Composite signal score (0–100):**
+```
+score = w1 × technical_score + w2 × ml_probability + w3 × risk_adjusted_kelly + w4 × sentiment_score
+weights: [0.35, 0.35, 0.20, 0.10]  — tuned quarterly via backtest performance
+```
+
+**Minimum score threshold for display:** 65/100. Signals below 65 are not surfaced to the user; they remain in `markets.signals` with `displayed = false` for backtesting audit.
+
+---
+
+#### 18.7.4 Personalisation Layer
+
+The recommendation engine must be portfolio-context-aware and risk-profile-aware. A signal appropriate for an aggressive trader is not appropriate for a conservative one.
+
+**User risk profile inputs:**
+- SEBI-mandated risk profiling questionnaire (6 questions: investment horizon, loss tolerance, income stability, existing portfolio, knowledge level, liquidity need)
+- Derived risk tier: Conservative (1–2), Moderate (3–4), Aggressive (5–6) — stored in `platform.profiles.risk_tier`
+- Portfolio context: existing holdings, sectors already heavy, cash available (from broker sync)
+
+**Personalisation filters applied:**
+- F&O signals hidden entirely for `risk_tier = Conservative`
+- Intraday signals show only if user has executed ≥ 5 intraday trades (avoids beginner harm)
+- Sector overlap filter: suppress signals in sectors where user already holds > 15% of portfolio
+- Position size suggestion scaled to portfolio value and Kelly fraction (§18.7.3)
+- Duplicate signal filter: if the same symbol already has an open position, re-recommend only if the signal is additive (averaging down suppressed unless user explicitly enables)
+
+---
+
+#### 18.7.5 Output Formats
+
+**Trade card (intraday / short-term swing):**
+```
+[Signal icon: ▲ BUY | ▼ SELL]    RELIANCE  NSE·EQ    Confidence: 78/100
+Strategy: Breakout on volume + SuperTrend cross
+Entry:  ₹2,842.00 – ₹2,850.00    Target: ₹2,920.00 (+2.7%)    SL: ₹2,800.00 (−1.5%)
+Timeframe: Intraday (MIS)         Suggested qty: 5 shares (₹14,225)
+Risk: ₹210 (0.25% of ₹84,000 available)
+[Add to Watchlist]  [Place Order]  [Dismiss]
+```
+
+**Watchlist nudge (non-intrusive):**
+- Small badge on watchlist row: coloured dot (green/red) + score number
+- Tap to expand full signal card
+
+**Portfolio rebalancing alert:**
+```
+⚠️ HDFC Bank (HDFCBANK) now 22% of your equity portfolio. 
+Suggested action: Trim 30 shares to reduce to 15%.
+[Review]  [Dismiss]
+```
+
+**Weekly portfolio health summary:**
+- Delivered via in-app notification + optional email
+- Net P&L, best/worst performers, upcoming dividends/earnings, sector drift vs target allocation
+- AI-generated 3-sentence natural language summary (Claude claude-sonnet-4-6, stored output not a live API call)
+
+---
+
+#### 18.7.6 Backtesting Integration
+
+Every signal type must be validated against 5-year historical data before being enabled in production.
+
+**Backtest pipeline (extends existing `markets.backtests` schema, §17):**
+1. Signal generator runs in "backtest mode" on historical OHLCV + OI + FII/DII data
+2. Simulated fills: use next-bar open as fill price; add 0.1% slippage + STT/brokerage modelled per §17.8 commission_model
+3. Performance metrics computed per signal type:
+   - Win rate (% signals where price hit target before SL)
+   - Average R:R ratio
+   - Profit factor (gross profit / gross loss)
+   - CAGR of the strategy signal over the backtest window
+   - Max drawdown (peak-to-trough)
+   - Sharpe ratio (annualised)
+4. Results stored in `markets.signal_backtest_results` (new table, linked to signal type)
+5. Minimum thresholds for production enablement: win rate ≥ 45%, profit factor ≥ 1.2, Sharpe ≥ 0.8
+6. Monthly walk-forward validation: append new month's data, re-validate; signals degraded below threshold are automatically disabled and flagged for re-tuning
+
+---
+
+#### 18.7.7 SEBI Compliance
+
+This is a firm requirement, not an optional enhancement. The recommendation engine operates in a grey area unless explicitly designed for compliance.
+
+**Current regulatory position:**
+- The platform is not a SEBI-registered Research Analyst (RA) — registration requires individual certification (NISM Series XV) and entity registration (SEBI RA Regulations 2014)
+- Without RA registration: the platform **cannot provide research reports, buy/sell recommendations, or price targets to customers** for a fee
+- Personal use (no customers, no fee) is currently unregulated; the signals are for the platform's own use only
+
+**Required actions before commercial launch with recommendation features:**
+1. Obtain SEBI RA registration (individual: NISM XV exam + SEBI application; entity: compliance officer, NW ≥ ₹25 lakh, etc.)
+2. Or: partner with a SEBI-registered RA and white-label their research (common industry practice — Smallcase uses this model)
+3. SEBI Feb 2025 algo circular: any signal that auto-places an order must carry an Algo-ID registered with the exchange via the broker. Our `markets.signals` → `orders.tag` pipeline already captures `algo_id` (§17.8).
+
+**Mandatory disclosures (display on all signal surfaces):**
+```
+"These are AI-generated research signals for informational purposes only and do not constitute 
+investment advice. Past performance of signals does not guarantee future results. Please consult 
+a SEBI-registered advisor before making investment decisions. Trading in derivatives involves 
+substantial risk of loss."
+```
+
+**Audit trail requirements:**
+- Every signal generated must be logged: `markets.signals` table with timestamp, signal_type, symbol, confidence_score, entry, target, sl, model_version, user_id
+- Every signal shown to a user: `displayed = true` flag + `displayed_at` timestamp
+- Every user interaction with a signal (viewed, dismissed, order placed from signal): tracked in `platform.audit_log`
+- Retention: 5 years minimum (SEBI record-keeping standards for RA)
+
+---
+
+### 18.8 Financial Instrument Coverage Matrix
+
+Indicates whether a given feature applies (✅ = full support, ⚡ = partial/derived, ❌ = not applicable, 🔜 = planned T2.5+).
+
+| Feature | Equity Intraday (MIS) | Equity Delivery (CNC) | Equity F&O | Index F&O | Currency F&O (CDS) | Commodity (MCX) | MF / ETF | Bonds / G-Sec |
+|---|---|---|---|---|---|---|---|---|
+| Live price chart | ✅ | ✅ | ✅ | ✅ | 🔜 | 🔜 | ❌ NAV daily | 🔜 |
+| Watchlist | ✅ | ✅ | ✅ | ✅ | 🔜 | 🔜 | ⚡ NAV only | 🔜 |
+| Order entry | 🔜 | 🔜 | 🔜 | 🔜 | 🔜 | 🔜 | 🔜 BSE StAR | 🔜 RBI Retail Direct |
+| GTT orders | ✅ | ✅ | ❌ (expiry-based) | ❌ | ❌ | ❌ | ❌ | ❌ |
+| Option chain | ❌ | ❌ | ✅ | ✅ | ⚡ USDINR only | ❌ | ❌ | ❌ |
+| Greeks | ❌ | ❌ | ✅ | ✅ | ⚡ | ❌ | ❌ | ❌ |
+| Strategy builder | ❌ | ❌ | ✅ | ✅ | ⚡ | ❌ | ❌ | ❌ |
+| Payoff graph | ❌ | ❌ | ✅ | ✅ | ⚡ | ❌ | ❌ | ❌ |
+| Theta tracker | ❌ | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ | ⚡ accrual |
+| SIP / DCA | ❌ | ⚡ SEP (ICICI model) | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| XIRR | ❌ | ✅ | ❌ | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Paper trading | ✅ | ✅ | ✅ | ✅ | 🔜 | 🔜 | ⚡ NAV simulation | ❌ |
+| AI signals | ✅ | ✅ | ✅ | ✅ | 🔜 | 🔜 | ⚡ fund screener | ❌ |
+| Backtesting | ✅ | ✅ | ⚡ premium only | ⚡ | ❌ | 🔜 | ❌ | ❌ |
+| SPAN margin calc | ❌ | ❌ | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| FII/DII flows | ⚡ market signal | ⚡ | ✅ | ✅ | 🔜 | ❌ | ❌ | ❌ |
+| Portfolio P&L | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Sector allocation | ✅ | ✅ | ✅ | ⚡ index-based | ❌ | ⚡ | ✅ | ❌ |
+| Tax report / STT | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Push alerts | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ |
+| Social / copy | 🔜 P3 | 🔜 P3 | 🔜 P3 | 🔜 P3 | ❌ | ❌ | ❌ | ❌ |
+
+---
+
+### 18.9 Trading Modes Coverage
+
+For each trading mode: current platform support level, gap vs market leaders, and priority enhancement.
+
+| Trading Mode | Description | Current State | Market Leader Gap | Priority |
+|---|---|---|---|---|
+| **Spot / Delivery (CNC)** | Buy and hold equity with full capital; no leverage; T+1 settlement | Schema designed (`markets.holdings`); broker sync designed (§17.9-B) | Zerodha holdings page + sector treemap; we lack UI and live sync | P1 — T2.5-B |
+| **Intraday / MIS** | Auto-square-off before market close; broker provides intraday margin (3–5×) | Order placement designed (§17.9-C); no GTT/SL/bracket logic | Dhan Super Orders; Zerodha order window improvements; we need full order form UX | P1 — T2.5-C |
+| **Equity Futures** | Leveraged directional trade on stock/index futures; margin-based | F&O module designed (§17.9-D); no UI built | Upstox futures heatmap; Dhan option chain; we need F&O dashboard | P1 — T2.5-D |
+| **Equity Options (long)** | Buy CE/PE; limited risk (premium paid); max leverage | Option chain UI designed; Greeks calculation designed (py_vollib) | Dhan/Zerodha option chain; we need full chain + basket; add payoff graph in P2 | P1 — T2.5-D |
+| **Options Selling / Strategies** | Sell CE/PE; unlimited risk; SPAN margin required; multi-leg strategies | Not designed beyond single-leg; strategy builder deferred | Sensibull/Upstox strategy builder; strategy builder is Phase 2 | P2 |
+| **Margin / Leverage (MTF)** | Margin Trading Facility: up to 4× leverage on equity delivery; interest charged | Not designed | Upstox MTF; HDFC Sky MTF; requires NBFC licensing or broker MTF pass-through | P3 — regulatory dependency |
+| **SIP / DCA** | Systematic Investment Plan for MF; recurring purchase at fixed frequency | `markets.mf_orders` table designed (§17.9-E); SIP tracker not built | Zerodha Coin daily SIP (March 2025); we need full SIP lifecycle UI | P1 — T2.5-E |
+| **Algo / Strategy** | API-based or rule-based automated order placement | Python worker scaffold; SEBI algo_id in `orders.tag` | Fyers API + TradingView webhooks; Streak no-code; we need webhook receiver + strategy executor | P2 — post SEBI circular April 2026 |
+| **Paper Trading** | Virtual capital simulation with live prices | Not built; cited as P1 gap throughout this document | TradingView paper trading; Sensibull simulator | P1 — build as first-class mode |
+| **Commodity (MCX)** | Spot and futures trading on MCX: Gold, Silver, Crude Oil, Natural Gas | Designed (§17.9-F); no UI or broker adapter | Groww/Dhan commodity order entry | P2 — T2.5-F |
+| **Currency Derivatives (CDS)** | USDINR, EURINR futures and options on NSE/BSE currency segment | Designed (§17.9-F); no UI | Upstox/Angel One CDS | P2 — T2.5-F |
+
+---
+
+### 18.10 Phased Implementation Roadmap
+
+---
+
+#### Phase 1 — Foundation (Q3 2026, 8 weeks)
+
+Corresponds to T2.5 phases A–E from §17.9. This phase establishes functional parity with basic broker apps and makes the platform usable for daily trading.
+
+**Feature list (8-week sprint):**
+
+1. **Broker connectivity** — Angel One SmartAPI adapter (primary); Zerodha Kite Connect adapter (secondary); daily token refresh cron; frontend Broker Settings page; encrypted token storage in Supabase Vault
+2. **Real-time watchlist** — Live LTP via broker WebSocket; Redis cache; up/down colour flash; multi-list (5 lists, 50 symbols each); LTP, change%, volume columns
+3. **Interactive chart** — TradingView Lightweight Charts v5 integrated; candlestick, line, OHLC; SMA(20,50), EMA(9), RSI, MACD, Volume bars; 1D/1W/1M/3M/6M/1Y/5Y timeframes; draw horizontal line
+4. **Order entry form** — Market, Limit, SL, SL-M order types; MIS/CNC/NRML product; available margin inline; order slicing for freeze qty; order confirmation via Supabase Realtime
+5. **Position + order book** — Real-time MTM P&L per position; day P&L total; order book with status; trade book
+6. **Live option chain** — Underlying + expiry selector; strikes, LTP, OI, volume, IV, Greeks (Delta, Theta); PCR, Max Pain header; `option_chain_snapshots` populated from Angel One API
+7. **Paper trading mode** — Virtual ₹10 lakh account (separate from live); simulate all order types; fills at LTP; P&L tracked; reset button; clearly labelled "PAPER" throughout UI
+8. **SIP tracker** — Active SIPs from Angel One BSE StAR MF; next debit date; invested vs current value; XIRR
+9. **Risk kill switch** — Daily loss limit toggle; segment disable (F&O only, equity only, etc.); confirmation modal before order if limit approaching
+10. **Basic portfolio dashboard** — Holdings table; total value + overall P&L; day P&L; simple P&L chart (line)
+
+**Technical dependencies:**
+- `markets.broker_connections` table + RLS (§17.9-A) must be live
+- Angel One SmartAPI credentials and access token management
+- Supabase Realtime channels for order status CDC
+- Redis (Upstash) for LTP cache with 1-second TTL
+- Python worker `broker_sync` job operational
+
+**Success metrics:**
+- First trade placed via platform (paper or live): ≥ 1 per test user within session 1
+- Watchlist load time: < 300ms p95
+- Option chain load on expiry change: < 800ms p95
+- Zero order double-submission incidents (idempotency key on every order)
+- Paper trading P&L accuracy: within ±0.5% of manual calculation
+
+---
+
+#### Phase 2 — Intelligence (Q4 2026, 10 weeks)
+
+Transform the trading platform into an intelligent co-pilot. Users should feel the platform is helping them trade better, not just executing orders.
+
+**Features:**
+
+1. **AI intraday signal engine v1** — RSI, MACD, SuperTrend rule-based signals; XGBoost equity model (trained on 3Y NSE data); signal cards on watchlist + portfolio; disclosures per §18.7.7
+2. **Options strategy builder** — Multi-leg payoff graph (Bull Call Spread, Bear Put Spread, Iron Condor, Straddle, Strangle, custom); P&L curve at expiry + intermediate; breakeven display; aggregate Greeks
+3. **Advanced charting** — SuperTrend, VWAP, ATR, OI overlay, Ichimoku, Bollinger; Heikin Ashi and Renko chart types; drawing: Fibonacci retracement, rectangle, parallel channel; chart alerts
+4. **Portfolio analytics** — Sector treemap (holdings vs Nifty weightings); P&L attribution by symbol/sector; rolling 30/90/365d performance curve; Sharpe, XIRR, max drawdown calculation
+5. **MF screener** — AMFI scheme master filter by category, AMC, 1Y/3Y/5Y returns, expense ratio, AUM, CRISIL/ValueResearch rating
+6. **FII/DII flow dashboard** — Daily institutional data; net buy/sell chart; sector-wise institutional activity; provisional + final
+7. **Dark mode** — Full platform dark theme; user preference persisted; OLED-optimised palette
+8. **Novice / expert mode toggle** — Progressive disclosure per §18.6.5; onboarding quiz for F&O activation
+9. **Push notifications** — Price alerts (FCM for Android, APNs for iOS when React Native app builds); order fill alerts; SIP reminder
+10. **Backtesting v2** — Connect signal engine to backtest runner; visualise signal performance on chart; view all past signals with outcome; per-signal win rate dashboard
+
+**Technical dependencies:**
+- Python ML worker extended with XGBoost model serving (scikit-learn + joblib serialisation)
+- `markets.signals` table + `markets.signal_backtest_results` table
+- `markets.fii_dii_flows` table + NSE daily data ingestion job
+- `markets.news_sentiment` table + NLP pipeline (BERT sentiment model or Hugging Face API)
+- Notification service (Supabase Edge Function → Firebase / Expo Push)
+
+**Success metrics:**
+- Signal engine uptime: ≥ 99.5% during market hours
+- Signal win rate (paper validation): ≥ 45% within 30 trading sessions
+- Feature adoption: ≥ 40% of active users interact with at least one signal per week
+- Option strategy builder: ≥ 20% of F&O users build at least one strategy per week
+- Portfolio analytics: average session length ≥ 8 minutes (vs baseline)
+
+---
+
+#### Phase 3 — Parity (Q1 2027, 12 weeks)
+
+Achieve feature parity with Zerodha Kite + Dhan combined. Add social layer and mobile-native experience.
+
+**Features:**
+
+1. **Terminal / multi-panel workspace** — Configurable multi-pane layout; drag-and-drop; saved workspaces (5); presets: Trade, Invest, Scalper; linked panels (click watchlist → chart + option chain update)
+2. **Social / idea sharing** — Publish chart annotated ideas; follow other users; comment; like; curated "Top Ideas" feed; privacy controls (public/follower/private)
+3. **Copy trading v1** — Follow a published strategy (portfolio weights); auto-suggest replication trades based on leader's positions; user approval required before execution (not fully automatic — SEBI compliance)
+4. **Mobile app** — React Native app (iOS + Android); core flows: watchlist, chart, order entry, positions, portfolio; biometric confirm; swipe-to-exit; FCM push; deep links from alerts
+5. **AI portfolio advisor** — Weekly portfolio health AI commentary (Claude claude-sonnet-4-6 cached output); rebalancing suggestions; sector drift alerts; drawdown warnings
+6. **Performance analytics / trade journal** — Per-trade entry, rationale capture, exit; win rate, avg R:R, profit factor by strategy tag; AI-generated weekly pattern summary
+7. **SPAN margin calculator** — Multi-leg SPAN + exposure estimate before order; updated to April 2026 SEBI margin rules
+8. **Keyboard shortcuts + advanced order types** — Full keybindings; bracket order, cover order, iceberg order; after-market orders (AMO)
+
+**Technical dependencies:**
+- React Native project setup; shared business logic via TypeScript packages
+- WebSocket real-time connection from mobile (React Native) to Supabase Realtime
+- Social feature tables: `markets.ideas`, `markets.follows`, `markets.comments` (new schema)
+- Copy trading compliance controls: user approval gate; daily volume limit; SEBI disclosure
+
+**Success metrics:**
+- Mobile app: 4.0+ rating on Play Store within 90 days
+- Social layer: ≥ 15% of active users publish or interact with ideas monthly
+- Terminal workspace: ≥ 25% of desktop users switch to multi-panel layout
+- Mobile DAU: ≥ 60% of total DAU within 6 months of launch
+
+---
+
+#### Phase 4 — Differentiation (Q2 2027)
+
+Go beyond parity. Build features no other Indian broker currently offers. Leverage the unique logistics-finance integration that is native to Logic Nexus but impossible for a standalone broker.
+
+**Unique differentiators:**
+
+1. **Logistics-Finance FX hedging widget** — Pull USDINR invoice exposure from the logistics domain (`logistics.invoices` cross-domain join) → calculate net FX exposure → auto-generate suggested USDINR CDS hedge size → pre-fill order form. No Indian broker offers this; it is only possible because we own both domains.
+
+2. **AI-native trading assistant (conversational)** — In-app Claude-powered chat: "How is my portfolio positioned for a rate cut?" / "Show me the option strategy for Nifty staying range-bound this week" / "Which of my holdings have earnings this week?" — responds with live data from `markets.*` via MCP. Build on Angel One MCP server model (§18.2, Angel One).
+
+3. **Custom indicator scripting** — Pine Script-compatible (or Python-based) custom indicator upload; run server-side; output as chart overlay or signal trigger. Enables power users to build proprietary signals without leaving the platform.
+
+4. **Strategy marketplace** — Published strategies by verified community members (SEBI-registered RA or verified backtested strategy); subscription model; revenue share with strategy authors. Requires RA registration or RA partnership (§18.7.7).
+
+5. **Compliance-first options education** — Embedded interactive course on options trading mechanics (inspired by Zerodha Varsity); locked behind F&O activation; SEBI-acknowledged consent flow. Differentiates us as a responsible broker.
+
+6. **Multi-broker smart order routing** — Compare execution quality across brokers in real time; route to best price/liquidity automatically (see D-20 in §17.10). Requires multi-broker adapter live (T4).
+
+---
+
+### 18.11 Technical Requirements
+
+---
+
+#### Charting Library Recommendation
+
+**Decision: TradingView Lightweight Charts v5 for embedded charts; evaluate TradingView Advanced Charts (free charting library) for full-screen advanced chart page.**
+
+| Library | Strengths | Weaknesses | Licence | Recommendation |
+|---|---|---|---|---|
+| **TradingView Lightweight Charts v5** | 35kB bundle; multi-pane (v5); performant (Canvas); open source; Apache 2.0; used by Binance, Coinbase | Limited indicator set (must implement custom); no Pine Script | Apache 2.0 (free) | ✅ **Use for all standard chart widgets** (watchlist mini-chart, portfolio P&L curve, option chain inline) |
+| **TradingView Advanced Charts (free charting library)** | 100+ built-in indicators; full drawing tools; Pine Script community; identical to tradingview.com chart | Requires TV server-side data feed implementation; free for qualifying open-source / some commercial uses; commercial licence ~$1,200/month at scale | Free tier available; commercial licence for high-traffic | ✅ **Evaluate for full-screen chart page** — likely the best option long-term; start with Lightweight Charts and migrate the chart page |
+| **Recharts / Chart.js** | Simple, React-native; lightweight | Not financial-grade; no tick data support; no indicator library | MIT | ❌ Insufficient for trading charts |
+| **D3.js custom** | Maximum flexibility | 10× development effort; maintenance burden | MIT | ❌ Only if TV licensing becomes prohibitive |
+
+**Implementation guidance for Lightweight Charts v5:**
+- Use `createChart()` with `layout.background` for dark/light theme support
+- `CandlestickSeries` for main price pane; `HistogramSeries` for volume pane; `LineSeries` for indicators
+- WebSocket feed: update series via `series.update({ time, open, high, low, close })` on each tick — no re-render required
+- For multi-pane (v5): use `addPane()` API; render RSI, MACD, Volume in separate panes below price
+
+---
+
+#### Real-Time Data Infrastructure
+
+```
+Angel One SmartAPI WebSocket
+        │ (tick data, market hours)
+        ▼
+Python worker (markets-worker)
+  ├─ parse tick → normalise to {symbol, ltp, volume, oi, ...}
+  ├─ publish to Redis pub/sub channel `market:tick:{symbol}`
+  └─ write to markets.price_history (1-min aggregation via scheduler)
+        │
+        ├── Redis pub/sub → Supabase Realtime broadcast channel
+        │                   (frontend subscribes per symbol watchlist)
+        │
+        └── Supabase Realtime CDC → frontend (order book, position P&L)
+```
+
+**Latency targets:**
+- Tick → Redis publish: < 10ms
+- Redis → Supabase Realtime → browser: < 100ms
+- End-to-end (broker WebSocket → chart update): < 300ms p95
+
+**Fallback chain:**
+1. Angel One WebSocket (primary, live)
+2. Angel One REST snapshot every 30s (WebSocket disconnect)
+3. Redis cached LTP (< 60s old)
+4. Upstash KV last-known price (stale indicator shown in UI)
+
+**Tick data storage:** 1-minute OHLCV bars aggregated by the worker and written to `markets.price_history`. Raw ticks are ephemeral (Redis, 24h TTL only). EOD bars downloaded from NSE/BSE bulk download nightly.
+
+---
+
+#### ML Infrastructure
+
+The Python worker (`services/markets-worker`) already exists with scaffold. Extend it:
+
+```
+services/markets-worker/src/markets_worker/
+  signals/
+    rule_engine.py          # pandas_ta-based technical signals
+    ml_models/
+      equity_classifier.py  # XGBoost model wrapper
+      feature_engineering.py
+      model_registry.py     # load/version/swap models via joblib
+    backtest/
+      walk_forward.py       # TimeSeriesSplit validation
+      metrics.py            # Sharpe, MDD, win rate, profit factor
+  nlp/
+    news_sentiment.py       # HuggingFace FinBERT sentiment pipeline
+    earnings_parser.py      # BSE XML → structured transcript
+```
+
+**Model serving:** Use `joblib` serialisation; models stored in Supabase Storage (`models/` bucket); loaded at worker startup; hot-swap on model registry update without restart.
+
+**Retraining schedule:** Weekly cron (Sunday 2:00 AM IST); triggered by `markets-worker` scheduler; results logged to `markets.signal_backtest_results`; alert if new model performance < threshold (do not auto-deploy).
+
+---
+
+#### Mobile Strategy
+
+| Option | Pros | Cons | Decision |
+|---|---|---|---|
+| **React Native** | True native performance; biometric APIs; push notifications (APNs/FCM); camera for KYC; reuse TypeScript business logic | Separate codebase to maintain; slower iteration than web | ✅ **Recommended for Phase 3** — use Expo managed workflow for faster dev |
+| **Progressive Web App (PWA)** | No app store; instant deployment; shared codebase with web | Limited biometric (WebAuthn partial), no reliable push on iOS (until iOS 17+ PWA improvements), not accepted by users as "real app" | ⚡ **Interim** — PWA for Phase 1–2 web mobile experience; full RN app for Phase 3 |
+| **Capacitor (web-wrapped)** | Reuse React codebase; native plugin access | Worse performance than RN for real-time WebSocket + Canvas charts | ❌ Not recommended for chart-heavy trading app |
+
+**Expo approach for React Native:**
+- Use `expo-local-authentication` for biometric confirm
+- `expo-notifications` for FCM/APNs push
+- `expo-camera` for future KYC/document scanning
+- Shared `@logic-nexus/markets-core` TypeScript package between web and RN
+
+---
+
+### 18.12 Success Metrics & KPIs
+
+These KPIs are tracked per phase against defined baselines. The tracking infrastructure uses PostHog (already configured in `src/main.tsx` per CLAUDE.md) with custom events.
+
+#### Phase 1 KPIs (Q3 2026)
+
+| KPI | Target | Measurement |
+|---|---|---|
+| First trade placed (paper or live) per new user | ≥ 70% of activated users within first session | PostHog funnel: `account_activated` → `order_placed` |
+| Watchlist creation rate | ≥ 80% of activated users create a watchlist | PostHog event: `watchlist_created` |
+| Chart interaction rate | ≥ 60% of users interact with chart (draw, change timeframe) | PostHog event: `chart_interaction` |
+| Order error rate | < 0.5% of orders result in rejection due to platform error (not broker rejection) | `markets.orders.status = 'platform_error'` count |
+| Watchlist load latency (p95) | < 300ms | APM (Sentry performance monitoring) |
+| Option chain load latency (p95) | < 800ms | Sentry |
+| Paper trading session rate | ≥ 50% of new users use paper trading before placing live orders | PostHog event: `paper_trade_placed` before `live_order_placed` |
+
+#### Phase 2 KPIs (Q4 2026)
+
+| KPI | Target | Measurement |
+|---|---|---|
+| AI signal weekly active rate | ≥ 40% of trading users interact with ≥ 1 signal/week | PostHog event: `signal_viewed` |
+| Signal-to-order conversion | ≥ 15% of viewed signals result in an order placed within 24h | Funnel: `signal_viewed` → `order_placed` with `signal_id` tag |
+| Signal accuracy (paper backtest) | ≥ 45% win rate over rolling 30-session window | `markets.signal_backtest_results` |
+| Average session length | ≥ 8 minutes for users with AI features enabled | PostHog session recording |
+| Portfolio analytics weekly view rate | ≥ 50% of users with ≥ 3 holdings view portfolio analytics weekly | PostHog event: `portfolio_analytics_viewed` |
+| Dark mode adoption | ≥ 35% of users switch to dark mode | PostHog user property: `theme = dark` |
+
+#### Phase 3 KPIs (Q1 2027)
+
+| KPI | Target | Measurement |
+|---|---|---|
+| Mobile app rating (Play Store / App Store) | ≥ 4.0 stars within 90 days | App store listings |
+| Mobile DAU as % of total DAU | ≥ 60% within 6 months of mobile launch | PostHog platform breakdown |
+| Social idea publishing rate | ≥ 15% of active users publish ≥ 1 idea/month | PostHog event: `idea_published` |
+| Copy-following rate | ≥ 10% of users follow ≥ 1 strategy/portfolio | PostHog event: `strategy_followed` |
+| Terminal workspace adoption | ≥ 25% of desktop power users (≥ 5 trades/month) use multi-panel layout | PostHog user segment + event: `workspace_configured` |
+| 30-day retention | ≥ 55% of activated users return after 30 days | PostHog retention cohort |
+
+#### Platform Health KPIs (ongoing)
+
+| KPI | Target | Measurement |
+|---|---|---|
+| Broker WebSocket uptime (market hours) | ≥ 99.5% (< 2.5 min downtime per session) | Sentry uptime monitor on Angel One WS |
+| Order placement success rate | ≥ 99.2% (broker-reachable orders complete) | `markets.orders` success/failure ratio |
+| SEBI algo_id compliance | 100% of algo-placed orders carry valid algo_id | `orders.tag` null check in CI test |
+| P&L calculation accuracy | ≤ 0.1% deviation vs broker-reported P&L | Daily reconciliation job + alert on breach |
+| Data freshness (LTP) | ≥ 95% of watchlist symbols have LTP < 5s old during market hours | Redis TTL monitoring |
+
+---
+
+### 18.13 Open Items Added by This Section
+
+Append to §13 deferred decisions table:
+
+| ID | Item | Defer to |
+|---|---|---|
+| D-21 | SEBI Research Analyst registration vs RA partnership — determine before Phase 2 AI signal commercial launch | Phase 2 planning |
+| D-22 | TradingView Advanced Charts commercial licence cost vs hosting own charting server (TV requires data adapter) | Phase 2 start |
+| D-23 | React Native vs PWA for Phase 3 mobile — validate with user research on platform preference of target users | Phase 3 planning |
+| D-24 | Copy trading SEBI classification — is "auto-replication of another user's portfolio" an investment advisory service requiring RIA registration? Legal opinion required | Phase 3 planning |
+| D-25 | XGBoost ML model retraining infrastructure — use managed ML platform (AWS SageMaker, GCP Vertex) or self-hosted Celery + joblib? Cost and maintenance tradeoff | Phase 2 start |
+| D-26 | Social layer moderation — financial misinformation in published ideas is a regulatory and reputational risk; define moderation policy and tooling before Phase 3 social launch | Phase 3 planning |
+| D-27 | NSE OI data real-time feed cost — Angel One SmartAPI provides option chain snapshots but historical OI not available on free tier; evaluate NSE direct data feed for production | T2.5-D |
+| D-28 | Logistics-FX widget (§18.5 Commodity/Currency feature #5): cross-domain data join between `logistics.invoices` and `markets.positions` — define RLS policy and tenant isolation rules | Phase 4 design |
+| D-29 | Paper trading fill model accuracy — use LTP as fill vs mid-price vs VWAP simulation; decision affects how closely paper P&L mirrors real trading experience | Phase 1 start |
+
+---
+
+*Section added 2026-05-17. Authored: Vimal + Claude. Research sources: Zerodha Z-Connect, Upstox product pages, Angel One SmartAPI docs, Groww, Dhan, 5paisa, Fyers, ICICI Direct, HDFC Sky, Kotak Neo, TradingView documentation, SEBI.gov.in circulars and investor survey 2025, NSE registered investor data, Business Standard, CNBC India, Analytics Vidhya, StockBrokers.com, OneTradeJournal.*
+
 *End of design document.*
