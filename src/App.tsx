@@ -208,6 +208,7 @@ const AmroSuppliersMasterData = lazy(() => import("./features/module-amro/settin
 const AmroMaintenanceFacilitiesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.MaintenanceFacilitiesMasterDataPage })));
 
 // Markets domain (per design doc 2026-05-14 §6.2, ADR-025)
+const MarketsTerminal   = lazy(() => import("./features/markets/pages/TerminalPage"));
 const MarketsHome       = lazy(() => import("./features/markets/pages/MarketsHomePage"));
 const MarketsPortfolios = lazy(() => import("./features/markets/pages/PortfoliosPage"));
 const MarketsPortfolioDetail = lazy(() => import("./features/markets/pages/PortfolioDetailPage"));
@@ -972,6 +973,7 @@ const App = () => (
             <Route path="/dashboard/amro/changes" element={<Navigate to="/dashboard/amro/work-orders" replace />} />
 
             {/* Markets domain (Multi-Asset Trading Platform) — per design doc 2026-05-14 */}
+            <Route path="/dashboard/markets/terminal" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsTerminal /></ProtectedRoute>} />
             <Route path="/dashboard/markets" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsHome /></ProtectedRoute>} />
             <Route path="/dashboard/markets/portfolios" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsPortfolios /></ProtectedRoute>} />
             <Route path="/dashboard/markets/portfolios/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsPortfolioDetail /></ProtectedRoute>} />

@@ -16,6 +16,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ArrowLeft, ExternalLink, Newspaper, Star, Trash2 } from "lucide-react";
 import { TradingChart } from "@/features/markets/components/TradingChart";
+import { MarketDepthPanel } from "@/features/markets/components/MarketDepthPanel";
 
 import {
   useInstrumentDetail,
@@ -83,6 +84,12 @@ export default function InstrumentDetailPage() {
             height={420}
             showVolume
             title={`${detail.data.instrument.symbol} · ${detail.data.instrument.exchange}`}
+          />
+
+          {/* Level 2 Market Depth */}
+          <MarketDepthPanel
+            symbol={detail.data.instrument.symbol}
+            exchange={detail.data.instrument.exchange}
           />
 
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">

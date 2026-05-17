@@ -133,6 +133,12 @@ export const marketsKeys = {
     alerts: (portfolioId: string) => [...marketsKeys.rebalancing.all(), "alerts", portfolioId] as const,
   },
 
+  options: {
+    all:       () => [...marketsKeys.all, "options"] as const,
+    positions: (portfolioId: string) =>
+      [...marketsKeys.options.all(), "positions", portfolioId] as const,
+  },
+
   journal: {
     all:   () => [...marketsKeys.all, "journal"] as const,
     list:  (filters?: { symbol?: string; portfolioId?: string; outcome?: string; tags?: string[] }) =>

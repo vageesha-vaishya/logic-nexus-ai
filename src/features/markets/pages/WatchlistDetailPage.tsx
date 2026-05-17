@@ -29,7 +29,8 @@ import {
 } from "lucide-react";
 import { PriceAlertSheet } from "../components/PriceAlertSheet";
 import { SignalBadge } from "../components/SignalBadge";
-import { useLTP, type LTPQuote } from "../hooks/useLTP";
+import { type LTPQuote } from "../hooks/useLTP";
+import { useWebSocketLTP } from "../hooks/useWebSocketLTP";
 import { useSignalSummary } from "../hooks/useSignals";
 import { isMarketOpen } from "../utils/market-hours";
 
@@ -188,7 +189,8 @@ function ItemsTable({
     .map((i) => i.instrument?.symbol)
     .filter((s): s is string => Boolean(s));
 
-  const { data: ltpMap, isFetching } = useLTP(nseSymbols);
+  const { data: ltpMap, connected: wsConnected, isWebSocket } = useWebSocketLTP(nseSymbols);
+  const isFetching = !isWebSocket && nseSymbols.length > 0;
   const { data: signalMap } = useSignalSummary(nseSymbols);
 
   if (items.length === 0) {
@@ -222,13 +224,22 @@ function ItemsTable({
         <CardTitle className="text-base">Instruments</CardTitle>
         <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
           {marketOpen ? (
-            <>
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-              </span>
-              Live
-            </>
+            wsConnected ? (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                </span>
+                Live (WS)
+              </>
+            ) : (
+              <>
+                <span className="relative flex h-2 w-2">
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+                </span>
+                Live (polling)
+              </>
+            )
           ) : (
             <>
               <Activity className="h-3 w-3" />

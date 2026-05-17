@@ -37,6 +37,7 @@ import {
   Eye,
   GitBranch,
   Keyboard,
+  Monitor,
   PiggyBank,
   Radar,
   Search,
@@ -161,6 +162,13 @@ export default function MarketsHomePage() {
               <Link to="/dashboard/markets/portfolios">
                 <TrendingUp className="h-4 w-4" />
                 New Order
+              </Link>
+            </Button>
+
+            <Button variant="outline" size="sm" asChild className="h-9 gap-2 border-primary/40 text-primary hover:bg-primary/10">
+              <Link to="/dashboard/markets/terminal">
+                <Monitor className="h-4 w-4" />
+                Open Terminal
               </Link>
             </Button>
 
