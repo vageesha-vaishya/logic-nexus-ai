@@ -10,6 +10,8 @@ from markets_worker.config import get_settings
 from markets_worker.mcp_server import mcp
 from markets_worker.routers import health, jobs, llm, research
 from markets_worker.routers import broker as broker_router
+from markets_worker.routers import fno as fno_router
+from markets_worker.routers import mf as mf_router
 
 
 def configure_logging() -> None:
@@ -56,6 +58,8 @@ def create_app() -> FastAPI:
     app.include_router(research.router,        tags=["research"])
     app.include_router(jobs.router,            tags=["jobs"])
     app.include_router(broker_router.router,   tags=["brokers"])
+    app.include_router(fno_router.router,      tags=["fno"])
+    app.include_router(mf_router.router,       tags=["mf"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.

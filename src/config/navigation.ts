@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -205,6 +205,18 @@ export const APP_MENU: MenuModule[] = [
         path: '/dashboard/markets/settings/brokers',
         icon: Wifi,
         description: 'Connect broker accounts for live sync and order placement',
+      },
+      {
+        name: 'F&O Chain',
+        path: '/dashboard/markets/fno',
+        icon: TrendingUp,
+        description: 'NSE-style live option chain with greeks and quick order placement',
+      },
+      {
+        name: 'Mutual Funds',
+        path: '/dashboard/markets/mf',
+        icon: PiggyBank,
+        description: 'Direct MF plans — discover, invest, SIP, and manage portfolio',
       },
       {
         name: 'LLM Settings',

@@ -157,9 +157,11 @@ export function CRMProvider({ children }: { children: ReactNode }) {
     if (!user) return;
     try {
       const isPlatformAdmin = hasPlatformAdminAccess();
+      let requestedTenantId: string | null = null;
+
       if (isPlatformAdmin) {
-        const requestedTenantId = tenantIdOverride !== undefined 
-          ? tenantIdOverride 
+        requestedTenantId = tenantIdOverride !== undefined
+          ? tenantIdOverride
           : (pref?.tenant_id ?? ownedTenantId ?? null);
 
         await (supabase as any).rpc('set_admin_override', {
@@ -168,6 +170,7 @@ export function CRMProvider({ children }: { children: ReactNode }) {
           p_franchise_id: franchiseIdOverride ?? pref?.franchise_id ?? null,
         });
       } else if (hasTenantAdminAccess) {
+        requestedTenantId = ownedTenantId;
         await (supabase as any).rpc('set_user_scope_preference', {
           p_tenant_id: ownedTenantId,
           p_franchise_id: enabled ? (franchiseIdOverride ?? pref?.franchise_id ?? null) : null,
@@ -177,6 +180,23 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         throw new Error('Only platform admins and tenant admins can enable admin override');
       }
 
+      // Fire-and-forget audit record — never throw
+      try {
+        await (supabase as any).schema('platform').from('audit_log').insert({
+          domain:        'platform',
+          op:            'admin_override',
+          action:        enabled ? 'admin_override_enabled' : 'admin_override_disabled',
+          tenant_id:     requestedTenantId ?? null,
+          franchise_id:  franchiseIdOverride ?? pref?.franchise_id ?? null,
+          acted_by:      user.id,
+          user_id:       user.id,
+          before:        { admin_override_enabled: !enabled },
+          after:         { admin_override_enabled: enabled },
+          resource_type: 'user_preferences',
+          resource_id:   user.id,
+        });
+      } catch (_) { /* audit failure must never block the action */ }
+
       const { data } = await (supabase as any)
         .from('user_preferences')
         .select('tenant_id, franchise_id, admin_override_enabled')
@@ -184,10 +204,10 @@ export function CRMProvider({ children }: { children: ReactNode }) {
         .limit(1)
         .maybeSingle();
       if (data) {
-        setPref({ 
-          tenant_id: data.tenant_id ?? null, 
-          franchise_id: data.franchise_id ?? null, 
-          admin_override_enabled: !!data.admin_override_enabled 
+        setPref({
+          tenant_id: data.tenant_id ?? null,
+          franchise_id: data.franchise_id ?? null,
+          admin_override_enabled: !!data.admin_override_enabled
         });
         setContextVersion(v => v + 1);
       }

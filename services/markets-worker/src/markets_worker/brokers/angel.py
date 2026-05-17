@@ -323,3 +323,50 @@ class AngelAdapter(BrokerAdapter):
     async def get_margins(self) -> dict[str, Any]:
         raw = await asyncio.to_thread(self._obj.rmsLimit)
         return raw.get("data", {}) if raw else {}
+
+    # ── Mutual Funds ──────────────────────────────────────────────────────────
+
+    async def get_mf_holdings(self) -> list[dict[str, Any]]:
+        try:
+            raw = await asyncio.to_thread(self._obj.allHoldings)
+            # SmartAPI returns all holdings; filter by exchange "BSE" + product "MF"
+            data = (raw or {}).get("data", {})
+            mf = data.get("mutualFundHoldings", []) if isinstance(data, dict) else []
+            return mf if isinstance(mf, list) else []
+        except Exception as exc:
+            logger.warning("angel.get_mf_holdings_failed", error=str(exc))
+            return []
+
+    async def get_mf_orders(self) -> list:
+        try:
+            raw = await asyncio.to_thread(self._obj.orderBook)
+            orders = (raw or {}).get("data", []) or []
+            mf_orders = [o for o in orders if o.get("producttype") == "MF"]
+            return mf_orders
+        except Exception as exc:
+            logger.warning("angel.get_mf_orders_failed", error=str(exc))
+            return []
+
+    async def place_mf_order(self, order: dict[str, Any]) -> dict[str, Any]:
+        """
+        Place an MF order via Angel One SmartAPI.
+        order keys: isin, order_type (PURCHASE|REDEMPTION), amount, units, folio_number
+        """
+        try:
+            params = {
+                "tradingsymbol": order.get("isin", ""),
+                "transactiontype": "BUY" if order.get("order_type", "").upper() in ("PURCHASE", "BUY") else "SELL",
+                "quantity": str(order.get("units") or 0),
+                "price": str(order.get("amount") or 0),
+                "producttype": "MF",
+                "exchange": "BSE",
+                "ordertype": "MARKET",
+                "duration": "DAY",
+            }
+            raw = await asyncio.to_thread(self._obj.placeOrder, params)
+            if raw and raw.get("status"):
+                return {"status": "ok", "order_id": (raw.get("data") or {}).get("orderid", ""), "message": raw.get("message", "")}
+            return {"status": "error", "message": (raw or {}).get("message", "Order placement failed")}
+        except Exception as exc:
+            logger.warning("angel.place_mf_order_failed", error=str(exc))
+            return {"status": "error", "message": str(exc)}

@@ -280,3 +280,49 @@ class DhanAdapter(BrokerAdapter):
     async def get_margins(self) -> dict[str, Any]:
         raw = await asyncio.to_thread(self._dhan.get_fund_limits)
         return raw.get("data", {}) if raw else {}
+
+    # ── Mutual Funds ──────────────────────────────────────────────────────────
+
+    async def get_mf_holdings(self) -> list[dict[str, Any]]:
+        try:
+            raw = await asyncio.to_thread(self._dhan.get_fund_limits)
+            # Dhan's MF holdings endpoint
+            holdings_raw = await asyncio.to_thread(
+                lambda: self._dhan.get_holdings() if hasattr(self._dhan, 'get_holdings') else {"data": []}
+            )
+            data = (holdings_raw or {}).get("data", []) or []
+            mf = [h for h in data if h.get("exchange", "") in ("BSE", "NSE") and
+                  h.get("product", "") in ("MF", "MUTUAL_FUND")]
+            return mf
+        except Exception as exc:
+            logger.warning("dhan.get_mf_holdings_failed", error=str(exc))
+            return []
+
+    async def get_mf_orders(self) -> list:
+        try:
+            raw = await asyncio.to_thread(self._dhan.get_order_list)
+            orders = (raw or {}).get("data", []) or []
+            return [o for o in orders if o.get("productType", "") in ("MF", "MUTUAL_FUND")]
+        except Exception as exc:
+            logger.warning("dhan.get_mf_orders_failed", error=str(exc))
+            return []
+
+    async def place_mf_order(self, order: dict[str, Any]) -> dict[str, Any]:
+        """Place MF order via Dhan. order keys: isin, order_type, amount, units."""
+        try:
+            raw = await asyncio.to_thread(
+                self._dhan.place_order,
+                security_id=order.get("isin", ""),
+                exchange_segment="BSE_EQ",
+                transaction_type="BUY" if order.get("order_type", "").upper() in ("PURCHASE", "BUY") else "SELL",
+                quantity=int(order.get("units") or 1),
+                order_type="MARKET",
+                product_type="MF",
+                price=float(order.get("amount") or 0),
+            )
+            if raw and raw.get("status") == "success":
+                return {"status": "ok", "order_id": (raw.get("data") or {}).get("orderId", ""), "message": ""}
+            return {"status": "error", "message": (raw or {}).get("remarks", "Order failed")}
+        except Exception as exc:
+            logger.warning("dhan.place_mf_order_failed", error=str(exc))
+            return {"status": "error", "message": str(exc)}

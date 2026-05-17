@@ -13,6 +13,7 @@ import { usePipeline } from '@/components/debug/pipeline/PipelineContext';
 import { PipelineDashboard } from '@/components/debug/pipeline/PipelineDashboard';
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary';
 import { OnboardingTour } from '@/components/system/OnboardingTour';
+import { ConsentBanner } from '@/components/system/ConsentBanner';
 import { HelpDialog } from '@/components/system/HelpDialog';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useAuth } from '@/hooks/useAuth';
@@ -567,6 +568,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   return (
     <TooltipProvider>
       <div ref={shellRef} className="min-h-screen flex w-full relative">
+        <ConsentBanner />
         <OnboardingTour />
         <a
           href="#main-content"

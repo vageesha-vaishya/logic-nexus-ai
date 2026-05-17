@@ -17,6 +17,7 @@
  */
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -33,6 +34,13 @@ import {
   WifiOff,
   XCircle,
 } from "lucide-react";
+import { usePlanGate } from "@/hooks/usePlanGate";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/design-system";
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
@@ -106,14 +114,16 @@ function ConnectionCard({
   onSync,
   onReauth,
   onRemove,
+  onViewPortfolio,
   isSyncing,
 }: {
-  conn:      BrokerConnection;
-  broker?:   SupportedBroker;
-  onSync:    () => void;
-  onReauth:  () => void;
-  onRemove:  () => void;
-  isSyncing: boolean;
+  conn:             BrokerConnection;
+  broker?:          SupportedBroker;
+  onSync:           () => void;
+  onReauth:         () => void;
+  onRemove:         () => void;
+  onViewPortfolio:  () => void;
+  isSyncing:        boolean;
 }) {
   return (
     <Card>
@@ -160,6 +170,10 @@ function ConnectionCard({
           </div>
 
           <div className="flex items-center gap-1 shrink-0">
+            <Button variant="outline" size="sm" className="h-8 text-xs"
+              onClick={onViewPortfolio} title="View portfolio">
+              View Portfolio
+            </Button>
             {conn.status === "active" && (
               <Button variant="ghost" size="icon" className="h-8 w-8"
                 onClick={onSync} disabled={isSyncing} title="Sync now">
@@ -197,8 +211,9 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
   const [authUrl, setAuthUrl] = useState("");
   const [canTrade, setCanTrade] = useState(false);
 
-  const addConn     = useAddBrokerConnection();
+  const addConn      = useAddBrokerConnection();
   const exchangeCode = useExchangeBrokerCode();
+  const triggerSync  = useTriggerBrokerSync();
 
   if (!broker) return null;
 
@@ -335,6 +350,8 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
     };
     const conn = await addConn.mutateAsync(input);
     toast.success(`${broker.name} connected`);
+    // Immediately trigger a sync for the new connection
+    triggerSync.mutate(conn.id);
     onSuccess(conn);
     handleClose();
   }
@@ -547,10 +564,17 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function BrokerConnectionsPage() {
+  const navigate        = useNavigate();
   const connections     = useBrokerConnections();
   const supportedQuery  = useSupportedBrokers();
   const removeConn      = useRemoveBrokerConnection();
   const triggerSync     = useTriggerBrokerSync();
+
+  // Plan gate for broker connections
+  const brokerGate = usePlanGate("broker_connections");
+  const atLimit    = brokerGate.limit !== -1 &&
+                     (connections.data?.length ?? 0) >= brokerGate.limit;
+  const addBlocked = atLimit || !brokerGate.allowed;
 
   const [selectedBroker, setSelectedBroker] = useState<SupportedBroker | null>(null);
   const [removeId, setRemoveId]             = useState<string | null>(null);
@@ -634,6 +658,7 @@ export default function BrokerConnectionsPage() {
                   onSync={() => handleSync(conn.id)}
                   onReauth={() => handleReauth(conn)}
                   onRemove={() => setRemoveId(conn.id)}
+                  onViewPortfolio={() => navigate(`/dashboard/markets/settings/brokers/${conn.id}`)}
                   isSyncing={syncingId === conn.id}
                 />
               ))}
@@ -648,47 +673,66 @@ export default function BrokerConnectionsPage() {
           </h2>
           {supportedQuery.isPending && <SkeletonCard lines={2} />}
           {fullApi.length > 0 && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {fullApi.map(broker => {
-                const alreadyConnected = connIds.has(broker.id);
-                return (
-                  <button
-                    key={broker.id}
-                    onClick={() => setSelectedBroker(broker)}
-                    className="text-left p-4 rounded-lg border hover:border-primary hover:bg-accent transition-colors"
-                  >
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="font-medium text-sm">{broker.name}</span>
-                          {alreadyConnected && (
-                            <Wifi className="h-3.5 w-3.5 text-emerald-500" />
-                          )}
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          {broker.data_cost}
-                        </p>
-                        <div className="flex gap-1 mt-1.5 flex-wrap">
-                          {broker.supports.map(s => (
-                            <span key={s}
-                              className="text-[10px] px-1.5 py-0 rounded border bg-muted text-muted-foreground">
-                              {s}
-                            </span>
-                          ))}
-                        </div>
-                        {broker.refresh === "automated" && (
-                          <p className="text-[10px] text-emerald-600 mt-1">✓ Auto token refresh</p>
-                        )}
-                        {broker.refresh === "none" && (
-                          <p className="text-[10px] text-emerald-600 mt-1">✓ Token never expires</p>
-                        )}
-                      </div>
-                      <ChevronRight className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
+            <TooltipProvider>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {fullApi.map(broker => {
+                  const alreadyConnected = connIds.has(broker.id);
+                  return (
+                    <Tooltip key={broker.id}>
+                      <TooltipTrigger asChild>
+                        <span>
+                          <button
+                            onClick={() => !addBlocked && setSelectedBroker(broker)}
+                            disabled={addBlocked}
+                            className={`w-full text-left p-4 rounded-lg border transition-colors ${
+                              addBlocked
+                                ? "opacity-50 cursor-not-allowed bg-muted border-muted"
+                                : "hover:border-primary hover:bg-accent"
+                            }`}
+                          >
+                            <div className="flex items-start justify-between">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-center gap-2">
+                                  <span className="font-medium text-sm">{broker.name}</span>
+                                  {alreadyConnected && (
+                                    <Wifi className="h-3.5 w-3.5 text-emerald-500" />
+                                  )}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {broker.data_cost}
+                                </p>
+                                <div className="flex gap-1 mt-1.5 flex-wrap">
+                                  {broker.supports.map(s => (
+                                    <span key={s}
+                                      className="text-[10px] px-1.5 py-0 rounded border bg-muted text-muted-foreground">
+                                      {s}
+                                    </span>
+                                  ))}
+                                </div>
+                                {broker.refresh === "automated" && (
+                                  <p className="text-[10px] text-emerald-600 mt-1">✓ Auto token refresh</p>
+                                )}
+                                {broker.refresh === "none" && (
+                                  <p className="text-[10px] text-emerald-600 mt-1">✓ Token never expires</p>
+                                )}
+                              </div>
+                              <ChevronRight className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                            </div>
+                          </button>
+                        </span>
+                      </TooltipTrigger>
+                      {addBlocked && (
+                        <TooltipContent>
+                          {atLimit
+                            ? `Your plan allows ${brokerGate.limit} broker connection${brokerGate.limit === 1 ? "" : "s"}. Upgrade to add more.`
+                            : (brokerGate.reason ?? "Upgrade to connect brokers")}
+                        </TooltipContent>
+                      )}
+                    </Tooltip>
+                  );
+                })}
+              </div>
+            </TooltipProvider>
           )}
         </section>
 

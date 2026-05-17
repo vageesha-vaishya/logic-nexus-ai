@@ -212,6 +212,7 @@ const MarketsPortfolios = lazy(() => import("./features/markets/pages/Portfolios
 const MarketsPortfolioDetail = lazy(() => import("./features/markets/pages/PortfolioDetailPage"));
 const MarketsLlmSettings        = lazy(() => import("./features/markets/pages/LlmSettingsPage"));
 const MarketsBrokerConnections  = lazy(() => import("./features/markets/pages/BrokerConnectionsPage"));
+const MarketsBrokerPortfolio    = lazy(() => import("./features/markets/pages/BrokerPortfolioPage"));
 const MarketsWatchlists = lazy(() => import("./features/markets/pages/WatchlistsPage"));
 const MarketsWatchlistDetail = lazy(() => import("./features/markets/pages/WatchlistDetailPage"));
 const MarketsInstrumentDetail = lazy(() => import("./features/markets/pages/InstrumentDetailPage"));
@@ -219,6 +220,8 @@ const MarketsResearch = lazy(() => import("./features/markets/pages/ResearchThre
 const MarketsStrategies = lazy(() => import("./features/markets/pages/StrategiesPage"));
 const MarketsBacktests = lazy(() => import("./features/markets/pages/BacktestsPage"));
 const MarketsSignals = lazy(() => import("./features/markets/pages/SignalsPage"));
+const MarketsFno     = lazy(() => import("./features/markets/pages/FnoPage"));
+const MarketsMf      = lazy(() => import("./features/markets/pages/MfPage"));
 // Platform-wide LLM provider settings — same component, reachable from main settings hub.
 const PlatformLlmSettings = MarketsLlmSettings;
 const FeatureFlagsAdmin = lazy(() => import("./pages/dashboard/settings/FeatureFlagsPage"));
@@ -972,6 +975,9 @@ const App = () => (
             <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSignals /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerConnections /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/settings/brokers/:connectionId" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerPortfolio /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/fno" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsFno /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/mf" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsMf /></ProtectedRoute>} />
             <Route path="/dashboard/settings/feature-flags" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><FeatureFlagsAdmin /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}

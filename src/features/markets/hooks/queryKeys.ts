@@ -78,6 +78,24 @@ export const marketsKeys = {
     supported:   () => [...marketsKeys.brokers.all(), "supported"] as const,
     connections: () => [...marketsKeys.brokers.all(), "connections"] as const,
     connection:  (id: string) => [...marketsKeys.brokers.connections(), id] as const,
+    holdings:    (connectionId: string) => [...marketsKeys.brokers.connection(connectionId), "holdings"] as const,
+    positions:   (connectionId: string) => [...marketsKeys.brokers.connection(connectionId), "positions"] as const,
+    orders:      (connectionId: string) => [...marketsKeys.brokers.connection(connectionId), "orders"] as const,
+  },
+
+  fno: {
+    all:         () => [...marketsKeys.all, "fno"] as const,
+    underlyings: () => [...marketsKeys.fno.all(), "underlyings"] as const,
+    chain: (symbol: string, expiry: string) =>
+      [...marketsKeys.fno.all(), "chain", symbol, expiry] as const,
+  },
+
+  mf: {
+    all:       () => [...marketsKeys.all, "mf"] as const,
+    funds:     (q: string, category: string) => [...marketsKeys.mf.all(), "funds", q, category] as const,
+    fund:      (code: string) => [...marketsKeys.mf.all(), "fund", code] as const,
+    portfolio: () => [...marketsKeys.mf.all(), "portfolio"] as const,
+    sips:      () => [...marketsKeys.mf.all(), "sips"] as const,
   },
 
   backtests: {

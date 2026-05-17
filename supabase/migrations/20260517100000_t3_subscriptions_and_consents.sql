@@ -1,0 +1,16 @@
+-- T3 Commercial enablement: subscriptions + DPDP consents
+-- Applied directly via Supabase MCP on 2026-05-17.
+-- DB-VERIFICATION: t3-subscriptions-consents-v1
+-- DB-ARCH-APPROVAL: vimal-2026-05-17
+--
+-- Tables created:
+--   public.subscriptions     — tenant subscription records (linked to subscription_plans)
+--   platform.consents        — DPDP Act 2023 consent records per user
+--
+-- Plan limits updated:
+--   lnai-starter:    broker_connections=3, live_trading=true, fno_access=false, ai_briefs_daily=10
+--   lnai-pro:        broker_connections=10, live_trading=true, fno_access=true, ai_briefs_daily=50
+--   lnai-enterprise: broker_connections=-1, live_trading=true, fno_access=true, ai_briefs_daily=-1
+--   sos-enter:       broker_connections=-1, live_trading=true, fno_access=true, ai_briefs_daily=-1
+--
+-- Run `supabase db pull` to regenerate schema from live if needed.
