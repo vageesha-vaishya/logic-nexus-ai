@@ -2,6 +2,8 @@ import { useQuery } from "@tanstack/react-query";
 import { marketsKeys } from "./queryKeys";
 import { isMarketOpen } from "../utils/market-hours";
 
+const WORKER_URL = import.meta.env.VITE_MARKETS_WORKER_URL ?? "http://localhost:8001";
+
 export interface LTPQuote {
   symbol: string;
   exchange: string;
@@ -22,7 +24,7 @@ export function useLTP(symbols: string[], exchange = "NSE") {
     queryKey: marketsKeys.ltp.batch(sorted, exchange),
     queryFn: async () => {
       const params = new URLSearchParams({ symbols: sorted.join(","), exchange });
-      const res = await fetch(`/v1/ltp?${params.toString()}`);
+      const res = await fetch(`${WORKER_URL}/v1/ltp?${params.toString()}`);
       if (!res.ok) throw new Error(`LTP fetch failed (${res.status})`);
       const json = await res.json();
       const map: Record<string, LTPQuote> = {};

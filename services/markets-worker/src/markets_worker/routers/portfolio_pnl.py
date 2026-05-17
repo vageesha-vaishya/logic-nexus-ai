@@ -61,8 +61,8 @@ def _pnl_response(portfolio_id: str, series: list[dict], realized_total: float) 
 @router.get("/pnl/{portfolio_id}")
 async def get_portfolio_pnl(
     portfolio_id: str,
-    lookback: int = Query(365, ge=1, le=1825),
     auth: Auth,
+    lookback: int = Query(365, ge=1, le=1825),
 ) -> dict[str, Any]:
     import asyncio
 
