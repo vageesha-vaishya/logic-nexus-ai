@@ -209,14 +209,30 @@ async def place_paper_order(body: PaperOrderRequest, auth: Auth):
 
     portfolio = _verify_portfolio_owner(body.portfolio_id, auth.user_id)
 
+    db = get_supabase()
+
+    # Check kill switch and segment controls
+    risk = (
+        db.schema("markets").from_("risk_controls")
+        .select("kill_switch_active, equity_enabled, fno_enabled")
+        .eq("user_id", auth.user_id)
+        .or_(f"portfolio_id.eq.{body.portfolio_id},portfolio_id.is.null")
+        .order("portfolio_id", nulls_first=False)  # portfolio-specific takes precedence
+        .limit(1)
+        .maybe_single()
+        .execute()
+    ).data
+
+    if risk and risk.get("kill_switch_active"):
+        raise HTTPException(403, detail="Trading halted: kill switch is active. Disable it in Risk Controls first.")
+    if risk and not risk.get("equity_enabled", True):
+        raise HTTPException(403, detail="Equity trading is disabled in Risk Controls.")
+
     # Fetch current LTP
     ltp = await _get_ltp(body.symbol, body.exchange)
 
     trade_value = ltp * body.qty
     charges     = _compute_charges(trade_value)
-    net_amount  = trade_value + charges  # cost for buy; proceeds for sell
-
-    db = get_supabase()
 
     # Ensure paper_capital row exists
     capital = _get_paper_capital(body.portfolio_id)
@@ -226,6 +242,7 @@ async def place_paper_order(body: PaperOrderRequest, auth: Auth):
     available_cash = float(capital["available_cash"])
 
     if body.txn_type == "buy":
+        net_amount = trade_value + charges
         if available_cash < net_amount:
             raise HTTPException(400, detail=(
                 f"Insufficient paper cash. Need ₹{net_amount:,.2f} "
@@ -252,6 +269,7 @@ async def place_paper_order(body: PaperOrderRequest, auth: Auth):
             ))
         # Sell proceeds credited (minus charges)
         sell_proceeds = trade_value - charges
+        net_amount = sell_proceeds
         new_cash = available_cash + sell_proceeds
 
     # Insert transaction

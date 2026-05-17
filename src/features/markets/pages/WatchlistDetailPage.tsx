@@ -29,6 +29,7 @@ import {
 } from "lucide-react";
 import { PriceAlertSheet } from "../components/PriceAlertSheet";
 import { useLTP, type LTPQuote } from "../hooks/useLTP";
+import { isMarketOpen } from "../utils/market-hours";
 
 import {
   useAddWatchlistItem,
@@ -146,15 +147,6 @@ function fmtINR(n: number | null | undefined): string {
   return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
 }
 
-function isMarketOpenNow(): boolean {
-  const now = new Date();
-  const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
-  const day = ist.getUTCDay();
-  if (day === 0 || day === 6) return false;
-  const mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  return mins >= 555 && mins < 930;
-}
-
 function PriceCell({ quote }: { quote: LTPQuote | undefined }) {
   if (!quote || quote.ltp == null) return <TableCell className="text-right text-muted-foreground">—</TableCell>;
   return <TableCell className="text-right font-mono font-medium">₹{fmtINR(quote.ltp)}</TableCell>;
@@ -187,7 +179,7 @@ function ItemsTable({
   items: import("../types").WatchlistItem[];
 }) {
   const remove = useRemoveWatchlistItem(watchlistId);
-  const marketOpen = isMarketOpenNow();
+  const marketOpen = isMarketOpen();
   const [alertSheet, setAlertSheet] = useState<{ symbol: string; exchange: string; ltp: number | null } | null>(null);
 
   const nseSymbols = items

@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { marketsKeys } from "./queryKeys";
+import { isMarketOpen } from "../utils/market-hours";
 
 export interface LTPQuote {
   symbol: string;
@@ -13,16 +14,6 @@ export interface LTPQuote {
   change_pct: number | null;
   volume: number | null;
   error?: string;
-}
-
-function isMarketOpen(): boolean {
-  const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const ist = new Date(now.getTime() + istOffset);
-  const day = ist.getUTCDay();
-  if (day === 0 || day === 6) return false;
-  const mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  return mins >= 555 && mins < 930; // 9:15 – 15:30 IST
 }
 
 export function useLTP(symbols: string[], exchange = "NSE") {
@@ -41,7 +32,7 @@ export function useLTP(symbols: string[], exchange = "NSE") {
       return map;
     },
     enabled: sorted.length > 0,
-    refetchInterval: isMarketOpen() ? 5_000 : 60_000,
+    refetchInterval: () => isMarketOpen() ? 5_000 : 60_000,
     staleTime: 5_000,
   });
 }

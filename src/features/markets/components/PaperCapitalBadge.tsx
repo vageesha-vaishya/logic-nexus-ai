@@ -24,7 +24,16 @@ export function PaperCapitalBadge({ portfolioId }: PaperCapitalBadgeProps) {
     return <Skeleton className="h-6 w-40 rounded-full" />;
   }
 
-  if (isError || !data) {
+  if (isError) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-xs text-amber-700 border border-amber-200 dark:bg-amber-950 dark:text-amber-300">
+        <FlaskConical className="h-3 w-3" />
+        Paper capital not seeded — open "Paper Trade" to start
+      </span>
+    );
+  }
+
+  if (!data) {
     return null;
   }
 

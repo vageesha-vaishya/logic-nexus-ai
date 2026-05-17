@@ -52,30 +52,7 @@ import {
   TXN_TYPES_NEED_INSTRUMENT as TTN,
 } from "../types";
 import type { Transaction } from "../types";
-
-// ─── Sector map ────────────────────────────────────────────────────────────
-
-const SECTOR_MAP: Record<string, string> = {
-  EXIIND: "Auto / Auto Ancillary",
-  BORGLA: "Glass / Solar",          // Borosil Renewables Ltd
-  IDFBAN: "Banks", YESBAN: "Banks", KAARAD: "Technology (Micro-cap)",
-  TRITUR: "Engineering / Capital Goods", NTPC: "Power", RELIND: "Energy",
-  AADVEN: "Finance", JIOFIN: "Finance", REPHOM: "Finance", PENMER: "Finance",
-  GLEPHA: "Pharma", AMAREM: "Pharma", GRANUL: "Pharma", MORLAB: "Pharma",
-  HCLTEC: "Technology", TCS: "Technology", TECMAH: "Technology",
-  GLOTEC: "Technology (Micro-cap)", TELDAT: "Technology (Micro-cap)",
-  TELMAR: "Technology (Micro-cap)", TELTEC: "Technology (Micro-cap)",
-  ITC: "FMCG", ASIPAI: "FMCG",
-  TATSTE: "Metals & Mining",
-  ITCHOT: "Hotels & Hospitality",
-  TRILTD: "Textiles",               // Trident Ltd (yarn/paper)
-  GOLDEX: "ETF / Gold",
-  DILMED: "Media", SITCAB: "Media", ZEELEA: "Media", ZEEMED: "Media",
-};
-
-function getSector(symbol: string): string {
-  return SECTOR_MAP[symbol?.toUpperCase()] ?? "Others";
-}
+import { getSector } from "../utils/nse-sectors";
 
 // ─── LTCG qty computation ─────────────────────────────────────────────────
 

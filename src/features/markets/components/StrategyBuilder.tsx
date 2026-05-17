@@ -129,6 +129,7 @@ export function StrategyBuilder({ underlying, spot, expiry }: StrategyBuilderPro
   const chainQuery = useOptionChain(underlying, expiry);
   const chain = chainQuery.data;
   const lotSize = chain?.lot_size ?? 50;
+  const chainDataReady = !chainQuery?.isPending && !chainQuery?.isError && Boolean(chainQuery?.data);
 
   // ── Payoff computation ────────────────────────────────────────────────────
 
@@ -251,8 +252,9 @@ export function StrategyBuilder({ underlying, spot, expiry }: StrategyBuilderPro
                   key={t.name}
                   type="button"
                   onClick={() => applyTemplate(i)}
+                  disabled={!chainDataReady}
                   className={cn(
-                    "rounded-full border px-3 py-1 text-xs font-medium transition-opacity hover:opacity-80 cursor-pointer",
+                    "rounded-full border px-3 py-1 text-xs font-medium transition-opacity hover:opacity-80 cursor-pointer disabled:cursor-not-allowed disabled:opacity-40",
                     CATEGORY_COLORS[t.category],
                   )}
                   title={t.description}
@@ -261,9 +263,16 @@ export function StrategyBuilder({ underlying, spot, expiry }: StrategyBuilderPro
                 </button>
               ))}
             </div>
-            <p className="text-xs text-muted-foreground mt-2">
-              Click a template to auto-fill legs from live option chain data.
-            </p>
+            {!chainDataReady && (
+              <p className="text-xs text-muted-foreground mt-1">
+                Select an underlying and expiry to enable strategy templates with live premiums.
+              </p>
+            )}
+            {chainDataReady && (
+              <p className="text-xs text-muted-foreground mt-2">
+                Click a template to auto-fill legs from live option chain data.
+              </p>
+            )}
           </CardContent>
         </Card>
 

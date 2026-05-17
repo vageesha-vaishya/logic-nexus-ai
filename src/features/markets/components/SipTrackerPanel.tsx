@@ -20,6 +20,7 @@
 import { useMemo } from "react";
 import { PiggyBank, TrendingUp, TrendingDown } from "lucide-react";
 import { Link } from "react-router-dom";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 
 import {
   Badge,
@@ -384,11 +385,19 @@ function SipRow({ enriched }: { enriched: EnrichedSip }) {
         xirrPos === null ? "text-muted-foreground" :
         xirrPos ? "text-green-600 dark:text-green-400" : "text-red-600 dark:text-red-400"
       }`}>
-        <span className="flex items-center justify-end gap-1">
-          {xirrPos === true  && <TrendingUp className="h-3 w-3 shrink-0" aria-hidden />}
-          {xirrPos === false && <TrendingDown className="h-3 w-3 shrink-0" aria-hidden />}
-          {formatXirr(xirrRate)}
-        </span>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <span className="flex items-center justify-end gap-1 cursor-default">
+              {xirrPos === true  && <TrendingUp className="h-3 w-3 shrink-0" aria-hidden />}
+              {xirrPos === false && <TrendingDown className="h-3 w-3 shrink-0" aria-hidden />}
+              {formatXirr(xirrRate)}
+              <span className="text-xs text-muted-foreground font-normal">(estimated)</span>
+            </span>
+          </TooltipTrigger>
+          <TooltipContent>
+            XIRR estimated from SIP amount × months since creation. Accuracy improves when actual transaction history is available.
+          </TooltipContent>
+        </Tooltip>
       </TableCell>
 
       {/* Returns (absolute) */}
@@ -410,26 +419,26 @@ function SipRow({ enriched }: { enriched: EnrichedSip }) {
       <TableCell>
         {isActive ? (
           <div className="flex items-center gap-1.5">
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-amber-200 text-amber-700 hover:bg-amber-50 dark:border-amber-800 dark:text-amber-400 dark:hover:bg-amber-900/20"
-              onClick={() => {
-                logger.info("[SipTrackerPanel] pause SIP requested", { holding_id: sip.holding_id });
-              }}
-            >
-              Pause
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-7 text-xs border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
-              onClick={() => {
-                logger.info("[SipTrackerPanel] cancel SIP requested", { holding_id: sip.holding_id });
-              }}
-            >
-              Cancel
-            </Button>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button size="sm" variant="outline" disabled className="text-xs">
+                    Pause
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>SIP pause coming soon — contact your broker directly</TooltipContent>
+            </Tooltip>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <span>
+                  <Button size="sm" variant="outline" disabled className="text-xs">
+                    Cancel
+                  </Button>
+                </span>
+              </TooltipTrigger>
+              <TooltipContent>SIP pause coming soon — contact your broker directly</TooltipContent>
+            </Tooltip>
           </div>
         ) : (
           <span className="text-xs text-muted-foreground">—</span>

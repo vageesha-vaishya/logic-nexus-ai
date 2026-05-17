@@ -88,7 +88,7 @@ export function computeMetrics(
   curve: PayoffPoint[],
   currentSpot: number,
 ): StrategyMetrics {
-  if (curve.length === 0) {
+  if (curve.length < 3) {
     return {
       maxProfit: 0,
       maxLoss: 0,

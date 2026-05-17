@@ -47,10 +47,10 @@ export interface PortfolioPnLChartProps {
 }
 
 export function PortfolioPnLChart({ portfolioId, className }: PortfolioPnLChartProps) {
-  const [selectedTF, setSelectedTF] = useState<TFLabel>("1Y");
-  const lookback = TIMEFRAMES.find((t) => t.label === selectedTF)?.days ?? 365;
+  const [selectedLookback, setSelectedLookback] = useState(365);
+  const selectedTF = TIMEFRAMES.find((t) => t.days === selectedLookback)?.label ?? "1Y";
 
-  const { data, isLoading, isError } = usePortfolioPnL(portfolioId, 1825);
+  const { data, isLoading, isError } = usePortfolioPnL(portfolioId, selectedLookback);
 
   // ── Refs ───────────────────────────────────────────────────────────────────
   const containerRef  = useRef<HTMLDivElement>(null);
@@ -128,7 +128,7 @@ export function PortfolioPnLChart({ portfolioId, className }: PortfolioPnLChartP
     if (!data || !navSeriesRef.current || !costSeriesRef.current) return;
 
     const cutoff = new Date();
-    cutoff.setDate(cutoff.getDate() - lookback);
+    cutoff.setDate(cutoff.getDate() - selectedLookback);
     const cutoffStr = cutoff.toISOString().slice(0, 10);
 
     const filtered: PnLPoint[] = data.series
@@ -143,7 +143,7 @@ export function PortfolioPnLChart({ portfolioId, className }: PortfolioPnLChartP
     );
 
     chartRef.current?.timeScale().fitContent();
-  }, [data, lookback]);
+  }, [data, selectedLookback]);
 
   // ── Summary stats ──────────────────────────────────────────────────────────
   const s = data?.summary;
@@ -182,7 +182,7 @@ export function PortfolioPnLChart({ portfolioId, className }: PortfolioPnLChartP
               <button
                 key={tf.label}
                 type="button"
-                onClick={() => setSelectedTF(tf.label)}
+                onClick={() => setSelectedLookback(tf.days)}
                 className={cn(
                   "h-6 rounded px-2 text-xs font-medium transition-colors",
                   selectedTF === tf.label

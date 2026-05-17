@@ -25,6 +25,7 @@ import {
 import { useLTP, type LTPQuote } from "../hooks/useLTP";
 import { useWatchlists, useWatchlist } from "../hooks/useWatchlists";
 import { usePortfolios } from "../hooks/usePortfolios";
+import { isMarketOpen } from "../utils/market-hours";
 
 import {
   Badge,
@@ -39,18 +40,6 @@ import {
 } from "@/design-system";
 import type { Portfolio, WatchlistItem } from "../types";
 import { logger } from "@/lib/logger";
-
-// ─── Market hours helper (mirrors useLTP.ts) ────────────────────────────────
-
-function isMarketOpen(): boolean {
-  const now = new Date();
-  const istOffset = 5.5 * 60 * 60 * 1000;
-  const ist = new Date(now.getTime() + istOffset);
-  const day = ist.getUTCDay();
-  if (day === 0 || day === 6) return false;
-  const mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
-  return mins >= 555 && mins < 930; // 9:15 – 15:30 IST
-}
 
 // ─── Index symbols ───────────────────────────────────────────────────────────
 
