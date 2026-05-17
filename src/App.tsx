@@ -232,6 +232,8 @@ const MarketsFiiDii       = lazy(() => import("./features/markets/pages/FiiDiiPa
 const MarketsScanner        = lazy(() => import("./features/markets/pages/ScannerPage"));
 const MarketsSpan           = lazy(() => import("./features/markets/pages/SpanCalculatorPage"));
 const MarketsTradeJournal   = lazy(() => import("./features/markets/pages/TradeJournalPage"));
+const MarketsIdeas          = lazy(() => import("./features/markets/pages/IdeasPage"));
+const MarketsIdeaDetail     = lazy(() => import("./features/markets/pages/IdeaDetailPage"));
 // Platform-wide LLM provider settings — same component, reachable from main settings hub.
 const PlatformLlmSettings = MarketsLlmSettings;
 const FeatureFlagsAdmin = lazy(() => import("./pages/dashboard/settings/FeatureFlagsPage"));
@@ -997,6 +999,8 @@ const App = () => (
             <Route path="/dashboard/markets/scanner" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsScanner /></ProtectedRoute>} />
             <Route path="/dashboard/markets/span" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSpan /></ProtectedRoute>} />
             <Route path="/dashboard/markets/journal" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsTradeJournal /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/ideas" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsIdeas /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/ideas/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsIdeaDetail /></ProtectedRoute>} />
             <Route path="/dashboard/settings/feature-flags" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><FeatureFlagsAdmin /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}

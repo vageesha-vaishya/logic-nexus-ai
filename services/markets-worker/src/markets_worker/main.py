@@ -26,6 +26,7 @@ from markets_worker.routers import span as span_router
 from markets_worker.routers import ws_ticks as ws_ticks_router
 from markets_worker.routers import depth as depth_router
 from markets_worker.routers import options_positions as options_positions_router
+from markets_worker.routers.ideas import router_ideas as ideas_router, router_users as users_router
 
 
 def configure_logging() -> None:
@@ -93,6 +94,8 @@ def create_app() -> FastAPI:
     app.include_router(ws_ticks_router.router,      tags=["websocket"])
     app.include_router(depth_router.router,         tags=["depth"])
     app.include_router(options_positions_router.router, tags=["options"])
+    app.include_router(ideas_router,                   tags=["ideas"])
+    app.include_router(users_router,                   tags=["social"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.
