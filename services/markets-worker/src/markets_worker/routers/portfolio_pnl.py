@@ -8,10 +8,18 @@ POST /v1/portfolio/advisor/{portfolio_id}
     Generate a Claude-powered AI brief covering portfolio health, risks,
     opportunities and suggested actions. Cached in markets.ai_briefs with
     scope="portfolio_advisor".
+
+GET  /v1/portfolio/attribution/{portfolio_id}?lookback=365
+    Compute position-level performance attribution: sector grouping, top/bottom
+    contributors, and monthly cash-flow series.
 """
 from __future__ import annotations
 
+import asyncio
+import math
 import uuid
+from collections import defaultdict
+from concurrent.futures import ThreadPoolExecutor as _TPE
 from datetime import date, datetime, timedelta, timezone
 from typing import Any
 
@@ -21,6 +29,29 @@ from fastapi import APIRouter, HTTPException, Query
 from markets_worker.auth import Auth
 from markets_worker.db import get_supabase
 from markets_worker.llm_gateway import invoke as llm_invoke
+
+# ── yfinance price helpers (used by attribution endpoint) ─────────────────────
+
+_pnl_executor = _TPE(max_workers=8)
+
+
+def _fetch_yf_price(symbol: str) -> float | None:
+    try:
+        import yfinance as yf
+        suffix = ".NS"
+        fi = yf.Ticker(f"{symbol}{suffix}").fast_info
+        v = fi.last_price
+        if v is None:
+            return None
+        f = float(v)
+        return None if math.isnan(f) or math.isinf(f) else round(f, 2)
+    except Exception:
+        return None
+
+
+async def _get_price_async(symbol: str) -> float | None:
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(_pnl_executor, _fetch_yf_price, symbol)
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/v1/portfolio")
@@ -691,4 +722,278 @@ async def generate_portfolio_advisor(portfolio_id: str, auth: Auth) -> dict[str,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "portfolio_id": portfolio_id,
         "cached":       False,
+    }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Performance Attribution
+# ─────────────────────────────────────────────────────────────────────────────
+
+@router.get("/attribution/{portfolio_id}")
+async def get_portfolio_attribution(
+    portfolio_id: str,
+    auth: Auth,
+    lookback: int = Query(365, ge=1, le=1825),
+) -> dict[str, Any]:
+    """
+    GET /v1/portfolio/attribution/{portfolio_id}?lookback=365
+
+    Compute position-level performance attribution broken down by sector,
+    top/bottom contributors, and monthly cash-flow series.
+    """
+    user_id = auth.user_id or auth.service_account_id
+    if not user_id and not auth.is_service_account:
+        raise HTTPException(401, detail="Authentication required")
+
+    db = get_supabase()
+    now_utc = datetime.now(timezone.utc)
+    as_of = now_utc.isoformat()
+
+    # ── 1. Verify portfolio ownership ─────────────────────────────────────────
+    def _fetch_portfolio() -> dict | None:
+        return (
+            db.schema("markets")
+            .from_("portfolios")
+            .select("id, owner_user_id")
+            .eq("id", portfolio_id)
+            .maybe_single()
+            .execute()
+        ).data
+
+    portfolio = await asyncio.to_thread(_fetch_portfolio)
+    if not portfolio:
+        raise HTTPException(404, detail="Portfolio not found")
+    if auth.user_id and portfolio.get("owner_user_id") != auth.user_id:
+        raise HTTPException(403, detail="Access denied")
+
+    # ── 2. Load current holdings (quantity > 0) ───────────────────────────────
+    def _fetch_holdings() -> list[dict]:
+        return (
+            db.schema("markets")
+            .from_("holdings")
+            .select(
+                "instrument_id, symbol, quantity, avg_cost"
+            )
+            .eq("portfolio_id", portfolio_id)
+            .gt("quantity", 0)
+            .execute()
+        ).data or []
+
+    # ── 3. Load transactions within lookback window ───────────────────────────
+    cutoff_iso = (now_utc - timedelta(days=lookback)).isoformat()
+
+    def _fetch_transactions() -> list[dict]:
+        return (
+            db.schema("markets")
+            .from_("transactions")
+            .select("instrument_id, symbol, txn_type, qty, price, created_at")
+            .eq("portfolio_id", portfolio_id)
+            .gt("created_at", cutoff_iso)
+            .order("created_at", desc=False)
+            .execute()
+        ).data or []
+
+    holdings_rows, txn_rows = await asyncio.gather(
+        asyncio.to_thread(_fetch_holdings),
+        asyncio.to_thread(_fetch_transactions),
+    )
+
+    if not holdings_rows:
+        return {
+            "portfolio_id": portfolio_id,
+            "as_of": as_of,
+            "lookback_days": lookback,
+            "summary": {
+                "total_invested": 0.0,
+                "total_current_value": 0.0,
+                "total_pnl": 0.0,
+                "total_pnl_pct": 0.0,
+                "position_count": 0,
+            },
+            "positions": [],
+            "sectors": [],
+            "top_contributors": [],
+            "bottom_contributors": [],
+            "monthly_flows": [],
+        }
+
+    # ── 4. Fetch current prices for each holding concurrently ─────────────────
+    async def _resolve_price(holding: dict) -> float:
+        """Try DB price_history first, fall back to yfinance, then avg_cost."""
+        instrument_id: str | None = holding.get("instrument_id")
+        symbol: str = (holding.get("symbol") or "").upper()
+        avg_cost = float(holding.get("avg_cost") or 0)
+
+        # (a) DB price_history
+        if instrument_id:
+            def _db_price() -> float | None:
+                resp = (
+                    db.schema("markets")
+                    .from_("price_history")
+                    .select("close")
+                    .eq("instrument_id", instrument_id)
+                    .order("date", desc=True)
+                    .limit(1)
+                    .execute()
+                )
+                if resp.data:
+                    return float(resp.data[0]["close"])
+                return None
+
+            try:
+                db_price = await asyncio.to_thread(_db_price)
+                if db_price is not None:
+                    return db_price
+            except Exception:
+                pass
+
+        # (b) yfinance fallback
+        if symbol:
+            yf_price = await _get_price_async(symbol)
+            if yf_price is not None:
+                return yf_price
+
+        # (c) last resort: avg_cost (zero P&L)
+        return avg_cost
+
+    price_tasks = [_resolve_price(h) for h in holdings_rows]
+    resolved_prices: list[float] = await asyncio.gather(*price_tasks)
+
+    # ── 5. Build position-level metrics ──────────────────────────────────────
+    positions: list[dict] = []
+    total_invested = 0.0
+    total_current = 0.0
+
+    for holding, current_price in zip(holdings_rows, resolved_prices):
+        symbol = (holding.get("symbol") or "").upper()
+        quantity = float(holding.get("quantity") or 0)
+        avg_cost = float(holding.get("avg_cost") or 0)
+
+        invested = quantity * avg_cost
+        current_value = quantity * current_price
+        pnl = current_value - invested
+        pnl_pct = (pnl / invested * 100) if invested > 0 else 0.0
+
+        total_invested += invested
+        total_current += current_value
+
+        positions.append({
+            "symbol":        symbol,
+            "sector":        _get_sector(symbol),
+            "quantity":      round(quantity, 4),
+            "avg_cost":      round(avg_cost, 4),
+            "current_price": round(current_price, 4),
+            "invested":      round(invested, 4),
+            "current_value": round(current_value, 4),
+            "pnl":           round(pnl, 4),
+            "pnl_pct":       round(pnl_pct, 4),
+            # contribution_pct filled after total_invested is known
+            "contribution_pct": 0.0,
+        })
+
+    # ── 6. Portfolio totals ───────────────────────────────────────────────────
+    total_pnl = total_current - total_invested
+    total_pnl_pct = (total_pnl / total_invested * 100) if total_invested > 0 else 0.0
+
+    # ── 7. Contribution % per position ───────────────────────────────────────
+    for pos in positions:
+        pos["contribution_pct"] = round(
+            (pos["pnl"] / total_invested * 100) if total_invested > 0 else 0.0,
+            4,
+        )
+
+    # Sort positions by contribution_pct descending
+    positions.sort(key=lambda p: p["contribution_pct"], reverse=True)
+
+    # ── 8. Sector grouping ────────────────────────────────────────────────────
+    sector_buckets: dict[str, dict[str, float]] = defaultdict(
+        lambda: {"invested": 0.0, "current_value": 0.0, "pnl": 0.0, "count": 0.0}
+    )
+    for pos in positions:
+        s = pos["sector"]
+        sector_buckets[s]["invested"] += pos["invested"]
+        sector_buckets[s]["current_value"] += pos["current_value"]
+        sector_buckets[s]["pnl"] += pos["pnl"]
+        sector_buckets[s]["count"] += 1
+
+    sectors: list[dict] = []
+    for sector_name, bucket in sector_buckets.items():
+        s_invested = bucket["invested"]
+        s_pnl = bucket["pnl"]
+        s_pnl_pct = (s_pnl / s_invested * 100) if s_invested > 0 else 0.0
+        s_weight = (s_invested / total_invested * 100) if total_invested > 0 else 0.0
+        s_contribution = (s_pnl / total_invested * 100) if total_invested > 0 else 0.0
+        sectors.append({
+            "sector":           sector_name,
+            "invested":         round(s_invested, 4),
+            "current_value":    round(bucket["current_value"], 4),
+            "pnl":              round(s_pnl, 4),
+            "pnl_pct":          round(s_pnl_pct, 4),
+            "weight_pct":       round(s_weight, 4),
+            "contribution_pct": round(s_contribution, 4),
+            "position_count":   int(bucket["count"]),
+        })
+    sectors.sort(key=lambda s: s["weight_pct"], reverse=True)
+
+    # ── 9. Monthly cash-flow series ───────────────────────────────────────────
+    # Build a map: "YYYY-MM" -> {buy_amount, sell_amount}
+    monthly: dict[str, dict[str, float]] = defaultdict(
+        lambda: {"buy_amount": 0.0, "sell_amount": 0.0}
+    )
+    for txn in txn_rows:
+        created_at = str(txn.get("created_at") or "")[:7]  # "YYYY-MM"
+        if not created_at or len(created_at) < 7:
+            continue
+        txn_type = (txn.get("txn_type") or "").lower()
+        qty = float(txn.get("qty") or 0)
+        price = float(txn.get("price") or 0)
+        amount = qty * price
+
+        if txn_type in _BUY_TYPES:
+            monthly[created_at]["buy_amount"] += amount
+        elif txn_type in _SELL_TYPES:
+            monthly[created_at]["sell_amount"] += amount
+
+    monthly_flows: list[dict] = sorted(
+        [
+            {
+                "month":       month_key,
+                "buy_amount":  round(v["buy_amount"], 4),
+                "sell_amount": round(v["sell_amount"], 4),
+                "net_flow":    round(v["sell_amount"] - v["buy_amount"], 4),
+            }
+            for month_key, v in monthly.items()
+        ],
+        key=lambda x: x["month"],
+    )
+
+    # ── 10. Top / bottom contributors ─────────────────────────────────────────
+    # positions already sorted by contribution_pct DESC
+    top_contributors = positions[:5]
+    bottom_contributors = list(reversed(positions[-5:])) if len(positions) >= 5 else list(reversed(positions))
+
+    logger.info(
+        "portfolio.attribution",
+        portfolio_id=portfolio_id,
+        lookback=lookback,
+        position_count=len(positions),
+        sector_count=len(sectors),
+    )
+
+    return {
+        "portfolio_id":  portfolio_id,
+        "as_of":         as_of,
+        "lookback_days": lookback,
+        "summary": {
+            "total_invested":     round(total_invested, 4),
+            "total_current_value": round(total_current, 4),
+            "total_pnl":          round(total_pnl, 4),
+            "total_pnl_pct":      round(total_pnl_pct, 4),
+            "position_count":     len(positions),
+        },
+        "positions":          positions,
+        "sectors":            sectors,
+        "top_contributors":   top_contributors,
+        "bottom_contributors": bottom_contributors,
+        "monthly_flows":      monthly_flows,
     }

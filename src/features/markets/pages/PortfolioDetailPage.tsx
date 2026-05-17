@@ -30,6 +30,7 @@ import { PortfolioAnalyticsPanel } from "../components/PortfolioAnalyticsPanel";
 import { RebalancingRulesPanel } from "../components/RebalancingRulesPanel";
 import { PortfolioAdvisorCard } from "../components/PortfolioAdvisorCard";
 import { OptionsPnLPanel } from "../components/OptionsPnLPanel";
+import { PortfolioAttributionTab } from "../components/PortfolioAttributionTab";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -255,7 +256,7 @@ export default function PortfolioDetailPage() {
       {/* Tabs */}
       <Tabs defaultValue="holdings">
         <TabsList className="w-full justify-start border-b bg-transparent p-0 h-auto">
-          {(["holdings","transactions","briefs","sector","analytics","rebalancing","options","advisor"] as const).map((t) => (
+          {(["holdings","transactions","briefs","sector","analytics","rebalancing","options","advisor","attribution"] as const).map((t) => (
             <TabsTrigger
               key={t}
               value={t}
@@ -285,7 +286,9 @@ export default function PortfolioDetailPage() {
                                 AI Advisor
                               </span>
                             )
-                            : "Rebalancing"}
+                            : t === "attribution"
+                              ? "Attribution"
+                              : "Rebalancing"}
               {t === "transactions" && (transactions.data?.length ?? 0) > 0 && (
                 <span className="ml-1.5 rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
                   {transactions.data!.length}
@@ -472,6 +475,11 @@ export default function PortfolioDetailPage() {
         {/* ── AI Advisor tab ─────────────────────────────────────────────── */}
         <TabsContent value="advisor" className="mt-4">
           {id && <PortfolioAdvisorCard portfolioId={id} />}
+        </TabsContent>
+
+        {/* ── Attribution tab ─────────────────────────────────────────────── */}
+        <TabsContent value="attribution" className="mt-4">
+          {id && <PortfolioAttributionTab portfolioId={id} />}
         </TabsContent>
       </Tabs>
 
