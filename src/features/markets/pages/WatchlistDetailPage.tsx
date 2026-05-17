@@ -70,6 +70,7 @@ import {
 } from "@/components/ui/command";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import { QuickTradeButton } from "../components/QuickTradeButton";
 
 export default function WatchlistDetailPage() {
   const { id } = useParams<{ id: string }>();
@@ -302,6 +303,13 @@ function ItemsTable({
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="inline-flex items-center gap-1">
+                      {inst?.symbol && (
+                        <QuickTradeButton
+                          symbol={inst.symbol}
+                          exchange={inst.exchange ?? "NSE"}
+                          size="sm"
+                        />
+                      )}
                       <Button
                         size="sm"
                         variant="ghost"

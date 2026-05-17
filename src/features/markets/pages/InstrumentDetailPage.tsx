@@ -17,6 +17,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { ArrowLeft, ExternalLink, Newspaper, Star, Trash2 } from "lucide-react";
 import { TradingChart } from "@/features/markets/components/TradingChart";
 import { MarketDepthPanel } from "@/features/markets/components/MarketDepthPanel";
+import { QuickTradeButton } from "@/features/markets/components/QuickTradeButton";
 
 import {
   useInstrumentDetail,
@@ -118,6 +119,7 @@ function Header({ data }: { data: import("../types").InstrumentDetail }) {
         <h1 className="flex items-center gap-3 font-mono text-2xl font-semibold tracking-tight">
           {i.symbol}
           <Badge variant="secondary">{i.exchange}</Badge>
+          <QuickTradeButton symbol={i.symbol} exchange={i.exchange} size="default" />
           {!i.is_active && (
             <Badge variant="outline" className="text-xs">
               inactive
