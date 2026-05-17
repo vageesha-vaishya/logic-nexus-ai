@@ -7,10 +7,10 @@
 
 import { useRef, useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
-  ArrowLeft, Brain, Download, FlaskConical, Layers, Loader2, MoreVertical, Newspaper, Plus, Sparkles, Trash2, Upload,
+  ArrowLeft, Brain, Download, FlaskConical, Layers, Loader2, MoreVertical, Newspaper, Plus, Receipt, Sliders, Sparkles, Trash2, Upload,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useForm } from "react-hook-form";
@@ -95,6 +95,7 @@ type GroupingMode = "None" | "Sector" | "Exchange" | "Asset Class";
 
 export default function PortfolioDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const navigate      = useNavigate();
   const portfolio     = usePortfolio(id);
   const holdings      = usePortfolioHoldings(id);
   const briefs        = useBriefs(id);
@@ -220,6 +221,22 @@ export default function PortfolioDetailPage() {
                 </div>
               )}
             </div>
+          )}
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => navigate(`/dashboard/markets/portfolios/${id}/tax`)}
+          >
+            <Receipt className="mr-2 h-4 w-4 text-emerald-600" />
+            Tax P&L
+          </Button>
+          {id && (
+            <Link to={`/dashboard/markets/portfolios/${id}/rebalancing`}>
+              <Button variant="outline" size="lg">
+                <Sliders className="mr-2 h-4 w-4 text-blue-500" />
+                Rebalance
+              </Button>
+            </Link>
           )}
           <Button onClick={onGenerate} disabled={generateBrief.isPending} size="lg">
             <Brain className="mr-2 h-4 w-4" />

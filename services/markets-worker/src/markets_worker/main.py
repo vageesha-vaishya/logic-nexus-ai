@@ -29,6 +29,8 @@ from markets_worker.routers import options_positions as options_positions_router
 from markets_worker.routers.ideas import router_ideas as ideas_router, router_users as users_router
 from markets_worker.routers import chat as chat_router
 from markets_worker.routers import copy_trades as copy_trades_router
+from markets_worker.routers import rebalancing as rebalancing_router
+from markets_worker.routers import tax_pnl as tax_pnl_router
 
 
 def configure_logging() -> None:
@@ -100,6 +102,8 @@ def create_app() -> FastAPI:
     app.include_router(users_router,                        tags=["social"])
     app.include_router(chat_router.router,                  tags=["chat"])
     app.include_router(copy_trades_router.router,           tags=["copy-trades"])
+    app.include_router(rebalancing_router.router,           tags=["rebalancing"])
+    app.include_router(tax_pnl_router.router,               tags=["tax"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.
