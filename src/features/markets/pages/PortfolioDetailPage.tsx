@@ -22,6 +22,7 @@ import {
 } from "../hooks/useTransactions";
 import { ImportHoldingsDialog } from "../components/ImportHoldingsDialog";
 import { NewsPanel } from "../components/NewsPanel";
+import { PortfolioPnLChart } from "../components/PortfolioPnLChart";
 import { formatDateTime, formatRelativeTime } from "@/lib/format";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel,
@@ -217,6 +218,9 @@ export default function PortfolioDetailPage() {
 
         {/* ── Holdings tab ──────────────────────────────────────────────── */}
         <TabsContent value="holdings" className="mt-4 space-y-4">
+          {/* P&L chart */}
+          <PortfolioPnLChart portfolioId={id} />
+
           {/* Action bar */}
           <div className="flex items-center justify-end gap-2">
             <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>

@@ -16,6 +16,7 @@ import { toast } from "sonner";
 import {
   Activity,
   ArrowLeft,
+  Bell,
   Check,
   ChevronsUpDown,
   Eye,
@@ -26,6 +27,7 @@ import {
   TrendingDown,
   TrendingUp,
 } from "lucide-react";
+import { PriceAlertSheet } from "../components/PriceAlertSheet";
 import { useLTP, type LTPQuote } from "../hooks/useLTP";
 
 import {
@@ -186,6 +188,7 @@ function ItemsTable({
 }) {
   const remove = useRemoveWatchlistItem(watchlistId);
   const marketOpen = isMarketOpenNow();
+  const [alertSheet, setAlertSheet] = useState<{ symbol: string; exchange: string; ltp: number | null } | null>(null);
 
   const nseSymbols = items
     .map((i) => i.instrument?.symbol)
@@ -218,6 +221,7 @@ function ItemsTable({
   };
 
   return (
+    <>
     <Card>
       <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-base">Instruments</CardTitle>
@@ -287,16 +291,27 @@ function ItemsTable({
                     {inst?.instrument_type ?? "—"}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => onRemove(item.id, inst?.symbol)}
-                      disabled={remove.isPending}
-                      className="text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
-                      <span className="sr-only">Remove</span>
-                    </Button>
+                    <div className="inline-flex items-center gap-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setAlertSheet({ symbol: inst?.symbol ?? "", exchange: inst?.exchange ?? "NSE", ltp: quote?.ltp ?? null })}
+                        disabled={!inst?.symbol}
+                      >
+                        <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span className="sr-only">Set alert</span>
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => onRemove(item.id, inst?.symbol)}
+                        disabled={remove.isPending}
+                        className="text-destructive hover:text-destructive"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                        <span className="sr-only">Remove</span>
+                      </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -305,6 +320,17 @@ function ItemsTable({
         </Table>
       </CardContent>
     </Card>
+
+    {alertSheet && (
+      <PriceAlertSheet
+        symbol={alertSheet.symbol}
+        exchange={alertSheet.exchange}
+        currentLtp={alertSheet.ltp}
+        open={Boolean(alertSheet)}
+        onOpenChange={(o) => !o && setAlertSheet(null)}
+      />
+    )}
+    </>
   );
 }
 

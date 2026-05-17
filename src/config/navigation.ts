@@ -219,6 +219,12 @@ export const APP_MENU: MenuModule[] = [
         description: 'Direct MF plans — discover, invest, SIP, and manage portfolio',
       },
       {
+        name: 'Price Alerts',
+        path: '/dashboard/markets/alerts',
+        icon: Activity,
+        description: 'Set LTP threshold alerts — get notified when prices cross your target',
+      },
+      {
         name: 'LLM Settings',
         path: '/dashboard/markets/settings/llm',
         icon: CandlestickChart,

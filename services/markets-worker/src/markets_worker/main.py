@@ -1,11 +1,14 @@
 """FastAPI application factory for the markets-worker service."""
 
+import asyncio
 import logging
+from contextlib import asynccontextmanager
 
 import structlog
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from markets_worker.alert_checker import check_alerts_loop
 from markets_worker.config import get_settings
 from markets_worker.mcp_server import mcp
 from markets_worker.routers import health, jobs, llm, research
@@ -14,6 +17,7 @@ from markets_worker.routers import chart as chart_router
 from markets_worker.routers import ltp as ltp_router
 from markets_worker.routers import fno as fno_router
 from markets_worker.routers import mf as mf_router
+from markets_worker.routers import portfolio_pnl as portfolio_pnl_router
 
 
 def configure_logging() -> None:
@@ -34,6 +38,13 @@ def configure_logging() -> None:
     )
 
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(check_alerts_loop())
+    yield
+    task.cancel()
+
+
 def create_app() -> FastAPI:
     configure_logging()
     s = get_settings()
@@ -45,6 +56,7 @@ def create_app() -> FastAPI:
         # Disable docs in production
         docs_url="/docs" if s.environment != "production" else None,
         redoc_url=None,
+        lifespan=lifespan,
     )
 
     app.add_middleware(
@@ -63,7 +75,8 @@ def create_app() -> FastAPI:
     app.include_router(chart_router.router,    tags=["chart"])
     app.include_router(ltp_router.router,      tags=["ltp"])
     app.include_router(fno_router.router,      tags=["fno"])
-    app.include_router(mf_router.router,       tags=["mf"])
+    app.include_router(mf_router.router,           tags=["mf"])
+    app.include_router(portfolio_pnl_router.router, tags=["portfolio"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.
