@@ -31,6 +31,7 @@ import type {
 import { RefreshCw } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { useDarkMode } from "@/components/system/DarkModeToggle";
 import { useChartData } from "../hooks/useChartData";
 import type { ChartInterval } from "../hooks/useChartData";
 
@@ -69,12 +70,11 @@ const MA_COLORS: Record<string, string> = {
 // ── Indicator series refs shape ───────────────────────────────────────────────
 
 interface IndicatorSeriesRefs {
-  bbUpper?:   ISeriesApi<"Line">;
-  bbMiddle?:  ISeriesApi<"Line">;
-  bbLower?:   ISeriesApi<"Line">;
-  vwap?:      ISeriesApi<"Line">;
-  stUp?:      ISeriesApi<"Line">;
-  stDown?:    ISeriesApi<"Line">;
+  bbUpper?:    ISeriesApi<"Line">;
+  bbMiddle?:   ISeriesApi<"Line">;
+  bbLower?:    ISeriesApi<"Line">;
+  vwap?:       ISeriesApi<"Line">;
+  stSegments?: ISeriesApi<"Line">[];
 }
 
 // ── Component ─────────────────────────────────────────────────────────────────
@@ -127,11 +127,28 @@ export function TradingChart({
     { indicators: indicatorParam },
   );
 
+  // ── Dark mode reactivity ─────────────────────────────────────────────────
+  const isDark = useDarkMode();
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    chartRef.current.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: "transparent" },
+        textColor:  isDark ? "#D1D5DB" : "#374151",
+      },
+      grid: {
+        vertLines: { color: isDark ? "#374151" : "#F3F4F6" },
+        horzLines: { color: isDark ? "#374151" : "#F3F4F6" },
+      },
+      rightPriceScale: { borderColor: isDark ? "#4B5563" : "#E5E7EB" },
+      timeScale:       { borderColor: isDark ? "#4B5563" : "#E5E7EB" },
+    });
+  }, [isDark]);
+
   // ── Chart init (mount only) ───────────────────────────────────────────────
   useEffect(() => {
     if (!chartContainerRef.current) return;
-
-    const isDark = document.documentElement.classList.contains("dark");
 
     const chart = createChart(chartContainerRef.current, {
       layout: {
@@ -201,13 +218,19 @@ export function TradingChart({
   // ── Helper: remove all indicator series ──────────────────────────────────
   function _removeIndicatorSeries(chart: IChartApi) {
     const refs = indicatorSeriesRefs.current;
-    const keys: (keyof IndicatorSeriesRefs)[] = ["bbUpper", "bbMiddle", "bbLower", "vwap", "stUp", "stDown"];
-    for (const key of keys) {
-      const s = refs[key];
+    const scalarKeys: (keyof IndicatorSeriesRefs)[] = ["bbUpper", "bbMiddle", "bbLower", "vwap"];
+    for (const key of scalarKeys) {
+      const s = refs[key] as ISeriesApi<"Line"> | undefined;
       if (s) {
         try { chart.removeSeries(s); } catch { /* already removed */ }
         delete refs[key];
       }
+    }
+    if (refs.stSegments) {
+      for (const s of refs.stSegments) {
+        try { chart.removeSeries(s); } catch { /* already removed */ }
+      }
+      delete refs.stSegments;
     }
   }
 
@@ -308,71 +331,44 @@ export function TradingChart({
       indicatorSeriesRefs.current.vwap = vwapSeries;
     }
 
-    // SuperTrend — split into up (green) and down (red) segments
+    // SuperTrend — one LineSeries per contiguous direction segment
     if (data.supertrend && indicators.has("supertrend") && data.supertrend.length > 0) {
-      // Build contiguous runs for each direction
-      type STSegment = { time: string | number; value: number }[];
-      const upSegments:   STSegment[] = [];
-      const downSegments: STSegment[] = [];
+      const stData = data.supertrend;
+      type STPoint = { time: string | number; value: number };
+      const segments: { direction: "up" | "down"; points: STPoint[] }[] = [];
 
-      let currentUp:   STSegment = [];
-      let currentDown: STSegment = [];
-      let prevDirection: "up" | "down" | null = null;
+      let currentDir    = stData[0].direction;
+      let currentPoints: STPoint[] = [{ time: stData[0].time, value: stData[0].value }];
 
-      for (const pt of data.supertrend) {
-        if (pt.direction === "up") {
-          if (prevDirection === "down" && currentDown.length > 0) {
-            // Bridge: carry last down point into up segment for continuity
-            currentDown.push({ time: pt.time, value: pt.value });
-            downSegments.push(currentDown);
-            currentDown = [];
-            currentUp = [{ time: pt.time, value: pt.value }];
-          } else {
-            currentUp.push({ time: pt.time, value: pt.value });
-          }
+      for (let i = 1; i < stData.length; i++) {
+        const pt = stData[i];
+        if (pt.direction === currentDir) {
+          currentPoints.push({ time: pt.time, value: pt.value });
         } else {
-          if (prevDirection === "up" && currentUp.length > 0) {
-            // Bridge: carry last up point into down segment for continuity
-            currentUp.push({ time: pt.time, value: pt.value });
-            upSegments.push(currentUp);
-            currentUp = [];
-            currentDown = [{ time: pt.time, value: pt.value }];
-          } else {
-            currentDown.push({ time: pt.time, value: pt.value });
-          }
+          // Bridge: add the transition point to close the current segment visually
+          currentPoints.push({ time: pt.time, value: pt.value });
+          segments.push({ direction: currentDir, points: currentPoints });
+          // Start new segment at the same bridging point
+          currentDir    = pt.direction;
+          currentPoints = [{ time: pt.time, value: pt.value }];
         }
-        prevDirection = pt.direction;
       }
-      if (currentUp.length > 0)   upSegments.push(currentUp);
-      if (currentDown.length > 0) downSegments.push(currentDown);
+      segments.push({ direction: currentDir, points: currentPoints });
 
-      // Merge all up segments into one series (they share color)
-      const allUpPoints   = upSegments.flat();
-      const allDownPoints = downSegments.flat();
-
-      if (allUpPoints.length > 0) {
-        const stUpSeries = chart.addSeries(LineSeries, {
-          color:                  "#10b981",
-          lineWidth:              2,
-          lastValueVisible:       false,
-          priceLineVisible:       false,
-          crosshairMarkerVisible: false,
+      const stSeriesArr: ISeriesApi<"Line">[] = [];
+      for (const seg of segments) {
+        const color = seg.direction === "up" ? "#10B981" : "#EF4444";
+        const s = chart.addSeries(LineSeries, {
+          color,
+          lineWidth:        2,
+          lineStyle:        0,
+          lastValueVisible: false,
+          priceLineVisible: false,
         });
-        stUpSeries.setData(allUpPoints);
-        indicatorSeriesRefs.current.stUp = stUpSeries;
+        s.setData(seg.points as Parameters<typeof s.setData>[0]);
+        stSeriesArr.push(s);
       }
-
-      if (allDownPoints.length > 0) {
-        const stDownSeries = chart.addSeries(LineSeries, {
-          color:                  "#ef4444",
-          lineWidth:              2,
-          lastValueVisible:       false,
-          priceLineVisible:       false,
-          crosshairMarkerVisible: false,
-        });
-        stDownSeries.setData(allDownPoints);
-        indicatorSeriesRefs.current.stDown = stDownSeries;
-      }
+      indicatorSeriesRefs.current.stSegments = stSeriesArr;
     }
 
     // Fit content after data load

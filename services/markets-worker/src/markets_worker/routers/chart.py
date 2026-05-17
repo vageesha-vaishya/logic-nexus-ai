@@ -441,8 +441,11 @@ def _supertrend_overlay(bars: list[dict], period: int = 10, multiplier: float = 
         hl2 = (highs[idx] + lows[idx]) / 2
         upper = hl2 + multiplier * atr
         lower = hl2 - multiplier * atr
-        upper_band = upper if upper < upper_band or closes[idx - 1] > upper_band else upper_band
-        lower_band = lower if lower > lower_band or closes[idx - 1] < lower_band else lower_band
+        if i == 0:
+            upper_band, lower_band = upper, lower
+        else:
+            upper_band = upper if upper < upper_band or closes[idx - 1] > upper_band else upper_band
+            lower_band = lower if lower > lower_band or closes[idx - 1] < lower_band else lower_band
         if closes[idx] > upper_band:
             direction = 1
         elif closes[idx] < lower_band:

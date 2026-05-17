@@ -3,11 +3,11 @@ import App from "./App.tsx";
 import "./index.css";
 
 // Apply dark mode before first render to prevent flash
-{
+if (typeof window !== "undefined") {
   const storedDark = localStorage.getItem("lnai_dark_mode");
   if (
     storedDark === "true" ||
-    (!storedDark && window.matchMedia("(prefers-color-scheme: dark)").matches)
+    (!storedDark && typeof window.matchMedia === "function" && window.matchMedia("(prefers-color-scheme: dark)").matches)
   ) {
     document.documentElement.classList.add("dark");
   }

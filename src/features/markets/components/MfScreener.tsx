@@ -206,7 +206,7 @@ export function MfScreener() {
   }>({ open: false, fund: null });
 
   // ── Data ──────────────────────────────────────────────────────────────────
-  const funds      = useMfFunds("", "ALL");
+  const funds      = useMfFunds("", "");
   const connections = useBrokerConnections();
   const tradeConnection = connections.data?.find(c => c.can_trade) ?? null;
 

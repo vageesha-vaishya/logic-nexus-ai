@@ -142,6 +142,51 @@ export default function FnoPage() {
   const pcr = chain.data?.pcr ?? null;
   const { text: pcrText, color: pcrColor } = pcrLabel(pcr);
 
+  // ── Novice early return ──────────────────────────────────────────────────
+  if (isNovice) {
+    return (
+      <DashboardLayout>
+        <div className="mx-auto max-w-[1400px] space-y-4 p-4 lg:p-6">
+
+          {/* ── Page header ────────────────────────────────────────────── */}
+          <header className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <h1 className="flex items-center gap-2 text-2xl font-semibold tracking-tight">
+                <TrendingUp className="h-5 w-5 text-muted-foreground" aria-hidden="true" />
+                F&amp;O — Option Chain
+              </h1>
+              <p className="text-sm text-muted-foreground">NSE live data · updated every 60s</p>
+            </div>
+            <Link to="/dashboard/markets/strategy-builder">
+              <Button variant="outline" size="sm" className="gap-1.5">
+                <GitBranch className="h-4 w-4" />
+                Strategy Builder
+              </Button>
+            </Link>
+          </header>
+
+          {/* ── Novice mode banner ─────────────────────────────────────── */}
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-6 text-center">
+            <AlertCircle className="h-8 w-8 text-blue-500" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-blue-800 dark:text-blue-200">You&apos;re in Novice mode</p>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                Switch to Expert to access F&amp;O options chain and order placement.
+              </p>
+            </div>
+            <Button
+              onClick={() => setTradingMode("expert")}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Switch to Expert
+            </Button>
+          </div>
+
+        </div>
+      </DashboardLayout>
+    );
+  }
+
   // ── Render ──────────────────────────────────────────────────────────────────
   return (
     <DashboardLayout>
@@ -303,27 +348,7 @@ export default function FnoPage() {
           />
         )}
 
-        {/* ── Novice mode banner ───────────────────────────────────────── */}
-        {isNovice && (
-          <div className="flex flex-col items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-6 text-center">
-            <AlertCircle className="h-8 w-8 text-blue-500" aria-hidden="true" />
-            <div>
-              <p className="font-semibold text-blue-800 dark:text-blue-200">You&apos;re in Novice mode</p>
-              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                Switch to Expert to access F&amp;O options chain and order placement.
-              </p>
-            </div>
-            <Button
-              onClick={() => setTradingMode("expert")}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              Switch to Expert
-            </Button>
-          </div>
-        )}
-
         {/* ── Summary cards + Option chain — gated by fno_access plan ── */}
-        {!isNovice && (
         <PlanGate feature="fno_access" mode="overlay">
           <div className="space-y-4">
             {/* Summary cards */}
@@ -394,7 +419,6 @@ export default function FnoPage() {
             </Card>
           </div>
         </PlanGate>
-        )}
 
       </div>
 

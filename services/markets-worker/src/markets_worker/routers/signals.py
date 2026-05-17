@@ -374,7 +374,7 @@ async def compute_signal(
 async def backtest_signal(
     symbol: str,
     exchange: str = Query(default="NSE"),
-    lookback: int = Query(default=252, ge=30, le=1825),
+    lookback: int = Query(default=252, ge=30, le=504),
 ) -> dict:
     """Walk-forward backtest of the RSI+MACD+SuperTrend signal on historical data."""
     import asyncio
@@ -502,7 +502,13 @@ async def backtest_signal(
         }
 
     loop = asyncio.get_event_loop()
-    return await loop.run_in_executor(None, _run_backtest)
+    try:
+        return await asyncio.wait_for(
+            loop.run_in_executor(None, _run_backtest),
+            timeout=45.0,
+        )
+    except asyncio.TimeoutError:
+        raise HTTPException(504, detail="Backtest timed out — try a shorter lookback period.")
 
 
 @router.get("/summary")

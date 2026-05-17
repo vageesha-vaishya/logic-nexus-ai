@@ -16,13 +16,14 @@ const STORAGE_KEY = "lnai_trading_mode";
 
 export function useTradingMode(): [TradingMode, (mode: TradingMode) => void] {
   const [mode, setModeState] = useState<TradingMode>(() => {
+    if (typeof window === "undefined") return "novice";
     const stored = localStorage.getItem(STORAGE_KEY);
     if (stored === "novice" || stored === "expert") return stored;
     return "novice";
   });
 
   const setMode = (m: TradingMode) => {
-    localStorage.setItem(STORAGE_KEY, m);
+    if (typeof window !== "undefined") localStorage.setItem(STORAGE_KEY, m);
     setModeState(m);
   };
 
