@@ -304,8 +304,8 @@ function HoldingsTab({
                         </Button>
                         <Button
                           size="sm"
-                          variant="ghost"
-                          className="h-7 px-2 text-[10px] text-blue-600 hover:bg-blue-50"
+                          variant="outline"
+                          className="h-7 px-2 text-blue-600 border-blue-200 hover:bg-blue-50"
                           onClick={() => onGtt?.(symbol, exchange, ltp ?? 0, Math.floor(h.qty))}
                         >
                           GTT
@@ -812,6 +812,14 @@ export default function BrokerPortfolioPage() {
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              <Button
+                size="sm"
+                variant="outline"
+                className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                onClick={() => setGttSheet({ open: true, symbol: "", exchange: "NSE", ltp: 0, qty: 1 })}
+              >
+                New GTT
+              </Button>
               {conn?.can_trade && (
                 <Button
                   size="sm"
