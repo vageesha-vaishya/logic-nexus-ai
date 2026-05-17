@@ -105,6 +105,12 @@ export const marketsKeys = {
       [...marketsKeys.chart.all(), symbol, exchange, interval, lookback] as const,
   },
 
+  ltp: {
+    all: () => [...marketsKeys.all, "ltp"] as const,
+    batch: (symbols: string[], exchange: string) =>
+      [...marketsKeys.ltp.all(), "batch", [...symbols].sort().join(","), exchange] as const,
+  },
+
   backtests: {
     all:    () => [...marketsKeys.all, "backtests"] as const,
     list:   (filters?: { strategyId?: string | null }) =>

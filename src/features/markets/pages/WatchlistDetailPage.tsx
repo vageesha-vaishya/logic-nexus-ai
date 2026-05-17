@@ -14,6 +14,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
+  Activity,
   ArrowLeft,
   Check,
   ChevronsUpDown,
@@ -22,7 +23,10 @@ import {
   Plus,
   Search,
   Trash2,
+  TrendingDown,
+  TrendingUp,
 } from "lucide-react";
+import { useLTP, type LTPQuote } from "../hooks/useLTP";
 
 import {
   useAddWatchlistItem,
@@ -135,6 +139,44 @@ export default function WatchlistDetailPage() {
 
 // ─── Items table ───────────────────────────────────────────────────────
 
+function fmtINR(n: number | null | undefined): string {
+  if (n == null) return "—";
+  return new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(n);
+}
+
+function isMarketOpenNow(): boolean {
+  const now = new Date();
+  const ist = new Date(now.getTime() + 5.5 * 60 * 60 * 1000);
+  const day = ist.getUTCDay();
+  if (day === 0 || day === 6) return false;
+  const mins = ist.getUTCHours() * 60 + ist.getUTCMinutes();
+  return mins >= 555 && mins < 930;
+}
+
+function PriceCell({ quote }: { quote: LTPQuote | undefined }) {
+  if (!quote || quote.ltp == null) return <TableCell className="text-right text-muted-foreground">—</TableCell>;
+  return <TableCell className="text-right font-mono font-medium">₹{fmtINR(quote.ltp)}</TableCell>;
+}
+
+function ChangeCell({ quote }: { quote: LTPQuote | undefined }) {
+  if (!quote || quote.change == null || quote.change_pct == null) {
+    return <TableCell className="text-right text-muted-foreground">—</TableCell>;
+  }
+  const positive = quote.change >= 0;
+  const color = positive ? "text-green-600 dark:text-green-400" : "text-red-500 dark:text-red-400";
+  const Icon = positive ? TrendingUp : TrendingDown;
+  return (
+    <TableCell className={`text-right font-mono text-sm ${color}`}>
+      <span className="inline-flex items-center justify-end gap-1">
+        <Icon className="h-3 w-3" aria-hidden="true" />
+        {positive ? "+" : ""}
+        {fmtINR(quote.change)} ({positive ? "+" : ""}
+        {quote.change_pct.toFixed(2)}%)
+      </span>
+    </TableCell>
+  );
+}
+
 function ItemsTable({
   watchlistId,
   items,
@@ -143,6 +185,13 @@ function ItemsTable({
   items: import("../types").WatchlistItem[];
 }) {
   const remove = useRemoveWatchlistItem(watchlistId);
+  const marketOpen = isMarketOpenNow();
+
+  const nseSymbols = items
+    .map((i) => i.instrument?.symbol)
+    .filter((s): s is string => Boolean(s));
+
+  const { data: ltpMap, isFetching } = useLTP(nseSymbols);
 
   if (items.length === 0) {
     return (
@@ -170,24 +219,43 @@ function ItemsTable({
 
   return (
     <Card>
-      <CardHeader>
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-3">
         <CardTitle className="text-base">Instruments</CardTitle>
+        <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {marketOpen ? (
+            <>
+              <span className="relative flex h-2 w-2">
+                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+              </span>
+              Live
+            </>
+          ) : (
+            <>
+              <Activity className="h-3 w-3" />
+              Market closed
+            </>
+          )}
+          {isFetching && <Loader2 className="ml-1 h-3 w-3 animate-spin" aria-hidden="true" />}
+        </span>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>Symbol</TableHead>
-              <TableHead>Exchange</TableHead>
-              <TableHead>Type</TableHead>
-              <TableHead>Note</TableHead>
-              <TableHead>Added</TableHead>
+              <TableHead className="text-right">LTP</TableHead>
+              <TableHead className="text-right">Change</TableHead>
+              <TableHead className="text-right hidden md:table-cell">High</TableHead>
+              <TableHead className="text-right hidden md:table-cell">Low</TableHead>
+              <TableHead className="hidden lg:table-cell">Type</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {items.map((item) => {
               const inst = item.instrument;
+              const quote = inst?.symbol ? ltpMap?.[inst.symbol] : undefined;
               return (
                 <TableRow key={item.id}>
                   <TableCell className="font-mono font-medium">
@@ -201,20 +269,22 @@ function ItemsTable({
                     ) : (
                       <span className="text-muted-foreground">unknown</span>
                     )}
+                    {item.note && (
+                      <p className="mt-0.5 text-xs font-normal text-muted-foreground truncate max-w-[14ch]">
+                        {item.note}
+                      </p>
+                    )}
                   </TableCell>
-                  <TableCell>
-                    <Badge variant="secondary" className="text-xs">
-                      {inst?.exchange ?? "—"}
-                    </Badge>
+                  <PriceCell quote={quote} />
+                  <ChangeCell quote={quote} />
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground hidden md:table-cell">
+                    {quote?.high != null ? `₹${fmtINR(quote.high)}` : "—"}
                   </TableCell>
-                  <TableCell className="text-xs capitalize text-muted-foreground">
+                  <TableCell className="text-right font-mono text-xs text-muted-foreground hidden md:table-cell">
+                    {quote?.low != null ? `₹${fmtINR(quote.low)}` : "—"}
+                  </TableCell>
+                  <TableCell className="text-xs capitalize text-muted-foreground hidden lg:table-cell">
                     {inst?.instrument_type ?? "—"}
-                  </TableCell>
-                  <TableCell className="max-w-[16rem] truncate text-sm text-muted-foreground">
-                    {item.note ?? <span className="italic">—</span>}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-xs text-muted-foreground">
-                    {new Date(item.added_at).toLocaleDateString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

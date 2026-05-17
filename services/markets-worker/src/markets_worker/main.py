@@ -11,6 +11,7 @@ from markets_worker.mcp_server import mcp
 from markets_worker.routers import health, jobs, llm, research
 from markets_worker.routers import broker as broker_router
 from markets_worker.routers import chart as chart_router
+from markets_worker.routers import ltp as ltp_router
 from markets_worker.routers import fno as fno_router
 from markets_worker.routers import mf as mf_router
 
@@ -60,6 +61,7 @@ def create_app() -> FastAPI:
     app.include_router(jobs.router,            tags=["jobs"])
     app.include_router(broker_router.router,   tags=["brokers"])
     app.include_router(chart_router.router,    tags=["chart"])
+    app.include_router(ltp_router.router,      tags=["ltp"])
     app.include_router(fno_router.router,      tags=["fno"])
     app.include_router(mf_router.router,       tags=["mf"])
 
