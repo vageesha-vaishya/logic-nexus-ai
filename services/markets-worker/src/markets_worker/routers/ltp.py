@@ -13,8 +13,38 @@ _CACHE_TTL = 5.0
 _executor = ThreadPoolExecutor(max_workers=8)
 
 
+# Known NSE/BSE index symbols → correct yfinance ticker (no exchange suffix needed)
+_INDEX_SYMBOL_MAP: dict[str, str] = {
+    "NIFTY 50":       "^NSEI",
+    "NIFTY50":        "^NSEI",
+    "SENSEX":         "^BSESN",
+    "NIFTY BANK":     "^NSEBANK",
+    "NIFTYBANK":      "^NSEBANK",
+    "NIFTY IT":       "^CNXIT",
+    "NIFTYIT":        "^CNXIT",
+    "INDIA VIX":      "^INDIAVIX",
+    "INDIAVIX":       "^INDIAVIX",
+    "NIFTY MIDCAP":   "^NSEMDCP50",
+    "NIFTY MIDCAP 50":"^NSEMDCP50",
+    "NIFTY NEXT 50":  "^NSMIDCP",
+    "NIFTY FMCG":     "^CNXFMCG",
+    "NIFTY AUTO":     "^CNXAUTO",
+    "NIFTY PHARMA":   "^CNXPHARMA",
+    "NIFTY METAL":    "^CNXMETAL",
+    "NIFTY REALTY":   "^CNXREALTY",
+    "NIFTY ENERGY":   "^CNXENERGY",
+    "NIFTY INFRA":    "^CNXINFRA",
+    "NIFTY PSU BANK": "^CNXPSUBANK",
+}
+
+
 def _suffix(exchange: str) -> str:
     return ".NS" if exchange.upper() in ("NSE", "NSE_EQ") else ".BO"
+
+
+def _resolve_yf_ticker(sym: str, suffix: str) -> str:
+    """Map logical symbol name to actual yfinance ticker."""
+    return _INDEX_SYMBOL_MAP.get(sym.upper(), f"{sym}{suffix}")
 
 
 def _safe_float(val) -> float | None:
@@ -29,7 +59,8 @@ def _safe_float(val) -> float | None:
 
 def _fetch_one(sym: str, suffix: str, exchange: str) -> tuple[str, dict]:
     try:
-        fi = yf.Ticker(f"{sym}{suffix}").fast_info
+        yf_ticker = _resolve_yf_ticker(sym, suffix)
+        fi = yf.Ticker(yf_ticker).fast_info
         ltp = _safe_float(fi.last_price)
         prev_close = _safe_float(fi.previous_close)
         change: float | None = None

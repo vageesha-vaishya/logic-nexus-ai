@@ -124,23 +124,54 @@ async def _fetch_nse_live() -> list[dict[str, Any]] | None:
 
     rows: list[dict[str, Any]] = []
     for item in payload:
-        raw_date = item.get("date") or item.get("Date") or ""
+        raw_date = (
+            item.get("date") or item.get("Date") or item.get("DATE") or ""
+        )
         iso_date = _parse_nse_date(str(raw_date))
         if not iso_date:
             continue
 
-        fii_net = _parse_float(
-            item.get("fiiNet")
-            or item.get("FII_NET")
-            or item.get("netFII")
-            or 0
-        )
-        dii_net = _parse_float(
-            item.get("diiNet")
-            or item.get("DII_NET")
-            or item.get("netDII")
-            or 0
-        )
+        # NSE uses many field name variants across API versions — try all known ones
+        def _get_fii(row: dict) -> float:
+            for key in ("fiiNet", "FII_NET", "netFII", "fii_net", "FII_NET_TOTAL",
+                        "fii_NET", "FII_NET_AMT", "FiiNet"):
+                v = row.get(key)
+                if v is not None:
+                    return _parse_float(v)
+            # Try nested: {"fii": {"NET": 1234}} or {"fii": {"net": 1234}}
+            nested = row.get("fii") or row.get("FII") or {}
+            if isinstance(nested, dict):
+                for k in ("NET", "net", "Net", "netAmt"):
+                    v = nested.get(k)
+                    if v is not None:
+                        return _parse_float(v)
+            # Compute from buy - sell if available
+            buy = _parse_float(row.get("fiiBuy") or row.get("FII_BUY") or nested.get("BUY") or 0)
+            sell = _parse_float(row.get("fiiSell") or row.get("FII_SELL") or nested.get("SELL") or 0)
+            if buy or sell:
+                return round(buy - sell, 2)
+            return 0.0
+
+        def _get_dii(row: dict) -> float:
+            for key in ("diiNet", "DII_NET", "netDII", "dii_net", "DII_NET_TOTAL",
+                        "dii_NET", "DII_NET_AMT", "DiiNet"):
+                v = row.get(key)
+                if v is not None:
+                    return _parse_float(v)
+            nested = row.get("dii") or row.get("DII") or {}
+            if isinstance(nested, dict):
+                for k in ("NET", "net", "Net", "netAmt"):
+                    v = nested.get(k)
+                    if v is not None:
+                        return _parse_float(v)
+            buy = _parse_float(row.get("diiBuy") or row.get("DII_BUY") or nested.get("BUY") or 0)
+            sell = _parse_float(row.get("diiSell") or row.get("DII_SELL") or nested.get("SELL") or 0)
+            if buy or sell:
+                return round(buy - sell, 2)
+            return 0.0
+
+        fii_net = _get_fii(item)
+        dii_net = _get_dii(item)
         rows.append(
             {
                 "date": iso_date,
@@ -149,6 +180,11 @@ async def _fetch_nse_live() -> list[dict[str, Any]] | None:
                 "total_net": round(fii_net + dii_net, 2),
             }
         )
+
+    # If every row has zero FII and DII, treat as parse failure (field names unknown)
+    if rows and all(r["fii_net"] == 0.0 and r["dii_net"] == 0.0 for r in rows):
+        logger.warning("fii_dii.all_zeros_suspected_parse_failure", sample_keys=list(payload[0].keys()) if payload else [])
+        return None
 
     return rows if rows else None
 
