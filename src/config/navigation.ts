@@ -286,6 +286,12 @@ export const APP_MENU: MenuModule[] = [
         description: 'Daily institutional buy/sell flow data',
       },
       {
+        name: 'Market Breadth',
+        path: '/dashboard/markets/breadth',
+        icon: BarChart2,
+        description: 'NSE sector heatmap and advance/decline breadth indicators',
+      },
+      {
         name: 'Margin Calculator',
         path: '/dashboard/markets/span',
         icon: Calculator,

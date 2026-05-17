@@ -2,6 +2,7 @@ import asyncio
 import math
 import time
 from concurrent.futures import ThreadPoolExecutor
+from datetime import datetime, timezone
 from fastapi import APIRouter, Query
 
 import yfinance as yf
@@ -126,3 +127,101 @@ async def get_ltp(
 
     quotes = [result.get(sym, {"symbol": sym, "exchange": exchange.upper(), "ltp": None}) for sym in sym_list]
     return {"quotes": quotes}
+
+
+# ── Market Breadth / Sector Heatmap ───────────────────────────────────────────
+
+# NSE sector ETF / index proxies for breadth
+_SECTOR_TICKERS: dict[str, str] = {
+    "Financial Services": "^CNXFIN",
+    "Information Technology": "^CNXIT",
+    "Energy": "^CNXENERGY",
+    "Healthcare": "^CNXPHARMA",
+    "Consumer Staples": "^CNXFMCG",
+    "Automobile": "^CNXAUTO",
+    "Metal": "^CNXMETAL",
+    "Realty": "^CNXREALTY",
+    "PSU Bank": "^CNXPSUBANK",
+    "Infrastructure": "^CNXINFRA",
+}
+
+_BREADTH_CACHE: dict = {}
+_BREADTH_TTL = 300  # 5 minutes
+
+
+@router.get("/breadth")
+async def get_market_breadth():
+    """
+    GET /v1/ltp/breadth
+    Returns sector-level change % using NSE sector index tickers,
+    plus the major index snapshot (NIFTY 50, NIFTY BANK, NIFTY IT, INDIA VIX).
+    Cached 5 minutes.
+    """
+    now = time.monotonic()
+    if _BREADTH_CACHE.get("stored_at") and (now - _BREADTH_CACHE["stored_at"]) < _BREADTH_TTL:
+        return _BREADTH_CACHE["data"]
+
+    # Fetch sector indices + main indices concurrently
+    all_symbols = list(_SECTOR_TICKERS.values()) + ["^NSEI", "^NSEBANK", "^CNXIT", "^INDIAVIX"]
+    loop = asyncio.get_event_loop()
+
+    def _fetch_batch(tickers: list[str]) -> dict[str, dict]:
+        result = {}
+        for ticker in tickers:
+            try:
+                fi = yf.Ticker(ticker).fast_info
+                ltp = fi.last_price
+                prev = fi.previous_close
+                if ltp and prev and prev > 0:
+                    change_pct = round((float(ltp) - float(prev)) / float(prev) * 100, 2)
+                    result[ticker] = {"ltp": round(float(ltp), 2), "change_pct": change_pct, "prev_close": round(float(prev), 2)}
+                else:
+                    result[ticker] = {"ltp": None, "change_pct": None, "prev_close": None}
+            except Exception:
+                result[ticker] = {"ltp": None, "change_pct": None, "prev_close": None}
+        return result
+
+    prices = await loop.run_in_executor(_executor, _fetch_batch, all_symbols)
+
+    # Build sectors list
+    sectors = []
+    for name, ticker in _SECTOR_TICKERS.items():
+        p = prices.get(ticker, {})
+        sectors.append({
+            "sector": name,
+            "ticker": ticker,
+            "change_pct": p.get("change_pct"),
+            "ltp": p.get("ltp"),
+        })
+
+    # Build indices list
+    idx_map = {
+        "^NSEI":     "NIFTY 50",
+        "^NSEBANK":  "NIFTY Bank",
+        "^CNXIT":    "NIFTY IT",
+        "^INDIAVIX": "India VIX",
+    }
+    indices = []
+    for ticker, name in idx_map.items():
+        p = prices.get(ticker, {})
+        indices.append({
+            "name": name, "ticker": ticker,
+            "change_pct": p.get("change_pct"),
+            "ltp": p.get("ltp"),
+        })
+
+    # Simple advance/decline from sectors (positive = advance, negative = decline)
+    valid = [s for s in sectors if s["change_pct"] is not None]
+    advances = sum(1 for s in valid if s["change_pct"] > 0)
+    declines = sum(1 for s in valid if s["change_pct"] < 0)
+
+    data = {
+        "sectors": sectors,
+        "indices": indices,
+        "advance_decline": {"advances": advances, "declines": declines, "unchanged": len(valid) - advances - declines},
+        "as_of": datetime.now(timezone.utc).isoformat(),
+        "is_stale": False,
+    }
+    _BREADTH_CACHE["data"] = data
+    _BREADTH_CACHE["stored_at"] = now
+    return data
