@@ -333,3 +333,126 @@ export function useModifyOrder(
     },
   });
 }
+
+// ── GTT types ─────────────────────────────────────────────────────────────────
+
+export interface GTTTrigger {
+  transaction_type: "BUY" | "SELL";
+  quantity:         number;
+  order_type:       "LIMIT" | "MARKET";
+  trigger_price:    number;
+  price:            number;
+  product:          string;
+}
+
+export interface GTTOrder {
+  gtt_id:           string;
+  status:           "active" | "triggered" | "cancelled" | "expired";
+  tradingsymbol:    string;
+  exchange:         string;
+  trigger_type:     "single" | "oco";
+  ltp:              number;
+  triggers:         GTTTrigger[];
+  created_at:       string | null;
+}
+
+export interface CreateGTTInput {
+  tradingsymbol:    string;
+  exchange:         string;
+  ltp:              number;
+  trigger_type:     "single" | "oco";
+  // Single GTT fields
+  transaction_type?:  "BUY" | "SELL";
+  quantity?:          number;
+  trigger_price?:     number;
+  price?:             number;
+  product?:           string;
+  order_type?:        string;
+  // OCO upper leg (take profit)
+  upper_trigger_price?:    number;
+  upper_price?:            number;
+  upper_quantity?:         number;
+  upper_transaction_type?: "BUY" | "SELL";
+  // OCO lower leg (stop loss)
+  lower_trigger_price?:    number;
+  lower_price?:            number;
+  lower_quantity?:         number;
+  lower_transaction_type?: "BUY" | "SELL";
+}
+
+// ── GTT hooks ─────────────────────────────────────────────────────────────────
+
+// List active GTTs for a connection
+export function useConnectionGtts(
+  connectionId: string | null,
+): UseQueryResult<GTTOrder[]> {
+  const { tenantId, franchiseId } = useActiveScope();
+
+  return useQuery<GTTOrder[]>({
+    queryKey: marketsKeys.brokers.gtts(connectionId!),
+    enabled: Boolean(connectionId),
+    staleTime: 30_000,
+    queryFn: async () => {
+      const token = await getToken();
+      const data = await workerFetch(
+        "GET",
+        `/v1/brokers/connections/${connectionId}/gtts`,
+        token,
+        tenantId ?? "",
+        franchiseId ?? "",
+      ) as { gtts: GTTOrder[] };
+      return data.gtts ?? [];
+    },
+  });
+}
+
+// Create GTT mutation
+export function useCreateGtt(
+  connectionId: string,
+): UseMutationResult<{ gtt_id: string; status: string }, Error, CreateGTTInput> {
+  const { tenantId, franchiseId } = useActiveScope();
+  const queryClient = useQueryClient();
+
+  return useMutation<{ gtt_id: string; status: string }, Error, CreateGTTInput>({
+    mutationFn: async (input) => {
+      const token = await getToken();
+      const data = await workerFetch(
+        "POST",
+        `/v1/brokers/connections/${connectionId}/gtts`,
+        token,
+        tenantId ?? "",
+        franchiseId ?? "",
+        input,
+      ) as { gtt_id: string; status: string };
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: marketsKeys.brokers.gtts(connectionId) });
+    },
+  });
+}
+
+// Cancel GTT mutation (takes gtt_id string)
+export function useCancelGtt(
+  connectionId: string,
+): UseMutationResult<{ gtt_id: string; status: string }, Error, string> {
+  const { tenantId, franchiseId } = useActiveScope();
+  const queryClient = useQueryClient();
+
+  return useMutation<{ gtt_id: string; status: string }, Error, string>({
+    mutationFn: async (gtt_id) => {
+      const token = await getToken();
+      const data = await workerFetch(
+        "DELETE",
+        `/v1/brokers/connections/${connectionId}/gtts/${gtt_id}`,
+        token,
+        tenantId ?? "",
+        franchiseId ?? "",
+      ) as { gtt_id: string; status: string };
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: marketsKeys.brokers.gtts(connectionId) });
+    },
+  });
+}

@@ -326,3 +326,74 @@ class DhanAdapter(BrokerAdapter):
         except Exception as exc:
             logger.warning("dhan.place_mf_order_failed", error=str(exc))
             return {"status": "error", "message": str(exc)}
+
+    # ── GTT / Forever Orders ─────────────────────────────────────────────────────
+
+    async def create_gtt(self, req: "GTTRequest") -> "GTTResult":
+        """Dhan Forever Order (equivalent to GTT single-leg)."""
+        try:
+            from markets_worker.brokers.base import GTTResult
+            t = req.triggers[0]
+            # Dhan forever order uses place_order with order_type="SL" + validity
+            # Map GTT to a Dhan stop-loss order with extended validity
+            raw = await asyncio.to_thread(
+                self._client.place_order,
+                security_id=req.tradingsymbol,
+                exchange_segment=f"{req.exchange}_EQ",
+                transaction_type=t.transaction_type,
+                quantity=t.quantity,
+                order_type="SL",
+                product_type=t.product,
+                price=float(t.price),
+                trigger_price=float(t.trigger_price),
+                validity="GTC",     # Good Till Cancelled = Forever Order
+            )
+            if raw and raw.get("status") == "success":
+                gtt_id = str((raw.get("data") or {}).get("orderId", ""))
+                return GTTResult(gtt_id=gtt_id, status="active")
+            return GTTResult(gtt_id="", status="error",
+                             message=(raw or {}).get("remarks", "GTT creation failed"))
+        except Exception as exc:
+            logger.warning("dhan.create_gtt_failed", error=str(exc))
+            return GTTResult(gtt_id="", status="error", message=str(exc))
+
+    async def cancel_gtt(self, gtt_id: str) -> "GTTResult":
+        try:
+            from markets_worker.brokers.base import GTTResult
+            raw = await asyncio.to_thread(self._client.cancel_order, gtt_id)
+            status = "cancelled" if (raw and raw.get("status") == "success") else "error"
+            return GTTResult(gtt_id=gtt_id, status=status)
+        except Exception as exc:
+            logger.warning("dhan.cancel_gtt_failed", error=str(exc))
+            return GTTResult(gtt_id=gtt_id, status="error", message=str(exc))
+
+    async def get_gtts(self) -> list:
+        """Return GTC orders from Dhan order book."""
+        try:
+            from markets_worker.brokers.base import GTTOrder, GTTTrigger
+            raw = await asyncio.to_thread(self._dhan.get_order_list)
+            orders = (raw or {}).get("data", []) or []
+            result = []
+            for row in orders:
+                if row.get("validity", "") not in ("GTC", "GTD"):
+                    continue
+                result.append(GTTOrder(
+                    gtt_id=str(row.get("orderId", "")),
+                    status=str(row.get("orderStatus", "PENDING")).lower(),
+                    tradingsymbol=row.get("tradingSymbol", ""),
+                    exchange=row.get("exchangeSegment", "NSE_EQ").split("_")[0],
+                    trigger_type="single",
+                    ltp=Decimal("0"),
+                    triggers=[GTTTrigger(
+                        transaction_type=row.get("transactionType", "BUY"),
+                        quantity=int(row.get("quantity", 0)),
+                        order_type=row.get("orderType", "LIMIT"),
+                        trigger_price=Decimal(str(row.get("triggerPrice", 0))),
+                        price=Decimal(str(row.get("price", 0))),
+                        product=row.get("productType", "CNC"),
+                    )],
+                ))
+            return result
+        except Exception as exc:
+            logger.warning("dhan.get_gtts_failed", error=str(exc))
+            return []

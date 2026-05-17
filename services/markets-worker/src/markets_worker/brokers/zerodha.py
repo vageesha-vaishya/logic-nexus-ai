@@ -310,3 +310,89 @@ class ZerodhaAdapter(BrokerAdapter):
     async def get_margins(self) -> dict[str, Any]:
         raw = await asyncio.to_thread(self._kite.margins)
         return raw or {}
+
+    # ── GTT ──────────────────────────────────────────────────────────────────────
+
+    async def create_gtt(self, req: "GTTRequest") -> "GTTResult":
+        try:
+            from markets_worker.brokers.base import GTTResult
+            from kiteconnect import KiteConnect  # type: ignore
+
+            t0 = req.triggers[0]
+            if req.trigger_type == "oco" and len(req.triggers) >= 2:
+                t1 = req.triggers[1]
+                trigger_type = "two-leg"
+                trigger_values = [float(t0.trigger_price), float(t1.trigger_price)]
+                orders = [
+                    {"exchange": req.exchange, "tradingsymbol": req.tradingsymbol,
+                     "transaction_type": t0.transaction_type, "quantity": t0.quantity,
+                     "order_type": "LIMIT", "product": t0.product, "price": float(t0.price)},
+                    {"exchange": req.exchange, "tradingsymbol": req.tradingsymbol,
+                     "transaction_type": t1.transaction_type, "quantity": t1.quantity,
+                     "order_type": "LIMIT", "product": t1.product, "price": float(t1.price)},
+                ]
+            else:
+                trigger_type = "single"
+                trigger_values = [float(t0.trigger_price)]
+                orders = [
+                    {"exchange": req.exchange, "tradingsymbol": req.tradingsymbol,
+                     "transaction_type": t0.transaction_type, "quantity": t0.quantity,
+                     "order_type": "LIMIT", "product": t0.product, "price": float(t0.price)},
+                ]
+
+            def _place():
+                return self._kite.place_gtt(
+                    trigger_type=trigger_type,
+                    tradingsymbol=req.tradingsymbol,
+                    exchange=req.exchange,
+                    trigger_values=trigger_values,
+                    last_price=float(req.ltp),
+                    orders=orders,
+                )
+            raw = await asyncio.to_thread(_place)
+            gtt_id = str(raw.get("trigger_id", raw.get("id", ""))) if isinstance(raw, dict) else str(raw)
+            return GTTResult(gtt_id=gtt_id, status="active")
+        except Exception as exc:
+            logger.warning("zerodha.create_gtt_failed", error=str(exc))
+            return GTTResult(gtt_id="", status="error", message=str(exc))
+
+    async def cancel_gtt(self, gtt_id: str) -> "GTTResult":
+        try:
+            from markets_worker.brokers.base import GTTResult
+            await asyncio.to_thread(self._kite.delete_gtt, int(gtt_id))
+            return GTTResult(gtt_id=gtt_id, status="cancelled")
+        except Exception as exc:
+            logger.warning("zerodha.cancel_gtt_failed", error=str(exc))
+            return GTTResult(gtt_id=gtt_id, status="error", message=str(exc))
+
+    async def get_gtts(self) -> list:
+        try:
+            from markets_worker.brokers.base import GTTOrder, GTTTrigger
+            raw = await asyncio.to_thread(self._kite.get_gtts)
+            result = []
+            for row in (raw or []):
+                cond = row.get("condition", {})
+                orders = row.get("orders", [{}])
+                triggers = []
+                for leg in orders:
+                    triggers.append(GTTTrigger(
+                        transaction_type=leg.get("transaction_type", "BUY"),
+                        quantity=int(leg.get("quantity", 0)),
+                        order_type=leg.get("order_type", "LIMIT"),
+                        trigger_price=Decimal(str(cond.get("trigger_values", [0])[0])),
+                        price=Decimal(str(leg.get("price", 0))),
+                        product=leg.get("product", "CNC"),
+                    ))
+                result.append(GTTOrder(
+                    gtt_id=str(row.get("id", "")),
+                    status=str(row.get("status", "active")).lower(),
+                    tradingsymbol=cond.get("tradingsymbol", ""),
+                    exchange=cond.get("exchange", "NSE"),
+                    trigger_type="oco" if row.get("type") == "two-leg" else "single",
+                    ltp=Decimal(str(cond.get("last_price", 0))),
+                    triggers=triggers,
+                ))
+            return result
+        except Exception as exc:
+            logger.warning("zerodha.get_gtts_failed", error=str(exc))
+            return []

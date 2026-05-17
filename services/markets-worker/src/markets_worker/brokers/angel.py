@@ -370,3 +370,79 @@ class AngelAdapter(BrokerAdapter):
         except Exception as exc:
             logger.warning("angel.place_mf_order_failed", error=str(exc))
             return {"status": "error", "message": str(exc)}
+
+    # ── GTT (Good Till Triggered) ─────────────────────────────────────────────
+
+    async def create_gtt(self, req: "GTTRequest") -> "GTTResult":
+        """
+        Angel One GTT via SmartAPI gttCreateRule.
+        Docs: https://smartapi.angelbroking.com/docs
+        """
+        try:
+            from markets_worker.brokers.base import GTTResult
+            t = req.triggers[0]
+            params = {
+                "tradingsymbol":   req.tradingsymbol,
+                "symboltoken":     "",          # Angel needs token; empty = broker looks it up
+                "exchange":        req.exchange,
+                "producttype":     t.product,
+                "transactiontype": t.transaction_type,
+                "price":           float(t.price),
+                "qty":             t.quantity,
+                "disclosedqty":    t.quantity,
+                "triggerprice":    float(t.trigger_price),
+                "timeperiod":      365,         # 1-year validity
+            }
+            raw = await asyncio.to_thread(self._obj.gttCreateRule, params)
+            if raw and raw.get("status"):
+                gtt_id = str((raw.get("data") or {}).get("id", ""))
+                return GTTResult(gtt_id=gtt_id, status="active")
+            return GTTResult(gtt_id="", status="error",
+                             message=(raw or {}).get("message", "GTT creation failed"))
+        except Exception as exc:
+            logger.warning("angel.create_gtt_failed", error=str(exc))
+            return GTTResult(gtt_id="", status="error", message=str(exc))
+
+    async def cancel_gtt(self, gtt_id: str) -> "GTTResult":
+        try:
+            from markets_worker.brokers.base import GTTResult
+            raw = await asyncio.to_thread(
+                self._obj.gttDeleteRule, int(gtt_id), "", ""
+            )
+            status = "cancelled" if (raw and raw.get("status")) else "error"
+            return GTTResult(gtt_id=gtt_id, status=status,
+                             message=(raw or {}).get("message"))
+        except Exception as exc:
+            logger.warning("angel.cancel_gtt_failed", error=str(exc))
+            return GTTResult(gtt_id=gtt_id, status="error", message=str(exc))
+
+    async def get_gtts(self) -> list:
+        try:
+            from markets_worker.brokers.base import GTTOrder, GTTTrigger
+            raw = await asyncio.to_thread(
+                self._obj.gttLists, ["FORALL"], [], [], []
+            )
+            data = (raw or {}).get("data") or []
+            result = []
+            for row in (data if isinstance(data, list) else []):
+                t = GTTTrigger(
+                    transaction_type=row.get("transactiontype", "BUY"),
+                    quantity=int(row.get("qty", 0)),
+                    order_type="LIMIT",
+                    trigger_price=Decimal(str(row.get("triggerprice", 0))),
+                    price=Decimal(str(row.get("price", 0))),
+                    product=row.get("producttype", "CNC"),
+                )
+                result.append(GTTOrder(
+                    gtt_id=str(row.get("id", "")),
+                    status=str(row.get("status", "active")).lower(),
+                    tradingsymbol=row.get("tradingsymbol", ""),
+                    exchange=row.get("exchange", "NSE"),
+                    trigger_type="single",
+                    ltp=Decimal(str(row.get("ltp", 0))),
+                    triggers=[t],
+                ))
+            return result
+        except Exception as exc:
+            logger.warning("angel.get_gtts_failed", error=str(exc))
+            return []

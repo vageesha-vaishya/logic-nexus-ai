@@ -81,6 +81,7 @@ export const marketsKeys = {
     holdings:    (connectionId: string) => [...marketsKeys.brokers.connection(connectionId), "holdings"] as const,
     positions:   (connectionId: string) => [...marketsKeys.brokers.connection(connectionId), "positions"] as const,
     orders:      (connectionId: string) => [...marketsKeys.brokers.connection(connectionId), "orders"] as const,
+    gtts:        (connectionId: string) => [...marketsKeys.brokers.connection(connectionId), "gtts"] as const,
   },
 
   fno: {

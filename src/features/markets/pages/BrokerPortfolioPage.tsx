@@ -49,11 +49,15 @@ import {
   useConnectionPositions,
   useConnectionOrders,
   useCancelOrder,
+  useConnectionGtts,
+  useCancelGtt,
   type BrokerHolding,
   type BrokerPosition,
   type BrokerOrder,
+  type GTTOrder,
 } from "../hooks/useBrokerPortfolio";
 import { OrderFormSheet } from "@/features/markets/components/OrderFormSheet";
+import { GTTFormSheet } from "@/features/markets/components/GTTFormSheet";
 import { marketsKeys } from "../hooks/queryKeys";
 
 // ── Formatters ────────────────────────────────────────────────────────────────
@@ -149,6 +153,7 @@ function HoldingsTab({
   error,
   refetch,
   onOrder,
+  onGtt,
 }: {
   holdings: BrokerHolding[];
   isLoading: boolean;
@@ -156,6 +161,7 @@ function HoldingsTab({
   error: Error | null;
   refetch: () => void;
   onOrder?: (symbol: string, exchange: string, side: "BUY" | "SELL") => void;
+  onGtt?: (symbol: string, exchange: string, ltp: number, qty: number) => void;
 }) {
   if (isLoading) {
     return (
@@ -295,6 +301,14 @@ function HoldingsTab({
                           onClick={() => onOrder?.(symbol, exchange, "SELL")}
                         >
                           Sell
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-[10px] text-blue-600 hover:bg-blue-50"
+                          onClick={() => onGtt?.(symbol, exchange, ltp ?? 0, Math.floor(h.qty))}
+                        >
+                          GTT
                         </Button>
                       </div>
                     </TableCell>
@@ -520,6 +534,161 @@ function OrdersTab({
   );
 }
 
+// ── GTT status badge ──────────────────────────────────────────────────────────
+
+function GttStatusBadge({ status }: { status: GTTOrder["status"] }) {
+  if (status === "active") {
+    return <Badge variant="default" className="text-xs bg-emerald-600 hover:bg-emerald-600">Active</Badge>;
+  }
+  if (status === "triggered") {
+    return <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-100">Triggered</Badge>;
+  }
+  if (status === "expired") {
+    return <Badge variant="destructive" className="text-xs">Expired</Badge>;
+  }
+  return <Badge variant="outline" className="text-xs text-muted-foreground">Cancelled</Badge>;
+}
+
+// ── GTT tab ───────────────────────────────────────────────────────────────────
+
+function GttTab({
+  gtts,
+  isLoading,
+  isError,
+  error,
+  refetch,
+  onNewGtt,
+  onCancel,
+  isCancelling,
+}: {
+  gtts:         GTTOrder[];
+  isLoading:    boolean;
+  isError:      boolean;
+  error:        Error | null;
+  refetch:      () => void;
+  onNewGtt:     () => void;
+  onCancel:     (gttId: string) => void;
+  isCancelling: boolean;
+}) {
+  if (isLoading) {
+    return (
+      <div className="space-y-2 mt-2">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <Skeleton key={i} className="h-10 w-full" />
+        ))}
+      </div>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card className="mt-4">
+        <CardContent className="flex items-center gap-3 p-4">
+          <AlertCircle className="h-5 w-5 text-destructive shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium">Failed to load GTT orders</p>
+            <p className="text-xs text-muted-foreground truncate">{error?.message}</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={refetch}>Retry</Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <div className="space-y-4 mt-2">
+      {/* Top action row */}
+      <div className="flex justify-end">
+        <Button size="sm" onClick={onNewGtt} className="bg-blue-600 hover:bg-blue-700">
+          New GTT
+        </Button>
+      </div>
+
+      {gtts.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-center">
+          <TrendingUp className="h-10 w-10 text-muted-foreground mb-3" />
+          <p className="text-sm font-medium">No active GTT orders</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Set a GTT from any holding row.
+          </p>
+        </div>
+      ) : (
+        <ScrollArea className="w-full">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Symbol</TableHead>
+                <TableHead>Exchange</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="text-right">Trigger</TableHead>
+                <TableHead className="text-right">Limit</TableHead>
+                <TableHead className="text-right">Qty</TableHead>
+                <TableHead>Product</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {gtts.map((g) => {
+                const isSingle      = g.trigger_type === "single";
+                const firstTrigger  = g.triggers[0];
+                const secondTrigger = g.triggers[1];
+                const isActive      = g.status === "active";
+
+                return (
+                  <TableRow key={g.gtt_id}>
+                    <TableCell className="font-medium">{g.tradingsymbol}</TableCell>
+                    <TableCell className="text-muted-foreground text-xs">{g.exchange}</TableCell>
+                    <TableCell>
+                      {isSingle
+                        ? <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800 hover:bg-blue-100">Single</Badge>
+                        : <Badge variant="secondary" className="text-xs bg-purple-100 text-purple-800 hover:bg-purple-100">OCO</Badge>
+                      }
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {isSingle
+                        ? firstTrigger ? fmtINR(firstTrigger.trigger_price) : "—"
+                        : (firstTrigger && secondTrigger)
+                          ? <span>↑{fmtINR(firstTrigger.trigger_price)} / ↓{fmtINR(secondTrigger.trigger_price)}</span>
+                          : firstTrigger ? fmtINR(firstTrigger.trigger_price) : "—"
+                      }
+                    </TableCell>
+                    <TableCell className="text-right font-mono text-xs">
+                      {firstTrigger ? fmtINR(firstTrigger.price) : "—"}
+                    </TableCell>
+                    <TableCell className="text-right">
+                      {firstTrigger ? fmtQty(firstTrigger.quantity) : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs">
+                      {firstTrigger?.product ?? "—"}
+                    </TableCell>
+                    <TableCell><GttStatusBadge status={g.status} /></TableCell>
+                    <TableCell className="text-right">
+                      {isActive ? (
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="h-7 px-2 text-red-600 hover:text-red-700 hover:bg-red-50"
+                          onClick={() => onCancel(g.gtt_id)}
+                          disabled={isCancelling}
+                        >
+                          Cancel
+                        </Button>
+                      ) : (
+                        <span className="text-muted-foreground text-xs">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </ScrollArea>
+      )}
+    </div>
+  );
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function BrokerPortfolioPage() {
@@ -534,6 +703,14 @@ export default function BrokerPortfolioPage() {
     side:     "BUY" | "SELL";
   }>({ open: false, symbol: "", exchange: "NSE", side: "BUY" });
 
+  const [gttSheet, setGttSheet] = useState<{
+    open:     boolean;
+    symbol:   string;
+    exchange: string;
+    ltp:      number;
+    qty:      number;
+  }>({ open: false, symbol: "", exchange: "NSE", ltp: 0, qty: 1 });
+
   const { data: connections = [] } = useBrokerConnections();
   const { data: supported = [] }   = useSupportedBrokers();
 
@@ -546,10 +723,13 @@ export default function BrokerPortfolioPage() {
   const holdingsQuery  = useConnectionHoldings(connectionId ?? null);
   const positionsQuery = useConnectionPositions(connectionId ?? null);
   const ordersQuery    = useConnectionOrders(connectionId ?? null);
+  const connectionGtts = useConnectionGtts(connectionId ?? null);
+  const cancelGtt      = useCancelGtt(connectionId!);
 
   const holdings  = holdingsQuery.data  ?? [];
   const positions = positionsQuery.data ?? [];
   const orders    = ordersQuery.data    ?? [];
+  const gtts      = connectionGtts.data ?? [];
 
   const hasEverSynced = Boolean(conn?.last_synced_at);
   const isSyncing     = triggerSync.isPending;
@@ -693,6 +873,14 @@ export default function BrokerPortfolioPage() {
                   {orders.length}
                 </span>
               </TabsTrigger>
+              <TabsTrigger value="gtts" className="gap-1.5">
+                GTT
+                {(connectionGtts.data?.length ?? 0) > 0 && (
+                  <Badge variant="secondary" className="ml-1.5 h-5 px-1.5 text-[10px]">
+                    {connectionGtts.data?.length}
+                  </Badge>
+                )}
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="holdings">
@@ -704,6 +892,9 @@ export default function BrokerPortfolioPage() {
                 refetch={holdingsQuery.refetch}
                 onOrder={(sym, exch, side) =>
                   setOrderSheet({ open: true, symbol: sym, exchange: exch, side })
+                }
+                onGtt={(sym, exch, ltp, qty) =>
+                  setGttSheet({ open: true, symbol: sym, exchange: exch, ltp, qty })
                 }
               />
             </TabsContent>
@@ -729,6 +920,19 @@ export default function BrokerPortfolioPage() {
                 isCancelling={cancelOrder.isPending}
               />
             </TabsContent>
+
+            <TabsContent value="gtts">
+              <GttTab
+                gtts={gtts}
+                isLoading={connectionGtts.isPending}
+                isError={connectionGtts.isError}
+                error={connectionGtts.error}
+                refetch={connectionGtts.refetch}
+                onNewGtt={() => setGttSheet(prev => ({ ...prev, open: true }))}
+                onCancel={(gttId) => cancelGtt.mutate(gttId)}
+                isCancelling={cancelGtt.isPending}
+              />
+            </TabsContent>
           </Tabs>
 
         </div>
@@ -746,6 +950,21 @@ export default function BrokerPortfolioPage() {
           defaultSymbol={orderSheet.symbol}
           defaultExchange={orderSheet.exchange}
           defaultTransactionType={orderSheet.side}
+        />
+      )}
+
+      {/* ── GTT form sheet ───────────────────────────────────────────────── */}
+      {conn && (
+        <GTTFormSheet
+          open={gttSheet.open}
+          onOpenChange={(open) => setGttSheet(prev => ({ ...prev, open }))}
+          connectionId={connectionId!}
+          connectionName={conn.display_name}
+          brokerName={conn.broker}
+          defaultSymbol={gttSheet.symbol}
+          defaultExchange={gttSheet.exchange}
+          defaultLtp={gttSheet.ltp}
+          defaultQty={gttSheet.qty}
         />
       )}
     </DashboardLayout>

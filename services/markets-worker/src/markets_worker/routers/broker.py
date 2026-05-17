@@ -75,7 +75,47 @@ class ModifyOrderRequest(BaseModel):
     validity:      str | None = None
 
 
+class CreateGTTRequest(BaseModel):
+    tradingsymbol:    str
+    exchange:         str
+    ltp:              float
+    trigger_type:     str = "single"   # "single" | "oco"
+    # Single GTT
+    transaction_type: str = "BUY"
+    quantity:         int = 1
+    trigger_price:    float = 0.0
+    price:            float = 0.0
+    product:          str = "CNC"
+    order_type:       str = "LIMIT"
+    # OCO only — upper leg (take profit)
+    upper_trigger_price: float | None = None
+    upper_price:         float | None = None
+    upper_quantity:      int | None = None
+    upper_transaction_type: str = "SELL"
+    # OCO only — lower leg (stop loss)
+    lower_trigger_price: float | None = None
+    lower_price:         float | None = None
+    lower_quantity:      int | None = None
+    lower_transaction_type: str = "SELL"
+
+
 # ── Routes ────────────────────────────────────────────────────────────────────
+
+
+def _verify_conn(connection_id: str, auth: Auth) -> dict:
+    """Verify connection ownership and return the row. Raises 404 if not found."""
+    db  = get_supabase()
+    row = (
+        db.schema("markets").from_("broker_connections")
+        .select("id, broker, credentials_enc, tenant_id, franchise_id, portfolio_id, can_trade")
+        .eq("id", connection_id)
+        .eq("owner_user_id", auth.user_id)
+        .maybe_single()
+        .execute()
+    ).data
+    if not row:
+        raise HTTPException(404, detail="Connection not found")
+    return row
 
 @router.get("")
 async def list_supported_brokers():
@@ -607,6 +647,154 @@ async def cancel_order(connection_id: str, broker_order_id: str, auth: Auth):
                 connection_id=connection_id, broker_order_id=broker_order_id,
                 user_id=auth.user_id)
     return {"order_id": broker_order_id, "status": "cancelled"}
+
+
+@router.get("/connections/{connection_id}/gtts")
+async def get_gtts(connection_id: str, auth: Auth):
+    """List all active GTT orders for this broker connection."""
+    conn_row = _verify_conn(connection_id, auth)
+    if not getattr(build_adapter(conn_row["broker"], {}), "supports_gtt", False):
+        raise HTTPException(400, detail=f"{conn_row['broker']} does not support GTT")
+    try:
+        creds   = decrypt_credentials(conn_row["credentials_enc"])
+        adapter = build_adapter(conn_row["broker"], creds)
+        await adapter.connect()
+        gtts = await adapter.get_gtts()
+        await adapter.disconnect()
+        return {
+            "gtts": [
+                {
+                    "gtt_id":        g.gtt_id,
+                    "status":        g.status,
+                    "tradingsymbol": g.tradingsymbol,
+                    "exchange":      g.exchange,
+                    "trigger_type":  g.trigger_type,
+                    "ltp":           float(g.ltp),
+                    "triggers": [
+                        {
+                            "transaction_type": t.transaction_type,
+                            "quantity":         t.quantity,
+                            "order_type":       t.order_type,
+                            "trigger_price":    float(t.trigger_price),
+                            "price":            float(t.price),
+                            "product":          t.product,
+                        } for t in g.triggers
+                    ],
+                    "created_at":    g.created_at.isoformat() if g.created_at else None,
+                }
+                for g in gtts
+            ]
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(502, detail=f"Broker error: {exc}") from exc
+
+
+@router.post("/connections/{connection_id}/gtts", status_code=201)
+async def create_gtt(connection_id: str, body: CreateGTTRequest, auth: Auth):
+    """Create a GTT order (single or OCO)."""
+    conn_row = _verify_conn(connection_id, auth)
+    if not conn_row.get("can_trade"):
+        raise HTTPException(403, detail="Trading not enabled for this connection")
+    try:
+        from markets_worker.brokers.base import GTTRequest, GTTTrigger
+        creds   = decrypt_credentials(conn_row["credentials_enc"])
+        adapter = build_adapter(conn_row["broker"], creds)
+        if not getattr(adapter, "supports_gtt", False):
+            raise HTTPException(400, detail=f"{conn_row['broker']} does not support GTT")
+
+        if body.trigger_type == "oco":
+            triggers = [
+                GTTTrigger(transaction_type=body.upper_transaction_type,
+                           quantity=body.upper_quantity or body.quantity,
+                           order_type=body.order_type,
+                           trigger_price=Decimal(str(body.upper_trigger_price or 0)),
+                           price=Decimal(str(body.upper_price or 0)),
+                           product=body.product),
+                GTTTrigger(transaction_type=body.lower_transaction_type,
+                           quantity=body.lower_quantity or body.quantity,
+                           order_type=body.order_type,
+                           trigger_price=Decimal(str(body.lower_trigger_price or 0)),
+                           price=Decimal(str(body.lower_price or 0)),
+                           product=body.product),
+            ]
+        else:
+            triggers = [
+                GTTTrigger(transaction_type=body.transaction_type,
+                           quantity=body.quantity,
+                           order_type=body.order_type,
+                           trigger_price=Decimal(str(body.trigger_price)),
+                           price=Decimal(str(body.price)),
+                           product=body.product),
+            ]
+
+        req = GTTRequest(
+            tradingsymbol=body.tradingsymbol.upper(),
+            exchange=body.exchange.upper(),
+            ltp=Decimal(str(body.ltp)),
+            trigger_type=body.trigger_type,
+            triggers=triggers,
+        )
+
+        await adapter.connect()
+        result = await adapter.create_gtt(req)
+        await adapter.disconnect()
+
+        if result.status == "error":
+            raise HTTPException(400, detail=result.message or "GTT creation failed")
+
+        # Persist to DB
+        db = get_supabase()
+        db.schema("markets").from_("gtt_orders").insert({
+            "connection_id":   connection_id,
+            "broker_gtt_id":   result.gtt_id,
+            "owner_user_id":   auth.user_id,
+            "tenant_id":       conn_row["tenant_id"],
+            "franchise_id":    conn_row["franchise_id"],
+            "tradingsymbol":   body.tradingsymbol.upper(),
+            "exchange":        body.exchange.upper(),
+            "trigger_type":    body.trigger_type,
+            "ltp_at_creation": float(body.ltp),
+            "status":          "active",
+            "triggers":        [
+                {"transaction_type": t.transaction_type, "quantity": t.quantity,
+                 "trigger_price": float(t.trigger_price), "price": float(t.price),
+                 "product": t.product, "order_type": t.order_type}
+                for t in triggers
+            ],
+        }).execute()
+
+        logger.info("gtt.created", gtt_id=result.gtt_id, broker=conn_row["broker"])
+        return {"gtt_id": result.gtt_id, "status": "active"}
+
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(502, detail=f"Broker error: {exc}") from exc
+
+
+@router.delete("/connections/{connection_id}/gtts/{gtt_id}", status_code=200)
+async def cancel_gtt(connection_id: str, gtt_id: str, auth: Auth):
+    """Cancel a GTT order."""
+    conn_row = _verify_conn(connection_id, auth)
+    try:
+        creds   = decrypt_credentials(conn_row["credentials_enc"])
+        adapter = build_adapter(conn_row["broker"], creds)
+        await adapter.connect()
+        result = await adapter.cancel_gtt(gtt_id)
+        await adapter.disconnect()
+
+        # Update DB
+        db = get_supabase()
+        db.schema("markets").from_("gtt_orders").update({"status": "cancelled"}).eq(
+            "broker_gtt_id", gtt_id).eq("owner_user_id", auth.user_id).execute()
+
+        return {"gtt_id": gtt_id, "status": result.status}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(502, detail=f"Broker error: {exc}") from exc
 
 
 @router.get("/auth-url")

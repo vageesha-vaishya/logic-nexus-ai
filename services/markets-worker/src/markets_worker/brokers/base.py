@@ -139,6 +139,51 @@ class MFOrder:
 
 
 @dataclass
+class GTTTrigger:
+    """One leg of a GTT order."""
+    transaction_type: str            # BUY | SELL
+    quantity:         int
+    order_type:       str            # LIMIT | MARKET
+    trigger_price:    Decimal
+    price:            Decimal        # limit price (same as trigger_price for MARKET)
+    product:          str = "CNC"    # CNC | MIS | NRML
+
+
+@dataclass
+class GTTRequest:
+    """Input for creating or modifying a GTT."""
+    tradingsymbol:    str
+    exchange:         str            # NSE | BSE | NFO etc.
+    ltp:              Decimal        # last traded price at time of creation
+    trigger_type:     str            # "single" | "oco"
+    triggers:         list           # list[GTTTrigger] — 1 for single, 2 for OCO
+    # For OCO: triggers[0] = upper (take profit), triggers[1] = lower (stop loss)
+
+
+@dataclass
+class GTTOrder:
+    """A GTT order as stored/returned by the broker."""
+    gtt_id:           str
+    status:           str            # active | triggered | cancelled | expired | disabled
+    tradingsymbol:    str
+    exchange:         str
+    trigger_type:     str            # single | oco
+    ltp:              Decimal
+    triggers:         list           # list[GTTTrigger]
+    created_at:       datetime | None = None
+    updated_at:       datetime | None = None
+    triggered_at:     datetime | None = None
+
+
+@dataclass
+class GTTResult:
+    """Result of a GTT create/modify/cancel operation."""
+    gtt_id:  str
+    status:  str
+    message: str | None = None
+
+
+@dataclass
 class AuthResult:
     """Credentials returned after a successful authentication."""
     access_token:   str
@@ -290,6 +335,20 @@ class BrokerAdapter(ABC):
 
     async def place_mf_order(self, order: dict[str, Any]) -> dict[str, Any]:
         raise NotImplementedError(f"{self.display_name} MF not supported")
+
+    # ── GTT (Good Till Triggered) ─────────────────────────────────────────────
+
+    async def create_gtt(self, req: GTTRequest) -> GTTResult:
+        raise NotImplementedError(f"{self.display_name} does not support GTT orders")
+
+    async def modify_gtt(self, gtt_id: str, req: GTTRequest) -> GTTResult:
+        raise NotImplementedError(f"{self.display_name} does not support GTT modification")
+
+    async def cancel_gtt(self, gtt_id: str) -> GTTResult:
+        raise NotImplementedError(f"{self.display_name} does not support GTT cancellation")
+
+    async def get_gtts(self) -> list[GTTOrder]:
+        raise NotImplementedError(f"{self.display_name} does not support GTT listing")
 
     # ── Utilities ─────────────────────────────────────────────────────────────
 
