@@ -151,7 +151,7 @@ async def get_tax_pnl(
         resp = (
             db.schema("markets")
             .from_("portfolios")
-            .select("owner_user_id,user_id")
+            .select("owner_user_id")
             .eq("id", portfolio_id)
             .limit(1)
             .execute()
@@ -166,7 +166,6 @@ async def get_tax_pnl(
     if not (
         auth.is_service_account
         or p.get("owner_user_id") == auth.user_id
-        or p.get("user_id") == auth.user_id
     ):
         raise HTTPException(403, detail="Access denied")
 
@@ -183,7 +182,7 @@ async def get_tax_pnl(
             .from_("transactions")
             .select(
                 "id, instrument_id, txn_type, txn_date, qty, price, "
-                "charges, net_amount, currency, asset_class, owner_user_id"
+                "charges, asset_class, instruments(symbol)"
             )
             .eq("portfolio_id", portfolio_id)
             .order("txn_date", desc=False)
@@ -196,7 +195,16 @@ async def get_tax_pnl(
         logger.info("tax_pnl.no_transactions", portfolio_id=portfolio_id, fy=fy)
         return _empty_response(portfolio_id, fy, fy_start, fy_end, as_of)
 
-    # ── 4. Normalise and split transactions ───────────────────────────────────
+    # ── 4. Build instrument_id → symbol lookup ────────────────────────────────
+    iid_to_sym: dict[str, str] = {}
+    for t in all_txns:
+        iid = t.get("instrument_id") or ""
+        instr = t.get("instruments") or {}
+        sym = instr.get("symbol") or iid
+        if iid:
+            iid_to_sym[iid] = sym.upper()
+
+    # ── 5. Normalise and split transactions ───────────────────────────────────
     # Parse txn_date strings to date objects; normalise txn_type to uppercase
     parsed: list[dict] = []
     for t in all_txns:
@@ -212,9 +220,12 @@ async def get_tax_pnl(
         if txn_date_obj is None:
             continue
 
+        iid = t.get("instrument_id") or ""
+        symbol = iid_to_sym.get(iid, iid.upper())
+
         parsed.append({
             "id":           t.get("id"),
-            "symbol":       (t.get("instrument_id") or "").upper(),  # instrument_id used as symbol key
+            "symbol":       symbol,
             "txn_type":     (t.get("txn_type") or "").upper(),
             "txn_date":     txn_date_obj,
             "qty":          float(t.get("qty") or 0),

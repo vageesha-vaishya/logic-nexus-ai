@@ -72,7 +72,7 @@ def _check_ownership(db: Any, portfolio_id: str, auth: "AuthContext") -> None:  
     port = (
         db.schema("markets")
         .from_("portfolios")
-        .select("owner_user_id, user_id")
+        .select("owner_user_id")
         .eq("id", portfolio_id)
         .limit(1)
         .execute()
@@ -83,7 +83,6 @@ def _check_ownership(db: Any, portfolio_id: str, auth: "AuthContext") -> None:  
     if not (
         auth.is_service_account
         or p.get("owner_user_id") == auth.user_id
-        or p.get("user_id") == auth.user_id
     ):
         raise HTTPException(403, "Not your portfolio")
 
