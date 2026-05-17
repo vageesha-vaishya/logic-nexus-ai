@@ -12,6 +12,7 @@ GET /v1/signals/summary?symbols=RELIANCE,TCS&exchange=NSE
 
 from __future__ import annotations
 
+import asyncio
 import time
 from typing import Any
 
@@ -528,6 +529,14 @@ FILTER_DESCRIPTIONS: dict[str, str] = {
     "strong_sell":     "2+ indicators bearish — strong signal",
     "near_52w_high":   "Within 5% of 52-week high",
     "near_52w_low":    "Within 5% of 52-week low",
+    # ── Price & Volume filters ────────────────────────────────────────────────
+    "volume_surge":     "Volume > 2× 30-day average — unusual activity",
+    "above_200ma":      "Price above 200-day moving average — long-term uptrend",
+    "below_200ma":      "Price below 200-day moving average — long-term downtrend",
+    "fresh_52w_high":   "At or above 52-week high — breakout",
+    "fresh_52w_low":    "At or below 52-week low — breakdown",
+    "momentum_bullish": "3-month price momentum > +10%",
+    "momentum_bearish": "3-month price momentum < −10%",
 }
 
 _VALID_FILTERS = set(FILTER_DESCRIPTIONS.keys())
@@ -563,7 +572,97 @@ def _apply_filter(signal_data: dict, filter_name: str) -> bool:
         if low52 and price and low52 > 0:
             return price <= low52 * 1.05
         return False
+    # ── Price & Volume filters (require enriched meta) ────────────────────────
+    if filter_name == "volume_surge":
+        meta = signal_data.get("meta") or {}
+        vr = meta.get("volume_ratio")
+        return vr is not None and float(vr) >= 2.0
+    if filter_name == "above_200ma":
+        meta = signal_data.get("meta") or {}
+        ma200 = meta.get("ma_200")
+        price = signal_data.get("price_at_signal")
+        return ma200 is not None and price is not None and float(price) > float(ma200)
+    if filter_name == "below_200ma":
+        meta = signal_data.get("meta") or {}
+        ma200 = meta.get("ma_200")
+        price = signal_data.get("price_at_signal")
+        return ma200 is not None and price is not None and float(price) < float(ma200)
+    if filter_name == "fresh_52w_high":
+        meta = signal_data.get("meta") or {}
+        high52 = meta.get("high_52w")
+        price = signal_data.get("price_at_signal")
+        return high52 is not None and price is not None and float(price) >= float(high52) * 0.99
+    if filter_name == "fresh_52w_low":
+        meta = signal_data.get("meta") or {}
+        low52 = meta.get("low_52w")
+        price = signal_data.get("price_at_signal")
+        return low52 is not None and price is not None and float(price) <= float(low52) * 1.01
+    if filter_name == "momentum_bullish":
+        meta = signal_data.get("meta") or {}
+        mom = meta.get("momentum_3m")
+        return mom is not None and float(mom) > 10.0
+    if filter_name == "momentum_bearish":
+        meta = signal_data.get("meta") or {}
+        mom = meta.get("momentum_3m")
+        return mom is not None and float(mom) < -10.0
     return False
+
+
+# ── Price-history meta enrichment ────────────────────────────────────────────
+
+_ENRICHMENT_FILTERS = frozenset({
+    "volume_surge", "above_200ma", "below_200ma",
+    "fresh_52w_high", "fresh_52w_low", "momentum_bullish", "momentum_bearish",
+})
+
+
+async def _enrich_meta(db, instrument_id: str, current_price: float) -> dict:
+    """Fetch price history to compute volume_ratio, ma_200, momentum_3m, high/low_52w."""
+    try:
+        resp = await asyncio.to_thread(
+            lambda: db.schema("markets").from_("price_history")
+            .select("close, volume, date")
+            .eq("instrument_id", instrument_id)
+            .order("date", desc=True)
+            .limit(252)
+            .execute()
+        )
+        ph = resp.data or []
+        if len(ph) < 20:
+            return {}
+
+        closes = [float(r["close"]) for r in ph]   # newest first
+        vols   = [float(r.get("volume") or 0) for r in ph]
+
+        # volume_ratio: today vol / avg of last 30 days
+        volume_ratio = None
+        if vols[0] > 0 and len(vols) >= 2:
+            avg30 = sum(vols[1:31]) / min(30, len(vols) - 1)
+            volume_ratio = round(vols[0] / avg30, 2) if avg30 > 0 else None
+
+        # ma_200: simple average of 200 most-recent closes
+        ma_200 = None
+        if len(closes) >= 200:
+            ma_200 = round(sum(closes[:200]) / 200, 2)
+
+        # momentum_3m: (current - price 63 trading days ago) / price 63 days ago * 100
+        momentum_3m = None
+        if len(closes) >= 63 and closes[62] > 0:
+            momentum_3m = round((closes[0] - closes[62]) / closes[62] * 100, 2)
+
+        # high_52w / low_52w over available history (up to 252 days)
+        high_52w = round(max(closes), 2)
+        low_52w  = round(min(closes), 2)
+
+        return {
+            "volume_ratio": volume_ratio,
+            "ma_200":       ma_200,
+            "momentum_3m":  momentum_3m,
+            "high_52w":     high_52w,
+            "low_52w":      low_52w,
+        }
+    except Exception:
+        return {}
 
 
 @router.get("/scanner")
@@ -638,6 +737,24 @@ async def scanner(
                 change_pct  = data.get("change_pct")
                 return ltp_val, change_pct
         return None, None
+
+    # ── Enrich meta for price/volume filters (only when needed) ─────────────
+    needs_enrichment = bool(_ENRICHMENT_FILTERS & set(filter_list))
+    if needs_enrichment and rows:
+        enrich_tasks = [
+            _enrich_meta(
+                db,
+                row["instrument_id"],
+                float(row.get("price_at_signal") or 0),
+            )
+            for row in rows
+        ]
+        enriched_metas: list[dict] = await asyncio.gather(*enrich_tasks)
+        # Merge enriched fields into each row's metadata (creates new dicts, originals untouched)
+        rows = [
+            {**row, "metadata": {**(row.get("metadata") or {}), **extra}}
+            for row, extra in zip(rows, enriched_metas)
+        ]
 
     # ── Apply filters + build result rows ────────────────────────────────
     results: list[dict] = []

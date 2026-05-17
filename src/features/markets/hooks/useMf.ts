@@ -224,6 +224,128 @@ export function useMfSips(): UseQueryResult<MfSip[]> {
   });
 }
 
+// ── SIP Schedule types ────────────────────────────────────────────────────────
+
+export interface SipSchedule {
+  id: string;
+  portfolio_id: string;
+  scheme_code?: string | null;
+  scheme_name: string;
+  amount: number;
+  sip_day: number;
+  status: "active" | "paused" | "cancelled";
+  last_executed_at?: string | null;
+  execution_count: number;
+  next_run_date: string;
+  created_at: string;
+  updated_at?: string;
+}
+
+export interface SipScheduleCreateInput {
+  portfolio_id: string;
+  scheme_code: string;
+  scheme_name: string;
+  amount: number;
+  sip_day: number;
+}
+
+export interface SipSchedulePatchInput {
+  id: string;
+  patch: {
+    status?: "active" | "paused" | "cancelled";
+    amount?: number;
+    sip_day?: number;
+  };
+}
+
+// ── SIP Schedule hooks ────────────────────────────────────────────────────────
+
+/**
+ * Fetch the user's SIP schedules (active + paused) — requires auth.
+ */
+export function useSipSchedules(): UseQueryResult<SipSchedule[]> {
+  const { tenantId, franchiseId } = useActiveScope();
+
+  return useQuery<SipSchedule[]>({
+    queryKey: marketsKeys.mf.sipSchedules(),
+    staleTime: 60_000,
+    queryFn: async () => {
+      const token = await getToken();
+      const data = await workerFetch(
+        "GET", "/v1/mf/sip-schedules",
+        token, tenantId ?? "", franchiseId ?? "",
+      ) as { sip_schedules: SipSchedule[] };
+      return data.sip_schedules ?? [];
+    },
+  });
+}
+
+/**
+ * Create a new SIP schedule.
+ */
+export function useCreateSipSchedule(): UseMutationResult<{ sip_schedule: SipSchedule }, Error, SipScheduleCreateInput> {
+  const queryClient = useQueryClient();
+  const { tenantId, franchiseId } = useActiveScope();
+
+  return useMutation<{ sip_schedule: SipSchedule }, Error, SipScheduleCreateInput>({
+    mutationFn: async (input) => {
+      const token = await getToken();
+      return await workerFetch(
+        "POST", "/v1/mf/sip-schedules",
+        token, tenantId ?? "", franchiseId ?? "",
+        input,
+      ) as { sip_schedule: SipSchedule };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: marketsKeys.mf.sipSchedules() });
+    },
+  });
+}
+
+/**
+ * Patch a SIP schedule (status / amount / sip_day).
+ */
+export function usePatchSipSchedule(): UseMutationResult<{ sip_schedule: SipSchedule }, Error, SipSchedulePatchInput> {
+  const queryClient = useQueryClient();
+  const { tenantId, franchiseId } = useActiveScope();
+
+  return useMutation<{ sip_schedule: SipSchedule }, Error, SipSchedulePatchInput>({
+    mutationFn: async ({ id, patch }) => {
+      const token = await getToken();
+      return await workerFetch(
+        "PATCH", `/v1/mf/sip-schedules/${id}`,
+        token, tenantId ?? "", franchiseId ?? "",
+        patch,
+      ) as { sip_schedule: SipSchedule };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: marketsKeys.mf.sipSchedules() });
+    },
+  });
+}
+
+/**
+ * Cancel a SIP schedule (soft delete via status = 'cancelled').
+ */
+export function useDeleteSipSchedule(): UseMutationResult<null, Error, string> {
+  const queryClient = useQueryClient();
+  const { tenantId, franchiseId } = useActiveScope();
+
+  return useMutation<null, Error, string>({
+    mutationFn: async (id) => {
+      const token = await getToken();
+      await workerFetch(
+        "DELETE", `/v1/mf/sip-schedules/${id}`,
+        token, tenantId ?? "", franchiseId ?? "",
+      );
+      return null;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: marketsKeys.mf.sipSchedules() });
+    },
+  });
+}
+
 /**
  * Place a mutual fund order (purchase / redemption / SIP) — requires auth.
  */

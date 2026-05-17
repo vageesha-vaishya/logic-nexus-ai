@@ -48,7 +48,9 @@ import {
   Wifi,
 } from "lucide-react";
 import { KeyboardShortcutsHelp } from "../components/KeyboardShortcutsHelp";
+import { AlertNotificationBell } from "../components/AlertNotificationBell";
 import { useMarketKeyboardShortcuts } from "../hooks/useMarketKeyboardShortcuts";
+import { useAlertRealtime } from "../hooks/useAlertRealtime";
 
 import { useLTP, type LTPQuote } from "../hooks/useLTP";
 import { useWatchlists, useWatchlist } from "../hooks/useWatchlists";
@@ -129,6 +131,9 @@ export default function MarketsHomePage() {
   const statusLabel = marketStatusLabel();
   const { showHelp, setShowHelp } = useMarketKeyboardShortcuts();
 
+  // Subscribe to Realtime price-alert triggers and show toast notifications
+  useAlertRealtime();
+
   return (
     <DashboardLayout>
       <div className="mx-auto max-w-screen-xl space-y-6 p-4 sm:p-6">
@@ -171,6 +176,9 @@ export default function MarketsHomePage() {
                 Open Terminal
               </Link>
             </Button>
+
+            {/* Alert notification bell */}
+            <AlertNotificationBell className="h-9 w-9 p-0" />
 
             {/* Keyboard shortcuts trigger */}
             <Button

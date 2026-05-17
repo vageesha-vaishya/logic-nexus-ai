@@ -1,17 +1,21 @@
 """
 Mutual Fund endpoints.
 
-GET  /v1/mf/funds                        — search/list funds from DB
-GET  /v1/mf/funds/{scheme_code}          — fund detail + current NAV + returns
-GET  /v1/mf/portfolio                    — user's MF holdings enriched with live NAV
-POST /v1/mf/orders                       — place buy/redeem via broker
-GET  /v1/mf/sips                         — user's active SIPs (holdings where sip_amount > 0)
+GET    /v1/mf/funds                        — search/list funds from DB
+GET    /v1/mf/funds/{scheme_code}          — fund detail + current NAV + returns
+GET    /v1/mf/portfolio                    — user's MF holdings enriched with live NAV
+POST   /v1/mf/orders                       — place buy/redeem via broker
+GET    /v1/mf/sips                         — user's active SIPs (holdings where sip_amount > 0)
+GET    /v1/mf/sip-schedules                — list SIP schedules for user
+POST   /v1/mf/sip-schedules                — create a new SIP schedule
+PATCH  /v1/mf/sip-schedules/{id}          — update status / amount / sip_day
+DELETE /v1/mf/sip-schedules/{id}          — cancel a SIP schedule
 """
 from __future__ import annotations
 
 import asyncio
 import uuid
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any
 
 import structlog
@@ -30,6 +34,20 @@ router = APIRouter(prefix="/v1/mf")
 
 
 # ── Models ────────────────────────────────────────────────────────────────────
+
+class SipScheduleCreate(BaseModel):
+    portfolio_id: str
+    scheme_code: str
+    scheme_name: str
+    amount: float
+    sip_day: int  # 1-28
+
+
+class SipSchedulePatch(BaseModel):
+    status: str | None = None    # active | paused | cancelled
+    amount: float | None = None
+    sip_day: int | None = None
+
 
 class MfOrderRequest(BaseModel):
     connection_id: str           # broker_connection id
@@ -223,6 +241,132 @@ async def get_sips(auth: Auth):
         })
 
     return {"sips": sips}
+
+
+@router.get("/sip-schedules")
+async def list_sip_schedules(auth: Auth):
+    """Return user's SIP schedules (active + paused) with next_run_date computed."""
+    db = get_supabase()
+    rows = (
+        db.schema("markets").from_("sip_schedules")
+        .select("*")
+        .eq("owner_user_id", auth.user_id)
+        .neq("status", "cancelled")
+        .order("created_at", desc=True)
+        .execute()
+    ).data or []
+
+    today = date.today()
+    for r in rows:
+        sip_day = r.get("sip_day", 1)
+        try:
+            if today.day <= sip_day:
+                next_run = today.replace(day=sip_day)
+            else:
+                if today.month == 12:
+                    next_run = today.replace(year=today.year + 1, month=1, day=sip_day)
+                else:
+                    next_run = today.replace(month=today.month + 1, day=sip_day)
+        except ValueError:
+            # sip_day > days in that month — fall back to last valid day
+            import calendar
+            if today.month == 12:
+                year, month = today.year + 1, 1
+            else:
+                year, month = today.year, today.month + 1
+            last_day = calendar.monthrange(year, month)[1]
+            next_run = today.replace(year=year, month=month, day=min(sip_day, last_day))
+        r["next_run_date"] = next_run.isoformat()
+
+    return {"sip_schedules": rows}
+
+
+@router.post("/sip-schedules", status_code=201)
+async def create_sip_schedule(body: SipScheduleCreate, auth: Auth):
+    """Create a new SIP schedule."""
+    if not (1 <= body.sip_day <= 28):
+        raise HTTPException(422, detail="sip_day must be between 1 and 28")
+
+    db = get_supabase()
+    row = (
+        db.schema("markets").from_("sip_schedules")
+        .insert({
+            "portfolio_id":   body.portfolio_id,
+            "owner_user_id":  auth.user_id,
+            "scheme_code":    body.scheme_code,
+            "scheme_name":    body.scheme_name,
+            "amount":         body.amount,
+            "sip_day":        body.sip_day,
+            "status":         "active",
+            "execution_count": 0,
+        })
+        .execute()
+    ).data
+
+    if not row:
+        raise HTTPException(500, detail="Failed to create SIP schedule")
+
+    created = row[0] if isinstance(row, list) else row
+    logger.info("sip_schedule.created", schedule_id=created.get("id"), user_id=auth.user_id)
+    return {"sip_schedule": created}
+
+
+@router.patch("/sip-schedules/{schedule_id}")
+async def patch_sip_schedule(schedule_id: str, body: SipSchedulePatch, auth: Auth):
+    """Update status, amount, or sip_day of a SIP schedule the user owns."""
+    if body.sip_day is not None and not (1 <= body.sip_day <= 28):
+        raise HTTPException(422, detail="sip_day must be between 1 and 28")
+
+    if body.status is not None and body.status not in ("active", "paused", "cancelled"):
+        raise HTTPException(422, detail="status must be active | paused | cancelled")
+
+    # Build update payload from non-None fields only
+    updates: dict = {}
+    if body.status is not None:
+        updates["status"] = body.status
+    if body.amount is not None:
+        updates["amount"] = body.amount
+    if body.sip_day is not None:
+        updates["sip_day"] = body.sip_day
+
+    if not updates:
+        raise HTTPException(422, detail="No fields to update")
+
+    db = get_supabase()
+    # Ownership check included in the filter
+    row = (
+        db.schema("markets").from_("sip_schedules")
+        .update(updates)
+        .eq("id", schedule_id)
+        .eq("owner_user_id", auth.user_id)
+        .execute()
+    ).data
+
+    if not row:
+        raise HTTPException(404, detail="SIP schedule not found or not owned by user")
+
+    updated = row[0] if isinstance(row, list) else row
+    logger.info("sip_schedule.updated", schedule_id=schedule_id, updates=updates)
+    return {"sip_schedule": updated}
+
+
+@router.delete("/sip-schedules/{schedule_id}", status_code=204)
+async def delete_sip_schedule(schedule_id: str, auth: Auth):
+    """Soft-delete a SIP schedule by setting status = 'cancelled'."""
+    db = get_supabase()
+    row = (
+        db.schema("markets").from_("sip_schedules")
+        .update({"status": "cancelled"})
+        .eq("id", schedule_id)
+        .eq("owner_user_id", auth.user_id)
+        .execute()
+    ).data
+
+    if not row:
+        raise HTTPException(404, detail="SIP schedule not found or not owned by user")
+
+    logger.info("sip_schedule.cancelled", schedule_id=schedule_id, user_id=auth.user_id)
+    # 204 — no body
 
 
 @router.post("/orders", status_code=201)

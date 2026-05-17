@@ -25,7 +25,15 @@ export type ScanFilter =
   | "strong_buy"
   | "strong_sell"
   | "near_52w_high"
-  | "near_52w_low";
+  | "near_52w_low"
+  // Price & Volume
+  | "volume_surge"
+  | "above_200ma"
+  | "below_200ma"
+  | "fresh_52w_high"
+  | "fresh_52w_low"
+  | "momentum_bullish"
+  | "momentum_bearish";
 
 export interface ScanResult {
   symbol:              string;

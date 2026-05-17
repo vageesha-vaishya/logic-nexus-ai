@@ -37,21 +37,29 @@ import { isMarketOpen } from "../utils/market-hours";
 interface FilterMeta {
   key:         ScanFilter;
   label:       string;
-  variant:     "bullish" | "bearish";
+  variant:     "bullish" | "bearish" | "price_volume";
   description: string;
 }
 
 const FILTER_META: FilterMeta[] = [
-  { key: "strong_buy",      label: "Strong Buy",       variant: "bullish", description: "2+ indicators bullish — strong buy signal" },
-  { key: "rsi_oversold",    label: "RSI Oversold",     variant: "bullish", description: "RSI < 30 — oversold, potential bounce" },
-  { key: "macd_bullish",    label: "MACD Bullish",     variant: "bullish", description: "MACD bullish crossover — momentum turning up" },
-  { key: "supertrend_buy",  label: "SuperTrend Buy",   variant: "bullish", description: "SuperTrend signal = buy — uptrend confirmed" },
-  { key: "near_52w_high",   label: "Near 52W High",    variant: "bullish", description: "Within 5% of the 52-week high" },
-  { key: "strong_sell",     label: "Strong Sell",      variant: "bearish", description: "2+ indicators bearish — strong sell signal" },
-  { key: "rsi_overbought",  label: "RSI Overbought",   variant: "bearish", description: "RSI > 70 — overbought, potential correction" },
-  { key: "macd_bearish",    label: "MACD Bearish",     variant: "bearish", description: "MACD bearish crossover — momentum turning down" },
-  { key: "supertrend_sell", label: "SuperTrend Sell",  variant: "bearish", description: "SuperTrend signal = sell — downtrend confirmed" },
-  { key: "near_52w_low",    label: "Near 52W Low",     variant: "bearish", description: "Within 5% of the 52-week low" },
+  { key: "strong_buy",       label: "Strong Buy",           variant: "bullish",      description: "2+ indicators bullish — strong buy signal" },
+  { key: "rsi_oversold",    label: "RSI Oversold",         variant: "bullish",      description: "RSI < 30 — oversold, potential bounce" },
+  { key: "macd_bullish",    label: "MACD Bullish",         variant: "bullish",      description: "MACD bullish crossover — momentum turning up" },
+  { key: "supertrend_buy",  label: "SuperTrend Buy",       variant: "bullish",      description: "SuperTrend signal = buy — uptrend confirmed" },
+  { key: "near_52w_high",   label: "Near 52W High",        variant: "bullish",      description: "Within 5% of the 52-week high" },
+  { key: "strong_sell",     label: "Strong Sell",          variant: "bearish",      description: "2+ indicators bearish — strong sell signal" },
+  { key: "rsi_overbought",  label: "RSI Overbought",       variant: "bearish",      description: "RSI > 70 — overbought, potential correction" },
+  { key: "macd_bearish",    label: "MACD Bearish",         variant: "bearish",      description: "MACD bearish crossover — momentum turning down" },
+  { key: "supertrend_sell", label: "SuperTrend Sell",      variant: "bearish",      description: "SuperTrend signal = sell — downtrend confirmed" },
+  { key: "near_52w_low",    label: "Near 52W Low",         variant: "bearish",      description: "Within 5% of the 52-week low" },
+  // ── Price & Volume ────────────────────────────────────────────────────────
+  { key: "volume_surge",    label: "Volume Surge (2× avg)", variant: "price_volume", description: "Volume > 2× 30-day average — unusual activity" },
+  { key: "above_200ma",     label: "Above 200 MA",          variant: "price_volume", description: "Price above 200-day moving average — long-term uptrend" },
+  { key: "below_200ma",     label: "Below 200 MA",          variant: "price_volume", description: "Price below 200-day moving average — long-term downtrend" },
+  { key: "fresh_52w_high",  label: "Fresh 52W High",        variant: "price_volume", description: "At or above 52-week high — breakout" },
+  { key: "fresh_52w_low",   label: "Fresh 52W Low",         variant: "price_volume", description: "At or below 52-week low — breakdown" },
+  { key: "momentum_bullish", label: "Momentum Bullish (3M)", variant: "price_volume", description: "3-month price momentum > +10%" },
+  { key: "momentum_bearish", label: "Momentum Bearish (3M)", variant: "price_volume", description: "3-month price momentum < −10%" },
 ];
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -476,6 +484,33 @@ export default function ScannerPage() {
                         active
                           ? "border-rose-500 bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-400"
                           : "border-muted-foreground/30 text-muted-foreground hover:border-rose-400 hover:text-rose-600 dark:hover:border-rose-700 dark:hover:text-rose-400"
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Price & Volume filters */}
+            <div>
+              <p className="mb-2 text-[10px] font-semibold uppercase tracking-widest text-sky-600 dark:text-sky-400">
+                Price &amp; Volume
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {FILTER_META.filter((f) => f.variant === "price_volume").map((f) => {
+                  const active = selectedFilters.includes(f.key);
+                  return (
+                    <button
+                      key={f.key}
+                      type="button"
+                      title={f.description}
+                      onClick={() => toggleFilter(f.key)}
+                      className={`rounded-full border px-3 py-1 text-xs font-semibold transition-all ${
+                        active
+                          ? "border-sky-500 bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-400"
+                          : "border-muted-foreground/30 text-muted-foreground hover:border-sky-400 hover:text-sky-600 dark:hover:border-sky-700 dark:hover:text-sky-400"
                       }`}
                     >
                       {f.label}

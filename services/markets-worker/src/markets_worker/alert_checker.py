@@ -75,6 +75,7 @@ async def _check_once() -> None:
     if not rows:
         await _check_risk_controls(db, loop)
         await _check_rebalancing(db, loop)
+        await _execute_due_sips(db, loop)
         return
 
     now = time.monotonic()
@@ -105,6 +106,7 @@ async def _check_once() -> None:
     if not to_trigger:
         await _check_risk_controls(db, loop)
         await _check_rebalancing(db, loop)
+        await _execute_due_sips(db, loop)
         return
 
     settings = get_settings()
@@ -148,6 +150,7 @@ async def _check_once() -> None:
 
     await _check_risk_controls(db, loop)
     await _check_rebalancing(db, loop)
+    await _execute_due_sips(db, loop)
 
 
 async def _check_risk_controls(db, loop) -> None:
@@ -293,3 +296,73 @@ async def _check_rebalancing(db, loop) -> None:
                     direction=direction,
                     weight=current_weight,
                 )
+
+
+async def _execute_due_sips(db, loop) -> None:
+    """Execute SIP schedules due today (sip_day == today's day-of-month)."""
+    from datetime import date, datetime, timezone
+    today = date.today()
+    today_day = today.day
+    today_iso = today.isoformat()
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Fetch active SIP schedules due today
+    rows = await loop.run_in_executor(
+        None,
+        lambda: db.schema("markets").from_("sip_schedules")
+            .select("id, portfolio_id, scheme_code, scheme_name, amount, owner_user_id")
+            .eq("sip_day", today_day)
+            .eq("status", "active")
+            .execute().data or []
+    )
+    if not rows:
+        return
+
+    for sip in rows:
+        try:
+            # Check if already executed today
+            recent = await loop.run_in_executor(
+                None,
+                lambda s=sip: db.schema("markets").from_("sip_schedules")
+                    .select("last_executed_at")
+                    .eq("id", s["id"])
+                    .maybe_single()
+                    .execute()
+            )
+            if recent and recent.data:
+                last = (recent.data.get("last_executed_at") or "")[:10]
+                if last == today_iso:
+                    continue  # already ran today
+
+            # Insert paper transaction
+            await loop.run_in_executor(
+                None,
+                lambda s=sip: db.schema("markets").from_("transactions").insert({
+                    "portfolio_id":  s["portfolio_id"],
+                    "owner_user_id": s["owner_user_id"],
+                    "txn_type":      "sip",
+                    "txn_date":      today_iso,
+                    "qty":           1.0,
+                    "price":         float(s["amount"]),
+                    "charges":       0.0,
+                    "net_amount":    float(s["amount"]),
+                    "currency":      "INR",
+                    "fx_rate":       1.0,
+                    "asset_class":   "mutual_fund",
+                    "source":        "sip_auto",
+                    "notes":         f"Auto SIP: {s['scheme_name']}",
+                }).execute()
+            )
+
+            # Mark last_executed_at
+            await loop.run_in_executor(
+                None,
+                lambda s=sip: db.schema("markets").from_("sip_schedules")
+                    .update({"last_executed_at": now_iso})
+                    .eq("id", s["id"])
+                    .execute()
+            )
+            logger.info("sip.executed", schedule_id=sip["id"], scheme=sip["scheme_name"])
+
+        except Exception as exc:
+            logger.error("sip.execution_failed", schedule_id=sip.get("id"), error=str(exc))

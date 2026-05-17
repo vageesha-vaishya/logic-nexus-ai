@@ -96,11 +96,12 @@ export const marketsKeys = {
   },
 
   mf: {
-    all:       () => [...marketsKeys.all, "mf"] as const,
-    funds:     (q: string, category: string) => [...marketsKeys.mf.all(), "funds", q, category] as const,
-    fund:      (code: string) => [...marketsKeys.mf.all(), "fund", code] as const,
-    portfolio: () => [...marketsKeys.mf.all(), "portfolio"] as const,
-    sips:      () => [...marketsKeys.mf.all(), "sips"] as const,
+    all:          () => [...marketsKeys.all, "mf"] as const,
+    funds:        (q: string, category: string) => [...marketsKeys.mf.all(), "funds", q, category] as const,
+    fund:         (code: string) => [...marketsKeys.mf.all(), "fund", code] as const,
+    portfolio:    () => [...marketsKeys.mf.all(), "portfolio"] as const,
+    sips:         () => [...marketsKeys.mf.all(), "sips"] as const,
+    sipSchedules: () => [...marketsKeys.mf.all(), "sip-schedules"] as const,
   },
 
   chart: {
