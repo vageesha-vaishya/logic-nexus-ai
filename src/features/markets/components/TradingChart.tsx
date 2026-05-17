@@ -77,6 +77,22 @@ interface IndicatorSeriesRefs {
   stSegments?: ISeriesApi<"Line">[];
 }
 
+// ── Deduplicate + sort helper (Lightweight Charts requires strict asc order, no dupes) ──
+
+function dedupeAsc<T extends { time: number | string }>(arr: T[]): T[] {
+  const sorted = [...arr].sort((a, b) => {
+    const ta = typeof a.time === "string" ? new Date(a.time).getTime() : (a.time as number);
+    const tb = typeof b.time === "string" ? new Date(b.time).getTime() : (b.time as number);
+    return ta - tb;
+  });
+  const seen = new Set<number | string>();
+  return sorted.filter(item => {
+    if (seen.has(item.time)) return false;
+    seen.add(item.time);
+    return true;
+  });
+}
+
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export function TradingChart({
@@ -238,15 +254,16 @@ export function TradingChart({
   useEffect(() => {
     if (!data || !candleSeriesRef.current) return;
 
-    candleSeriesRef.current.setData(data.bars);
+    const cleanBars = dedupeAsc(data.bars);
+    candleSeriesRef.current.setData(cleanBars);
 
     if (volumeSeriesRef.current) {
       volumeSeriesRef.current.setData(
-        data.bars.map(b => ({
+        dedupeAsc(cleanBars.map(b => ({
           time:  b.time,
           value: b.volume,
           color: b.close >= b.open ? "#6EE7B7" : "#FCA5A5",
-        })),
+        }))),
       );
     }
 
@@ -268,7 +285,7 @@ export function TradingChart({
           lastValueVisible:        false,
           crosshairMarkerVisible:  false,
         });
-        lineSeries.setData(points);
+        lineSeries.setData(dedupeAsc(points));
         maSeriesRefs.current[period] = lineSeries;
       });
     } else if (!showMaLines) {
@@ -291,7 +308,7 @@ export function TradingChart({
         priceLineVisible:       false,
         crosshairMarkerVisible: false,
       });
-      bbUpper.setData(data.bollinger.upper);
+      bbUpper.setData(dedupeAsc(data.bollinger.upper));
       indicatorSeriesRefs.current.bbUpper = bbUpper;
 
       const bbMiddle = chart.addSeries(LineSeries, {
@@ -302,7 +319,7 @@ export function TradingChart({
         priceLineVisible:       false,
         crosshairMarkerVisible: false,
       });
-      bbMiddle.setData(data.bollinger.middle);
+      bbMiddle.setData(dedupeAsc(data.bollinger.middle));
       indicatorSeriesRefs.current.bbMiddle = bbMiddle;
 
       const bbLower = chart.addSeries(LineSeries, {
@@ -313,7 +330,7 @@ export function TradingChart({
         priceLineVisible:       false,
         crosshairMarkerVisible: false,
       });
-      bbLower.setData(data.bollinger.lower);
+      bbLower.setData(dedupeAsc(data.bollinger.lower));
       indicatorSeriesRefs.current.bbLower = bbLower;
     }
 
@@ -327,7 +344,7 @@ export function TradingChart({
         priceLineVisible:       false,
         crosshairMarkerVisible: false,
       });
-      vwapSeries.setData(data.vwap);
+      vwapSeries.setData(dedupeAsc(data.vwap));
       indicatorSeriesRefs.current.vwap = vwapSeries;
     }
 
@@ -365,7 +382,7 @@ export function TradingChart({
           lastValueVisible: false,
           priceLineVisible: false,
         });
-        s.setData(seg.points as Parameters<typeof s.setData>[0]);
+        s.setData(dedupeAsc(seg.points) as Parameters<typeof s.setData>[0]);
         stSeriesArr.push(s);
       }
       indicatorSeriesRefs.current.stSegments = stSeriesArr;
