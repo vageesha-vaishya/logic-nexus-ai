@@ -633,6 +633,7 @@ router.get(
     const modelId = String(req.query.model_id || '').trim();
     const supabase = getSupabaseAdminClient();
     const records = await fetchAircraftOptions({ supabase, tenantId, franchiseId, modelId });
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
       version: 'v2',
       interface: 'configure-directives-aircraft-options',
@@ -666,6 +667,7 @@ router.get(
     const supabase = getSupabaseAdminClient();
 
     if (!modelId || !aircraftId) {
+      res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({
         version: 'v2',
         interface: 'configure-directives-non-configured-list',
@@ -731,11 +733,13 @@ router.get(
             .join(','),
         );
       }
+      res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.status(200).send(lines.join('\n'));
       return;
     }
 
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
       version: 'v2',
       interface: 'configure-directives-non-configured-list',
@@ -771,6 +775,7 @@ router.get(
     const supabase = getSupabaseAdminClient();
 
     if (!aircraftId) {
+      res.setHeader('Cache-Control', 'no-store');
       res.status(200).json({
         version: 'v2',
         interface: 'configure-directives-configured-list',
@@ -858,11 +863,13 @@ router.get(
             .join(','),
         );
       }
+      res.setHeader('Cache-Control', 'no-store');
       res.setHeader('Content-Type', 'text/csv; charset=utf-8');
       res.status(200).send(lines.join('\n'));
       return;
     }
 
+    res.setHeader('Cache-Control', 'no-store');
     res.status(200).json({
       version: 'v2',
       interface: 'configure-directives-configured-list',

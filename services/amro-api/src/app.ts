@@ -26,6 +26,7 @@ import { amroEventsProducer } from './events/amro-events.producer';
 import { executeWithResilience, getResilienceStatus } from './utils/resilience';
 
 const app: Express = express();
+app.set('etag', false);
 type JsonRecord = Record<string, unknown>;
 type PilotLookupRow = {
   user_id: string;
