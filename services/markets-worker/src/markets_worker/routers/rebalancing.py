@@ -254,9 +254,9 @@ async def get_analysis(portfolio_id: str, auth: Auth) -> dict[str, Any]:
         return (
             db.schema("markets")
             .from_("holdings")
-            .select("id, symbol, quantity, avg_cost, instrument_id")
+            .select("id, qty, avg_cost, instrument_id, instruments(symbol)")
             .eq("portfolio_id", portfolio_id)
-            .gt("quantity", 0)
+            .gt("qty", 0)
             .execute()
         ).data or []
 
@@ -292,7 +292,11 @@ async def get_analysis(portfolio_id: str, auth: Auth) -> dict[str, Any]:
 
     # ── Step 2 cont: fetch LTPs concurrently ─────────────────────────────────
 
-    symbols = [h["symbol"] for h in holdings_rows]
+    def _sym(h: dict) -> str:
+        instr = h.get("instruments") or {}
+        return (instr.get("symbol") or h.get("instrument_id") or "").upper()
+
+    symbols = [_sym(h) for h in holdings_rows]
     ltp_results: list[float | None] = await asyncio.gather(
         *[_ltp(sym) for sym in symbols]
     )
@@ -303,8 +307,8 @@ async def get_analysis(portfolio_id: str, auth: Auth) -> dict[str, Any]:
     ltp_map: dict[str, float] = {}
 
     for holding, price in zip(holdings_rows, ltp_results):
-        sym = holding["symbol"]
-        qty = float(holding.get("quantity") or 0)
+        sym = _sym(holding)
+        qty = float(holding.get("qty") or 0)
         avg_cost = float(holding.get("avg_cost") or 0)
         effective_price = price if price is not None else avg_cost
         ltp_map[sym] = effective_price
@@ -331,8 +335,8 @@ async def get_analysis(portfolio_id: str, auth: Auth) -> dict[str, Any]:
     positions: list[dict] = []
 
     for holding in holdings_rows:
-        sym = holding["symbol"].upper()
-        qty = float(holding.get("quantity") or 0)
+        sym = _sym(holding)
+        qty = float(holding.get("qty") or 0)
         avg_cost = float(holding.get("avg_cost") or 0)
         current_price = ltp_map.get(sym, avg_cost)
         c_val = current_values.get(sym, 0.0)
@@ -382,7 +386,7 @@ async def get_analysis(portfolio_id: str, auth: Auth) -> dict[str, Any]:
         positions.append(
             {
                 "symbol": sym,
-                "quantity": qty,
+                "quantity": round(qty, 4),
                 "avg_cost": round(avg_cost, 4),
                 "current_price": round(current_price, 4),
                 "current_value": round(c_val, 4),

@@ -402,7 +402,7 @@ async def execute_copy_trade(copy_trade_id: str, body: ExecuteBody, auth: Auth) 
         # Auto-compute from allocation_pct and available cash
         capital_row = (
             db.schema("markets").from_("paper_capital")
-            .select("cash_balance, initial_capital")
+            .select("available_cash, initial_capital")
             .eq("portfolio_id", paper_portfolio_id)
             .maybe_single()
             .execute()
@@ -414,7 +414,7 @@ async def execute_copy_trade(copy_trade_id: str, body: ExecuteBody, auth: Auth) 
                 detail="Paper capital not seeded for this portfolio. Call POST /v1/paper/portfolio/seed first.",
             )
 
-        cash_balance = float(capital_row["cash_balance"])
+        cash_balance = float(capital_row["available_cash"])
         alloc_cash = (allocation_pct / 100.0) * cash_balance
         quantity = math.floor(alloc_cash / ltp)
 
@@ -435,35 +435,38 @@ async def execute_copy_trade(copy_trade_id: str, body: ExecuteBody, auth: Auth) 
     executed_at = _now_iso()
 
     # 6. Insert transaction into markets.transactions
+    from datetime import date as _date
     db.schema("markets").from_("transactions").insert({
-        "portfolio_id":   paper_portfolio_id,
-        "user_id":        auth.user_id,
-        "instrument_id":  None,
-        "symbol":         symbol,
-        "exchange":       "NSE",
-        "transaction_type": side,        # "BUY" or "SELL"
-        "quantity":       quantity,
-        "price":          ltp,
-        "amount":         amount,
-        "notes":          f"Copy trade from idea {body.idea_id}",
+        "portfolio_id":  paper_portfolio_id,
+        "owner_user_id": auth.user_id,
+        "instrument_id": None,
+        "txn_type":      side,
+        "txn_date":      _date.today().isoformat(),
+        "qty":           quantity,
+        "price":         ltp,
+        "charges":       0.0,
+        "net_amount":    amount,
+        "currency":      "INR",
+        "fx_rate":       1.0,
+        "asset_class":   "equity",
+        "source":        "copy_trade",
+        "notes":         f"Copy trade from idea {body.idea_id}",
     }).execute()
 
     # 7. Update paper_capital cash balance
-    # Re-read current cash to avoid stale reads in case of concurrent requests
     capital_row = (
         db.schema("markets").from_("paper_capital")
-        .select("cash_balance")
+        .select("available_cash")
         .eq("portfolio_id", paper_portfolio_id)
         .maybe_single()
         .execute()
     ).data
 
     if capital_row:
-        current_cash = float(capital_row["cash_balance"])
+        current_cash = float(capital_row["available_cash"])
         new_cash = (current_cash - amount) if side == "BUY" else (current_cash + amount)
         db.schema("markets").from_("paper_capital").update({
-            "cash_balance": round(new_cash, 2),
-            "updated_at":   executed_at,
+            "available_cash": round(new_cash, 2),
         }).eq("portfolio_id", paper_portfolio_id).execute()
 
     # 8. Insert into copy_executions
