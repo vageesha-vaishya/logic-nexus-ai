@@ -766,30 +766,28 @@ async def get_portfolio_attribution(
     if auth.user_id and portfolio.get("owner_user_id") != auth.user_id:
         raise HTTPException(403, detail="Access denied")
 
-    # ── 2. Load current holdings (quantity > 0) ───────────────────────────────
+    # ── 2. Load current holdings (qty > 0, join instruments for symbol) ─────────
     def _fetch_holdings() -> list[dict]:
         return (
             db.schema("markets")
             .from_("holdings")
-            .select(
-                "instrument_id, symbol, quantity, avg_cost"
-            )
+            .select("instrument_id, qty, avg_cost, instruments(symbol, exchange)")
             .eq("portfolio_id", portfolio_id)
-            .gt("quantity", 0)
+            .gt("qty", 0)
             .execute()
         ).data or []
 
     # ── 3. Load transactions within lookback window ───────────────────────────
-    cutoff_iso = (now_utc - timedelta(days=lookback)).isoformat()
+    cutoff_iso = (now_utc - timedelta(days=lookback)).date().isoformat()
 
     def _fetch_transactions() -> list[dict]:
         return (
             db.schema("markets")
             .from_("transactions")
-            .select("instrument_id, symbol, txn_type, qty, price, created_at")
+            .select("instrument_id, txn_type, qty, price, txn_date, instruments(symbol)")
             .eq("portfolio_id", portfolio_id)
-            .gt("created_at", cutoff_iso)
-            .order("created_at", desc=False)
+            .gte("txn_date", cutoff_iso)
+            .order("txn_date", desc=False)
             .execute()
         ).data or []
 
@@ -821,7 +819,8 @@ async def get_portfolio_attribution(
     async def _resolve_price(holding: dict) -> float:
         """Try DB price_history first, fall back to yfinance, then avg_cost."""
         instrument_id: str | None = holding.get("instrument_id")
-        symbol: str = (holding.get("symbol") or "").upper()
+        instr = holding.get("instruments") or {}
+        symbol: str = (instr.get("symbol") or "").upper()
         avg_cost = float(holding.get("avg_cost") or 0)
 
         # (a) DB price_history
@@ -865,8 +864,9 @@ async def get_portfolio_attribution(
     total_current = 0.0
 
     for holding, current_price in zip(holdings_rows, resolved_prices):
-        symbol = (holding.get("symbol") or "").upper()
-        quantity = float(holding.get("quantity") or 0)
+        instr = holding.get("instruments") or {}
+        symbol = (instr.get("symbol") or "").upper()
+        quantity = float(holding.get("qty") or 0)
         avg_cost = float(holding.get("avg_cost") or 0)
 
         invested = quantity * avg_cost
@@ -941,7 +941,7 @@ async def get_portfolio_attribution(
         lambda: {"buy_amount": 0.0, "sell_amount": 0.0}
     )
     for txn in txn_rows:
-        created_at = str(txn.get("created_at") or "")[:7]  # "YYYY-MM"
+        created_at = str(txn.get("txn_date") or txn.get("created_at") or "")[:7]  # "YYYY-MM"
         if not created_at or len(created_at) < 7:
             continue
         txn_type = (txn.get("txn_type") or "").lower()
