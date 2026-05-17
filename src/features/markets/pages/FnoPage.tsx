@@ -7,6 +7,7 @@
 
 import { useState, useEffect } from "react";
 import { RefreshCw, TrendingUp, AlertCircle, Clock } from "lucide-react";
+import { TradingChart } from "../components/TradingChart";
 import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -23,6 +24,7 @@ import {
 } from "@/design-system";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
 
 import { useFnoUnderlyings, useOptionChain } from "../hooks/useFno";
 import { useBrokerConnections } from "../hooks/useBrokerConnections";
@@ -87,6 +89,7 @@ export default function FnoPage() {
   const [selectedSymbol, setSelectedSymbol] = useState("NIFTY");
   const [selectedExpiry, setSelectedExpiry] = useState("");
   const [showGreeks,     setShowGreeks]     = useState(false);
+  const [showChart,      setShowChart]      = useState(false);
   const [orderSheet,     setOrderSheet]     = useState<{
     open:   boolean;
     strike: number;
@@ -211,6 +214,19 @@ export default function FnoPage() {
                 δ Greeks
               </Button>
 
+              {/* Chart toggle */}
+              <button
+                onClick={() => setShowChart(v => !v)}
+                className={cn(
+                  "h-7 px-2 rounded text-xs font-medium transition-colors",
+                  showChart
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:bg-muted border",
+                )}
+              >
+                Chart
+              </button>
+
               {/* Refresh */}
               <Button
                 variant="outline"
@@ -263,6 +279,18 @@ export default function FnoPage() {
               . Live data resumes Mon–Fri 09:15–15:30 IST.
             </span>
           </div>
+        )}
+
+        {/* ── Underlying price chart — toggled via "Chart" button ────── */}
+        {showChart && (
+          <TradingChart
+            symbol={selectedSymbol}
+            exchange="NSE"
+            height={320}
+            showVolume
+            title={`${selectedSymbol} · NSE`}
+            className="mt-0"
+          />
         )}
 
         {/* ── Summary cards + Option chain — gated by fno_access plan ── */}

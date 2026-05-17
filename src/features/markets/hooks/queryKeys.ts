@@ -99,6 +99,12 @@ export const marketsKeys = {
     sips:      () => [...marketsKeys.mf.all(), "sips"] as const,
   },
 
+  chart: {
+    all:  () => [...marketsKeys.all, "chart"] as const,
+    data: (symbol: string, exchange: string, interval: string, lookback: number) =>
+      [...marketsKeys.chart.all(), symbol, exchange, interval, lookback] as const,
+  },
+
   backtests: {
     all:    () => [...marketsKeys.all, "backtests"] as const,
     list:   (filters?: { strategyId?: string | null }) =>
