@@ -11,9 +11,11 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Badge, Button, Card, CardContent, CardDescription,
   CardFooter, CardHeader, CardTitle,
-  Separator, Skeleton, Switch, Tooltip, TooltipContent,
+  Switch, Tooltip, TooltipContent,
   TooltipProvider, TooltipTrigger,
 } from "@/design-system";
+import { Separator } from "@/components/ui/separator";
+import { Skeleton } from "@/components/ui/skeleton";
 import { useCRM } from "@/hooks/useCRM";
 import {
   useLnaiPlans, useCurrentSubscription, useInvoices,
