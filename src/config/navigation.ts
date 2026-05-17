@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank, LayoutDashboard } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -159,6 +159,12 @@ export const APP_MENU: MenuModule[] = [
   {
     label: 'Markets',
     items: [
+      {
+        name: 'Dashboard',
+        path: '/dashboard/markets',
+        icon: LayoutDashboard,
+        description: 'Market pulse, portfolio overview, watchlist preview',
+      },
       {
         name: 'Portfolios',
         path: '/dashboard/markets/portfolios',

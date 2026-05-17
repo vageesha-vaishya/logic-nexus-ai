@@ -9,8 +9,6 @@
 
 import { useState, useRef } from "react";
 import { PiggyBank, AlertTriangle, Info } from "lucide-react";
-import { toast } from "sonner";
-
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -42,12 +40,12 @@ import { useBrokerConnections }   from "../hooks/useBrokerConnections";
 import {
   useMfFunds,
   useMfPortfolio,
-  useMfSips,
   useMfFundDetail,
   type MfFund,
   type MfHolding,
 } from "../hooks/useMf";
-import { MfOrderSheet }  from "../components/MfOrderSheet";
+import { MfOrderSheet }       from "../components/MfOrderSheet";
+import { SipTrackerPanel }    from "../components/SipTrackerPanel";
 
 // ── Formatters ────────────────────────────────────────────────────────────────
 
@@ -207,7 +205,6 @@ export default function MfPage() {
   // Data hooks
   const funds     = useMfFunds(debouncedQ, category);
   const portfolio = useMfPortfolio();
-  const sips      = useMfSips();
   const fundDetail = useMfFundDetail(selectedFundCode);
   const connections = useBrokerConnections();
 
@@ -256,7 +253,6 @@ export default function MfPage() {
 
   const summary = portfolio.data?.summary;
   const holdings = portfolio.data?.holdings ?? [];
-  const sipList  = sips.data ?? [];
 
   // ── Render ────────────────────────────────────────────────────────────────
 
@@ -488,96 +484,7 @@ export default function MfPage() {
 
           {/* ── SIPs tab ────────────────────────────────────────────── */}
           <TabsContent value="sips" className="space-y-4 mt-4">
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Active SIPs</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                {sips.isLoading ? (
-                  <div className="p-4 space-y-2">
-                    {Array.from({ length: 3 }).map((_, i) => (
-                      <Skeleton key={i} className="h-10 w-full" />
-                    ))}
-                  </div>
-                ) : sipList.length === 0 ? (
-                  <div className="flex flex-col items-center gap-3 py-12 text-center px-4">
-                    <PiggyBank className="h-8 w-8 text-muted-foreground/40" />
-                    <p className="text-sm text-muted-foreground">
-                      No active SIPs. Set up a SIP from the Discover tab.
-                    </p>
-                  </div>
-                ) : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Fund</TableHead>
-                          <TableHead className="text-right">SIP Amount</TableHead>
-                          <TableHead className="text-right">SIP Date</TableHead>
-                          <TableHead>Next SIP</TableHead>
-                          <TableHead className="text-right">Units Held</TableHead>
-                          <TableHead>Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {sipList.map((sip) => {
-                          // Build a proxy fund for Top Up
-                          const fundProxy: MfFund = {
-                            symbol:          sip.amfi_code ?? "",
-                            isin:            sip.isin,
-                            instrument_type: "mf_equity",
-                            metadata:        { scheme_name: sip.scheme_name },
-                            scheme_name:     sip.scheme_name,
-                          };
-
-                          return (
-                            <TableRow key={sip.holding_id}>
-                              <TableCell>
-                                <p className="font-medium text-sm max-w-[220px] truncate" title={sip.scheme_name}>
-                                  {sip.scheme_name}
-                                </p>
-                                {sip.folio_number && (
-                                  <p className="text-xs text-muted-foreground">Folio: {sip.folio_number}</p>
-                                )}
-                              </TableCell>
-                              <TableCell className="text-right">{fmtINR(sip.sip_amount)}</TableCell>
-                              <TableCell className="text-right">
-                                {sip.sip_date != null ? `${sip.sip_date}` : "—"}
-                              </TableCell>
-                              <TableCell>{sip.next_sip_date ?? "—"}</TableCell>
-                              <TableCell className="text-right font-mono">{fmtUnits(sip.units_held)}</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-1.5">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs"
-                                    onClick={() => {
-                                      setSelectedFundCode(sip.amfi_code ?? null);
-                                      setOrderSheet({ open: true, fund: fundProxy, orderType: "PURCHASE" });
-                                    }}
-                                  >
-                                    Top Up
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-7 text-xs"
-                                    onClick={() => toast.info("Contact your broker to cancel SIP")}
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <SipTrackerPanel />
           </TabsContent>
         </Tabs>
       </div>
