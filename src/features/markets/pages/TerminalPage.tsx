@@ -57,7 +57,15 @@ function loadState(): SavedState | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    return JSON.parse(raw) as SavedState;
+    const parsed = JSON.parse(raw);
+    if (
+      parsed &&
+      typeof parsed.presetId === "string" &&
+      Array.isArray(parsed.panels)
+    ) {
+      return parsed as SavedState;
+    }
+    return null;
   } catch {
     return null;
   }
@@ -118,7 +126,7 @@ function TerminalInner() {
 
   const [panels, setPanels] = useState<PanelConfig[]>(() => {
     const saved = loadState();
-    if (saved?.presetId === (WORKSPACE_PRESETS.find((p) => p.id === saved.presetId)?.id)) {
+    if (saved?.panels && saved.presetId && WORKSPACE_PRESETS.some((p) => p.id === saved.presetId)) {
       return saved.panels;
     }
     return WORKSPACE_PRESETS[0].panels;
