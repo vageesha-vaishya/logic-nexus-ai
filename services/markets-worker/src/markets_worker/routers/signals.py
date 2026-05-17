@@ -370,6 +370,141 @@ async def compute_signal(
     return result
 
 
+@router.post("/backtest/{symbol}")
+async def backtest_signal(
+    symbol: str,
+    exchange: str = Query(default="NSE"),
+    lookback: int = Query(default=252, ge=30, le=1825),
+) -> dict:
+    """Walk-forward backtest of the RSI+MACD+SuperTrend signal on historical data."""
+    import asyncio
+    from datetime import datetime, timezone
+
+    instrument = _resolve_instrument(symbol, exchange)
+    if instrument is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"Instrument {symbol} not found on {exchange}. "
+                   "Import it via the instruments admin page first.",
+        )
+
+    # Fetch total bars needed: lookback + 200 warm-up days
+    total_bars = lookback + 200
+
+    db = get_supabase()
+    result = (
+        db.schema("markets")
+        .from_("price_history")
+        .select("ts, open, high, low, close, volume")
+        .eq("instrument_id", instrument["id"])
+        .order("ts", desc=False)
+        .limit(total_bars)
+        .execute()
+    )
+    rows = result.data or []
+
+    if len(rows) < 150:
+        raise HTTPException(
+            status_code=422,
+            detail=f"Insufficient price history for {symbol}. Need at least 150 bars.",
+        )
+
+    opens  = [float(r["open"])  for r in rows]
+    highs  = [float(r["high"])  for r in rows]
+    lows   = [float(r["low"])   for r in rows]
+    closes = [float(r["close"]) for r in rows]
+    dates  = [r["ts"][:10] for r in rows]
+
+    def _run_backtest() -> dict:
+        warm_up = 120
+        signals_list: list[dict] = []
+        wins = 0
+        losses = 0
+        returns_1d: list[float] = []
+        returns_5d: list[float] = []
+
+        for i in range(warm_up, len(closes) - 1):
+            c_slice = closes[:i + 1]
+            h_slice = highs[:i + 1]
+            l_slice = lows[:i + 1]
+
+            rsi  = compute_rsi(c_slice)
+            macd = compute_macd(c_slice)
+            st   = compute_supertrend(h_slice, l_slice, c_slice)
+            agg  = _aggregate_signal(rsi, macd, st)
+
+            direction = agg["direction"]
+            if direction == "neutral":
+                continue
+
+            entry_price = closes[i]
+            next_1d = closes[i + 1] if i + 1 < len(closes) else None
+            next_5d = closes[i + 5] if i + 5 < len(closes) else None
+
+            pct_1d: float | None = None
+            outcome = "pending"
+
+            if next_1d is not None and entry_price > 0:
+                pct_1d = round((next_1d - entry_price) / entry_price * 100, 3)
+                was_correct = (
+                    (direction == "buy"  and next_1d > entry_price) or
+                    (direction == "sell" and next_1d < entry_price)
+                )
+                outcome = "win" if was_correct else "loss"
+                if was_correct:
+                    wins += 1
+                else:
+                    losses += 1
+                returns_1d.append(pct_1d)
+
+            pct_5d: float | None = None
+            if next_5d is not None and entry_price > 0:
+                pct_5d = round((next_5d - entry_price) / entry_price * 100, 3)
+                returns_5d.append(pct_5d)
+
+            signals_list.append({
+                "date":        dates[i],
+                "direction":   direction,
+                "confidence":  agg["confidence"],
+                "entry_price": round(entry_price, 2),
+                "next_1d":     round(next_1d, 2) if next_1d is not None else None,
+                "next_5d":     round(next_5d, 2) if next_5d is not None else None,
+                "outcome":     outcome,
+                "pct_1d":      pct_1d,
+            })
+
+        total = wins + losses
+        win_rate    = round(wins / total * 100, 2) if total > 0 else 0.0
+        avg_1d_pct  = round(sum(returns_1d) / len(returns_1d), 3) if returns_1d else 0.0
+        avg_5d_pct  = round(sum(returns_5d) / len(returns_5d), 3) if returns_5d else 0.0
+        best_pct    = round(max(returns_1d), 3) if returns_1d else 0.0
+        worst_pct   = round(min(returns_1d), 3) if returns_1d else 0.0
+
+        # Return last 50 signals only
+        output_signals = signals_list[-50:]
+
+        return {
+            "symbol":   symbol.upper(),
+            "exchange": exchange.upper(),
+            "lookback": lookback,
+            "metrics": {
+                "total":      total,
+                "wins":       wins,
+                "losses":     losses,
+                "win_rate":   win_rate,
+                "avg_1d_pct": avg_1d_pct,
+                "avg_5d_pct": avg_5d_pct,
+                "best_pct":   best_pct,
+                "worst_pct":  worst_pct,
+            },
+            "signals":     output_signals,
+            "computed_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+    loop = asyncio.get_event_loop()
+    return await loop.run_in_executor(None, _run_backtest)
+
+
 @router.get("/summary")
 async def signals_summary(
     symbols:  str = Query(..., description="Comma-separated symbols, e.g. RELIANCE,TCS"),

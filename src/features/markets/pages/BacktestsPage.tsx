@@ -14,14 +14,18 @@ import {
   TrendingDown,
   TrendingUp,
   X,
+  Zap,
 } from "lucide-react";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import {
   Badge,
   Button,
+  Card,
+  CardContent,
   EmptyState,
   ErrorState,
+  Input,
   Progress,
   Select,
   SelectContent,
@@ -47,6 +51,11 @@ import {
 
 import { useBacktests } from "../hooks/useBacktests";
 import { useStrategies } from "../hooks/useStrategies";
+import {
+  useRunSignalBacktest,
+  type BacktestResult,
+  type BacktestSignal,
+} from "../hooks/useSignals";
 import type { Backtest, BacktestMetrics, BacktestStatus } from "../types";
 
 // ─── Status badge config ──────────────────────────────────────────────────
@@ -65,11 +74,25 @@ const STATUS_CONFIG: Record<
 
 // ─── Page ─────────────────────────────────────────────────────────────────
 
+const LOOKBACK_OPTIONS: { label: string; value: number }[] = [
+  { label: "90D",  value: 90  },
+  { label: "180D", value: 180 },
+  { label: "1Y",   value: 252 },
+  { label: "2Y",   value: 504 },
+];
+
 export default function BacktestsPage() {
   const strategies = useStrategies();
 
   const [strategyFilter, setStrategyFilter] = useState<string>("all");
   const [detailBacktest, setDetailBacktest] = useState<Backtest | null>(null);
+
+  // Signal backtest state
+  const [sigSymbol,   setSigSymbol]   = useState("");
+  const [sigLookback, setSigLookback] = useState(252);
+  const [sigResult,   setSigResult]   = useState<BacktestResult | null>(null);
+
+  const runSignalBacktest = useRunSignalBacktest();
 
   const backtests = useBacktests(
     strategyFilter !== "all" ? { strategyId: strategyFilter } : undefined,
@@ -81,9 +104,152 @@ export default function BacktestsPage() {
     strategyNames[s.id] = s.name;
   });
 
+  function handleSignalBacktest() {
+    if (!sigSymbol.trim()) return;
+    runSignalBacktest.mutate(
+      { symbol: sigSymbol.trim(), exchange: "NSE", lookback: sigLookback },
+      { onSuccess: (data) => setSigResult(data) },
+    );
+  }
+
   return (
     <DashboardLayout>
       <div className="mx-auto max-w-7xl space-y-6 p-6">
+
+        {/* ── Signal Backtest Section ─────────────────────────────────── */}
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <Zap className="h-5 w-5 text-purple-500" aria-hidden="true" />
+            <h2 className="text-xl font-semibold tracking-tight">Signal Backtest</h2>
+            <Badge variant="secondary" className="text-xs">RSI + MACD + SuperTrend</Badge>
+          </div>
+
+          {/* Controls */}
+          <div className="flex flex-wrap items-end gap-3">
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                Symbol
+              </label>
+              <Input
+                placeholder="e.g. RELIANCE"
+                value={sigSymbol}
+                onChange={(e) => setSigSymbol(e.target.value.toUpperCase())}
+                className="w-40"
+              />
+            </div>
+
+            <div className="space-y-1.5">
+              <label className="text-xs text-muted-foreground font-medium uppercase tracking-wide">
+                Lookback
+              </label>
+              <div className="flex gap-1">
+                {LOOKBACK_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={() => setSigLookback(opt.value)}
+                    className={`px-3 py-2 text-xs font-semibold rounded-md border transition-colors ${
+                      sigLookback === opt.value
+                        ? "bg-primary text-primary-foreground border-primary"
+                        : "bg-muted text-muted-foreground border-transparent hover:border-muted-foreground/30"
+                    }`}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <Button
+              onClick={handleSignalBacktest}
+              disabled={!sigSymbol.trim() || runSignalBacktest.isPending}
+              className="gap-2"
+            >
+              {runSignalBacktest.isPending
+                ? <><Loader2 className="h-4 w-4 animate-spin" />Running…</>
+                : <><Zap className="h-4 w-4" />Run Backtest</>
+              }
+            </Button>
+          </div>
+
+          {runSignalBacktest.isError && (
+            <p className="text-sm text-destructive">
+              {runSignalBacktest.error.message}
+            </p>
+          )}
+
+          {/* Results */}
+          {sigResult && (
+            <div className="space-y-4">
+              {/* KPI cards */}
+              <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                <SignalKpiCard
+                  label="Win Rate"
+                  value={`${sigResult.metrics.win_rate.toFixed(1)}%`}
+                  positive={sigResult.metrics.win_rate >= 50}
+                />
+                <SignalKpiCard
+                  label="Avg 1D Return"
+                  value={`${sigResult.metrics.avg_1d_pct >= 0 ? "+" : ""}${sigResult.metrics.avg_1d_pct.toFixed(2)}%`}
+                  positive={sigResult.metrics.avg_1d_pct >= 0}
+                />
+                <SignalKpiCard
+                  label="Total Signals"
+                  value={String(sigResult.metrics.total)}
+                  neutral
+                />
+                <SignalKpiCard
+                  label="Best Trade"
+                  value={`+${sigResult.metrics.best_pct.toFixed(2)}%`}
+                  positive
+                />
+              </div>
+
+              {/* Win rate progress bar */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between text-xs text-muted-foreground">
+                  <span>Win rate</span>
+                  <span className="font-medium">
+                    {sigResult.metrics.wins}W / {sigResult.metrics.losses}L
+                  </span>
+                </div>
+                <div className="h-2 w-full overflow-hidden rounded-full bg-red-200 dark:bg-red-900/30">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all"
+                    style={{ width: `${Math.min(sigResult.metrics.win_rate, 100)}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Mini signals table */}
+              <div className="rounded-md border overflow-hidden">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Direction</TableHead>
+                      <TableHead className="text-right">Entry</TableHead>
+                      <TableHead className="text-right">1D Return</TableHead>
+                      <TableHead>Outcome</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {sigResult.signals.slice(-20).reverse().map((sig, i) => (
+                      <SignalResultRow key={i} sig={sig} />
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+
+              <p className="text-xs text-muted-foreground italic">
+                Note: Past signal performance does not guarantee future results.
+              </p>
+            </div>
+          )}
+        </section>
+
+        <div className="border-t" />
+
         {/* Header */}
         <header className="flex items-start justify-between gap-4">
           <div>
@@ -627,6 +793,82 @@ function MetricCard({
         {value}
       </p>
     </div>
+  );
+}
+
+// ─── Signal backtest helpers ──────────────────────────────────────────────
+
+function SignalKpiCard({
+  label,
+  value,
+  positive,
+  neutral,
+}: {
+  label: string;
+  value: string;
+  positive?: boolean;
+  neutral?: boolean;
+}) {
+  const valueColor = neutral
+    ? "text-foreground"
+    : positive
+      ? "text-emerald-600"
+      : "text-red-500";
+
+  return (
+    <Card>
+      <CardContent className="p-3 space-y-0.5">
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className={["text-xl font-semibold font-mono", valueColor].join(" ")}>{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function SignalResultRow({ sig }: { sig: BacktestSignal }) {
+  return (
+    <TableRow>
+      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">{sig.date}</TableCell>
+      <TableCell>
+        <Badge
+          className={
+            sig.direction === "buy"
+              ? "bg-emerald-600 text-white"
+              : "bg-red-600 text-white"
+          }
+        >
+          {sig.direction.toUpperCase()}
+        </Badge>
+      </TableCell>
+      <TableCell className="text-right font-mono text-sm">
+        ₹{sig.entry_price.toLocaleString("en-IN", { maximumFractionDigits: 2 })}
+      </TableCell>
+      <TableCell className="text-right font-mono text-sm">
+        {sig.pct_1d != null
+          ? (
+            <span className={sig.pct_1d >= 0 ? "text-emerald-600" : "text-red-500"}>
+              {sig.pct_1d >= 0 ? "+" : ""}{sig.pct_1d.toFixed(2)}%
+            </span>
+          )
+          : <span className="text-muted-foreground">—</span>
+        }
+      </TableCell>
+      <TableCell>
+        {sig.outcome === "win" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+            <TrendingUp className="h-3 w-3" /> Win
+          </span>
+        )}
+        {sig.outcome === "loss" && (
+          <span className="inline-flex items-center gap-1 text-xs font-medium text-red-500">
+            <TrendingDown className="h-3 w-3" /> Loss
+          </span>
+        )}
+        {sig.outcome === "pending" && (
+          <span className="text-xs text-muted-foreground">Pending</span>
+        )}
+      </TableCell>
+    </TableRow>
   );
 }
 

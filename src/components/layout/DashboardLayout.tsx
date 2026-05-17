@@ -52,6 +52,7 @@ import { GlobalSearch } from '@/components/ui/global-search';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { ServiceStatusBadge } from '@/components/dev/ServiceStatusBadge';
 import { DarkModeToggle } from '@/components/system/DarkModeToggle';
+import { TradingModeToggle } from '@/components/system/TradingModeToggle';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -710,6 +711,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <div className="flex-1" />
               <GlobalSearch />
               <ServiceStatusBadge />
+              <TradingModeToggle />
               <DarkModeToggle />
               <HelpDialog />
               {canShowDebugButton && (

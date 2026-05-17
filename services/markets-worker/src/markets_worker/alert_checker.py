@@ -12,9 +12,39 @@ from datetime import datetime, timezone
 import structlog
 
 from markets_worker.db import get_supabase
+from markets_worker.config import get_settings
 
 logger = structlog.get_logger()
 _POLL_INTERVAL = 30  # seconds
+
+
+async def _send_push_notification(
+    supabase_url: str,
+    service_key: str,
+    user_id: str,
+    title: str,
+    body: str,
+    data: dict | None = None,
+) -> None:
+    """Fire-and-forget push notification via Supabase Edge Function."""
+    import httpx
+    try:
+        async with httpx.AsyncClient(timeout=5.0) as client:
+            await client.post(
+                f"{supabase_url}/functions/v1/markets-push-notify",
+                headers={
+                    "Authorization": f"Bearer {service_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "user_id": user_id,
+                    "title":   title,
+                    "body":    body,
+                    "data":    data or {},
+                },
+            )
+    except Exception:
+        pass  # Fire-and-forget — never let notification failure block alert processing
 
 
 async def check_alerts_loop() -> None:
@@ -77,7 +107,12 @@ async def _check_once() -> None:
         await _check_rebalancing(db, loop)
         return
 
+    settings = get_settings()
     now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Build a quick lookup of alert metadata for push notifications
+    alert_map: dict[str, dict] = {str(a["id"]): a for a in rows}
+
     for t in to_trigger:
         await loop.run_in_executor(
             None,
@@ -92,6 +127,24 @@ async def _check_once() -> None:
                 .execute()
         )
         logger.info("alert.triggered", alert_id=t["id"], ltp=t["ltp"])
+
+        # Send push notification (fire-and-forget)
+        alert = alert_map.get(str(t["id"]))
+        if alert and alert.get("user_id"):
+            trigger_price = float(alert.get("trigger_price", t["ltp"]))
+            condition     = alert.get("condition", "above")
+            sym           = alert.get("symbol", "")
+            direction_str = "risen above" if condition == "above" else "fallen below"
+            asyncio.ensure_future(
+                _send_push_notification(
+                    supabase_url=settings.supabase_url,
+                    service_key=settings.supabase_service_role_key,
+                    user_id=str(alert["user_id"]),
+                    title=f"Price Alert: {sym}",
+                    body=f"{sym} has {direction_str} ₹{trigger_price:,.2f}",
+                    data={"alert_id": str(t["id"]), "symbol": sym},
+                )
+            )
 
     await _check_risk_controls(db, loop)
     await _check_rebalancing(db, loop)

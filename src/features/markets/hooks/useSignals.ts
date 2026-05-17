@@ -125,6 +125,69 @@ export function useSignalSummary(symbols: string[], exchange = "NSE") {
   });
 }
 
+// ── Signal backtest ───────────────────────────────────────────────────────
+
+export interface BacktestMetrics {
+  total:      number;
+  wins:       number;
+  losses:     number;
+  win_rate:   number;
+  avg_1d_pct: number;
+  avg_5d_pct: number;
+  best_pct:   number;
+  worst_pct:  number;
+}
+
+export interface BacktestSignal {
+  date:        string;
+  direction:   string;
+  confidence:  number;
+  entry_price: number;
+  next_1d:     number | null;
+  next_5d:     number | null;
+  outcome:     "win" | "loss" | "pending";
+  pct_1d:      number | null;
+}
+
+export interface BacktestResult {
+  symbol:      string;
+  exchange:    string;
+  lookback:    number;
+  metrics:     BacktestMetrics;
+  signals:     BacktestSignal[];
+  computed_at: string;
+}
+
+interface RunSignalBacktestInput {
+  symbol:   string;
+  exchange?: string;
+  lookback?: number;
+}
+
+export function useRunSignalBacktest() {
+  return useMutation<BacktestResult, Error, RunSignalBacktestInput>({
+    mutationFn: async ({ symbol, exchange = "NSE", lookback = 252 }) => {
+      const params = new URLSearchParams({ exchange, lookback: String(lookback) });
+      let res: Response;
+      try {
+        res = await fetch(
+          `${WORKER_URL}/v1/signals/backtest/${encodeURIComponent(symbol.toUpperCase())}?${params}`,
+          { method: "POST" },
+        );
+      } catch {
+        throw new Error(
+          "Markets worker not running. Start it with: uv run python -m markets_worker.worker",
+        );
+      }
+      if (!res.ok) {
+        const text = await res.text().catch(() => res.statusText);
+        throw new Error(`Backtest error ${res.status}: ${text}`);
+      }
+      return res.json() as Promise<BacktestResult>;
+    },
+  });
+}
+
 // ── Run signals for a portfolio ───────────────────────────────────────────
 
 interface RunSignalsInput {

@@ -32,6 +32,7 @@ import { useBrokerConnections } from "../hooks/useBrokerConnections";
 import { OptionChainTable } from "../components/OptionChainTable";
 import { OrderFormSheet } from "../components/OrderFormSheet";
 import { PlanGate } from "@/components/system/PlanGate";
+import { useTradingMode } from "@/hooks/useTradingMode";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,8 @@ export default function FnoPage() {
   const underlyings = useFnoUnderlyings();
   const chain       = useOptionChain(selectedSymbol, selectedExpiry);
   const connections = useBrokerConnections();
+  const [tradingMode, setTradingMode] = useTradingMode();
+  const isNovice = tradingMode === "novice";
 
   // Auto-select first expiry when chain loads
   useEffect(() => {
@@ -300,7 +303,27 @@ export default function FnoPage() {
           />
         )}
 
+        {/* ── Novice mode banner ───────────────────────────────────────── */}
+        {isNovice && (
+          <div className="flex flex-col items-center gap-3 rounded-lg border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 p-6 text-center">
+            <AlertCircle className="h-8 w-8 text-blue-500" aria-hidden="true" />
+            <div>
+              <p className="font-semibold text-blue-800 dark:text-blue-200">You&apos;re in Novice mode</p>
+              <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                Switch to Expert to access F&amp;O options chain and order placement.
+              </p>
+            </div>
+            <Button
+              onClick={() => setTradingMode("expert")}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              Switch to Expert
+            </Button>
+          </div>
+        )}
+
         {/* ── Summary cards + Option chain — gated by fno_access plan ── */}
+        {!isNovice && (
         <PlanGate feature="fno_access" mode="overlay">
           <div className="space-y-4">
             {/* Summary cards */}
@@ -371,6 +394,7 @@ export default function FnoPage() {
             </Card>
           </div>
         </PlanGate>
+        )}
 
       </div>
 

@@ -15,6 +15,7 @@ import { Loader2, AlertTriangle, Lock, TrendingUp, TrendingDown } from "lucide-r
 import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import { usePlanGate } from "@/hooks/usePlanGate";
+import { useTradingMode } from "@/hooks/useTradingMode";
 
 import {
   Badge,
@@ -137,6 +138,8 @@ export function OrderFormSheet({
   const placeOrder   = usePlaceOrder(connectionId);
   const tradingGate  = usePlanGate("live_trading");
   const navigate     = useNavigate();
+  const [tradingMode, setTradingMode] = useTradingMode();
+  const isNovice = tradingMode === "novice";
 
   // ── Derived values ───────────────────────────────────────────────────────
   const showPrice        = orderMode === "regular" && (orderType === "LIMIT" || orderType === "SL");
@@ -327,40 +330,60 @@ export function OrderFormSheet({
                 </button>
               </div>
 
-              {/* ── Order mode toggle: Regular | Bracket | Cover ───────── */}
-              <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground uppercase tracking-wide">Order Mode</Label>
-                <div className="flex gap-1.5">
-                  {(["regular", "bracket", "cover"] as OrderMode[]).map((mode) => (
+              {/* ── Novice mode hint ──────────────────────────────────── */}
+              {isNovice && (
+                <div className="rounded-md border border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950/30 px-3 py-2 text-xs text-blue-700 dark:text-blue-300 flex items-start gap-2">
+                  <span className="mt-0.5 shrink-0">ℹ</span>
+                  <span>
+                    Switch to{" "}
                     <button
-                      key={mode}
                       type="button"
-                      onClick={() => {
-                        setOrderMode(mode);
-                        setBracketTarget("");
-                        setBracketSl("");
-                      }}
-                      className={`flex-1 rounded-md py-2 text-xs font-semibold border transition-colors ${
-                        orderMode === mode
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-muted text-muted-foreground border-transparent hover:border-muted-foreground/30"
-                      }`}
+                      className="underline font-semibold"
+                      onClick={() => setTradingMode("expert")}
                     >
-                      {ORDER_MODE_LABELS[mode]}
+                      Expert mode
                     </button>
-                  ))}
+                    {" "}to access bracket orders and limit prices.
+                  </span>
                 </div>
-                {orderMode === "bracket" && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Single ticket: entry limit + take-profit + stop-loss legs.
-                  </p>
-                )}
-                {orderMode === "cover" && (
-                  <p className="text-[11px] text-muted-foreground">
-                    Market entry with a mandatory stop-loss. Higher leverage allowed.
-                  </p>
-                )}
-              </div>
+              )}
+
+              {/* ── Order mode toggle: Regular | Bracket | Cover ───────── */}
+              {!isNovice && (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground uppercase tracking-wide">Order Mode</Label>
+                  <div className="flex gap-1.5">
+                    {(["regular", "bracket", "cover"] as OrderMode[]).map((mode) => (
+                      <button
+                        key={mode}
+                        type="button"
+                        onClick={() => {
+                          setOrderMode(mode);
+                          setBracketTarget("");
+                          setBracketSl("");
+                        }}
+                        className={`flex-1 rounded-md py-2 text-xs font-semibold border transition-colors ${
+                          orderMode === mode
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-muted text-muted-foreground border-transparent hover:border-muted-foreground/30"
+                        }`}
+                      >
+                        {ORDER_MODE_LABELS[mode]}
+                      </button>
+                    ))}
+                  </div>
+                  {orderMode === "bracket" && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Single ticket: entry limit + take-profit + stop-loss legs.
+                    </p>
+                  )}
+                  {orderMode === "cover" && (
+                    <p className="text-[11px] text-muted-foreground">
+                      Market entry with a mandatory stop-loss. Higher leverage allowed.
+                    </p>
+                  )}
+                </div>
+              )}
 
               <Separator />
 
@@ -426,8 +449,8 @@ export function OrderFormSheet({
                   </div>
                 </div>
 
-                {/* Order type — hidden for bracket/cover (forced by mode) */}
-                {orderMode === "regular" && (
+                {/* Order type — hidden for bracket/cover (forced by mode); hidden in novice */}
+                {!isNovice && orderMode === "regular" && (
                   <div className="space-y-1.5">
                     <Label htmlFor="order-type">Order Type</Label>
                     <Select value={orderType} onValueChange={(v) => setOrderType(v as OrderType)}>
