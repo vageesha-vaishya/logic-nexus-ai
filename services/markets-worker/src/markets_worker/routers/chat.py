@@ -9,7 +9,6 @@ Endpoints (prefix /v1/chat):
 """
 
 import asyncio
-import os
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, AsyncGenerator
@@ -20,8 +19,8 @@ from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from markets_worker.auth import Auth
-from markets_worker.config import get_settings
 from markets_worker.db import get_supabase
+from markets_worker.llm_gateway import resolve_llm_config
 
 logger = structlog.get_logger()
 
@@ -102,29 +101,47 @@ def _build_system_prompt(context: dict[str, Any] | None) -> str:
 
 
 async def _generate_sse(
-    api_key: str,
+    cfg: Any,
     messages_payload: list[dict],
     system_prompt: str,
     on_complete,
 ) -> AsyncGenerator[str, None]:
-    """Async generator that runs Anthropic streaming in a thread executor."""
+    """Async SSE generator — supports Anthropic streaming and OpenAI-compat streaming."""
     queue: asyncio.Queue[str | None] = asyncio.Queue()
     loop = asyncio.get_event_loop()
 
     def run_stream():
-        import anthropic  # local import — only needed here
-        client = anthropic.Anthropic(api_key=api_key)
         full_text: list[str] = []
         try:
-            with client.messages.stream(
-                model="claude-haiku-4-5-20251001",
-                max_tokens=1024,
-                system=system_prompt,
-                messages=messages_payload,
-            ) as stream:
-                for text in stream.text_stream:
-                    full_text.append(text)
-                    asyncio.run_coroutine_threadsafe(queue.put(text), loop)
+            if cfg.provider in ("anthropic", "claude"):
+                import anthropic
+                client = anthropic.Anthropic(api_key=cfg.api_key)
+                with client.messages.stream(
+                    model=cfg.model,
+                    max_tokens=1024,
+                    system=system_prompt,
+                    messages=messages_payload,
+                ) as stream:
+                    for text in stream.text_stream:
+                        full_text.append(text)
+                        asyncio.run_coroutine_threadsafe(queue.put(text), loop)
+            else:
+                from openai import OpenAI
+                from markets_worker.llm_gateway import OPENROUTER_BASE_URL
+                base_url = cfg.base_url or (OPENROUTER_BASE_URL if cfg.provider == "openrouter" else None)
+                client = OpenAI(api_key=cfg.api_key, base_url=base_url)
+                oai_msgs = [{"role": "system", "content": system_prompt}, *messages_payload]
+                stream = client.chat.completions.create(
+                    model=cfg.model,
+                    max_tokens=1024,
+                    messages=oai_msgs,
+                    stream=True,
+                )
+                for chunk in stream:
+                    delta = chunk.choices[0].delta.content or "" if chunk.choices else ""
+                    if delta:
+                        full_text.append(delta)
+                        asyncio.run_coroutine_threadsafe(queue.put(delta), loop)
         finally:
             asyncio.run_coroutine_threadsafe(queue.put(None), loop)
         return "".join(full_text)
@@ -253,14 +270,11 @@ async def stream_chat(session_id: str, body: StreamBody, auth: Auth):
     # 5. Build system prompt (with optional context injections)
     system_prompt = _build_system_prompt(body.context)
 
-    # 6. Resolve API key
-    s = get_settings()
-    api_key = s.anthropic_api_key or os.environ.get("ANTHROPIC_API_KEY", "")
-    if not api_key:
-        raise HTTPException(
-            status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="Anthropic API key not configured",
-        )
+    # 6. Resolve LLM config (Anthropic or OpenAI-compat, whichever is configured)
+    try:
+        cfg = resolve_llm_config(auth.tenant_id)
+    except RuntimeError as exc:
+        raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
 
     # 7. Callback: persist assistant response + update session after stream ends
     async def on_complete(full_response: str) -> None:
@@ -299,7 +313,7 @@ async def stream_chat(session_id: str, body: StreamBody, auth: Auth):
 
     # 8. Return StreamingResponse
     return StreamingResponse(
-        _generate_sse(api_key, messages_payload, system_prompt, on_complete),
+        _generate_sse(cfg, messages_payload, system_prompt, on_complete),
         media_type="text/event-stream",
         headers={
             "Cache-Control":    "no-cache",

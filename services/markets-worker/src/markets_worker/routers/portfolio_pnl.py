@@ -681,7 +681,7 @@ async def generate_portfolio_advisor(portfolio_id: str, auth: Auth) -> dict[str,
             user_id=user_id,
             system_override="You are an expert Indian equity market advisor. Respond only with the structured Markdown brief requested.",
             user_override=prompt,
-            model_override="claude-haiku-4-5",  # fast + cheap for briefs
+            # No model_override — use the configured provider's default (gpt-4o-mini for OpenAI, claude-sonnet-4-6 for Anthropic)
         )
         content = result.content
         logger.info(
