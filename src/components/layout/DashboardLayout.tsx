@@ -53,6 +53,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/comp
 import { ServiceStatusBadge } from '@/components/dev/ServiceStatusBadge';
 import { DarkModeToggle } from '@/components/system/DarkModeToggle';
 import { TradingModeToggle } from '@/components/system/TradingModeToggle';
+import { AIAssistantPanel } from '@/features/markets/components/AIAssistantPanel';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -762,6 +763,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           </main>
         </div>
         {canShowDebugButton && <PipelineDashboard />}
+        <AIAssistantPanel />
         <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
           <DialogContent className="sm:max-w-2xl">
             <DialogHeader>
