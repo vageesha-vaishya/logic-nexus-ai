@@ -28,6 +28,7 @@ from markets_worker.routers import depth as depth_router
 from markets_worker.routers import options_positions as options_positions_router
 from markets_worker.routers.ideas import router_ideas as ideas_router, router_users as users_router
 from markets_worker.routers import chat as chat_router
+from markets_worker.routers import copy_trades as copy_trades_router
 
 
 def configure_logging() -> None:
@@ -95,9 +96,10 @@ def create_app() -> FastAPI:
     app.include_router(ws_ticks_router.router,      tags=["websocket"])
     app.include_router(depth_router.router,         tags=["depth"])
     app.include_router(options_positions_router.router, tags=["options"])
-    app.include_router(ideas_router,                   tags=["ideas"])
-    app.include_router(users_router,                   tags=["social"])
-    app.include_router(chat_router.router,             tags=["chat"])
+    app.include_router(ideas_router,                        tags=["ideas"])
+    app.include_router(users_router,                        tags=["social"])
+    app.include_router(chat_router.router,                  tags=["chat"])
+    app.include_router(copy_trades_router.router,           tags=["copy-trades"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.

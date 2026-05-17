@@ -235,6 +235,7 @@ const MarketsTradeJournal   = lazy(() => import("./features/markets/pages/TradeJ
 const MarketsIdeas          = lazy(() => import("./features/markets/pages/IdeasPage"));
 const MarketsIdeaDetail     = lazy(() => import("./features/markets/pages/IdeaDetailPage"));
 const MarketsAIChat         = lazy(() => import("./features/markets/pages/AIChatPage"));
+const MarketsCopyTrading    = lazy(() => import("./features/markets/pages/CopyTradingPage"));
 // Platform-wide LLM provider settings — same component, reachable from main settings hub.
 const PlatformLlmSettings = MarketsLlmSettings;
 const FeatureFlagsAdmin = lazy(() => import("./pages/dashboard/settings/FeatureFlagsPage"));
@@ -1003,6 +1004,7 @@ const App = () => (
             <Route path="/dashboard/markets/ideas" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsIdeas /></ProtectedRoute>} />
             <Route path="/dashboard/markets/ideas/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsIdeaDetail /></ProtectedRoute>} />
             <Route path="/dashboard/markets/ai-chat" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsAIChat /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/copy-trading" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsCopyTrading /></ProtectedRoute>} />
             <Route path="/dashboard/settings/feature-flags" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><FeatureFlagsAdmin /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}
