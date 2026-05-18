@@ -108,13 +108,15 @@ class TestBaskets:
 class TestInvest:
     def test_invest_in_basket_returns_confirmed(self, client, auth_headers):
         mock_sb = MagicMock()
-        # Position lookup (None = new position)
+        # First select: basket existence check (returns basket with total_invested)
+        basket_check_select = MagicMock()
+        basket_check_select.eq.return_value.maybe_single.return_value.execute.return_value.data = {
+            "id": "b1", "total_invested": 10000.0
+        }
+        # Second select: position lookup (None = new position)
         pos_select = MagicMock()
         pos_select.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
-        # Basket total_invested lookup
-        basket_select = MagicMock()
-        basket_select.eq.return_value.maybe_single.return_value.execute.return_value.data = {"total_invested": 10000.0}
-        mock_sb.schema.return_value.from_.return_value.select.side_effect = [pos_select, basket_select]
+        mock_sb.schema.return_value.from_.return_value.select.side_effect = [basket_check_select, pos_select]
         mock_sb.schema.return_value.from_.return_value.insert.return_value.execute.return_value.data = [{}]
         mock_sb.schema.return_value.from_.return_value.update.return_value.eq.return_value.execute.return_value.data = [{}]
         with patch("markets_worker.routers.community.get_supabase", return_value=mock_sb):
@@ -127,6 +129,15 @@ class TestInvest:
         with patch("markets_worker.routers.community.get_supabase", return_value=mock_sb):
             resp = client.post("/v1/community/baskets/b1/invest", json={"amount": 0}, headers=auth_headers)
         assert resp.status_code == 422
+
+    def test_invest_returns_404_for_nonexistent_basket(self, client, auth_headers):
+        mock_sb = MagicMock()
+        mock_sb.schema.return_value.from_.return_value.select.return_value \
+            .eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        with patch("markets_worker.routers.community.get_supabase", return_value=mock_sb):
+            resp = client.post("/v1/community/baskets/nonexistent/invest",
+                               json={"amount": 1000.0}, headers=auth_headers)
+        assert resp.status_code == 404
 
 
 class TestStrategiesDeploy:

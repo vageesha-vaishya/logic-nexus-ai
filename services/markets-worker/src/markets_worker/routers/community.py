@@ -112,6 +112,16 @@ async def invest_in_basket(basket_id: str, body: InvestRequest, auth: Auth):
     if body.amount <= 0:
         raise HTTPException(422, detail="Investment amount must be positive")
     db = get_supabase()
+    # Verify basket exists
+    basket_check = (
+        db.schema("markets").from_("community_baskets")
+        .select("id, total_invested")
+        .eq("id", basket_id)
+        .maybe_single()
+        .execute()
+    ).data
+    if not basket_check:
+        raise HTTPException(404, detail="Basket not found")
     try:
         existing = (
             db.schema("markets").from_("basket_user_positions")
@@ -132,14 +142,7 @@ async def invest_in_basket(basket_id: str, body: InvestRequest, auth: Auth):
                 "invested_amt": body.amount,
                 "portfolio_id": body.portfolio_id,
             }).execute()
-        basket = (
-            db.schema("markets").from_("community_baskets")
-            .select("total_invested")
-            .eq("id", basket_id)
-            .maybe_single()
-            .execute()
-        ).data
-        current_total = float((basket or {}).get("total_invested", 0) or 0)
+        current_total = float((basket_check or {}).get("total_invested", 0) or 0)
         db.schema("markets").from_("community_baskets") \
             .update({"total_invested": current_total + body.amount}) \
             .eq("id", basket_id).execute()
