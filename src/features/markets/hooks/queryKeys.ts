@@ -146,4 +146,10 @@ export const marketsKeys = {
       [...marketsKeys.journal.all(), "list", filters ?? {}] as const,
     stats: (userId: string) => [...marketsKeys.journal.all(), "stats", userId] as const,
   },
+
+  retail: {
+    profile: () => [...marketsKeys.all, "retail", "profile"] as const,
+    tiers:   () => [...marketsKeys.all, "retail", "tiers"] as const,
+    signals: (f?: object) => [...marketsKeys.all, "retail", "signals", f ?? {}] as const,
+  },
 } as const;
