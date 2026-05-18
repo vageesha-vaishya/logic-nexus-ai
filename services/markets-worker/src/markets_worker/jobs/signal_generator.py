@@ -1153,7 +1153,10 @@ async def _call_llm_for_explanation(prompt_text: str) -> dict:
     """Call the configured LLM provider and return parsed JSON. Returns {} on any error."""
     import re
 
-    config = resolve_llm_config()
+    try:
+        config = resolve_llm_config()
+    except RuntimeError:
+        return {}
     if not config:
         return {}
 
@@ -1175,7 +1178,8 @@ async def _call_llm_for_explanation(prompt_text: str) -> dict:
             logger.warning("explanation_llm_call_failed", error=str(exc))
             return {}
 
-    # Other providers not implemented in Phase 1
+    # Other providers not implemented for explanations in Phase 1
+    logger.debug("explanation_skipped_non_anthropic_provider", provider=config.get("provider"))
     return {}
 
 
@@ -1189,6 +1193,7 @@ async def _generate_explanations(
     horizon: str,
 ) -> dict:
     """Generate beginner/casual/self_directed explanations. Returns {} on any failure."""
+    import asyncio
     try:
         prompt = (
             f"Symbol: {symbol}\n"
@@ -1201,27 +1206,10 @@ async def _generate_explanations(
             f"Target: {risk_params.get('target_pct', 'N/A')}%  "
             f"R/R: {risk_params.get('r_r', 'N/A')}"
         )
-        return await _call_llm_for_explanation(prompt)
+        return await asyncio.wait_for(_call_llm_for_explanation(prompt), timeout=8.0)
     except Exception as exc:
         logger.warning("generate_explanations_failed", symbol=symbol, error=str(exc))
         return {}
-
-
-def _run_async(coro):
-    """Run a coroutine safely regardless of whether an event loop is running."""
-    import asyncio
-    import concurrent.futures
-    try:
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # We're inside an async context — schedule via a new thread
-            with concurrent.futures.ThreadPoolExecutor() as pool:
-                future = pool.submit(asyncio.run, coro)
-                return future.result()
-        else:
-            return loop.run_until_complete(coro)
-    except RuntimeError:
-        return asyncio.run(coro)
 
 
 # ── Graph assembly ────────────────────────────────────────────────────────────
