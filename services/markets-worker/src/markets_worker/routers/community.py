@@ -132,8 +132,16 @@ async def invest_in_basket(basket_id: str, body: InvestRequest, auth: Auth):
                 "invested_amt": body.amount,
                 "portfolio_id": body.portfolio_id,
             }).execute()
+        basket = (
+            db.schema("markets").from_("community_baskets")
+            .select("total_invested")
+            .eq("id", basket_id)
+            .maybe_single()
+            .execute()
+        ).data
+        current_total = float((basket or {}).get("total_invested", 0) or 0)
         db.schema("markets").from_("community_baskets") \
-            .update({"total_invested": body.amount}) \
+            .update({"total_invested": current_total + body.amount}) \
             .eq("id", basket_id).execute()
     except Exception as exc:
         raise HTTPException(500, detail=str(exc))

@@ -103,3 +103,48 @@ class TestBaskets:
             resp = client.get("/v1/community/baskets/b1/holdings", headers=auth_headers)
         assert resp.status_code == 200
         assert len(resp.json()["holdings"]) == 1
+
+
+class TestInvest:
+    def test_invest_in_basket_returns_confirmed(self, client, auth_headers):
+        mock_sb = MagicMock()
+        # Position lookup (None = new position)
+        pos_select = MagicMock()
+        pos_select.eq.return_value.eq.return_value.maybe_single.return_value.execute.return_value.data = None
+        # Basket total_invested lookup
+        basket_select = MagicMock()
+        basket_select.eq.return_value.maybe_single.return_value.execute.return_value.data = {"total_invested": 10000.0}
+        mock_sb.schema.return_value.from_.return_value.select.side_effect = [pos_select, basket_select]
+        mock_sb.schema.return_value.from_.return_value.insert.return_value.execute.return_value.data = [{}]
+        mock_sb.schema.return_value.from_.return_value.update.return_value.eq.return_value.execute.return_value.data = [{}]
+        with patch("markets_worker.routers.community.get_supabase", return_value=mock_sb):
+            resp = client.post("/v1/community/baskets/b1/invest", json={"amount": 5000.0}, headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "confirmed"
+
+    def test_invest_rejects_zero_amount(self, client, auth_headers):
+        mock_sb = MagicMock()
+        with patch("markets_worker.routers.community.get_supabase", return_value=mock_sb):
+            resp = client.post("/v1/community/baskets/b1/invest", json={"amount": 0}, headers=auth_headers)
+        assert resp.status_code == 422
+
+
+class TestStrategiesDeploy:
+    def test_deploy_blocked_in_paper_phase(self, client, auth_headers):
+        mock_sb = MagicMock()
+        mock_sb.schema.return_value.from_.return_value.select.return_value \
+            .eq.return_value.maybe_single.return_value.execute.return_value.data = {"current_phase": "paper"}
+        with patch("markets_worker.routers.community.get_supabase", return_value=mock_sb):
+            resp = client.post("/v1/community/strategies/s1/deploy", headers=auth_headers)
+        assert resp.status_code == 400
+        assert "paper" in resp.json()["detail"].lower()
+
+    def test_deploy_succeeds_in_micro_phase(self, client, auth_headers):
+        mock_sb = MagicMock()
+        mock_sb.schema.return_value.from_.return_value.select.return_value \
+            .eq.return_value.maybe_single.return_value.execute.return_value.data = {"current_phase": "micro"}
+        mock_sb.schema.return_value.from_.return_value.insert.return_value.execute.return_value.data = [{}]
+        with patch("markets_worker.routers.community.get_supabase", return_value=mock_sb):
+            resp = client.post("/v1/community/strategies/s1/deploy", headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json()["status"] == "deployed"
