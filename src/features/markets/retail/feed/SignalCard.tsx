@@ -1,7 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
+import { InlineEducation } from '../behavioral/InlineEducation';
+import { useLogBehavioralEvent } from '../behavioral/useBehavioralEvents';
 import type { ExperienceLevel, RetailSignal } from '../types';
+import type { EducationId } from '../behavioral/types';
 
 function confidenceLabel(c: number): string {
   if (c >= 0.85) return 'High Conviction';
@@ -19,9 +22,11 @@ interface SignalCardProps {
   signal: RetailSignal;
   experienceLevel: ExperienceLevel;
   onExecute?: (signal: RetailSignal) => void;
+  isHighStress?: boolean;
+  seenEducationIds?: Set<string>;
 }
 
-export function SignalCard({ signal, experienceLevel, onExecute }: SignalCardProps) {
+export function SignalCard({ signal, experienceLevel, onExecute, isHighStress, seenEducationIds }: SignalCardProps) {
   const { instrument, confidence = 0, metadata, signal_type, horizon, risk_params } = signal;
 
   const expl = metadata?.explanations;
@@ -38,6 +43,29 @@ export function SignalCard({ signal, experienceLevel, onExecute }: SignalCardPro
   // Directional indicator — rendered as an accessible label so that
   // getByText queries on "buy"/"sell" land on the explanation text only.
   const directionIcon = isBuy ? '↑' : '↓';
+
+  const { mutate: logEducation } = useLogBehavioralEvent();
+
+  const educationToShow: EducationId | null = (() => {
+    if (!seenEducationIds) return null;
+    if ((confidence ?? 0) >= 0.85 && !seenEducationIds.has('high_conviction_signal'))
+      return 'high_conviction_signal';
+    if (isHighStress && !seenEducationIds.has('high_vix_execution'))
+      return 'high_vix_execution';
+    if (signal.horizon === 'intraday' && !seenEducationIds.has('first_intraday'))
+      return 'first_intraday';
+    if (signal.asset_class === 'derivative' && !seenEducationIds.has('fo_enable'))
+      return 'fo_enable';
+    return null;
+  })();
+
+  const handleEducationDismiss = (id: EducationId) => {
+    logEducation({
+      event_type: 'education_shown',
+      severity: 'info',
+      metadata: { education_id: id },
+    });
+  };
 
   return (
     <Card className="overflow-hidden">
@@ -64,6 +92,16 @@ export function SignalCard({ signal, experienceLevel, onExecute }: SignalCardPro
 
         {/* Adaptive explanation — contains confidence % for casual/self_directed */}
         <p className="text-sm text-muted-foreground leading-snug">{explanation}</p>
+
+        {/* Inline education — shown at most one at a time, priority ordered */}
+        {educationToShow && (
+          <InlineEducation
+            educationId={educationToShow}
+            experienceLevel={experienceLevel}
+            onDismiss={handleEducationDismiss}
+            className="mt-2"
+          />
+        )}
 
         {/* Self-directed extras */}
         {experienceLevel === 'self_directed' && metadata?.stop_loss && (

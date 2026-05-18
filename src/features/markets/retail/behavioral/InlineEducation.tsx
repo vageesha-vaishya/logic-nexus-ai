@@ -23,7 +23,7 @@ export function InlineEducation({
   if (!content) return null;
 
   const text =
-    experienceLevel === 'self_directed' && content.self_directed
+    experienceLevel === 'self_directed' && content.self_directed !== undefined
       ? content.self_directed
       : experienceLevel === 'casual'
       ? content.casual

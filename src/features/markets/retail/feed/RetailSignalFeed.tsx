@@ -7,9 +7,11 @@ import type { ExperienceLevel, RetailSignal } from '../types';
 interface RetailSignalFeedProps {
   experienceLevel: ExperienceLevel;
   onExecute?: (signal: RetailSignal) => void;
+  isHighStress?: boolean;
+  seenEducationIds?: Set<string>;
 }
 
-export function RetailSignalFeed({ experienceLevel, onExecute }: RetailSignalFeedProps) {
+export function RetailSignalFeed({ experienceLevel, onExecute, isHighStress, seenEducationIds }: RetailSignalFeedProps) {
   const [filters, setFilters] = useState({
     assetClass: undefined as string | undefined,
     horizon: undefined as string | undefined,
@@ -56,6 +58,8 @@ export function RetailSignalFeed({ experienceLevel, onExecute }: RetailSignalFee
             signal={s}
             experienceLevel={experienceLevel}
             onExecute={onExecute}
+            isHighStress={isHighStress}
+            seenEducationIds={seenEducationIds}
           />
         ))}
       </div>
