@@ -6,6 +6,7 @@ import { RetailDashboard } from './dashboard/RetailDashboard';
 import { RetailSignalFeed } from './feed/RetailSignalFeed';
 import { ExecutionBottomSheet } from './feed/ExecutionBottomSheet';
 import { AutoExecutionSetup } from './autonomous/AutoExecutionSetup';
+import { CommunityHub } from './community/CommunityHub';
 import { BehavioralAlertBanner } from './behavioral/BehavioralAlertBanner';
 import { useRiskProfile } from './hooks/useRiskProfile';
 import { usePortfolioTiers } from './hooks/usePortfolioTiers';
@@ -73,6 +74,7 @@ export function RetailMode() {
           <TabsList className="w-full">
             <TabsTrigger value="feed" className="flex-1 text-xs">Signals</TabsTrigger>
             <TabsTrigger value="auto" className="flex-1 text-xs">Auto-Execute</TabsTrigger>
+            <TabsTrigger value="community" className="flex-1 text-xs">Community</TabsTrigger>
           </TabsList>
           <TabsContent value="feed">
             <RetailSignalFeed
@@ -84,6 +86,9 @@ export function RetailMode() {
           </TabsContent>
           <TabsContent value="auto">
             <AutoExecutionSetup />
+          </TabsContent>
+          <TabsContent value="community">
+            <CommunityHub />
           </TabsContent>
         </Tabs>
       ) : (
