@@ -7,6 +7,7 @@ PATCH /v1/retail/behavioral/events/{id}/acknowledge — acknowledge a behavioral
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Any, Literal
 
 import structlog
@@ -129,6 +130,27 @@ async def get_market_stress(auth: Auth):
     }
 
 
+@router.get("/events")
+async def list_behavioral_events(auth: Auth, limit: int = 10):
+    """Return recent unacknowledged behavioral events for the current user."""
+    sb = get_supabase()
+    try:
+        res = (
+            sb.schema("markets")
+            .from_("behavioral_events")
+            .select("*")
+            .eq("user_id", auth.user_id)
+            .is_("acknowledged_at", "null")
+            .order("created_at", desc=True)
+            .limit(limit)
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("behavioral_events_fetch_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Database error")
+    return res.data or []
+
+
 @router.post("/events", status_code=201)
 async def log_behavioral_event(
     body: BehavioralEventRequest,
@@ -167,7 +189,7 @@ async def acknowledge_event(
         res = (
             sb.schema("markets")
             .from_("behavioral_events")
-            .update({"acknowledged": True})
+            .update({"acknowledged_at": datetime.now(timezone.utc).isoformat()})
             .eq("id", event_id)
             .eq("user_id", auth.user_id)
             .execute()

@@ -76,6 +76,17 @@ class TestLogBehavioralEvent:
         )
         assert resp.status_code == 422
 
+class TestListBehavioralEvents:
+    def test_returns_empty_list_when_no_events(self, client, auth_headers):
+        mock_sb = MagicMock()
+        mock_sb.schema.return_value.from_.return_value.select.return_value \
+            .eq.return_value.is_.return_value.order.return_value \
+            .limit.return_value.execute.return_value = MagicMock(data=[], error=None)
+        with patch("markets_worker.routers.behavioral.get_supabase", return_value=mock_sb):
+            resp = client.get("/v1/retail/behavioral/events", headers=auth_headers)
+        assert resp.status_code == 200
+        assert resp.json() == []
+
 class TestAcknowledgeEvent:
     def test_acknowledges_event(self, client, auth_headers):
         mock_sb = MagicMock()
