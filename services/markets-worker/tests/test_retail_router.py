@@ -89,7 +89,6 @@ class TestGetTiers:
 class TestUpsertTier:
     def test_rejects_invalid_tier_number(self, client, auth_headers):
         resp = client.post("/v1/retail/tiers/5", headers=auth_headers, json={
-            "tier_number": 5,
             "name": "Invalid",
         })
         assert resp.status_code == 400
@@ -102,7 +101,6 @@ class TestUpsertTier:
             MagicMock(data=tier, error=None)
         with patch("markets_worker.routers.retail.get_supabase", return_value=mock_sb):
             resp = client.post("/v1/retail/tiers/2", headers=auth_headers, json={
-                "tier_number": 2,
                 "name": "Core Portfolio",
             })
         assert resp.status_code == 201

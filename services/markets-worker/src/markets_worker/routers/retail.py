@@ -8,6 +8,7 @@ GET    /v1/retail/signals           — retail-grade signal feed
 """
 from __future__ import annotations
 
+from datetime import datetime, timezone
 from typing import Any
 
 import structlog
@@ -38,7 +39,6 @@ class UpsertProfileRequest(BaseModel):
 
 
 class UpsertTierRequest(BaseModel):
-    tier_number: int
     name: str
     portfolio_id: str | None = None
     target_amount: float | None = None
@@ -51,16 +51,18 @@ class UpsertTierRequest(BaseModel):
 async def get_profile(auth: Auth):
     """Fetch the authenticated user's risk/experience profile."""
     sb = get_supabase()
-    res = (
-        sb.schema("markets")
-        .from_("risk_profiles")
-        .select("*")
-        .eq("user_id", auth.user_id)
-        .maybe_single()
-        .execute()
-    )
-    if res.error:
-        raise HTTPException(status_code=500, detail=str(res.error))
+    try:
+        res = (
+            sb.schema("markets")
+            .from_("risk_profiles")
+            .select("*")
+            .eq("user_id", auth.user_id)
+            .maybe_single()
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("retail_profile_get_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Database error")
     if not res.data:
         raise HTTPException(status_code=404, detail="Risk profile not found")
     return res.data
@@ -78,16 +80,18 @@ async def upsert_profile(
         "goals": [g.model_dump() for g in body.goals],
         "user_id": auth.user_id,
     }
-    res = (
-        sb.schema("markets")
-        .from_("risk_profiles")
-        .upsert(payload, on_conflict="user_id")
-        .select()
-        .single()
-        .execute()
-    )
-    if res.error:
-        raise HTTPException(status_code=500, detail=str(res.error))
+    try:
+        res = (
+            sb.schema("markets")
+            .from_("risk_profiles")
+            .upsert(payload, on_conflict="user_id")
+            .select()
+            .single()
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("retail_profile_upsert_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Database error")
     return res.data
 
 
@@ -97,16 +101,18 @@ async def upsert_profile(
 async def get_tiers(auth: Auth):
     """List the user's portfolio tiers ordered by tier_number."""
     sb = get_supabase()
-    res = (
-        sb.schema("markets")
-        .from_("portfolio_tiers")
-        .select("*")
-        .eq("user_id", auth.user_id)
-        .order("tier_number")
-        .execute()
-    )
-    if res.error:
-        raise HTTPException(status_code=500, detail=str(res.error))
+    try:
+        res = (
+            sb.schema("markets")
+            .from_("portfolio_tiers")
+            .select("*")
+            .eq("user_id", auth.user_id)
+            .order("tier_number")
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("retail_tiers_get_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Database error")
     return res.data or []
 
 
@@ -121,16 +127,18 @@ async def upsert_tier(
         raise HTTPException(status_code=400, detail="tier_number must be 1, 2, or 3")
     sb = get_supabase()
     payload = {**body.model_dump(), "tier_number": tier_number, "user_id": auth.user_id}
-    res = (
-        sb.schema("markets")
-        .from_("portfolio_tiers")
-        .upsert(payload, on_conflict="user_id,tier_number")
-        .select()
-        .single()
-        .execute()
-    )
-    if res.error:
-        raise HTTPException(status_code=500, detail=str(res.error))
+    try:
+        res = (
+            sb.schema("markets")
+            .from_("portfolio_tiers")
+            .upsert(payload, on_conflict="user_id,tier_number")
+            .select()
+            .single()
+            .execute()
+        )
+    except Exception as exc:
+        logger.error("retail_tier_upsert_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Database error")
     return res.data
 
 
@@ -147,6 +155,7 @@ async def get_retail_signals(
     """Return active signals filtered for retail investors (equity + MF by default)."""
     sb = get_supabase()
     asset_classes = [asset_class] if asset_class else ["equity", "mutual_fund"]
+    now_iso = datetime.now(timezone.utc).isoformat()
     q = (
         sb.schema("markets")
         .from_("signals")
@@ -159,13 +168,15 @@ async def get_retail_signals(
         .gte("confidence", min_confidence)
         .in_("asset_class", asset_classes)
         .not_.is_("expires_at", "null")
-        .gte("expires_at", "now()")
+        .gte("expires_at", now_iso)
         .order("ts", desc=True)
         .limit(limit)
     )
     if horizon:
         q = q.eq("horizon", horizon)
-    res = q.execute()
-    if res.error:
-        raise HTTPException(status_code=500, detail=str(res.error))
+    try:
+        res = q.execute()
+    except Exception as exc:
+        logger.error("retail_signals_get_failed", error=str(exc))
+        raise HTTPException(status_code=500, detail="Database error")
     return res.data or []
