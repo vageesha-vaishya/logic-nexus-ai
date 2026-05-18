@@ -122,6 +122,34 @@ class TestOrderSubmission:
         assert resp.status_code == 200
         assert resp.json()["phase"] == "paper"
 
+    def test_micro_phase_cap_blocks_large_order(self, client, auth_headers):
+        mock_sb = MagicMock()
+        mock_sb.schema.return_value.from_.return_value.select.return_value \
+            .eq.return_value.maybe_single.return_value \
+            .execute.return_value.data = {
+                "current_phase": "micro",
+                "kill_switch_level": "none",
+                "paper_trades_done": 12,
+                "micro_trades_done": 3,
+            }
+        mock_sb.schema.return_value.from_.return_value.insert.return_value \
+            .execute.return_value.data = [{"id": "audit-1"}]
+        fresh_cache = {"HDFC:NSE": (time.time(), {"ltp": 3000.0})}
+        with patch("markets_worker.routers.execution.get_supabase", return_value=mock_sb), \
+             patch("markets_worker.routers.execution._ltp_cache", fresh_cache):
+            resp = client.post("/v1/execution/orders", json={
+                "rule_id": "rule-1",
+                "signal_id": "signal-1",
+                "tradingsymbol": "HDFC",
+                "exchange": "NSE",
+                "side": "BUY",
+                "quantity": 1,
+                "order_value": 3000.0,   # 3% of 100k NAV — exceeds 2% micro cap
+                "portfolio_nav": 100000.0,
+            }, headers=auth_headers)
+        assert resp.status_code == 422
+        assert "Micro-Live cap" in resp.json()["detail"]
+
     def test_fat_finger_blocks_order(self, client, auth_headers):
         mock_sb = MagicMock()
         mock_sb.schema.return_value.from_.return_value.select.return_value \

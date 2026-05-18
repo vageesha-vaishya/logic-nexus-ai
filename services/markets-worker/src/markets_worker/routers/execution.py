@@ -196,7 +196,29 @@ async def submit_order(body: PlaceOrderRequest, auth: Auth):
 
     progress = _get_progress(db, auth.user_id)
     if progress["kill_switch_level"] in ("all_pause", "flatten_positions", "revoke_api_key"):
-        raise HTTPException(409, detail=f"kill_switch active: {progress['kill_switch_level']}")
+        ks_level = progress["kill_switch_level"]
+        # Log the rejection to audit trail before raising
+        try:
+            db.schema("markets").from_("execution_audit_log").insert({
+                "user_id": auth.user_id,
+                "rule_id": body.rule_id,
+                "signal_id": body.signal_id,
+                "tradingsymbol": body.tradingsymbol,
+                "exchange": body.exchange,
+                "side": body.side,
+                "order_type": "MARKET",
+                "quantity": body.quantity,
+                "order_value": body.order_value,
+                "portfolio_nav_at_order": body.portfolio_nav,
+                "phase": progress["current_phase"],
+                "pre_trade_checks": {},
+                "status": "rejected",
+                "rejection_reason": f"kill_switch active: {ks_level}",
+                "kill_switch_active": True,
+            }).execute()
+        except Exception as exc:
+            logger.error("kill_switch_audit_failed", error=str(exc))
+        raise HTTPException(409, detail=f"kill_switch active: {ks_level}")
 
     symbol_key = f"{body.tradingsymbol}:{body.exchange}"
     checks = run_all_checks(
