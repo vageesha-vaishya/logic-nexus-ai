@@ -1,0 +1,37 @@
+{
+  "baskets": {
+    "title": "Thematic Baskets",
+    "subtitle": "Curated collections of stocks and ETFs",
+    "filter_all": "All",
+    "filter_risk": "Risk Level",
+    "invest": "Invest",
+    "investing": "Investing…",
+    "invested_label": "invested",
+    "followers_label": "followers",
+    "no_baskets": "No baskets match your filter.",
+    "holdings_title": "Holdings",
+    "no_holdings": "No holdings added yet.",
+    "back": "← Back to baskets",
+    "allocation_note": "Amount is allocated across all holdings proportionally."
+  },
+  "strategies": {
+    "title": "Strategy Marketplace",
+    "deploy": "Deploy",
+    "deploying": "Deploying…",
+    "paper_phase_warning": "Complete paper trading (10 trades) to deploy community strategies.",
+    "paper_phase_button": "Paper phase",
+    "live_users": "using this",
+    "no_strategies": "No published strategies yet."
+  },
+  "copy": {
+    "title": "Top Traders Leaderboard",
+    "safety_notice": "Safety limits: Copy trading is only allowed in your Experimental tier. Maximum 20% of Experimental tier NAV per copied trader. Auto-unfollow triggers if copied trader drawdown exceeds your limit.",
+    "experimental_badge": "Experimental only",
+    "connect_prompt": "Connect to view top traders"
+  },
+  "creator": {
+    "verified_badge": "Verified Creator",
+    "not_verified_title": "Verified Creator Required",
+    "not_verified_message": "Only SEBI-registered research analysts and verified creators can publish baskets. Contact support to apply for creator verification."
+  }
+}

@@ -146,4 +146,27 @@ export const marketsKeys = {
       [...marketsKeys.journal.all(), "list", filters ?? {}] as const,
     stats: (userId: string) => [...marketsKeys.journal.all(), "stats", userId] as const,
   },
+
+  retail: {
+    all:     () => [...marketsKeys.all, "retail"] as const,
+    profile: () => [...marketsKeys.all, "retail", "profile"] as const,
+    tiers:   () => [...marketsKeys.all, "retail", "tiers"] as const,
+    signals: (f?: object) => [...marketsKeys.all, "retail", "signals", f ?? {}] as const,
+    behavioral: {
+      stress: () => [...marketsKeys.all, "retail", "behavioral", "stress"] as const,
+      events: () => [...marketsKeys.all, "retail", "behavioral", "events"] as const,
+    },
+    autonomous: {
+      progress:   () => [...marketsKeys.retail.all(), 'autonomous', 'progress'] as const,
+      rules:      () => [...marketsKeys.retail.all(), 'autonomous', 'rules'] as const,
+      audit:      () => [...marketsKeys.retail.all(), 'autonomous', 'audit'] as const,
+      killSwitch: () => [...marketsKeys.retail.all(), 'autonomous', 'kill-switch'] as const,
+    },
+    community: {
+      baskets:    () => [...marketsKeys.retail.all(), 'community', 'baskets'] as const,
+      basket:     (id: string) => [...marketsKeys.retail.all(), 'community', 'basket', id] as const,
+      strategies: () => [...marketsKeys.retail.all(), 'community', 'strategies'] as const,
+      creator:    () => [...marketsKeys.retail.all(), 'community', 'creator'] as const,
+    },
+  },
 } as const;

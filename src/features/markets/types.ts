@@ -361,6 +361,10 @@ export interface Signal {
   generated_by: string | null;
   expires_at: string | null;
   metadata: Record<string, unknown>;
+  // Present when queried with extended select (signal engine + retail feed)
+  horizon?: string;
+  asset_class?: string;
+  risk_params?: Record<string, unknown>;
   instrument: {
     symbol: string;
     exchange: string;

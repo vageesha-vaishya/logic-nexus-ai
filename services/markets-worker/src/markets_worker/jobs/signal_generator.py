@@ -62,7 +62,7 @@ class SignalState(TypedDict):
     instrument_id:   str
     symbol:          str
     exchange:        str
-    asset_class:     str   # equity, fo, mf, fx, bond, commodity
+    asset_class:     str   # equity, derivative, mutual_fund, forex, fixed_income, commodity, crypto
     instrument_type: str   # EQ, FUT, OPT, CE, PE, MF, CURRENCY, BOND, COMM
     option_type:     str | None
     expiry:          str | None
@@ -103,6 +103,8 @@ class SignalState(TypedDict):
     risk_params: dict  # stop_loss_pct, target_pct, r_r, position_size_pct, atr_pts
 
     error:       str | None
+
+    debate_notes: dict  # populated by bull_debate, bear_debate, risk_debate nodes
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
@@ -366,12 +368,12 @@ async def fetch_data(state: SignalState) -> dict:
 
     # OI series for F&O
     oi_series: list[dict] = []
-    if state.get("asset_class") in ("fo",) and any(p.get("oi") for p in prices):
+    if state.get("asset_class") in ("derivative",) and any(p.get("oi") for p in prices):
         oi_series = [{"ts": p["ts"], "oi": p.get("oi", 0)} for p in prices[-30:]]
 
     # NAV history for MF
     nav_history: list[dict] = []
-    if state.get("asset_class") == "mf":
+    if state.get("asset_class") == "mutual_fund":
         try:
             mf = (
                 db.schema("markets").from_("mf_schemes")
@@ -408,7 +410,7 @@ async def fetch_data(state: SignalState) -> dict:
 
     # FX rate for currency instruments
     extra_data: dict = {}
-    if state.get("asset_class") == "fx":
+    if state.get("asset_class") == "forex":
         try:
             fx = (
                 db.schema("markets").from_("fx_rates")
@@ -783,7 +785,7 @@ Signal types: buy | sell | hold | buy_more | reduce | exit
 Respond ONLY with valid JSON:
 {"signal_type":"...","direction":"long|short|neutral","confidence":0.0,"score":0.0,"rationale":"≤2 sentences"}""",
 
-    "fo": """You are an expert derivatives trader for Indian markets (NSE F&O segment).
+    "derivative": """You are an expert derivatives trader for Indian markets (NSE F&O segment).
 Analyse the F&O indicators including OI, basis, days-to-expiry, and price action.
 
 Signal types: buy (long futures/call), sell (short futures/put), hold, roll (near expiry), exit
@@ -793,7 +795,7 @@ days to expiry (DTE < 5 = roll/exit urgency), basis premium/discount.
 Respond ONLY with valid JSON:
 {"signal_type":"...","direction":"long|short|neutral","confidence":0.0,"score":0.0,"rationale":"≤2 sentences"}""",
 
-    "mf": """You are a mutual fund analyst for Indian markets (AMFI registered).
+    "mutual_fund": """You are a mutual fund analyst for Indian markets (AMFI registered).
 Analyse the NAV momentum, returns across timeframes, and volatility.
 
 Signal types: buy (lump sum), sell (redeem), hold (continue SIP), switch (to better fund), buy_more (increase SIP)
@@ -803,7 +805,7 @@ For MF, confidence should be lower (0.3–0.7) as MF signals are less precise th
 Respond ONLY with valid JSON:
 {"signal_type":"...","direction":"long|short|neutral","confidence":0.0,"score":0.0,"rationale":"≤2 sentences"}""",
 
-    "fx": """You are a currency analyst for Indian forex markets (NSE currency segment: USD/INR, EUR/INR etc.).
+    "forex": """You are a currency analyst for Indian forex markets (NSE currency segment: USD/INR, EUR/INR etc.).
 Analyse technical indicators for the currency pair.
 
 Signal types: buy (long base currency), sell (short base currency), hold
@@ -813,7 +815,7 @@ Consider: RBI intervention risk (for INR pairs), range-bound behaviour typical o
 Respond ONLY with valid JSON:
 {"signal_type":"...","direction":"long|short|neutral","confidence":0.0,"score":0.0,"rationale":"≤2 sentences"}""",
 
-    "bond": """You are a fixed income analyst for Indian bond markets (G-Sec, corporate bonds, T-Bills).
+    "fixed_income": """You are a fixed income analyst for Indian bond markets (G-Sec, corporate bonds, T-Bills).
 Analyse bond price movement and yield direction.
 
 Signal types: buy (price expected to rise / yield to fall), sell (price fall / yield rise), hold
@@ -837,6 +839,73 @@ Respond ONLY with valid JSON:
 
 _VALID_SIGNAL_TYPES = {"buy", "sell", "hold", "buy_more", "reduce", "exit", "switch", "roll"}
 _VALID_DIRECTIONS   = {"long", "short", "neutral"}
+
+
+# ── Debate nodes: Bull / Bear / Risk agents ───────────────────────────────────
+
+def _bull_debate(state: SignalState) -> dict:
+    """Bull agent: looks for technical reasons to buy."""
+    ind = state.get("indicators", {})
+    rsi = ind.get("rsi", 50)
+    macd = ind.get("macd_diff", 0)
+    adx = ind.get("adx", 20)
+    notes = dict(state.get("debate_notes") or {})
+
+    bullish = []
+    if rsi < 40:
+        bullish.append("RSI oversold — potential bounce")
+    if macd > 0:
+        bullish.append("MACD positive crossover")
+    if adx > 25:
+        bullish.append("Strong trend (ADX > 25)")
+
+    notes["bull"] = {
+        "stance": "bullish" if bullish else "neutral",
+        "reasons": bullish or ["No strong bullish signal detected"],
+    }
+    return {"debate_notes": notes}
+
+
+def _bear_debate(state: SignalState) -> dict:
+    """Bear agent: looks for technical reasons to sell or avoid."""
+    ind = state.get("indicators", {})
+    rsi = ind.get("rsi", 50)
+    macd = ind.get("macd_diff", 0)
+    notes = dict(state.get("debate_notes") or {})
+
+    bearish = []
+    if rsi > 70:
+        bearish.append("RSI overbought — risk of reversal")
+    if macd < 0:
+        bearish.append("MACD negative — downward momentum")
+
+    notes["bear"] = {
+        "stance": "bearish" if bearish else "neutral",
+        "reasons": bearish or ["No strong bearish signal detected"],
+    }
+    return {"debate_notes": notes}
+
+
+def _risk_debate(state: SignalState) -> dict:
+    """Risk agent: evaluates position sizing and risk/reward."""
+    risk_params = state.get("risk_params") or {}
+    notes = dict(state.get("debate_notes") or {})
+    r_r = risk_params.get("r_r", 0)
+    pos_pct = risk_params.get("position_size_pct", 0)
+
+    warnings = []
+    if r_r > 0 and r_r < 1.5:
+        warnings.append(f"R:R ratio {r_r:.1f} below minimum 1.5 — reduce position")
+    if pos_pct > 8:
+        warnings.append(f"Position size {pos_pct:.1f}% is large — consider splitting entry")
+
+    notes["risk"] = {
+        "r_r": r_r,
+        "position_pct": pos_pct,
+        "warnings": warnings,
+        "approved": len(warnings) == 0,
+    }
+    return {"debate_notes": notes}
 
 
 # ── Node 3: score_signal (shared, asset-class-aware prompt) ──────────────────
@@ -946,7 +1015,7 @@ def _rule_based_fallback(
     regime   = ind.get("regime", "unknown")
     oi_interp = ind.get("oi_interpretation")
 
-    if asset_cls == "fo" and oi_interp:
+    if asset_cls == "derivative" and oi_interp:
         if oi_interp == "long_buildup":
             return "buy", "long", 0.55, 0.4, "Long build-up: OI rising with price. Rule-based."
         if oi_interp == "short_buildup":
@@ -954,7 +1023,7 @@ def _rule_based_fallback(
         if oi_interp == "short_covering":
             return "buy", "long", 0.50, 0.3, "Short covering: OI falling, price rising. Rule-based."
 
-    if asset_cls == "mf":
+    if asset_cls == "mutual_fund":
         momentum = ind.get("dual_momentum", 0)
         if momentum and momentum > 10:
             return "buy_more", "long", 0.55, 0.4, f"Strong dual momentum ({momentum:.1f}%). Rule-based."
@@ -1033,6 +1102,20 @@ async def persist_signal(state: SignalState) -> dict:
         },
     }
 
+    # Generate LLM explanations for equity/MF signals with sufficient confidence
+    if state.get("asset_class") in ("equity", "mutual_fund") and state.get("confidence", 0) >= 0.60:
+        explanations = await _generate_explanations(
+            symbol=state["symbol"],
+            asset_class=state["asset_class"],
+            signal_type=state.get("signal_type", "hold"),
+            confidence=state["confidence"],
+            rationale=state.get("rationale", ""),
+            risk_params=state.get("risk_params", {}),
+            horizon=state.get("horizon", "short_term"),
+        )
+        if explanations:
+            row["metadata"] = {**(row["metadata"] or {}), "explanations": explanations}
+
     try:
         db  = get_supabase()
         today_start = datetime.now(timezone.utc).replace(
@@ -1088,34 +1171,120 @@ def _derive_horizon(holding_period_days: int | None, instrument_type: str) -> st
     return HORIZON_LONG
 
 def _derive_asset_class(instrument_type: str, asset_class_db: str) -> str:
-    """Map instruments.asset_class + instrument_type to internal class key."""
+    """Map instruments.asset_class + instrument_type to canonical long-form class key.
+
+    Returns values that match what retail.py queries for and what SignalFilter.tsx sends:
+    derivative | mutual_fund | forex | fixed_income | commodity | crypto | equity
+    """
     it = (instrument_type or "").upper()
     ac = (asset_class_db or "equity").lower()
     if it in ("FUT", "OPT", "CE", "PE"):
-        return "fo"
+        return "derivative"
     if ac == "mf" or it == "MF":
-        return "mf"
+        return "mutual_fund"
     if ac in ("fx", "currency") or it == "CURRENCY":
-        return "fx"
+        return "forex"
     if ac in ("bond", "gsec", "tbill") or it in ("BOND", "GB"):
-        return "bond"
+        return "fixed_income"
     if ac == "commodity" or it in ("COMM", "MCX"):
         return "commodity"
+    if ac == "crypto" or it == "CRYPTO":
+        return "crypto"
     return "equity"
 
 def _route_to_compute(state: SignalState) -> str:
     return {
-        "fo":        "compute_fo",
-        "mf":        "compute_mf",
-        "fx":        "compute_fx",
-        "bond":      "compute_bond",
-        "commodity": "compute_commodity",
+        "derivative":  "compute_fo",
+        "mutual_fund": "compute_mf",
+        "forex":       "compute_fx",
+        "fixed_income": "compute_bond",
+        "commodity":   "compute_commodity",
     }.get(state.get("asset_class", "equity"), "compute_equity")
 
 def _should_continue(state: SignalState) -> str:
     if state.get("error") and not state.get("prices"):
         return END
     return _route_to_compute(state)
+
+
+# ── LLM Explanation Layer ─────────────────────────────────────────────────────
+# Generates 3-level explanations for retail users. Called async post-scoring.
+# Returns {} on any failure so it never breaks the signal pipeline.
+
+_EXPLANATION_SYSTEM_PROMPT = """\
+You are a financial signal explainer for a retail investment app.
+Given a trading signal, produce explanations at three reading levels.
+Return ONLY valid JSON with exactly these three keys:
+{"beginner": "...", "casual": "...", "self_directed": "..."}
+
+- beginner: 1-2 plain English sentences, no numbers except the action
+- casual: 2-3 sentences with key indicator name, confidence %, entry price
+- self_directed: full technical detail — all indicators used, confidence with CI note,
+  stop loss, target, R/R ratio, brief note on historical accuracy for this signal type
+"""
+
+
+async def _call_llm_for_explanation(prompt_text: str) -> dict:
+    """Call the configured LLM provider and return parsed JSON. Returns {} on any error."""
+    import re
+
+    try:
+        config = resolve_llm_config()
+    except RuntimeError:
+        return {}
+    if not config:
+        return {}
+
+    if config.provider in ("anthropic", "claude"):
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=config.api_key)
+            msg = await client.messages.create(
+                model=config.model,
+                max_tokens=512,
+                temperature=0,
+                system=_EXPLANATION_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt_text}],
+            )
+            raw = msg.content[0].text
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
+            return json.loads(m.group()) if m else {}
+        except Exception as exc:
+            logger.warning("explanation_llm_call_failed", error=str(exc))
+            return {}
+
+    # Other providers not implemented for explanations in Phase 1
+    logger.debug("explanation_skipped_non_anthropic_provider", provider=config.provider)
+    return {}
+
+
+async def _generate_explanations(
+    symbol: str,
+    asset_class: str,
+    signal_type: str,
+    confidence: float,
+    rationale: str,
+    risk_params: dict,
+    horizon: str,
+) -> dict:
+    """Generate beginner/casual/self_directed explanations. Returns {} on any failure."""
+    import asyncio
+    try:
+        prompt = (
+            f"Symbol: {symbol}\n"
+            f"Asset class: {asset_class}\n"
+            f"Signal: {signal_type}\n"
+            f"Horizon: {horizon}\n"
+            f"Confidence: {confidence:.0%}\n"
+            f"Rationale: {rationale}\n"
+            f"Stop loss: {risk_params.get('stop_loss_pct', 'N/A')}%  "
+            f"Target: {risk_params.get('target_pct', 'N/A')}%  "
+            f"R/R: {risk_params.get('r_r', 'N/A')}"
+        )
+        return await asyncio.wait_for(_call_llm_for_explanation(prompt), timeout=8.0)
+    except Exception as exc:
+        logger.warning("generate_explanations_failed", symbol=symbol, error=str(exc))
+        return {}
 
 
 # ── Graph assembly ────────────────────────────────────────────────────────────
@@ -1130,6 +1299,9 @@ def build_signal_graph() -> Any:
     g.add_node("compute_fx",         compute_fx)
     g.add_node("compute_bond",       compute_bond)
     g.add_node("compute_commodity",  compute_commodity)
+    g.add_node("bull_debate",        _bull_debate)
+    g.add_node("bear_debate",        _bear_debate)
+    g.add_node("risk_debate",        _risk_debate)
     g.add_node("score_signal",       score_signal)
     g.add_node("persist_signal",     persist_signal)
 
@@ -1138,8 +1310,11 @@ def build_signal_graph() -> Any:
 
     for compute_node in ("compute_equity", "compute_fo", "compute_mf",
                          "compute_fx", "compute_bond", "compute_commodity"):
-        g.add_edge(compute_node, "score_signal")
+        g.add_edge(compute_node, "bull_debate")
 
+    g.add_edge("bull_debate",    "bear_debate")
+    g.add_edge("bear_debate",    "risk_debate")
+    g.add_edge("risk_debate",    "score_signal")
     g.add_edge("score_signal",   "persist_signal")
     g.add_edge("persist_signal", END)
 
@@ -1202,6 +1377,7 @@ async def _run_for_instrument(
         "score":              0.0,
         "risk_params":        {},
         "error":              None,
+        "debate_notes":       {},
     }
     result = await signal_graph.ainvoke(initial)
     # Refine horizon after fetch (holding_period_days is now populated)
@@ -1261,8 +1437,8 @@ def generate_signals_for_portfolio(portfolio_id: str) -> dict:
         asset_cls  = _derive_asset_class(instr_type, instr.get("asset_class", "equity"))
 
         # Skip asset classes whose flag is off
-        if asset_cls == "fo"        and not fo_enabled:
-            logger.debug("signal_skip.flag_off", symbol=instr.get("symbol"), asset_cls="fo"); continue
+        if asset_cls == "derivative" and not fo_enabled:
+            logger.debug("signal_skip.flag_off", symbol=instr.get("symbol"), asset_cls="derivative"); continue
         if asset_cls == "commodity" and not comm_enabled:
             logger.debug("signal_skip.flag_off", symbol=instr.get("symbol"), asset_cls="commodity"); continue
 
