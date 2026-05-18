@@ -14,9 +14,11 @@ export function useMarketStress() {
     staleTime: 60_000,
     refetchInterval: 2 * 60_000,
     queryFn: async (): Promise<MarketStress> => {
+      const token = session?.access_token;
+      if (!token) throw new Error('No auth token');
       const resp = await fetch(
         `${WORKER_URL}/v1/retail/behavioral/market-stress`,
-        { headers: { Authorization: `Bearer ${session!.access_token}` } },
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       if (!resp.ok) throw new Error(`market-stress: ${resp.status}`);
       return resp.json();
