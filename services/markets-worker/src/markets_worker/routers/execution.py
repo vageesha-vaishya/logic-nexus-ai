@@ -255,3 +255,62 @@ async def submit_order(body: PlaceOrderRequest, auth: Auth):
 
     _log_audit(db, auth.user_id, body, phase, checks, "submitted")
     return {"phase": phase, "status": "submitted", "message": "Order queued for broker submission"}
+
+
+VALID_KILL_SWITCH_LEVELS = frozenset({"none", "strategy_pause", "all_pause", "flatten_positions", "revoke_api_key"})
+
+
+@router.get("/kill-switch")
+async def get_kill_switch(auth: Auth):
+    db = get_supabase()
+    progress = _get_progress(db, auth.user_id)
+    return {
+        "kill_switch_level": progress["kill_switch_level"],
+        "current_phase": progress["current_phase"],
+    }
+
+
+@router.post("/kill-switch/{level}")
+async def set_kill_switch(level: str, auth: Auth):
+    if level not in VALID_KILL_SWITCH_LEVELS:
+        raise HTTPException(422, detail=f"Invalid kill switch level '{level}'. Valid: {sorted(VALID_KILL_SWITCH_LEVELS)}")
+
+    db = get_supabase()
+
+    if level == "revoke_api_key":
+        try:
+            db.schema("markets").from_("broker_connections") \
+                .update({"can_trade": False}) \
+                .eq("owner_user_id", auth.user_id).execute()
+        except Exception as exc:
+            logger.error("kill_switch_broker_revoke_failed", error=str(exc))
+
+    try:
+        db.schema("markets").from_("autonomy_progress") \
+            .update({
+                "kill_switch_level": level,
+                "kill_switch_set_at": datetime.now(timezone.utc).isoformat() if level != "none" else None,
+            }) \
+            .eq("user_id", auth.user_id).execute()
+    except Exception as exc:
+        raise HTTPException(500, detail=str(exc))
+
+    # Log to audit trail
+    try:
+        db.schema("markets").from_("execution_audit_log").insert({
+            "user_id": auth.user_id,
+            "tradingsymbol": "_KILL_SWITCH_",
+            "exchange": "SYSTEM",
+            "side": "BUY",
+            "order_type": "MARKET",
+            "quantity": 0,
+            "phase": "paper",
+            "pre_trade_checks": {},
+            "status": "rejected",
+            "kill_switch_active": True,
+            "rejection_reason": f"Kill switch activated: {level}",
+        }).execute()
+    except Exception as exc:
+        logger.error("kill_switch_audit_failed", error=str(exc))
+
+    return {"kill_switch_level": level, "set_at": datetime.now(timezone.utc).isoformat()}
