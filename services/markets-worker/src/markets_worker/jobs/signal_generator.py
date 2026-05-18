@@ -1179,7 +1179,7 @@ async def _call_llm_for_explanation(prompt_text: str) -> dict:
             return {}
 
     # Other providers not implemented for explanations in Phase 1
-    logger.debug("explanation_skipped_non_anthropic_provider", provider=config.get("provider"))
+    logger.debug("explanation_skipped_non_anthropic_provider", provider=config.provider)
     return {}
 
 
