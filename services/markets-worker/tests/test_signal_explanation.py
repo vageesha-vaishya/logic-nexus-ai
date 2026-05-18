@@ -119,3 +119,25 @@ def test_derive_asset_class_uses_long_form_values():
             f"_derive_asset_class({instr_type!r}, {ac_db!r}) returned short-form {result!r}; "
             f"must return long-form for retail API compatibility"
         )
+
+
+def test_debate_notes_present_after_debate_nodes():
+    """Each debate node adds its stance to debate_notes."""
+    from markets_worker.jobs.signal_generator import (
+        _bull_debate, _bear_debate, _risk_debate,
+    )
+    base_state = {
+        "indicators": {"rsi": 62, "macd_diff": 1.2, "adx": 30},
+        "risk_params": {"r_r": 2.0, "position_size_pct": 5.0},
+        "debate_notes": {},
+    }
+    s1 = {**base_state, **_bull_debate(base_state)}
+    assert "bull" in s1["debate_notes"]
+    assert s1["debate_notes"]["bull"]["stance"] == "bullish"  # adx > 25 triggers
+
+    s2 = {**s1, **_bear_debate(s1)}
+    assert "bear" in s2["debate_notes"]
+
+    s3 = {**s2, **_risk_debate(s2)}
+    assert "risk" in s3["debate_notes"]
+    assert s3["debate_notes"]["risk"]["approved"] is True  # r_r=2.0 >= 1.5, pos=5% < 8%

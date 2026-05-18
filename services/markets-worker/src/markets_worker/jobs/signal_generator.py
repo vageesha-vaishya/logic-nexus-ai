@@ -104,6 +104,8 @@ class SignalState(TypedDict):
 
     error:       str | None
 
+    debate_notes: dict  # populated by bull_debate, bear_debate, risk_debate nodes
+
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -839,6 +841,73 @@ _VALID_SIGNAL_TYPES = {"buy", "sell", "hold", "buy_more", "reduce", "exit", "swi
 _VALID_DIRECTIONS   = {"long", "short", "neutral"}
 
 
+# ── Debate nodes: Bull / Bear / Risk agents ───────────────────────────────────
+
+def _bull_debate(state: SignalState) -> dict:
+    """Bull agent: looks for technical reasons to buy."""
+    ind = state.get("indicators", {})
+    rsi = ind.get("rsi", 50)
+    macd = ind.get("macd_diff", 0)
+    adx = ind.get("adx", 20)
+    notes = dict(state.get("debate_notes") or {})
+
+    bullish = []
+    if rsi < 40:
+        bullish.append("RSI oversold — potential bounce")
+    if macd > 0:
+        bullish.append("MACD positive crossover")
+    if adx > 25:
+        bullish.append("Strong trend (ADX > 25)")
+
+    notes["bull"] = {
+        "stance": "bullish" if bullish else "neutral",
+        "reasons": bullish or ["No strong bullish signal detected"],
+    }
+    return {"debate_notes": notes}
+
+
+def _bear_debate(state: SignalState) -> dict:
+    """Bear agent: looks for technical reasons to sell or avoid."""
+    ind = state.get("indicators", {})
+    rsi = ind.get("rsi", 50)
+    macd = ind.get("macd_diff", 0)
+    notes = dict(state.get("debate_notes") or {})
+
+    bearish = []
+    if rsi > 70:
+        bearish.append("RSI overbought — risk of reversal")
+    if macd < 0:
+        bearish.append("MACD negative — downward momentum")
+
+    notes["bear"] = {
+        "stance": "bearish" if bearish else "neutral",
+        "reasons": bearish or ["No strong bearish signal detected"],
+    }
+    return {"debate_notes": notes}
+
+
+def _risk_debate(state: SignalState) -> dict:
+    """Risk agent: evaluates position sizing and risk/reward."""
+    risk_params = state.get("risk_params") or {}
+    notes = dict(state.get("debate_notes") or {})
+    r_r = risk_params.get("r_r", 0)
+    pos_pct = risk_params.get("position_size_pct", 0)
+
+    warnings = []
+    if r_r > 0 and r_r < 1.5:
+        warnings.append(f"R:R ratio {r_r:.1f} below minimum 1.5 — reduce position")
+    if pos_pct > 8:
+        warnings.append(f"Position size {pos_pct:.1f}% is large — consider splitting entry")
+
+    notes["risk"] = {
+        "r_r": r_r,
+        "position_pct": pos_pct,
+        "warnings": warnings,
+        "approved": len(warnings) == 0,
+    }
+    return {"debate_notes": notes}
+
+
 # ── Node 3: score_signal (shared, asset-class-aware prompt) ──────────────────
 
 async def score_signal(state: SignalState) -> dict:
@@ -1230,6 +1299,9 @@ def build_signal_graph() -> Any:
     g.add_node("compute_fx",         compute_fx)
     g.add_node("compute_bond",       compute_bond)
     g.add_node("compute_commodity",  compute_commodity)
+    g.add_node("bull_debate",        _bull_debate)
+    g.add_node("bear_debate",        _bear_debate)
+    g.add_node("risk_debate",        _risk_debate)
     g.add_node("score_signal",       score_signal)
     g.add_node("persist_signal",     persist_signal)
 
@@ -1238,8 +1310,11 @@ def build_signal_graph() -> Any:
 
     for compute_node in ("compute_equity", "compute_fo", "compute_mf",
                          "compute_fx", "compute_bond", "compute_commodity"):
-        g.add_edge(compute_node, "score_signal")
+        g.add_edge(compute_node, "bull_debate")
 
+    g.add_edge("bull_debate",    "bear_debate")
+    g.add_edge("bear_debate",    "risk_debate")
+    g.add_edge("risk_debate",    "score_signal")
     g.add_edge("score_signal",   "persist_signal")
     g.add_edge("persist_signal", END)
 
@@ -1302,6 +1377,7 @@ async def _run_for_instrument(
         "score":              0.0,
         "risk_params":        {},
         "error":              None,
+        "debate_notes":       {},
     }
     result = await signal_graph.ainvoke(initial)
     # Refine horizon after fetch (holding_period_days is now populated)
