@@ -1,4 +1,5 @@
 // src/features/markets/retail/behavioral/BehavioralAlertBanner.tsx
+import { useState } from 'react';
 import { AlertTriangle, TrendingDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useLogBehavioralEvent } from './useBehavioralEvents';
@@ -16,9 +17,10 @@ export function BehavioralAlertBanner({
   portfolioId,
 }: BehavioralAlertBannerProps) {
   const { mutate: logEvent } = useLogBehavioralEvent();
+  const [dismissed, setDismissed] = useState(false);
 
   // Red tier is handled by CoolingOffScreen, not this banner
-  if (!alertTier || alertTier === 'red') return null;
+  if (dismissed || !alertTier || alertTier === 'red') return null;
 
   const isOrange = alertTier === 'orange';
   const pctStr = drawdownPct.toFixed(1);
@@ -30,11 +32,13 @@ export function BehavioralAlertBanner({
   const actionLabel = isOrange ? 'I understand, keep holding' : 'Understood';
 
   const handleDismiss = () => {
+    // Log first, then update UI
     logEvent({
       event_type: alertTier === 'orange' ? 'orange_alert' : 'yellow_alert',
       severity: isOrange ? 'warning' : 'info',
       metadata: { drawdown_pct: drawdownPct, portfolio_id: portfolioId, action: 'dismissed' },
     });
+    setDismissed(true);
   };
 
   const borderColor = isOrange

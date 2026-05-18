@@ -44,16 +44,25 @@ describe('BehavioralAlertBanner', () => {
     expect(screen.getByText(/recover|selling|lock/i)).toBeInTheDocument();
   });
 
-  it('dismiss button calls logEvent with correct event_type', async () => {
+  it('yellow dismiss button calls logEvent with yellow_alert event_type', async () => {
     const { BehavioralAlertBanner } = await import('./BehavioralAlertBanner');
     render(
       <BehavioralAlertBanner alertTier="yellow" drawdownPct={7} portfolioId="p1" />,
     );
-    // Click the dismiss/understood button
-    const btn = screen.getByRole('button');
-    fireEvent.click(btn);
+    fireEvent.click(screen.getByRole('button'));
     expect(mockMutate).toHaveBeenCalledWith(
       expect.objectContaining({ event_type: 'yellow_alert' }),
+    );
+  });
+
+  it('orange dismiss button calls logEvent with orange_alert event_type', async () => {
+    const { BehavioralAlertBanner } = await import('./BehavioralAlertBanner');
+    render(
+      <BehavioralAlertBanner alertTier="orange" drawdownPct={14} portfolioId="p1" />,
+    );
+    fireEvent.click(screen.getByRole('button'));
+    expect(mockMutate).toHaveBeenCalledWith(
+      expect.objectContaining({ event_type: 'orange_alert' }),
     );
   });
 });
