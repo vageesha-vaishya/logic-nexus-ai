@@ -10,6 +10,10 @@ vi.mock('@/features/markets/hooks/useActiveConnection', () => ({
   }),
 }));
 
+vi.mock('../behavioral/useBehavioralEvents', () => ({
+  useLogBehavioralEvent: () => ({ mutate: vi.fn() }),
+}));
+
 const mockSignal = {
   id: 's1',
   ts: '2026-05-18T10:00:00Z',
