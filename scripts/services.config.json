@@ -49,6 +49,22 @@
       "dependsOn": []
     },
     {
+      "id": "marketsWorker",
+      "name": "Markets Worker",
+      "command": "if command -v uv >/dev/null 2>&1; then cd services/markets-worker && uv run uvicorn markets_worker.main:create_app --factory --host 127.0.0.1 --port 8001 --reload; elif command -v python3 >/dev/null 2>&1 && python3 -c \"import uvicorn\" >/dev/null 2>&1; then cd services/markets-worker && python3 -m uvicorn markets_worker.main:create_app --factory --host 127.0.0.1 --port 8001 --reload; else node scripts/markets-worker-mock.mjs; fi",
+      "urlEnv": "VITE_MARKETS_WORKER_URL",
+      "defaultUrl": "http://127.0.0.1:8001",
+      "remoteUrlEnv": "VITE_MARKETS_WORKER_URL_REMOTE",
+      "remoteDefaultUrl": "",
+      "preferEndpoint": "local",
+      "healthPath": "/health",
+      "okStatus": [200],
+      "required": false,
+      "requiredWhenRemote": true,
+      "retry": { "attempts": 12, "baseDelayMs": 500, "timeoutMs": 30000 },
+      "dependsOn": []
+    },
+    {
       "id": "tenantBranding",
       "name": "Tenant Branding API",
       "command": null,

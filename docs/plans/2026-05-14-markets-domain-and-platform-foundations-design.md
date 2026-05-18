@@ -2458,6 +2458,119 @@ Append to §13 deferred decisions table:
 
 ---
 
+#### Charles Schwab (US)
+
+**Tier:** Full-service / Retail + Active Trader
+**Core differentiator:** Broad long-term investing stack plus competent active trading tools; strong education and support. (Benchmarks frequently rank Schwab among top overall brokers for 2026.)  
+Source: https://www.stockbrokers.com/guides/online-stock-brokers?wptouch_preview_theme=enabled
+
+**Strengths:**
+- Strong “one home” brokerage: equities, ETFs, mutual funds, bonds, options; cash management and retirement flows integrated
+- Research + education depth (screeners, analyst research, learning content) oriented for long-horizon retail portfolios
+- Multi-surface UX: web for investing, desktop tooling for active traders, mobile for fast actions
+- Operational trust: stability under volatility and robust customer support (key differentiator vs app-first brokers)
+
+**Weaknesses:**
+- Less “mobile-native delight” than Robinhood/Groww; onboarding and navigation feel more enterprise
+- Complex products exist but often require navigating multiple sub-flows; progressive disclosure is weaker than Robinhood
+
+**Standout Features:**
+- Education + research integrated directly into instrument pages (reduce context switching)
+- Clear retirement-first journeys (goal-based flows that remain comprehensible for non-experts)
+
+**UI/UX Signature:** Conservative, trust-centric design; heavy use of dashboards, tables, and well-labeled actions; optimized for clarity over novelty.
+
+---
+
+#### Fidelity (US)
+
+**Tier:** Full-service / Long-term investing + Active trader
+**Core differentiator:** Depth of research + product breadth; frequently ranked top overall among US brokers.  
+Source: https://www.investopedia.com/best-online-brokers-4587872
+
+**Strengths:**
+- Best-in-class education + research stack; strong support for novices who want to “level up”
+- Broad instrument coverage: equities, ETFs, mutual funds, fixed income, options; portfolio planning tools
+- “Explain the why” patterns: market commentary and educational funnels that reduce novice anxiety
+
+**Weaknesses:**
+- UI density can be high; the novice experience is not as “single-scroll” as Robinhood/Groww
+- Some advanced workflows still feel legacy (multiple pages, higher friction)
+
+**Standout Features:**
+- Learning-center-driven product design (education is not separate; it is embedded in decision points)
+- Portfolio analysis tooling that is understandable for retail but deep enough for semi-pro users
+
+**UI/UX Signature:** Education-heavy, information-rich, stability-first. Uses guidance + guardrails more than gamification.
+
+---
+
+#### IG (UK / Global)
+
+**Tier:** Active trading / CFDs + derivatives (jurisdiction dependent)
+**Core differentiator:** Multi-asset active trading with strong risk tools; web/mobile designed for frequent execution.
+
+**Strengths:**
+- Multi-asset access (commonly: FX, indices, commodities, CFDs; some regions have share dealing)
+- Risk tooling commonly includes guaranteed stops (where available), margin visibility, and fast execution UX
+- Suitable benchmark for “professional risk controls exposed in retail UI”
+
+**Weaknesses:**
+- Complex products (CFDs/leverage) increase suitability and compliance burden; not a direct India NSE/BSE comparable
+- UX optimized for traders; long-term investing flows can feel secondary
+
+**Standout Features:**
+- Prominent margin and stop-loss visibility in the ticket (risk shown before trade)
+- Fast “repeat order / reverse position / close all” workflows
+
+**UI/UX Signature:** Trading-first, instrument-centric navigation, with persistent risk context in the order flow.
+
+---
+
+#### Saxo (EU / Global)
+
+**Tier:** Professional-grade multi-asset (institutional polish for advanced retail)
+**Core differentiator:** High-quality cross-asset portfolio + analytics + execution across regions.
+
+**Strengths:**
+- Wide instrument coverage (region-dependent): equities, ETFs, bonds, FX, options, futures
+- Sophisticated portfolio analytics: exposures, risk, attribution (good benchmark for “advanced but explainable” analytics)
+- Strong “multi-currency + multi-exchange” UX patterns relevant to global expansion
+
+**Weaknesses:**
+- Advanced UI can overwhelm novices; learning curve is non-trivial
+- Premium positioning; UX often assumes user already understands concepts like margin and greeks
+
+**Standout Features:**
+- Cross-asset unified portfolio and reporting (single mental model for many instruments)
+- Professional-grade risk/exposure views that can be simplified into novice-friendly “risk tiles”
+
+**UI/UX Signature:** Polished, professional, dense-but-structured. Strong information architecture and analytics.
+
+---
+
+#### Binance (Global)
+
+**Tier:** Crypto-first / Spot + Perps + Options (jurisdiction dependent)
+**Core differentiator:** Liquidity + breadth of crypto instruments + extremely fast execution UX.
+
+**Strengths:**
+- Comprehensive crypto modes: spot, margin, futures/perpetuals, options (availability varies); rich order types
+- Strong “trader mode” patterns: ladder depth, funding rates, mark price, liquidation price, position management
+- Notifications and real-time status design patterns for high-volatility markets
+
+**Weaknesses:**
+- High compliance variability by region; product availability changes frequently
+- Retail risk exposure is high; UX often needs stronger educational guardrails for non-experts
+
+**Standout Features:**
+- Clear derivative risk surfaces: liquidation price, funding, mark vs last, margin ratio
+- Fast symbol search + favorites + multi-watchlist behavior optimized for high-frequency scanning
+
+**UI/UX Signature:** Dense, real-time, trader-centric. High information throughput with aggressive use of color/status indicators.
+
+---
+
 ### 18.4 Feature Gap Analysis — Logic Nexus vs Market Leaders
 
 The table below scores the **current gap** between Logic Nexus's present state (T2 completed per §17) and the market leader benchmark for each feature. Gap Score: 1 = near-parity, 5 = significant gap. Priority: P1 = T2.5 must-have, P2 = Phase 2 (Q4 2026), P3 = Phase 3 (Q1 2027), P4 = Phase 4 / future.

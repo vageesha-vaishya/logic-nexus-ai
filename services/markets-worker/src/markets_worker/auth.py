@@ -119,8 +119,8 @@ async def get_auth(
     logger.info("auth.jwt_user", user_id=user_id)
 
     # Pull tenant from x-tenant-id header (mirrors Edge Function convention)
-    tenant_id = request.headers.get("x-tenant-id")
-    franchise_id = request.headers.get("x-franchise-id")
+    tenant_id = (request.headers.get("x-tenant-id") or "").strip() or None
+    franchise_id = (request.headers.get("x-franchise-id") or "").strip() or None
 
     return AuthContext(
         user_id=user_id,

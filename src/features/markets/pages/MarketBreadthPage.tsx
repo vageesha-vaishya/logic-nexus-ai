@@ -12,7 +12,7 @@
  */
 
 import { useMemo } from "react";
-import { BarChart2, TrendingUp, TrendingDown, Minus, AlertTriangle, RefreshCw } from "lucide-react";
+import { BarChart3, TrendingUp, TrendingDown, Minus, AlertTriangle, RefreshCw } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
@@ -145,7 +145,7 @@ export default function MarketBreadthPage() {
         {/* ── Header ── */}
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-3">
-            <BarChart2 className="h-6 w-6 text-primary" />
+            <BarChart3 className="h-6 w-6 text-primary" />
             <div>
               <h1 className="text-xl font-semibold">Market Breadth</h1>
               <p className="text-sm text-muted-foreground">
@@ -174,7 +174,7 @@ export default function MarketBreadthPage() {
         {isError && (
           <ErrorState
             title="Failed to load breadth data"
-            description={(error as Error)?.message}
+            message={(error as Error)?.message || "Unknown error"}
           />
         )}
 

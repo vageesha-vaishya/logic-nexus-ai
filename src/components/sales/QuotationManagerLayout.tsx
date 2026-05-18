@@ -5,7 +5,7 @@ import {
   FileText, 
   Users, 
   CreditCard, 
-  BarChart2, 
+  BarChart3, 
   Settings, 
   Bot, 
   MessageSquare, 
@@ -204,7 +204,7 @@ export function QuotationManagerLayout({
             <DropdownMenuContent className="w-56">
               <DropdownMenuLabel>Sales Overview</DropdownMenuLabel>
               <DropdownMenuItem onClick={() => handleNavigation('/dashboard/sales')}>
-                <BarChart2 className="mr-2 h-4 w-4" />
+                <BarChart3 className="mr-2 h-4 w-4" />
                 Dashboard
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => handleNavigation('/dashboard/sales/performance')}>
@@ -263,7 +263,7 @@ export function QuotationManagerLayout({
               </DropdownMenuTrigger>
               <DropdownMenuContent>
                 <DropdownMenuItem onClick={() => handleNavigation('/dashboard/reports/sales')}>
-                  <BarChart2 className="mr-2 h-4 w-4" />
+                  <BarChart3 className="mr-2 h-4 w-4" />
                   Sales Analysis
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => handleNavigation('/dashboard/reports/reps')}>

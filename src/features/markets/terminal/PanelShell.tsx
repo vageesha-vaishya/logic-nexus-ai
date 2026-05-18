@@ -8,7 +8,7 @@
  */
 
 import {
-  BarChart2,
+  BarChart3,
   CandlestickChart,
   Eye,
   Layers,
@@ -39,7 +39,7 @@ const PANEL_ICONS: Record<string, React.ReactNode> = {
   Wallet:           <Wallet className="h-3.5 w-3.5" />,
   Radar:            <Radar className="h-3.5 w-3.5" />,
   Newspaper:        <Newspaper className="h-3.5 w-3.5" />,
-  BarChart2:        <BarChart2 className="h-3.5 w-3.5" />,
+  BarChart3:        <BarChart3 className="h-3.5 w-3.5" />,
   Layers:           <Layers className="h-3.5 w-3.5" />,
 };
 

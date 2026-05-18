@@ -90,7 +90,7 @@ export const PANEL_REGISTRY: Record<PanelType, PanelDefinition> = {
   depth: {
     type: "depth",
     title: "Market Depth",
-    icon: "BarChart2",
+    icon: "BarChart3",
     minWidth: 2,
     minHeight: 3,
     defaultWidth: 3,

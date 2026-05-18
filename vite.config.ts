@@ -87,7 +87,7 @@ export default defineConfig(({ mode }) => {
     healthPathHint: '/',
   });
   const marketsWorkerProxyTarget =
-    process.env.VITE_MARKETS_WORKER_TARGET || env.VITE_MARKETS_WORKER_TARGET || 'http://localhost:8001';
+    process.env.VITE_MARKETS_WORKER_TARGET || env.VITE_MARKETS_WORKER_TARGET || 'http://127.0.0.1:8001';
   const marketsWorkerProxy = createServiceProxy({
     serviceName: 'Markets Worker',
     startCommand: 'uv run python -m markets_worker.worker',
@@ -171,7 +171,7 @@ export default defineConfig(({ mode }) => {
     // Domain assignments - POST
     if (pathname === '/api/v1/domain-assignments' && method === 'POST') {
       let body = '';
-      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('data', (chunk: any) => { body += chunk.toString(); });
       req.on('end', async () => {
         try {
           const parsed = body ? JSON.parse(body) : {};
@@ -193,7 +193,7 @@ export default defineConfig(({ mode }) => {
 
           if (hasSupabaseAccess) {
             try {
-              const assignmentsToInsert = tenantIds.map(tenantId => ({
+              const assignmentsToInsert = tenantIds.map((tenantId: any) => ({
                 tenant_id: tenantId,
                 domain_id: domainId,
                 is_active: true,
@@ -225,7 +225,7 @@ export default defineConfig(({ mode }) => {
               }
 
               // Write audit log entries
-              const auditEntries = tenantIds.map(tenantId => ({
+              const auditEntries = tenantIds.map((tenantId: any) => ({
                 action: 'assign',
                 tenant_id: tenantId,
                 domain_id: domainId,
@@ -240,16 +240,16 @@ export default defineConfig(({ mode }) => {
 
               try {
                 await callSupabaseAPI('domain_audit_log', 'POST', auditEntries);
-              } catch (auditError) {
-                console.error('[Domain API] Failed to write audit log:', auditError.message);
+              } catch (auditError: any) {
+                console.error('[Domain API] Failed to write audit log:', String(auditError?.message || auditError));
                 // Don't fail the whole operation if audit log fails
               }
-            } catch (dbError) {
+            } catch (dbError: any) {
               // Check if it's a duplicate key error
-              if (dbError.message.includes('unique_violation') || 
-                  dbError.message.includes('duplicate key') ||
-                  dbError.message.includes('23505')) {
-                console.warn('[Domain API] Duplicate assignment detected, skipping:', dbError.message);
+              if (String(dbError?.message || '').includes('unique_violation') || 
+                  String(dbError?.message || '').includes('duplicate key') ||
+                  String(dbError?.message || '').includes('23505')) {
+                console.warn('[Domain API] Duplicate assignment detected, skipping:', String(dbError?.message || dbError));
                 // Try one-by-one to skip duplicates
                 const successfulAssignments: any[] = [];
                 for (const tenantId of tenantIds) {
@@ -278,11 +278,11 @@ export default defineConfig(({ mode }) => {
                         created_at: row.created_at,
                       })));
                     }
-                  } catch (individualError) {
+                  } catch (individualError: any) {
                     // Skip duplicates silently
-                    if (!individualError.message.includes('23505') && 
-                        !individualError.message.includes('duplicate key')) {
-                      console.error('[Domain API] Assignment failed:', individualError.message);
+                    if (!String(individualError?.message || '').includes('23505') && 
+                        !String(individualError?.message || '').includes('duplicate key')) {
+                      console.error('[Domain API] Assignment failed:', String(individualError?.message || individualError));
                     }
                   }
                 }
@@ -307,14 +307,14 @@ export default defineConfig(({ mode }) => {
 
                   try {
                     await callSupabaseAPI('domain_audit_log', 'POST', auditEntries);
-                  } catch (auditError) {
-                    console.error('[Domain API] Failed to write audit log:', auditError.message);
+                  } catch (auditError: any) {
+                    console.error('[Domain API] Failed to write audit log:', String(auditError?.message || auditError));
                   }
                 } else {
                   savedToDb = false;
                 }
               } else {
-                console.error('[Domain API] Supabase save failed, using in-memory:', dbError.message);
+                console.error('[Domain API] Supabase save failed, using in-memory:', String(dbError?.message || dbError));
                 savedToDb = false;
               }
             }
@@ -362,7 +362,7 @@ export default defineConfig(({ mode }) => {
     // Domain assignments - DELETE
     if (pathname === '/api/v1/domain-assignments' && method === 'DELETE') {
       let body = '';
-      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('data', (chunk: any) => { body += chunk.toString(); });
       req.on('end', async () => {
         try {
           const parsed = body ? JSON.parse(body) : {};
@@ -393,7 +393,7 @@ export default defineConfig(({ mode }) => {
 
               // Write audit log entries
               if (revokedCount > 0) {
-                const auditEntries = tenantIds.slice(0, revokedCount).map(tenantId => ({
+                const auditEntries = tenantIds.slice(0, revokedCount).map((tenantId: any) => ({
                   action: 'revoke',
                   tenant_id: tenantId,
                   domain_id: domainId,
@@ -404,12 +404,12 @@ export default defineConfig(({ mode }) => {
 
                 try {
                   await callSupabaseAPI('domain_audit_log', 'POST', auditEntries);
-                } catch (auditError) {
-                  console.error('[Domain API] Failed to write audit log:', auditError.message);
+                } catch (auditError: any) {
+                  console.error('[Domain API] Failed to write audit log:', String(auditError?.message || auditError));
                 }
               }
-            } catch (dbError) {
-              console.error('[Domain API] Supabase delete failed, using in-memory:', dbError.message);
+            } catch (dbError: any) {
+              console.error('[Domain API] Supabase delete failed, using in-memory:', String(dbError?.message || dbError));
               savedToDb = false;
             }
           }
@@ -512,7 +512,7 @@ export default defineConfig(({ mode }) => {
     // Domain config - PUT
     if (pathname === '/api/v1/domain-config' && method === 'PUT') {
       let body = '';
-      req.on('data', chunk => { body += chunk.toString(); });
+      req.on('data', (chunk: any) => { body += chunk.toString(); });
       req.on('end', () => {
         try {
           const parsed = body ? JSON.parse(body) : {};
