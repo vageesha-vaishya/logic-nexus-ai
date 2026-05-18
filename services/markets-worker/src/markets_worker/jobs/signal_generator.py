@@ -1033,6 +1033,20 @@ async def persist_signal(state: SignalState) -> dict:
         },
     }
 
+    # Generate LLM explanations for equity/MF signals with sufficient confidence
+    if state.get("asset_class") in ("equity", "mf", "mutual_fund") and state.get("confidence", 0) >= 0.60:
+        explanations = await _generate_explanations(
+            symbol=state["symbol"],
+            asset_class=state["asset_class"],
+            signal_type=state.get("signal_type", "hold"),
+            confidence=state["confidence"],
+            rationale=state.get("rationale", ""),
+            risk_params=state.get("risk_params", {}),
+            horizon=state.get("horizon", "short_term"),
+        )
+        if explanations:
+            row["metadata"] = {**(row["metadata"] or {}), "explanations": explanations}
+
     try:
         db  = get_supabase()
         today_start = datetime.now(timezone.utc).replace(
@@ -1116,6 +1130,98 @@ def _should_continue(state: SignalState) -> str:
     if state.get("error") and not state.get("prices"):
         return END
     return _route_to_compute(state)
+
+
+# ── LLM Explanation Layer ─────────────────────────────────────────────────────
+# Generates 3-level explanations for retail users. Called async post-scoring.
+# Returns {} on any failure so it never breaks the signal pipeline.
+
+_EXPLANATION_SYSTEM_PROMPT = """\
+You are a financial signal explainer for a retail investment app.
+Given a trading signal, produce explanations at three reading levels.
+Return ONLY valid JSON with exactly these three keys:
+{"beginner": "...", "casual": "...", "self_directed": "..."}
+
+- beginner: 1-2 plain English sentences, no numbers except the action
+- casual: 2-3 sentences with key indicator name, confidence %, entry price
+- self_directed: full technical detail — all indicators used, confidence with CI note,
+  stop loss, target, R/R ratio, brief note on historical accuracy for this signal type
+"""
+
+
+async def _call_llm_for_explanation(prompt_text: str) -> dict:
+    """Call the configured LLM provider and return parsed JSON. Returns {} on any error."""
+    import re
+
+    config = resolve_llm_config()
+    if not config:
+        return {}
+
+    if config.provider in ("anthropic", "claude"):
+        try:
+            import anthropic
+            client = anthropic.AsyncAnthropic(api_key=config.api_key)
+            msg = await client.messages.create(
+                model=config.model,
+                max_tokens=512,
+                temperature=0,
+                system=_EXPLANATION_SYSTEM_PROMPT,
+                messages=[{"role": "user", "content": prompt_text}],
+            )
+            raw = msg.content[0].text
+            m = re.search(r"\{.*\}", raw, re.DOTALL)
+            return json.loads(m.group()) if m else {}
+        except Exception as exc:
+            logger.warning("explanation_llm_call_failed", error=str(exc))
+            return {}
+
+    # Other providers not implemented in Phase 1
+    return {}
+
+
+async def _generate_explanations(
+    symbol: str,
+    asset_class: str,
+    signal_type: str,
+    confidence: float,
+    rationale: str,
+    risk_params: dict,
+    horizon: str,
+) -> dict:
+    """Generate beginner/casual/self_directed explanations. Returns {} on any failure."""
+    try:
+        prompt = (
+            f"Symbol: {symbol}\n"
+            f"Asset class: {asset_class}\n"
+            f"Signal: {signal_type}\n"
+            f"Horizon: {horizon}\n"
+            f"Confidence: {confidence:.0%}\n"
+            f"Rationale: {rationale}\n"
+            f"Stop loss: {risk_params.get('stop_loss_pct', 'N/A')}%  "
+            f"Target: {risk_params.get('target_pct', 'N/A')}%  "
+            f"R/R: {risk_params.get('r_r', 'N/A')}"
+        )
+        return await _call_llm_for_explanation(prompt)
+    except Exception as exc:
+        logger.warning("generate_explanations_failed", symbol=symbol, error=str(exc))
+        return {}
+
+
+def _run_async(coro):
+    """Run a coroutine safely regardless of whether an event loop is running."""
+    import asyncio
+    import concurrent.futures
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're inside an async context — schedule via a new thread
+            with concurrent.futures.ThreadPoolExecutor() as pool:
+                future = pool.submit(asyncio.run, coro)
+                return future.result()
+        else:
+            return loop.run_until_complete(coro)
+    except RuntimeError:
+        return asyncio.run(coro)
 
 
 # ── Graph assembly ────────────────────────────────────────────────────────────
