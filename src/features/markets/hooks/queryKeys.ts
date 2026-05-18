@@ -151,5 +151,9 @@ export const marketsKeys = {
     profile: () => [...marketsKeys.all, "retail", "profile"] as const,
     tiers:   () => [...marketsKeys.all, "retail", "tiers"] as const,
     signals: (f?: object) => [...marketsKeys.all, "retail", "signals", f ?? {}] as const,
+    behavioral: {
+      stress: () => [...marketsKeys.all, "retail", "behavioral", "stress"] as const,
+      events: () => [...marketsKeys.all, "retail", "behavioral", "events"] as const,
+    },
   },
 } as const;
