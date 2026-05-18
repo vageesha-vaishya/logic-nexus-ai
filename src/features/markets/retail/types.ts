@@ -43,6 +43,13 @@ export interface PortfolioTier {
   updated_at: string;
 }
 
+/** Draft shape used during onboarding before tiers are persisted. */
+export interface TierDraft {
+  tier_number: 1 | 2 | 3;
+  portfolio_id: string | null;
+  target_amount: number | null;
+}
+
 export interface UpsertTierInput {
   tier_number: 1 | 2 | 3;
   name: TierName;

@@ -20,11 +20,7 @@ export function GoalSelector({ selected, onChange }: GoalSelectorProps) {
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">Select up to 3 goals</p>
       {GOALS.map(({ id, label }) => (
-        <div
-          key={id}
-          className="flex items-center gap-3 cursor-pointer"
-          onClick={() => toggle(id)}
-        >
+        <div key={id} className="flex items-center gap-3 cursor-pointer">
           <Checkbox
             id={id}
             checked={selected.includes(id)}

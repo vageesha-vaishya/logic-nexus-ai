@@ -19,17 +19,12 @@ import {
   TIER_DEFAULTS,
   type ExperienceLevel,
   type Goal,
+  type TierDraft,
 } from '../types';
 import { useUpsertRiskProfile } from '../hooks/useRiskProfile';
 import { useUpsertPortfolioTier } from '../hooks/usePortfolioTiers';
 
 const STEPS = ['Experience', 'Goals', 'Timeline', 'Quiz', 'Tiers'] as const;
-
-interface TierDraft {
-  tier_number: 1 | 2 | 3;
-  portfolio_id: string | null;
-  target_amount: number | null;
-}
 
 interface OnboardingWizardProps {
   onComplete: () => void;

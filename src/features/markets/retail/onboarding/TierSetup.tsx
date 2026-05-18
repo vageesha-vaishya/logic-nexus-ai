@@ -8,14 +8,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { TIER_DEFAULTS } from '../types';
+import { TIER_DEFAULTS, type TierDraft } from '../types';
 import { usePortfolios } from '../../hooks/usePortfolios';
-
-interface TierDraft {
-  tier_number: 1 | 2 | 3;
-  portfolio_id: string | null;
-  target_amount: number | null;
-}
 
 interface TierSetupProps {
   tiers: TierDraft[];
