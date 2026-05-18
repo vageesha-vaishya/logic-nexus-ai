@@ -101,6 +101,9 @@ export function RetailMode() {
         experienceLevel={profile.experience_level}
         isHighStress={isHighStress}
         seenEducationIds={seenEducationIds}
+        coreDrawdownTier={coreDrawdown.alertTier}
+        coreDrawdownPct={coreDrawdown.drawdownPct}
+        corePortfolioId={coreTier?.portfolio_id ?? ''}
       />
     </div>
   );

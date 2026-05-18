@@ -23,6 +23,12 @@ vi.mock('../../components/OrderFormSheet', () => ({
     open ? <div data-testid="order-form">OrderForm</div> : null,
 }));
 
+// CoolingOffScreen calls useLogBehavioralEvent (TanStack mutation); stub it out
+// so the sheet test doesn't need a QueryClient wrapper.
+vi.mock('../behavioral/useBehavioralEvents', () => ({
+  useLogBehavioralEvent: () => ({ mutate: vi.fn() }),
+}));
+
 import { ExecutionBottomSheet } from './ExecutionBottomSheet';
 import type { RetailSignal } from '../types';
 
@@ -83,5 +89,81 @@ describe('ExecutionBottomSheet', () => {
       wrap(<ExecutionBottomSheet signal={null} open onOpenChange={vi.fn()} />),
     );
     expect(container.firstChild).toBeNull();
+  });
+
+  it('skips cooling-off and goes straight to OrderFormSheet for a BUY', async () => {
+    const onOpenChange = vi.fn();
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    render(
+      wrap(
+        <ExecutionBottomSheet
+          signal={mockSignal}
+          open
+          onOpenChange={onOpenChange}
+          coreDrawdownTier="red"
+          coreDrawdownPct={23}
+          corePortfolioId="p1"
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /proceed to buy/i }));
+
+    expect(screen.getByTestId('order-form')).toBeInTheDocument();
+    // CoolingOffScreen mustn't have appeared — its hallmark button is "Proceed anyway".
+    expect(screen.queryByRole('button', { name: /proceed anyway/i })).not.toBeInTheDocument();
+  });
+
+  it('interposes the CoolingOffScreen for a SELL during a red-tier drawdown', async () => {
+    const onOpenChange = vi.fn();
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    const sellSignal = { ...mockSignal, signal_type: 'sell' } as unknown as RetailSignal;
+
+    render(
+      wrap(
+        <ExecutionBottomSheet
+          signal={sellSignal}
+          open
+          onOpenChange={onOpenChange}
+          coreDrawdownTier="red"
+          coreDrawdownPct={23}
+          corePortfolioId="p1"
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /proceed to sell/i }));
+
+    // The OrderFormSheet should NOT be open yet; cooling-off intervened.
+    expect(screen.queryByTestId('order-form')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /proceed anyway/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /wait 24 hours/i })).toBeInTheDocument();
+  });
+
+  it('does NOT interpose cooling-off for a SELL when drawdown is below red', async () => {
+    const onOpenChange = vi.fn();
+    const { default: userEvent } = await import('@testing-library/user-event');
+    const user = userEvent.setup();
+
+    const sellSignal = { ...mockSignal, signal_type: 'sell' } as unknown as RetailSignal;
+
+    render(
+      wrap(
+        <ExecutionBottomSheet
+          signal={sellSignal}
+          open
+          onOpenChange={onOpenChange}
+          coreDrawdownTier="orange"
+          coreDrawdownPct={12}
+          corePortfolioId="p1"
+        />,
+      ),
+    );
+    await user.click(screen.getByRole('button', { name: /proceed to sell/i }));
+
+    expect(screen.getByTestId('order-form')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /proceed anyway/i })).not.toBeInTheDocument();
   });
 });

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 
 import { InlineEducation } from '../behavioral/InlineEducation';
+import type { AlertTier } from '../behavioral/types';
 import { useInlineEducation } from '../behavioral/useInlineEducation';
 import { ExecutionBottomSheet } from './ExecutionBottomSheet';
 import { SignalCard } from './SignalCard';
@@ -28,6 +29,10 @@ interface RetailSignalFeedProps {
    * appears on first visit even before behavioral_events syncs.
    */
   seenEducationIds?: Set<string>;
+  /** Core (tier 2) drawdown — feeds the cooling-off interception on sells. */
+  coreDrawdownTier?: AlertTier;
+  coreDrawdownPct?: number;
+  corePortfolioId?: string;
 }
 
 export function RetailSignalFeed({
@@ -35,6 +40,9 @@ export function RetailSignalFeed({
   onExecute,
   isHighStress = false,
   seenEducationIds,
+  coreDrawdownTier,
+  coreDrawdownPct,
+  corePortfolioId,
 }: RetailSignalFeedProps) {
   const [filters, setFilters] = useState<SignalFilterState>({
     assetClass:    undefined,
@@ -127,6 +135,9 @@ export function RetailSignalFeed({
           onOpenChange={(open) => {
             if (!open) setSheetSignal(null);
           }}
+          coreDrawdownTier={coreDrawdownTier}
+          coreDrawdownPct={coreDrawdownPct}
+          corePortfolioId={corePortfolioId}
         />
       )}
     </div>

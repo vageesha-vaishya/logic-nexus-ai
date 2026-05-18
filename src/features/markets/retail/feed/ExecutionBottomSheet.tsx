@@ -10,6 +10,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 
+import { CoolingOffScreen } from '../behavioral/CoolingOffScreen';
+import type { AlertTier } from '../behavioral/types';
 import { OrderFormSheet } from '../../components/OrderFormSheet';
 import { useActiveConnection } from '../../hooks/useActiveConnection';
 import type { RetailSignal } from '../types';
@@ -18,21 +20,34 @@ interface ExecutionBottomSheetProps {
   signal: RetailSignal | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /**
+   * Current alert tier on the user's Core portfolio (tier 2). When 'red' and
+   * the action is a SELL, the cooling-off screen interposes between this
+   * sheet and the OrderFormSheet — informational only, never blocks.
+   */
+  coreDrawdownTier?: AlertTier;
+  coreDrawdownPct?: number;
+  corePortfolioId?: string;
 }
 
 /**
- * Two-step trade confirmation:
+ * Two-step (sometimes three-step) trade confirmation:
  *   1. Bottom sheet shows the signal summary + SEBI-mandated disclaimer.
- *   2. Tapping "Proceed" closes this sheet and opens the canonical
- *      OrderFormSheet (the same form QuickTradeButton uses), pre-filled with
- *      symbol/exchange/side.
- *
- * The disclaimer text is intentionally explicit per SEBI's investor-protection
- * guidance for retail-facing trading apps.
+ *   2. (Optional) CoolingOffScreen when selling during a red-tier drawdown.
+ *   3. OrderFormSheet (the canonical broker order form) opens pre-filled
+ *      with symbol/exchange/side.
  */
-export function ExecutionBottomSheet({ signal, open, onOpenChange }: ExecutionBottomSheetProps) {
+export function ExecutionBottomSheet({
+  signal,
+  open,
+  onOpenChange,
+  coreDrawdownTier,
+  coreDrawdownPct = 0,
+  corePortfolioId = '',
+}: ExecutionBottomSheetProps) {
   const { connection, hasTradeableConnection } = useActiveConnection();
   const [orderOpen, setOrderOpen] = useState(false);
+  const [coolingOpen, setCoolingOpen] = useState(false);
 
   if (!signal) return null;
 
@@ -47,9 +62,19 @@ export function ExecutionBottomSheet({ signal, open, onOpenChange }: ExecutionBo
 
   const canProceed = Boolean(connection) && (isBuy || isSell);
 
+  // Red-tier cooling-off is interposed only when:
+  //   1. The action is a SELL (panic-sell scenario).
+  //   2. The user's Core portfolio is in red-tier drawdown.
+  // Buys are unaffected; yellow/orange are handled by the dashboard banner.
+  const needsCoolingOff = isSell && coreDrawdownTier === 'red';
+
   const handleProceed = () => {
     onOpenChange(false);
-    setOrderOpen(true);
+    if (needsCoolingOff) {
+      setCoolingOpen(true);
+    } else {
+      setOrderOpen(true);
+    }
   };
 
   return (
@@ -107,6 +132,18 @@ export function ExecutionBottomSheet({ signal, open, onOpenChange }: ExecutionBo
           </div>
         </SheetContent>
       </Sheet>
+
+      {/* Cooling-off interposes for red-tier sells only. */}
+      <CoolingOffScreen
+        open={coolingOpen}
+        drawdownPct={coreDrawdownPct}
+        portfolioId={corePortfolioId}
+        onClose={() => setCoolingOpen(false)}
+        onProceed={() => {
+          setCoolingOpen(false);
+          setOrderOpen(true);
+        }}
+      />
 
       {connection && (
         <OrderFormSheet
