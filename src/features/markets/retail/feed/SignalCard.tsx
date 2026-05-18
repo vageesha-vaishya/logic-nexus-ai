@@ -22,10 +22,7 @@ interface SignalCardProps {
 }
 
 export function SignalCard({ signal, experienceLevel, onExecute }: SignalCardProps) {
-  const { instrument, confidence = 0, metadata, signal_type } = signal;
-  // risk_params and horizon are not on the base Signal type; access via any
-  const risk_params = (signal as any).risk_params as Record<string, unknown> | undefined;
-  const horizon = (signal as any).horizon as string | undefined;
+  const { instrument, confidence = 0, metadata, signal_type, horizon, risk_params } = signal;
 
   const expl = metadata?.explanations;
   const symbol = instrument?.symbol ?? '—';

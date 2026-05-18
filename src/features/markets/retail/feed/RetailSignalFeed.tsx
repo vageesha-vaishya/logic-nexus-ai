@@ -6,7 +6,7 @@ import type { ExperienceLevel, RetailSignal } from '../types';
 
 interface RetailSignalFeedProps {
   experienceLevel: ExperienceLevel;
-  onExecute: (signal: RetailSignal) => void;
+  onExecute?: (signal: RetailSignal) => void;
 }
 
 export function RetailSignalFeed({ experienceLevel, onExecute }: RetailSignalFeedProps) {
@@ -44,7 +44,7 @@ export function RetailSignalFeed({ experienceLevel, onExecute }: RetailSignalFee
           Failed to load signals. Is the markets worker running?
         </p>
       )}
-      {!isLoading && signals.length === 0 && (
+      {!isLoading && !isError && signals.length === 0 && (
         <p className="text-sm text-muted-foreground text-center py-8">
           No signals match your filters right now.
         </p>
