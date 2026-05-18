@@ -162,5 +162,11 @@ export const marketsKeys = {
       audit:      () => [...marketsKeys.retail.all(), 'autonomous', 'audit'] as const,
       killSwitch: () => [...marketsKeys.retail.all(), 'autonomous', 'kill-switch'] as const,
     },
+    community: {
+      baskets:    () => [...marketsKeys.retail.all(), 'community', 'baskets'] as const,
+      basket:     (id: string) => [...marketsKeys.retail.all(), 'community', 'basket', id] as const,
+      strategies: () => [...marketsKeys.retail.all(), 'community', 'strategies'] as const,
+      creator:    () => [...marketsKeys.retail.all(), 'community', 'creator'] as const,
+    },
   },
 } as const;
