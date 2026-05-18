@@ -1,9 +1,11 @@
 import { useState, useMemo } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { OnboardingWizard } from './onboarding/OnboardingWizard';
 import { RetailDashboard } from './dashboard/RetailDashboard';
 import { RetailSignalFeed } from './feed/RetailSignalFeed';
 import { ExecutionBottomSheet } from './feed/ExecutionBottomSheet';
+import { AutoExecutionSetup } from './autonomous/AutoExecutionSetup';
 import { BehavioralAlertBanner } from './behavioral/BehavioralAlertBanner';
 import { useRiskProfile } from './hooks/useRiskProfile';
 import { usePortfolioTiers } from './hooks/usePortfolioTiers';
@@ -66,12 +68,32 @@ export function RetailMode() {
 
       <hr className="border-border" />
 
-      <RetailSignalFeed
-        experienceLevel={profile.experience_level}
-        isHighStress={isHighStress}
-        seenEducationIds={seenEducationIds}
-        onExecute={(signal) => setExecuting(signal)}
-      />
+      {profile.experience_level === 'self_directed' ? (
+        <Tabs defaultValue="feed">
+          <TabsList className="w-full">
+            <TabsTrigger value="feed" className="flex-1 text-xs">Signals</TabsTrigger>
+            <TabsTrigger value="auto" className="flex-1 text-xs">Auto-Execute</TabsTrigger>
+          </TabsList>
+          <TabsContent value="feed">
+            <RetailSignalFeed
+              experienceLevel={profile.experience_level}
+              isHighStress={isHighStress}
+              seenEducationIds={seenEducationIds}
+              onExecute={(signal) => setExecuting(signal)}
+            />
+          </TabsContent>
+          <TabsContent value="auto">
+            <AutoExecutionSetup />
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <RetailSignalFeed
+          experienceLevel={profile.experience_level}
+          isHighStress={isHighStress}
+          seenEducationIds={seenEducationIds}
+          onExecute={(signal) => setExecuting(signal)}
+        />
+      )}
 
       <ExecutionBottomSheet
         signal={executing}
