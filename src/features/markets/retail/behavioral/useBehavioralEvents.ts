@@ -14,8 +14,10 @@ export function useBehavioralEvents() {
     enabled: Boolean(session?.access_token),
     staleTime: 30_000,
     queryFn: async (): Promise<BehavioralEvent[]> => {
+      const token = session?.access_token;
+      if (!token) throw new Error('behavioral-events: unauthenticated');
       const resp = await fetch(`${WORKER_URL}/v1/retail/behavioral/events`, {
-        headers: { Authorization: `Bearer ${session!.access_token}` },
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (!resp.ok) throw new Error(`behavioral-events: ${resp.status}`);
       return resp.json();
@@ -33,10 +35,12 @@ export function useLogBehavioralEvent() {
       severity: 'info' | 'warning' | 'critical';
       metadata?: Record<string, unknown>;
     }) => {
+      const token = session?.access_token;
+      if (!token) throw new Error('log-event: unauthenticated');
       const resp = await fetch(`${WORKER_URL}/v1/retail/behavioral/events`, {
         method: 'POST',
         headers: {
-          Authorization: `Bearer ${session!.access_token}`,
+          Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({ ...payload, metadata: payload.metadata ?? {} }),
@@ -55,11 +59,13 @@ export function useAcknowledgeBehavioralEvent() {
 
   return useMutation({
     mutationFn: async (eventId: string) => {
+      const token = session?.access_token;
+      if (!token) throw new Error('ack-event: unauthenticated');
       const resp = await fetch(
         `${WORKER_URL}/v1/retail/behavioral/events/${eventId}/acknowledge`,
         {
           method: 'PATCH',
-          headers: { Authorization: `Bearer ${session!.access_token}` },
+          headers: { Authorization: `Bearer ${token}` },
         },
       );
       if (!resp.ok) throw new Error(`ack-event: ${resp.status}`);
