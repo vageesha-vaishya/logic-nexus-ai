@@ -152,9 +152,11 @@ async def get_retail_signals(
     horizon: str | None = None,
     min_confidence: float = 0.60,
 ):
-    """Return active signals filtered for retail investors (equity + MF by default)."""
+    """Return active signals filtered for retail investors (all asset classes by default)."""
     sb = get_supabase()
-    asset_classes = [asset_class] if asset_class else ["equity", "mutual_fund"]
+    asset_classes = [asset_class] if asset_class else [
+        "equity", "mutual_fund", "crypto", "derivative", "commodity", "fixed_income", "forex",
+    ]
     now_iso = datetime.now(timezone.utc).isoformat()
     q = (
         sb.schema("markets")

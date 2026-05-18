@@ -12,15 +12,22 @@ interface SignalFilterProps {
 }
 
 const ASSET_CLASSES = [
-  { value: undefined,     label: 'All' },
-  { value: 'equity',      label: 'Stocks' },
-  { value: 'mutual_fund', label: 'MF' },
+  { value: undefined,       label: 'All' },
+  { value: 'equity',        label: 'Stocks' },
+  { value: 'mutual_fund',   label: 'MF' },
+  { value: 'crypto',        label: 'Crypto' },
+  { value: 'derivative',    label: 'F&O' },
+  { value: 'commodity',     label: 'Commodity' },
+  { value: 'fixed_income',  label: 'Bonds' },
+  { value: 'forex',         label: 'Forex' },
 ];
 
 const HORIZONS = [
-  { value: undefined,     label: 'All' },
-  { value: 'short_term',  label: 'Swing' },
-  { value: 'long_term',   label: 'Long-term' },
+  { value: undefined,       label: 'All' },
+  { value: 'intraday',      label: 'Intraday' },
+  { value: 'short_term',    label: 'Swing' },
+  { value: 'medium_term',   label: 'Positional' },
+  { value: 'long_term',     label: 'Long-term' },
 ];
 
 export function SignalFilter({ filters, onChange }: SignalFilterProps) {

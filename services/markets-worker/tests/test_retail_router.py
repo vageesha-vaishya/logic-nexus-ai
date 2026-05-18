@@ -119,3 +119,14 @@ class TestRetailSignals:
         with patch("markets_worker.routers.retail.get_supabase", return_value=mock_sb):
             resp = client.get("/v1/retail/signals", headers=auth_headers)
         assert resp.status_code == 200
+
+    def test_accepts_crypto_asset_class(self, client, auth_headers):
+        """Crypto asset_class filter should be accepted and return 200."""
+        mock_sb = MagicMock()
+        chain = mock_sb.schema.return_value.from_.return_value.select.return_value
+        chain.gte.return_value.in_.return_value.not_.is_.return_value \
+            .gte.return_value.order.return_value \
+            .limit.return_value.execute.return_value = MagicMock(data=[], error=None)
+        with patch("markets_worker.routers.retail.get_supabase", return_value=mock_sb):
+            resp = client.get("/v1/retail/signals?asset_class=crypto", headers=auth_headers)
+        assert resp.status_code == 200
