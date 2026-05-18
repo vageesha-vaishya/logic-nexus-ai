@@ -148,12 +148,19 @@ export const marketsKeys = {
   },
 
   retail: {
+    all:     () => [...marketsKeys.all, "retail"] as const,
     profile: () => [...marketsKeys.all, "retail", "profile"] as const,
     tiers:   () => [...marketsKeys.all, "retail", "tiers"] as const,
     signals: (f?: object) => [...marketsKeys.all, "retail", "signals", f ?? {}] as const,
     behavioral: {
       stress: () => [...marketsKeys.all, "retail", "behavioral", "stress"] as const,
       events: () => [...marketsKeys.all, "retail", "behavioral", "events"] as const,
+    },
+    autonomous: {
+      progress:   () => [...marketsKeys.retail.all(), 'autonomous', 'progress'] as const,
+      rules:      () => [...marketsKeys.retail.all(), 'autonomous', 'rules'] as const,
+      audit:      () => [...marketsKeys.retail.all(), 'autonomous', 'audit'] as const,
+      killSwitch: () => [...marketsKeys.retail.all(), 'autonomous', 'kill-switch'] as const,
     },
   },
 } as const;
