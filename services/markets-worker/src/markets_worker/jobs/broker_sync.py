@@ -15,6 +15,7 @@ import structlog
 
 from markets_worker.brokers import build_adapter, decrypt_credentials, encrypt_credentials
 from markets_worker.db import get_supabase
+from markets_worker.notifications import notify_user_sync
 
 logger = structlog.get_logger()
 
@@ -336,6 +337,8 @@ def _upsert_orders(db, orders, portfolio_id, owner_id, tenant_id, franchise_id, 
         if existing and existing["status"] in ("complete", "cancelled", "rejected"):
             continue  # Don't overwrite terminal orders
 
+        prev_status = existing["status"] if existing else None
+
         row = {
             "portfolio_id":          portfolio_id,
             "owner_user_id":         owner_id,
@@ -364,6 +367,46 @@ def _upsert_orders(db, orders, portfolio_id, owner_id, tenant_id, franchise_id, 
             db.schema("markets").from_("orders").update(row).eq("id", existing["id"]).execute()
         else:
             db.schema("markets").from_("orders").insert(row).execute()
+
+        # Notify on transition into a terminal state.
+        new_status = o.status
+        terminal  = new_status in ("complete", "rejected", "cancelled")
+        changed   = new_status != prev_status
+        if terminal and changed and owner_id:
+            side = (o.transaction_type or "").upper()
+            sym  = o.tradingsymbol or ""
+            qty  = float(o.filled_quantity or o.quantity or 0)
+            price = float(o.avg_fill_price or o.price or 0)
+
+            if new_status == "complete":
+                title    = f"Order filled: {side} {sym}"
+                body     = f"{side} {qty:g} {sym} @ ₹{price:,.2f}"
+                severity = "success"
+            elif new_status == "rejected":
+                title    = f"Order rejected: {side} {sym}"
+                body     = (o.status_message or "Broker rejected the order.")[:200]
+                severity = "critical"
+            else:  # cancelled
+                title    = f"Order cancelled: {side} {sym}"
+                body     = (o.status_message or f"{side} {qty:g} {sym} was cancelled.")[:200]
+                severity = "warning"
+
+            notify_user_sync(
+                user_id=str(owner_id),
+                category="order_fill",
+                severity=severity,
+                title=title,
+                body=body,
+                data={
+                    "broker_order_id": o.broker_order_id,
+                    "symbol": sym,
+                    "side": side,
+                    "qty": qty,
+                    "price": price,
+                    "status": new_status,
+                },
+                link_url="/dashboard/markets/orders",
+            )
 
 
 # ── Sync helper (run async adapter methods synchronously in RQ worker) ────────

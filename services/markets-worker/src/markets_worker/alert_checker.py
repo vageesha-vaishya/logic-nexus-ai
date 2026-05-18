@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import structlog
 
 from markets_worker.db import get_supabase
-from markets_worker.notifications import notify_user, notify_user_sync
+from markets_worker.notifications import notify_user
 
 logger = structlog.get_logger()
 _POLL_INTERVAL = 30  # seconds
@@ -275,6 +275,37 @@ async def _check_rebalancing(db, loop) -> None:
                     weight=current_weight,
                 )
 
+                # Lookup the portfolio owner to deliver an in-app notification.
+                owner = await loop.run_in_executor(None, lambda p=portfolio_id:
+                    db.schema("markets").from_("portfolios")
+                      .select("owner_user_id")
+                      .eq("id", p)
+                      .maybe_single()
+                      .execute()
+                )
+                user_id = (owner.data or {}).get("owner_user_id") if owner else None
+                if user_id:
+                    sym = rule.get("symbol", "")
+                    target = rule.get("target_weight")
+                    target_str = f" (target {target}%)" if target is not None else ""
+                    body = (
+                        f"{sym} is {current_weight:.1f}% — {'above max' if direction == 'over' else 'below min'}{target_str}."
+                    )
+                    await notify_user(
+                        user_id=str(user_id),
+                        category="rebalance",
+                        severity="warning",
+                        title="Rebalance needed",
+                        body=body,
+                        data={
+                            "portfolio_id": portfolio_id,
+                            "symbol": sym,
+                            "direction": direction,
+                            "current_weight": round(current_weight, 2),
+                        },
+                        link_url="/dashboard/markets/portfolio",
+                    )
+
 
 async def _execute_due_sips(db, loop) -> None:
     """Execute SIP schedules due today (sip_day == today's day-of-month)."""
@@ -341,6 +372,21 @@ async def _execute_due_sips(db, loop) -> None:
                     .execute()
             )
             logger.info("sip.executed", schedule_id=sip["id"], scheme=sip["scheme_name"])
+
+            if sip.get("owner_user_id"):
+                await notify_user(
+                    user_id=str(sip["owner_user_id"]),
+                    category="sip",
+                    severity="success",
+                    title="SIP executed",
+                    body=f"₹{float(sip['amount']):,.0f} invested in {sip['scheme_name']}.",
+                    data={
+                        "schedule_id": sip["id"],
+                        "scheme_code": sip.get("scheme_code"),
+                        "amount": float(sip["amount"]),
+                    },
+                    link_url="/dashboard/markets/sip",
+                )
 
         except Exception as exc:
             logger.error("sip.execution_failed", schedule_id=sip.get("id"), error=str(exc))

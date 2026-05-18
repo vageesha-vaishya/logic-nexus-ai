@@ -146,4 +146,16 @@ export const marketsKeys = {
       [...marketsKeys.journal.all(), "list", filters ?? {}] as const,
     stats: (userId: string) => [...marketsKeys.journal.all(), "stats", userId] as const,
   },
+
+  retail: {
+    all:     () => [...marketsKeys.all, "retail"] as const,
+    profile: () => [...marketsKeys.retail.all(), "profile"] as const,
+    tiers:   () => [...marketsKeys.retail.all(), "tiers"] as const,
+    signals: (filters?: { tier?: 1 | 2 | 3; horizon?: string; assetClass?: string }) =>
+      [...marketsKeys.retail.all(), "signals", filters ?? {}] as const,
+    behavioral: {
+      stress: () => [...marketsKeys.retail.all(), "behavioral", "stress"] as const,
+      events: () => [...marketsKeys.retail.all(), "behavioral", "events"] as const,
+    },
+  },
 } as const;

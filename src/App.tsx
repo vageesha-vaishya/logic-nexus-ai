@@ -222,6 +222,7 @@ const MarketsResearch = lazy(() => import("./features/markets/pages/ResearchThre
 const MarketsStrategies = lazy(() => import("./features/markets/pages/StrategiesPage"));
 const MarketsBacktests = lazy(() => import("./features/markets/pages/BacktestsPage"));
 const MarketsSignals = lazy(() => import("./features/markets/pages/SignalsPage"));
+const MarketsRetail  = lazy(() => import("./features/markets/pages/RetailModePage"));
 const MarketsFno             = lazy(() => import("./features/markets/pages/FnoPage"));
 const MarketsStrategyBuilder = lazy(() => import("./features/markets/pages/StrategyBuilderPage"));
 const MarketsMf      = lazy(() => import("./features/markets/pages/MfPage"));
@@ -992,6 +993,7 @@ const App = () => (
             <Route path="/dashboard/markets/strategies" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsStrategies /></ProtectedRoute>} />
             <Route path="/dashboard/markets/backtests" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBacktests /></ProtectedRoute>} />
             <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSignals /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/retail" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRetail /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerConnections /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/brokers/:connectionId" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerPortfolio /></ProtectedRoute>} />

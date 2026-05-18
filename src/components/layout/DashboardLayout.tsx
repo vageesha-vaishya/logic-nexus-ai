@@ -54,7 +54,7 @@ import { ServiceStatusBadge } from '@/components/dev/ServiceStatusBadge';
 import { DarkModeToggle } from '@/components/system/DarkModeToggle';
 import { TradingModeToggle } from '@/components/system/TradingModeToggle';
 import { AIAssistantPanel } from '@/features/markets/components/AIAssistantPanel';
-import { useAlertRealtime } from '@/features/markets/hooks/useAlertRealtime';
+import { InAppNotificationBell, useNotificationsRealtime } from '@/features/notifications';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -185,7 +185,7 @@ function PipelineTrigger() {
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   useKeyboardShortcuts();
   // Global price-alert Realtime subscription — active on all dashboard pages
-  useAlertRealtime();
+  useNotificationsRealtime();
   const navigate = useNavigate();
   const location = useLocation();
   const { user, profile, roles, signOut, refreshProfile } = useAuth();
@@ -717,6 +717,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               <ServiceStatusBadge />
               <TradingModeToggle />
               <DarkModeToggle />
+              <InAppNotificationBell />
               <HelpDialog />
               {canShowDebugButton && (
                 <Tooltip>

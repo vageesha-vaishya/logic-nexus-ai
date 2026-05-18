@@ -28,7 +28,7 @@ import structlog
 from langgraph.graph import END, StateGraph
 
 from markets_worker.db import get_supabase
-from markets_worker.llm_gateway import resolve_llm_config
+from markets_worker.llm_gateway import invoke as llm_invoke, resolve_llm_config
 
 logger = structlog.get_logger()
 
@@ -975,6 +975,93 @@ def _rule_based_fallback(
     return "hold", "neutral", 0.30, 0.0, "No strong signal. Rule-based."
 
 
+# ── LLM Explanation Layer ────────────────────────────────────────────────────
+#
+# Decorates retail-facing signals (equity + MF) with three reading-level
+# explanations stored under metadata.explanations. Failures are swallowed: a
+# missing or malformed LLM response leaves metadata.explanations absent, and
+# the front-end falls back to the raw rationale.
+
+_EXPLANATION_SYSTEM_PROMPT = (
+    "You are a financial signal explainer for a retail investment app.\n"
+    "Given a trading signal, produce explanations at three reading levels.\n"
+    'Return ONLY valid JSON: {"beginner": "...", "casual": "...", "self_directed": "..."}\n'
+    "- beginner: 1–2 plain English sentences, no numbers except the action\n"
+    "- casual: 2–3 sentences with the key indicator, confidence %, entry price\n"
+    "- self_directed: full technical detail — all indicators, confidence CI, "
+    "stop, target, R/R, historical accuracy hint"
+)
+
+_EXPLANATION_KEYS = ("beginner", "casual", "self_directed")
+
+
+async def _call_llm_for_explanation(prompt_text: str) -> dict:
+    """Route through the project's llm_gateway so usage/cost is tracked and
+    the model selection follows the same per-tenant config every other LLM
+    call respects. Returns {} on any failure or unparsable response."""
+    import json
+    import re
+
+    try:
+        result = await llm_invoke(
+            task_id="markets.signal_explanation",
+            variables={},
+            system_override=_EXPLANATION_SYSTEM_PROMPT,
+            user_override=prompt_text,
+        )
+    except Exception as exc:
+        logger.warning("explanation.llm_invoke_failed", error=str(exc))
+        return {}
+
+    raw = getattr(result, "content", "") or ""
+    match = re.search(r"\{.*\}", raw, re.DOTALL)
+    if not match:
+        return {}
+    try:
+        parsed = json.loads(match.group())
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+async def _generate_explanations(
+    *,
+    symbol: str,
+    asset_class: str,
+    signal_type: str,
+    confidence: float,
+    rationale: str,
+    risk_params: dict,
+    horizon: str,
+) -> dict:
+    """Return a {beginner, casual, self_directed} dict, or {} on failure /
+    partial response. Caller merges into metadata only if non-empty."""
+    prompt = (
+        f"Symbol: {symbol}\n"
+        f"Asset class: {asset_class}\n"
+        f"Signal: {signal_type}\n"
+        f"Horizon: {horizon}\n"
+        f"Confidence: {confidence:.0%}\n"
+        f"Rationale: {rationale}\n"
+        f"Stop loss: {risk_params.get('stop_loss_pct', 'N/A')}%  "
+        f"Target: {risk_params.get('target_pct', 'N/A')}%  "
+        f"R/R: {risk_params.get('r_r', 'N/A')}"
+    )
+    try:
+        payload = await _call_llm_for_explanation(prompt)
+    except Exception as exc:
+        logger.warning("explanation.failed", symbol=symbol, error=str(exc))
+        return {}
+
+    # Require all three reading levels — partial responses are not useful and
+    # would force the frontend into mixed-fallback logic.
+    if not isinstance(payload, dict):
+        return {}
+    if not all(isinstance(payload.get(k), str) and payload[k].strip() for k in _EXPLANATION_KEYS):
+        return {}
+    return {k: payload[k] for k in _EXPLANATION_KEYS}
+
+
 # ── Node 4: persist_signal (upsert to avoid duplicates) ──────────────────────
 
 async def persist_signal(state: SignalState) -> dict:
@@ -1005,6 +1092,38 @@ async def persist_signal(state: SignalState) -> dict:
     horizon   = state.get("horizon", HORIZON_MEDIUM)
     asset_cls = state.get("asset_class", "equity")
 
+    # Retail explanation layer: only for the asset classes the retail product
+    # surfaces (equity + MF) and only for signals confident enough to be shown
+    # — anything below 0.60 won't make the feed anyway, so skip the LLM cost.
+    explanations: dict = {}
+    if (
+        asset_cls in ("equity", "mf")
+        and float(state.get("confidence") or 0) >= 0.60
+        and state.get("signal_type") != "hold"
+    ):
+        try:
+            explanations = await _generate_explanations(
+                symbol=state["symbol"],
+                asset_class=asset_cls,
+                signal_type=state["signal_type"],
+                confidence=float(state["confidence"]),
+                rationale=state.get("rationale") or "",
+                risk_params=state.get("risk_params") or {},
+                horizon=horizon,
+            )
+        except Exception as exc:
+            logger.warning("persist_signal.explanation_skipped",
+                           symbol=state.get("symbol"), error=str(exc))
+
+    metadata: dict = {
+        "indicators":          state.get("indicators", {}),
+        "symbol":              state["symbol"],
+        "exchange":            state["exchange"],
+        "holding_period_days": state.get("holding_period_days"),
+    }
+    if explanations:
+        metadata["explanations"] = explanations
+
     row = {
         "instrument_id":   state["instrument_id"],
         "tenant_id":       state["tenant_id"],
@@ -1025,12 +1144,7 @@ async def persist_signal(state: SignalState) -> dict:
         "instrument_type": state.get("instrument_type", "EQ"),
         "horizon":         horizon,
         "risk_params":     state.get("risk_params", {}),
-        "metadata": {
-            "indicators":            state.get("indicators", {}),
-            "symbol":                state["symbol"],
-            "exchange":              state["exchange"],
-            "holding_period_days":   state.get("holding_period_days"),
-        },
+        "metadata":        metadata,
     }
 
     try:

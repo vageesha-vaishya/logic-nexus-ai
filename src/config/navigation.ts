@@ -213,6 +213,12 @@ export const APP_MENU: MenuModule[] = [
         description: 'AI-generated buy, sell, and hold signals across instruments',
       },
       {
+        name: 'Retail Mode',
+        path: '/dashboard/markets/retail',
+        icon: PiggyBank,
+        description: 'Beginner-friendly three-tier portfolio with adaptive signal explanations',
+      },
+      {
         name: 'Trade Ideas',
         path: '/dashboard/markets/ideas',
         icon: Lightbulb,
