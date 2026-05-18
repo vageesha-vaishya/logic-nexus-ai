@@ -1,5 +1,4 @@
 import { Progress } from '@/components/ui/progress';
-import { formatCurrency } from '@/lib/utils';
 
 interface GoalProgressAnchorProps {
   currentValue: number;
@@ -8,6 +7,8 @@ interface GoalProgressAnchorProps {
   targetYear: number;
 }
 
+const fmt = (n: number) => `₹${n.toLocaleString('en-IN')}`;
+
 export function GoalProgressAnchor({
   currentValue,
   targetValue,
@@ -15,8 +16,8 @@ export function GoalProgressAnchor({
   targetYear,
 }: GoalProgressAnchorProps) {
   const pct = Math.min(Math.round((currentValue / targetValue) * 100), 100);
-  const fmtTarget = formatCurrency(targetValue, 'INR', { minimumFractionDigits: 0 });
-  const fmtCurrent = formatCurrency(currentValue, 'INR', { minimumFractionDigits: 0 });
+  const fmtTarget = fmt(targetValue);
+  const fmtCurrent = fmt(currentValue);
 
   return (
     <div className="space-y-1">

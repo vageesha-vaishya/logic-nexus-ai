@@ -16,7 +16,7 @@ export function RetailDashboard({ profile }: RetailDashboardProps) {
           </p>
         </div>
       </div>
-      <PortfolioTierView />
+      <PortfolioTierView profileGoals={profile.goals} />
     </div>
   );
 }

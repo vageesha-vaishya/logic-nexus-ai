@@ -4,11 +4,23 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { usePortfolioTiers } from '../hooks/usePortfolioTiers';
 import { usePortfolioPnL } from '../../hooks/usePortfolioPnL';
 import { GoalProgressAnchor } from './GoalProgressAnchor';
-import type { PortfolioTier } from '../types';
+import type { Goal, PortfolioTier } from '../types';
 
-function TierCard({ tier }: { tier: PortfolioTier }) {
+interface TierCardProps {
+  tier: PortfolioTier;
+  profileGoals: Goal[];
+}
+
+function TierCard({ tier, profileGoals }: TierCardProps) {
   const pnl = usePortfolioPnL(tier.portfolio_id ?? undefined, 365);
   const summary = pnl.data?.summary;
+
+  // Match the tier's first goal against profile goals to get the target year
+  const firstGoalId = tier.goals[0];
+  const matchedGoal = profileGoals.find((g) => g.goal === firstGoalId);
+  const targetYear = matchedGoal
+    ? new Date().getFullYear() + matchedGoal.years
+    : new Date().getFullYear() + 10;
 
   return (
     <Card>
@@ -42,8 +54,8 @@ function TierCard({ tier }: { tier: PortfolioTier }) {
           <GoalProgressAnchor
             currentValue={summary.current_nav}
             targetValue={tier.target_amount}
-            goalLabel={tier.goals[0] ?? tier.name}
-            targetYear={new Date().getFullYear() + 10}
+            goalLabel={firstGoalId ?? tier.name}
+            targetYear={targetYear}
           />
         )}
       </CardContent>
@@ -51,7 +63,11 @@ function TierCard({ tier }: { tier: PortfolioTier }) {
   );
 }
 
-export function PortfolioTierView() {
+interface PortfolioTierViewProps {
+  profileGoals?: Goal[];
+}
+
+export function PortfolioTierView({ profileGoals = [] }: PortfolioTierViewProps) {
   const { data: tiers = [], isLoading } = usePortfolioTiers();
 
   if (isLoading) {
@@ -76,7 +92,7 @@ export function PortfolioTierView() {
       </TabsList>
       {tiers.map((t) => (
         <TabsContent key={t.tier_number} value={String(t.tier_number)}>
-          <TierCard tier={t} />
+          <TierCard tier={t} profileGoals={profileGoals} />
         </TabsContent>
       ))}
     </Tabs>
