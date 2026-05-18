@@ -41,7 +41,9 @@ def validate_circuit_breaker(symbol_key: str, ltp_cache: dict, side: str = "BUY"
     if not entry:
         return ValidationResult(False, f"Price not found in cache for {symbol_key}")
     _, data = entry
-    ltp = data.get("ltp", 0)
+    ltp = data.get("ltp")
+    if ltp is None:
+        return ValidationResult(False, f"LTP not found in cache data for {symbol_key}")
     upper = data.get("upper_circuit")
     lower = data.get("lower_circuit")
     if upper and side == "BUY" and ltp >= upper:

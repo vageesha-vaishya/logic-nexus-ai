@@ -67,3 +67,10 @@ class TestCircuitBreaker:
         cache = {"RELIANCE:NSE": (FRESH, {"ltp": 2890.0})}
         r = validate_circuit_breaker("RELIANCE:NSE", cache)
         assert r.passed is True
+
+    def test_missing_ltp_in_cache_data_fails(self):
+        # Cache entry exists but data dict has no 'ltp' key
+        cache = {"RELIANCE:NSE": (FRESH, {"prev_price": 2880.0})}
+        r = validate_circuit_breaker("RELIANCE:NSE", cache)
+        assert r.passed is False
+        assert "ltp" in r.reason.lower()
