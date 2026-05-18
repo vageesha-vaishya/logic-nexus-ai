@@ -62,7 +62,7 @@ class SignalState(TypedDict):
     instrument_id:   str
     symbol:          str
     exchange:        str
-    asset_class:     str   # equity, fo, mf, fx, bond, commodity
+    asset_class:     str   # equity, derivative, mutual_fund, forex, fixed_income, commodity, crypto
     instrument_type: str   # EQ, FUT, OPT, CE, PE, MF, CURRENCY, BOND, COMM
     option_type:     str | None
     expiry:          str | None
@@ -366,12 +366,12 @@ async def fetch_data(state: SignalState) -> dict:
 
     # OI series for F&O
     oi_series: list[dict] = []
-    if state.get("asset_class") in ("fo",) and any(p.get("oi") for p in prices):
+    if state.get("asset_class") in ("derivative",) and any(p.get("oi") for p in prices):
         oi_series = [{"ts": p["ts"], "oi": p.get("oi", 0)} for p in prices[-30:]]
 
     # NAV history for MF
     nav_history: list[dict] = []
-    if state.get("asset_class") == "mf":
+    if state.get("asset_class") == "mutual_fund":
         try:
             mf = (
                 db.schema("markets").from_("mf_schemes")
@@ -408,7 +408,7 @@ async def fetch_data(state: SignalState) -> dict:
 
     # FX rate for currency instruments
     extra_data: dict = {}
-    if state.get("asset_class") == "fx":
+    if state.get("asset_class") == "forex":
         try:
             fx = (
                 db.schema("markets").from_("fx_rates")
@@ -783,7 +783,7 @@ Signal types: buy | sell | hold | buy_more | reduce | exit
 Respond ONLY with valid JSON:
 {"signal_type":"...","direction":"long|short|neutral","confidence":0.0,"score":0.0,"rationale":"≤2 sentences"}""",
 
-    "fo": """You are an expert derivatives trader for Indian markets (NSE F&O segment).
+    "derivative": """You are an expert derivatives trader for Indian markets (NSE F&O segment).
 Analyse the F&O indicators including OI, basis, days-to-expiry, and price action.
 
 Signal types: buy (long futures/call), sell (short futures/put), hold, roll (near expiry), exit
@@ -793,7 +793,7 @@ days to expiry (DTE < 5 = roll/exit urgency), basis premium/discount.
 Respond ONLY with valid JSON:
 {"signal_type":"...","direction":"long|short|neutral","confidence":0.0,"score":0.0,"rationale":"≤2 sentences"}""",
 
-    "mf": """You are a mutual fund analyst for Indian markets (AMFI registered).
+    "mutual_fund": """You are a mutual fund analyst for Indian markets (AMFI registered).
 Analyse the NAV momentum, returns across timeframes, and volatility.
 
 Signal types: buy (lump sum), sell (redeem), hold (continue SIP), switch (to better fund), buy_more (increase SIP)
@@ -803,7 +803,7 @@ For MF, confidence should be lower (0.3–0.7) as MF signals are less precise th
 Respond ONLY with valid JSON:
 {"signal_type":"...","direction":"long|short|neutral","confidence":0.0,"score":0.0,"rationale":"≤2 sentences"}""",
 
-    "fx": """You are a currency analyst for Indian forex markets (NSE currency segment: USD/INR, EUR/INR etc.).
+    "forex": """You are a currency analyst for Indian forex markets (NSE currency segment: USD/INR, EUR/INR etc.).
 Analyse technical indicators for the currency pair.
 
 Signal types: buy (long base currency), sell (short base currency), hold
@@ -813,7 +813,7 @@ Consider: RBI intervention risk (for INR pairs), range-bound behaviour typical o
 Respond ONLY with valid JSON:
 {"signal_type":"...","direction":"long|short|neutral","confidence":0.0,"score":0.0,"rationale":"≤2 sentences"}""",
 
-    "bond": """You are a fixed income analyst for Indian bond markets (G-Sec, corporate bonds, T-Bills).
+    "fixed_income": """You are a fixed income analyst for Indian bond markets (G-Sec, corporate bonds, T-Bills).
 Analyse bond price movement and yield direction.
 
 Signal types: buy (price expected to rise / yield to fall), sell (price fall / yield rise), hold
@@ -946,7 +946,7 @@ def _rule_based_fallback(
     regime   = ind.get("regime", "unknown")
     oi_interp = ind.get("oi_interpretation")
 
-    if asset_cls == "fo" and oi_interp:
+    if asset_cls == "derivative" and oi_interp:
         if oi_interp == "long_buildup":
             return "buy", "long", 0.55, 0.4, "Long build-up: OI rising with price. Rule-based."
         if oi_interp == "short_buildup":
@@ -954,7 +954,7 @@ def _rule_based_fallback(
         if oi_interp == "short_covering":
             return "buy", "long", 0.50, 0.3, "Short covering: OI falling, price rising. Rule-based."
 
-    if asset_cls == "mf":
+    if asset_cls == "mutual_fund":
         momentum = ind.get("dual_momentum", 0)
         if momentum and momentum > 10:
             return "buy_more", "long", 0.55, 0.4, f"Strong dual momentum ({momentum:.1f}%). Rule-based."
@@ -1034,7 +1034,7 @@ async def persist_signal(state: SignalState) -> dict:
     }
 
     # Generate LLM explanations for equity/MF signals with sufficient confidence
-    if state.get("asset_class") in ("equity", "mf", "mutual_fund") and state.get("confidence", 0) >= 0.60:
+    if state.get("asset_class") in ("equity", "mutual_fund") and state.get("confidence", 0) >= 0.60:
         explanations = await _generate_explanations(
             symbol=state["symbol"],
             asset_class=state["asset_class"],
@@ -1102,28 +1102,34 @@ def _derive_horizon(holding_period_days: int | None, instrument_type: str) -> st
     return HORIZON_LONG
 
 def _derive_asset_class(instrument_type: str, asset_class_db: str) -> str:
-    """Map instruments.asset_class + instrument_type to internal class key."""
+    """Map instruments.asset_class + instrument_type to canonical long-form class key.
+
+    Returns values that match what retail.py queries for and what SignalFilter.tsx sends:
+    derivative | mutual_fund | forex | fixed_income | commodity | crypto | equity
+    """
     it = (instrument_type or "").upper()
     ac = (asset_class_db or "equity").lower()
     if it in ("FUT", "OPT", "CE", "PE"):
-        return "fo"
+        return "derivative"
     if ac == "mf" or it == "MF":
-        return "mf"
+        return "mutual_fund"
     if ac in ("fx", "currency") or it == "CURRENCY":
-        return "fx"
+        return "forex"
     if ac in ("bond", "gsec", "tbill") or it in ("BOND", "GB"):
-        return "bond"
+        return "fixed_income"
     if ac == "commodity" or it in ("COMM", "MCX"):
         return "commodity"
+    if ac == "crypto" or it == "CRYPTO":
+        return "crypto"
     return "equity"
 
 def _route_to_compute(state: SignalState) -> str:
     return {
-        "fo":        "compute_fo",
-        "mf":        "compute_mf",
-        "fx":        "compute_fx",
-        "bond":      "compute_bond",
-        "commodity": "compute_commodity",
+        "derivative":  "compute_fo",
+        "mutual_fund": "compute_mf",
+        "forex":       "compute_fx",
+        "fixed_income": "compute_bond",
+        "commodity":   "compute_commodity",
     }.get(state.get("asset_class", "equity"), "compute_equity")
 
 def _should_continue(state: SignalState) -> str:
@@ -1355,8 +1361,8 @@ def generate_signals_for_portfolio(portfolio_id: str) -> dict:
         asset_cls  = _derive_asset_class(instr_type, instr.get("asset_class", "equity"))
 
         # Skip asset classes whose flag is off
-        if asset_cls == "fo"        and not fo_enabled:
-            logger.debug("signal_skip.flag_off", symbol=instr.get("symbol"), asset_cls="fo"); continue
+        if asset_cls == "derivative" and not fo_enabled:
+            logger.debug("signal_skip.flag_off", symbol=instr.get("symbol"), asset_cls="derivative"); continue
         if asset_cls == "commodity" and not comm_enabled:
             logger.debug("signal_skip.flag_off", symbol=instr.get("symbol"), asset_cls="commodity"); continue
 
