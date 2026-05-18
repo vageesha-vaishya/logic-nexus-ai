@@ -314,3 +314,52 @@ async def set_kill_switch(level: str, auth: Auth):
         logger.error("kill_switch_audit_failed", error=str(exc))
 
     return {"kill_switch_level": level, "set_at": datetime.now(timezone.utc).isoformat()}
+
+
+PHASE_ORDER = ["paper", "micro", "pilot", "full"]
+PHASE_NEXT  = {"paper": "micro", "micro": "pilot", "pilot": "full"}
+
+
+@router.post("/advance-phase")
+async def advance_phase(auth: Auth):
+    db = get_supabase()
+    progress = _get_progress(db, auth.user_id)
+    current = progress["current_phase"]
+
+    if current == "full":
+        raise HTTPException(400, detail="Already at full autonomy phase")
+
+    if current == "paper" and progress["paper_trades_done"] < PAPER_TRADES_REQUIRED:
+        remaining = PAPER_TRADES_REQUIRED - progress["paper_trades_done"]
+        raise HTTPException(400, detail=f"Complete {PAPER_TRADES_REQUIRED} paper trades first ({remaining} remaining)")
+
+    if current == "micro" and progress["micro_trades_done"] < MICRO_TRADES_REQUIRED:
+        remaining = MICRO_TRADES_REQUIRED - progress["micro_trades_done"]
+        raise HTTPException(400, detail=f"Complete {MICRO_TRADES_REQUIRED} Micro-Live trades first ({remaining} remaining)")
+
+    new_phase = PHASE_NEXT[current]
+    try:
+        db.schema("markets").from_("autonomy_progress") \
+            .update({"current_phase": new_phase}) \
+            .eq("user_id", auth.user_id).execute()
+    except Exception as exc:
+        raise HTTPException(500, detail=str(exc))
+
+    # Log phase transition in audit trail
+    try:
+        db.schema("markets").from_("execution_audit_log").insert({
+            "user_id": auth.user_id,
+            "tradingsymbol": "_PHASE_ADVANCE_",
+            "exchange": "SYSTEM",
+            "side": "BUY",
+            "order_type": "MARKET",
+            "quantity": 0,
+            "phase": new_phase,
+            "pre_trade_checks": {},
+            "status": "submitted",
+            "rejection_reason": f"Phase advanced: {current} → {new_phase}",
+        }).execute()
+    except Exception:
+        pass
+
+    return {"previous_phase": current, "new_phase": new_phase}
