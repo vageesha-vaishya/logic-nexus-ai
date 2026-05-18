@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -25,11 +25,18 @@ export function ExecutionBottomSheet({
   const { connection, hasTradeableConnection } = useActiveConnection();
   const [orderOpen, setOrderOpen] = useState(false);
 
+  // Reset order form state when signal is cleared to prevent stale open state
+  useEffect(() => {
+    if (!signal) setOrderOpen(false);
+  }, [signal]);
+
   if (!signal) return null;
 
   const { instrument, signal_type, confidence = 0, price_at_signal } = signal;
   const symbol = instrument?.symbol ?? '—';
-  const side = signal_type === 'buy' ? 'BUY' : 'SELL';
+  // Only BUY/SELL are actionable — hold signals should not reach this component
+  const side = signal_type === 'buy' ? 'BUY' : signal_type === 'sell' ? 'SELL' : null;
+  if (!side) return null;
 
   const handleProceed = () => {
     onOpenChange(false);
