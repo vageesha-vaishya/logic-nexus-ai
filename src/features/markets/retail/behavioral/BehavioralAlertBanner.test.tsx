@@ -6,11 +6,17 @@ const mockLog = vi.fn();
 vi.mock('./useBehavioralEvents', () => ({
   useLogBehavioralEvent: () => ({ mutate: mockLog, isPending: false }),
 }));
+vi.mock('@/hooks/useAuth', () => ({
+  useAuth: () => ({ user: { id: 'user-banner-1' }, roles: [] }),
+}));
 
 import { BehavioralAlertBanner } from './BehavioralAlertBanner';
 
 describe('BehavioralAlertBanner', () => {
-  beforeEach(() => mockLog.mockReset());
+  beforeEach(() => {
+    mockLog.mockReset();
+    window.localStorage.clear();
+  });
 
   it('renders nothing when alertTier is null', () => {
     const { container } = render(
@@ -66,5 +72,54 @@ describe('BehavioralAlertBanner', () => {
       severity: 'warning',
       metadata: { drawdown_pct: 14, portfolio_id: 'p1', action: 'dismissed' },
     });
+  });
+
+  it('hides immediately on dismiss (same render tree)', () => {
+    const { container } = render(
+      <BehavioralAlertBanner alertTier="orange" drawdownPct={12} portfolioId="p1" />,
+    );
+    expect(screen.getByRole('button', { name: /keep holding/i })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /keep holding/i }));
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('stays hidden across remounts when previously dismissed (localStorage TTL)', () => {
+    const { unmount } = render(
+      <BehavioralAlertBanner alertTier="orange" drawdownPct={12} portfolioId="p1" />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /keep holding/i }));
+    unmount();
+
+    // Remount with the same tier+portfolio — should be suppressed.
+    const second = render(
+      <BehavioralAlertBanner alertTier="orange" drawdownPct={12} portfolioId="p1" />,
+    );
+    expect(second.container.firstChild).toBeNull();
+  });
+
+  it('re-appears when the tier escalates (yellow → orange)', () => {
+    const { rerender, container } = render(
+      <BehavioralAlertBanner alertTier="yellow" drawdownPct={6} portfolioId="p1" />,
+    );
+    fireEvent.click(screen.getByRole('button', { name: /understood/i }));
+    expect(container.firstChild).toBeNull();
+
+    // Drawdown deepens → orange tier; banner must surface again.
+    rerender(
+      <BehavioralAlertBanner alertTier="orange" drawdownPct={12} portfolioId="p1" />,
+    );
+    expect(screen.getByRole('button', { name: /keep holding/i })).toBeInTheDocument();
+  });
+
+  it('re-appears once the 24h ack window has elapsed', () => {
+    // Pre-seed an ack from 25h ago.
+    window.localStorage.setItem(
+      'lnai_drawdown_ack_user-banner-1_p1',
+      JSON.stringify({ tier: 'orange', ackedAt: Date.now() - 25 * 60 * 60 * 1000 }),
+    );
+    render(
+      <BehavioralAlertBanner alertTier="orange" drawdownPct={12} portfolioId="p1" />,
+    );
+    expect(screen.getByRole('button', { name: /keep holding/i })).toBeInTheDocument();
   });
 });
