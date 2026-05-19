@@ -9,7 +9,7 @@ vi.mock('./useBehavioralEvents', () => ({
 beforeEach(() => vi.clearAllMocks());
 
 describe('CoolingOffScreen', () => {
-  it('shows drawdown percentage and all three action options', async () => {
+  it('shows drawdown percentage and both action buttons', async () => {
     const { CoolingOffScreen } = await import('./CoolingOffScreen');
     render(
       <CoolingOffScreen
