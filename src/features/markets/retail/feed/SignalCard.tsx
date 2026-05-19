@@ -38,9 +38,13 @@ export function SignalCard({
 }: SignalCardProps) {
   const { instrument, metadata, signal_type } = signal;
   const confidence = signal.confidence ?? 0;
-  const horizon   = metadata?.horizon ?? signal.metadata?.horizon;
-  const expl      = metadata?.explanations;
-  const symbol    = instrument?.symbol ?? '—';
+  // The worker writes `horizon` as a top-level column (selected by the retail
+  // router) but the LangGraph state also stashes it in metadata. Prefer the
+  // column — that's the authoritative value — and fall back to either flavour
+  // of metadata for older signals.
+  const horizon = signal.horizon ?? metadata?.horizon;
+  const expl    = metadata?.explanations;
+  const symbol  = instrument?.symbol ?? '—';
 
   const isBuy = signal_type === 'buy';
   const isSell = signal_type === 'sell';
@@ -57,7 +61,8 @@ export function SignalCard({
     if (confidence >= 0.85 && !seen.has('high_conviction_signal')) return 'high_conviction_signal';
     if (isHighStress         && !seen.has('high_vix_execution'))    return 'high_vix_execution';
     if (horizon === 'intraday' && !seen.has('first_intraday'))      return 'first_intraday';
-    if (signal.metadata?.asset_class === 'fo' && !seen.has('fo_enable')) return 'fo_enable';
+    const assetClass = signal.asset_class ?? signal.metadata?.asset_class;
+    if (assetClass === 'fo' && !seen.has('fo_enable')) return 'fo_enable';
     return null;
   })();
 

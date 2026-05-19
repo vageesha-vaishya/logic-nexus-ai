@@ -75,9 +75,21 @@ export interface SignalExplanations {
 
 /** A markets.signals row with the retail explanation + execution metadata. */
 export interface RetailSignal extends Signal {
+  /** Top-level column on markets.signals — the worker's authoritative horizon. */
+  horizon?: 'intraday' | 'short_term' | 'medium_term' | 'long_term';
+  /** Asset class column (selected by the retail router). */
+  asset_class?: string;
+  /** Risk params column (stop_loss_pct, target_pct, r_r, …). */
+  risk_params?: {
+    stop_loss_pct?: number;
+    target_pct?: number;
+    r_r?: number;
+    [k: string]: unknown;
+  } | null;
   metadata: Signal['metadata'] & {
     explanations?: SignalExplanations;
-    horizon?: 'short_term' | 'long_term' | string;
+    /** Legacy: older signals stashed horizon in metadata. */
+    horizon?: 'intraday' | 'short_term' | 'medium_term' | 'long_term' | string;
     entry_price?: number;
     stop_loss?: number;
     target_price?: number;
@@ -85,6 +97,10 @@ export interface RetailSignal extends Signal {
     confidence_high?: number;
     accuracy_historical?: number;
     accuracy_sample_size?: number;
+    /** Symbol mirrored into metadata for older signals. */
+    symbol?: string;
+    /** Asset class mirrored into metadata. */
+    asset_class?: string;
   };
 }
 
