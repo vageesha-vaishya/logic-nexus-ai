@@ -14,6 +14,13 @@ const amroCandidatePorts = (process.env.AMRO_API_CANDIDATE_PORTS || '8031,3001')
 const amroWaitRetries = Math.max(1, Number(process.env.AMRO_API_WAIT_RETRIES || 20));
 const amroWaitIntervalSec = Math.max(1, Number(process.env.AMRO_API_WAIT_INTERVAL_SEC || 2));
 const deployBranch = (process.env.DEPLOY_BRANCH || process.env.BRANCH_NAME || 'main').trim();
+// Markets-worker upstream (FastAPI on the VPS host). Default matches the
+// systemd unit deployed by scripts/deploy_markets_worker_vps.cjs.
+const marketsApiUpstream = String(process.env.MARKETS_API_UPSTREAM || 'host.docker.internal:8001').trim();
+// Build-time URL the SPA uses for fetch(). A relative path means same-origin
+// → nginx in the same container proxies to MARKETS_API_UPSTREAM, so the
+// browser never needs to know the worker exists.
+const viteMarketsWorkerUrl = String(process.env.VITE_MARKETS_WORKER_URL || '/api/markets').trim();
 
 if (!host || !password) {
   console.error('Missing VPS_IP or VPS_PASSWORD environment variables');
@@ -44,7 +51,7 @@ conn.on('ready', () => {
     `git checkout -f ${targetBranch}`,
     `git reset --hard origin/${targetBranch}`,
     `echo "Building commit $(git rev-parse --short HEAD) on branch ${targetBranch}"`,
-    `docker build -t logicpro-web --build-arg VITE_SUPABASE_URL='${SUPABASE_URL}' --build-arg VITE_SUPABASE_ANON_KEY='${escapedAnon}' --build-arg VITE_SUPABASE_PUBLISHABLE_KEY='${escapedAnon}' -f ${REMOTE_APP_DIR}/Dockerfile ${REMOTE_APP_DIR}`,
+    `docker build -t logicpro-web --build-arg VITE_SUPABASE_URL='${SUPABASE_URL}' --build-arg VITE_SUPABASE_ANON_KEY='${escapedAnon}' --build-arg VITE_SUPABASE_PUBLISHABLE_KEY='${escapedAnon}' --build-arg VITE_MARKETS_WORKER_URL='${viteMarketsWorkerUrl}' -f ${REMOTE_APP_DIR}/Dockerfile ${REMOTE_APP_DIR}`,
     `AMRO_PORT=''`,
     ...(amroApiUpstream ? [`AMRO_PORT='${amroApiUpstream.split(':').slice(-1)[0]}'`] : []),
     `AMRO_CANDIDATE_PORTS='${escapedCandidatePorts}'`,
@@ -55,7 +62,7 @@ conn.on('ready', () => {
     `AMRO_API_UPSTREAM_EFFECTIVE='host.docker.internal:'"$AMRO_PORT"`,
     `echo "Using AMRO upstream: $AMRO_API_UPSTREAM_EFFECTIVE"`,
     `(docker ps -a --format '{{.Names}}' | grep -q '^logicpro-web$' && docker rm -f logicpro-web || true)`,
-    `docker run -d --name logicpro-web --restart unless-stopped -p ${appPort}:80 --add-host=host.docker.internal:host-gateway -e AMRO_API_UPSTREAM="$AMRO_API_UPSTREAM_EFFECTIVE" logicpro-web`,
+    `docker run -d --name logicpro-web --restart unless-stopped -p ${appPort}:80 --add-host=host.docker.internal:host-gateway -e AMRO_API_UPSTREAM="$AMRO_API_UPSTREAM_EFFECTIVE" -e MARKETS_API_UPSTREAM="${marketsApiUpstream}" logicpro-web`,
     // Health-check the AMRO proxy via the running container. We probe by HTTP
     // status code rather than curl's exit code — curl sometimes exits non-zero
     // on a 200 (keep-alive close, response-length quirks, etc.).

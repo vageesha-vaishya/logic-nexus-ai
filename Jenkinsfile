@@ -383,11 +383,33 @@ fi
                             "VITE_SUPABASE_URL=${env.SELECTED_SUPABASE_URL}",
                             "VITE_SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}",
                             "VITE_SUPABASE_PUBLISHABLE_KEY=${env.SELECTED_ANON_KEY}",
+                            "VITE_MARKETS_WORKER_URL=/api/markets",
+                            "MARKETS_API_UPSTREAM=host.docker.internal:8001",
                             "AMRO_API_UPSTREAM=${params.AMRO_API_UPSTREAM ?: 'host.docker.internal:8031'}",
                             "DEPLOY_BRANCH=main"
                         ]) {
                             echo "App Port: ${env.APP_PORT}, Using Supabase: ${env.SELECTED_SUPABASE_URL}"
                             sh 'node scripts/deploy_web_app_vps.cjs'
+                        }
+                    }
+                }
+            }
+        }
+        stage('Deploy Markets Worker to VPS') {
+            steps {
+                script {
+                    echo "Installing/restarting markets-worker (FastAPI) on VPS host..."
+                    sh 'npm install --no-save ssh2'
+                    // First run is slow because python3.12 needs to be installed
+                    // via deadsnakes; subsequent runs are fast (pip install -e is
+                    // a no-op when nothing changed).
+                    timeout(time: 20, unit: 'MINUTES') {
+                        withEnv([
+                            "SUPABASE_URL=${env.SELECTED_SUPABASE_URL}",
+                            "SUPABASE_SERVICE_ROLE_KEY=${env.SELECTED_SERVICE_ROLE_KEY}",
+                            "MARKETS_WORKER_PORT=8001"
+                        ]) {
+                            sh 'node scripts/deploy_markets_worker_vps.cjs'
                         }
                     }
                 }

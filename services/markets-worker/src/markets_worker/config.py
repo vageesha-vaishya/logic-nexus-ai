@@ -8,7 +8,9 @@ class Settings(BaseSettings):
     # ── Supabase ──────────────────────────────────────────────────────────
     supabase_url:              str
     supabase_service_role_key: str
-    supabase_jwt_secret:       str  # for verifying user JWTs
+    # Optional: only needed if we ever decode JWTs locally. Today auth.py
+    # validates via supabase.auth.get_user(token), which doesn't need this.
+    supabase_jwt_secret:       str = ""
 
     # ── Redis (Upstash — shared with Edge Function rate limiter) ─────────
     upstash_redis_rest_url:   str = ""
