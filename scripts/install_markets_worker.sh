@@ -80,12 +80,32 @@ SyslogIdentifier=markets-worker
 WantedBy=multi-user.target
 UNIT
 
-echo "▶ 5/6 reload + restart"
+echo "▶ 5/7 open firewall for docker bridge → host:$PORT"
+# The worker binds to the host (not a Docker container), so traffic from
+# the logicpro-web container reaches it through the docker0 bridge and
+# crosses UFW. AMRO works without this because it *is* a container —
+# Docker installs its own iptables rules and bypasses UFW. Without this
+# allow, the proxy chain times out with 504.
+if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
+  DOCKER_SUBNET="$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null || true)"
+  if [ -n "$DOCKER_SUBNET" ]; then
+    # ufw is idempotent — "Skipping adding existing rule" if already set.
+    ufw allow from "$DOCKER_SUBNET" to any port "$PORT" proto tcp \
+      comment 'docker -> markets-worker' >/dev/null
+    echo "  allowed $DOCKER_SUBNET → $PORT/tcp"
+  else
+    echo "  warning: could not detect docker bridge subnet; skipping UFW rule"
+  fi
+else
+  echo "  ufw not active; skipping firewall rule"
+fi
+
+echo "▶ 6/7 reload + restart"
 systemctl daemon-reload
 systemctl enable --quiet markets-worker
 systemctl restart markets-worker
 
-echo "▶ 6/6 health probe"
+echo "▶ 7/7 health probe"
 OK=""
 for i in $(seq 1 30); do
   CODE=$(curl -s --max-time 5 -o /dev/null -w '%{http_code}' "http://127.0.0.1:$PORT/health" 2>/dev/null || true)

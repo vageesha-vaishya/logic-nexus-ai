@@ -138,8 +138,26 @@ conn.on('ready', () => {
     `.venv/bin/pip install -q -U pip wheel setuptools`,
     `.venv/bin/pip install -q -e .`,
 
-    // 5. systemd unit + restart.
+    // 5. systemd unit.
     `cat >${SERVICE_FILE} <<'__MARKETS_UNIT__'\n${escapedService}__MARKETS_UNIT__`,
+
+    // 5b. UFW allow for docker bridge → host:$PORT. The worker runs on
+    //     the host (not a container), so traffic from logicpro-web crosses
+    //     UFW. AMRO is a container so Docker's own iptables rules bypass
+    //     UFW — that's why AMRO worked out of the box and markets didn't.
+    `if command -v ufw >/dev/null 2>&1 && ufw status 2>/dev/null | grep -q 'Status: active'; then
+       DOCKER_SUBNET=$(docker network inspect bridge --format '{{range .IPAM.Config}}{{.Subnet}}{{end}}' 2>/dev/null || true);
+       if [ -n "$DOCKER_SUBNET" ]; then
+         ufw allow from "$DOCKER_SUBNET" to any port ${workerPort} proto tcp comment 'docker -> markets-worker' >/dev/null;
+         echo "  ufw: allowed $DOCKER_SUBNET -> ${workerPort}/tcp";
+       else
+         echo "  ufw: could not detect docker bridge subnet";
+       fi;
+     else
+       echo "  ufw: not active, skipping firewall rule";
+     fi`,
+
+    // 5c. Reload + restart.
     `systemctl daemon-reload`,
     `systemctl enable --quiet markets-worker`,
     `systemctl restart markets-worker`,
