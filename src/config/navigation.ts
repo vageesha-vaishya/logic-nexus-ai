@@ -237,6 +237,12 @@ export const APP_MENU: MenuModule[] = [
         description: 'NSE-style live option chain with greeks and quick order placement',
       },
       {
+        name: 'Options Payoff',
+        path: '/dashboard/markets/options-payoff',
+        icon: Calculator,
+        description: 'Standalone multi-leg options strategy payoff builder — no live data required',
+      },
+      {
         name: 'Strategy Builder',
         path: '/dashboard/markets/strategy-builder',
         icon: GitBranch,
