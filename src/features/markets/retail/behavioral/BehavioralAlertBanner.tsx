@@ -5,6 +5,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/hooks/useAuth';
 
+import { WhyButton } from '../glossary';
 import { useLogBehavioralEvent } from './useBehavioralEvents';
 import type { AlertTier } from './types';
 
@@ -135,7 +136,10 @@ export function BehavioralAlertBanner({
     <Alert className={`${variant.classes} [&>svg]:text-current`}>
       <variant.Icon className="h-4 w-4" />
       <div className="space-y-1">
-        <p className="text-sm font-semibold">{variant.title}</p>
+        <p className="flex items-center gap-1.5 text-sm font-semibold">
+          {variant.title}
+          <WhyButton term="drawdown" srLabel="What is a drawdown?" />
+        </p>
         <AlertDescription className="text-xs leading-relaxed">
           {variant.message}
         </AlertDescription>

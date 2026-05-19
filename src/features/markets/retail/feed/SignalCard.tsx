@@ -5,7 +5,18 @@ import { Card, CardContent } from '@/components/ui/card';
 import { InlineEducation } from '../behavioral/InlineEducation';
 import type { EducationId } from '../behavioral/types';
 import { useLogBehavioralEvent } from '../behavioral/useBehavioralEvents';
+import { Term, WhyButton } from '../glossary';
 import type { ExperienceLevel, RetailSignal } from '../types';
+
+// Worker horizon vocabulary → glossary key. Keeps the display label
+// (rendered separately) decoupled from the dictionary lookup so we can
+// change UX strings without breaking the popover.
+const HORIZON_GLOSSARY: Record<string, string> = {
+  intraday:    'intraday',
+  short_term:  'swing',
+  medium_term: 'positional',
+  long_term:   'long-term',
+};
 
 function confidenceLabel(c: number): string {
   if (c >= 0.85) return 'High Conviction';
@@ -114,6 +125,7 @@ export function SignalCard({
             <Badge variant={confidenceVariant(confidence)} className="text-xs">
               {confidenceLabel(confidence)}
             </Badge>
+            <WhyButton term="confidence" srLabel="What does confidence mean?" />
           </div>
         </div>
 
@@ -132,7 +144,7 @@ export function SignalCard({
         {showRiskRow && (
           <div className="grid grid-cols-3 gap-2 text-xs text-muted-foreground">
             <div>
-              Stop{' '}
+              <Term word="stop-loss">Stop</Term>{' '}
               <span className="font-medium text-foreground">
                 {stop != null
                   ? `₹${stop.toLocaleString('en-IN')}`
@@ -142,7 +154,7 @@ export function SignalCard({
               </span>
             </div>
             <div>
-              Target{' '}
+              <Term word="target">Target</Term>{' '}
               <span className="font-medium text-foreground">
                 {target != null
                   ? `₹${target.toLocaleString('en-IN')}`
@@ -152,7 +164,7 @@ export function SignalCard({
               </span>
             </div>
             <div>
-              R/R{' '}
+              <Term word="r/r">R/R</Term>{' '}
               <span className="font-medium text-foreground">
                 {risk?.r_r != null ? `1:${risk.r_r}` : '—'}
               </span>
@@ -162,7 +174,11 @@ export function SignalCard({
 
         <div className="flex items-center justify-between pt-1">
           <span className="text-xs capitalize text-muted-foreground">
-            {horizon ? horizon.replace(/_/g, ' ') : 'no horizon'}
+            {horizon ? (
+              <Term word={HORIZON_GLOSSARY[horizon]}>{horizon.replace(/_/g, ' ')}</Term>
+            ) : (
+              'no horizon'
+            )}
             {instrument?.exchange ? ` · ${instrument.exchange}` : ''}
           </span>
           {showAction && onExecute && (
