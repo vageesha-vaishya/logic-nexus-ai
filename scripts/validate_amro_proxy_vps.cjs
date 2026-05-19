@@ -22,7 +22,10 @@ const cmd = [
   "set -e",
   "timeout 20s docker inspect logicpro-web --format '{{range .Config.Env}}{{println .}}{{end}}' | grep AMRO_API_UPSTREAM",
   "timeout 20s docker exec logicpro-web sh -c \"grep -n 'proxy_pass' /etc/nginx/conf.d/default.conf\"",
-  `timeout 20s curl -fsS --max-time 10 http://127.0.0.1:${appPort}/api/v2/amro/health >/dev/null`,
+  // Probe by HTTP status code, not curl exit code. `curl -fsS` was exiting
+  // non-zero on legitimate 200 responses (keep-alive close / response-length
+  // quirks) — same bug we already fixed in deploy_web_app_vps.cjs.
+  `WEB_HEALTH_CODE=$(timeout 20s curl -s --max-time 10 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${appPort}/api/v2/amro/health" 2>/dev/null || true); echo "amro proxy health: http_code=$WEB_HEALTH_CODE"; [ "$WEB_HEALTH_CODE" = "200" ] || { echo "AMRO proxy health failed (expected 200, got $WEB_HEALTH_CODE)"; exit 1; }`,
 ].join(' && ');
 
 conn.on('ready', () => {
