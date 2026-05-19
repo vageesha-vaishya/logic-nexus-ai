@@ -43,3 +43,17 @@ migration.env
 # Project rules workflow runtime state
 .trae/rules/.consultation-state.json
 .trae/rules/generated/
+
+# Capacitor / Android (Phase 1 Addendum T24)
+# The android/ source tree itself IS checked in so CI can rebuild the APK,
+# but build artifacts and machine-local SDK pointers stay out of git.
+android/.gradle/
+android/build/
+android/app/build/
+android/local.properties
+android/captures/
+android/.idea/
+android/app/release/
+android/app/debug/
+# Local-only Capacitor overrides (live-reload dev server URL etc.)
+capacitor.config.local.ts
