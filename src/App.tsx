@@ -223,6 +223,11 @@ const MarketsStrategies = lazy(() => import("./features/markets/pages/Strategies
 const MarketsBacktests = lazy(() => import("./features/markets/pages/BacktestsPage"));
 const MarketsSignals = lazy(() => import("./features/markets/pages/SignalsPage"));
 const MarketsRetail  = lazy(() => import("./features/markets/pages/RetailModePage"));
+const RetailHomeTab      = lazy(() => import("./features/markets/retail/pages/RetailHomePage"));
+const RetailPortfolioTab = lazy(() => import("./features/markets/retail/pages/RetailPortfolioPage"));
+const RetailSignalsTab   = lazy(() => import("./features/markets/retail/pages/RetailSignalsPage"));
+const RetailGoalsTab     = lazy(() => import("./features/markets/retail/pages/RetailGoalsPage"));
+const RetailMoreTab      = lazy(() => import("./features/markets/retail/pages/RetailMorePage"));
 const MarketsFno             = lazy(() => import("./features/markets/pages/FnoPage"));
 const MarketsStrategyBuilder = lazy(() => import("./features/markets/pages/StrategyBuilderPage"));
 const MarketsMf      = lazy(() => import("./features/markets/pages/MfPage"));
@@ -993,7 +998,14 @@ const App = () => (
             <Route path="/dashboard/markets/strategies" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsStrategies /></ProtectedRoute>} />
             <Route path="/dashboard/markets/backtests" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBacktests /></ProtectedRoute>} />
             <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSignals /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/retail" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/retail" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRetail /></ProtectedRoute>}>
+              <Route index             element={<Navigate to="home" replace />} />
+              <Route path="home"       element={<RetailHomeTab />} />
+              <Route path="portfolio"  element={<RetailPortfolioTab />} />
+              <Route path="signals"    element={<RetailSignalsTab />} />
+              <Route path="goals"      element={<RetailGoalsTab />} />
+              <Route path="more"       element={<RetailMoreTab />} />
+            </Route>
             <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerConnections /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/brokers/:connectionId" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerPortfolio /></ProtectedRoute>} />
