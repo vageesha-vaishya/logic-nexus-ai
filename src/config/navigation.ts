@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator, Monitor, Lightbulb, Bot, Copy } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, BarChart2, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator, Monitor, Lightbulb, Bot, Copy } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -284,6 +284,12 @@ export const APP_MENU: MenuModule[] = [
         path: '/dashboard/markets/fii-dii',
         icon: BarChart3,
         description: 'Daily institutional buy/sell flow data',
+      },
+      {
+        name: 'Market Breadth',
+        path: '/dashboard/markets/breadth',
+        icon: BarChart2,
+        description: 'NSE sector heatmap and advance/decline breadth',
       },
       {
         name: 'Margin Calculator',

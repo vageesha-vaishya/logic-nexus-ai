@@ -239,6 +239,7 @@ const MarketsCopyTrading    = lazy(() => import("./features/markets/pages/CopyTr
 const MarketsTaxPnL         = lazy(() => import("./features/markets/pages/TaxPnLPage"));
 const MarketsRebalancing    = lazy(() => import("./features/markets/pages/RebalancingPage"));
 const MarketsOptionsPayoff  = lazy(() => import("./features/markets/pages/OptionsStrategyPage"));
+const MarketsMarketBreadth  = lazy(() => import("./features/markets/pages/MarketBreadthPage"));
 // Platform-wide LLM provider settings — same component, reachable from main settings hub.
 const PlatformLlmSettings = MarketsLlmSettings;
 const FeatureFlagsAdmin = lazy(() => import("./pages/dashboard/settings/FeatureFlagsPage"));
@@ -1001,6 +1002,7 @@ const App = () => (
             <Route path="/dashboard/markets/risk" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRisk /></ProtectedRoute>} />
             <Route path="/dashboard/markets/calendar" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsCalendar /></ProtectedRoute>} />
             <Route path="/dashboard/markets/fii-dii" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsFiiDii /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/breadth" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsMarketBreadth /></ProtectedRoute>} />
             <Route path="/dashboard/markets/scanner" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsScanner /></ProtectedRoute>} />
             <Route path="/dashboard/markets/span" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSpan /></ProtectedRoute>} />
             <Route path="/dashboard/markets/journal" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsTradeJournal /></ProtectedRoute>} />
