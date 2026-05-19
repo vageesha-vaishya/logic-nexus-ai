@@ -87,6 +87,74 @@ this doc is the scaffold.
 | `capacitor.config.ts` | **committed** | shared config |
 | `capacitor.config.local.ts` | ignored | per-developer overrides |
 
+## Push notifications — Firebase / FCM setup (T24c)
+
+The Android shell uses FCM HTTP v1 for system-tray notifications (5 events
+per addendum §2). Setup is per-environment and one-time.
+
+**1. Firebase Console**
+
+- Create a Firebase project (or reuse an existing one for the org).
+- Add an Android app → package name **`com.sospro.logicnexus`** (matches
+  `capacitor.config.ts`).
+- Download `google-services.json` and drop it at `android/app/google-services.json`.
+  This file is **not** in git (`android/app/google-services.json` is in
+  the platform's stock `.gitignore`); it's required for each developer
+  who builds the APK.
+
+**2. Worker-side credential**
+
+In Firebase Console → Project Settings → Service accounts, click
+"Generate new private key". Copy the entire JSON file contents.
+
+On the VPS, append two lines to `/etc/logic-nexus/markets-worker.env`:
+
+```
+FCM_PROJECT_ID=your-firebase-project-id
+FCM_SERVICE_ACCOUNT_JSON={"type":"service_account",...}   # single line
+```
+
+Then restart the worker:
+
+```bash
+systemctl restart markets-worker
+journalctl -u markets-worker -n 30 --no-pager | grep -i fcm
+```
+
+If you see no `fcm.bad_service_account_json` warnings the JSON parsed
+cleanly. Test from an authenticated session:
+
+```bash
+curl -X POST https://<host>/api/markets/v1/retail/push/test \
+  -H "Authorization: Bearer $JWT" -H "Content-Type: application/json" \
+  -d '{}'
+```
+
+Returns `{"delivered": N}` where N is the number of active tokens for
+the caller. A 503 means the worker env is missing the credential.
+
+**3. Frontend behaviour**
+
+`usePushRegistration()` runs once when `RetailMode` mounts. On Android it
+prompts the OS permission dialog, registers the FCM token, then POSTs to
+`/v1/retail/push/register`. On web it's a no-op. Re-registration is
+idempotent — the worker route upserts on `(user_id, token)`.
+
+**4. Events that trigger a push today**
+
+| Event | Fires from | Notes |
+|---|---|---|
+| Drift rebalance available | `routers/rebalance.py` `get_pending` on first detection | Title: "Time to rebalance" |
+| Daily Portfolio Health Diagnostic | T19 (not built yet) | Wired via `notify_user_sync` |
+| Stop-loss triggered | T17 risk-trio extension | Broker webhook → `notify_user_sync` |
+| SIP debit success/failure | Broker SIP integration | Same path |
+| Material signal change | T20 holdings-aware commentary | Same path |
+
+The other four event types use the existing `notify_user_sync` plumbing
+— the FCM fan-out is automatic. Push delivery is best-effort: if FCM is
+misconfigured or unreachable the in-app notification still lands, and
+the calling job never fails.
+
 ## Capacitor plugins wired in T24a
 
 | Plugin | Used for | Lands in task |

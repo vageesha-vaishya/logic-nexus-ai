@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { marketsKeys } from "../hooks/queryKeys";
 import { RetailNavLayout } from "./layouts/RetailNavLayout";
 import { OnboardingWizard } from "./onboarding/OnboardingWizard";
+import { usePushRegistration } from "./hooks/usePushRegistration";
 import { useRiskProfile } from "./hooks/useRiskProfile";
 
 /**
@@ -18,6 +19,9 @@ import { useRiskProfile } from "./hooks/useRiskProfile";
 export function RetailMode() {
   const queryClient = useQueryClient();
   const { isLoading, isError, error, hasOnboarded } = useRiskProfile();
+  // Kick off FCM registration once per session — no-op on web, prompts
+  // permission + posts token to /v1/retail/push/register on Android.
+  usePushRegistration();
 
   if (isLoading) {
     return (

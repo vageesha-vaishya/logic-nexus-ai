@@ -214,6 +214,24 @@ def get_pending(auth: Auth) -> dict[str, Any] | None:
         .single()
         .execute()
     )
+
+    # Fire an in-app + system push so users see the rec without having to
+    # open the app. notify_user_sync soft-fails everything internally — a
+    # missing FCM credential or stale token never breaks the rec creation.
+    try:
+        from markets_worker.notifications import notify_user_sync  # noqa: PLC0415
+        notify_user_sync(
+            user_id,
+            category="rebalance",
+            title="Time to rebalance",
+            body=str(payload.get("reason") or "Your portfolio drifted from plan."),
+            severity="warning",
+            data={"rec_id": (inserted.data or {}).get("id", "")},
+            link_url="/dashboard/markets/retail/home",
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("rebalance.notify_failed", error=str(exc))
+
     return inserted.data
 
 

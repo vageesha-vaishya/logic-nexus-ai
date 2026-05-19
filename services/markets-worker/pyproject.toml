@@ -48,6 +48,8 @@ dependencies = [
     # neo-api-client (Kotak Neo) is NOT on PyPI — Kotak adapter uses lazy import
     # ── Credential encryption ─────────────────────────────────────────────────
     "cryptography>=42.0.0",        # Fernet encryption for broker credentials
+    # ── FCM push (T24c) ──────────────────────────────────────────────────────
+    "google-auth>=2.30",           # service-account JWT → OAuth access token for FCM HTTP v1
 ]
 
 [dependency-groups]

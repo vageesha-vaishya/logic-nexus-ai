@@ -33,7 +33,13 @@ def notify_user_sync(
     data: dict[str, Any] | None = None,
     link_url: str | None = None,
 ) -> None:
-    """Synchronous insert — for use from RQ jobs / blocking code paths."""
+    """Synchronous insert — for use from RQ jobs / blocking code paths.
+
+    After the in-app row lands, fans out to FCM via push.fan_out_push so
+    Android sees a system notification too (T24c). Push delivery is a
+    soft-fail — any FCM error is logged inside fan_out_push and never
+    bubbles up.
+    """
     if not user_id:
         return
     try:
@@ -50,6 +56,16 @@ def notify_user_sync(
     except Exception as exc:
         # Never let notification failure break the calling job.
         logger.warning("notify.insert_failed",
+                       user_id=user_id, category=category, error=str(exc))
+        return
+
+    # Best-effort mobile push. Import here to avoid a hard dep cycle and
+    # to keep the in-app path working when google-auth isn't installed.
+    try:
+        from markets_worker.push import fan_out_push  # noqa: PLC0415
+        fan_out_push(user_id, title, body, data=data, link_url=link_url)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("notify.push_failed",
                        user_id=user_id, category=category, error=str(exc))
 
 
