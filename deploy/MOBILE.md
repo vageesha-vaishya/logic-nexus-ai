@@ -61,21 +61,91 @@ export default {
 Capacitor block at the bottom). Restore the bundled-assets behaviour for
 release builds by removing the file or commenting out the `server.url`.
 
-## Release build (Phase 1 launch)
+## Release build (Phase 1 launch — T24e)
+
+### 1. Generate the release keystore (one-time, KEEP THIS FILE SAFE)
 
 ```bash
-npm run mobile:build
-cd android
-./gradlew bundleRelease   # → android/app/build/outputs/bundle/release/app-release.aab
+keytool -genkey -v \
+  -keystore ~/keys/logic-nexus-release.jks \
+  -alias logic-nexus-prod \
+  -keyalg RSA -keysize 2048 -validity 36500 \
+  -storetype JKS
 ```
 
-You'll need:
-- A keystore (one-time: `keytool -genkey -v -keystore release.keystore ...`)
-- A `~/.gradle/gradle.properties` entry with the keystore + password
-- The Play Console signing key uploaded to Google
+You'll be prompted for store password, key password (use the same), and
+the standard X.509 fields. Keep the keystore + passwords in a password
+manager — losing them means **you can never publish an update to the
+same Play listing**. Back up to two physically separated locations.
 
-These steps land with T24e (first signed APK + Play Console listing) —
-this doc is the scaffold.
+### 2. Local release build
+
+The Gradle release config reads four env vars (or matching
+`gradle.properties` entries):
+
+```bash
+export LN_KEYSTORE_PATH=/Users/you/keys/logic-nexus-release.jks
+export LN_KEYSTORE_PASSWORD='…'
+export LN_KEY_ALIAS=logic-nexus-prod
+export LN_KEY_PASSWORD='…'
+
+npm run mobile:build
+cd android
+./gradlew bundleRelease     # → android/app/build/outputs/bundle/release/app-release.aab
+# or for a sideload-able APK:
+./gradlew assembleRelease   # → android/app/build/outputs/apk/release/app-release.apk
+```
+
+Without those env vars the build still succeeds but falls back to the
+debug signing key — useful for smoke tests, NOT useful for Play Store.
+
+### 3. Jenkins CI release build
+
+Set up four Jenkins credentials in **Manage Jenkins → Credentials**:
+
+| Credential ID | Type | Value |
+|---|---|---|
+| `android-keystore-file` | Secret file | Upload the `.jks` from step 1 |
+| `android-keystore-password` | Secret text | store password |
+| `android-key-alias` | Secret text | e.g. `logic-nexus-prod` |
+| `android-key-password` | Secret text | key password |
+
+The Jenkins agent itself needs JDK 17 + Android SDK Platform 34 +
+Build-Tools 34 installed, plus `ANDROID_HOME` exported in the agent's
+environment. The dockerized Jenkins on the VPS does **not** ship those
+by default — add them to the Jenkins image or use a labelled agent.
+
+Trigger a release build:
+
+1. Open Jenkins → LogicNexus-Pipeline → **Build with Parameters**
+2. Tick `ENABLE_ANDROID_RELEASE`
+3. Build. The new `Build Android Release` stage runs after the web
+   deploy; the AAB lands as a build artifact you can download from
+   Jenkins.
+
+### 4. Play Console first upload (the one-time human checklist)
+
+1. Create a developer account at https://play.google.com/console
+   ($25 one-time).
+2. Create app → package name `com.sospro.logicnexus`.
+3. Fill **App content** declarations:
+   - Privacy policy URL (required for any app collecting user data —
+     ours collects auth + portfolio data).
+   - Target audience + content rating questionnaire.
+   - Data safety form — disclose Supabase Auth, FCM, broker OAuth
+     scopes.
+4. **Internal testing** track:
+   - Upload the AAB.
+   - Add a tester list (Google groups or comma-separated emails).
+   - Share the opt-in link with the team.
+5. **Pre-launch report** runs automatically on Google's emulator fleet
+   for 4 hours after upload. Check the device-compat + accessibility
+   warnings.
+6. Promote to **Closed testing → Production** after the team
+   bakes-in for a week.
+
+Internal testing is enough to start dogfooding before production.
+Production review usually takes 1–3 days for new apps.
 
 ## What's checked in vs ignored
 

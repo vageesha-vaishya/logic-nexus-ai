@@ -1,5 +1,37 @@
 apply plugin: 'com.android.application'
 
+// ── Release signing config (T24e) ────────────────────────────────────────────
+// Reads from env vars first (Jenkins / scripted release path), then falls
+// back to gradle.properties (local developer overrides). When neither
+// source provides a keystore we leave signingConfig=null on release and
+// Gradle falls through to the debug signing config — that keeps local
+// `./gradlew assembleDebug` working without any setup.
+//
+// Env vars:
+//   LN_KEYSTORE_PATH      absolute path to a JKS / PKCS12 keystore file
+//   LN_KEYSTORE_PASSWORD  storePassword
+//   LN_KEY_ALIAS          alias inside the keystore (e.g. logic-nexus-prod)
+//   LN_KEY_PASSWORD       keyPassword
+def resolveProp(String name) {
+    def fromEnv = System.getenv(name)
+    if (fromEnv?.trim()) return fromEnv.trim()
+    if (project.hasProperty(name)) return project.property(name).toString().trim()
+    return null
+}
+
+def releaseKeystorePath     = resolveProp('LN_KEYSTORE_PATH')
+def releaseKeystorePassword = resolveProp('LN_KEYSTORE_PASSWORD')
+def releaseKeyAlias         = resolveProp('LN_KEY_ALIAS')
+def releaseKeyPassword      = resolveProp('LN_KEY_PASSWORD')
+
+def releaseSigningReady = (
+    releaseKeystorePath     != null &&
+    releaseKeystorePassword != null &&
+    releaseKeyAlias         != null &&
+    releaseKeyPassword      != null &&
+    file(releaseKeystorePath).exists()
+)
+
 android {
     namespace "com.sospro.logicnexus"
     compileSdk rootProject.ext.compileSdkVersion
@@ -16,10 +48,28 @@ android {
             ignoreAssetsPattern '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+
+    if (releaseSigningReady) {
+        signingConfigs {
+            release {
+                storeFile     file(releaseKeystorePath)
+                storePassword releaseKeystorePassword
+                keyAlias      releaseKeyAlias
+                keyPassword   releaseKeyPassword
+            }
+        }
+    } else {
+        logger.lifecycle('[logic-nexus] Release signing config NOT set — release builds will fall back to debug signing. ' +
+                         'See deploy/MOBILE.md for the keystore + env-var walkthrough.')
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+            if (releaseSigningReady) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 }

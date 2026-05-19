@@ -4,6 +4,7 @@ pipeline {
         string(name: 'DEPLOY_BRANCH', defaultValue: 'main', description: 'Git branch to checkout and deploy')
         string(name: 'GIT_CREDENTIALS_ID', defaultValue: 'logic-nexus-git', description: 'Jenkins credentialsId for GitHub access (PAT or app credential)')
         booleanParam(name: 'ENABLE_COOLIFY_TRIGGER', defaultValue: false, description: 'Trigger Coolify webhook after VPS deploy (can overwrite VPS container config)')
+        booleanParam(name: 'ENABLE_ANDROID_RELEASE', defaultValue: false, description: 'Build a signed Android Release AAB (requires JDK 17 + Android SDK + Jenkins credentials android-keystore-file / android-keystore-password / android-key-alias / android-key-password)')
         string(name: 'AMRO_API_UPSTREAM', defaultValue: 'host.docker.internal:8031', description: 'AMRO API upstream for logicpro-web container')
         choice(name: 'DB_TARGET', choices: ['auto', 'local', 'cloud'], description: 'Select Supabase instance for build')
         string(name: 'SUPABASE_URL_OVERRIDE', defaultValue: 'https://gzhxgoigflftharcmdqj.supabase.co', description: 'Optional: override Supabase URL')
@@ -415,6 +416,69 @@ fi
                 }
             }
         }
+        stage('Build Android Release') {
+            when {
+                expression { return params.ENABLE_ANDROID_RELEASE == true }
+            }
+            steps {
+                script {
+                    echo "Building signed Android release (T24e)…"
+                    // The Jenkins agent needs JDK 17 + Android SDK Platform 34
+                    // + Build-Tools 34 installed. We log up front so the
+                    // failure mode is obvious if those aren't present.
+                    sh '''
+set -e
+echo "▶ Toolchain summary"
+java -version 2>&1 | head -2 || { echo "JDK not on PATH — install JDK 17 on this Jenkins agent"; exit 1; }
+echo "ANDROID_HOME=${ANDROID_HOME:-(unset)}"
+if [ -z "$ANDROID_HOME" ] || [ ! -d "$ANDROID_HOME" ]; then
+  echo "ANDROID_HOME is not set or does not exist — install the Android SDK on this Jenkins agent and export ANDROID_HOME"
+  exit 1
+fi
+'''
+                    timeout(time: 30, unit: 'MINUTES') {
+                        // Web build + cap sync. Reuses VPS deploy's Supabase
+                        // env so the bundled assets point at the same backend.
+                        withEnv([
+                            "VITE_SUPABASE_URL=${env.SELECTED_SUPABASE_URL}",
+                            "VITE_SUPABASE_ANON_KEY=${env.SELECTED_ANON_KEY}",
+                            "VITE_SUPABASE_PUBLISHABLE_KEY=${env.SELECTED_ANON_KEY}",
+                            "VITE_MARKETS_WORKER_URL=/api/markets",
+                        ]) {
+                            sh 'npm run mobile:build'
+                        }
+
+                        // Gradle bundleRelease with credentials injected as
+                        // env vars. The Gradle file (android/app/build.gradle)
+                        // reads them via resolveProp().
+                        withCredentials([
+                            file(   credentialsId: 'android-keystore-file',     variable: 'LN_KEYSTORE_PATH'),
+                            string( credentialsId: 'android-keystore-password', variable: 'LN_KEYSTORE_PASSWORD'),
+                            string( credentialsId: 'android-key-alias',         variable: 'LN_KEY_ALIAS'),
+                            string( credentialsId: 'android-key-password',      variable: 'LN_KEY_PASSWORD'),
+                        ]) {
+                            sh '''
+set -e
+cd android
+chmod +x ./gradlew
+./gradlew bundleRelease --no-daemon --console=plain
+echo
+echo "▶ Built artifacts:"
+ls -lh app/build/outputs/bundle/release/ 2>/dev/null || true
+ls -lh app/build/outputs/apk/release/    2>/dev/null || true
+'''
+                        }
+
+                        archiveArtifacts(
+                            artifacts: 'android/app/build/outputs/bundle/release/*.aab,android/app/build/outputs/apk/release/*.apk',
+                            fingerprint: true,
+                            allowEmptyArchive: false,
+                        )
+                    }
+                }
+            }
+        }
+
         stage('Validate AMRO Proxy Post Deploy') {
             steps {
                 script {
