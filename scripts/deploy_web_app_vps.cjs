@@ -58,11 +58,15 @@ conn.on('ready', () => {
     `docker run -d --name logicpro-web --restart unless-stopped -p ${appPort}:80 --add-host=host.docker.internal:host-gateway -e AMRO_API_UPSTREAM="$AMRO_API_UPSTREAM_EFFECTIVE" logicpro-web`,
     // Health-check the AMRO proxy via the running container. We probe by HTTP
     // status code rather than curl's exit code — curl sometimes exits non-zero
-    // on a 200 (keep-alive close, response-length quirks, etc.), and the old
-    // probe lost the signal entirely because `>/dev/null 2>&1` swallowed it.
+    // on a 200 (keep-alive close, response-length quirks, etc.).
+    //
+    // Use `|| true` (not `|| echo "000"`) so that a non-zero curl exit doesn't
+    // *append* "000" onto the captured http_code. Previously a 200 response
+    // with non-zero curl exit produced WEB_HEALTH_CODE="200000" which never
+    // matched "200" — see build #136.
     `WEB_HEALTH_OK=''`,
     `WEB_HEALTH_CODE=''`,
-    `for i in $(seq 1 20); do WEB_HEALTH_CODE=$(curl -s --max-time 8 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${appPort}/api/v2/amro/health" 2>/dev/null || echo "000"); if [ "$WEB_HEALTH_CODE" = "200" ]; then WEB_HEALTH_OK='yes'; break; fi; echo "web-health probe $i/20: http_code=$WEB_HEALTH_CODE"; sleep 2; done`,
+    `for i in $(seq 1 20); do WEB_HEALTH_CODE=$(curl -s --max-time 8 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${appPort}/api/v2/amro/health" 2>/dev/null || true); if [ "$WEB_HEALTH_CODE" = "200" ]; then WEB_HEALTH_OK='yes'; break; fi; echo "web-health probe $i/20: http_code=$WEB_HEALTH_CODE"; sleep 2; done`,
     `if [ -z "$WEB_HEALTH_OK" ]; then echo "logicpro-web started but AMRO proxy health failed (last http_code=$WEB_HEALTH_CODE)"; echo '--- logicpro-web logs ---'; docker logs --tail 120 logicpro-web || true; exit 1; fi`,
     `echo "logicpro-web AMRO proxy health: 200 OK"`
   ].join(' && ');
