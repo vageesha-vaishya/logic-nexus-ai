@@ -4,7 +4,10 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { StickyActionsProvider } from "@/components/layout/StickyActionsContext";
 import { logger } from "@/lib/logger";
 import { initializePlugins } from "./plugins/init";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient } from "@tanstack/react-query";
+import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
+
+import { queryPersister, shouldPersistQuery } from "@/lib/queryPersistence";
 import { lazy, Suspense, type ComponentType } from "react";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./hooks/useAuth";
@@ -271,7 +274,19 @@ try {
   logger.error("Failed to initialize plugins:", e);
 }
 
-const queryClient = new QueryClient();
+// QueryClient + retail-only persistence layer (T24d).
+//
+// Defaults: TanStack Query gcTime is 5min, so the persister would evict
+// our offline cache faster than we'd want. Bump to 24h so a user who
+// opens the app offline after a day still sees their last portfolio
+// snapshot. Per-hook staleTime overrides still control freshness.
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      gcTime: 24 * 60 * 60 * 1000, // 24h
+    },
+  },
+});
 
 try {
   logger.info('App initialization started', { component: 'App' });
@@ -280,7 +295,23 @@ try {
 }
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
+  <PersistQueryClientProvider
+    client={queryClient}
+    persistOptions={{
+      persister: queryPersister,
+      // Match the QueryClient gcTime so the persister and the in-memory
+      // cache evict on the same timeline.
+      maxAge: 24 * 60 * 60 * 1000,
+      // Bump when the cache shape changes — old payloads are dropped.
+      buster: "v1",
+      dehydrateOptions: {
+        // Only retail read-paths survive a reload. Trading / order data
+        // never persists — stale broker info presented as fresh would be
+        // actively misleading.
+        shouldDehydrateQuery: (query) => shouldPersistQuery(query.queryKey),
+      },
+    }}
+  >
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <CRMProvider>
@@ -1065,7 +1096,7 @@ const App = () => (
         </CRMProvider>
       </AuthProvider>
     </BrowserRouter>
-  </QueryClientProvider>
+  </PersistQueryClientProvider>
 );
 
 export default App;

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/integrations/supabase/client";
+import { requireOnline } from "@/lib/network";
 
 import { marketsKeys } from "../../hooks/queryKeys";
 
@@ -106,6 +107,7 @@ export function useDismissRebalance(opts: MutationOpts = {}) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (recId: string): Promise<RebalanceRecommendation> => {
+      requireOnline(); // T24d: never queue offline mutations
       const headers = await authHeader();
       const resp = await fetch(
         `${WORKER_URL}/v1/retail/rebalance/${encodeURIComponent(recId)}/dismiss`,
@@ -134,6 +136,7 @@ export function useExecuteRebalance(opts: MutationOpts = {}) {
       recId: string;
       confirmMethod?: "biometric" | "password" | "web";
     }): Promise<RebalanceRecommendation> => {
+      requireOnline(); // T24d: never queue offline mutations
       const headers = { ...(await authHeader()), "Content-Type": "application/json" };
       const resp = await fetch(
         `${WORKER_URL}/v1/retail/rebalance/${encodeURIComponent(input.recId)}/execute`,

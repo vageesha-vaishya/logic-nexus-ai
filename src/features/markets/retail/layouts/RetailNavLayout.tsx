@@ -11,6 +11,8 @@ import {
 
 import { cn } from "@/lib/utils";
 
+import { OfflineBanner } from "./OfflineBanner";
+
 /**
  * 5-tab IA for retail mode (Phase 1 Addendum, §7b).
  *
@@ -78,6 +80,7 @@ export function RetailNavLayout() {
 
       {/* Page content — leaves bottom space for the mobile nav. */}
       <main className="flex-1 pb-20 md:pb-0">
+        <OfflineBanner />
         <Outlet />
       </main>
 
