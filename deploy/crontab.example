@@ -1,0 +1,29 @@
+# /var/spool/cron/crontabs/markets   — install via `crontab -u markets -e`
+#
+# All times are server-local. Hostinger VPS defaults are usually UTC; convert
+# IST → UTC (subtract 5h30m) before pasting.
+#
+# Output goes to /var/log/markets/*.log; create the dir + chown to `markets`
+# during install (the install script does this).
+
+SHELL=/bin/bash
+PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+WORKER=/srv/logic-nexus/services/markets-worker
+PYTHON=${WORKER}/.venv/bin/python
+
+# ── Daily signal regeneration (NSE equities) ────────────────────────────────
+# 03:15 UTC = 08:45 IST = 30 min before NSE market open (9:15 IST).
+# Mon-Fri only (NSE closed on weekends).
+15 3 * * 1-5  cd ${WORKER} && ${PYTHON} -m markets_worker.cli signals:daily \
+              >> /var/log/markets/signals-daily.log 2>&1
+
+# ── Weekly OHLC backfill ────────────────────────────────────────────────────
+# Saturday 23:00 UTC — pull the last 30 days of price history for every NSE
+# equity. Catches any rows the per-instrument daily fetches missed.
+0 23 * * 6    cd ${WORKER} && ${PYTHON} -m markets_worker.cli prices:backfill --days 30 \
+              >> /var/log/markets/prices-backfill.log 2>&1
+
+# ── Optional: log rotation ─────────────────────────────────────────────────
+# If you'd rather not depend on /etc/logrotate.d, trim the journal-bound logs
+# weekly. (logrotate handles /var/log/nginx/* already by default on Ubuntu.)
+# 0 4 * * 0    find /var/log/markets -name '*.log' -size +100M -delete

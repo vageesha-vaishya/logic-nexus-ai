@@ -1,0 +1,59 @@
+[Unit]
+Description=Logic Nexus AI — markets worker (FastAPI)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=markets
+Group=markets
+WorkingDirectory=/srv/logic-nexus/services/markets-worker
+
+# Load secrets from /srv/logic-nexus/.env (mode 600, root or markets-owned).
+EnvironmentFile=/srv/logic-nexus/.env
+
+# Bind to localhost only — Nginx reverse-proxies from :443.
+ExecStart=/srv/logic-nexus/services/markets-worker/.venv/bin/uvicorn \
+    markets_worker.main:create_app \
+    --factory \
+    --host 127.0.0.1 \
+    --port 8001 \
+    --proxy-headers \
+    --forwarded-allow-ips=127.0.0.1 \
+    --no-access-log \
+    --log-level info
+
+# Restart policy — kick back up on any non-clean exit, with backoff.
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=10
+StartLimitIntervalSec=600
+
+# Resource caps — tune to your VPS plan.
+LimitNOFILE=65535
+MemoryMax=2G
+TasksMax=4096
+
+# Sandboxing — `markets` user has no shell login; minimize blast radius.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/srv/logic-nexus/services/markets-worker /var/log/markets
+ProtectHome=true
+PrivateTmp=true
+PrivateDevices=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+RestrictSUIDSGID=true
+SystemCallArchitectures=native
+
+# Journal-only logging by default — pipe to log shipper later if you want.
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=markets-worker
+
+[Install]
+WantedBy=multi-user.target
