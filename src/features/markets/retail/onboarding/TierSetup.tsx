@@ -11,6 +11,7 @@ import {
 
 import { usePortfolios } from '../../hooks/usePortfolios';
 import { TIER_DEFAULTS } from '../types';
+import { StarterTemplatePicker } from './StarterTemplatePicker';
 
 // Radix Select rejects an empty-string SelectItem value — use a sentinel for
 // the "no portfolio linked" choice and translate it back to null in onChange.
@@ -39,6 +40,17 @@ export function TierSetup({ tiers, onChange }: TierSetupProps) {
       <p className="text-sm text-muted-foreground">
         Assign each tier to a portfolio and set a target amount. You can change these anytime.
       </p>
+
+      <StarterTemplatePicker
+        onApply={(allocations) => {
+          // Bulk-populate target_amount across the 3 tiers in one shot. The
+          // host's onChange signature only accepts one tier+field at a time,
+          // so we fan-out into 3 calls.
+          for (const alloc of allocations) {
+            onChange(alloc.tier_number, 'target_amount', alloc.target_amount);
+          }
+        }}
+      />
 
       {TIER_DEFAULTS.map((def) => {
         const tier = tiers.find((t) => t.tier_number === def.tier_number);

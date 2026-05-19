@@ -157,5 +157,6 @@ export const marketsKeys = {
       stress: () => [...marketsKeys.retail.all(), "behavioral", "stress"] as const,
       events: () => [...marketsKeys.retail.all(), "behavioral", "events"] as const,
     },
+    starterTemplates: () => [...marketsKeys.retail.all(), "starter-templates"] as const,
   },
 } as const;
