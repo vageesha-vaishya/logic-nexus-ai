@@ -56,9 +56,15 @@ conn.on('ready', () => {
     `echo "Using AMRO upstream: $AMRO_API_UPSTREAM_EFFECTIVE"`,
     `(docker ps -a --format '{{.Names}}' | grep -q '^logicpro-web$' && docker rm -f logicpro-web || true)`,
     `docker run -d --name logicpro-web --restart unless-stopped -p ${appPort}:80 --add-host=host.docker.internal:host-gateway -e AMRO_API_UPSTREAM="$AMRO_API_UPSTREAM_EFFECTIVE" logicpro-web`,
+    // Health-check the AMRO proxy via the running container. We probe by HTTP
+    // status code rather than curl's exit code — curl sometimes exits non-zero
+    // on a 200 (keep-alive close, response-length quirks, etc.), and the old
+    // probe lost the signal entirely because `>/dev/null 2>&1` swallowed it.
     `WEB_HEALTH_OK=''`,
-    `for i in $(seq 1 20); do curl -fsS --max-time 8 "http://127.0.0.1:${appPort}/api/v2/amro/health" >/dev/null 2>&1 && WEB_HEALTH_OK='yes' && break; sleep 2; done`,
-    `if [ -z "$WEB_HEALTH_OK" ]; then echo 'logicpro-web started but AMRO proxy health failed'; echo '--- logicpro-web logs ---'; docker logs --tail 120 logicpro-web || true; exit 1; fi`
+    `WEB_HEALTH_CODE=''`,
+    `for i in $(seq 1 20); do WEB_HEALTH_CODE=$(curl -s --max-time 8 -o /dev/null -w '%{http_code}' "http://127.0.0.1:${appPort}/api/v2/amro/health" 2>/dev/null || echo "000"); if [ "$WEB_HEALTH_CODE" = "200" ]; then WEB_HEALTH_OK='yes'; break; fi; echo "web-health probe $i/20: http_code=$WEB_HEALTH_CODE"; sleep 2; done`,
+    `if [ -z "$WEB_HEALTH_OK" ]; then echo "logicpro-web started but AMRO proxy health failed (last http_code=$WEB_HEALTH_CODE)"; echo '--- logicpro-web logs ---'; docker logs --tail 120 logicpro-web || true; exit 1; fi`,
+    `echo "logicpro-web AMRO proxy health: 200 OK"`
   ].join(' && ');
   conn.exec(buildCmd, (err, stream) => {
     if (err) return fail(err);
