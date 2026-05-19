@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Activity, AlertTriangle, ArrowRight, Loader2 } from "lucide-react";
 
@@ -5,7 +6,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 import { WhyButton } from "../glossary";
+import { usePendingRebalance } from "../hooks/useRebalanceRecommendation";
 import { useRiskScore } from "../hooks/useRiskScore";
+import { RebalanceSheet } from "./RebalanceSheet";
 
 const SCORE_BAND = (score: number): string => {
   if (score <= 3) return "Low";
@@ -26,6 +29,11 @@ const SCORE_BAND = (score: number): string => {
  */
 export function RiskScoreCard() {
   const { data, isLoading, isError, error } = useRiskScore();
+  // The "How to fix this" CTA opens the same RebalanceSheet that RebalanceCard
+  // owns, so the user doesn't have to scroll up to find it. TanStack Query
+  // dedupes the pending fetch across the two callsites.
+  const { data: pendingRec } = usePendingRebalance();
+  const [sheetOpen, setSheetOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -59,6 +67,7 @@ export function RiskScoreCard() {
   const elevated = delta > 2;
 
   return (
+    <>
     <Card
       className={cn(
         elevated &&
@@ -110,13 +119,28 @@ export function RiskScoreCard() {
           </div>
 
           {elevated && (
-            <Link
-              to="/dashboard/markets/retail/portfolio"
-              className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-400 bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/60 dark:text-amber-100"
-            >
-              How to fix this
-              <ArrowRight className="h-3 w-3" />
-            </Link>
+            pendingRec ? (
+              <button
+                type="button"
+                onClick={() => setSheetOpen(true)}
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-400 bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring dark:border-amber-700 dark:bg-amber-900/60 dark:text-amber-100"
+                aria-label="Review rebalance recommendation"
+              >
+                How to fix this
+                <ArrowRight className="h-3 w-3" />
+              </button>
+            ) : (
+              // Elevated score but no pending rebalance recommendation
+              // (transient — detector hasn't run yet or thresholds disagree).
+              // Fall back to the Portfolio tab so the user can adjust manually.
+              <Link
+                to="/dashboard/markets/retail/portfolio"
+                className="inline-flex shrink-0 items-center gap-1 rounded-md border border-amber-400 bg-amber-100 px-2.5 py-1 text-xs font-medium text-amber-900 hover:bg-amber-200 dark:border-amber-700 dark:bg-amber-900/60 dark:text-amber-100"
+              >
+                Open Portfolio
+                <ArrowRight className="h-3 w-3" />
+              </Link>
+            )
           )}
         </div>
 
@@ -140,5 +164,11 @@ export function RiskScoreCard() {
         </ul>
       </CardContent>
     </Card>
+    <RebalanceSheet
+      recommendation={pendingRec ?? null}
+      open={sheetOpen}
+      onOpenChange={setSheetOpen}
+    />
+    </>
   );
 }

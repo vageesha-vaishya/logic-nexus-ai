@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { usePortfolioPnL } from "../../hooks/usePortfolioPnL";
 import { BehavioralAlertBanner } from "../behavioral/BehavioralAlertBanner";
 import { useDrawdownState } from "../behavioral/useDrawdownAlerts";
+import { RebalanceCard } from "../dashboard/RebalanceCard";
 import { RetailDashboard } from "../dashboard/RetailDashboard";
 import { RiskScoreCard } from "../dashboard/RiskScoreCard";
 import { usePortfolioTiers } from "../hooks/usePortfolioTiers";
@@ -26,6 +27,7 @@ export default function RetailHomePage() {
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-4 md:p-6">
       <RetailDashboard profile={profile} />
+      <RebalanceCard />
       <RiskScoreCard />
       {coreTier && drawdown.alertTier && drawdown.alertTier !== "red" && (
         <BehavioralAlertBanner

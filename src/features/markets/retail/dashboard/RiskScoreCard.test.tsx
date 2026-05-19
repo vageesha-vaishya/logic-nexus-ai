@@ -41,6 +41,25 @@ vi.mock("../hooks/useRiskScore", () => ({
   useRiskScore: () => mockState,
 }));
 
+// usePendingRebalance is invoked by RiskScoreCard to decide whether the
+// "How to fix this" CTA opens the sheet or falls back to the Portfolio tab.
+// Default: no pending rec → fall-back link.
+const mockPending = vi.hoisted(() => ({
+  data: null as unknown,
+  isLoading: false,
+}));
+vi.mock("../hooks/useRebalanceRecommendation", async () => {
+  const actual = await vi.importActual<
+    typeof import("../hooks/useRebalanceRecommendation")
+  >("../hooks/useRebalanceRecommendation");
+  return {
+    ...actual,
+    usePendingRebalance: () => mockPending,
+    useDismissRebalance: () => ({ mutate: vi.fn(), isPending: false }),
+    useExecuteRebalance: () => ({ mutate: vi.fn(), isPending: false }),
+  };
+});
+
 function renderCard() {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
@@ -75,17 +94,36 @@ describe("RiskScoreCard", () => {
     expect(screen.queryByText(/how to fix this/i)).toBeNull();
   });
 
-  it("upgrades to elevated state when delta > 2 and shows the rebalance CTA", () => {
-    // current 9.0, target 6.0 → delta = +3.0 → elevated
+  it("falls back to Open Portfolio link when elevated but no rec exists", () => {
+    // current 9.0, target 6.0 → delta = +3.0 → elevated. No pending rec.
     mockState.data = stubResponse(9.0, 6.0);
     mockState.isLoading = false;
     mockState.isError = false;
     mockState.error = null;
+    mockPending.data = null;
     renderCard();
     expect(screen.getByText("9.0")).toBeInTheDocument();
-    const cta = screen.getByRole("link", { name: /how to fix this/i });
+    const cta = screen.getByRole("link", { name: /open portfolio/i });
     expect(cta).toHaveAttribute("href", "/dashboard/markets/retail/portfolio");
     expect(screen.getByText(/\+3\.0 vs plan/i)).toBeInTheDocument();
+  });
+
+  it("renders the rebalance-opening button when elevated AND a rec is pending", () => {
+    mockState.data = stubResponse(9.0, 6.0);
+    mockState.isLoading = false;
+    mockState.isError = false;
+    mockState.error = null;
+    mockPending.data = {
+      id: "rec-x",
+      payload: {
+        reason: "stub", orders: [], net_cash_impact: 0,
+        estimated_brokerage: 0, drifts: [], threshold_pct: 5,
+      },
+    };
+    renderCard();
+    expect(
+      screen.getByRole("button", { name: /review rebalance recommendation/i }),
+    ).toBeInTheDocument();
   });
 
   it("returns null on 412 (onboarding not complete) so the dashboard stays clean", () => {

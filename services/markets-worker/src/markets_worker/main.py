@@ -34,6 +34,7 @@ from markets_worker.routers import tax_pnl as tax_pnl_router
 from markets_worker.routers import retail as retail_router
 from markets_worker.routers import behavioral as behavioral_router
 from markets_worker.routers import risk as risk_router
+from markets_worker.routers import rebalance as rebalance_router
 
 
 def configure_logging() -> None:
@@ -110,6 +111,7 @@ def create_app() -> FastAPI:
     app.include_router(retail_router.router,                tags=["retail"])
     app.include_router(behavioral_router.router,            tags=["retail-behavioral"])
     app.include_router(risk_router.router,                  tags=["retail-risk"])
+    app.include_router(rebalance_router.router,             tags=["retail-rebalance"])
 
     # ── MCP server mounted at /mcp ────────────────────────────────────────
     # Claude Agent SDK connects here via streamable HTTP transport.
