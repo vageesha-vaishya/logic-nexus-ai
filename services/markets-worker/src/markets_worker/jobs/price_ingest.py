@@ -178,7 +178,14 @@ def _resolve_ticker(symbol: str, exchange: str, isin: str | None) -> list[str]:
 
 
 def _yf_fetch(ticker: str, start: date, end: date) -> list[dict]:
-    """Fetch OHLCV from Yahoo Finance for one ticker. Returns [] on failure."""
+    """Fetch OHLCV from Yahoo Finance for one ticker. Returns [] on failure.
+
+    yfinance occasionally returns rows with NaN OHLC (e.g. NSE holidays where
+    only a placeholder row exists). NaN is not JSON-encodable, so the whole
+    batch upsert into PostgREST would fail with `Out of range float values
+    are not JSON compliant`. Skip those rows rather than fabricating a value.
+    """
+    import math
     try:
         t = yf.Ticker(ticker)
         hist = t.history(
@@ -191,13 +198,21 @@ def _yf_fetch(ticker: str, start: date, end: date) -> list[dict]:
             return []
         rows = []
         for ts, row in hist.iterrows():
+            o, h, l, c = float(row["Open"]), float(row["High"]), float(row["Low"]), float(row["Close"])
+            if any(math.isnan(v) for v in (o, h, l, c)):
+                continue
+            vol_raw = row.get("Volume")
+            try:
+                vol = int(vol_raw) if vol_raw is not None and not math.isnan(float(vol_raw)) else 0
+            except (TypeError, ValueError):
+                vol = 0
             rows.append({
                 "ts":     ts.strftime("%Y-%m-%dT00:00:00+00:00"),
-                "open":   round(float(row["Open"]),   4),
-                "high":   round(float(row["High"]),   4),
-                "low":    round(float(row["Low"]),    4),
-                "close":  round(float(row["Close"]),  4),
-                "volume": int(row.get("Volume") or 0),
+                "open":   round(o, 4),
+                "high":   round(h, 4),
+                "low":    round(l, 4),
+                "close":  round(c, 4),
+                "volume": vol,
                 "source": f"yfinance/{ticker}",
             })
         return rows

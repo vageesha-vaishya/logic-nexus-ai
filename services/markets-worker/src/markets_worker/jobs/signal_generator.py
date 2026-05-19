@@ -1153,9 +1153,10 @@ async def persist_signal(state: SignalState) -> dict:
             hour=0, minute=0, second=0, microsecond=0
         ).isoformat()
 
-        # Delete today's signal for this exact (instrument, portfolio, horizon) before
-        # inserting the fresh one.  This is the primary dedup path; the unique index
-        # signals_portfolio_daily_dedup acts as a safety net for concurrent runs.
+        # Delete today's signal for this exact (instrument, portfolio, horizon)
+        # before inserting the fresh one. This is the primary dedup path; the
+        # partial unique index `signals_portfolio_daily_dedup` (active only
+        # WHERE portfolio_id IS NOT NULL) is the safety net for concurrent runs.
         del_q = (
             db.schema("markets").from_("signals").delete()
             .eq("instrument_id", state["instrument_id"])
@@ -1167,13 +1168,12 @@ async def persist_signal(state: SignalState) -> dict:
             del_q = del_q.eq("horizon", horizon)
         del_q.execute()
 
-        # Insert the fresh signal; ON CONFLICT DO UPDATE handles any race condition
-        # between concurrent worker runs thanks to the unique index.
-        db.schema("markets").from_("signals").upsert(
-            row,
-            on_conflict="instrument_id,portfolio_id,horizon,date_trunc('day', ts AT TIME ZONE 'UTC')",
-            ignore_duplicates=False,
-        ).execute()
+        # Plain insert — the DELETE above is the dedup path. We can't use
+        # PostgREST's on_conflict with the SQL expression `date_trunc(...)`
+        # that the unique index uses, so a concurrent-run collision will
+        # surface as a 23505 unique-violation that the outer except catches
+        # and logs as `persist_signal.failed`.
+        db.schema("markets").from_("signals").insert(row).execute()
 
         logger.info("persist_signal.ok", symbol=state["symbol"],
                     signal=state["signal_type"], confidence=state["confidence"],
