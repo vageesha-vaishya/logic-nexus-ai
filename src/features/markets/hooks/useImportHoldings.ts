@@ -65,7 +65,7 @@ function useActiveScope() {
 /** Parse a CSV string → array of row-objects keyed by normalised header. */
 function parseCsvToObjects(raw: string): Record<string, string>[] {
   // Strip BOM, normalise line endings
-  const text = raw.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const text = raw.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = text.split("\n").filter((l) => l.trim().length > 0);
   if (lines.length < 2) return [];
 
@@ -262,7 +262,7 @@ function _parseDdMonYyyy(s: string): string | undefined {
 }
 
 function parseIciciDirect(csv: string): ImportRow[] {
-  const text  = csv.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const text  = csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
   const headerKeywords = /symbol|scrip|isin|qty|quantity|rate|price|nse|bse|action/i;
@@ -399,7 +399,7 @@ function parseIciciDirect(csv: string): ImportRow[] {
  */
 function parseKotak(csv: string): ImportRow[] {
   // Skip preamble rows (account info) — find the header
-  const text  = csv.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const text  = csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
   const headerKeywords = /symbol|scrip|isin|qty|quantity|price|nse|stock|holding/i;
@@ -470,7 +470,7 @@ function parseKotak(csv: string): ImportRow[] {
  *   camsonline.com: Login → Portfolio → Download → CSV
  */
 function parseCamsMf(csv: string): ImportRow[] {
-  const text = csv.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const text = csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
   // Find the header row
@@ -551,7 +551,7 @@ function parseCamsMf(csv: string): ImportRow[] {
  *   Company Name | ISIN | Quantity | Face Value | Market Price
  */
 function parseCdsl(csv: string): ImportRow[] {
-  const text = csv.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const text = csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
   // Skip rows until we find the data header (look for ISIN keyword)
@@ -611,7 +611,7 @@ function parseCdsl(csv: string): ImportRow[] {
  *   Sr No | Scrip Name | ISIN | Quantity | Category
  */
 function parseNsdl(csv: string): ImportRow[] {
-  const text = csv.replace(/^﻿/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+  const text = csv.replace(/^\uFEFF/, "").replace(/\r\n/g, "\n").replace(/\r/g, "\n");
   const lines = text.split("\n").map(l => l.trim()).filter(Boolean);
 
   let headerIdx = 0;

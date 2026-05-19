@@ -230,7 +230,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       }
       // Also fetch item counts in one shot — cheap aggregate via service-role.
       const ids = (data ?? []).map((w: any) => w.id);
-      let counts: Record<string, number> = {};
+      const counts: Record<string, number> = {};
       if (ids.length > 0) {
         const { data: countRows } = await (supabaseAdmin as any)
           .schema("markets")

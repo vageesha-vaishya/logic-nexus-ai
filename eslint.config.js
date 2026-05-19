@@ -19,7 +19,7 @@ try {
 const storybookFlatRecommended = storybook?.configs?.["flat/recommended"] ?? {};
 
 export default tseslint.config(
-  { ignores: ["dist", "storybook-static", "test-results", "docs", ".worktrees", "CHANGELOG.md", "RUN_MIGRATION.md", "dataentry/dataEntryInstructions.md"] },
+  { ignores: ["dist", "storybook-static", "test-results", "docs", ".worktrees", ".claude", "coverage", "playwright-report", "**/.venv/**", "**/node_modules/**", "CHANGELOG.md", "RUN_MIGRATION.md", "dataentry/dataEntryInstructions.md"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -100,6 +100,28 @@ export default tseslint.config(
       "**/*.spec.tsx",
       "**/*.stories.ts",
       "**/*.stories.tsx",
+    ],
+    rules: { "no-console": "off" },
+  },
+  {
+    // Console output is the legitimate API in scripts, edge functions, build
+    // configs, test harness, the Cloudflare worker, backend Express services,
+    // browser extensions, and one-shot scripts — none of them have a logger
+    // to delegate to. `no-console` is meant to catch raw console use in the
+    // React app code, not in tooling or out-of-process code.
+    files: [
+      "supabase/functions/**/*.{ts,tsx}",
+      "tests/**/*.{ts,tsx}",
+      "test/**/*.{ts,tsx}",
+      "scripts/**/*.{ts,tsx}",
+      "worker/**/*.{ts,tsx}",
+      "services/**/*.{ts,tsx}",
+      "nexus-connect-extension/**/*.{ts,tsx}",
+      "src/pages/api/**/*.{ts,tsx}",
+      "*.config.{ts,js,mjs}",
+      "vite.config.ts",
+      "vitest.config.ts",
+      "verify_migration_suite.ts",
     ],
     rules: { "no-console": "off" },
   },

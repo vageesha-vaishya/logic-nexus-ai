@@ -1649,8 +1649,8 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       if (records.length > 500) {
         throw new HttpError('bulk import supports up to 500 records per request', 400);
       }
-      let resolvedRecords = records;
-      let assemblyModelIssues = new Map<number, { field: string; message: string }[]>();
+      const resolvedRecords = records;
+      const assemblyModelIssues = new Map<number, { field: string; message: string }[]>();
       if (entity === 'assembly_models') {
         assemblyModelIssues = await validateAssemblyModelReferences(supabase, tenantId, franchiseId, records);
       }
@@ -1755,7 +1755,7 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
       return;
     }
 
-    let resolvedBody = body;
+    const resolvedBody = body;
     const payload = sanitizeWritePayload(entity, resolvedBody, { requireCreateFields: entity !== 'aircraft' });
     if (entity === 'ata_codes') {
       payload.code = String(payload.code || '').trim().toUpperCase();

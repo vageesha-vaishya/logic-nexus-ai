@@ -2278,7 +2278,7 @@ export function AmroSettingsMasterDataPage({ entityOverride, variant = 'master-d
         return [];
       }
 
-      let query = (scopedDb as any)
+      const query = (scopedDb as any)
         .from('aircraft_categories')
         .select('tenant_id,franchise_id,code,name,is_active')
         .eq('tenant_id', tenantId)
