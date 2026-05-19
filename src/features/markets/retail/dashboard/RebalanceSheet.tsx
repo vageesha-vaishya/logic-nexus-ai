@@ -17,6 +17,8 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet";
 
+import { requireBiometric } from "@/lib/biometric";
+
 import { WhyButton } from "../glossary";
 import {
   useDismissRebalance,
@@ -65,11 +67,22 @@ export function RebalanceSheet({
     });
   };
 
-  const handleConfirm = () => {
+  const handleConfirm = async () => {
     if (!recommendation) return;
     setErrorMessage(null);
+    // Per addendum §2: biometric is a LOCAL re-confirmation on top of the
+    // active session. On web this no-ops with method='web', so the same
+    // call site works in browser preview AND on Android.
+    const auth = await requireBiometric({
+      reason: "Authorise this rebalance",
+      cancelTitle: "Cancel",
+    });
+    if (!auth.ok) {
+      if (auth.reason !== "userCancel") setErrorMessage(auth.message);
+      return;
+    }
     executeMutation.mutate(
-      { recId: recommendation.id, confirmMethod: "web" },
+      { recId: recommendation.id, confirmMethod: auth.method },
       { onError: (err) => setErrorMessage(err.message) },
     );
   };

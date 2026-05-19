@@ -10,6 +10,8 @@ import {
   SheetTitle,
 } from '@/components/ui/sheet';
 
+import { requireBiometric } from '@/lib/biometric';
+
 import { CoolingOffScreen } from '../behavioral/CoolingOffScreen';
 import type { AlertTier } from '../behavioral/types';
 import { OrderFormSheet } from '../../components/OrderFormSheet';
@@ -48,6 +50,7 @@ export function ExecutionBottomSheet({
   const { connection, hasTradeableConnection } = useActiveConnection();
   const [orderOpen, setOrderOpen] = useState(false);
   const [coolingOpen, setCoolingOpen] = useState(false);
+  const [biometricError, setBiometricError] = useState<string | null>(null);
 
   if (!signal) return null;
 
@@ -68,7 +71,20 @@ export function ExecutionBottomSheet({
   // Buys are unaffected; yellow/orange are handled by the dashboard banner.
   const needsCoolingOff = isSell && coreDrawdownTier === 'red';
 
-  const handleProceed = () => {
+  const handleProceed = async () => {
+    setBiometricError(null);
+    // Per-trade biometric gate (addendum §2 + T24b). Pass-through on web
+    // so the browser preview still works. Cooling-off screen comes AFTER
+    // a successful biometric — it's an informational interstitial, not a
+    // second authentication step.
+    const auth = await requireBiometric({
+      reason: `Authorise ${side} ${symbol}`,
+      cancelTitle: 'Cancel',
+    });
+    if (!auth.ok) {
+      if (auth.reason !== 'userCancel') setBiometricError(auth.message);
+      return;
+    }
     onOpenChange(false);
     if (needsCoolingOff) {
       setCoolingOpen(true);
@@ -116,6 +132,12 @@ export function ExecutionBottomSheet({
               for informational purposes only and does not constitute investment
               advice. Invest only what you can afford to lose.
             </p>
+
+            {biometricError && (
+              <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+                {biometricError}
+              </p>
+            )}
 
             <Button
               className="w-full"

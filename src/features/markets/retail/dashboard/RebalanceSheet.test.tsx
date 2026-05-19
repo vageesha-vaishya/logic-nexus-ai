@@ -1,11 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { RebalanceSheet } from "./RebalanceSheet";
 import type {
   RebalanceRecommendation,
 } from "../hooks/useRebalanceRecommendation";
+
+// The Confirm button calls into the biometric wrapper. In jsdom Capacitor
+// reports platform="web", so the wrapper would already short-circuit to
+// ok=true / method='web' — but we mock the module to keep this test
+// independent of @capacitor/core's runtime detection.
+const requireBiometricMock = vi.hoisted(() => vi.fn());
+vi.mock("@/lib/biometric", () => ({
+  requireBiometric: requireBiometricMock,
+}));
 
 const stubRec: RebalanceRecommendation = {
   id:           "rec-2",
@@ -82,6 +91,9 @@ describe("RebalanceSheet", () => {
   beforeEach(() => {
     dismissMock.mockClear();
     executeMock.mockClear();
+    requireBiometricMock.mockReset();
+    // Default: biometric passes through as on web.
+    requireBiometricMock.mockResolvedValue({ ok: true, method: "web" });
   });
 
   it("renders nothing when recommendation is null", () => {
@@ -110,13 +122,39 @@ describe("RebalanceSheet", () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
-  it("dispatches execute mutation with confirm_method=web on Confirm click", () => {
+  it("dispatches execute mutation with confirm_method=web on Confirm click (web platform)", async () => {
     const { onOpenChange } = renderSheet();
     fireEvent.click(screen.getByRole("button", { name: /confirm rebalance/i }));
-    expect(executeMock).toHaveBeenCalledWith(
-      { recId: stubRec.id, confirmMethod: "web" },
-      expect.anything(),
-    );
+    await waitFor(() => {
+      expect(executeMock).toHaveBeenCalledWith(
+        { recId: stubRec.id, confirmMethod: "web" },
+        expect.anything(),
+      );
+    });
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it("records confirm_method=biometric when the OS biometric prompt resolves", async () => {
+    requireBiometricMock.mockResolvedValueOnce({ ok: true, method: "biometric" });
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /confirm rebalance/i }));
+    await waitFor(() => {
+      expect(executeMock).toHaveBeenCalledWith(
+        { recId: stubRec.id, confirmMethod: "biometric" },
+        expect.anything(),
+      );
+    });
+  });
+
+  it("does NOT execute the mutation when biometric is cancelled by the user", async () => {
+    requireBiometricMock.mockResolvedValueOnce({
+      ok: false,
+      reason: "userCancel",
+      message: "cancelled",
+    });
+    renderSheet();
+    fireEvent.click(screen.getByRole("button", { name: /confirm rebalance/i }));
+    await waitFor(() => expect(requireBiometricMock).toHaveBeenCalled());
+    expect(executeMock).not.toHaveBeenCalled();
   });
 });
