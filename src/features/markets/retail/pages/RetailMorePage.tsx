@@ -87,8 +87,8 @@ export default function RetailMorePage() {
         <Row
           Icon={Wallet}
           label="Withdraw"
-          hint="Coming soon — settlement timeline, exit loads, tax impact"
-          disabled
+          hint="Settlement timeline, exit loads, tax impact"
+          to="/dashboard/markets/retail/withdraw"
         />
         <Row
           Icon={TrendingDown}

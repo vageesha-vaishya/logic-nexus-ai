@@ -228,6 +228,7 @@ const RetailPortfolioTab = lazy(() => import("./features/markets/retail/pages/Re
 const RetailSignalsTab   = lazy(() => import("./features/markets/retail/pages/RetailSignalsPage"));
 const RetailGoalsTab     = lazy(() => import("./features/markets/retail/pages/RetailGoalsPage"));
 const RetailMoreTab      = lazy(() => import("./features/markets/retail/pages/RetailMorePage"));
+const RetailWithdrawTab  = lazy(() => import("./features/markets/retail/pages/RetailWithdrawPage"));
 const MarketsFno             = lazy(() => import("./features/markets/pages/FnoPage"));
 const MarketsStrategyBuilder = lazy(() => import("./features/markets/pages/StrategyBuilderPage"));
 const MarketsMf      = lazy(() => import("./features/markets/pages/MfPage"));
@@ -1005,6 +1006,7 @@ const App = () => (
               <Route path="signals"    element={<RetailSignalsTab />} />
               <Route path="goals"      element={<RetailGoalsTab />} />
               <Route path="more"       element={<RetailMoreTab />} />
+              <Route path="withdraw"   element={<RetailWithdrawTab />} />
             </Route>
             <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerConnections /></ProtectedRoute>} />
