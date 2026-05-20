@@ -199,6 +199,37 @@ function ConnectionCard({
 
 // ── Connect sheet ─────────────────────────────────────────────────────────────
 
+// IMPORTANT: defined OUTSIDE ConnectSheet so React treats it as a stable
+// component type across renders. Defining this inside the parent caused
+// the input to lose focus after every keystroke (parent re-renders →
+// new function reference → React unmounts the old input).
+interface FieldProps {
+  id:           string;
+  label:        string;
+  type?:        string;
+  placeholder?: string;
+  hint?:        string;
+  value:        string;
+  onChange:     (v: string) => void;
+}
+
+function Field({ id, label, type = "text", placeholder = "", hint = "", value, onChange }: FieldProps) {
+  return (
+    <div className="space-y-1.5">
+      <Label htmlFor={id}>{label}</Label>
+      <Input
+        id={id}
+        type={type}
+        placeholder={placeholder}
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        autoComplete="off"
+      />
+      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
+    </div>
+  );
+}
+
 interface ConnectSheetProps {
   broker:     SupportedBroker | null;
   open:       boolean;
@@ -373,64 +404,48 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
     onClose();
   }
 
-  // ── Field helpers ─────────────────────────────────────────────────────────
-
-  const F = ({ id, label, type = "text", placeholder = "", hint = "" }: {
-    id: string; label: string; type?: string; placeholder?: string; hint?: string;
-  }) => (
-    <div className="space-y-1.5">
-      <Label htmlFor={id}>{label}</Label>
-      <Input id={id} type={type} placeholder={placeholder}
-        value={form[id] ?? ""}
-        onChange={e => set(id, e.target.value)}
-        autoComplete="off"
-      />
-      {hint && <p className="text-xs text-muted-foreground">{hint}</p>}
-    </div>
-  );
-
   // ── Form body per auth type + step ────────────────────────────────────────
 
   const renderForm = () => {
     if (broker.auth_type === "api_key") return (
       <div className="space-y-4">
-        <F id="display_name" label="Account label" placeholder={`My ${broker.name} account`} />
-        <F id="client_id"    label="Client ID"     placeholder="Your Dhan client ID" />
-        <F id="access_token" label="Access token"  type="password"
+        <Field id="display_name" label="Account label" placeholder={`My ${broker.name} account`} value={form["display_name"] ?? ""} onChange={v => set("display_name", v)} />
+        <Field id="client_id"    label="Client ID"     placeholder="Your Dhan client ID" value={form["client_id"] ?? ""} onChange={v => set("client_id", v)} />
+        <Field id="access_token" label="Access token"  type="password"
            placeholder="Paste from console.dhan.co → My Profile → Access Token"
-           hint="Dhan tokens are long-lived — no daily re-auth needed." />
+           hint="Dhan tokens are long-lived — no daily re-auth needed." value={form["access_token"] ?? ""} onChange={v => set("access_token", v)} />
       </div>
     );
 
     if (broker.auth_type === "api_key_secret") return (
       <div className="space-y-4">
-        <F id="display_name" label="Account label" placeholder={`My ${broker.name} account`} />
-        <F id="api_key"      label="API Key"       placeholder="From groww.in/trade-api/api-keys" />
-        <F id="api_secret"   label="API Secret"    type="password"
+        <Field id="display_name" label="Account label" placeholder={`My ${broker.name} account`} value={form["display_name"] ?? ""} onChange={v => set("display_name", v)} />
+        <Field id="api_key"      label="API Key"       placeholder="From groww.in/trade-api/api-keys" value={form["api_key"] ?? ""} onChange={v => set("api_key", v)} />
+        <Field id="api_secret"   label="API Secret"    type="password"
            placeholder="Secret shown when you created the API key"
-           hint="Groww requires daily approval — tap 'Approve' on the Groww Cloud API Keys page each day before trading." />
+           hint="Groww requires daily approval — tap 'Approve' on the Groww Cloud API Keys page each day before trading." value={form["api_secret"] ?? ""} onChange={v => set("api_secret", v)} />
       </div>
     );
 
     if (broker.auth_type === "totp") return (
       <div className="space-y-4">
-        <F id="display_name" label="Account label"    placeholder={`My ${broker.name} account`} />
-        <F id="api_key"      label="API Key"          placeholder="From smartapi.angelbroking.com" />
-        <F id="client_id"    label="Client ID"        placeholder="Angel One client ID (e.g. A123456)" />
-        <F id="password"     label="Trading password" type="password" />
-        <F id="totp_secret"  label="TOTP secret key"  type="password"
+        <Field id="display_name" label="Account label"    placeholder={`My ${broker.name} account`} value={form["display_name"] ?? ""} onChange={v => set("display_name", v)} />
+        <Field id="api_key"      label="API Key"          placeholder="From smartapi.angelbroking.com" value={form["api_key"] ?? ""} onChange={v => set("api_key", v)} />
+        <Field id="client_id"    label="Client ID"        placeholder="Angel One client ID (e.g. A123456)" value={form["client_id"] ?? ""} onChange={v => set("client_id", v)} />
+        <Field id="password"     label="Trading password" type="password" value={form["password"] ?? ""} onChange={v => set("password", v)} />
+        <Field id="totp_secret"  label="TOTP secret key"  type="password"
            placeholder="32-character base32 secret from QR code"
-           hint="Found when you set up 2FA on Angel One. Enables automated daily token refresh." />
+           hint="Found when you set up 2FA on Angel One. Enables automated daily token refresh." value={form["totp_secret"] ?? ""} onChange={v => set("totp_secret", v)} />
       </div>
     );
 
     if (broker.auth_type === "session_token") {
       if (step === 0) return (
         <div className="space-y-4">
-          <F id="display_name" label="Account label"  placeholder={`My ${broker.name} account`} />
-          <F id="client_id"    label="Client ID"      placeholder="Your ICICI Direct client ID" />
-          <F id="api_key"      label="API Key"        placeholder="From ICICIdirect API portal" />
-          <F id="api_secret"   label="API Secret"     type="password" />
+          <Field id="display_name" label="Account label"  placeholder={`My ${broker.name} account`} value={form["display_name"] ?? ""} onChange={v => set("display_name", v)} />
+          <Field id="client_id"    label="Client ID"      placeholder="Your ICICI Direct client ID" value={form["client_id"] ?? ""} onChange={v => set("client_id", v)} />
+          <Field id="api_key"      label="API Key"        placeholder="From ICICIdirect API portal" value={form["api_key"] ?? ""} onChange={v => set("api_key", v)} />
+          <Field id="api_secret"   label="API Secret"     type="password" value={form["api_secret"] ?? ""} onChange={v => set("api_secret", v)} />
           <p className="text-xs text-muted-foreground bg-muted p-3 rounded">
             Click Connect to generate your login URL. You'll be prompted to
             visit it, log in to ICICI Direct, and paste back the session token.
@@ -452,8 +467,8 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
               </a>
             )}
           </div>
-          <F id="session_token" label="Session token" type="password"
-             placeholder="Paste token= value from redirect URL" />
+          <Field id="session_token" label="Session token" type="password"
+             placeholder="Paste token= value from redirect URL" value={form["session_token"] ?? ""} onChange={v => set("session_token", v)} />
         </div>
       );
     }
@@ -461,13 +476,14 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
     if (broker.auth_type === "oauth") {
       if (step === 0) return (
         <div className="space-y-4">
-          <F id="display_name"  label="Account label"  placeholder={`My ${broker.name} account`} />
-          <F id="client_id"     label="Client ID"      placeholder="Your broker client ID" />
-          <F id="api_key"       label="API Key"        placeholder={broker.id === "zerodha" ? "Kite API Key" : "App ID (XXXXX-100)"} />
-          <F id="api_secret"    label="Secret / API Secret" type="password" />
+          <Field id="display_name"  label="Account label"  placeholder={`My ${broker.name} account`} value={form["display_name"] ?? ""} onChange={v => set("display_name", v)} />
+          <Field id="client_id"     label="Client ID"      placeholder="Your broker client ID" value={form["client_id"] ?? ""} onChange={v => set("client_id", v)} />
+          <Field id="api_key"       label="API Key"        placeholder={broker.id === "zerodha" ? "Kite API Key" : "App ID (XXXXX-100)"} value={form["api_key"] ?? ""} onChange={v => set("api_key", v)} />
+          <Field id="api_secret"    label="Secret / API Secret" type="password" value={form["api_secret"] ?? ""} onChange={v => set("api_secret", v)} />
           {broker.id === "fyers" && (
-            <F id="redirect_uri" label="Redirect URI"  placeholder="https://127.0.0.1/"
-               hint="Must match the redirect URI registered in your Fyers app." />
+            <Field id="redirect_uri" label="Redirect URI"  placeholder="https://127.0.0.1/"
+               hint="Must match the redirect URI registered in your Fyers app."
+               value={form["redirect_uri"] ?? ""} onChange={v => set("redirect_uri", v)} />
           )}
           <p className="text-xs text-muted-foreground bg-muted p-3 rounded">
             Click Connect to open the {broker.name} login page in a new tab.
@@ -491,8 +507,8 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
               </button>
             )}
           </div>
-          <F id="auth_code" label={broker.id === "zerodha" ? "Request token" : "Auth code"}
-             type="password" placeholder="Paste from redirect URL" />
+          <Field id="auth_code" label={broker.id === "zerodha" ? "Request token" : "Auth code"}
+             type="password" placeholder="Paste from redirect URL" value={form["auth_code"] ?? ""} onChange={v => set("auth_code", v)} />
         </div>
       );
     }
@@ -500,12 +516,12 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
     if (broker.auth_type === "otp") {
       if (step === 0) return (
         <div className="space-y-4">
-          <F id="display_name"     label="Account label"   placeholder={`My ${broker.name} account`} />
-          <F id="consumer_key"     label="Consumer Key"    placeholder="From Neo API developer portal" />
-          <F id="consumer_secret"  label="Consumer Secret" type="password" />
-          <F id="mobile_number"    label="Mobile number"   placeholder="10-digit registered mobile" />
-          <F id="password"         label="Neo password"    type="password" />
-          <F id="mpin"             label="MPIN"            type="password" placeholder="6-digit MPIN" />
+          <Field id="display_name"     label="Account label"   placeholder={`My ${broker.name} account`} value={form["display_name"] ?? ""} onChange={v => set("display_name", v)} />
+          <Field id="consumer_key"     label="Consumer Key"    placeholder="From Neo API developer portal" value={form["consumer_key"] ?? ""} onChange={v => set("consumer_key", v)} />
+          <Field id="consumer_secret"  label="Consumer Secret" type="password" value={form["consumer_secret"] ?? ""} onChange={v => set("consumer_secret", v)} />
+          <Field id="mobile_number"    label="Mobile number"   placeholder="10-digit registered mobile" value={form["mobile_number"] ?? ""} onChange={v => set("mobile_number", v)} />
+          <Field id="password"         label="Neo password"    type="password" value={form["password"] ?? ""} onChange={v => set("password", v)} />
+          <Field id="mpin"             label="MPIN"            type="password" placeholder="6-digit MPIN" value={form["mpin"] ?? ""} onChange={v => set("mpin", v)} />
           <p className="text-xs text-muted-foreground bg-muted p-3 rounded">
             Click Send OTP to trigger a one-time password to your registered mobile.
           </p>
@@ -519,7 +535,7 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
               Enter the OTP sent to {form.mobile_number ?? "your registered mobile"}.
             </p>
           </div>
-          <F id="otp" label="OTP" placeholder="6-digit OTP" />
+          <Field id="otp" label="OTP" placeholder="6-digit OTP" value={form["otp"] ?? ""} onChange={v => set("otp", v)} />
         </div>
       );
     }
