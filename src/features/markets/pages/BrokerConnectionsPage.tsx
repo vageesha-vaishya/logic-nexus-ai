@@ -66,6 +66,11 @@ import {
   ErrorState,
   Input,
   Label,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Sheet,
   SheetContent,
   SheetHeader,
@@ -85,6 +90,7 @@ import {
   useSupportedBrokers,
   useTriggerBrokerSync,
 } from "../hooks/useBrokerConnections";
+import { useCreatePortfolio, usePortfolios } from "../hooks/usePortfolios";
 
 // ── Status helpers ────────────────────────────────────────────────────────────
 
@@ -243,6 +249,13 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
   const [authUrl, setAuthUrl] = useState("");
   const [canTrade, setCanTrade] = useState(false);
 
+  // Portfolio binding (1:1 — each broker connection targets exactly one portfolio)
+  const NEW_PORTFOLIO = "__new__";
+  const [portfolioChoice, setPortfolioChoice] = useState<string>(NEW_PORTFOLIO);
+  const [newPortfolioName, setNewPortfolioName] = useState<string>("");
+
+  const portfoliosQuery = usePortfolios();
+  const createPortfolio = useCreatePortfolio();
   const addConn      = useAddBrokerConnection();
   const exchangeCode = useExchangeBrokerCode();
   const triggerSync  = useTriggerBrokerSync();
@@ -378,12 +391,31 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
     }
   }
 
+  async function resolvePortfolioId(clientId: string): Promise<string> {
+    if (!broker) throw new Error("No broker selected");
+    if (portfolioChoice !== NEW_PORTFOLIO) return portfolioChoice;
+
+    // Auto-create a portfolio for this connection
+    const name = newPortfolioName.trim()
+      || `${broker.name} — ${clientId.slice(0, 8) || "new"}`;
+    const created = await createPortfolio.mutateAsync({
+      name,
+      description: `Auto-created for ${broker.name} broker connection`,
+      mode: "paper",
+      base_currency: "INR",
+      holder_type: "self_directed",
+    });
+    return created.id;
+  }
+
   async function finalise(credentials: Record<string, string>, clientId: string) {
     if (!broker) return;
+    const portfolio_id = await resolvePortfolioId(clientId);
     const input: AddConnectionInput = {
       broker:           broker.id,
       broker_client_id: clientId,
       display_name:     form.display_name || `${broker.name} – ${clientId}`,
+      portfolio_id,
       credentials,
       segments:         broker.supports,
       can_trade:        canTrade,
@@ -401,6 +433,8 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
     setForm({});
     setAuthUrl("");
     setCanTrade(false);
+    setPortfolioChoice(NEW_PORTFOLIO);
+    setNewPortfolioName("");
     onClose();
   }
 
@@ -565,6 +599,33 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
 
         <div className="mt-6 space-y-6">
           {renderForm()}
+
+          {/* ── Portfolio binding (1:1) ─────────────────────────────────── */}
+          <div className="space-y-2 border-t pt-4">
+            <Label htmlFor="portfolio">Portfolio</Label>
+            <Select value={portfolioChoice} onValueChange={setPortfolioChoice}>
+              <SelectTrigger id="portfolio">
+                <SelectValue placeholder="Choose a portfolio" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value={NEW_PORTFOLIO}>Create new portfolio…</SelectItem>
+                {portfoliosQuery.data?.map(p => (
+                  <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            {portfolioChoice === NEW_PORTFOLIO && (
+              <Input
+                value={newPortfolioName}
+                onChange={e => setNewPortfolioName(e.target.value)}
+                placeholder={`${broker.name} — ${(form.client_id || form.api_key || "").slice(0, 8) || "new"}`}
+                autoComplete="off"
+              />
+            )}
+            <p className="text-xs text-muted-foreground">
+              Holdings synced from this broker will land in this portfolio. Orders placed via this connection will be tagged with it.
+            </p>
+          </div>
 
           <div className="flex items-center justify-between">
             <div>

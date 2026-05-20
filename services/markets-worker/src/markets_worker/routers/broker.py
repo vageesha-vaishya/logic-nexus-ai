@@ -153,6 +153,23 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
     except ValueError as exc:
         raise HTTPException(400, detail=str(exc))
 
+    # If the client supplied a portfolio_id, verify it exists and is visible to
+    # this user. Without this check a client could attach a connection to a
+    # portfolio they don't own — RLS on the holdings table would block actual
+    # data leakage later, but the orphaned connection row would persist.
+    if body.portfolio_id:
+        portfolio_check = (
+            get_supabase().schema("markets").from_("portfolios")
+            .select("id")
+            .eq("id", body.portfolio_id)
+            .execute()
+        )
+        if not portfolio_check.data:
+            raise HTTPException(
+                400,
+                detail=f"portfolio_id {body.portfolio_id} not found or not visible to this user",
+            )
+
     creds = dict(body.credentials)
 
     # ── Verify credentials immediately for brokers that support it ──────────
