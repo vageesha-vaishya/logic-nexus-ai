@@ -276,16 +276,18 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
             "id, broker, broker_client_id, display_name, status, "
             "segments, can_trade, token_expires_at, created_at"
         )
-        .single()
         .execute()
     )
 
     if not result.data:
         raise HTTPException(500, detail="Failed to create broker connection")
 
+    # postgrest 2.x: .single() not available after insert; unwrap first row
+    inserted = result.data[0] if isinstance(result.data, list) else result.data
+
     logger.info("broker.connection_added",
                 broker=body.broker, user_id=auth.user_id)
-    return {"connection": result.data}
+    return {"connection": inserted}
 
 
 @router.get("/connections/{connection_id}")

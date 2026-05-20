@@ -256,7 +256,7 @@ def _upsert_holdings(db, holdings, portfolio_id, owner_id, tenant_id, franchise_
             rows[i]["instrument_id"] = instr["id"]
         else:
             # Auto-create minimal instrument record
-            new_instr = (
+            res = (
                 db.schema("markets").from_("instruments")
                 .upsert({
                     "symbol":          h.tradingsymbol,
@@ -264,9 +264,11 @@ def _upsert_holdings(db, holdings, portfolio_id, owner_id, tenant_id, franchise_
                     "isin":            h.isin or None,
                     "instrument_type": "equity",
                 }, on_conflict="symbol,exchange")
-                .select("id").single()
+                .select("id")
                 .execute()
-            ).data
+            )
+            # postgrest 2.x: .single() not available after upsert
+            new_instr = res.data[0] if isinstance(res.data, list) and res.data else res.data
             if new_instr:
                 rows[i]["instrument_id"] = new_instr["id"]
 

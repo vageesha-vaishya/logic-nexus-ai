@@ -130,10 +130,11 @@ def get_risk_score(auth: Auth) -> dict[str, Any]:
             }
         )
         .select("computed_at")
-        .single()
         .execute()
     )
-    computed_at = (inserted.data or {}).get("computed_at")
+    # postgrest 2.x: .single() not available after insert
+    inserted_row = (inserted.data[0] if isinstance(inserted.data, list) and inserted.data else inserted.data) or {}
+    computed_at = inserted_row.get("computed_at")
 
     history_res = (
         sb.schema("markets")

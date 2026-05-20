@@ -95,10 +95,10 @@ def upsert_profile(body: UpsertProfileRequest, auth: Auth) -> dict[str, Any]:
         .from_("risk_profiles")
         .upsert(payload, on_conflict="user_id")
         .select()
-        .single()
         .execute()
     )
-    return res.data
+    # postgrest 2.x: .single() not available after upsert; unwrap first row
+    return (res.data[0] if isinstance(res.data, list) and res.data else res.data) or {}
 
 
 # ── Portfolio tiers ───────────────────────────────────────────────────────────
@@ -136,10 +136,10 @@ def upsert_tier(
         .from_("portfolio_tiers")
         .upsert(payload, on_conflict="user_id,tier_number")
         .select()
-        .single()
         .execute()
     )
-    return res.data
+    # postgrest 2.x: .single() not available after upsert; unwrap first row
+    return (res.data[0] if isinstance(res.data, list) and res.data else res.data) or {}
 
 
 # ── Retail signal feed ────────────────────────────────────────────────────────

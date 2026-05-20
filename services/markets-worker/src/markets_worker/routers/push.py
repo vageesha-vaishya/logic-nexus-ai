@@ -51,10 +51,11 @@ def register(body: RegisterRequest, auth: Auth) -> dict[str, Any]:
         .from_("push_tokens")
         .upsert(payload, on_conflict="user_id,token")
         .select("id, last_seen_at")
-        .single()
         .execute()
     )
-    return {"ok": True, "row": res.data}
+    # postgrest 2.x: .single() not available after upsert; unwrap first row
+    row = (res.data[0] if isinstance(res.data, list) and res.data else res.data) or {}
+    return {"ok": True, "row": row}
 
 
 @router.post("/test")
