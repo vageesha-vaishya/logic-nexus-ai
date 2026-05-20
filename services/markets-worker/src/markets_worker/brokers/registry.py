@@ -24,6 +24,27 @@ _REGISTRY: dict[str, Type[BrokerAdapter]] = {
     "kotak_neo":       KotakAdapter,
 }
 
+# ── Preview brokers (API exists but adapter not yet implemented) ──────────────
+# Listed in the UI as "Coming soon — request access" so users can apply for
+# API keys directly with the broker. No entry in _REGISTRY → build_adapter()
+# raises ValueError if anything ever tries to instantiate one. Promote to
+# _REGISTRY by writing the adapter and moving the entry.
+_PREVIEW: dict[str, dict[str, Any]] = {
+    "groww": {
+        "id":          "groww",
+        "name":        "Groww (Trade API)",
+        "auth_type":   "totp_api_key",
+        "data_cost":   "Free (Trade API, invitation-based)",
+        "supports":    ["equity", "fno", "mf"],
+        "refresh":     "automated",
+        "logo":        "groww.svg",
+        "tier":        "preview",
+        "request_url": "https://groww.in/trade-api/api-keys",
+        "note":        "Trade API access is invitation-based. Request keys, then check back here.",
+    },
+}
+
+
 # ── Import-only brokers (no trading API available) ────────────────────────────
 # These appear in the frontend so users can see why live trading isn't offered,
 # and are directed to the CSV import flow instead.
@@ -132,4 +153,4 @@ def list_brokers() -> list[dict[str, Any]]:
             "tier":          "full_api",
         },
     ]
-    return full_api + list(_IMPORT_ONLY.values())
+    return full_api + list(_PREVIEW.values()) + list(_IMPORT_ONLY.values())

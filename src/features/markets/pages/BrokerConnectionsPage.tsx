@@ -583,6 +583,7 @@ export default function BrokerConnectionsPage() {
 
   const supported   = supportedQuery.data ?? [];
   const fullApi     = supported.filter(b => b.tier === "full_api");
+  const preview     = supported.filter(b => b.tier === "preview");
   const importOnly  = supported.filter(b => b.tier === "import_only");
   const connected   = connections.data ?? [];
   const connIds     = new Set(connected.map(c => c.broker));
@@ -735,6 +736,54 @@ export default function BrokerConnectionsPage() {
             </TooltipProvider>
           )}
         </section>
+
+        {/* ── Preview brokers (adapter not yet built) ─────────────────── */}
+        {preview.length > 0 && (
+          <section>
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted-foreground mb-3">
+              Coming soon — request access
+            </h2>
+            <p className="text-xs text-muted-foreground mb-3">
+              These brokers have public APIs but the in-app adapter isn't built yet.
+              Request API keys from the broker now and we'll wire it up.
+            </p>
+            <div className="space-y-2">
+              {preview.map(broker => (
+                <div key={broker.id}
+                  className="flex items-center justify-between p-3 rounded-lg border">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium">{broker.name}</span>
+                      <span className="text-[10px] px-1.5 py-0.5 rounded border bg-muted text-muted-foreground">
+                        Beta
+                      </span>
+                    </div>
+                    {broker.note && (
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {broker.note}
+                      </p>
+                    )}
+                    <div className="flex gap-1 mt-1.5 flex-wrap">
+                      {broker.supports.map(s => (
+                        <span key={s}
+                          className="text-[10px] px-1.5 py-0 rounded border bg-muted text-muted-foreground">
+                          {s}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                  {broker.request_url && (
+                    <Button variant="outline" size="sm" asChild className="shrink-0 gap-1.5">
+                      <a href={broker.request_url} target="_blank" rel="noopener noreferrer">
+                        Request API keys
+                      </a>
+                    </Button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         {/* ── Import-only brokers ─────────────────────────────────────── */}
         {importOnly.length > 0 && (
