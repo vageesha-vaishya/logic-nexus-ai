@@ -131,19 +131,22 @@ class GrowwAdapter(BrokerAdapter):
     # ── Market data ───────────────────────────────────────────────────────────
 
     async def get_quotes(self, symbols: list[str]) -> list[Quote]:
-        """LTP-only quotes via get_stocks_ltp. Full quote depth left to v2."""
+        """LTP-only quotes via get_ltp. Full quote depth available via get_quote in v2."""
         results: list[Quote] = []
         for sym in symbols:
             exchange, tsym = (sym.split(":", 1) + [""])[:2] if ":" in sym else ("NSE", sym)
             try:
-                def _q(s: str = tsym) -> Any:
-                    return self._groww.get_stocks_ltp(s, timeout=3)
+                def _q(s: str = tsym, ex: str = exchange) -> Any:
+                    return self._groww.get_ltp(
+                        segment=self._infer_segment(ex),
+                        exchange=ex,
+                        trading_symbol=s,
+                    )
                 raw = await asyncio.to_thread(_q)
                 if not raw:
                     continue
                 # The SDK may return either a bare number, a dict like
                 # {"ltp": X, "close": Y, ...}, or a wrapped {symbol: {...}}.
-                # Handle the dict-shaped responses; bare numbers map to ltp only.
                 if isinstance(raw, dict):
                     inner = raw.get(tsym) if tsym in raw else raw
                     ltp = inner.get("ltp") if isinstance(inner, dict) else inner
@@ -175,14 +178,10 @@ class GrowwAdapter(BrokerAdapter):
 
     async def get_holdings(self) -> list[Holding]:
         try:
-            raw = await asyncio.to_thread(self._groww.get_holdings)
-        except AttributeError:
-            # Method name uncertain in SDK; try common alternates
-            try:
-                raw = await asyncio.to_thread(self._groww.get_holding_list)
-            except Exception as exc:
-                logger.warning("groww.holdings_method_not_found", error=str(exc))
-                return []
+            raw = await asyncio.to_thread(self._groww.get_holdings_for_user)
+        except Exception as exc:
+            logger.warning("groww.holdings_failed", error=str(exc))
+            return []
 
         rows = self._extract_list(raw)
         holdings: list[Holding] = []
@@ -200,13 +199,10 @@ class GrowwAdapter(BrokerAdapter):
 
     async def get_positions(self) -> list[Position]:
         try:
-            raw = await asyncio.to_thread(self._groww.get_positions)
-        except AttributeError:
-            try:
-                raw = await asyncio.to_thread(self._groww.get_position_list)
-            except Exception as exc:
-                logger.warning("groww.positions_method_not_found", error=str(exc))
-                return []
+            raw = await asyncio.to_thread(self._groww.get_positions_for_user)
+        except Exception as exc:
+            logger.warning("groww.positions_failed", error=str(exc))
+            return []
 
         rows = self._extract_list(raw)
         positions: list[Position] = []

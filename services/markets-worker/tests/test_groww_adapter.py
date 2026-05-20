@@ -108,7 +108,7 @@ def test_get_auth_url_returns_keys_page(fake_growwapi):
 async def test_get_holdings_normalises_response(adapter, fake_growwapi):
     await adapter.connect()
     client = fake_growwapi.return_value
-    client.get_holdings = MagicMock(return_value={
+    client.get_holdings_for_user = MagicMock(return_value={
         "data": [
             {
                 "trading_symbol": "WIPRO", "exchange": "NSE", "isin": "INE075A01022",
@@ -132,7 +132,7 @@ async def test_get_holdings_normalises_response(adapter, fake_growwapi):
 async def test_get_holdings_handles_bare_list(adapter, fake_growwapi):
     await adapter.connect()
     client = fake_growwapi.return_value
-    client.get_holdings = MagicMock(return_value=[
+    client.get_holdings_for_user = MagicMock(return_value=[
         {"symbol": "TCS", "quantity": 5, "avg_price": "3100"},
     ])
 
@@ -143,26 +143,20 @@ async def test_get_holdings_handles_bare_list(adapter, fake_growwapi):
 
 
 @pytest.mark.asyncio
-async def test_get_holdings_falls_back_to_alternate_method(adapter, fake_growwapi):
+async def test_get_holdings_returns_empty_on_sdk_error(adapter, fake_growwapi):
     await adapter.connect()
     client = fake_growwapi.return_value
-    # No get_holdings attribute — adapter should try get_holding_list
-    del client.get_holdings
-    client.get_holding_list = MagicMock(return_value=[
-        {"symbol": "INFY", "quantity": 2, "avg_price": "1500"},
-    ])
+    client.get_holdings_for_user = MagicMock(side_effect=Exception("api timeout"))
 
     holdings = await adapter.get_holdings()
-    assert len(holdings) == 1
-    assert holdings[0].tradingsymbol == "INFY"
+    assert holdings == []
 
 
 @pytest.mark.asyncio
-async def test_get_positions_returns_empty_when_method_missing(adapter, fake_growwapi):
+async def test_get_positions_returns_empty_on_sdk_error(adapter, fake_growwapi):
     await adapter.connect()
     client = fake_growwapi.return_value
-    del client.get_positions
-    del client.get_position_list
+    client.get_positions_for_user = MagicMock(side_effect=Exception("api timeout"))
 
     positions = await adapter.get_positions()
     assert positions == []

@@ -2,13 +2,20 @@
 
 Run with:
   OBJC_DISABLE_INITIALIZE_FORK_SAFETY=YES uv run python -m markets_worker.worker
+
+On macOS the default forking RQ Worker can SIGSEGV when C-extension
+libraries (numpy/polars/postgrest under HTTP/2, etc.) are imported in
+the parent before fork(). We use SimpleWorker which runs jobs inline in
+the parent process — no fork, no segv. Single-job-at-a-time is fine
+for the markets workload (broker sync, signal generation are I/O bound).
 """
 
 import logging
+import platform
 
 import redis
 import structlog
-from rq import Worker
+from rq import SimpleWorker, Worker
 
 from markets_worker.config import get_settings
 
@@ -36,7 +43,11 @@ def main() -> None:
     except Exception as exc:
         logger.warning("scheduler.setup_error", error=str(exc))
 
-    worker = Worker(queues, connection=conn)
+    # macOS: forking work-horse crashes (SIGSEGV) with some C extensions.
+    # Linux: keep the default forking Worker for better isolation.
+    worker_cls = SimpleWorker if platform.system() == "Darwin" else Worker
+    logger.info("worker.class", cls=worker_cls.__name__)
+    worker = worker_cls(queues, connection=conn)
     worker.work(with_scheduler=True)
 
 
