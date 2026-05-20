@@ -20,7 +20,7 @@ const WORKER_URL = import.meta.env.VITE_MARKETS_WORKER_URL ?? "http://localhost:
 // ── Shared broker types ───────────────────────────────────────────────────────
 
 export type BrokerTier   = "full_api" | "preview" | "import_only";
-export type BrokerAuth   = "session_token" | "totp" | "api_key" | "oauth" | "otp" | "totp_api_key" | "none";
+export type BrokerAuth   = "session_token" | "totp" | "api_key" | "api_key_secret" | "oauth" | "otp" | "totp_api_key" | "none";
 export type BrokerRefresh = "automated" | "manual" | "otp" | "none";
 export type ConnStatus   = "pending" | "active" | "expired" | "revoked" | "error";
 

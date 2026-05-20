@@ -218,8 +218,35 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
         except Exception as exc:
             raise HTTPException(400, detail=f"Dhan authentication failed: {exc}") from exc
 
+    elif body.broker == "groww":
+        try:
+            from growwapi import GrowwAPI  # type: ignore
+            import asyncio
+
+            api_key    = creds.get("api_key", "")
+            api_secret = creds.get("api_secret", "")
+            if not (api_key and api_secret):
+                raise HTTPException(400, detail="groww requires api_key and api_secret")
+
+            def _auth() -> str:
+                # Daily-approved access token — Groww requires the user to
+                # approve today's session on the Groww Cloud API Keys page
+                # before this call succeeds.
+                return GrowwAPI.get_access_token(api_key=api_key, secret=api_secret)
+
+            access_token = await asyncio.to_thread(_auth)
+            if not access_token:
+                raise ValueError("Empty access_token from Groww (did you approve today's session?)")
+            creds["access_token"] = access_token
+            logger.info("groww.verified_on_add")
+
+        except HTTPException:
+            raise
+        except Exception as exc:
+            raise HTTPException(400, detail=f"Groww authentication failed: {exc}") from exc
+
     # ── Compute token_expires_at for brokers with daily tokens ───────────────
-    daily_token_brokers = {"angel_one", "icici_breeze", "fyers", "zerodha", "kotak_neo"}
+    daily_token_brokers = {"angel_one", "icici_breeze", "fyers", "groww", "zerodha", "kotak_neo"}
     token_expires_at = None
     if body.broker in daily_token_brokers:
         midnight_ist = datetime.now(_IST).replace(hour=23, minute=59, second=59)

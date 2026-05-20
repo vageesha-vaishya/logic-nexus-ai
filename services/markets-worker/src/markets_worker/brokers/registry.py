@@ -12,6 +12,7 @@ from .breeze import BreezeAdapter
 from .angel import AngelAdapter
 from .dhan import DhanAdapter
 from .fyers import FyersAdapter
+from .groww import GrowwAdapter
 from .zerodha import ZerodhaAdapter
 from .kotak import KotakAdapter
 
@@ -20,6 +21,7 @@ _REGISTRY: dict[str, Type[BrokerAdapter]] = {
     "angel_one":       AngelAdapter,
     "dhan":            DhanAdapter,
     "fyers":           FyersAdapter,
+    "groww":           GrowwAdapter,
     "zerodha":         ZerodhaAdapter,
     "kotak_neo":       KotakAdapter,
 }
@@ -29,20 +31,7 @@ _REGISTRY: dict[str, Type[BrokerAdapter]] = {
 # API keys directly with the broker. No entry in _REGISTRY → build_adapter()
 # raises ValueError if anything ever tries to instantiate one. Promote to
 # _REGISTRY by writing the adapter and moving the entry.
-_PREVIEW: dict[str, dict[str, Any]] = {
-    "groww": {
-        "id":          "groww",
-        "name":        "Groww (Trade API)",
-        "auth_type":   "totp_api_key",
-        "data_cost":   "Free (Trade API, invitation-based)",
-        "supports":    ["equity", "fno", "mf"],
-        "refresh":     "automated",
-        "logo":        "groww.svg",
-        "tier":        "preview",
-        "request_url": "https://groww.in/trade-api/api-keys",
-        "note":        "Trade API access is invitation-based. Request keys, then check back here.",
-    },
-}
+_PREVIEW: dict[str, dict[str, Any]] = {}
 
 
 # ── Import-only brokers (no trading API available) ────────────────────────────
@@ -120,6 +109,16 @@ def list_brokers() -> list[dict[str, Any]]:
             "supports":      ["equity", "fno", "currency", "commodity", "mf"],
             "refresh":       "none",
             "logo":          "dhan.svg",
+            "tier":          "full_api",
+        },
+        {
+            "id":            "groww",
+            "name":          "Groww (Trade API)",
+            "auth_type":     "api_key_secret",
+            "data_cost":     "Free (daily approval required)",
+            "supports":      ["equity", "fno", "mf"],
+            "refresh":       "automated",
+            "logo":          "groww.svg",
             "tier":          "full_api",
         },
         {

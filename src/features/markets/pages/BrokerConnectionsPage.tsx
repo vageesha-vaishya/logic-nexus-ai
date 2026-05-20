@@ -9,11 +9,12 @@
  *   3. Import-only brokers — shown differently with "Import holdings →" link
  *
  * Auth flows (handled in ConnectSheet):
- *   api_key      → single form (Dhan)
- *   totp         → single form (Angel One)
- *   session_token → 2-step: enter keys → get URL → paste session token (ICICI)
- *   oauth        → 2-step: enter keys → open URL → paste code (Fyers, Zerodha)
- *   otp          → 3-step: enter creds → send OTP → enter OTP (Kotak)
+ *   api_key         → single form (Dhan)
+ *   api_key_secret  → single form (Groww) — server-side generates daily access_token
+ *   totp            → single form (Angel One)
+ *   session_token   → 2-step: enter keys → get URL → paste session token (ICICI)
+ *   oauth           → 2-step: enter keys → open URL → paste code (Fyers, Zerodha)
+ *   otp             → 3-step: enter creds → send OTP → enter OTP (Kotak)
  */
 
 import { useState } from "react";
@@ -234,6 +235,14 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
         }, form.client_id);
       }
 
+      else if (broker.auth_type === "api_key_secret") {
+        // Groww: api_key + api_secret; server generates daily access_token on add
+        await finalise({
+          api_key:    form.api_key,
+          api_secret: form.api_secret,
+        }, form.api_key.slice(0, 8));
+      }
+
       else if (broker.auth_type === "totp") {
         // Angel One: store all creds; connect on server side
         await finalise({
@@ -390,6 +399,16 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
         <F id="access_token" label="Access token"  type="password"
            placeholder="Paste from console.dhan.co → My Profile → Access Token"
            hint="Dhan tokens are long-lived — no daily re-auth needed." />
+      </div>
+    );
+
+    if (broker.auth_type === "api_key_secret") return (
+      <div className="space-y-4">
+        <F id="display_name" label="Account label" placeholder={`My ${broker.name} account`} />
+        <F id="api_key"      label="API Key"       placeholder="From groww.in/trade-api/api-keys" />
+        <F id="api_secret"   label="API Secret"    type="password"
+           placeholder="Secret shown when you created the API key"
+           hint="Groww requires daily approval — tap 'Approve' on the Groww Cloud API Keys page each day before trading." />
       </div>
     );
 

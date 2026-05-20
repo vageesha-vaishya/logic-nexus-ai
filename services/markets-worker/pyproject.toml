@@ -44,6 +44,7 @@ dependencies = [
     "pyotp>=2.9.0",                # TOTP for Angel One automated refresh
     "dhanhq>=2.0.0",               # Dhan HQ API
     "fyers-apiv3>=3.0.0",          # Fyers API v3
+    "growwapi>=0.1.0",             # Groww Trade API (daily-approval access token)
     "kiteconnect>=5.0.0",          # Zerodha Kite Connect
     # neo-api-client (Kotak Neo) is NOT on PyPI — Kotak adapter uses lazy import
     # ── Credential encryption ─────────────────────────────────────────────────
