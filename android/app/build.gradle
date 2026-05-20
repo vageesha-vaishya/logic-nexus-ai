@@ -33,10 +33,10 @@ def releaseSigningReady = (
 )
 
 android {
-    namespace "com.sospro.logicnexus"
+    namespace "com.sos.sthira"
     compileSdk rootProject.ext.compileSdkVersion
     defaultConfig {
-        applicationId "com.sospro.logicnexus"
+        applicationId "com.sos.sthira"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 1

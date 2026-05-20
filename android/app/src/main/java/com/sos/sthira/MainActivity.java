@@ -1,4 +1,4 @@
-package com.sospro.logicnexus;
+package com.sos.sthira;
 
 import com.getcapacitor.BridgeActivity;
 

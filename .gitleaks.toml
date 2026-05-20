@@ -28,6 +28,12 @@ tags = ["supabase", "url"]
     '''.env\.example''',
     '''docs/incidents/.*''',
     '''\.gitleaks\.toml''',
+    # google-services.json is the PUBLIC Firebase Android config — the
+    # AIzaSy* API key inside is meant to ship in published APKs; security
+    # is enforced via SHA-1 + package-name binding on Firebase's side, not
+    # by key secrecy. See https://firebase.google.com/docs/projects/api-keys
+    '''android/app/google-services.json''',
+    '''ios/.*/GoogleService-Info\.plist''',
   ]
   # Allow placeholder values in example files
   regexes = [

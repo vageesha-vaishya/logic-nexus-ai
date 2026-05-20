@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "317425610300",
+    "project_id": "sos-markets-26061963",
+    "storage_bucket": "sos-markets-26061963.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:317425610300:android:1da5efb49495f1ba361d39",
+        "android_client_info": {
+          "package_name": "com.sos.sthira"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyALrQXEYQ8MLleVEqKKNSTf5Q0pXcH27TA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

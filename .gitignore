@@ -57,3 +57,14 @@ android/app/release/
 android/app/debug/
 # Local-only Capacitor overrides (live-reload dev server URL etc.)
 capacitor.config.local.ts
+
+# Firebase / GCP service-account JSON keys — NEVER commit.
+# The downloaded file from Firebase Console contains a private RSA key.
+# Pattern matches the Firebase Admin SDK default filename (firebase-adminsdk-*).
+# google-services.json is the public Android config (no private key) — that
+# one IS safe to commit, so we explicitly include it via a negation below.
+**/firebase-adminsdk-*.json
+**/*-firebase-adminsdk-*.json
+**/service-account*.json
+**/serviceAccountKey*.json
+!android/app/google-services.json

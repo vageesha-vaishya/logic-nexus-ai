@@ -16,8 +16,8 @@ import type { CapacitorConfig } from "@capacitor/cli";
  * `cap run android`.
  */
 const config: CapacitorConfig = {
-  appId:   "com.sospro.logicnexus",
-  appName: "Logic Nexus",
+  appId:   "com.sos.sthira",
+  appName: "Sthira",
   webDir:  "dist",
 
   // androidScheme=https so cookies + Supabase storage behave like a real
