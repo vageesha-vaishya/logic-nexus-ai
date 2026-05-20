@@ -43,8 +43,8 @@ dependencies = [
     "smartapi-python>=1.4.0",      # Angel One SmartAPI
     "pyotp>=2.9.0",                # TOTP for Angel One automated refresh
     "dhanhq>=2.0.0",               # Dhan HQ API
-    "fyers-apiv3>=3.0.0",          # Fyers API v3
-    "growwapi>=0.1.0",             # Groww Trade API (daily-approval access token)
+    "fyers-apiv3>=3.1.4",          # Fyers API v3 (3.0.x pinned requests==2.31, conflicts with growwapi)
+    "growwapi>=1.0.0",             # Groww Trade API (daily-approval access token)
     "kiteconnect>=5.0.0",          # Zerodha Kite Connect
     # neo-api-client (Kotak Neo) is NOT on PyPI — Kotak adapter uses lazy import
     # ── Credential encryption ─────────────────────────────────────────────────
@@ -60,6 +60,16 @@ dev = [
     "pytest-asyncio>=0.24",
     "pytest-httpx>=0.32",
     "respx>=0.21",
+]
+
+[tool.uv]
+# fyers-apiv3 hard-pins several common deps (requests==2.31.0,
+# aiohttp==3.9.3, etc.) while growwapi wants newer floors. Override to
+# resolve forward — both libs are network clients tested against modern
+# requests/aiohttp in production usage.
+override-dependencies = [
+    "requests>=2.32.3",
+    "aiohttp>=3.11.18",
 ]
 
 [build-system]
