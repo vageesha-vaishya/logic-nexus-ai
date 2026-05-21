@@ -57,8 +57,15 @@ const config: CapacitorConfig = {
   },
 
   android: {
-    // Allow our own dev server during local cap-live-reload sessions.
-    allowMixedContent: false,
+    // The native shell loads bundled dist/ at https://localhost/ but the
+    // markets-worker fetches go to plain http://localhost:8001 (no TLS in
+    // local dev; the adb-reverse tunnel makes this loopback-only on the
+    // device). Chromium blocks http XHR from https origins by default,
+    // which breaks broker tiles + signals + holdings entirely. Allow
+    // mixed content so the WebView can reach the worker.
+    // Note: in production the worker must be HTTPS for this to be
+    // truly safe — re-evaluate when the worker moves off localhost.
+    allowMixedContent: true,
     captureInput: true,
   },
 };
