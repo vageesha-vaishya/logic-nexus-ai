@@ -39,11 +39,14 @@ const config: CapacitorConfig = {
     SplashScreen: {
       // Sthira splash — navy background, copper wordmark.
       // See docs/plans/2026-05-20-sthira-mobile-onboarding-and-markets-ux-design.md
-      // PR 1 ships the Capacitor default splash drawable + brand background
-      // colour; PR 1.1 replaces the drawable with public/sthira-splash.svg
-      // rendered to density PNGs.
+      //
+      // PR 1: launchAutoHide stays true so the native splash dismisses on
+      // its own after launchShowDuration. PR 2 will flip this to false and
+      // call hideSthiraSplash() once session + tenant config resolve.
+      // Without that programmatic hide, false would freeze the app on the
+      // splash forever — observed today on Nord after PR 1 install.
       launchShowDuration:        1500,
-      launchAutoHide:            false, // hidden programmatically after session + tenant resolve
+      launchAutoHide:            true,
       backgroundColor:           "#0F1A2E",
       androidSplashResourceName: "splash",
       androidScaleType:          "CENTER_CROP",
