@@ -28,8 +28,9 @@ export function useWebSocketLTP(
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout>>();
 
-  // Stable key for dependency arrays
-  const symbolsKey = [...symbols].sort().join(",");
+  // Stable key for dependency arrays. Defensive: callers occasionally pass
+  // undefined while their upstream query is still loading.
+  const symbolsKey = Array.isArray(symbols) ? [...symbols].sort().join(",") : "";
 
   // Fallback polling — enabled only when WS is not connected
   const pollFallback = useLTP(connected ? [] : symbols, exchange);

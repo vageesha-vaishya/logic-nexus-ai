@@ -154,7 +154,7 @@ export function PortfolioAnalyticsPanel({ portfolioId }: PortfolioAnalyticsPanel
   const { data, isLoading, isError } = usePortfolioPnL(portfolioId, 365);
 
   const analytics = useMemo(() => {
-    if (!data || data.series.length < 2) return null;
+    if (!data || !Array.isArray(data.series) || data.series.length < 2) return null;
     const series = [...data.series].sort((a, b) => a.date.localeCompare(b.date));
     return {
       xirr: computeXirrFromSeries(series),
