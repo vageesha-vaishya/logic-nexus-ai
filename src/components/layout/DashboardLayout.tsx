@@ -3,7 +3,8 @@ import { ObjectMenu } from './ObjectMenu';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { AlertCircle, Bug, Check, ChevronLeft, Copy, Loader2, LogOut } from 'lucide-react';
+import { AlertCircle, Bug, Check, ChevronLeft, Copy, Loader2, LogOut, Menu } from 'lucide-react';
+import { useSidebar } from '@/components/ui/sidebar';
 import { Link, matchPath, useLocation, useNavigate } from 'react-router-dom';
 import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
@@ -188,6 +189,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   useNotificationsRealtime();
   const navigate = useNavigate();
   const location = useLocation();
+  const { toggleSidebar: toggleAppSidebar, isMobile: isMobileSidebar } = useSidebar();
   const { user, profile, roles, signOut, refreshProfile } = useAuth();
   const { context, scopedDb } = useCRM();
   const { enabled: userInfoHeaderEnabled } = useAppFeatureFlag(FEATURE_FLAGS.USER_INFO_HEADER_MODULE, false);
@@ -687,6 +689,17 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             )}
             <div className="relative z-[3] flex items-center gap-3 w-full">
+              {isMobileSidebar && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Open navigation menu"
+                  onClick={toggleAppSidebar}
+                  className="md:hidden"
+                >
+                  <Menu className="h-5 w-5" />
+                </Button>
+              )}
               <Button
                 variant="ghost"
                 size="icon"
