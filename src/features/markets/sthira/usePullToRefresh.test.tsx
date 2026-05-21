@@ -1,5 +1,11 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
+
+// Capacitor.isNativePlatform is read once at module init; mock it stable false.
+vi.mock("@capacitor/core", () => ({
+  Capacitor: { isNativePlatform: vi.fn(() => false) },
+}));
+
 import { usePullToRefresh } from "./usePullToRefresh";
 
 function mockTouchEvent(clientY: number, scrollTop = 0): any {
@@ -8,6 +14,14 @@ function mockTouchEvent(clientY: number, scrollTop = 0): any {
     touches: [{ clientY }],
   };
 }
+
+// Skip the rAF-driven snap-back animation so tests don't have to wait.
+beforeEach(() => {
+  vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) => {
+    return setTimeout(() => cb(performance.now() + 10_000), 0) as unknown as number;
+  });
+  vi.stubGlobal("cancelAnimationFrame", (id: number) => clearTimeout(id as unknown as NodeJS.Timeout));
+});
 
 describe("usePullToRefresh", () => {
   it("commits refresh when pulled past the threshold", async () => {

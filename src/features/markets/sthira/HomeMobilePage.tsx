@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 
 import { STHIRA_COPY } from "./copy";
 import { usePullToRefresh } from "./usePullToRefresh";
+import { useTierValuations } from "./useTierValuations";
 
 function formatINR(value: number | null | undefined): string {
   const n = value ?? 0;
@@ -47,6 +48,7 @@ export default function HomeMobilePage() {
   const connections = useBrokerConnections();
   const signals = useRetailSignals({ limit: 3 });
   const triggerSync = useTriggerBrokerSync();
+  const { valuations, refetch: refetchValuations } = useTierValuations();
   const qc = useQueryClient();
 
   const onRefresh = async () => {
@@ -55,6 +57,7 @@ export default function HomeMobilePage() {
       qc.invalidateQueries({ queryKey: marketsKeys.retail.tiers() }),
       qc.invalidateQueries({ queryKey: marketsKeys.brokers.connections() }),
       qc.invalidateQueries({ queryKey: marketsKeys.retail.signals?.() ?? [] }),
+      refetchValuations(),
     ]);
   };
 
@@ -84,7 +87,7 @@ export default function HomeMobilePage() {
       <div
         {...ptr.containerProps}
         className="px-5 pt-6 space-y-6 select-none"
-        style={{ transform: `translateY(${ptr.pullProgress * 40}px)`, transition: ptr.isRefreshing ? "transform 0.2s" : undefined }}
+        style={{ transform: `translateY(${Math.min(ptr.pullOffsetPx * 0.6, 60)}px)` }}
       >
         {/* Header */}
         <header className="flex items-start justify-between gap-3">
@@ -112,9 +115,9 @@ export default function HomeMobilePage() {
           )}
           {!tiers.isPending && tierRows.map(({ def, row }) => {
             const target = row?.target_amount ?? 0;
-            // Current value isn't joined yet; tier-level NAV summation lands
-            // when PR 3.1 wires the portfolios -> tiers join. Render 0 for now.
-            const current = 0;
+            const v = valuations[def.tier_number];
+            const current = v?.current_value ?? 0;
+            const pnl     = v?.pnl ?? 0;
             const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
             return (
               <Link
@@ -136,9 +139,19 @@ export default function HomeMobilePage() {
                   <ChevronRight className="h-4 w-4 mt-1 shrink-0 text-sthira-fog" aria-hidden="true" />
                 </div>
                 <div className="mt-4 flex items-end justify-between gap-3 tabular-nums">
-                  <span className="font-sthiraSerif text-2xl text-sthira-ink">
-                    {formatINR(current)}
-                  </span>
+                  <div>
+                    <span className="font-sthiraSerif text-2xl text-sthira-ink">
+                      {formatINR(current)}
+                    </span>
+                    {pnl !== 0 && (
+                      <p className={cn(
+                        "text-[11px] mt-0.5",
+                        pnl > 0 ? "text-sthira-sage" : "text-sthira-terracotta",
+                      )}>
+                        {pnl > 0 ? "+" : ""}{formatINR(pnl)}
+                      </p>
+                    )}
+                  </div>
                   <span className="text-xs text-sthira-fog">
                     {target > 0 ? `target ${formatINR(target)}` : "target not set"}
                   </span>
