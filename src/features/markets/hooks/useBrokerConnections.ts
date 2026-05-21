@@ -44,6 +44,7 @@ export interface BrokerConnection {
   broker_client_id:    string;
   display_name:        string;
   status:              ConnStatus;
+  portfolio_id:        string | null;
   segments:            string[];
   can_trade:           boolean;
   can_read_holdings:   boolean;

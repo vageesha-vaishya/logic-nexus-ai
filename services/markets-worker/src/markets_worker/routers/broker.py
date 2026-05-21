@@ -14,6 +14,7 @@ POST /v1/brokers/exchange-code            — exchange auth code for token
 
 from __future__ import annotations
 
+import hashlib
 import uuid
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -129,7 +130,7 @@ async def list_connections(auth: Auth):
     result = (
         db.schema("markets").from_("broker_connections")
         .select(
-            "id, broker, broker_client_id, display_name, status, "
+            "id, broker, broker_client_id, display_name, status, portfolio_id, "
             "segments, can_trade, can_read_holdings, can_read_positions, "
             "token_expires_at, last_synced_at, error_message, created_at"
         )
@@ -192,6 +193,11 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
             )
 
     creds = dict(body.credentials)
+    broker_client_id = body.broker_client_id
+    if body.broker == "groww":
+        api_key = str(creds.get("api_key", "")).strip()
+        if api_key:
+            broker_client_id = f"groww_{hashlib.sha256(api_key.encode()).hexdigest()[:12]}"
 
     # ── Verify credentials immediately for brokers that support it ──────────
     # angel_one (TOTP): authenticate now, store fresh access_token
@@ -296,32 +302,94 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
         .select("id")
         .eq("owner_user_id", auth.user_id)
         .eq("broker", body.broker)
-        .eq("broker_client_id", body.broker_client_id)
+        .eq("broker_client_id", broker_client_id)
         .maybe_single()
         .execute()
     ).data
+    if not (existing and existing.get("id")) and body.broker == "groww":
+        api_key = str(creds.get("api_key", "")).strip()
+        if api_key:
+            candidates = (
+                db.schema("markets").from_("broker_connections")
+                .select("id, credentials_enc")
+                .eq("owner_user_id", auth.user_id)
+                .eq("broker", "groww")
+                .execute()
+            ).data or []
+            for row in candidates:
+                try:
+                    stored = decrypt_credentials(row.get("credentials_enc") or "")
+                except Exception:
+                    continue
+                if str(stored.get("api_key", "")).strip() == api_key:
+                    existing = {"id": row.get("id")}
+                    break
     if existing and existing.get("id"):
-        updated = (
-            db.schema("markets").from_("broker_connections")
-            .update({
-                "tenant_id":        auth.tenant_id,
-                "franchise_id":     auth.franchise_id,
-                "portfolio_id":     body.portfolio_id,
-                "display_name":     body.display_name,
-                "status":           "active",
-                "error_message":    None,
-                "credentials_enc":  encrypt_credentials(creds),
-                "segments":         body.segments,
-                "can_trade":        body.can_trade,
-                "token_expires_at": token_expires_at,
-            })
-            .eq("id", existing["id"])
-            .select(
-                "id, broker, broker_client_id, display_name, status, "
-                "segments, can_trade, token_expires_at, created_at"
-            )
-            .execute()
-        ).data
+        try:
+            updated = (
+                db.schema("markets").from_("broker_connections")
+                .update({
+                    "tenant_id":        auth.tenant_id,
+                    "franchise_id":     auth.franchise_id,
+                    "portfolio_id":     body.portfolio_id,
+                    "display_name":     body.display_name,
+                    "broker_client_id": broker_client_id,
+                    "status":           "active",
+                    "error_message":    None,
+                    "credentials_enc":  encrypt_credentials(creds),
+                    "segments":         body.segments,
+                    "can_trade":        body.can_trade,
+                    "token_expires_at": token_expires_at,
+                })
+                .eq("id", existing["id"])
+                .select(
+                    "id, broker, broker_client_id, display_name, status, portfolio_id, "
+                    "segments, can_trade, token_expires_at, created_at"
+                )
+                .execute()
+            ).data
+        except Exception as exc:
+            err_code = None
+            if isinstance(exc.args, tuple) and exc.args:
+                first = exc.args[0]
+                if isinstance(first, dict):
+                    err_code = first.get("code")
+            if err_code == "23505":
+                existing_hashed = (
+                    db.schema("markets").from_("broker_connections")
+                    .select("id")
+                    .eq("owner_user_id", auth.user_id)
+                    .eq("broker", body.broker)
+                    .eq("broker_client_id", broker_client_id)
+                    .maybe_single()
+                    .execute()
+                ).data
+                if existing_hashed and existing_hashed.get("id"):
+                    updated = (
+                        db.schema("markets").from_("broker_connections")
+                        .update({
+                            "tenant_id":        auth.tenant_id,
+                            "franchise_id":     auth.franchise_id,
+                            "portfolio_id":     body.portfolio_id,
+                            "display_name":     body.display_name,
+                            "status":           "active",
+                            "error_message":    None,
+                            "credentials_enc":  encrypt_credentials(creds),
+                            "segments":         body.segments,
+                            "can_trade":        body.can_trade,
+                            "token_expires_at": token_expires_at,
+                        })
+                        .eq("id", existing_hashed["id"])
+                        .select(
+                            "id, broker, broker_client_id, display_name, status, portfolio_id, "
+                            "segments, can_trade, token_expires_at, created_at"
+                        )
+                        .execute()
+                    ).data
+                else:
+                    raise HTTPException(500, detail=f"Failed to update broker connection: {exc}") from exc
+            else:
+                raise HTTPException(500, detail=f"Failed to update broker connection: {exc}") from exc
         inserted = updated[0] if isinstance(updated, list) and updated else updated
         if not inserted:
             raise HTTPException(500, detail="Failed to update broker connection")
@@ -335,7 +403,7 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
         "owner_user_id":    auth.user_id,
         "portfolio_id":     body.portfolio_id,
         "broker":           body.broker,
-        "broker_client_id": body.broker_client_id,
+        "broker_client_id": broker_client_id,
         "display_name":     body.display_name,
         "status":           "active",
         "credentials_enc":  encrypt_credentials(creds),
@@ -348,7 +416,7 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
         db.schema("markets").from_("broker_connections")
         .insert(row)
         .select(
-            "id, broker, broker_client_id, display_name, status, "
+            "id, broker, broker_client_id, display_name, status, portfolio_id, "
             "segments, can_trade, token_expires_at, created_at"
         )
     )
@@ -370,12 +438,12 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
             existing_after = (
                 db.schema("markets").from_("broker_connections")
                 .select(
-                    "id, broker, broker_client_id, display_name, status, "
+                    "id, broker, broker_client_id, display_name, status, portfolio_id, "
                     "segments, can_trade, token_expires_at, created_at"
                 )
                 .eq("owner_user_id", auth.user_id)
                 .eq("broker", body.broker)
-                .eq("broker_client_id", body.broker_client_id)
+                .eq("broker_client_id", broker_client_id)
                 .maybe_single()
                 .execute()
             ).data
@@ -404,7 +472,7 @@ async def get_connection(connection_id: str, auth: Auth):
     row = (
         db.schema("markets").from_("broker_connections")
         .select(
-            "id, broker, broker_client_id, display_name, status, "
+            "id, broker, broker_client_id, display_name, status, portfolio_id, "
             "segments, can_trade, token_expires_at, last_synced_at, error_message, created_at"
         )
         .eq("id", connection_id)
@@ -432,11 +500,41 @@ async def remove_connection(connection_id: str, auth: Auth):
     if not row:
         raise HTTPException(404, detail="Connection not found")
 
-    # Delete positions linked to this connection before removing
-    db.schema("markets").from_("positions").delete().eq(
-        "broker_connection_id", connection_id).execute()
-    db.schema("markets").from_("broker_connections").delete().eq(
-        "id", connection_id).execute()
+    try:
+        db.schema("markets").from_("orders").delete().eq(
+            "broker_connection_id", connection_id).execute()
+    except Exception as exc:
+        logger.warning("broker.connection_remove.orders_delete_failed",
+                       connection_id=connection_id, user_id=auth.user_id, error=str(exc))
+
+    try:
+        db.schema("markets").from_("positions").delete().eq(
+            "broker_connection_id", connection_id).execute()
+    except Exception as exc:
+        logger.warning("broker.connection_remove.positions_delete_failed",
+                       connection_id=connection_id, user_id=auth.user_id, error=str(exc))
+
+    try:
+        db.schema("markets").from_("holdings").delete().eq(
+            "metadata->>broker_connection_id", connection_id).execute()
+    except Exception as exc:
+        logger.warning("broker.connection_remove.holdings_delete_failed",
+                       connection_id=connection_id, user_id=auth.user_id, error=str(exc))
+
+    try:
+        db.schema("markets").from_("gtt_orders").delete().eq(
+            "connection_id", connection_id).execute()
+    except Exception as exc:
+        logger.warning("broker.connection_remove.gtt_delete_failed",
+                       connection_id=connection_id, user_id=auth.user_id, error=str(exc))
+
+    try:
+        db.schema("markets").from_("broker_connections").delete().eq(
+            "id", connection_id).execute()
+    except Exception as exc:
+        logger.error("broker.connection_remove.connection_delete_failed",
+                     connection_id=connection_id, user_id=auth.user_id, error=str(exc))
+        raise HTTPException(500, detail=f"Failed to disconnect broker: {exc}") from exc
 
     logger.info("broker.connection_removed",
                 connection_id=connection_id, user_id=auth.user_id)
