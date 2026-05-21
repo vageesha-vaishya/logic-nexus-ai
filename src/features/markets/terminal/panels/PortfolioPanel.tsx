@@ -37,7 +37,9 @@ function FirstPortfolioHoldings({ portfolioId }: { portfolioId: string }) {
 
   if (!data) return null;
 
-  const { holdings, nav, todayPnl, sinceInceptionPct } = data;
+  // Defensive: some broker-sync states return data without holdings array.
+  const { nav, todayPnl, sinceInceptionPct } = data;
+  const holdings = Array.isArray(data.holdings) ? data.holdings : [];
 
   return (
     <div className="flex flex-col h-full min-h-0">

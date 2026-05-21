@@ -33,10 +33,12 @@ export function WatchlistPanel() {
   const defaultWatchlist = watchlists?.find((w) => w.is_default) ?? watchlists?.[0];
   const { data: watchlistDetail, isLoading: detailLoading } = useWatchlist(defaultWatchlist?.id);
 
-  const symbols =
-    watchlistDetail?.items
-      .map((item) => item.instrument?.symbol)
-      .filter((s): s is string => Boolean(s)) ?? [];
+  // Items can be missing from a partial response; default to [] so the
+  // map/length/etc. downstream don't crash.
+  const items = Array.isArray(watchlistDetail?.items) ? watchlistDetail.items : [];
+  const symbols = items
+    .map((item) => item.instrument?.symbol)
+    .filter((s): s is string => Boolean(s));
 
   const { data: ltpMap, isLoading: ltpLoading } = useLTP(symbols);
 
@@ -81,7 +83,7 @@ export function WatchlistPanel() {
 
       {/* Scrollable rows */}
       <div className="flex-1 overflow-y-auto min-h-0">
-        {watchlistDetail.items.map((item) => {
+        {items.map((item) => {
           const sym = item.instrument?.symbol;
           if (!sym) return null;
           const quote = ltpMap?.[sym];
@@ -119,7 +121,7 @@ export function WatchlistPanel() {
           );
         })}
 
-        {watchlistDetail.items.length === 0 && (
+        {items.length === 0 && (
           <div className="flex items-center justify-center py-8 text-xs text-muted-foreground">
             Watchlist is empty
           </div>
