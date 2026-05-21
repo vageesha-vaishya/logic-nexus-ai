@@ -42,7 +42,7 @@ Goal-anchored, three-tier portfolio framework (Foundation / Growth / Opportunist
 - **Item 3 (autonomous-execution audit-trail review) complete:** end of October 2026 — unblocks the rebalancing flow
 - **Item 4 (launch compliance) complete:** end of January 2027 — ahead of the April 1 2027 deadline
 
-Happy to NDA before sharing internal architecture, sample prompts, or the audit-trail schema. I can be available for the discovery call at [insert your availability — e.g. weekdays 2–6 PM IST through next Friday].
+I have attached a one-page platform brief that should answer most of the architectural questions you would otherwise ask in the first ten minutes of the call. Happy to NDA before sharing sample prompts, the 500-sample LLM output dump, or the audit-trail schema. I can be available for the discovery call at [insert your availability — e.g. weekdays 2–6 PM IST through next Friday].
 
 Best regards,
 
