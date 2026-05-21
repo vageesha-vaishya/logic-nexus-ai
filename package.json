@@ -51,6 +51,7 @@
     "cap:open:android": "cap open android",
     "mobile:build": "npm run build && cap sync android",
     "mobile:build:markets": "bash scripts/mobile-build-markets.sh",
+    "mobile:beta": "bash scripts/mobile-beta.sh",
     "dev:tunnel:check": "bash scripts/dev-tunnel-check.sh",
     "bundle:check": "node scripts/check-bundle-budget.mjs",
     "storybook": "storybook dev -p 6006",
