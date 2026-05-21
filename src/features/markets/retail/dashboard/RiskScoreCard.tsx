@@ -9,6 +9,7 @@ import { WhyButton } from "../glossary";
 import { usePendingRebalance } from "../hooks/useRebalanceRecommendation";
 import { useRiskScore } from "../hooks/useRiskScore";
 import { RebalanceSheet } from "./RebalanceSheet";
+import { StressTestPanel } from "./StressTestPanel";
 
 const SCORE_BAND = (score: number): string => {
   if (score <= 3) return "Low";
@@ -34,6 +35,7 @@ export function RiskScoreCard() {
   // dedupes the pending fetch across the two callsites.
   const { data: pendingRec } = usePendingRebalance();
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [stressOpen, setStressOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -162,6 +164,15 @@ export function RiskScoreCard() {
             <span className="text-foreground">{components.beta_score.toFixed(1)}</span>
           </li>
         </ul>
+
+        <button
+          type="button"
+          onClick={() => setStressOpen(true)}
+          className="inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded"
+        >
+          Stress test against history
+          <ArrowRight className="h-3 w-3" />
+        </button>
       </CardContent>
     </Card>
     <RebalanceSheet
@@ -169,6 +180,7 @@ export function RiskScoreCard() {
       open={sheetOpen}
       onOpenChange={setSheetOpen}
     />
+    <StressTestPanel open={stressOpen} onOpenChange={setStressOpen} />
     </>
   );
 }
