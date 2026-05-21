@@ -19,8 +19,13 @@ description = "Supabase project URL with credentials"
 regex = '''https://[a-z0-9]+\.supabase\.co'''
 tags = ["supabase", "url"]
 [rules.allowlist]
-  # Allow in .env.example and docs
-  paths = ['''.env\.example''', '''docs/.*''', '''README.*''']
+  # Allow in .env.example, docs, README, and Supabase migration files
+  # (pg_cron jobs etc. legitimately embed the project URL of the DB
+  # they run on; the URL is public and not a credential). Operational
+  # risk: cloning the schema to a new project requires rewriting the
+  # URL in the new project's migrations — accept this tradeoff vs.
+  # diverging local files from prod truth.
+  paths = ['''.env\.example''', '''docs/.*''', '''README.*''', '''supabase/migrations/.*\.sql''']
 
 [allowlist]
   description = "Global allowlist"
