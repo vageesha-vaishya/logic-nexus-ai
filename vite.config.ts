@@ -544,6 +544,29 @@ export default defineConfig(({ mode }) => {
     },
   };
 
+  // Path A Phase 2.3 step 2 — when VITE_DOMAIN_ONLY is set (e.g. "markets")
+  // rewrite index.html's main script tag to load the per-domain entry
+  // instead of /src/main.tsx. The `order: 'pre'` ensures this transform
+  // runs before Vite's HTML plugin extracts script srcs as rollup entries,
+  // so the bundle graph is rooted at the domain entry (and the unified
+  // App.tsx + its 250+ lazy imports are never reached). Capacitor still
+  // consumes dist/index.html unchanged.
+  const domainOnlyRaw = (process.env.VITE_DOMAIN_ONLY ?? env.VITE_DOMAIN_ONLY ?? '').trim().toLowerCase();
+  const domainOnlyEntryPlugin: PluginOption = domainOnlyRaw
+    ? {
+        name: 'domain-only-html-entry',
+        transformIndexHtml: {
+          order: 'pre',
+          handler(html: string) {
+            return html.replace(
+              /\/src\/main\.tsx/g,
+              `/src/entrypoints/${domainOnlyRaw}.tsx`,
+            );
+          },
+        },
+      }
+    : false;
+
   const enableDesignSystemFederation = env.VITE_ENABLE_DESIGN_SYSTEM_FEDERATION === 'true';
   const enableDesignSystemRemote = env.VITE_ENABLE_DESIGN_SYSTEM_REMOTE === 'true';
   let federationPlugin: PluginOption = false;
@@ -674,6 +697,7 @@ export default defineConfig(({ mode }) => {
     mode === "development" && componentTagger(),
     federationPlugin,
     domainApiPlugin,
+    domainOnlyEntryPlugin,
   ].filter(Boolean) as PluginOption[],
   resolve: {
     alias: {
