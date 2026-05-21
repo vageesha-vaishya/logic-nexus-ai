@@ -37,6 +37,7 @@ import { STHIRA_COPY } from "./copy";
 import { usePullToRefresh } from "./usePullToRefresh";
 import { useTierValuations } from "./useTierValuations";
 import { SthiraTradeSheet } from "./SthiraTradeSheet";
+import { SthiraBrokerStatusBanner } from "./SthiraBrokerStatusBanner";
 
 function formatINR(value: number | null | undefined): string {
   const n = value ?? 0;
@@ -115,6 +116,10 @@ export default function HomeMobilePage() {
             </span>
           )}
         </header>
+
+        {/* Broker status banner — visible only when ≥1 broker has status
+            error/expired. Productizes the option-A daily-refresh approach. */}
+        <SthiraBrokerStatusBanner />
 
         {/* Tier cards */}
         <section className="space-y-3" aria-label="Your portfolio tiers">
