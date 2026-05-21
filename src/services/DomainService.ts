@@ -1,6 +1,29 @@
 
+import { Capacitor } from '@capacitor/core';
 import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
+
+/**
+ * Detect Capacitor native shells (Sthira / future per-domain mobile apps).
+ *
+ * Capacitor loads the bundled `dist/` at https://localhost/ without any
+ * proxy, so every `/api/v1/*` call returns 404+HTML instead of JSON. Hitting
+ * those endpoints from the WebView wastes round-trips and floods the console
+ * with parse errors. Short-circuit the read paths and let the existing
+ * client-side fallback resolve domains directly via Supabase RLS-scoped
+ * queries (resolveTenantDomainsClientSide).
+ *
+ * See docs/plans/2026-05-20-sthira-mobile-onboarding-and-markets-ux-design.md
+ * and the multi-domain independence design — proper Phase 2 work will give
+ * each domain its own SPA bundle that doesn't even know about /api/*.
+ */
+function isCapacitorShell(): boolean {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
 
 export interface PlatformDomain {
   id: string;
@@ -514,6 +537,16 @@ export const DomainService = {
     forceRefresh = false,
     scope: AuthorizedDomainScope = {},
   ): Promise<AuthorizedDomainsResponse> {
+    // Capacitor shell has no /api/* proxy — skip the round-trip and resolve
+    // domains client-side from Supabase. Quiet log so we can see this branch
+    // exercised without the alarming error-level logs of the proxy path.
+    if (isCapacitorShell()) {
+      logger.debug('[DomainService] capacitor shell — resolving domains client-side', {
+        component: 'DomainService',
+      });
+      return fallbackAuthorizedDomains('capacitor-shell');
+    }
+
     const cacheBypass = forceRefresh ? '?refresh=1' : '';
     let accessToken = await this.getSessionToken();
     if (!accessToken) {

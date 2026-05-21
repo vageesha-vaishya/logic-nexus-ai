@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { DomainService, PlatformDomain } from './DomainService';
 import { supabase } from '@/integrations/supabase/client';
+import { Capacitor } from '@capacitor/core';
 
 // Mock Supabase client
 vi.mock('@/integrations/supabase/client', () => ({
@@ -12,6 +13,11 @@ vi.mock('@/integrations/supabase/client', () => ({
       getUser: vi.fn(),
     },
   },
+}));
+
+// Mock Capacitor — default to web; tests override per-case.
+vi.mock('@capacitor/core', () => ({
+  Capacitor: { isNativePlatform: vi.fn(() => false) },
 }));
 
 describe('DomainService', () => {
@@ -42,6 +48,29 @@ describe('DomainService', () => {
 
   describe('getAuthorizedDomains', () => {
     const jsonHeaders = { get: vi.fn().mockReturnValue('application/json') };
+
+    it('short-circuits the /api/v1/platform-domains fetch on Capacitor native', async () => {
+      vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
+      const mockFetch = vi.mocked(fetch);
+
+      // The client-side fallback path will try to read from Supabase. We don't
+      // care about its result shape here — we care that no HTTP fetch fires.
+      // Make the fallback throw quietly so the test stays simple; the
+      // important behaviour is "no /api round-trip on Capacitor".
+      (supabase.from as any).mockImplementation(() => {
+        throw new Error("noop fallback");
+      });
+
+      // Catch the rejection — the assertion below is what we actually test.
+      await DomainService.getAuthorizedDomains().catch(() => undefined);
+
+      // Critical: no HTTP fetch on Capacitor — the bundled WebView has no
+      // /api proxy and the round-trip 404s into HTML.
+      expect(mockFetch).not.toHaveBeenCalled();
+
+      // Reset for sibling tests.
+      vi.mocked(Capacitor.isNativePlatform).mockReturnValue(false);
+    });
 
     it('should return authorized domains payload from API', async () => {
       const mockFetch = vi.mocked(fetch);
