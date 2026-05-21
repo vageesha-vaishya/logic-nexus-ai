@@ -270,6 +270,43 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
         token_expires_at = midnight_ist.astimezone(timezone.utc).isoformat()
 
     db = get_supabase()
+    existing = (
+        db.schema("markets").from_("broker_connections")
+        .select("id")
+        .eq("owner_user_id", auth.user_id)
+        .eq("broker", body.broker)
+        .eq("broker_client_id", body.broker_client_id)
+        .maybe_single()
+        .execute()
+    ).data
+    if existing and existing.get("id"):
+        updated = (
+            db.schema("markets").from_("broker_connections")
+            .update({
+                "tenant_id":        auth.tenant_id,
+                "franchise_id":     auth.franchise_id,
+                "portfolio_id":     body.portfolio_id,
+                "display_name":     body.display_name,
+                "status":           "active",
+                "error_message":    None,
+                "credentials_enc":  encrypt_credentials(creds),
+                "segments":         body.segments,
+                "can_trade":        body.can_trade,
+                "token_expires_at": token_expires_at,
+            })
+            .eq("id", existing["id"])
+            .select(
+                "id, broker, broker_client_id, display_name, status, "
+                "segments, can_trade, token_expires_at, created_at"
+            )
+            .execute()
+        ).data
+        inserted = updated[0] if isinstance(updated, list) and updated else updated
+        if not inserted:
+            raise HTTPException(500, detail="Failed to update broker connection")
+        logger.info("broker.connection_updated", broker=body.broker, user_id=auth.user_id)
+        return {"connection": inserted}
+
     row = {
         "id":               str(uuid.uuid4()),
         "tenant_id":        auth.tenant_id,
@@ -293,14 +330,47 @@ async def add_connection(body: AddConnectionRequest, auth: Auth):
             "id, broker, broker_client_id, display_name, status, "
             "segments, can_trade, token_expires_at, created_at"
         )
-        .execute()
     )
+    try:
+        result = result.execute()
+    except Exception as exc:
+        logger.error(
+            "broker.connection_insert_failed",
+            broker=body.broker,
+            user_id=auth.user_id,
+            error=str(exc),
+        )
+        err_code = None
+        if isinstance(exc.args, tuple) and exc.args:
+            first = exc.args[0]
+            if isinstance(first, dict):
+                err_code = first.get("code")
+        if err_code == "23505":
+            existing_after = (
+                db.schema("markets").from_("broker_connections")
+                .select(
+                    "id, broker, broker_client_id, display_name, status, "
+                    "segments, can_trade, token_expires_at, created_at"
+                )
+                .eq("owner_user_id", auth.user_id)
+                .eq("broker", body.broker)
+                .eq("broker_client_id", body.broker_client_id)
+                .maybe_single()
+                .execute()
+            ).data
+            if existing_after:
+                return {"connection": existing_after}
+        raise HTTPException(500, detail=f"Failed to create broker connection: {exc}") from exc
 
-    if not result.data:
+    inserted_data = getattr(result, "data", None)
+    if not inserted_data:
+        err = getattr(result, "error", None)
+        if err:
+            raise HTTPException(500, detail=f"Failed to create broker connection: {err}")
         raise HTTPException(500, detail="Failed to create broker connection")
 
     # postgrest 2.x: .single() not available after insert; unwrap first row
-    inserted = result.data[0] if isinstance(result.data, list) else result.data
+    inserted = inserted_data[0] if isinstance(inserted_data, list) else inserted_data
 
     logger.info("broker.connection_added",
                 broker=body.broker, user_id=auth.user_id)

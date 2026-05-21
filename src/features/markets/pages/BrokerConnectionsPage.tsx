@@ -284,7 +284,7 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
         await finalise({
           api_key:    form.api_key,
           api_secret: form.api_secret,
-        }, form.api_key.slice(0, 8));
+        }, form.api_key);
       }
 
       else if (broker.auth_type === "totp") {

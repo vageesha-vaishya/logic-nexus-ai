@@ -8,6 +8,7 @@ from supabase import Client, create_client
 
 from markets_worker.config import get_settings
 
+_ORIG_CLIENT_SCHEMA = getattr(Client, "schema", None)
 
 def _patch_maybe_single() -> None:
     """
@@ -34,6 +35,62 @@ def _patch_maybe_single() -> None:
 
 
 _patch_maybe_single()
+
+
+def _extract_error_text(exc: Exception) -> str:
+    try:
+        return str(exc)
+    except Exception:
+        return "unknown_error"
+
+
+def _looks_like_unknown_schema(exc: Exception) -> bool:
+    msg = _extract_error_text(exc).lower()
+    return (
+        "schema must be one of the following" in msg
+        or "unknown schema" in msg
+        or "schema cache" in msg
+        or "schema" in msg and "not found" in msg
+    )
+
+
+@lru_cache
+def resolve_markets_schema_name() -> str:
+    s = get_settings()
+    requested = (s.markets_schema or "").strip()
+    if requested and requested.lower() != "auto":
+        return requested
+
+    client = create_client(s.supabase_url, s.supabase_service_role_key)
+    if not _ORIG_CLIENT_SCHEMA:
+        return "markets"
+
+    for candidate in ("markets", "module_markets"):
+        try:
+            _ORIG_CLIENT_SCHEMA(client, candidate).from_("broker_connections").select("id").limit(1).execute()
+            return candidate
+        except Exception as exc:
+            if _looks_like_unknown_schema(exc):
+                continue
+    return "markets"
+
+
+def _patch_markets_schema_alias() -> None:
+    try:
+        if not _ORIG_CLIENT_SCHEMA:
+            return
+
+        def _schema(self: Client, schema: str):
+            if schema == "markets":
+                return _ORIG_CLIENT_SCHEMA(self, resolve_markets_schema_name())
+            return _ORIG_CLIENT_SCHEMA(self, schema)
+
+        Client.schema = _schema  # type: ignore[method-assign]
+    except Exception:
+        pass
+
+
+_patch_markets_schema_alias()
 
 
 @lru_cache

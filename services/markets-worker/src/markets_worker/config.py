@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     job_timeout:        int = 300   # seconds — backtests killed after 5 min
     job_ttl:            int = 86400  # seconds — results kept for 24 h
 
+    markets_schema: str = "auto"
+
     # ── Service identity ──────────────────────────────────────────────────
     service_name:    str = "markets-worker"
     environment:     str = "production"

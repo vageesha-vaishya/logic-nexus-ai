@@ -82,6 +82,64 @@ function buildChart(symbol, exchange, interval, lookback) {
   };
 }
 
+function clamp(value, min, max) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function buildRiskScoreSnapshot(seed, computedAtIso) {
+  const weights = {
+    concentration: 0.3,
+    tier_skew: 0.3,
+    drawdown: 0.2,
+    beta: 0.2,
+  };
+
+  const concentration = clamp(((seed % 1000) / 1000) * 10, 0, 10);
+  const tierSkew = clamp((((seed >> 3) % 1000) / 1000) * 10, 0, 10);
+  const drawdown = clamp((((seed >> 7) % 1000) / 1000) * 10, 0, 10);
+  const beta = clamp((((seed >> 11) % 1000) / 1000) * 10, 0, 10);
+
+  const score =
+    concentration * weights.concentration +
+    tierSkew * weights.tier_skew +
+    drawdown * weights.drawdown +
+    beta * weights.beta;
+
+  const target = 4.5;
+
+  return {
+    score: Number(score.toFixed(2)),
+    target_score: target,
+    components: {
+      concentration_score: Number(concentration.toFixed(2)),
+      tier_skew_score: Number(tierSkew.toFixed(2)),
+      drawdown_score: Number(drawdown.toFixed(2)),
+      beta_score: Number(beta.toFixed(2)),
+      weights,
+      note: "Mock risk score — replace with markets-worker compute pipeline when Python service is enabled.",
+    },
+    computed_at: computedAtIso,
+  };
+}
+
+function buildRiskScoreResponse(authHeader) {
+  const token = String(authHeader || "");
+  const tokenSeed = hash32(token || "anonymous");
+  const now = new Date();
+  const nowIso = now.toISOString();
+
+  const current = buildRiskScoreSnapshot(tokenSeed, nowIso);
+  const history = Array.from({ length: 12 }).map((_, idx) => {
+    const daysAgo = 11 - idx;
+    const ts = new Date(now);
+    ts.setUTCDate(ts.getUTCDate() - daysAgo);
+    const seed = tokenSeed + (daysAgo + 1) * 97;
+    return buildRiskScoreSnapshot(seed, ts.toISOString());
+  });
+
+  return { current, history };
+}
+
 const server = http.createServer((req, res) => {
   try {
     const url = new URL(req.url || "/", `http://${req.headers.host || "localhost"}`);
@@ -110,6 +168,10 @@ const server = http.createServer((req, res) => {
       const interval = String(url.searchParams.get("interval") || "1d").toLowerCase();
       const lookback = Number(url.searchParams.get("lookback") || 365);
       return json(res, 200, buildChart(symbol.toUpperCase(), exchange, interval, lookback));
+    }
+
+    if (req.method === "GET" && url.pathname === "/v1/retail/risk-score") {
+      return json(res, 200, buildRiskScoreResponse(req.headers.authorization));
     }
 
     return json(res, 404, { error: "Not found", path: url.pathname });
