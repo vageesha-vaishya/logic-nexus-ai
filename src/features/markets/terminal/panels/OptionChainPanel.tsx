@@ -23,9 +23,11 @@ export function OptionChainPanel() {
   const { data: underlyings, isLoading: underlyingsLoading } = useFnoUnderlyings();
   const { data: chain, isLoading: chainLoading } = useOptionChain(underlying, expiry);
 
-  // Set expiry once chain loads for the first time
-  if (chain && !expiry && chain.expiries.length > 0) {
-    setExpiry(chain.expiries[0]);
+  // Set expiry once chain loads for the first time. Defensive: expiries
+  // can come back undefined from a partial response window.
+  const expiries = Array.isArray(chain?.expiries) ? chain.expiries : [];
+  if (chain && !expiry && expiries.length > 0) {
+    setExpiry(expiries[0]);
   }
 
   return (
@@ -50,7 +52,7 @@ export function OptionChainPanel() {
 
         {chain && (
           <div className="flex gap-1 flex-wrap">
-            {chain.expiries.slice(0, 4).map((exp) => (
+            {expiries.slice(0, 4).map((exp) => (
               <button
                 key={exp}
                 onClick={() => setExpiry(exp)}

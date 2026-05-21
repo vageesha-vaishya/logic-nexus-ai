@@ -107,7 +107,7 @@ export function ScannerPanel() {
           </div>
         )}
 
-        {!isLoading && !isError && data && data.results.length === 0 && (
+        {!isLoading && !isError && data && (!Array.isArray(data.results) || data.results.length === 0) && (
           <div className="flex items-center justify-center py-6 text-xs text-muted-foreground">
             No matches for this filter
           </div>
@@ -115,7 +115,7 @@ export function ScannerPanel() {
 
         {!isLoading &&
           !isError &&
-          data?.results.map((result) => {
+          (Array.isArray(data?.results) ? data.results : []).map((result) => {
             const changePct = result.change_pct ?? null;
             const isUp = changePct != null && changePct > 0;
             const isDown = changePct != null && changePct < 0;
