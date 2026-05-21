@@ -1,0 +1,11 @@
+{
+  "$comment": "Bundle-size budgets for the Sthira markets-only build. Phase 1 Addendum T23. Values are gzipped sizes in KB. Set near current baseline + a small buffer; ratchet down as we trim. Lighthouse + LCP budgets land separately when preview-deploy CI is wired.",
+  "entry_kb_gz_max":      280,
+  "single_chunk_kb_gz_max": 200,
+  "total_kb_gz_max":      1200,
+  "$baseline_2026_05_21": {
+    "entry_kb_gz":        249,
+    "largest_chunk_kb_gz": 154,
+    "total_kb_gz":         900
+  }
+}

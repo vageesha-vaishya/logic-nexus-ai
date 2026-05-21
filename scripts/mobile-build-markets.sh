@@ -84,4 +84,11 @@ VITE_DOMAIN_ONLY=markets \
 VITE_MARKETS_WORKER_URL="$WORKER_URL" \
   vite build
 
+# Phase 1 Addendum T23 — fail the build on bundle-budget regression before
+# we spend time on `cap sync`. Override with SKIP_BUDGET=1 if intentionally
+# bumping perf-budget.json in the same PR (keep that change reviewable).
+if [ -z "${SKIP_BUDGET:-}" ]; then
+  node scripts/check-bundle-budget.mjs
+fi
+
 npx cap sync android

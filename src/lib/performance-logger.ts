@@ -1,12 +1,39 @@
+import posthog from 'posthog-js';
+
 import { logger } from './logger';
 import { onCLS, onINP, onLCP, onFCP, onTTFB, Metric } from 'web-vitals';
 
 /**
- * Initialize Performance Monitoring using Web Vitals
- * Logs LCP, INP, CLS, FCP, TTFB to the system logs
+ * Initialize Performance Monitoring using Web Vitals.
+ *
+ * Each metric (CLS, LCP, INP, FCP, TTFB) is logged to the system logger
+ * AND forwarded to PostHog as a `$web_vital` event so the RUM dashboard
+ * can compute p50/p75/p95 by route + device class (Phase 1 Addendum T23).
+ * PostHog.capture is a no-op when the SDK was initialised without an API
+ * key, so this is safe in local dev too.
  */
 export const initPerformanceMonitoring = () => {
+  const reportToPostHog = (metric: Metric) => {
+    try {
+      posthog.capture('$web_vital', {
+        metric_name:  metric.name,
+        metric_value: metric.value,
+        metric_delta: metric.delta,
+        metric_id:    metric.id,
+        rating:       metric.rating,
+        // Route + device tagging — lets the dashboard slice without a
+        // per-surface custom event.
+        path:         typeof window !== 'undefined' ? window.location.pathname : null,
+        is_mobile:    typeof window !== 'undefined' && window.innerWidth <= 768,
+      });
+    } catch {
+      // Never let RUM reporting break a render — the logger.log path below
+      // still records the metric for our own observability.
+    }
+  };
+
   const logMetric = (metric: Metric) => {
+    reportToPostHog(metric);
     // Log as INFO normally, but WARN if values are poor
     // Thresholds: https://web.dev/vitals/
     let level = 'INFO';

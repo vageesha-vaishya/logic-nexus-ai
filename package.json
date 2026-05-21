@@ -52,6 +52,7 @@
     "mobile:build": "npm run build && cap sync android",
     "mobile:build:markets": "bash scripts/mobile-build-markets.sh",
     "dev:tunnel:check": "bash scripts/dev-tunnel-check.sh",
+    "bundle:check": "node scripts/check-bundle-budget.mjs",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
     "chromatic": "chromatic --project-token $CHROMATIC_PROJECT_TOKEN --only-changed --threshold 0.05",
