@@ -141,6 +141,14 @@ export const GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.freeze({
     title: "Drawdown Alert",
     body: "A banner that warns when your portfolio falls a set % from its peak. Helps you pause before panic-selling.",
   },
+  ltcg: {
+    title: "LTCG (Long-Term Capital Gains)",
+    body: "Profit from selling equity you held longer than 12 months. The first ₹1,25,000 of LTCG every financial year is tax-free; anything above is taxed at 12.5%.",
+  },
+  "ltcg exemption": {
+    title: "LTCG Exemption",
+    body: "The ₹1,25,000 per-year tax-free pool on long-term equity gains. It resets every Indian financial year (April 1). Use it before March 31 or lose it.",
+  },
 });
 
 /** Case-insensitive lookup. Returns undefined if the key isn't seeded. */

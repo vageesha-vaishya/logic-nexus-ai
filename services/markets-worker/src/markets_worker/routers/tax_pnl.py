@@ -127,7 +127,284 @@ def _classify_gain(
     return "STCG", -1.0
 
 
-# ── Main endpoint ─────────────────────────────────────────────────────────────
+# ── FIFO realization helper ──────────────────────────────────────────────────
+#
+# Used by the user-level endpoint (`/user/pnl`); the per-portfolio handler
+# below still inlines the same logic for safety (no test coverage for the
+# refactor). When tests land, fold the per-portfolio handler onto this helper
+# too — currently the two implementations must be kept in sync by hand.
+
+def _compute_realized_trades(
+    raw_txns: list[dict],
+    fy_start: date,
+    fy_end: date,
+    log_context: dict | None = None,
+) -> tuple[list[dict], dict[str, deque[list]]]:
+    """
+    Run FIFO lot matching on `raw_txns` (one portfolio's worth, in any order)
+    and emit the realized-trade list for sells inside [fy_start, fy_end].
+    Returns (realized_trades, residual_buy_queues) so a caller that also wants
+    unrealized positions can pick up where this left off without redoing the
+    queue construction.
+
+    `raw_txns` rows must carry id, instrument_id, txn_type, txn_date, qty,
+    price, charges, asset_class, and an `instruments` join for symbol lookup
+    (the same shape the existing select uses).
+    """
+    if not raw_txns:
+        return [], defaultdict(deque)
+
+    iid_to_sym: dict[str, str] = {}
+    for t in raw_txns:
+        iid = t.get("instrument_id") or ""
+        instr = t.get("instruments") or {}
+        sym = instr.get("symbol") or iid
+        if iid:
+            iid_to_sym[iid] = sym.upper()
+
+    parsed: list[dict] = []
+    for t in raw_txns:
+        raw_date = t.get("txn_date")
+        try:
+            txn_date_obj = (
+                date.fromisoformat(str(raw_date)[:10])
+                if raw_date
+                else None
+            )
+        except ValueError:
+            txn_date_obj = None
+        if txn_date_obj is None:
+            continue
+        iid = t.get("instrument_id") or ""
+        symbol = iid_to_sym.get(iid, iid.upper())
+        parsed.append({
+            "id":           t.get("id"),
+            "symbol":       symbol,
+            "txn_type":     (t.get("txn_type") or "").upper(),
+            "txn_date":     txn_date_obj,
+            "qty":          float(t.get("qty") or 0),
+            "price":        float(t.get("price") or 0),
+            "charges":      float(t.get("charges") or 0),
+            "asset_class":  (t.get("asset_class") or "equity").lower(),
+        })
+
+    all_buys = [t for t in parsed if t["txn_type"] in _BUY_TYPES]
+    fy_sells = [
+        t for t in parsed
+        if t["txn_type"] in _SELL_TYPES
+        and fy_start <= t["txn_date"] <= fy_end
+    ]
+
+    buy_queues: dict[str, deque[list]] = defaultdict(deque)
+    for buy in all_buys:
+        buy_queues[buy["symbol"]].append([
+            buy["txn_date"], buy["qty"], buy["price"], buy["asset_class"],
+        ])
+
+    realized_trades: list[dict] = []
+    for sell in fy_sells:
+        sym          = sell["symbol"]
+        sell_qty     = sell["qty"]
+        sell_price   = sell["price"]
+        sell_date    = sell["txn_date"]
+        sell_charges = sell["charges"]
+        queue = buy_queues.get(sym)
+        if not queue:
+            logger.warning(
+                "tax_pnl.no_buy_lots",
+                symbol=sym,
+                sell_date=sell_date.isoformat(),
+                **(log_context or {}),
+            )
+            continue
+        remaining_sell = sell_qty
+        while remaining_sell > 1e-9 and queue:
+            lot = queue[0]
+            lot_date, lot_qty, lot_price, lot_ac = lot[0], lot[1], lot[2], lot[3]
+            matched_qty = min(remaining_sell, lot_qty)
+            charges_prorated = sell_charges * (matched_qty / sell_qty) if sell_qty > 0 else 0.0
+            holding_days = (sell_date - lot_date).days
+            gain_type, tax_rate_pct = _classify_gain(lot_ac, holding_days)
+            raw_gain = (sell_price - lot_price) * matched_qty - charges_prorated
+            realized_trades.append({
+                "symbol":        sym,
+                "asset_class":   lot_ac,
+                "buy_date":      lot_date.isoformat(),
+                "sell_date":     sell_date.isoformat(),
+                "qty":           round(matched_qty, 6),
+                "buy_price":     round(lot_price, 4),
+                "sell_price":    round(sell_price, 4),
+                "gain":          round(raw_gain, 4),
+                "holding_days":  holding_days,
+                "gain_type":     gain_type,
+                "tax_rate_pct":  tax_rate_pct,
+            })
+            remaining_sell -= matched_qty
+            lot[1] -= matched_qty
+            if lot[1] <= 1e-9:
+                queue.popleft()
+
+    return realized_trades, buy_queues
+
+
+def _aggregate_summary(realized_trades: list[dict]) -> dict[str, float]:
+    """
+    Sum realized gains by bucket and compute tax estimates. Reusable across
+    per-portfolio (one slice) and user-level (concatenated across portfolios)
+    callers — the bucket math doesn't care where the trades came from.
+    """
+    equity_stcg_total = 0.0
+    equity_ltcg_total = 0.0
+    other_stcg_total  = 0.0
+    other_ltcg_total  = 0.0
+    for trade in realized_trades:
+        ac   = (trade["asset_class"] or "").lower()
+        gain = trade["gain"]
+        gt   = trade["gain_type"]
+        if ac in _EQUITY_ASSET_CLASSES:
+            if gt == "LTCG":
+                equity_ltcg_total += gain
+            else:
+                equity_stcg_total += gain
+        else:
+            if gt == "LTCG":
+                other_ltcg_total += gain
+            else:
+                other_stcg_total += gain
+    equity_ltcg_taxable = max(0.0, equity_ltcg_total - _LTCG_EXEMPTION)
+    equity_stcg_tax_est = max(0.0, equity_stcg_total) * _EQUITY_STCG_RATE
+    equity_ltcg_tax_est = equity_ltcg_taxable * _EQUITY_LTCG_RATE
+    total_realized_gain = sum(t["gain"] for t in realized_trades)
+    remaining_exemption = max(0.0, _LTCG_EXEMPTION - equity_ltcg_total)
+    return {
+        "equity_stcg":            round(equity_stcg_total, 4),
+        "equity_ltcg":            round(equity_ltcg_total, 4),
+        "equity_ltcg_exempt":     _LTCG_EXEMPTION,
+        "equity_ltcg_taxable":    round(equity_ltcg_taxable, 4),
+        "equity_ltcg_remaining":  round(remaining_exemption, 4),
+        "equity_stcg_tax_est":    round(equity_stcg_tax_est, 4),
+        "equity_ltcg_tax_est":    round(equity_ltcg_tax_est, 4),
+        "total_tax_est":          round(equity_stcg_tax_est + equity_ltcg_tax_est, 4),
+        "total_realized_gain":    round(total_realized_gain, 4),
+        "other_stcg":             round(other_stcg_total, 4),
+        "other_ltcg":             round(other_ltcg_total, 4),
+    }
+
+
+# ── User-aggregating LTCG endpoint (T15) ──────────────────────────────────────
+#
+# Registered ABOVE the `/{portfolio_id}/pnl` route so FastAPI matches the
+# literal "user" segment before the param. The retail LTCG card calls this:
+# the ₹1.25 L exemption is per-PAN, not per-portfolio, so summing the user's
+# realized LTCG across every owned portfolio is the only correct headline
+# number.
+
+@router.get("/user/pnl")
+async def get_user_tax_pnl(
+    auth: Auth,
+    fy: str = Query("2024-25", description='Indian financial year, e.g. "2024-25"'),
+) -> dict[str, Any]:
+    """
+    GET /v1/tax/user/pnl?fy=2024-25
+
+    Aggregate realized capital-gains across all of auth.user_id's portfolios.
+    Omits the unrealized-positions block (and the yfinance calls it would
+    require) — the retail card only needs the realized totals + remaining
+    exemption headline.
+    """
+    if not auth.user_id and not auth.is_service_account:
+        raise HTTPException(401, detail="User authentication required")
+
+    db = get_supabase()
+    as_of = datetime.now(timezone.utc).date().isoformat()
+
+    try:
+        fy_start, fy_end = fy_date_range(fy)
+    except (ValueError, IndexError):
+        raise HTTPException(400, detail=f'Invalid fy format: "{fy}". Expected "YYYY-YY" e.g. "2024-25"')
+
+    def _fetch_user_portfolios() -> list[dict]:
+        return (
+            db.schema("markets")
+            .from_("portfolios")
+            .select("id")
+            .eq("owner_user_id", auth.user_id)
+            .execute()
+        ).data or []
+
+    portfolios = await asyncio.to_thread(_fetch_user_portfolios)
+    portfolio_ids = [p["id"] for p in portfolios if p.get("id")]
+
+    if not portfolio_ids:
+        logger.info("tax_pnl.user.no_portfolios", user_id=auth.user_id, fy=fy)
+        return {
+            "user_id":              auth.user_id,
+            "fy":                   fy,
+            "fy_start":             fy_start.isoformat(),
+            "fy_end":               fy_end.isoformat(),
+            "as_of":                as_of,
+            "portfolio_count":      0,
+            "summary":              _aggregate_summary([]),
+            "realized_trades":      [],
+            "available_fy_options": _available_fy_options(),
+        }
+
+    def _fetch_txns_for(portfolio_id: str) -> list[dict]:
+        return (
+            db.schema("markets")
+            .from_("transactions")
+            .select(
+                "id, instrument_id, txn_type, txn_date, qty, price, "
+                "charges, asset_class, instruments(symbol)"
+            )
+            .eq("portfolio_id", portfolio_id)
+            .order("txn_date", desc=False)
+            .execute()
+        ).data or []
+
+    # Run per-portfolio FIFO in parallel — each call is an independent DB
+    # round-trip + a CPU-bound merge. asyncio.gather over to_thread keeps the
+    # event loop free.
+    txn_lists: list[list[dict]] = await asyncio.gather(*[
+        asyncio.to_thread(_fetch_txns_for, pid) for pid in portfolio_ids
+    ])
+
+    all_realized: list[dict] = []
+    for pid, txns in zip(portfolio_ids, txn_lists):
+        realized, _residual = _compute_realized_trades(
+            txns, fy_start, fy_end, log_context={"portfolio_id": pid},
+        )
+        # Tag each trade so the client can group by portfolio if it wants.
+        for trade in realized:
+            trade["portfolio_id"] = pid
+        all_realized.extend(realized)
+
+    summary = _aggregate_summary(all_realized)
+
+    logger.info(
+        "tax_pnl.user.computed",
+        user_id=auth.user_id,
+        fy=fy,
+        portfolio_count=len(portfolio_ids),
+        realized_trades=len(all_realized),
+        equity_ltcg=summary["equity_ltcg"],
+        equity_ltcg_remaining=summary["equity_ltcg_remaining"],
+    )
+
+    return {
+        "user_id":              auth.user_id,
+        "fy":                   fy,
+        "fy_start":             fy_start.isoformat(),
+        "fy_end":               fy_end.isoformat(),
+        "as_of":                as_of,
+        "portfolio_count":      len(portfolio_ids),
+        "summary":              summary,
+        "realized_trades":      all_realized,
+        "available_fy_options": _available_fy_options(),
+    }
+
+
+# ── Per-portfolio endpoint ────────────────────────────────────────────────────
 
 @router.get("/{portfolio_id}/pnl")
 async def get_tax_pnl(

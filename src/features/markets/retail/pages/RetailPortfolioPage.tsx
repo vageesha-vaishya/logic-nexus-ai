@@ -1,3 +1,4 @@
+import { LtcgTrackerCard } from "../dashboard/LtcgTrackerCard";
 import { PortfolioTierView } from "../dashboard/PortfolioTierView";
 import { WhyButton } from "../glossary";
 
@@ -6,7 +7,6 @@ import { WhyButton } from "../glossary";
  *
  * Sub-pages mounted here in later addendum tasks:
  *   • Stop-loss manager (T17 risk trio extension)
- *   • LTCG tracker (T15)
  *   • Per-holding detail sheet
  */
 export default function RetailPortfolioPage() {
@@ -22,6 +22,7 @@ export default function RetailPortfolioPage() {
           job.
         </p>
       </header>
+      <LtcgTrackerCard />
       <PortfolioTierView />
     </div>
   );
