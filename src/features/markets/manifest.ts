@@ -58,7 +58,6 @@ export const marketsManifest: DomainManifest = {
       path: "/dashboard/markets/retail",
       component: () => import("./pages/RetailModePage"),
       mobile: true,
-      requiredPermissions: ["markets.view"],
       children: [
         { path: "home", component: () => import("./retail/pages/RetailHomePage"), mobile: true },
         { path: "portfolio", component: () => import("./retail/pages/RetailPortfolioPage"), mobile: true },
@@ -75,7 +74,6 @@ export const marketsManifest: DomainManifest = {
       path: "/dashboard/markets/settings/brokers",
       component: () => import("./pages/BrokerConnectionsPage"),
       mobile: true,
-      requiredPermissions: ["markets.view"],
     },
 
     // Desktop-only Markets surfaces. Each was the source of one or more
@@ -91,7 +89,12 @@ export const marketsManifest: DomainManifest = {
     { path: "/dashboard/markets/risk", component: () => import("./pages/RiskControlsPage"), mobile: false },
   ],
   defaultAssignmentPolicy: "opt-in",
-  requiredPermissions: ["markets.view"],
+  // Routes here use requiredDomainCode='MARKETS' (applied by
+  // buildDomainRoutes), matching the hand-declared App.tsx gates which do
+  // not require a granular `markets.view` permission — domain assignment
+  // is the only check. Adding requiredPermissions here would be more
+  // restrictive than the existing behaviour and break tenant_admins
+  // whose tenant has the MARKETS domain but no explicit markets.view grant.
   seedMigration: "20260520150000_seed_markets_domain_and_assignments.sql",
   services: ["markets-worker"],
 };

@@ -26,9 +26,12 @@ import { StickyActionsProvider } from "@/components/layout/StickyActionsContext"
 import { queryPersister, shouldPersistQuery } from "@/lib/queryPersistence";
 
 import { AuthProvider } from "./hooks/useAuth";
+import { CRMProvider } from "./hooks/useCRM";
 import { DomainContextProvider } from "./contexts/DomainContext";
 import { TenantBrandingProvider } from "./contexts/TenantBrandingContext";
+import { LeadsViewStateProvider } from "./hooks/useLeadsViewState";
 import { ThemeProvider } from "./hooks/useTheme";
+import { PipelineProvider } from "@/components/debug/pipeline/PipelineContext";
 
 import Landing from "./pages/Landing";
 import Auth from "./pages/Auth";
@@ -68,30 +71,36 @@ const MarketsApp = () => (
   >
     <BrowserRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
-        <DomainContextProvider>
-          <TenantBrandingProvider>
-            <ThemeProvider>
-              <TooltipProvider>
-                <SidebarProvider defaultOpen={false}>
-                  <StickyActionsProvider>
-                    <Sonner />
-                    <Suspense fallback={SuspenseFallback}>
-                      <Routes>
-                        <Route path="/" element={<Landing />} />
-                        <Route path="/auth" element={<Auth />} />
-                        <Route path="/oauth/callback" element={<OAuthCallback />} />
-                        <Route path="/setup-admin" element={<SetupAdmin />} />
-                        <Route path="/unauthorized" element={<Unauthorized />} />
-                        {buildAllDomainRoutes(filterManifestsForBuild(DOMAIN_MANIFESTS), { mobile: true })}
-                        <Route path="*" element={<DomainOnlyNotFound />} />
-                      </Routes>
-                    </Suspense>
-                  </StickyActionsProvider>
-                </SidebarProvider>
-              </TooltipProvider>
-            </ThemeProvider>
-          </TenantBrandingProvider>
-        </DomainContextProvider>
+        <CRMProvider>
+          <DomainContextProvider>
+            <TenantBrandingProvider>
+              <ThemeProvider>
+                <TooltipProvider>
+                  <SidebarProvider defaultOpen={false}>
+                    <StickyActionsProvider>
+                      <LeadsViewStateProvider>
+                        <PipelineProvider>
+                          <Sonner />
+                          <Suspense fallback={SuspenseFallback}>
+                            <Routes>
+                              <Route path="/" element={<Landing />} />
+                              <Route path="/auth" element={<Auth />} />
+                              <Route path="/oauth/callback" element={<OAuthCallback />} />
+                              <Route path="/setup-admin" element={<SetupAdmin />} />
+                              <Route path="/unauthorized" element={<Unauthorized />} />
+                              {buildAllDomainRoutes(filterManifestsForBuild(DOMAIN_MANIFESTS), { mobile: true })}
+                              <Route path="*" element={<DomainOnlyNotFound />} />
+                            </Routes>
+                          </Suspense>
+                        </PipelineProvider>
+                      </LeadsViewStateProvider>
+                    </StickyActionsProvider>
+                  </SidebarProvider>
+                </TooltipProvider>
+              </ThemeProvider>
+            </TenantBrandingProvider>
+          </DomainContextProvider>
+        </CRMProvider>
       </AuthProvider>
     </BrowserRouter>
   </PersistQueryClientProvider>
