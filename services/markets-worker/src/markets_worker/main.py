@@ -32,6 +32,7 @@ from markets_worker.routers import copy_trades as copy_trades_router
 from markets_worker.routers import rebalancing as rebalancing_router
 from markets_worker.routers import tax_pnl as tax_pnl_router
 from markets_worker.routers import stress_test as stress_test_router
+from markets_worker.routers import holdings_news as holdings_news_router
 from markets_worker.routers import retail as retail_router
 from markets_worker.routers import behavioral as behavioral_router
 from markets_worker.routers import risk as risk_router
@@ -111,6 +112,7 @@ def create_app() -> FastAPI:
     app.include_router(rebalancing_router.router,           tags=["rebalancing"])
     app.include_router(tax_pnl_router.router,               tags=["tax"])
     app.include_router(stress_test_router.router,           tags=["retail-stress"])
+    app.include_router(holdings_news_router.router,         tags=["retail-news"])
     app.include_router(retail_router.router,                tags=["retail"])
     app.include_router(behavioral_router.router,            tags=["retail-behavioral"])
     app.include_router(risk_router.router,                  tags=["retail-risk"])

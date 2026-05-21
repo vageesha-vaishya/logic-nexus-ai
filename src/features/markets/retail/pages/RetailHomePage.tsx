@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { usePortfolioPnL } from "../../hooks/usePortfolioPnL";
 import { BehavioralAlertBanner } from "../behavioral/BehavioralAlertBanner";
 import { useDrawdownState } from "../behavioral/useDrawdownAlerts";
+import { HoldingsNewsCarousel } from "../dashboard/HoldingsNewsCarousel";
 import { RebalanceCard } from "../dashboard/RebalanceCard";
 import { RetailDashboard } from "../dashboard/RetailDashboard";
 import { RiskScoreCard } from "../dashboard/RiskScoreCard";
@@ -11,9 +12,8 @@ import { useRiskProfile } from "../hooks/useRiskProfile";
 
 /**
  * Home tab — overview of the user's portfolio + non-blocking drawdown banner.
- * Subsequent Addendum tasks (T17 Risk Score, T19 Diagnostic, T20 Holdings news,
- * T21 Rebalance card) will be appended to this page rather than fan out into
- * new tabs.
+ * Subsequent Addendum tasks (T19 Diagnostic) append here. T17 Risk Score
+ * (with T18 Stress Test reached from it) and T20 Holdings News are live.
  */
 export default function RetailHomePage() {
   const { data: profile } = useRiskProfile();
@@ -29,6 +29,7 @@ export default function RetailHomePage() {
       <RetailDashboard profile={profile} />
       <RebalanceCard />
       <RiskScoreCard />
+      <HoldingsNewsCarousel />
       {coreTier && drawdown.alertTier && drawdown.alertTier !== "red" && (
         <BehavioralAlertBanner
           alertTier={drawdown.alertTier}
