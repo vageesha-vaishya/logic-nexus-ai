@@ -83,7 +83,9 @@ def test_holdings_news_empty_when_no_portfolios(client, auth_headers):
     assert resp.status_code == 200
     body = resp.json()
     assert body["holdings"] == []
-    assert body["lookback_hours"] == 24
+    assert body["lookback_hours"] == 72
+    # market_context bucket is always present (even on empty holdings)
+    assert "market_context" in body
 
 
 def test_holdings_news_returns_headlines_for_top_holding(client, auth_headers):

@@ -32,7 +32,11 @@ router = APIRouter(prefix="/v1/retail", tags=["retail"])
 
 _TOP_HOLDINGS    = 3       # number of largest positions to surface news for
 _HEADLINES_LIMIT = 5       # per-symbol headline cap
-_LOOKBACK_HOURS  = 24      # news freshness window
+_LOOKBACK_HOURS  = 72      # news freshness window; bumped from 24 → 72 in
+                           # docs/audits/2026-05-21-content-coverage.md D2
+                           # fix — ingestion is sparse enough that a single
+                           # weekend kills the 24h window for typical
+                           # NIFTY-50 holders.
 
 
 # ── Holdings aggregation (mirrors stress_test pattern) ───────────────────────
@@ -210,15 +214,34 @@ async def get_holdings_news(auth: Auth) -> dict[str, Any]:
         for h in top
     ]
 
+    # Always include a "Markets today" fallback bucket of index-tagged news
+    # — NIFTY / SENSEX / NIFTY 50. The carousel shows this as the first
+    # tile so friends whose top-3 holdings happen to have no news in the
+    # window still see something on Home. Docs/audits/2026-05-21
+    # content-coverage D2 fix.
+    market_buckets = await _fetch_news_for_symbols(
+        db, ["NIFTY", "NIFTY 50", "SENSEX"], since.isoformat(), _HEADLINES_LIMIT,
+    )
+    # Flatten + dedupe by id, then keep the freshest N.
+    seen: dict[str, dict] = {}
+    for items in market_buckets.values():
+        for item in items:
+            seen.setdefault(str(item.get("id")), item)
+    market_context = sorted(
+        seen.values(), key=lambda n: n.get("ts") or "", reverse=True,
+    )[:_HEADLINES_LIMIT]
+
     logger.info(
         "holdings_news.served",
         user_id=auth.user_id,
         symbols=symbols,
         headlines_total=sum(len(h["news"]) for h in holdings_out),
+        market_context_n=len(market_context),
     )
 
     return {
         "as_of":          now.isoformat(),
         "lookback_hours": _LOOKBACK_HOURS,
         "holdings":       holdings_out,
+        "market_context": market_context,
     }

@@ -23,6 +23,12 @@ export interface HoldingsNewsResponse {
   as_of:          string;
   lookback_hours: number;
   holdings:       HoldingsNewsBucket[];
+  /**
+   * Index-tagged news (NIFTY / SENSEX) for the same lookback window.
+   * Rendered as a fallback tile so the carousel always shows *something*
+   * when individual holdings have no news that day.
+   */
+  market_context: HoldingsNewsItem[];
 }
 
 const WORKER_URL = import.meta.env.VITE_MARKETS_WORKER_URL ?? "http://localhost:8001";
