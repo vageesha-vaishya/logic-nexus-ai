@@ -79,7 +79,8 @@ interface IndicatorSeriesRefs {
 
 // ── Deduplicate + sort helper (Lightweight Charts requires strict asc order, no dupes) ──
 
-function dedupeAsc<T extends { time: number | string }>(arr: T[]): T[] {
+function dedupeAsc<T extends { time: number | string }>(arr: T[] | null | undefined): T[] {
+  if (!arr || !Array.isArray(arr)) return [];
   const sorted = [...arr].sort((a, b) => {
     const ta = typeof a.time === "string" ? new Date(a.time).getTime() : (a.time as number);
     const tb = typeof b.time === "string" ? new Date(b.time).getTime() : (b.time as number);
