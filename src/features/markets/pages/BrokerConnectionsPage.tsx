@@ -118,20 +118,32 @@ function StatusIcon({ status }: { status: BrokerConnection["status"] }) {
 function ConnectionCard({
   conn,
   broker,
+  portfolioName,
   onSync,
   onReauth,
   onRemove,
   onViewPortfolio,
+  onViewBroker,
   isSyncing,
 }: {
   conn:             BrokerConnection;
   broker?:          SupportedBroker;
+  portfolioName?:   string | null;
   onSync:           () => void;
   onReauth:         () => void;
   onRemove:         () => void;
   onViewPortfolio:  () => void;
+  onViewBroker:     () => void;
   isSyncing:        boolean;
 }) {
+  const maskedClientId = (() => {
+    const raw = String(conn.broker_client_id || "");
+    if (!raw) return "hidden";
+    if (raw.startsWith("groww_")) return raw.replace("groww_", "key_");
+    if (raw.length <= 4) return "••••";
+    if (raw.length <= 8) return `${raw.slice(0, 2)}••${raw.slice(-2)}`;
+    return `${raw.slice(0, 2)}…${raw.slice(-2)}`;
+  })();
   return (
     <Card>
       <CardContent className="p-4">
@@ -149,8 +161,13 @@ function ConnectionCard({
                 )}
               </div>
               <p className="text-xs text-muted-foreground mt-0.5">
-                {broker?.name ?? conn.broker} · Client {conn.broker_client_id}
+                {broker?.name ?? conn.broker} · Client {maskedClientId}
               </p>
+              {portfolioName && (
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Portfolio · {portfolioName}
+                </p>
+              )}
               <div className="flex gap-3 mt-1 text-xs text-muted-foreground">
                 {conn.last_synced_at && (
                   <span>
@@ -178,8 +195,13 @@ function ConnectionCard({
 
           <div className="flex items-center gap-1 shrink-0">
             <Button variant="outline" size="sm" className="h-8 text-xs"
-              onClick={onViewPortfolio} title="View portfolio">
+              onClick={onViewPortfolio} title="Open linked portfolio">
               View Portfolio
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 text-xs"
+              onClick={onViewBroker} title="View broker data">
+              Broker Data
+              <ChevronRight className="h-3.5 w-3.5 ml-1" />
             </Button>
             {conn.status === "active" && (
               <Button variant="ghost" size="icon" className="h-8 w-8"
@@ -284,7 +306,7 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
         await finalise({
           api_key:    form.api_key,
           api_secret: form.api_secret,
-        }, form.api_key);
+        }, "groww");
       }
 
       else if (broker.auth_type === "totp") {
@@ -396,8 +418,10 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
     if (portfolioChoice !== NEW_PORTFOLIO) return portfolioChoice;
 
     // Auto-create a portfolio for this connection
-    const name = newPortfolioName.trim()
-      || `${broker.name} — ${clientId.slice(0, 8) || "new"}`;
+    const defaultName = broker.id === "groww"
+      ? `${broker.name} — account`
+      : `${broker.name} — ${clientId.slice(0, 8) || "new"}`;
+    const name = newPortfolioName.trim() || defaultName;
     const created = await createPortfolio.mutateAsync({
       name,
       description: `Auto-created for ${broker.name} broker connection`,
@@ -414,7 +438,14 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
     const input: AddConnectionInput = {
       broker:           broker.id,
       broker_client_id: clientId,
-      display_name:     form.display_name || `${broker.name} – ${clientId}`,
+      // Default label: "<broker name>" when no client id is available
+      // (e.g. Groww passes the literal string "groww"), otherwise "<broker
+      // name> – <client id>". Never include access tokens — the worker
+      // also sanitises this defensively (see _sanitize_display_name).
+      display_name:     form.display_name
+        || (clientId && clientId !== broker.id
+              ? `${broker.name} – ${clientId}`
+              : broker.name),
       portfolio_id,
       credentials,
       segments:         broker.supports,
@@ -665,6 +696,7 @@ export default function BrokerConnectionsPage() {
   const supportedQuery  = useSupportedBrokers();
   const removeConn      = useRemoveBrokerConnection();
   const triggerSync     = useTriggerBrokerSync();
+  const portfoliosQuery = usePortfolios();
 
   // Plan gate for broker connections
   const brokerGate = usePlanGate("broker_connections");
@@ -683,6 +715,7 @@ export default function BrokerConnectionsPage() {
   const importOnly  = supported.filter(b => b.tier === "import_only");
   const connected   = connections.data ?? [];
   const connIds     = new Set(connected.map(c => c.broker));
+  const portfolioNameById = new Map((portfoliosQuery.data ?? []).map(p => [p.id, p.name]));
 
   const brokerMeta = (broker: string) =>
     supported.find(b => b.id === broker);
@@ -752,10 +785,14 @@ export default function BrokerConnectionsPage() {
                   key={conn.id}
                   conn={conn}
                   broker={brokerMeta(conn.broker)}
+                  portfolioName={conn.portfolio_id ? portfolioNameById.get(conn.portfolio_id) ?? null : null}
                   onSync={() => handleSync(conn.id)}
                   onReauth={() => handleReauth(conn)}
                   onRemove={() => setRemoveId(conn.id)}
-                  onViewPortfolio={() => navigate(`/dashboard/markets/settings/brokers/${conn.id}`)}
+                  onViewPortfolio={() => conn.portfolio_id
+                    ? navigate(`/dashboard/markets/portfolios/${conn.portfolio_id}`)
+                    : navigate("/dashboard/markets/portfolios")}
+                  onViewBroker={() => navigate(`/dashboard/markets/settings/brokers/${conn.id}`)}
                   isSyncing={syncingId === conn.id}
                 />
               ))}

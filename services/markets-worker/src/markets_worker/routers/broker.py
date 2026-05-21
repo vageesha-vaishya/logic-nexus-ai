@@ -141,12 +141,33 @@ async def list_connections(auth: Auth):
     return {"connections": result.data or []}
 
 
+def _sanitize_display_name(raw: str, broker_label: str) -> str:
+    """
+    Belt-and-suspenders strip of credential-shaped substrings from the
+    display_name written to the DB. An earlier frontend revision accidentally
+    pasted the full access JWT into this field; this defends against any
+    future regression. Rule of thumb: a label shouldn't be longer than ~80
+    chars and shouldn't contain a JWT (starts with `eyJ`, contains a dot).
+    """
+    s = (raw or "").strip()
+    if not s:
+        return broker_label
+    # Detect anything JWT-shaped and fall back to the bare broker label.
+    if "eyJ" in s and "." in s and len(s) > 64:
+        return broker_label
+    if len(s) > 80:
+        return s[:77] + "..."
+    return s
+
+
 @router.post("/connections", status_code=201)
 async def add_connection(body: AddConnectionRequest, auth: Auth):
     if not auth.user_id:
         raise HTTPException(401, detail="Authentication required")
     if not auth.tenant_id or not auth.franchise_id:
         raise HTTPException(400, detail="x-tenant-id and x-franchise-id headers required")
+
+    body.display_name = _sanitize_display_name(body.display_name, body.broker)
 
     try:
         cls = get_adapter_class(body.broker)
