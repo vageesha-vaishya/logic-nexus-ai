@@ -1,6 +1,7 @@
 """Job endpoints — backtest + signal generation + price ingest.
 
 POST /v1/jobs/backtest                  — enqueue a backtest job
+POST /v1/jobs/bootstrap-portfolio       — full first-run setup for a new portfolio
 POST /v1/jobs/signals/portfolio         — generate signals for all holdings
 POST /v1/jobs/signals/watchlist         — generate signals for watchlist
 POST /v1/jobs/prices/ingest/portfolio   — fetch 2yr OHLCV for all holdings
@@ -132,6 +133,68 @@ class SignalWatchlistRequest(BaseModel):
     owner_user_id: str
     tenant_id:     str
     franchise_id:  str
+
+
+class BootstrapPortfolioRequest(BaseModel):
+    portfolio_id: str
+
+
+@router.post("/bootstrap-portfolio")
+async def bootstrap_new_portfolio(body: BootstrapPortfolioRequest, auth: Auth):
+    """
+    First-run setup for a freshly-created portfolio. Two things at once:
+      1. Schedules the recurring daily refresh+signals job at 07:00 IST so
+         the portfolio joins the same cadence as every other one.
+      2. Fires an immediate refresh+signals run so the user sees content on
+         their first visit to the Signals tab instead of an empty state.
+
+    Idempotent — `_enqueue_daily_for_portfolio` dedupes by job_id and skips
+    if today's slot is already scheduled. Safe to call multiple times from
+    the frontend without spawning duplicate jobs.
+
+    Closed-beta dealbreaker fix #D1 (see docs/audits/2026-05-21-content-coverage.md).
+    """
+    from markets_worker.scheduler import (
+        _enqueue_daily_for_portfolio,
+        schedule_immediate_refresh,
+    )
+    try:
+        # Verify the portfolio exists + is visible to this user. RLS would
+        # block the daily job's own reads anyway, but a 400 here gives a
+        # cleaner error than a job that silently no-ops at 07:00 IST.
+        db = get_supabase()
+        check = (
+            db.schema("markets").from_("portfolios")
+            .select("id, owner_user_id")
+            .eq("id", body.portfolio_id)
+            .limit(1)
+            .execute()
+        )
+        if not check.data:
+            raise HTTPException(404, detail=f"portfolio {body.portfolio_id} not found")
+        port = check.data[0]
+        if not (auth.is_service_account or port.get("owner_user_id") == auth.user_id):
+            raise HTTPException(403, detail="Access denied")
+
+        daily_job     = _enqueue_daily_for_portfolio(body.portfolio_id)
+        immediate_job = schedule_immediate_refresh(body.portfolio_id)
+        logger.info(
+            "bootstrap_portfolio.enqueued",
+            portfolio_id=body.portfolio_id,
+            daily_job_id=getattr(daily_job, "id", None),
+            immediate_job_id=immediate_job,
+        )
+        return {
+            "portfolio_id":     body.portfolio_id,
+            "daily_job_id":     getattr(daily_job, "id", None),
+            "immediate_job_id": immediate_job,
+            "status":           "queued",
+        }
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("bootstrap_portfolio.failed", portfolio_id=body.portfolio_id, error=str(exc))
+        raise HTTPException(503, detail=f"Job queue unavailable: {exc}") from exc
 
 
 @router.post("/signals/portfolio")

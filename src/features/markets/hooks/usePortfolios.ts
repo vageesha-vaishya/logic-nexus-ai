@@ -12,7 +12,9 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useDebounce } from "@/hooks/useDebounce";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { logger } from "@/lib/logger";
 import { marketsKeys } from "./queryKeys";
+import { useBootstrapPortfolio } from "./useBootstrapPortfolio";
 import type {
   CreatePortfolioInput,
   CrmContactSearchResult,
@@ -63,6 +65,12 @@ export function usePortfolios() {
 export function useCreatePortfolio() {
   const queryClient  = useQueryClient();
   const { tenantId, franchiseId } = useActiveScope();
+  // Best-effort fire on success — see onSuccess. Failure of the bootstrap
+  // does not fail portfolio creation: the portfolio still exists, signals
+  // will lag until the next worker restart, and the bootstrap can be
+  // retried by re-opening the create-portfolio flow or via task #32's
+  // server-side fallback when that lands.
+  const bootstrap = useBootstrapPortfolio();
 
   return useMutation<Portfolio, Error, CreatePortfolioInput>({
     mutationFn: async (input) => {
@@ -95,6 +103,20 @@ export function useCreatePortfolio() {
         (prev) => (prev ? [created, ...prev] : [created]),
       );
       queryClient.invalidateQueries({ queryKey: marketsKeys.portfolios.all() });
+
+      // Closed-beta dealbreaker #D1: ask the worker to set up the daily
+      // refresh+signals job for this portfolio AND run it once now, so
+      // the user sees content on their first Signals-tab visit. Fire-
+      // and-forget — failure here doesn't block portfolio creation, and
+      // the worker's useBootstrapPortfolio onError logs the drop.
+      try {
+        bootstrap.mutate(created.id);
+      } catch (e) {
+        logger.warn("bootstrap kick-off failed in onSuccess", {
+          portfolio_id: created.id,
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
     },
   });
 }
