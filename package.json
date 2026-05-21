@@ -19,6 +19,7 @@
     "lint:markdown": "eslint \"**/*.{md,mdx}\"",
     "lint:markdown:fix": "eslint \"**/*.{md,mdx}\" --fix",
     "lint:remark": "remark . --frail",
+    "lint:domain-manifests": "node scripts/lint-domain-manifests.mjs",
     "lint:remark:fix": "remark . -o",
     "test": "vitest run",
     "test:ci": "vitest run --reporter=dot --bail=1 --test-timeout=30000",
