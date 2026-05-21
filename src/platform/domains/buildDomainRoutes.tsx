@@ -155,3 +155,32 @@ export function buildAllDomainRoutes(
  */
 export const USE_DOMAIN_MANIFESTS: boolean =
   String(import.meta.env.VITE_USE_DOMAIN_MANIFESTS ?? "").toLowerCase() === "true";
+
+/**
+ * Phase 2.3 — read VITE_DOMAIN_ONLY env. When set (e.g. "markets"), the
+ * runtime treats this as a *single-domain* build and renders ONLY routes
+ * from the named manifest. The hand-declared App.tsx route blocks for
+ * other domains should be conditionally skipped by the caller. Used by
+ * the Sthira mobile build to ship just the Markets domain.
+ *
+ * Empty string / undefined → multi-domain (unified web build).
+ */
+export const DOMAIN_ONLY: string = String(
+  import.meta.env.VITE_DOMAIN_ONLY ?? "",
+).trim().toLowerCase();
+
+/** True when this build is restricted to a single domain. */
+export const IS_DOMAIN_ONLY_BUILD: boolean = DOMAIN_ONLY.length > 0;
+
+/**
+ * Filter a manifest list to the named domain. Case-insensitive match on
+ * code. Returns the full list when `domainOnly` is empty.
+ */
+export function filterManifestsForBuild(
+  manifests: readonly DomainManifest[],
+  domainOnly: string = DOMAIN_ONLY,
+): readonly DomainManifest[] {
+  const norm = domainOnly.trim().toLowerCase();
+  if (!norm) return manifests;
+  return manifests.filter((m) => m.code.toLowerCase() === norm);
+}
