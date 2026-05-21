@@ -8,6 +8,7 @@ import structlog
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
+from markets_worker.config import get_settings
 from markets_worker.db import get_supabase
 
 logger = structlog.get_logger()
@@ -110,7 +111,23 @@ async def get_auth(
             is_service_account=True,
         )
 
-    # 2. Try Supabase JWT (user-facing calls from Edge Functions)
+    # 2. Service-role passthrough (from admin scripts / edge functions).
+    # _verify_supabase_jwt below calls auth.get_user which dies on
+    # service-role tokens (no user attached). Short-circuit here when the
+    # Bearer literally equals SUPABASE_SERVICE_ROLE_KEY — equivalent in
+    # power to a service-account, since anyone with this key could call
+    # Supabase REST directly with full admin powers anyway.
+    import hmac as _hmac
+    s = get_settings()
+    if s.supabase_service_role_key and _hmac.compare_digest(token, s.supabase_service_role_key):
+        logger.info("auth.service_role_key")
+        return AuthContext(
+            tenant_id=(request.headers.get("x-tenant-id") or "").strip() or None,
+            franchise_id=(request.headers.get("x-franchise-id") or "").strip() or None,
+            is_service_account=True,
+        )
+
+    # 3. User JWT (Edge-Function-issued or direct user calls)
     claims = _verify_supabase_jwt(token)
     user_id = claims.get("sub")
     if not user_id:
