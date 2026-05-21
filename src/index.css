@@ -276,6 +276,61 @@ All colors MUST be HSL.
   body {
     @apply bg-background text-foreground;
   }
+
+  /* Mobile viewport stop-gap (PR 4).
+   *
+   * The unified DashboardLayout was designed for desktop. On phones the
+   * flex children inherit min-content widths from their descendants
+   * (header bar with breadcrumb + global search + several toggles
+   * ~999px of intrinsic content), which then makes the entire main
+   * column overflow horizontally to ~1023px. Users see truncated
+   * content with no way to reach the right-side buttons.
+   *
+   * The proper fix is wrapping more routes in SthiraShell (Path A).
+   * Until then:
+   *   1. Clip horizontal overflow on the root so the document doesn't
+   *      grow wider than the viewport.
+   *   2. Force `min-width: 0` on the flex main column so it can shrink
+   *      below its descendants' intrinsic widths.
+   *   3. Allow the desktop header to wrap onto multiple lines instead
+   *      of overflowing — height auto rather than fixed h-12.
+   *   4. Cap the dashboard <main> inner padding at the viewport width
+   *      so cards inside also re-flow.
+   */
+  @media (max-width: 767px) {
+    html, body {
+      overflow-x: clip;
+      max-width: 100vw;
+    }
+
+    /* Allow the dashboard column to shrink to viewport width. */
+    .min-h-screen.flex.w-full > .flex-1 {
+      min-width: 0;
+      max-width: 100vw;
+    }
+
+    /* Header was h-12 + flex no-wrap; let it wrap on mobile. */
+    header.h-12 {
+      height: auto;
+      min-height: 3rem;
+      flex-wrap: wrap;
+      padding-block: 0.25rem;
+    }
+
+    /* Hide desktop-only header chrome that the mobile shell will
+     * replace eventually. Breadcrumb is already `hidden md:block`; the
+     * global search and trading-mode toggle are not. */
+    header.h-12 .trading-mode-toggle,
+    header.h-12 [data-mobile-hide="true"] {
+      display: none;
+    }
+
+    /* The main content area should respect viewport width. */
+    main.flex-1 {
+      max-width: 100vw;
+      overflow-x: hidden;
+    }
+  }
 }
 
 /* Custom Scrollbar Utilities (mimicking tailwind-scrollbar) */
