@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 import {
+  Bug,
   BookOpen,
   ChevronRight,
   LogOut,
@@ -13,6 +15,38 @@ import {
 import { useAuth } from "@/hooks/useAuth";
 
 import { GLOSSARY, lookupTerm, Term } from "../glossary";
+
+// Configurable destination for closed-beta bug reports. Falls back to
+// the operator's personal address so the feature works in dev even when
+// the env isn't wired.
+const BUG_REPORT_EMAIL =
+  import.meta.env.VITE_BUG_REPORT_EMAIL || "bahuguna.vimal@gmail.com";
+
+function openBugReport(user: { id?: string; email?: string | null } | null) {
+  const platform = Capacitor.getPlatform();
+  const native   = Capacitor.isNativePlatform();
+  const ts       = new Date().toISOString();
+  const ua       = typeof navigator !== "undefined" ? navigator.userAgent : "n/a";
+  const subject  = "Sthira bug report";
+  const body = [
+    "What happened (please describe):",
+    "",
+    "",
+    "",
+    "—— diagnostic info (auto-filled, please leave intact) ——",
+    `When:      ${ts}`,
+    `Platform:  ${platform}${native ? " (native)" : " (web)"}`,
+    `User:      ${user?.email ?? "unknown"} (${user?.id ?? "no-id"})`,
+    `User-Agent: ${ua}`,
+  ].join("\n");
+  const href =
+    `mailto:${encodeURIComponent(BUG_REPORT_EMAIL)}` +
+    `?subject=${encodeURIComponent(subject)}` +
+    `&body=${encodeURIComponent(body)}`;
+  if (typeof window !== "undefined") {
+    window.location.href = href;
+  }
+}
 
 interface RowProps {
   Icon: LucideIcon;
@@ -63,7 +97,7 @@ function Row({ Icon, label, hint, to, onClick, disabled }: RowProps) {
  * lands; the glossary preview is live today since T13 shipped.
  */
 export default function RetailMorePage() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [showGlossary, setShowGlossary] = useState(false);
 
   const entries = Object.values(GLOSSARY);
@@ -101,6 +135,12 @@ export default function RetailMorePage() {
           label={showGlossary ? "Hide glossary" : "Glossary"}
           hint={`${entries.length} terms — tap a word in the app to see its definition`}
           onClick={() => setShowGlossary((v) => !v)}
+        />
+        <Row
+          Icon={Bug}
+          label="Report an issue"
+          hint="Open your email app with diagnostic info pre-filled"
+          onClick={() => openBugReport(user ? { id: user.id, email: user.email } : null)}
         />
         <Row
           Icon={LogOut}

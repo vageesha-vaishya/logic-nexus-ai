@@ -163,5 +163,6 @@ export const marketsKeys = {
     ltcg:             (fy?: string) => [...marketsKeys.retail.all(), "ltcg", fy ?? "current"] as const,
     stressTest:       () => [...marketsKeys.retail.all(), "stress-test"] as const,
     holdingsNews:     () => [...marketsKeys.retail.all(), "holdings-news"] as const,
+    appStatusBanner:  () => [...marketsKeys.retail.all(), "app-status-banner"] as const,
   },
 } as const;

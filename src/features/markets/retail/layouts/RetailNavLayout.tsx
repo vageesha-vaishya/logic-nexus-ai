@@ -11,6 +11,7 @@ import {
 
 import { cn } from "@/lib/utils";
 
+import { AppStatusBanner } from "./AppStatusBanner";
 import { OfflineBanner } from "./OfflineBanner";
 
 /**
@@ -80,6 +81,8 @@ export function RetailNavLayout() {
 
       {/* Page content — leaves bottom space for the mobile nav. */}
       <main className="flex-1 pb-20 md:pb-0">
+        {/* Operator status banner first (urgent), then offline (passive). */}
+        <AppStatusBanner />
         <OfflineBanner />
         <Outlet />
       </main>
