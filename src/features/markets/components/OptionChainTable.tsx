@@ -273,14 +273,18 @@ export function OptionChainTable({
     }
   }, [chain.symbol, chain.expiry]);
 
+  // Defensive: strikes can come back undefined from a partial response;
+  // hoist a stable local so every downstream `.map` works on [] in that case.
+  const strikes = Array.isArray(chain?.strikes) ? chain.strikes : [];
+
   // Pre-compute max OI values for relative bar scaling
   const maxCeOi = Math.max(
     1,
-    ...chain.strikes.map(s => s.ce?.oi ?? 0).filter((v): v is number => v > 0),
+    ...strikes.map(s => s.ce?.oi ?? 0).filter((v): v is number => v > 0),
   );
   const maxPeOi = Math.max(
     1,
-    ...chain.strikes.map(s => s.pe?.oi ?? 0).filter((v): v is number => v > 0),
+    ...strikes.map(s => s.pe?.oi ?? 0).filter((v): v is number => v > 0),
   );
 
   return (
@@ -346,7 +350,7 @@ export function OptionChainTable({
 
         {/* ── Body ───────────────────────────────────────────────────── */}
         <TableBody>
-          {chain.strikes.map((strike) => (
+          {strikes.map((strike) => (
             <StrikeRow
               key={strike.strike}
               strike={strike}
