@@ -50,7 +50,7 @@
     "cap:sync": "cap sync",
     "cap:open:android": "cap open android",
     "mobile:build": "npm run build && cap sync android",
-    "mobile:build:markets": "VITE_USE_DOMAIN_MANIFESTS=true VITE_DOMAIN_ONLY=markets VITE_MARKETS_WORKER_URL=http://127.0.0.1:8001 vite build && cap sync android",
+    "mobile:build:markets": "bash scripts/mobile-build-markets.sh",
     "dev:tunnel:check": "bash scripts/dev-tunnel-check.sh",
     "storybook": "storybook dev -p 6006",
     "build-storybook": "storybook build",
