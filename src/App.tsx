@@ -39,10 +39,11 @@ const lazyWithRetry = <T extends { default: ComponentType<unknown> }>(
     )
   );
 
-// Sthira mobile shell routes (PR 2 — onboarding flow)
+// Sthira mobile shell routes (PR 2 — onboarding flow, PR 3 — home guard)
 const SthiraSplashRoute = lazy(() => import("./features/markets/sthira/SthiraSplashRoute"));
 const SthiraOnboardingRoute = lazy(() => import("./features/markets/sthira/SthiraOnboardingRoute"));
 const SthiraBrokerRoute = lazy(() => import("./features/markets/sthira/SthiraBrokerRoute"));
+import { SthiraMobileGuard } from "./features/markets/sthira/SthiraMobileGuard";
 
 const DashboardRouter = lazy(() =>
   import("./components/dashboard/DashboardRouter").then((module) => ({ default: module.DashboardRouter }))
@@ -1059,7 +1060,7 @@ const App = () => (
             <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSignals /></ProtectedRoute>} />
             <Route path="/dashboard/markets/retail" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRetail /></ProtectedRoute>}>
               <Route index             element={<Navigate to="home" replace />} />
-              <Route path="home"       element={<RetailHomeTab />} />
+              <Route path="home"       element={<SthiraMobileGuard fallback={<RetailHomeTab />} />} />
               <Route path="portfolio"  element={<RetailPortfolioTab />} />
               <Route path="signals"    element={<RetailSignalsTab />} />
               <Route path="goals"      element={<RetailGoalsTab />} />
