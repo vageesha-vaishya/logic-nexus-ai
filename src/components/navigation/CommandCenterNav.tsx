@@ -147,18 +147,27 @@ const GROUP_THEME: Record<string, { heading: string; trigger: string; item: stri
   },
 };
 
-const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> = {
-  '/dashboard': () => import('@/pages/dashboard/Dashboards'),
-  '/dashboard/leads/pipeline': () => import('@/pages/dashboard/LeadsPipeline'),
-  '/dashboard/opportunities/pipeline': () => import('@/pages/dashboard/OpportunitiesPipeline'),
-  '/dashboard/accounts/pipeline': () => import('@/pages/dashboard/AccountsPipeline'),
-  '/dashboard/contacts/pipeline': () => import('@/pages/dashboard/ContactsPipeline'),
-  '/dashboard/quotes/pipeline': () => import('@/pages/dashboard/QuotesPipeline'),
-  '/dashboard/bookings': () => import('@/pages/dashboard/Bookings'),
-  '/dashboard/shipments/pipeline': () => import('@/pages/dashboard/ShipmentsPipeline'),
-  '/dashboard/uim': () => import('@/pages/dashboard/UimShell'),
-  '/dashboard/settings': () => import('@/pages/dashboard/Settings'),
-};
+// Domain-only builds (VITE_DOMAIN_ONLY=markets, etc.) never reach these
+// routes — they aren't in the Markets manifest. Gating the prefetcher
+// map on the env literal lets Vite's define-replacement substitute the
+// string at build time; the ternary then constant-folds to `{}` and
+// Rollup drops the dynamic imports, pruning ~500 kB of orphan chunks
+// from the APK. The unified web build keeps the full prefetch behaviour.
+const ROUTE_PREFETCHERS: Record<string, () => Promise<unknown>> =
+  import.meta.env.VITE_DOMAIN_ONLY
+    ? {}
+    : {
+        '/dashboard': () => import('@/pages/dashboard/Dashboards'),
+        '/dashboard/leads/pipeline': () => import('@/pages/dashboard/LeadsPipeline'),
+        '/dashboard/opportunities/pipeline': () => import('@/pages/dashboard/OpportunitiesPipeline'),
+        '/dashboard/accounts/pipeline': () => import('@/pages/dashboard/AccountsPipeline'),
+        '/dashboard/contacts/pipeline': () => import('@/pages/dashboard/ContactsPipeline'),
+        '/dashboard/quotes/pipeline': () => import('@/pages/dashboard/QuotesPipeline'),
+        '/dashboard/bookings': () => import('@/pages/dashboard/Bookings'),
+        '/dashboard/shipments/pipeline': () => import('@/pages/dashboard/ShipmentsPipeline'),
+        '/dashboard/uim': () => import('@/pages/dashboard/UimShell'),
+        '/dashboard/settings': () => import('@/pages/dashboard/Settings'),
+      };
 
 const IDLE_PREFETCH_ROUTES = [
   '/dashboard',

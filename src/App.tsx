@@ -46,21 +46,13 @@ const SthiraBrokerRoute = lazy(() => import("./features/markets/sthira/SthiraBro
 import { SthiraMobileGuard } from "./features/markets/sthira/SthiraMobileGuard";
 
 // Path A Phase 2.2 — manifest-driven route builder. Gated by
-// VITE_USE_DOMAIN_MANIFESTS so production rolls out behind a flag.
-// Phase 2.3 — VITE_DOMAIN_ONLY (e.g. "markets") makes this a single-
-// domain build: the hand-declared blocks for other domains are skipped
-// entirely, and a catch-all renders the friendly Not-Available screen.
+// VITE_USE_DOMAIN_MANIFESTS so the unified web build can opt into the
+// manifest-driven Markets routes without forcing them on yet. The
+// single-domain build (VITE_DOMAIN_ONLY=markets) uses MarketsApp.tsx,
+// not this file, so the IS_DOMAIN_ONLY_BUILD branch that used to live
+// here is gone — kept only the flag-gated manifest splice.
 import { marketsManifest } from "./features/markets/manifest";
-import {
-  buildAllDomainRoutes,
-  buildDomainRoutes,
-  DOMAIN_ONLY,
-  IS_DOMAIN_ONLY_BUILD,
-  USE_DOMAIN_MANIFESTS,
-  filterManifestsForBuild,
-} from "./platform/domains/buildDomainRoutes";
-import { DOMAIN_MANIFESTS } from "./platform/domains/registry";
-import DomainOnlyNotFound from "./platform/domains/DomainOnlyNotFound";
+import { buildDomainRoutes, USE_DOMAIN_MANIFESTS } from "./platform/domains/buildDomainRoutes";
 
 const DashboardRouter = lazy(() =>
   import("./components/dashboard/DashboardRouter").then((module) => ({ default: module.DashboardRouter }))
@@ -348,25 +340,6 @@ const App = () => (
                         <PipelineProvider>
                         <Sonner />
                         <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
-                        {IS_DOMAIN_ONLY_BUILD ? (
-                        <Routes>
-            {/* Domain-only build (Path A Phase 2.3) — VITE_DOMAIN_ONLY is
-                set, so we mount only:
-                  - The common routes (landing, auth, oauth, setup, unauthorized)
-                  - The Markets manifest's mobile-eligible routes
-                  - A catch-all that renders DomainOnlyNotFound for every
-                    other URL so a stray link from a deep-linked email,
-                    tenant nav cache, etc. lands somewhere friendly.
-                Hand-declared blocks for other domains never render. */}
-            <Route path="/" element={<Landing />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/oauth/callback" element={<OAuthCallback />} />
-            <Route path="/setup-admin" element={<SetupAdmin />} />
-            <Route path="/unauthorized" element={<Unauthorized />} />
-            {buildAllDomainRoutes(filterManifestsForBuild(DOMAIN_MANIFESTS), { mobile: true })}
-            <Route path="*" element={<DomainOnlyNotFound />} />
-                        </Routes>
-                        ) : (
                         <Routes>
             <Route path="/" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
@@ -1158,7 +1131,6 @@ const App = () => (
             
             <Route path="*" element={<NotFound />} />
                         </Routes>
-                        )}
                       </Suspense>
                       </PipelineProvider>
                     </LeadsViewStateProvider>

@@ -40,14 +40,26 @@ describe("DOMAIN_MANIFESTS registry", () => {
 
 describe("visibleManifests", () => {
   it("hides manifests whose requiredPermissions the user lacks", () => {
-    const visible = visibleManifests(DOMAIN_MANIFESTS, new Set());
-    // Markets requires "markets.view" — should be hidden when user has nothing.
+    // Inject a permission requirement so we test the gate itself, not
+    // any specific manifest's policy. Markets no longer declares
+    // requiredPermissions — domain assignment is the only check in
+    // production (Path A Phase 2.4 fix).
+    const gated = DOMAIN_MANIFESTS.map((m) =>
+      m.code === "MARKETS" ? { ...m, requiredPermissions: ["markets.view"] } : m,
+    );
+    const visible = visibleManifests(gated, new Set());
     expect(visible.find((m) => m.code === "MARKETS")).toBeUndefined();
   });
 
   it("shows manifests whose requirements the user has", () => {
+    // Inject the same gate; user holds the matching permission, so
+    // Markets should now be visible. AMRO/CRM have no requirements
+    // declared in the real manifests so they always show.
+    const gated = DOMAIN_MANIFESTS.map((m) =>
+      m.code === "MARKETS" ? { ...m, requiredPermissions: ["markets.view"] } : m,
+    );
     const visible = visibleManifests(
-      DOMAIN_MANIFESTS,
+      gated,
       new Set(["markets.view", "amro.view", "crm.view"]),
     );
     expect(visible.find((m) => m.code === "MARKETS")).toBeDefined();
