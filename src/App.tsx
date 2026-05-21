@@ -45,6 +45,11 @@ const SthiraOnboardingRoute = lazy(() => import("./features/markets/sthira/Sthir
 const SthiraBrokerRoute = lazy(() => import("./features/markets/sthira/SthiraBrokerRoute"));
 import { SthiraMobileGuard } from "./features/markets/sthira/SthiraMobileGuard";
 
+// Path A Phase 2.2 — manifest-driven route builder. Gated by
+// VITE_USE_DOMAIN_MANIFESTS so production rolls out behind a flag.
+import { marketsManifest } from "./features/markets/manifest";
+import { buildDomainRoutes, USE_DOMAIN_MANIFESTS } from "./platform/domains/buildDomainRoutes";
+
 const DashboardRouter = lazy(() =>
   import("./components/dashboard/DashboardRouter").then((module) => ({ default: module.DashboardRouter }))
 );
@@ -338,6 +343,16 @@ const App = () => (
             <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/setup-admin" element={<SetupAdmin />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
+
+            {/* Path A Phase 2.2 — manifest-driven routes for the Markets
+                domain. Flag-gated for safe rollout; when the flag is ON
+                these routes mount BEFORE the hand-declared Markets routes
+                below, so they win for matching paths. When the flag is OFF
+                (default), nothing renders here and the hand-declared
+                section continues to serve everything. Once the manifest
+                covers every Markets route, the hand-declared section can
+                be deleted and the flag retired. */}
+            {USE_DOMAIN_MANIFESTS && buildDomainRoutes(marketsManifest)}
 
             {/* Sthira mobile onboarding flow (PR 2). Currently opt-in by URL —
                 PR 3 will add a router guard that redirects mobile users from
