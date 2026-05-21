@@ -1,7 +1,7 @@
 import type { CapacitorConfig } from "@capacitor/cli";
 
 /**
- * Capacitor configuration for the Logic Nexus mobile shell (Addendum T24).
+ * Capacitor configuration for the Sthira mobile shell.
  *
  * Phase 1 = Android only. iOS lands in Phase 1.5 — `npx cap add ios` from
  * macOS will create the platform directory without touching this file.
@@ -36,10 +36,23 @@ const config: CapacitorConfig = {
       // FCM presentation options for foreground notifications.
       presentationOptions: ["badge", "sound", "alert"],
     },
+    SplashScreen: {
+      // Sthira splash — navy background, copper wordmark.
+      // See docs/plans/2026-05-20-sthira-mobile-onboarding-and-markets-ux-design.md
+      // PR 1 ships the Capacitor default splash drawable + brand background
+      // colour; PR 1.1 replaces the drawable with public/sthira-splash.svg
+      // rendered to density PNGs.
+      launchShowDuration:        1500,
+      launchAutoHide:            false, // hidden programmatically after session + tenant resolve
+      backgroundColor:           "#0F1A2E",
+      androidSplashResourceName: "splash",
+      androidScaleType:          "CENTER_CROP",
+      showSpinner:               false,
+      splashFullScreen:          true,
+      splashImmersive:           true,
+    },
   },
 
-  // Hide the splash screen as soon as React mounts — no splash plugin
-  // configured today, but if we add one later this is where to tune it.
   android: {
     // Allow our own dev server during local cap-live-reload sessions.
     allowMixedContent: false,

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Sthira splash wordmark (stub). Replace with commissioned logo for v1.1. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 1200" role="img" aria-label="Sthira — Steady Wealth">
+  <rect width="1200" height="1200" fill="#0F1A2E"/>
+  <g font-family="Source Serif Pro, Georgia, serif" text-anchor="middle">
+    <text x="600" y="600" font-size="180" font-weight="600" fill="#B07645">Sthira</text>
+    <text x="600" y="680" font-size="36" letter-spacing="14" fill="#F7F3EB" opacity="0.7">STEADY WEALTH</text>
+  </g>
+</svg>

@@ -16,8 +16,21 @@ export default {
     extend: {
       fontFamily: {
         outlook: ["Calibri", "Segoe UI", "Arial", "sans-serif"],
+        // Sthira mobile app brand — see docs/plans/2026-05-20-sthira-…-design.md
+        sthiraSerif: ["'Source Serif Pro'", "Georgia", "serif"],
+        sthiraSans:  ["Inter", "system-ui", "sans-serif"],
       },
       colors: {
+        // Sthira — Calm Wealth palette (PR 1)
+        sthira: {
+          navy:       "hsl(var(--sthira-navy))",
+          cream:      "hsl(var(--sthira-cream))",
+          copper:     "hsl(var(--sthira-copper))",
+          sage:       "hsl(var(--sthira-sage))",
+          terracotta: "hsl(var(--sthira-terracotta))",
+          ink:        "hsl(var(--sthira-ink))",
+          fog:        "hsl(var(--sthira-fog))",
+        },
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",
         ring: "hsl(var(--ring))",

@@ -2,6 +2,15 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
+// Sthira mobile-brand fonts (lazy-loaded via @fontsource subsets).
+// Source Serif Pro = headlines + tabular numerals; Inter = body/UI.
+import "@fontsource/source-serif-pro/400.css";
+import "@fontsource/source-serif-pro/600.css";
+import "@fontsource/source-serif-pro/400-italic.css";
+import "@fontsource/inter/400.css";
+import "@fontsource/inter/500.css";
+import "@fontsource/inter/600.css";
+
 // Apply dark mode before first render to prevent flash
 if (typeof window !== "undefined") {
   const storedDark = localStorage.getItem("lnai_dark_mode");
