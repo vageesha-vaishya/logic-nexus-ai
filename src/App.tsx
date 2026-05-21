@@ -39,6 +39,11 @@ const lazyWithRetry = <T extends { default: ComponentType<unknown> }>(
     )
   );
 
+// Sthira mobile shell routes (PR 2 — onboarding flow)
+const SthiraSplashRoute = lazy(() => import("./features/markets/sthira/SthiraSplashRoute"));
+const SthiraOnboardingRoute = lazy(() => import("./features/markets/sthira/SthiraOnboardingRoute"));
+const SthiraBrokerRoute = lazy(() => import("./features/markets/sthira/SthiraBrokerRoute"));
+
 const DashboardRouter = lazy(() =>
   import("./components/dashboard/DashboardRouter").then((module) => ({ default: module.DashboardRouter }))
 );
@@ -332,6 +337,28 @@ const App = () => (
             <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/setup-admin" element={<SetupAdmin />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
+
+            {/* Sthira mobile onboarding flow (PR 2). Currently opt-in by URL —
+                PR 3 will add a router guard that redirects mobile users from
+                /dashboard/markets/retail/home to /sthira/splash if onboarding
+                steps remain. */}
+            <Route path="/sthira/splash"     element={<SthiraSplashRoute />} />
+            <Route
+              path="/sthira/onboarding"
+              element={
+                <ProtectedRoute>
+                  <SthiraOnboardingRoute />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/sthira/broker"
+              element={
+                <ProtectedRoute>
+                  <SthiraBrokerRoute />
+                </ProtectedRoute>
+              }
+            />
             <Route 
               path="/dashboard" 
               element={
