@@ -15,6 +15,7 @@
  * Per design: brand copy comes from `./copy.ts` so a single edit retunes
  * voice everywhere.
  */
+import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { formatDistanceToNow } from "date-fns";
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { STHIRA_COPY } from "./copy";
 import { usePullToRefresh } from "./usePullToRefresh";
 import { useTierValuations } from "./useTierValuations";
+import { SthiraTradeSheet } from "./SthiraTradeSheet";
 
 function formatINR(value: number | null | undefined): string {
   const n = value ?? 0;
@@ -50,6 +52,10 @@ export default function HomeMobilePage() {
   const triggerSync = useTriggerBrokerSync();
   const { valuations, refetch: refetchValuations } = useTierValuations();
   const qc = useQueryClient();
+
+  // Trade FAB shows when at least one broker is can_trade=true.
+  const [tradeOpen, setTradeOpen] = useState(false);
+  const canTradeBroker = (connections.data ?? []).find((c) => c.status === "active" && c.can_trade);
 
   const onRefresh = async () => {
     await Promise.all([
@@ -83,7 +89,11 @@ export default function HomeMobilePage() {
     .at(-1);
 
   return (
-    <MobileShell activeTab="home">
+    <MobileShell
+      activeTab="home"
+      showTradeFab={Boolean(canTradeBroker)}
+      onTradePress={() => setTradeOpen(true)}
+    >
       <div
         {...ptr.containerProps}
         className="px-5 pt-6 space-y-6 select-none"
@@ -274,6 +284,7 @@ export default function HomeMobilePage() {
           </div>
         )}
       </div>
+      <SthiraTradeSheet open={tradeOpen} onClose={() => setTradeOpen(false)} />
     </MobileShell>
   );
 }
