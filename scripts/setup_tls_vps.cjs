@@ -150,7 +150,25 @@ fi
 
 rm -f /etc/nginx/sites-enabled/default
 nginx -t
-systemctl reload nginx || systemctl start nginx
+
+# Force a clean start. If something else is on :80 (Coolify/Traefik on
+# this VPS is the usual suspect), surface what + which process so the
+# Jenkins log shows the actual blocker instead of a generic exit code.
+echo "=== Port 80/443 listeners before nginx start ==="
+ss -tlnp 'sport = :80'  2>&1 || true
+ss -tlnp 'sport = :443' 2>&1 || true
+
+systemctl daemon-reload
+systemctl enable nginx >/dev/null 2>&1 || true
+if ! systemctl restart nginx; then
+  echo "=== nginx.service status ==="
+  systemctl status nginx.service --no-pager -l || true
+  echo "=== nginx.service journal (last 50 lines) ==="
+  journalctl -xeu nginx.service --no-pager -n 50 || true
+  echo "=== Port 80 listeners ==="
+  ss -tlnp 'sport = :80' || true
+  exit 1
+fi
 
 # 4. Issue / renew cert. --nginx plugin handles the http-01 challenge via
 #    the running nginx (we already opened :80). --keep-until-expiring
