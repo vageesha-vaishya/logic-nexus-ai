@@ -12,6 +12,7 @@ export const financeManifest: DomainManifest = {
   routes: [],
   defaultAssignmentPolicy: "auto", // Finance is platform-baseline.
   requiredPermissions: ["finance.view"],
+  seedMigration: "20260522142256_phase1_seed_missing_domains.sql",
 };
 
 export default financeManifest;

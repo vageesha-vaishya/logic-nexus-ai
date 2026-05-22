@@ -182,18 +182,21 @@ export function CommandCenterNav() {
   const location = useLocation();
   const navigate = useNavigate();
   const [searchQuery, setSearchQuery] = useState('');
-  const { availableDomains, isPlatformAdmin } = useDomain();
+  const { availableDomains } = useDomain();
   const { hasRole, hasPermission, isPlatformAdmin: isAuthPlatformAdmin } = useAuth();
   const { enabled: amroRbacFixEnabled } = useAppFeatureFlag(FEATURE_FLAGS.AMRO_RBAC_FIX_ENABLED, true);
-  const hasAmroDomain = isPlatformAdmin
-    || isAuthPlatformAdmin()
-    || hasRole('platform_admin')
-    || availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO');
-
-  const hasMarketsDomain = isPlatformAdmin
-    || isAuthPlatformAdmin()
-    || hasRole('platform_admin')
-    || availableDomains.some((domain) => String(domain.code || '').trim().toUpperCase() === 'MARKETS');
+  // Phase 1 (2026-05-22): platform-admin short-circuits removed.
+  // Per docs/plans/2026-05-20-multi-domain-platform-sequence-design.md §B.3,
+  // production behaviour now matches paying-customer behaviour — nav
+  // visibility is driven solely by tenant_domain_assignments. Verified safe:
+  // every active tenant on prod has AMRO + MARKETS assignments via the
+  // 2026-04-11 (AMRO) and 2026-05-20 (MARKETS) seed-and-assign migrations.
+  const hasAmroDomain = availableDomains.some(
+    (domain) => String(domain.code || '').trim().toUpperCase() === 'AMRO',
+  );
+  const hasMarketsDomain = availableDomains.some(
+    (domain) => String(domain.code || '').trim().toUpperCase() === 'MARKETS',
+  );
   const prefetchedRoutes = useRef(new Set<string>());
   const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>(() => {
     const getStoredExpandedItems = () => {

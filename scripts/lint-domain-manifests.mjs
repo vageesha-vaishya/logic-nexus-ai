@@ -92,23 +92,22 @@ for (const { name, manifestPath } of manifestPaths) {
     seenCodes.add(code);
   }
 
-  // seedMigration must exist on disk if declared. Phase 0 warns when
-  // missing; Phase 1 promotes this to a hard failure once every domain
-  // has a real seed (today CRM / FINANCE / COMMUNICATIONS / COMPLIANCE /
-  // QUOTATION ship without one).
+  // seedMigration is required as of Phase 1 (2026-05-22). Every manifest
+  // declares the migration that creates its platform_domains row; CI
+  // fails if the file is missing on disk or the field is absent.
   const seedMatch = src.match(/seedMigration\s*:\s*["']([^"']+)["']/);
-  if (seedMatch) {
+  if (!seedMatch) {
+    fail(
+      `Manifest ${name}/manifest.ts declares no seedMigration. ` +
+        `Add a seedMigration pointing at the .sql file that seeds this domain's row in platform_domains.`,
+    );
+  } else {
     const expectedFile = join(MIGRATIONS_DIR, seedMatch[1]);
     if (!existsSync(expectedFile)) {
       fail(
         `Manifest ${name}/manifest.ts references missing seedMigration: ${seedMatch[1]}.`,
       );
     }
-  } else {
-    warn(
-      `Manifest ${name}/manifest.ts declares no seedMigration. ` +
-        `Phase 1 will require one — track in docs/plans/2026-05-20-multi-domain-platform-sequence-design.md.`,
-    );
   }
 }
 
