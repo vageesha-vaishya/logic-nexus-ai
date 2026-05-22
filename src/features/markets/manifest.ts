@@ -119,7 +119,12 @@ export const marketsManifest: DomainManifest = {
   // is the only check. Adding requiredPermissions here would be more
   // restrictive than the existing behaviour and break tenant_admins
   // whose tenant has the MARKETS domain but no explicit markets.view grant.
-  seedMigration: "20260520150000_seed_markets_domain_and_assignments.sql",
+  // Original seed (20260520150000_seed_markets_domain_and_assignments.sql)
+  // was archived during the 2026-05-21 drift reconciliation; the live
+  // assignment migration below is the authoritative source today. The
+  // platform_domains row for MARKETS was inserted by an earlier migration
+  // (id d127c2d9-…) that is no longer a single canonical file.
+  seedMigration: "20260520130939_assign_markets_domain_to_active_tenants.sql",
   services: ["markets-worker"],
 };
 

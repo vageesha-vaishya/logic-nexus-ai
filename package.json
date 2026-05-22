@@ -45,7 +45,7 @@
     "phase5:gate:summary": "node scripts/generate-uim-phase5-gate-summary.mjs",
     "test:playwright:quotation": "playwright test tests/e2e/quotation/quotation-comprehensive.spec.ts",
     "test:playwright:quotation:headed": "playwright test tests/e2e/quotation/quotation-comprehensive.spec.ts --headed",
-    "ci:lint": "eslint src --ext .ts,.tsx,.mdx",
+    "ci:lint": "eslint src --ext .ts,.tsx,.mdx && npm run lint:domain-manifests",
     "preview": "vite preview",
     "cap:sync": "cap sync",
     "cap:open:android": "cap open android",

@@ -92,7 +92,10 @@ for (const { name, manifestPath } of manifestPaths) {
     seenCodes.add(code);
   }
 
-  // seedMigration must exist on disk if declared.
+  // seedMigration must exist on disk if declared. Phase 0 warns when
+  // missing; Phase 1 promotes this to a hard failure once every domain
+  // has a real seed (today CRM / FINANCE / COMMUNICATIONS / COMPLIANCE /
+  // QUOTATION ship without one).
   const seedMatch = src.match(/seedMigration\s*:\s*["']([^"']+)["']/);
   if (seedMatch) {
     const expectedFile = join(MIGRATIONS_DIR, seedMatch[1]);
@@ -101,15 +104,21 @@ for (const { name, manifestPath } of manifestPaths) {
         `Manifest ${name}/manifest.ts references missing seedMigration: ${seedMatch[1]}.`,
       );
     }
+  } else {
+    warn(
+      `Manifest ${name}/manifest.ts declares no seedMigration. ` +
+        `Phase 1 will require one — track in docs/plans/2026-05-20-multi-domain-platform-sequence-design.md.`,
+    );
   }
 }
 
 // 4. Every manifest must be wired into the registry.
 const registryPath = join(REPO_ROOT, "src", "platform", "domains", "registry.ts");
+let registrySrc = "";
 if (!existsSync(registryPath)) {
   fail(`Domain registry missing at ${registryPath}.`);
 } else {
-  const registrySrc = await import("node:fs").then((m) =>
+  registrySrc = await import("node:fs").then((m) =>
     m.promises.readFile(registryPath, "utf8"),
   );
   for (const { name } of manifestPaths) {
@@ -120,6 +129,34 @@ if (!existsSync(registryPath)) {
       fail(
         `Domain "${name}" has manifest.ts but is not imported in ${registryPath} ` +
           `(expected: ${expectedImport}).`,
+      );
+    }
+  }
+}
+
+// 5. Every domain code referenced by sidebar nav must have a manifest.
+//    The nav guards (`hasAmroDomain`, `hasMarketsDomain`, …) call out
+//    domain codes by string literal. If a guard ships for a code with no
+//    manifest, the nav row will only ever render under the
+//    platform-admin short-circuit — exactly the bug Phase 0 is closing.
+const navPath = join(REPO_ROOT, "src", "components", "navigation", "CommandCenterNav.tsx");
+if (existsSync(navPath)) {
+  const navSrc = await import("node:fs").then((m) =>
+    m.promises.readFile(navPath, "utf8"),
+  );
+  // Capture: domain.code || '').trim().toUpperCase() === 'FOO'
+  const codeRefs = new Set();
+  const re = /toUpperCase\(\)\s*===\s*['"]([A-Z_]+)['"]/g;
+  let match;
+  while ((match = re.exec(navSrc)) !== null) {
+    codeRefs.add(match[1]);
+  }
+  for (const code of codeRefs) {
+    if (!seenCodes.has(code)) {
+      fail(
+        `Sidebar nav (${navPath}) references domain code "${code}" but no ` +
+          `manifest declares it. Either add a manifest with code:"${code}", ` +
+          `or remove the nav gate.`,
       );
     }
   }
