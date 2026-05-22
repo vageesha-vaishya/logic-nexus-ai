@@ -62,6 +62,27 @@ pipeline {
                 sh 'ls -la'
             }
         }
+
+        stage('Setup Node') {
+            steps {
+                script {
+                    env.NODE_VERSION = '22.22.1'
+                    def nodeDist = 'linux-x64'
+                    def nodeRoot = "${env.WORKSPACE}/.jenkins/node-v${env.NODE_VERSION}-${nodeDist}"
+                    sh """
+set -euo pipefail
+mkdir -p "${env.WORKSPACE}/.jenkins"
+if [ ! -x "${nodeRoot}/bin/node" ]; then
+  curl -fsSL "https://nodejs.org/dist/v${env.NODE_VERSION}/node-v${env.NODE_VERSION}-${nodeDist}.tar.xz" -o "${env.WORKSPACE}/.jenkins/node.tar.xz"
+  tar -xJf "${env.WORKSPACE}/.jenkins/node.tar.xz" -C "${env.WORKSPACE}/.jenkins"
+fi
+"${nodeRoot}/bin/node" -v
+"${nodeRoot}/bin/npm" -v
+"""
+                    env.PATH = "${nodeRoot}/bin:${env.PATH}"
+                }
+            }
+        }
         
         stage('Install Dependencies') {
             steps {
