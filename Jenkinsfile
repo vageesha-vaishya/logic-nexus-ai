@@ -431,6 +431,23 @@ fi
                 }
             }
         }
+        stage('Setup TLS (markets.sosservices.online)') {
+            steps {
+                script {
+                    echo "Configuring host nginx + Let's Encrypt cert..."
+                    sh 'npm install --no-save ssh2'
+                    timeout(time: 10, unit: 'MINUTES') {
+                        withEnv([
+                            "TLS_DOMAIN=markets.sosservices.online",
+                            "TLS_EMAIL=bahuguna.vimal@gmail.com"
+                        ]) {
+                            sh 'node scripts/setup_tls_vps.cjs'
+                        }
+                    }
+                }
+            }
+        }
+
         stage('Deploy Markets Worker to VPS') {
             steps {
                 script {

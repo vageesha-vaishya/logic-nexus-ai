@@ -34,6 +34,29 @@ class Settings(BaseSettings):
     environment:     str = "production"
     log_level:       str = "INFO"
 
+    # ── CORS ──────────────────────────────────────────────────────────────
+    # Comma-separated list of allowed origins. Wildcard "*" is honoured.
+    # Defaults cover the Sthira Capacitor Android shell (https://localhost,
+    # capacitor://localhost) plus the VPS-hosted web app — override via env
+    # CORS_ALLOWED_ORIGINS for staging / additional domains.
+    cors_allowed_origins: str = (
+        "https://localhost,"
+        "capacitor://localhost,"
+        "http://localhost:5173,"
+        "http://localhost:8099,"
+        "http://72.61.249.111:8099,"
+        "https://markets.sosservices.online,"
+        "https://sosservices.online,"
+        "https://www.sosservices.online"
+    )
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        raw = (self.cors_allowed_origins or "").strip()
+        if not raw or raw == "*":
+            return ["*"]
+        return [o.strip() for o in raw.split(",") if o.strip()]
+
     # ── MCP server ────────────────────────────────────────────────────────
     # Broker credential encryption key (Fernet).
     # Generate: python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"

@@ -79,10 +79,16 @@ def create_app() -> FastAPI:
         lifespan=lifespan,
     )
 
+    # CORS — origins driven by settings so prod can tighten without a code
+    # change. Capacitor (Sthira Android) uses https://localhost +
+    # capacitor://localhost; the VPS web shell is the third leg. Methods
+    # include OPTIONS so FastAPI surfaces preflights explicitly in logs.
+    cors_origins = s.cors_origin_list
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],  # Locked down at Fly.io / Supabase level
-        allow_methods=["GET", "POST", "PATCH", "DELETE"],
+        allow_origins=cors_origins,
+        allow_credentials=cors_origins != ["*"],
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
         allow_headers=["*"],
     )
 
