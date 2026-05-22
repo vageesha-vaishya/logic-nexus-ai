@@ -1,3 +1,4 @@
+import { HarvestOpportunitiesCard } from "../dashboard/HarvestOpportunitiesCard";
 import { LtcgTrackerCard } from "../dashboard/LtcgTrackerCard";
 import { PortfolioTierView } from "../dashboard/PortfolioTierView";
 import { WhyButton } from "../glossary";
@@ -23,6 +24,7 @@ export default function RetailPortfolioPage() {
         </p>
       </header>
       <LtcgTrackerCard />
+      <HarvestOpportunitiesCard />
       <PortfolioTierView />
     </div>
   );

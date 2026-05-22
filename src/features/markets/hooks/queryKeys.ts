@@ -161,6 +161,7 @@ export const marketsKeys = {
     riskScore:        () => [...marketsKeys.retail.all(), "risk-score"] as const,
     rebalance:        () => [...marketsKeys.retail.all(), "rebalance", "pending"] as const,
     ltcg:             (fy?: string) => [...marketsKeys.retail.all(), "ltcg", fy ?? "current"] as const,
+    harvest:          (fy?: string) => [...marketsKeys.retail.all(), "harvest", fy ?? "current"] as const,
     stressTest:       () => [...marketsKeys.retail.all(), "stress-test"] as const,
     holdingsNews:     () => [...marketsKeys.retail.all(), "holdings-news"] as const,
     appStatusBanner:  () => [...marketsKeys.retail.all(), "app-status-banner"] as const,
