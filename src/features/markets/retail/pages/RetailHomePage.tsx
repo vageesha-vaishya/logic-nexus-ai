@@ -3,6 +3,7 @@ import { useMemo } from "react";
 import { usePortfolioPnL } from "../../hooks/usePortfolioPnL";
 import { BehavioralAlertBanner } from "../behavioral/BehavioralAlertBanner";
 import { useDrawdownState } from "../behavioral/useDrawdownAlerts";
+import { DiagnosticCard } from "../dashboard/DiagnosticCard";
 import { HoldingsNewsCarousel } from "../dashboard/HoldingsNewsCarousel";
 import { RankedNewsFeed } from "../dashboard/RankedNewsFeed";
 import { RebalanceCard } from "../dashboard/RebalanceCard";
@@ -14,8 +15,8 @@ import { HomeTour, useFirstHomeTour } from "../tour";
 
 /**
  * Home tab — overview of the user's portfolio + non-blocking drawdown banner.
- * Subsequent Addendum tasks (T19 Diagnostic) append here. T17 Risk Score
- * (with T18 Stress Test reached from it) and T20 Holdings News are live.
+ * T17 Risk Score (with T18 Stress Test reached from it), T19 Diagnostic,
+ * and T20 Holdings News are live.
  *
  * data-tour-id anchors here are referenced by the first-Home coach-marked
  * tour (tour/HomeTour.tsx). Wrapping at this level keeps the anchors stable
@@ -36,6 +37,7 @@ export default function RetailHomePage() {
       <div data-tour-id="dashboard">
         <RetailDashboard profile={profile} />
       </div>
+      <DiagnosticCard />
       <RebalanceCard />
       <div data-tour-id="risk-score">
         <RiskScoreCard />

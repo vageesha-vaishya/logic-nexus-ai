@@ -35,7 +35,8 @@ export type LlmTaskId =
   | "markets.news_sentiment"
   | "markets.earnings_summary"
   | "markets.research_thread"
-  | "markets.strategy_explain";
+  | "markets.strategy_explain"
+  | "markets.portfolio_diagnostic";
 
 interface RoutingEntry {
   provider: LlmProvider;
@@ -46,21 +47,23 @@ interface RoutingEntry {
 // Static fallback routing — used only when no tenant config exists.
 // Modify via the platform.llm_provider_configs table to override per tenant.
 const FALLBACK_ROUTING: Record<LlmTaskId, RoutingEntry> = {
-  "markets.daily_brief":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
-  "markets.news_sentiment":  { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  256 },
-  "markets.earnings_summary":{ provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens: 1024 },
-  "markets.research_thread": { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 4096 },
-  "markets.strategy_explain":{ provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
+  "markets.daily_brief":         { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
+  "markets.news_sentiment":      { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  256 },
+  "markets.earnings_summary":    { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens: 1024 },
+  "markets.research_thread":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 4096 },
+  "markets.strategy_explain":    { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
+  "markets.portfolio_diagnostic":{ provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  800 },
 };
 
 // Max output token defaults per task. The model name comes from the tenant
 // config; we keep the budget consistent per task regardless of model.
 const MAX_OUTPUT_TOKENS: Record<LlmTaskId, number> = {
-  "markets.daily_brief":     2048,
-  "markets.news_sentiment":   256,
-  "markets.earnings_summary":1024,
-  "markets.research_thread": 4096,
-  "markets.strategy_explain":2048,
+  "markets.daily_brief":         2048,
+  "markets.news_sentiment":       256,
+  "markets.earnings_summary":    1024,
+  "markets.research_thread":     4096,
+  "markets.strategy_explain":    2048,
+  "markets.portfolio_diagnostic": 800,
 };
 
 interface PromptTemplate { version: string; system: string; user: string; }
@@ -141,6 +144,29 @@ const PROMPTS: Record<LlmTaskId, PromptTemplate> = {
       "Explain this trading strategy in plain English, then list its assumptions and failure modes. " +
       "Audience: an Indian retail investor evaluating it.",
     user: "Strategy DSL:\n${strategy_dsl}\n\nBacktest metrics JSON: ${metrics_json}",
+  },
+  "markets.portfolio_diagnostic": {
+    version: "v1-2026-05-22",
+    system:
+      "You are a calm, India-market portfolio analyst writing a daily health diagnostic for one retail user. " +
+      "Output MUST be a single JSON object — no prose before or after, no markdown fences. " +
+      "Schema:\n" +
+      "{\n" +
+      "  \"headline\": string (≤ 80 chars, plain language, no jargon),\n" +
+      "  \"findings\": string[] (1-3 items, each ≤ 140 chars, each grounded in a metric below),\n" +
+      "  \"suggested_actions\": Array<{ \"type\": \"rebalance\" | \"view_harvest\" | \"view_stress_test\" | \"view_portfolio\", \"tier\"?: \"foundation\" | \"core\" | \"satellite\", \"symbol\"?: string, \"reason\": string }>\n" +
+      "}\n" +
+      "STRICT GROUNDING RULES:\n" +
+      "1. Every finding must reference a metric value from the Metrics JSON. Do NOT invent numbers.\n" +
+      "2. Use ONLY the action types listed above — each maps to an existing screen. Never invent new types or symbols not in the holdings list.\n" +
+      "3. If all metrics are within target bands, output a positive headline with 1 affirming finding and an empty suggested_actions array.\n" +
+      "4. Never give personalized investment advice. Frame findings as observations (\"Top holding is 28%\") not directives (\"Sell ICICI\").\n" +
+      "5. Output INR amounts with ₹ prefix when relevant.",
+    user:
+      "Metrics JSON: ${metrics_json}\n\n" +
+      "Top holdings (symbol → weight %): ${top_holdings_json}\n\n" +
+      "Target tier allocations (tier → target %): ${target_allocations_json}\n\n" +
+      "Generate the diagnostic JSON now.",
   },
 };
 

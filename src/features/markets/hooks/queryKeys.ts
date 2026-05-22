@@ -165,5 +165,6 @@ export const marketsKeys = {
     stressTest:       () => [...marketsKeys.retail.all(), "stress-test"] as const,
     holdingsNews:     () => [...marketsKeys.retail.all(), "holdings-news"] as const,
     appStatusBanner:  () => [...marketsKeys.retail.all(), "app-status-banner"] as const,
+    diagnostic:       () => [...marketsKeys.retail.all(), "diagnostic"] as const,
   },
 } as const;
