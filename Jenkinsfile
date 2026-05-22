@@ -69,22 +69,26 @@ pipeline {
                     env.NODE_VERSION = '22.22.1'
                     def nodeDist = 'linux-x64'
                     def nodeRoot = "${env.WORKSPACE}/.jenkins/node-v${env.NODE_VERSION}-${nodeDist}"
+                    // Shell-scoped vars (\$NODE_TGZ / \$NODE_URL) must be backslash-escaped:
+                    // sh """ … """ uses Groovy GString interpolation, so any bare \$VAR
+                    // is resolved as a Groovy property and crashes the pipeline with
+                    // MissingPropertyException before the shell ever runs.
                     sh """
 set -euo pipefail
 mkdir -p "${env.WORKSPACE}/.jenkins"
 if [ ! -x "${nodeRoot}/bin/node" ]; then
   NODE_TGZ="${env.WORKSPACE}/.jenkins/node-v${env.NODE_VERSION}-${nodeDist}.tar.gz"
   NODE_URL="https://nodejs.org/dist/v${env.NODE_VERSION}/node-v${env.NODE_VERSION}-${nodeDist}.tar.gz"
-  rm -f "$NODE_TGZ"
+  rm -f "\$NODE_TGZ"
   if command -v curl >/dev/null 2>&1; then
-    curl -fL --retry 5 --retry-all-errors --connect-timeout 10 --max-time 300 -o "$NODE_TGZ" "$NODE_URL"
+    curl -fL --retry 5 --retry-all-errors --connect-timeout 10 --max-time 300 -o "\$NODE_TGZ" "\$NODE_URL"
   elif command -v wget >/dev/null 2>&1; then
-    wget -O "$NODE_TGZ" "$NODE_URL"
+    wget -O "\$NODE_TGZ" "\$NODE_URL"
   else
     echo "Neither curl nor wget is available on this Jenkins agent."
     exit 2
   fi
-  tar -xzf "$NODE_TGZ" -C "${env.WORKSPACE}/.jenkins"
+  tar -xzf "\$NODE_TGZ" -C "${env.WORKSPACE}/.jenkins"
 fi
 "${nodeRoot}/bin/node" -v
 "${nodeRoot}/bin/npm" -v
