@@ -1,6 +1,7 @@
 import { HarvestOpportunitiesCard } from "../dashboard/HarvestOpportunitiesCard";
 import { LtcgTrackerCard } from "../dashboard/LtcgTrackerCard";
 import { PortfolioTierView } from "../dashboard/PortfolioTierView";
+import { StressTestPreviewCard } from "../dashboard/StressTestPreviewCard";
 import { WhyButton } from "../glossary";
 
 /**
@@ -25,6 +26,7 @@ export default function RetailPortfolioPage() {
       </header>
       <LtcgTrackerCard />
       <HarvestOpportunitiesCard />
+      <StressTestPreviewCard />
       <PortfolioTierView />
     </div>
   );
