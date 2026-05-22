@@ -99,6 +99,11 @@ export default defineConfig(({ mode }) => {
   // Domain management API handler with Supabase persistence
   const domainAssignments = new Map();
   const domainConfigs = new Map();
+  // Used only as a no-auth fallback (e.g. unauthenticated browser tab probing
+  // the endpoint, or local dev with no Supabase credentials configured). The
+  // real path is the JWT-forwarded Supabase query in handleDomainApi below.
+  // Keep MARKETS in this list so the fallback is consistent with prod's
+  // platform_domains.
   const platformDomains = [
     { id: '849b380e-3603-4530-94d3-e028126e2a2c', code: 'LOGISTICS', name: 'Logistics & Supply Chain', description: 'Transportation, warehousing, and freight', is_active: true },
     { id: '123e4567-e89b-12d3-a456-426614174000', code: 'BANKING', name: 'Banking & Finance', description: 'Financial services and lending', is_active: true },
@@ -109,6 +114,7 @@ export default defineConfig(({ mode }) => {
     { id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', code: 'TRADING', name: 'Trading & Procurement', description: 'Sourcing and trade execution', is_active: true },
     { id: 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a16', code: 'REAL_ESTATE', name: 'Real Estate', description: 'Property management and sales', is_active: true },
     { id: '00eebc99-9c0b-4ef8-bb6d-6bb9bd380a17', code: 'AMRO', name: 'Aircraft Maintenance & Repair Operations', description: 'Aviation maintenance, repair, and overhaul management', is_active: true },
+    { id: 'd127c2d9-91f0-4b71-bc44-3697efec92e8', code: 'MARKETS', name: 'Multi-Asset Trading Platform', description: 'Retail investment platform, portfolios, signals', is_active: true },
   ];
 
   // Supabase client setup for domain API
@@ -154,17 +160,74 @@ export default defineConfig(({ mode }) => {
     const method = req.method;
 
     // Platform domains - GET
+    //
+    // Query the public.tenant_active_domain_assignments view scoped to the
+    // authenticated user via their JWT (RLS does the tenant filtering).
+    // Falls back to the hardcoded `platformDomains` list only when (a) no
+    // JWT was sent or (b) Supabase is unreachable / unconfigured. Previously
+    // this handler returned the hardcoded list unconditionally, which
+    // omitted MARKETS and ignored tenant context entirely — that was the
+    // root cause of "MARKETS not showing in sidebar" on web.
     if (pathname === '/api/v1/platform-domains' && method === 'GET') {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({
-        version: 'v1',
-        correlationId: 'dev',
-        data: {
-          domains: platformDomains,
-          tenantDomainCount: platformDomains.length,
-          isPlatformAdmin: false,
+      const authHeader = String(req.headers?.authorization || '').trim();
+      const anonKey = env.SUPABASE_ANON_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY || '';
+
+      const writeOk = (domains: any[]) => {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          version: 'v1',
+          correlationId: 'dev',
+          data: {
+            domains,
+            tenantDomainCount: domains.length,
+            isPlatformAdmin: false,
+          },
+        }));
+      };
+
+      if (!authHeader || !supabaseUrl || !anonKey) {
+        // Fallback path — no auth context or Supabase not configured.
+        writeOk(platformDomains);
+        return true;
+      }
+
+      const restUrl = `${supabaseUrl}/rest/v1/tenant_active_domain_assignments`
+        + `?select=platform_domains!inner(id,code,name,description,is_active,status)`;
+
+      fetch(restUrl, {
+        method: 'GET',
+        headers: {
+          'Accept':        'application/json',
+          'Authorization': authHeader,
+          'apikey':        anonKey,
         },
-      }));
+      })
+        .then(async (upstream) => {
+          if (!upstream.ok) {
+            writeOk(platformDomains);
+            return;
+          }
+          const rows = (await upstream.json()) as Array<{ platform_domains: any }>;
+          const seen = new Set<string>();
+          const domains: any[] = [];
+          for (const row of rows) {
+            const pd = row?.platform_domains;
+            if (!pd || !pd.id || seen.has(pd.id)) continue;
+            seen.add(pd.id);
+            domains.push({
+              id:          pd.id,
+              code:        pd.code,
+              name:        pd.name,
+              description: pd.description ?? null,
+              is_active:   pd.is_active !== false,
+              status:      pd.status ?? 'active',
+            });
+          }
+          writeOk(domains);
+        })
+        .catch(() => {
+          writeOk(platformDomains);
+        });
       return true;
     }
 
