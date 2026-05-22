@@ -4,6 +4,7 @@ import { DashboardTemplateLoader } from './DashboardTemplateLoader';
 import { UserRole } from '@/types/dashboardTemplates';
 import { useCRM } from '@/hooks/useCRM';
 import { logger } from '@/lib/logger';
+import { SetupCardsPanel } from '@/features/onboarding/setup-cards';
 
 // Map auth system roles to dashboard roles
 const AUTH_ROLE_TO_DASHBOARD_ROLE: Record<string, UserRole> = {
@@ -144,7 +145,11 @@ export function DashboardRouter() {
 
   return (
     <DashboardLayout>
-      <div className="flex-1 overflow-auto p-6 bg-gray-50">
+      <div className="flex-1 overflow-auto p-6 bg-gray-50 space-y-4">
+        {/* "Get set up" panel — self-hides for retail memberships, all-
+            completed tenants, and when there's nothing to show. See
+            docs/plans/2026-05-22-unified-platform-onboarding-design.md. */}
+        <SetupCardsPanel />
         <DashboardTemplateLoader userRole={userRole} userId={user?.id || ''} />
       </div>
     </DashboardLayout>

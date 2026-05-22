@@ -22,6 +22,13 @@ import { PLATFORM_ADMIN_ROLE } from "@/config/permissions";
 
 // Eager: shell pages (needed immediately)
 import Landing from "./pages/Landing";
+import RootRedirect from "./pages/RootRedirect";
+import Welcome from "./pages/Welcome";
+import SignupDomainPicker from "./pages/signup/SignupDomainPicker";
+import SignupForm from "./pages/signup/SignupForm";
+import InviteAccept from "./pages/invite/InviteAccept";
+const TeamSettings    = lazy(() => import("./pages/dashboard/TeamSettings"));
+const BillingSettings = lazy(() => import("./pages/dashboard/BillingSettings"));
 import Auth from "./pages/Auth";
 import OAuthCallback from "./pages/OAuthCallback";
 import SetupAdmin from "./pages/SetupAdmin";
@@ -341,9 +348,32 @@ const App = () => (
                         <Sonner />
                         <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
                         <Routes>
-            <Route path="/" element={<Landing />} />
+            {/* `/` routes by auth state: signed-out → /welcome, signed-in
+                → /dashboard. The old Landing page stays available at
+                /landing for the future marketing-site graduation path
+                (see docs/plans/2026-05-22-unified-platform-onboarding-design.md). */}
+            <Route path="/"        element={<RootRedirect />} />
+            <Route path="/welcome" element={<Welcome />} />
+            <Route path="/landing" element={<Landing />} />
             <Route path="/auth" element={<Auth />} />
-            <Route path="/register-organization" element={<SelfServiceOnboarding />} />
+
+            {/* Unified B2B signup (U-A4). /signup picks a domain (logistics
+                / markets-advisor); /signup/:domain is the single-form
+                wizard that submits to Supabase Auth + dispatcher (see
+                supabase/functions/provision-retail-user/index.ts). */}
+            <Route path="/signup"          element={<SignupDomainPicker />} />
+            <Route path="/signup/:domain"  element={<SignupForm />} />
+
+            {/* Legacy /register-organization (the 5-step duplicate-Starter
+                page from the 2026-05-22 screenshot). Kept as a redirect so
+                any bookmarks / email links still land somewhere useful. */}
+            <Route path="/register-organization" element={<Navigate to="/signup" replace />} />
+            <Route path="/register-organization-legacy" element={<SelfServiceOnboarding />} />
+
+            {/* Magic-link invite landing (U-B2). Handles signed-in /
+                signed-out / wrong-email / expired all in one component. */}
+            <Route path="/invite/:token" element={<InviteAccept />} />
+            <Route path="/invite"        element={<Navigate to="/welcome" replace />} />
             <Route path="/oauth/callback" element={<OAuthCallback />} />
             <Route path="/setup-admin" element={<SetupAdmin />} />
             <Route path="/unauthorized" element={<Unauthorized />} />
@@ -558,6 +588,29 @@ const App = () => (
               element={
                 <ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required">
                   <Settings />
+                </ProtectedRoute>
+              }
+            />
+            {/* Team management — any signed-in member can visit, but writes
+                (create / revoke invite) are RLS-gated to tenant_admin /
+                platform_admin. See U-B2. */}
+            <Route
+              path="/dashboard/settings/team"
+              element={
+                <ProtectedRoute>
+                  <TeamSettings />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Billing & plan — per-tenant plan picker for the active domain.
+                Trial start, plan listing, and (post-D2) Razorpay card capture
+                all live here. See U-D1. */}
+            <Route
+              path="/dashboard/settings/billing"
+              element={
+                <ProtectedRoute>
+                  <BillingSettings />
                 </ProtectedRoute>
               }
             />

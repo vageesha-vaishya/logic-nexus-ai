@@ -10,6 +10,7 @@ import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
 import { AdminScopeSwitcher } from './AdminScopeSwitcher';
 import { DomainSwitcher } from '@/components/navigation/DomainSwitcher';
+import { MembershipSwitcher } from './MembershipSwitcher';
 import { usePipeline } from '@/components/debug/pipeline/PipelineContext';
 import { PipelineDashboard } from '@/components/debug/pipeline/PipelineDashboard';
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary';
@@ -742,6 +743,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   <TooltipContent side="bottom">Open Pipeline Debugger</TooltipContent>
                 </Tooltip>
               )}
+              <MembershipSwitcher />
               <DomainSwitcher />
               <AdminScopeSwitcher />
               <ObjectMenu />
