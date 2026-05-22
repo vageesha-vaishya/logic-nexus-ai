@@ -330,26 +330,97 @@ export async function handleUimMockRequest(req: IncomingMessage, res: ServerResp
   }
 
   // Platform domains - GET
+  //
+  // Returns the domains the authenticated user's tenant is assigned to TODAY.
+  // Source of truth is public.tenant_active_domain_assignments (view added in
+  // 20260522164420_phase1_lifecycle_grace_and_past_due_sweeps), which masks
+  // expired / cancelled / past_due / inactive rows. Filtering happens via
+  // Supabase RLS keyed off the user's JWT — we forward Authorization
+  // unchanged and let Postgres enforce per-tenant access.
+  //
+  // Previous behaviour: returned a hardcoded list of 9 domains that omitted
+  // MARKETS and ignored the auth context entirely, so every caller saw the
+  // same list regardless of tenant. That's why MARKETS was missing from the
+  // sidebar on web for tenants who actually owned it.
   if (pathname === '/api/v1/platform-domains' && method === 'GET') {
-    const domains = [
-      { id: '849b380e-3603-4530-94d3-e028126e2a2c', code: 'LOGISTICS', name: 'Logistics & Supply Chain', description: 'Transportation, warehousing, and freight', is_active: true },
-      { id: '123e4567-e89b-12d3-a456-426614174000', code: 'BANKING', name: 'Banking & Finance', description: 'Financial services and lending', is_active: true },
-      { id: 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', code: 'ECOMMERCE', name: 'E-Commerce', description: 'Online retail and order management', is_active: true },
-      { id: 'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380a12', code: 'TELECOM', name: 'Telecommunications', description: 'Network services and connectivity', is_active: true },
-      { id: 'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380a13', code: 'INSURANCE', name: 'Insurance', description: 'Risk management and coverage', is_active: true },
-      { id: 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380a14', code: 'CUSTOMS', name: 'Customs & Compliance', description: 'Regulatory compliance and border clearance', is_active: true },
-      { id: 'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380a15', code: 'TRADING', name: 'Trading & Procurement', description: 'Sourcing and trade execution', is_active: true },
-      { id: 'f0eebc99-9c0b-4ef8-bb6d-6bb9bd380a16', code: 'REAL_ESTATE', name: 'Real Estate', description: 'Property management and sales', is_active: true },
-      { id: '00eebc99-9c0b-4ef8-bb6d-6bb9bd380a17', code: 'AMRO', name: 'Aircraft Maintenance & Repair Operations', description: 'Aviation maintenance, repair, and overhaul management', is_active: true },
-    ];
+    const correlationId = String(getHeader(req, 'x-correlation-id') || randomUUID());
+    const authHeader = getHeader(req, 'authorization');
+    const supabaseUrl  = String(process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL || '').replace(/\/$/, '');
+    const supabaseAnon = String(process.env.SUPABASE_ANON_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY || '').trim();
 
-    sendJson(res, 200, {
-      version: 'v1',
-      correlationId: String(getHeader(req, 'x-correlation-id') || randomUUID()),
-      data: domains,
-      tenantDomainCount: domains.length,
-    });
-    return;
+    if (!supabaseUrl || !supabaseAnon) {
+      sendJson(res, 500, {
+        version: 'v1',
+        correlationId,
+        error: 'Supabase not configured (SUPABASE_URL / SUPABASE_ANON_KEY missing)',
+      });
+      return;
+    }
+    if (!authHeader) {
+      // No JWT → no tenant context. Return an empty list rather than fabricating one.
+      sendJson(res, 200, { version: 'v1', correlationId, data: [], tenantDomainCount: 0 });
+      return;
+    }
+
+    // PostgREST query: read from the view, join platform_domains for the
+    // sidebar fields. RLS on tenant_domain_assignments scopes by tenant.
+    const restUrl = `${supabaseUrl}/rest/v1/tenant_active_domain_assignments`
+      + `?select=platform_domains!inner(id,code,name,description,is_active,status)`;
+
+    try {
+      const upstream = await fetch(restUrl, {
+        method: 'GET',
+        headers: {
+          'Accept':        'application/json',
+          'Authorization': authHeader,
+          'apikey':        supabaseAnon,
+        },
+      });
+
+      if (!upstream.ok) {
+        const body = await upstream.text();
+        sendJson(res, upstream.status, {
+          version: 'v1',
+          correlationId,
+          error: `Supabase REST failed (${upstream.status})`,
+          detail: body.slice(0, 500),
+        });
+        return;
+      }
+
+      const rows = (await upstream.json()) as Array<{ platform_domains: any }>;
+      const seen = new Set<string>();
+      const domains: any[] = [];
+      for (const row of rows) {
+        const pd = row?.platform_domains;
+        if (!pd || !pd.id || seen.has(pd.id)) continue;
+        seen.add(pd.id);
+        domains.push({
+          id:          pd.id,
+          code:        pd.code,
+          name:        pd.name,
+          description: pd.description ?? null,
+          is_active:   pd.is_active !== false,
+          status:      pd.status ?? 'active',
+        });
+      }
+
+      sendJson(res, 200, {
+        version: 'v1',
+        correlationId,
+        data: domains,
+        tenantDomainCount: domains.length,
+      });
+      return;
+    } catch (err) {
+      sendJson(res, 502, {
+        version: 'v1',
+        correlationId,
+        error: 'Upstream Supabase unreachable',
+        detail: err instanceof Error ? err.message : 'unknown',
+      });
+      return;
+    }
   }
 
   // Domain config - GET
