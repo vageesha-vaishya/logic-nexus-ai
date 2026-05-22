@@ -4,6 +4,7 @@ import { usePortfolioPnL } from "../../hooks/usePortfolioPnL";
 import { BehavioralAlertBanner } from "../behavioral/BehavioralAlertBanner";
 import { useDrawdownState } from "../behavioral/useDrawdownAlerts";
 import { HoldingsNewsCarousel } from "../dashboard/HoldingsNewsCarousel";
+import { RankedNewsFeed } from "../dashboard/RankedNewsFeed";
 import { RebalanceCard } from "../dashboard/RebalanceCard";
 import { RetailDashboard } from "../dashboard/RetailDashboard";
 import { RiskScoreCard } from "../dashboard/RiskScoreCard";
@@ -42,6 +43,7 @@ export default function RetailHomePage() {
       <div data-tour-id="news">
         <HoldingsNewsCarousel />
       </div>
+      <RankedNewsFeed />
       {coreTier && drawdown.alertTier && drawdown.alertTier !== "red" && (
         <BehavioralAlertBanner
           alertTier={drawdown.alertTier}
