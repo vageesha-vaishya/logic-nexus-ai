@@ -73,8 +73,18 @@ pipeline {
 set -euo pipefail
 mkdir -p "${env.WORKSPACE}/.jenkins"
 if [ ! -x "${nodeRoot}/bin/node" ]; then
-  curl -fsSL "https://nodejs.org/dist/v${env.NODE_VERSION}/node-v${env.NODE_VERSION}-${nodeDist}.tar.xz" -o "${env.WORKSPACE}/.jenkins/node.tar.xz"
-  tar -xJf "${env.WORKSPACE}/.jenkins/node.tar.xz" -C "${env.WORKSPACE}/.jenkins"
+  NODE_TGZ="${env.WORKSPACE}/.jenkins/node-v${env.NODE_VERSION}-${nodeDist}.tar.gz"
+  NODE_URL="https://nodejs.org/dist/v${env.NODE_VERSION}/node-v${env.NODE_VERSION}-${nodeDist}.tar.gz"
+  rm -f "$NODE_TGZ"
+  if command -v curl >/dev/null 2>&1; then
+    curl -fL --retry 5 --retry-all-errors --connect-timeout 10 --max-time 300 -o "$NODE_TGZ" "$NODE_URL"
+  elif command -v wget >/dev/null 2>&1; then
+    wget -O "$NODE_TGZ" "$NODE_URL"
+  else
+    echo "Neither curl nor wget is available on this Jenkins agent."
+    exit 2
+  fi
+  tar -xzf "$NODE_TGZ" -C "${env.WORKSPACE}/.jenkins"
 fi
 "${nodeRoot}/bin/node" -v
 "${nodeRoot}/bin/npm" -v
