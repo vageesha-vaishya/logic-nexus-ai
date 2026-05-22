@@ -345,6 +345,24 @@ done
             }
         }
 
+        stage('Deploy Changed Edge Functions') {
+            steps {
+                script {
+                    // Diffs HEAD~1..HEAD against supabase/functions/ and
+                    // deploys only what changed. _shared/ changes trigger
+                    // a full redeploy. First build (no HEAD~1) is a no-op.
+                    withEnv([
+                        "PROJECT_REF=${env.SELECTED_PROJECT_REF}",
+                        "SUPABASE_ACCESS_TOKEN=${env.SUPABASE_ACCESS_TOKEN}"
+                    ]) {
+                        timeout(time: 15, unit: 'MINUTES') {
+                            sh 'bash scripts/deploy_changed_edge_functions.sh'
+                        }
+                    }
+                }
+            }
+        }
+
         stage('PDF Auth Smoke Test') {
             steps {
                 script {
