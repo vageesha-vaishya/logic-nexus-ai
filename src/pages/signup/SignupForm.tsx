@@ -31,6 +31,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/hooks/useAuth";
+import { SosLogo } from "@/components/branding";
 
 import { SIGNUP_DOMAINS, isSignupDomain, type SignupDomain } from "./types";
 
@@ -164,12 +165,13 @@ export default function SignupForm() {
           Back
         </Link>
 
-        <header className="mt-6 mb-6 space-y-1">
-          <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground">
+        <header className="mt-6 mb-6 space-y-2">
+          <SosLogo size={40} />
+          <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground pt-2">
             Register {brochure.name}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight">
-            Create your account
+            Create your {brochure.name} account
           </h1>
           <p className="text-sm text-muted-foreground">
             You'll start on the Free plan — no card needed. Add teammates,

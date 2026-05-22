@@ -20,6 +20,8 @@
 import { Link } from "react-router-dom";
 import { ArrowRight, Building2, Mail, TrendingUp } from "lucide-react";
 
+import { SosLogo } from "@/components/branding";
+
 interface Tile {
   to:          string;
   icon:        typeof TrendingUp;
@@ -60,17 +62,18 @@ export default function Welcome() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-4 py-10 md:py-16">
-        <header className="mb-10 space-y-3 text-center md:mb-14">
-          <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground">
+        <header className="mb-10 flex flex-col items-center gap-3 text-center md:mb-14">
+          <SosLogo size={56} />
+          <p className="mt-2 text-xs uppercase tracking-[0.32em] text-muted-foreground">
             sosservices.online
           </p>
           <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
             How would you like to get started?
           </h1>
           <p className="mx-auto max-w-2xl text-sm text-muted-foreground md:text-base">
-            One platform for individual investors, multi-product organisations,
-            and teammates who've been invited. Pick the path that matches you —
-            you can change accounts later from the menu.
+            SOS Services runs multiple products under one roof — pick the
+            path that matches you. You can add more, switch contexts, or
+            change accounts later from the menu.
           </p>
         </header>
 

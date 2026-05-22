@@ -20,7 +20,7 @@ export function OnboardingTour({ enabled = true }: OnboardingTourProps) {
   const steps: Step[] = [
     {
       target: 'body',
-      content: 'Welcome to Logic Nexus AI! Let us show you around.',
+      content: 'Welcome to SOS Services. Let us show you around.',
       placement: 'center',
     },
     {

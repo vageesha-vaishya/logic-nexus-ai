@@ -26,6 +26,7 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
+import { SosLogo } from "@/components/branding";
 
 type AcceptState =
   | { kind: "idle" }
@@ -97,7 +98,12 @@ export default function InviteAccept() {
 
   const Shell = ({ children }: { children: React.ReactNode }) => (
     <div className="min-h-screen bg-background">
-      <div className="mx-auto max-w-md px-4 py-16 text-center">{children}</div>
+      <div className="mx-auto max-w-md px-4 py-16 text-center">
+        <div className="mb-8 flex justify-center">
+          <SosLogo size={48} />
+        </div>
+        {children}
+      </div>
     </div>
   );
 
@@ -131,10 +137,11 @@ export default function InviteAccept() {
     return (
       <Shell>
         <MailWarning className="mx-auto h-12 w-12 text-primary" aria-hidden="true" />
-        <h1 className="mt-4 text-2xl font-semibold tracking-tight">You've been invited</h1>
+        <h1 className="mt-4 text-2xl font-semibold tracking-tight">You've been invited to SOS Services</h1>
         <p className="mt-3 text-sm text-muted-foreground">
-          Sign in to accept this invite. If you don't have an account yet,
-          you can create one — we'll add you to your team right after.
+          Sign in to accept this invite and join your team. If you don't
+          have an account yet, you can create one — we'll add you to the
+          team right after you verify your email.
         </p>
         <div className="mt-6 flex flex-col gap-2">
           <Button asChild>

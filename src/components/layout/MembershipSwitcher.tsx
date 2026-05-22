@@ -24,10 +24,31 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { useMemberships, type Membership } from "@/hooks/useMemberships";
+import { accentForDomain } from "@/components/branding";
 
 function membershipIcon(m: Membership) {
   if (m.is_retail) return TrendingUp;
   return Building2;
+}
+
+/**
+ * Small 8px accent dot whose color matches the membership's domain — see
+ * docs/plans/2026-05-22-platform-brand-architecture-design.md. Retail
+ * memberships intentionally have no dot (Sthira is its own visual system).
+ */
+function DomainDot({ m, size = 8 }: { m: Membership; size?: number }) {
+  if (m.is_retail) return null;
+  return (
+    <span
+      aria-hidden="true"
+      className="inline-block shrink-0 rounded-full"
+      style={{
+        width:      size,
+        height:     size,
+        background: accentForDomain(m.domain_code),
+      }}
+    />
+  );
 }
 
 function roleLabel(role: string): string {
@@ -52,6 +73,7 @@ export function MembershipSwitcher() {
     const Icon = membershipIcon(activeMembership);
     return (
       <span className="hidden md:inline-flex items-center gap-2 rounded-md border bg-background px-2.5 py-1 text-xs text-muted-foreground">
+        <DomainDot m={activeMembership} />
         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
         <span className="max-w-[18ch] truncate">{activeMembership.display_label}</span>
       </span>
@@ -72,7 +94,10 @@ export function MembershipSwitcher() {
           {isSwitching ? (
             <Loader2 className="h-4 w-4 animate-spin" />
           ) : (
-            <ActiveIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+            <>
+              <DomainDot m={activeMembership} />
+              <ActiveIcon className="h-4 w-4 text-primary" aria-hidden="true" />
+            </>
           )}
           <span className="hidden lg:inline-block max-w-[20ch] truncate">
             {activeMembership.display_label}
@@ -102,7 +127,10 @@ export function MembershipSwitcher() {
                 isActive && "bg-accent/40",
               )}
             >
-              <Icon className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+              <div className="mt-1 flex flex-col items-center gap-1">
+                <Icon className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+                <DomainDot m={m} size={6} />
+              </div>
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-medium">{m.display_label}</p>
                 <p className="truncate text-[11px] text-muted-foreground">

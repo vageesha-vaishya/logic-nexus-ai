@@ -217,7 +217,7 @@ export function useRazorpayCheckout() {
           key:         orderData.razorpay_key,
           amount:      orderData.amount_paise,
           currency:    "INR",
-          name:        "Logic Nexus AI",
+          name:        "SOS Services",
           description: `${orderData.plan_name} — ${params.billingCycle}`,
           order_id:    orderData.order_id,
           prefill: {

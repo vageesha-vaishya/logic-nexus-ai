@@ -27,8 +27,9 @@ import Welcome from "./pages/Welcome";
 import SignupDomainPicker from "./pages/signup/SignupDomainPicker";
 import SignupForm from "./pages/signup/SignupForm";
 import InviteAccept from "./pages/invite/InviteAccept";
-const TeamSettings    = lazy(() => import("./pages/dashboard/TeamSettings"));
-const BillingSettings = lazy(() => import("./pages/dashboard/BillingSettings"));
+const TeamSettings     = lazy(() => import("./pages/dashboard/TeamSettings"));
+const BillingSettings  = lazy(() => import("./pages/dashboard/BillingSettings"));
+const BrandingSettings = lazy(() => import("./pages/dashboard/BrandingSettings"));
 import Auth from "./pages/Auth";
 import OAuthCallback from "./pages/OAuthCallback";
 import SetupAdmin from "./pages/SetupAdmin";
@@ -611,6 +612,19 @@ const App = () => (
               element={
                 <ProtectedRoute>
                   <BillingSettings />
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Branding — per-tenant logo + accent + display name override
+                (BR-4). Pre-auth surfaces always show SOS chrome regardless;
+                only /dashboard/* surfaces honor the override. Writes are
+                RLS-gated to tenant_admin / platform_admin. */}
+            <Route
+              path="/dashboard/settings/branding"
+              element={
+                <ProtectedRoute>
+                  <BrandingSettings />
                 </ProtectedRoute>
               }
             />

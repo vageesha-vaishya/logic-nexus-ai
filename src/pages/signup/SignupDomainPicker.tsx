@@ -12,6 +12,7 @@
 import { Link } from "react-router-dom";
 import { ArrowLeft, ArrowRight, Building2, TrendingUp } from "lucide-react";
 
+import { SosLogo } from "@/components/branding";
 import { SIGNUP_DOMAIN_LIST, type SignupDomain } from "./types";
 
 const ICONS: Record<SignupDomain, typeof Building2> = {
@@ -23,26 +24,29 @@ export default function SignupDomainPicker() {
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-3xl px-4 py-10 md:py-14">
-        <Link
-          to="/welcome"
-          className="
-            inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground
-            focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded
-          "
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          Back
-        </Link>
+        <div className="flex items-center justify-between gap-3">
+          <Link
+            to="/welcome"
+            className="
+              inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground
+              focus:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded
+            "
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back
+          </Link>
+          <SosLogo size={36} />
+        </div>
 
         <header className="mt-6 mb-10 space-y-2 md:mb-12">
           <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground">
-            Register an organization
+            Register an organization on SOS Services
           </p>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
             Which product are you signing up for?
           </h1>
           <p className="text-sm text-muted-foreground md:text-base">
-            Pick one to start — you can add the other to your account later
+            Pick one to start — you can add the other to your tenant later
             from Settings → Billing.
           </p>
         </header>

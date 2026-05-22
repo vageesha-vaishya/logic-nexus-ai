@@ -29,7 +29,7 @@ export function HelpDialog() {
       </DialogTrigger>
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
-          <DialogTitle>Logic Nexus AI Help Center</DialogTitle>
+          <DialogTitle>SOS Services Help Center</DialogTitle>
           <DialogDescription>
             Get help with using the platform and discover powerful shortcuts.
           </DialogDescription>

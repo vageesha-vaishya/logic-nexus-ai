@@ -29,17 +29,18 @@ export const HeroSection = () => {
           
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-6 border border-primary/20">
             <Sparkles className="w-4 h-4 text-primary" />
-            <span className="text-sm font-medium text-primary">AI-Powered Logistics Intelligence</span>
+            <span className="text-sm font-medium text-primary">Multi-domain business platform</span>
           </div>
-          
+
           <h1 className="text-5xl md:text-7xl font-bold mb-6 text-primary-foreground leading-tight">
-            SOS Logistic Pro
-            <span className="block text-primary mt-2">Enterprise</span>
+            SOS Services
+            <span className="block text-primary mt-2 text-3xl md:text-5xl">One platform · many products</span>
           </h1>
-          
+
           <p className="text-xl md:text-2xl text-muted-foreground mb-8 max-w-2xl mx-auto leading-relaxed">
-            The ultimate multi-tenant logistics platform with AI automation, QuickBooks integration, 
-            and unified email management for freight forwarders.
+            Logistics CRM, advisor-tier markets tools, aviation MRO, and the
+            Sthira retail investing app — under one tenant, one bill, one
+            login.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">

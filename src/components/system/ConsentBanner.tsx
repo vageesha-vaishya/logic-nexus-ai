@@ -69,9 +69,9 @@ export function ConsentBanner() {
         <DialogHeader>
           <DialogTitle>Data Processing Consent</DialogTitle>
           <DialogDescription>
-            Logic Nexus AI processes your personal data to provide logistics, trading, and
-            business management services. Under India's Digital Personal Data Protection Act
-            2023 (DPDP), we need your explicit consent before processing your data.
+            SOS Services processes your personal data to provide logistics, markets-advisor,
+            AMRO, and other business products. Under India's Digital Personal Data Protection
+            Act 2023 (DPDP), we need your explicit consent before processing your data.
           </DialogDescription>
         </DialogHeader>
 

@@ -26,7 +26,7 @@ const ShieldLogo: React.FC<ShieldLogoProps> = ({ showWordmark = false, size = 40
   return (
     <div className={`flex items-center gap-2 ${className || ''}`}>
       <div
-        aria-label="SOS Logistic Pro Shield Logo"
+        aria-label="SOS Services shield logo"
         role="img"
         className="shield-logo group relative rounded-lg shadow-sm flex items-center justify-center border border-border"
         style={{
@@ -86,8 +86,7 @@ const ShieldLogo: React.FC<ShieldLogoProps> = ({ showWordmark = false, size = 40
 
       {showWordmark && (
         <div className={wordmarkClassName || 'leading-tight'}>
-          <div className="font-semibold text-card-foreground">SOS Logistic Pro</div>
-          <div className="text-xs text-muted-foreground">Enterprise</div>
+          <div className="font-semibold text-card-foreground">SOS Services</div>
         </div>
       )}
     </div>

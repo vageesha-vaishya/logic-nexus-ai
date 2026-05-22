@@ -89,9 +89,9 @@ export function InvoicePDF({ invoice, tenantName }: InvoicePDFProps) {
         {/* Header */}
         <div className="header">
           <div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: "#1e40af" }}>Logic Nexus AI</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: "#1e40af" }}>SOS Services</div>
             <div style={{ fontSize: 12, color: "#6b7280", marginTop: 4 }}>
-              {invoice.seller_name ?? "Logic Nexus AI Pvt. Ltd."}
+              {invoice.seller_name ?? "SOS Services Pvt. Ltd."}
             </div>
             <div style={{ fontSize: 12, color: "#6b7280" }}>
               {invoice.seller_address ?? "India"}
@@ -224,9 +224,9 @@ export function InvoicePDF({ invoice, tenantName }: InvoicePDFProps) {
       <div className="rounded-lg border bg-white p-8 text-sm shadow-sm">
         <div className="flex justify-between items-start mb-8">
           <div>
-            <div className="text-xl font-bold text-blue-700">Logic Nexus AI</div>
+            <div className="text-xl font-bold text-blue-700">SOS Services</div>
             <div className="text-xs text-muted-foreground mt-1">
-              {invoice.seller_name ?? "Logic Nexus AI Pvt. Ltd."}
+              {invoice.seller_name ?? "SOS Services Pvt. Ltd."}
             </div>
             {invoice.seller_gstin && (
               <div className="text-xs mt-1">GSTIN: {invoice.seller_gstin}</div>

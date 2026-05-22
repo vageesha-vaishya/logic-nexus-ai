@@ -205,6 +205,26 @@ All colors MUST be HSL.
     --sthira-terracotta: 11 47% 45%;    /* #A8553E negative P&L, destructive */
     --sthira-ink:        0 0% 17%;      /* #2C2C2C body text */
     --sthira-fog:        217 9% 49%;    /* #6B7280 secondary text */
+
+    /* ==========================================================================
+       SOS — umbrella brand palette (B2B + corporate)
+       See docs/plans/2026-05-22-platform-brand-architecture-design.md.
+       Used for the SOS-neutral chrome that wraps every B2B surface (auth,
+       welcome, signup, invite, dashboard). Per-domain accent is set at
+       runtime via --domain-accent (useDomainAccent hook). Sthira chrome
+       is the exception — Sthira surfaces keep their own palette above
+       and never inherit --sos-*.
+       ========================================================================== */
+    --sos-ink:    222 47% 11%;   /* #0F172A primary text, dark surfaces */
+    --sos-slate:  215 25% 27%;   /* #334155 secondary text, borders */
+    --sos-mist:   210 40% 98%;   /* #F8FAFC app background */
+    --sos-fog:    214 32% 91%;   /* #E2E8F0 card borders, dividers */
+    --sos-copper:  32 95% 36%;   /* #B45309 primary CTA, link, focus — the warm accent */
+
+    /* Per-domain accent — overwritten at runtime by useDomainAccent() based
+       on the active membership's domain_code. Default falls back to
+       --sos-copper so pre-auth surfaces (no membership) still render OK. */
+    --domain-accent: var(--sos-copper);
   }
 
   .dark {

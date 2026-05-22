@@ -20,7 +20,9 @@ export const Logo: React.FC<LogoProps> = ({
 }) => {
   const { branding } = useTenantBranding();
   const src = branding?.logoUrl || logoImage;
-  const title = branding?.companyName || 'SOS Logistic Pro';
+  // 2026-05-22: umbrella brand renamed per platform-brand-architecture
+  // design — tenant-level branding_settings.companyName still wins when set.
+  const title = branding?.companyName || 'SOS Services';
 
   return (
     <div className={cn('flex items-center gap-3', className)}>
@@ -34,7 +36,6 @@ export const Logo: React.FC<LogoProps> = ({
       {showWordmark && (
         <div className={wordmarkClassName || 'leading-tight'}>
           <div className="font-semibold text-foreground">{title}</div>
-          <div className="text-xs text-muted-foreground">Enterprise</div>
         </div>
       )}
     </div>

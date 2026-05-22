@@ -69,7 +69,7 @@ export interface ResolvedTenantBranding {
 const DEFAULT_BRANDING: Omit<ResolvedTenantBranding, 'tenantId' | 'tenantName' | 'tenantSlug' | 'metadata'> = {
   logoUrl: '',
   faviconUrl: '',
-  companyName: 'SOS Logistic Pro',
+  companyName: 'SOS Services',
   primaryColor: '#2563EB',
   secondaryColor: '#1D4ED8',
   accentColor: '#F59E0B',

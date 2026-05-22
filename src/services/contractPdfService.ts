@@ -34,7 +34,7 @@ export const generateContractPDF = (
   
   doc.setFontSize(12);
   doc.setFont('helvetica', 'normal');
-  doc.text('Logic Nexus AI', 20, 65);
+  doc.text('SOS Services', 20, 65);
   doc.setFontSize(10);
   doc.text('123 Innovation Dr, Tech City', 20, 70);
   doc.text('(The "Company")', 20, 75);
@@ -104,7 +104,7 @@ export const generateContractPDF = (
   
   doc.setFontSize(10);
   doc.text('Authorized Signature', 20, yPos + 5);
-  doc.text('Logic Nexus AI', 20, yPos + 10);
+  doc.text('SOS Services', 20, yPos + 10);
   
   doc.text('Authorized Signature', 120, yPos + 5);
   doc.text(vendorName, 120, yPos + 10);

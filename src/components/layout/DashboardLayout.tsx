@@ -11,6 +11,8 @@ import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
 import { AdminScopeSwitcher } from './AdminScopeSwitcher';
 import { DomainSwitcher } from '@/components/navigation/DomainSwitcher';
 import { MembershipSwitcher } from './MembershipSwitcher';
+import { DomainAccentStrip } from '@/components/branding';
+import { useDomainAccent } from '@/hooks/useDomainAccent';
 import { usePipeline } from '@/components/debug/pipeline/PipelineContext';
 import { PipelineDashboard } from '@/components/debug/pipeline/PipelineDashboard';
 import { FeatureErrorBoundary } from '@/components/FeatureErrorBoundary';
@@ -188,6 +190,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   useKeyboardShortcuts();
   // Global price-alert Realtime subscription — active on all dashboard pages
   useNotificationsRealtime();
+  // Per-domain accent — writes --domain-accent to :root from the active
+  // membership so DomainAccentStrip + MembershipSwitcher dots pick up the
+  // right color without prop-drilling. See BR-3.
+  useDomainAccent();
   const navigate = useNavigate();
   const location = useLocation();
   const { toggleSidebar: toggleAppSidebar, isMobile: isMobileSidebar } = useSidebar();
@@ -596,6 +602,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             }}
             aria-label={headerBanner.content || undefined}
           >
+            {/* Per-domain accent strip — 4px bar at the very top of the
+                sticky header. Color resolves from --domain-accent which
+                useDomainAccent() writes from active membership. */}
+            <DomainAccentStrip className="absolute inset-x-0 top-0" />
             {headerBanner.visible && (
               <div
                 className="absolute inset-0 z-[1] pointer-events-none"
