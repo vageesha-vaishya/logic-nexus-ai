@@ -95,3 +95,6 @@ jobs:
 
     - name: Build Test
       run: npm run build
+
+    - name: Bundle size budget (T23 perf gate)
+      run: npm run bundle:check

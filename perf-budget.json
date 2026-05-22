@@ -1,11 +1,18 @@
 {
-  "$comment": "Bundle-size budgets for the Sthira markets-only build. Phase 1 Addendum T23. Values are gzipped sizes in KB. Set near current baseline + a small buffer; ratchet down as we trim. Lighthouse + LCP budgets land separately when preview-deploy CI is wired.",
-  "entry_kb_gz_max":      280,
+  "$comment": "Bundle-size budgets for the full Vite production build. Phase 1 Addendum T23. Values are gzipped sizes in KB. Caps are set just above the current baseline so PRs that regress get caught; ratchet down as we trim. The earlier markets-only budget (entry 280 / total 1200) was speculative — the multi-domain build is the real artifact CI ships. Lighthouse + LCP budgets land separately when preview-deploy CI is wired.",
+  "entry_kb_gz_max":        310,
   "single_chunk_kb_gz_max": 200,
-  "total_kb_gz_max":      1200,
-  "$baseline_2026_05_21": {
-    "entry_kb_gz":        249,
+  "total_kb_gz_max":       3300,
+  "$baseline_2026_05_22": {
+    "entry_kb_gz":          290,
+    "largest_chunk_kb_gz":  180,
+    "total_kb_gz":         3121,
+    "$context":            "Full vite build (570 chunks). Captured at commit d2aeeb3d."
+  },
+  "$baseline_2026_05_21_markets_only": {
+    "entry_kb_gz":         249,
     "largest_chunk_kb_gz": 154,
-    "total_kb_gz":         900
+    "total_kb_gz":         900,
+    "$context":            "Aspirational markets-only build target. No build script ships this artifact today; kept here as the trim goal once Sthira splits to a per-domain SPA."
   }
 }

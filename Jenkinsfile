@@ -479,6 +479,11 @@ fi
                             sh 'npm run mobile:build'
                         }
 
+                        // T23 perf gate — same check that runs on PRs. Catches
+                        // bundle regressions before an APK rolls to the Play
+                        // Store; thresholds are in perf-budget.json.
+                        sh 'npm run bundle:check'
+
                         // Gradle bundleRelease with credentials injected as
                         // env vars. The Gradle file (android/app/build.gradle)
                         // reads them via resolveProp().
