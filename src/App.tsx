@@ -512,13 +512,17 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/dashboard/leads" 
+            <Route
+              path="/dashboard/leads"
               element={
-                <ProtectedRoute requiredPermissions={["leads.view"]}>
+                <ProtectedRoute
+                  requiredPermissions={["leads.view"]}
+                  moduleCode="logistics.leads"
+                  moduleLabel="Leads"
+                >
                   <Leads />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route 
               path="/dashboard/leads/new" 

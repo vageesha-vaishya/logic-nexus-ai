@@ -47,7 +47,18 @@ export const logisticsManifest: DomainManifest = {
     icon:  Building2,
   },
 
-  routes: [],
+  // Routes are still mounted from src/App.tsx today. Entries here exist
+  // for moduleCode metadata so <ProtectedRoute moduleCode> + the
+  // resolveModuleAccess pipeline can look up per-route requiredRole /
+  // minPlanTier. Phase 2.2 will swap App.tsx mounting to read this list.
+  routes: [
+    {
+      path:       "/dashboard/leads",
+      component:  () => import("@/pages/dashboard/Leads"),
+      moduleCode: "logistics.leads",
+      label:      "Leads",
+    },
+  ],
   defaultAssignmentPolicy: "opt-in",
   requiredPermissions: ["logistics.view"],
   seedMigration: "20260131053539_sync_logistics_domain.sql",
