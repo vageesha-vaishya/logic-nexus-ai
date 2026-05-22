@@ -1,9 +1,7 @@
 import { Loader2 } from "lucide-react";
-import { useQueryClient } from "@tanstack/react-query";
+import { Navigate } from "react-router-dom";
 
-import { marketsKeys } from "../hooks/queryKeys";
 import { RetailNavLayout } from "./layouts/RetailNavLayout";
-import { OnboardingWizard } from "./onboarding/OnboardingWizard";
 import { usePushRegistration } from "./hooks/usePushRegistration";
 import { useRiskProfile } from "./hooks/useRiskProfile";
 
@@ -17,7 +15,6 @@ import { useRiskProfile } from "./hooks/useRiskProfile";
  * fetches across tabs so there's no perf penalty for that split.
  */
 export function RetailMode() {
-  const queryClient = useQueryClient();
   const { isLoading, isError, error, hasOnboarded } = useRiskProfile();
   // Kick off FCM registration once per session — no-op on web, prompts
   // permission + posts token to /v1/retail/push/register on Android.
@@ -43,15 +40,11 @@ export function RetailMode() {
     );
   }
 
+  // Onboarding now owns its own route + 7-step wizard at /onboarding (see
+  // src/features/markets/retail/self-onboarding). Redirect rather than
+  // rendering inline so the wizard has a single, deep-linkable home.
   if (!hasOnboarded) {
-    return (
-      <OnboardingWizard
-        onComplete={() => {
-          queryClient.invalidateQueries({ queryKey: marketsKeys.retail.profile() });
-          queryClient.invalidateQueries({ queryKey: marketsKeys.retail.tiers() });
-        }}
-      />
-    );
+    return <Navigate to="/onboarding" replace />;
   }
 
   return <RetailNavLayout />;

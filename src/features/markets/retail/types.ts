@@ -17,6 +17,12 @@ export interface Goal {
   goal: string;             // 'retirement' | 'emergency_fund' | 'wealth_growth' | ...
   years: number;
   target_amount?: number;
+  /**
+   * 1-based rank. 1 = most important. Added by the self-onboarding wizard
+   * step 4 (rebuilt 2026-05-22, see docs/plans/2026-05-21-self-onboarding-wizard-design.md).
+   * Older Goal rows written by the legacy wizard don't have this field.
+   */
+  priority?: number;
 }
 
 // ── Risk profile ──────────────────────────────────────────────────────────────

@@ -44,6 +44,13 @@ export const marketsManifest: DomainManifest = {
       component: () => import("./sthira/SthiraOnboardingRoute"),
       mobile: true,
     },
+    // /onboarding alias — desktop-browser entry point for the self-
+    // onboarding wizard. Same component, friendlier URL for email copy.
+    {
+      path: "/onboarding",
+      component: () => import("./sthira/SthiraOnboardingRoute"),
+      mobile: true,
+    },
     {
       path: "/sthira/broker",
       component: () => import("./sthira/SthiraBrokerRoute"),

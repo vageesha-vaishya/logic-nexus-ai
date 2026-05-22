@@ -371,6 +371,20 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            {/* /onboarding alias — desktop-browser entry point for the
+                self-onboarding wizard. Both URLs render the same shell;
+                /sthira/onboarding is the mobile-shell-branded path that
+                ships in the APK, /onboarding is the friendlier URL we can
+                hand out in email/welcome copy and that the route guard
+                redirects to. */}
+            <Route
+              path="/onboarding"
+              element={
+                <ProtectedRoute>
+                  <SthiraOnboardingRoute />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/sthira/broker"
               element={
