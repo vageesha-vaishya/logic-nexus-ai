@@ -124,18 +124,21 @@ try {
   fatal(`auth.users lookup failed: ${e.message}`);
 }
 
-// 2. Resolve Sthira Retail tenant + franchise
+// 2. Resolve SOS Services tenant + SOS-RETAIL franchise
 let tenantId;
 let franchiseId;
 try {
-  const tenants = await pgRest('tenants?select=id&slug=eq.sthira-retail&limit=1');
-  if (!tenants?.length) fatal('No tenant with slug=sthira-retail. Run migration 20260521143940 first.');
+  // Updated 2026-05-22: Sthira Retail tenant was retired in favour of the
+  // SOS Services tenant + SOS-RETAIL franchise (see migration
+  // 20260522011746). Slug/code references updated accordingly.
+  const tenants = await pgRest('tenants?select=id&slug=eq.sos-services&limit=1');
+  if (!tenants?.length) fatal('No tenant with slug=sos-services. Run migration 20260522011746 first.');
   tenantId = tenants[0].id;
 
-  const franchises = await pgRest(`franchises?select=id&tenant_id=eq.${tenantId}&code=eq.sthira-default&limit=1`);
-  if (!franchises?.length) fatal('No franchise with code=sthira-default. Run migration 20260521143940 first.');
+  const franchises = await pgRest(`franchises?select=id&tenant_id=eq.${tenantId}&code=eq.SOS-RETAIL&limit=1`);
+  if (!franchises?.length) fatal('No franchise with code=SOS-RETAIL. Run migration 20260522011746 first.');
   franchiseId = franchises[0].id;
-  ok(`Sthira Retail tenant ${tenantId} / franchise ${franchiseId}`);
+  ok(`SOS Services tenant ${tenantId} / SOS-RETAIL franchise ${franchiseId}`);
 } catch (e) {
   fatal(`tenant/franchise lookup failed: ${e.message}`);
 }

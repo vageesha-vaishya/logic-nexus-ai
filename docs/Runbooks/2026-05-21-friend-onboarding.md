@@ -14,7 +14,7 @@ empty Tier-Setup with no portfolio to link.
 
 ## Prereqs (one-time)
 
-1. **Seed migration applied.** `supabase/migrations/20260521143940_seed_sthira_retail_tenant_and_franchise.sql` must be live on prod. Already applied on `gzhxgoigflftharcmdqj` as of 2026-05-21.
+1. **Seed migration applied.** `supabase/migrations/20260522011746_retail_self_onboarding_foundation.sql` must be live on prod. Already applied on `gzhxgoigflftharcmdqj` as of 2026-05-22. (Supersedes the original 20260521143940 seed; that migration's "Sthira Retail" tenant was retired in favour of the existing SOS Services tenant + a new SOS-RETAIL franchise — see the migration file for the rationale.)
 2. **Worker reachable.** `npm run dev:tunnel:check` must report a healthy
    path. The provisioning script POSTs to the worker to kick off signal
    generation — if the worker is unreachable the script logs a warning
@@ -34,7 +34,7 @@ empty Tier-Setup with no portfolio to link.
 │                                                                            │
 │    Script does, idempotently:                                              │
 │      - look up auth.users by email                                         │
-│      - bind them to the Sthira Retail tenant + Sthira Default franchise   │
+│      - bind them to the SOS Services tenant + SOS-RETAIL franchise        │
 │        with role 'user' in public.user_roles                              │
 │      - create a default "My Portfolio" (paper mode) in markets.portfolios │
 │      - POST /v1/jobs/bootstrap-portfolio to fire signal generation now    │
@@ -60,9 +60,9 @@ empty Tier-Setup with no portfolio to link.
 **`No auth.users row found`**
 Friend hasn't signed up yet. Send them the `/auth` URL first.
 
-**`No tenant with slug=sthira-retail`**
+**`No tenant with slug=sos-services` or `No franchise with code=SOS-RETAIL`**
 The seed migration hasn't been applied to the project the script is
-pointing at. Re-apply `20260521143940_seed_sthira_retail_tenant_and_franchise.sql`
+pointing at. Re-apply `20260522011746_retail_self_onboarding_foundation.sql`
 or check `SUPABASE_URL`.
 
 **Worker bootstrap warning (script still exits 0)**
