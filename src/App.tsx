@@ -432,10 +432,14 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/dashboard/accounts" 
+            <Route
+              path="/dashboard/accounts"
               element={
-                <ProtectedRoute requiredPermissions={["accounts.view"]}>
+                <ProtectedRoute
+                  requiredPermissions={["accounts.view"]}
+                  moduleCode="logistics.accounts"
+                  moduleLabel="Accounts"
+                >
                   <Accounts />
                 </ProtectedRoute>
               } 
@@ -472,10 +476,14 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/dashboard/contacts" 
+            <Route
+              path="/dashboard/contacts"
               element={
-                <ProtectedRoute requiredPermissions={["contacts.view"]}>
+                <ProtectedRoute
+                  requiredPermissions={["contacts.view"]}
+                  moduleCode="logistics.contacts"
+                  moduleLabel="Contacts"
+                >
                   <Contacts />
                 </ProtectedRoute>
               } 
@@ -753,13 +761,17 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/dashboard/opportunities" 
+            <Route
+              path="/dashboard/opportunities"
               element={
-                <ProtectedRoute requiredPermissions={["opportunities.view"]}>
+                <ProtectedRoute
+                  requiredPermissions={["opportunities.view"]}
+                  moduleCode="logistics.opportunities"
+                  moduleLabel="Opportunities"
+                >
                   <Opportunities />
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route 
               path="/dashboard/opportunities/pipeline" 
@@ -1069,7 +1081,7 @@ const App = () => (
             <Route path="/dashboard/bookings/map" element={<ProtectedRoute><QuoteBookingMapper /></ProtectedRoute>} />
             <Route path="/dashboard/bookings/:id" element={<ProtectedRoute><BookingDetail /></ProtectedRoute>} />
             <Route path="/dashboard/bookings/:id/edit" element={<ProtectedRoute><BookingEdit /></ProtectedRoute>} />
-            <Route path="/dashboard/shipments" element={<ProtectedRoute><Shipments /></ProtectedRoute>} />
+            <Route path="/dashboard/shipments" element={<ProtectedRoute moduleCode="logistics.shipments" moduleLabel="Shipments"><Shipments /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/new" element={<ProtectedRoute><ShipmentNew /></ProtectedRoute>} />
             <Route path="/dashboard/shipments/pipeline" element={<ProtectedRoute><ShipmentsPipeline /></ProtectedRoute>} />
             <Route path="/dashboard/customs-clearance/pipeline" element={<ProtectedRoute><CustomsClearancePipeline /></ProtectedRoute>} />
@@ -1080,7 +1092,7 @@ const App = () => (
             <Route path="/dashboard/vehicles" element={<ProtectedRoute><Vehicles /></ProtectedRoute>} />
             <Route path="/dashboard/vehicles/new" element={<ProtectedRoute><VehicleNew /></ProtectedRoute>} />
             <Route path="/dashboard/rate-management" element={<ProtectedRoute><RateManagement /></ProtectedRoute>} />
-            <Route path="/dashboard/carriers" element={<ProtectedRoute><Carriers /></ProtectedRoute>} />
+            <Route path="/dashboard/carriers" element={<ProtectedRoute moduleCode="logistics.carriers" moduleLabel="Carriers"><Carriers /></ProtectedRoute>} />
             <Route path="/dashboard/vendors" element={<ProtectedRoute><Vendors /></ProtectedRoute>} />
             <Route path="/dashboard/vendors/:id" element={<ProtectedRoute><VendorDetail /></ProtectedRoute>} />
             <Route path="/dashboard/consignees" element={<ProtectedRoute><Consignees /></ProtectedRoute>} />
