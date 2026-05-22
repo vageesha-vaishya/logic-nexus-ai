@@ -4,6 +4,13 @@ import { Loader2 } from 'lucide-react';
 import { PLATFORM_ADMIN_ROLE, type AppRole, type Permission } from '@/config/permissions';
 import { logger } from '@/lib/logger';
 import { useDomain } from '@/contexts/DomainContext';
+import { useModuleAccess } from '@/hooks/useModuleAccess';
+import {
+  AddDomainPrompt,
+  RequestAccessPrompt,
+  SwitchTenantPrompt,
+  UpgradePrompt,
+} from './remedy';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -12,15 +19,27 @@ interface ProtectedRouteProps {
   requiredPermissions?: Permission[];
   accessDeniedMessage?: string;
   requiredDomainCode?: string;
+  /**
+   * MV-4: when provided, ProtectedRoute consults useModuleAccess() and
+   * renders the appropriate remedy page on deny (per reason) instead of
+   * the legacy /unauthorized redirect. Legacy props (requiredRole,
+   * requiredPermissions, requiredDomainCode) keep working alongside —
+   * they evaluate first, before moduleCode. Migration is incremental.
+   */
+  moduleCode?: string;
+  /** Optional human-readable label for the module (used in remedy copy). */
+  moduleLabel?: string;
 }
 
-export function ProtectedRoute({ 
-  children, 
+export function ProtectedRoute({
+  children,
   requiredRole,
   requireAuth = true,
   requiredPermissions,
   accessDeniedMessage,
-  requiredDomainCode
+  requiredDomainCode,
+  moduleCode,
+  moduleLabel,
 }: ProtectedRouteProps) {
   const { user, loading, hasRole, hasPermission, isPlatformAdmin } = useAuth();
   const { isLoading: loadingDomains, availableDomains } = useDomain();
@@ -151,5 +170,62 @@ export function ProtectedRoute({
     }
   }
 
+  // MV-4 — moduleCode-driven access check + smart remedy pages.
+  // The actual hook call lives in <ModuleAccessGate> so it only runs
+  // when moduleCode is set — keeps legacy callers (which don't pass
+  // moduleCode and may not have QueryClientProvider in test setups)
+  // from triggering the new pipeline. Legacy /unauthorized redirects
+  // above evaluate first, so routes gated by requiredRole still use
+  // the old path even if moduleCode is also passed.
+  if (moduleCode) {
+    return (
+      <ModuleAccessGate moduleCode={moduleCode} moduleLabel={moduleLabel}>
+        {children}
+      </ModuleAccessGate>
+    );
+  }
+
   return <>{children}</>;
+}
+
+interface ModuleAccessGateProps {
+  moduleCode:   string;
+  moduleLabel?: string;
+  children:     React.ReactNode;
+}
+
+function ModuleAccessGate({ moduleCode, moduleLabel, children }: ModuleAccessGateProps) {
+  const { user } = useAuth();
+  const location = useLocation();
+  const moduleAccess = useModuleAccess(moduleCode);
+
+  if (moduleAccess.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  const access = moduleAccess.access;
+  if (!access || access.allowed) return <>{children}</>;
+
+  logger.warn(`ProtectedRoute denied moduleCode=${moduleCode} reason=${access.reason}`, {
+    userId:    user?.id,
+    path:      location.pathname,
+    reason:    access.reason,
+    component: 'ProtectedRoute',
+  });
+  switch (access.reason) {
+    case 'wrong_tenant':
+      return <SwitchTenantPrompt />;
+    case 'domain_off':
+      return <AddDomainPrompt domainCode={access.remedy?.targetPath?.match(/add=([^&]+)/)?.[1]} />;
+    case 'role':
+      return <RequestAccessPrompt moduleLabel={moduleLabel} />;
+    case 'plan':
+      return <UpgradePrompt moduleCode={moduleCode} moduleLabel={moduleLabel} />;
+    case 'unknown_module':
+    default:
+      return <Navigate to="/unauthorized" replace />;
+  }
 }

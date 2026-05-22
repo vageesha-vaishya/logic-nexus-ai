@@ -1,4 +1,4 @@
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -12,7 +12,10 @@ import { toast } from 'sonner';
 import { Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { cn } from '@/lib/utils';
-import { SosLogo } from '@/components/branding';
+import { SosLogo, accentForDomain } from '@/components/branding';
+import { resolveActiveDomain } from '@/platform/domains/resolver';
+import { getDomainManifest } from '@/platform/domains/registry';
+import type { DomainManifest } from '@/platform/domains/types';
 import { logger } from '@/lib/logger';
 
 const loginSchema = z.object({
@@ -59,6 +62,34 @@ export default function Auth() {
     intent === 'retail' ||
     next.startsWith('/sthira/') ||
     next.startsWith('/dashboard/markets/retail');
+
+  // MV-5 — domain hint for the SOS-neutral variant. Priority order:
+  //   (1) ?intent=retail wins → Sthira variant (handled above)
+  //   (2) next path matches a domain's pathPrefixes (and isn't retail)
+  //   (3) document.referrer is a /signup/<domain> page
+  //   (4) no hint — generic SOS-neutral
+  // Retail matches stay on the Sthira chrome path; only non-retail
+  // matches surface as a tint on SosChrome.
+  const domainHint = useMemo<DomainManifest | null>(() => {
+    if (isRetailVariant) return null;
+    const nextMatch = resolveActiveDomain(next);
+    if (nextMatch && nextMatch.code !== 'MARKETS') return nextMatch;
+    if (typeof document !== 'undefined' && document.referrer) {
+      try {
+        const referrerPath = new URL(document.referrer).pathname;
+        const refMatch = resolveActiveDomain(referrerPath);
+        if (refMatch && refMatch.code !== 'MARKETS') return refMatch;
+        // /signup/[domain] referrer — derive from the URL slug
+        const signupMatch = referrerPath.match(/^\/signup\/(logistics|markets|amro)$/);
+        if (signupMatch && signupMatch[1] !== 'markets') {
+          return getDomainManifest(signupMatch[1]);
+        }
+      } catch {
+        /* document.referrer may be a cross-origin URL; ignore */
+      }
+    }
+    return null;
+  }, [isRetailVariant, next]);
 
   useEffect(() => {
     if (user) {
@@ -187,7 +218,7 @@ export default function Auth() {
     }
   };
 
-  const Chrome = isRetailVariant ? SthiraChrome : SosChrome;
+  const ChromeComponent = isRetailVariant ? SthiraChrome : SosChrome;
 
   // Build the form once and slot it into whichever chrome the audience earned.
   const formBody = recoveryMode ? (
@@ -273,33 +304,60 @@ export default function Auth() {
     </form>
   );
 
+  // Eyebrow + title morphs to "Welcome back to SOS Logistics" / etc. when
+  // a domain hint resolved. Sthira variant stays as it was.
+  const title = isRetailVariant
+    ? 'Sthira'
+    : domainHint
+      ? `SOS ${domainHint.sidebar?.label ?? domainHint.name}`
+      : 'SOS Services';
+
   return (
-    <Chrome
-      title={isRetailVariant ? 'Sthira' : 'SOS Services'}
+    <ChromeComponent
+      title={title}
       subtitle={recoveryMode ? 'Set a new password for your account' : 'Sign in to continue'}
+      domainHint={isRetailVariant ? null : domainHint}
     >
       {formBody}
-    </Chrome>
+    </ChromeComponent>
   );
 }
 
 // ─── Chrome variants ───────────────────────────────────────────────────────
 
 interface ChromeProps {
-  title:    string;
-  subtitle: string;
-  children: ReactNode;
+  title:        string;
+  subtitle:     string;
+  children:     ReactNode;
+  /** MV-5 — when set, SosChrome paints a 4px accent strip + tagline. */
+  domainHint?:  DomainManifest | null;
 }
 
-function SosChrome({ title, subtitle, children }: ChromeProps) {
+function SosChrome({ title, subtitle, children, domainHint }: ChromeProps) {
+  const accentHex = domainHint ? accentForDomain(domainHint.code.toLowerCase()) : null;
+  const productName = domainHint?.sidebar?.label ?? domainHint?.name;
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
-      <Card className="w-full max-w-md">
+      <Card className="relative w-full max-w-md overflow-hidden">
+        {/* MV-5 — domain accent strip at the top of the login card. */}
+        {accentHex && (
+          <div
+            aria-hidden="true"
+            className="absolute inset-x-0 top-0 h-1"
+            style={{ background: accentHex }}
+          />
+        )}
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <SosLogo size={64} />
+            <SosLogo size={64} productName={productName} />
           </div>
           <H2>{title}</H2>
+          {productName && (
+            <p className="text-[11px] uppercase tracking-[0.32em] text-muted-foreground">
+              Welcome back to SOS {productName}
+            </p>
+          )}
           <CardDescription>{subtitle}</CardDescription>
         </CardHeader>
         <CardContent>{children}</CardContent>

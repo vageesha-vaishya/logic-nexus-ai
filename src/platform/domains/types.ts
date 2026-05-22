@@ -17,9 +17,23 @@
  */
 
 import type { LazyExoticComponent, ComponentType } from "react";
+import type { LucideIcon } from "lucide-react";
 
 /** What a domain's "primary tenant subscription policy" looks like. */
 export type DomainAssignmentPolicy = "auto" | "opt-in" | "trial";
+
+/** Plan tier names — match the subscription_tier enum + planLimits keys. */
+export type PlanTier = "free" | "basic" | "starter" | "business" | "professional" | "enterprise";
+
+/** App role names — match the public.app_role Postgres enum. */
+export type DomainAppRole =
+  | "platform_admin"
+  | "tenant_admin"
+  | "franchise_admin"
+  | "user"
+  | "viewer"
+  | "sales_manager"
+  | "platform_domain_admin";
 
 /** A single route owned by a domain. */
 export interface DomainRoute {
@@ -44,6 +58,46 @@ export interface DomainRoute {
    * requiredPermissions prop during route construction.
    */
   requiredPermissions?: string[];
+
+  // ─── MV-1 additions (all optional, backward-compatible) ─────────────────
+  /**
+   * Stable identifier for this module — used by
+   * `subscription_plans.limits.modules` to flip per-module access. Format:
+   * `<domain>.<feature>` (e.g. "markets.signals", "crm.invoices"). Omit
+   * for nested / utility routes that don't represent a top-level module
+   * the user thinks of as a thing.
+   */
+  moduleCode?: string;
+  /**
+   * Human-readable label for the sidebar. Omit to hide this route from
+   * the sidebar entirely (e.g. deep-nested detail pages).
+   */
+  label?: string;
+  /** Sidebar icon. Lucide component. */
+  icon?: LucideIcon;
+  /**
+   * Roles allowed to access this module. If the active membership's
+   * role isn't in this list, `resolveModuleAccess` returns reason='role'.
+   * Omit to allow all roles (subject to permission + plan checks).
+   */
+  requiredRole?: DomainAppRole | readonly DomainAppRole[];
+  /**
+   * Lower-bound plan tier that unlocks this module. Combined with
+   * `subscription_plans.limits.modules[moduleCode]` — the limits map can
+   * deny a module even when the tier passes (explicit false), but cannot
+   * grant it when the tier fails (security default).
+   */
+  minPlanTier?: PlanTier;
+}
+
+/** Sidebar grouping metadata for a domain. */
+export interface DomainSidebar {
+  /** Section header text in the sidebar (e.g. "Markets Advisor"). */
+  label: string;
+  /** Icon next to the section header — Lucide component. */
+  icon: LucideIcon;
+  /** Default expanded state when the user hasn't interacted yet. */
+  collapsedByDefault?: boolean;
 }
 
 /** Brand surface for a domain — CSS variable overrides applied when active. */
@@ -75,6 +129,29 @@ export interface DomainManifest {
   brand: DomainBrand;
   /** All routes this domain owns. */
   routes: DomainRoute[];
+
+  // ─── MV-1 additions (all optional, backward-compatible) ─────────────────
+  /**
+   * URL path prefixes this domain owns. The `resolveActiveDomain` resolver
+   * walks every manifest and picks the first whose prefix matches the
+   * current pathname. Order matters within the array but not across
+   * manifests (manifest iteration order is the registry order).
+   *
+   * Typical pattern: `["/dashboard/{code}"]` for the dashboard surface +
+   * any per-domain mobile shell paths (e.g. Sthira adds "/sthira" to
+   * the markets manifest because retail uses that URL prefix).
+   *
+   * If omitted, this domain participates in no sidebar grouping and
+   * the resolver never matches its URLs (treated as "tenant-wide" or
+   * legacy routes).
+   */
+  pathPrefixes?: readonly string[];
+  /**
+   * Sidebar grouping metadata. Omit to exclude this domain from the
+   * tenant-wide grouped sidebar (the sidebar still uses individual
+   * routes' `label` to render them).
+   */
+  sidebar?: DomainSidebar;
   /**
    * Default assignment policy when a new tenant signs up.
    * - 'auto':  domain is auto-assigned (e.g. CRM as a baseline)

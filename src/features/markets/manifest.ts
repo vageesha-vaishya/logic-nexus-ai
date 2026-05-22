@@ -8,11 +8,25 @@
  *
  * See docs/plans/2026-05-21-path-a-per-domain-spa-bundles-design.md
  */
+import { TrendingUp } from "lucide-react";
+
 import type { DomainManifest } from "@/platform/domains/types";
 
 export const marketsManifest: DomainManifest = {
   code: "MARKETS",
   name: "Retail Investment Platform",
+  // Path prefixes owned by this domain — consumed by resolveActiveDomain
+  // (src/platform/domains/resolver.ts). The retail (Sthira) and B2B
+  // Markets-advisor surfaces both live under this manifest because
+  // platform_domains.code = 'markets' for both. When the SOS Markets
+  // Advisor B2B product ships routes, add their prefixes (e.g.
+  // "/dashboard/markets/advisor") and their routes here with moduleCodes
+  // like "markets.advisor.portfolios". Per MV-2.
+  pathPrefixes: ["/dashboard/markets", "/sthira"],
+  sidebar: {
+    label: "Markets",
+    icon:  TrendingUp,
+  },
   description:
     "SEBI-compliant retail investment platform: portfolios, risk scoring, " +
     "rebalancing, behavioural events, push notifications. Powers the Sthira " +
@@ -65,10 +79,13 @@ export const marketsManifest: DomainManifest = {
       path: "/dashboard/markets/retail",
       component: () => import("./pages/RetailModePage"),
       mobile: true,
+      moduleCode: "markets.retail",
+      label: "Retail",
       children: [
         { path: "home", component: () => import("./retail/pages/RetailHomePage"), mobile: true },
         { path: "portfolio", component: () => import("./retail/pages/RetailPortfolioPage"), mobile: true },
-        { path: "signals", component: () => import("./retail/pages/RetailSignalsPage"), mobile: true },
+        { path: "signals", component: () => import("./retail/pages/RetailSignalsPage"), mobile: true,
+          moduleCode: "markets.signals" },
         { path: "goals", component: () => import("./retail/pages/RetailGoalsPage"), mobile: true },
         { path: "more", component: () => import("./retail/pages/RetailMorePage"), mobile: true },
         { path: "withdraw", component: () => import("./retail/pages/RetailWithdrawPage"), mobile: true },

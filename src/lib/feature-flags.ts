@@ -18,6 +18,13 @@ export const FEATURE_FLAGS = {
   USER_INFO_HEADER_DUAL_MODE: 'user_info_header_dual_mode',
   HEADER_DEBUG_BUTTON: 'header_debug_button',
   AMRO_RBAC_FIX_ENABLED: 'amro_rbac_fix_enabled',
+  /**
+   * MV-3 — replace the legacy CommandCenterNav with the new tenant-wide
+   * domain-grouped sidebar. Default off; flip on per-tenant or globally
+   * once the manifest-driven grouping has been validated. See
+   * docs/plans/2026-05-22-module-visibility-and-domain-login-design.md.
+   */
+  DOMAIN_GROUPED_NAV: 'domain_grouped_nav',
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];

@@ -14,6 +14,8 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { CommandCenterNav } from '@/components/navigation/CommandCenterNav';
+import { DomainGroupedNav } from '@/components/navigation/DomainGroupedNav';
+import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { motion } from 'framer-motion';
 import { logger } from "@/lib/logger";
 
@@ -137,7 +139,13 @@ export function AppSidebar() {
         </SidebarHeader>
 
         <SidebarContent ref={scrollRef} className="py-2 pr-1">
-          <CommandCenterNav />
+          {/* MV-3 — gate the new tenant-wide domain-grouped nav behind a
+              feature flag while we validate the manifest classification
+              against the live menu set. Default off; flip globally or
+              per-tenant once verified. */}
+          {useAppFeatureFlag(FEATURE_FLAGS.DOMAIN_GROUPED_NAV, false).enabled
+            ? <DomainGroupedNav />
+            : <CommandCenterNav />}
         </SidebarContent>
 
       <SidebarFooter className="border-t p-4">
