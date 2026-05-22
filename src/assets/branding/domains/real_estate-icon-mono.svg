@@ -1,0 +1,5 @@
+<!-- real_estate marketing icon — mono variant. PLACEHOLDER. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect x="0" y="0" width="64" height="64" rx="12" fill="#0F172A"/>
+  <path d="M14 30 L 32 16 L 50 30 L 50 48 L 14 48 Z" fill="none" stroke="white" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/><line x1="14" y1="30" x2="50" y2="30" stroke="white" stroke-width="3" stroke-linecap="round"/>
+</svg>

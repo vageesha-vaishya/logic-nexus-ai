@@ -1,0 +1,14 @@
+<!--
+  SOS master mark — light variant. PLACEHOLDER.
+  See docs/plans/2026-05-22-brand-logos-design-brief.md.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 60" width="64" height="60">
+  <rect x="0" y="0" width="64" height="60" rx="12" fill="#F8FAFC" stroke="#E2E8F0" stroke-width="1"/>
+  <path
+    d="M 47 21 C 47 16, 43 13, 38 13 L 26 13 C 21 13, 17 16, 17 21 C 17 26, 21 29, 26 29 L 38 29 C 43 29, 47 33, 47 38 C 47 43, 43 47, 38 47 L 26 47 C 21 47, 17 43, 17 38"
+    fill="none"
+    stroke="#0F172A"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"/>
+</svg>
