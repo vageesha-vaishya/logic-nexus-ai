@@ -126,6 +126,7 @@ export const marketsManifest: DomainManifest = {
   // (id d127c2d9-…) that is no longer a single canonical file.
   seedMigration: "20260520130939_assign_markets_domain_to_active_tenants.sql",
   services: ["markets-worker"],
+  defaultRoute: "/dashboard/markets/retail/home",
 };
 
 export default marketsManifest;

@@ -43,6 +43,7 @@ export const amroManifest: DomainManifest = {
   defaultAssignmentPolicy: "opt-in",
   requiredPermissions: ["amro.view"],
   seedMigration: "20260411000000_seed_amro_domain_and_assignments.sql",
+  defaultRoute: "/dashboard/amro",
 };
 
 export default amroManifest;

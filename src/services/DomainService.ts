@@ -216,10 +216,31 @@ async function resolveTenantDomainsClientSide(): Promise<{ domains: PlatformDoma
     return { domains: [], tenantDomainCount: 0, isPlatformAdmin: false };
   }
 
-  const { data: tenantAssignmentRows, error: tenantAssignmentError } = await (supabase as any)
-    .from('tenant_domain_assignments')
-    .select('platform_domains!inner(id, code, name, description, is_active)')
-    .eq('is_active', true);
+  // Phase 1 lifecycle: read from tenant_active_domain_assignments rather than
+  // the raw table so expired / cancelled / past_due / inactive rows are
+  // filtered server-side. Falls back to the raw table if the view is missing
+  // (older DBs that pre-date 20260522160216).
+  // See supabase/migrations/20260522160216_phase1_lifecycle_grace_and_past_due_sweeps.sql.
+  let tenantAssignmentRows: any[] | null = null;
+  let tenantAssignmentError: any = null;
+  {
+    const viewResult = await (supabase as any)
+      .from('tenant_active_domain_assignments')
+      .select('platform_domains!inner(id, code, name, description, is_active)');
+    if (viewResult.error && (viewResult.error as any)?.code === '42P01') {
+      // View not yet present — fall back to the table with the lifecycle filter inlined.
+      const tableResult = await (supabase as any)
+        .from('tenant_domain_assignments')
+        .select('platform_domains!inner(id, code, name, description, is_active), subscription_status')
+        .eq('is_active', true)
+        .in('subscription_status', ['active', 'trialing', 'grace_period']);
+      tenantAssignmentRows = tableResult.data ?? null;
+      tenantAssignmentError = tableResult.error;
+    } else {
+      tenantAssignmentRows = viewResult.data ?? null;
+      tenantAssignmentError = viewResult.error;
+    }
+  }
 
   let tenantDomains = normalizeDomainRows(tenantAssignmentRows || []);
   const missingAssignments = (tenantAssignmentError as any)?.code === '42P01';

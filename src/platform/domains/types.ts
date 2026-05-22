@@ -176,6 +176,17 @@ export interface DomainManifest {
    * "what's running for this domain" telemetry dashboard.
    */
   services?: string[];
+  /**
+   * Default landing route for a tenant whose ONLY assignment is this
+   * domain. `DomainShellRouter` redirects `/dashboard` to this path so
+   * a single-domain tenant sees a domain-shaped app instead of the
+   * generic Command Center dashboard. Multi-domain tenants and
+   * platform admins ignore this field. Omit to opt out — those
+   * tenants stay on the generic dashboard.
+   *
+   * Phase 2 of the multi-domain independence sequence.
+   */
+  defaultRoute?: string;
 }
 
 /**

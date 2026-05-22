@@ -13,6 +13,7 @@ export const communicationsManifest: DomainManifest = {
   defaultAssignmentPolicy: "auto",
   requiredPermissions: ["communications.view"],
   seedMigration: "20260522142256_phase1_seed_missing_domains.sql",
+  defaultRoute: "/dashboard/communications",
 };
 
 export default communicationsManifest;

@@ -92,6 +92,7 @@ export const logisticsManifest: DomainManifest = {
   defaultAssignmentPolicy: "opt-in",
   requiredPermissions: ["logistics.view"],
   seedMigration: "20260131053539_sync_logistics_domain.sql",
+  defaultRoute: "/dashboard/leads/pipeline",
 };
 
 export default logisticsManifest;

@@ -13,6 +13,7 @@ export const quotationManifest: DomainManifest = {
   defaultAssignmentPolicy: "opt-in",
   requiredPermissions: ["quotation.view"],
   seedMigration: "20260522142256_phase1_seed_missing_domains.sql",
+  defaultRoute: "/dashboard/quotations",
 };
 
 export default quotationManifest;

@@ -61,6 +61,9 @@ import { SthiraMobileGuard } from "./features/markets/sthira/SthiraMobileGuard";
 // here is gone — kept only the flag-gated manifest splice.
 import { marketsManifest } from "./features/markets/manifest";
 import { buildDomainRoutes, USE_DOMAIN_MANIFESTS } from "./platform/domains/buildDomainRoutes";
+// Phase 2 — single-domain tenants land on their domain's defaultRoute
+// instead of the generic dashboard. See DomainShellRouter doc-comment.
+import { DomainShellRouter } from "./platform/domains/DomainShellRouter";
 
 const DashboardRouter = lazy(() =>
   import("./components/dashboard/DashboardRouter").then((module) => ({ default: module.DashboardRouter }))
@@ -424,13 +427,15 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route 
-              path="/dashboard" 
+            <Route
+              path="/dashboard"
               element={
                 <ProtectedRoute>
-                  <DashboardRouter />
+                  <DomainShellRouter>
+                    <DashboardRouter />
+                  </DomainShellRouter>
                 </ProtectedRoute>
-              } 
+              }
             />
             <Route
               path="/dashboard/accounts"

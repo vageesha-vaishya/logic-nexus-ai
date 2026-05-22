@@ -13,6 +13,7 @@ export const complianceManifest: DomainManifest = {
   defaultAssignmentPolicy: "auto",
   requiredPermissions: ["compliance.view"],
   seedMigration: "20260522142256_phase1_seed_missing_domains.sql",
+  defaultRoute: "/dashboard/compliance",
 };
 
 export default complianceManifest;
