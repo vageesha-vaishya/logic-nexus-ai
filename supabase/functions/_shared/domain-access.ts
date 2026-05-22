@@ -36,6 +36,15 @@ export interface DomainAccessResult {
  * Callers typically use the service-role client so the check itself isn't
  * RLS-gated; the user's data access remains RLS-enforced.
  * No caching — T1.5 (markets-doc §16.8 P2) introduces Redis caching for these.
+ *
+ * Case-insensitivity: the `PlatformDomains` constants are lowercase, but
+ * legacy seed migrations (notably MARKETS, AMRO) stored uppercase codes in
+ * `platform_domains.code`. A case-sensitive `.eq()` made the check fail
+ * silently for any tenant whose row used the wrong casing → 403 from every
+ * function that gates with this helper. We match case-insensitively so a
+ * single canonical casing isn't required at the schema layer. Domain codes
+ * don't contain SQL LIKE wildcards (`%`, `_`), so `.ilike()` is exact-match
+ * here.
  */
 export async function checkDomainAccess(
   supabase: SupabaseClient,
@@ -49,7 +58,7 @@ export async function checkDomainAccess(
     )
     .eq("tenant_id", tenantId)
     .eq("is_active", true)
-    .eq("platform_domains.code", domain)
+    .ilike("platform_domains.code", domain)
     .eq("platform_domains.is_active", true)
     .maybeSingle();
 
