@@ -31,18 +31,20 @@ export interface RetailTab {
   to: string;
   label: string;
   Icon: LucideIcon;
+  /** Tour anchor id — referenced by tour/HomeTour.tsx. */
+  tourId?: string;
 }
 
 export const RETAIL_TABS: ReadonlyArray<RetailTab> = [
   { to: "/dashboard/markets/retail/home",      label: "Home",      Icon: Home },
   { to: "/dashboard/markets/retail/portfolio", label: "Portfolio", Icon: Wallet },
-  { to: "/dashboard/markets/retail/signals",   label: "Signals",   Icon: Zap },
+  { to: "/dashboard/markets/retail/signals",   label: "Signals",   Icon: Zap,             tourId: "tab-signals" },
   { to: "/dashboard/markets/retail/goals",     label: "Goals",     Icon: Target },
-  { to: "/dashboard/markets/retail/more",      label: "More",      Icon: MoreHorizontal },
+  { to: "/dashboard/markets/retail/more",      label: "More",      Icon: MoreHorizontal,  tourId: "tab-more" },
 ];
 
 function TabLink({ tab, vertical }: { tab: RetailTab; vertical: boolean }) {
-  const { to, label, Icon } = tab;
+  const { to, label, Icon, tourId } = tab;
   return (
     <NavLink
       to={to}
@@ -59,6 +61,7 @@ function TabLink({ tab, vertical }: { tab: RetailTab; vertical: boolean }) {
         )
       }
       aria-label={label}
+      data-tour-id={tourId}
     >
       <Icon className="h-5 w-5" aria-hidden="true" />
       <span>{label}</span>

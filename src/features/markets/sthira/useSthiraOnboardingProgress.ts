@@ -4,20 +4,20 @@
  * Drives the Sthira mobile onboarding routing. Returns the next required
  * step based on existing data:
  *   - "auth"     — not signed in
- *   - "risk"     — signed in, no risk profile yet
- *   - "broker"   — risk + goals done, no broker connected (skippable)
- *   - "complete" — fully onboarded; route to Home
+ *   - "risk"     — signed in, risk_profile.onboarding_complete is false
+ *   - "complete" — fully onboarded; route to Home (paper portfolio is
+ *                  pre-seeded by the post-signup edge function)
  *   - "loading"  — still querying
  *
- * "goals" and "risk" are merged into one wizard step in the existing
- * OnboardingWizard — they don't map to separate routes. The design doc
- * lists them separately for human-facing description; here they collapse.
+ * Updated 2026-05-22 for decision A (broker-deferred): a connected broker
+ * is no longer required to reach Home. Users start in paper mode and can
+ * connect a broker any time from More → Brokers. The "broker" step value
+ * is retained for back-compat with old callers but is never returned.
  *
- * See docs/plans/2026-05-20-sthira-mobile-onboarding-and-markets-ux-design.md
+ * See docs/plans/2026-05-21-self-onboarding-wizard-design.md.
  */
 import { useAuth } from "@/hooks/useAuth";
 import { useRiskProfile } from "@/features/markets/retail/hooks/useRiskProfile";
-import { useBrokerConnections } from "@/features/markets/hooks/useBrokerConnections";
 
 export type SthiraOnboardingStep =
   | "loading"
@@ -30,37 +30,27 @@ export interface SthiraOnboardingProgress {
   step:           SthiraOnboardingStep;
   hasAuth:        boolean;
   hasRiskProfile: boolean;
-  hasBroker:      boolean;
 }
 
 export function useSthiraOnboardingProgress(): SthiraOnboardingProgress {
   const { user, loading: authLoading } = useAuth();
   const profile = useRiskProfile();
-  const connections = useBrokerConnections();
 
-  // While we don't know the user's session yet, hold.
   if (authLoading) {
-    return { step: "loading", hasAuth: false, hasRiskProfile: false, hasBroker: false };
+    return { step: "loading", hasAuth: false, hasRiskProfile: false };
   }
 
-  // No session → first step is auth.
   if (!user?.id) {
-    return { step: "auth", hasAuth: false, hasRiskProfile: false, hasBroker: false };
+    return { step: "auth", hasAuth: false, hasRiskProfile: false };
   }
 
-  // Session resolved but the profile + brokers queries still loading.
-  if (profile.isPending || connections.isPending) {
-    return { step: "loading", hasAuth: true, hasRiskProfile: false, hasBroker: false };
+  if (profile.isPending) {
+    return { step: "loading", hasAuth: true, hasRiskProfile: false };
   }
 
   const hasRiskProfile = profile.hasOnboarded;
-  const hasBroker = (connections.data?.length ?? 0) > 0;
-
   if (!hasRiskProfile) {
-    return { step: "risk", hasAuth: true, hasRiskProfile, hasBroker };
+    return { step: "risk", hasAuth: true, hasRiskProfile };
   }
-  if (!hasBroker) {
-    return { step: "broker", hasAuth: true, hasRiskProfile, hasBroker };
-  }
-  return { step: "complete", hasAuth: true, hasRiskProfile, hasBroker };
+  return { step: "complete", hasAuth: true, hasRiskProfile };
 }
