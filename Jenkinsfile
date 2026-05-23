@@ -4,6 +4,7 @@ pipeline {
         string(name: 'DEPLOY_BRANCH', defaultValue: 'main', description: 'Git branch to checkout and deploy')
         string(name: 'GIT_CREDENTIALS_ID', defaultValue: 'logic-nexus-git', description: 'Jenkins credentialsId for GitHub access (PAT or app credential)')
         booleanParam(name: 'ENABLE_COOLIFY_TRIGGER', defaultValue: false, description: 'Trigger Coolify webhook after VPS deploy (can overwrite VPS container config)')
+        booleanParam(name: 'COOLIFY_OWNS_MARKETS_WORKER', defaultValue: false, description: 'When true: skip the host-nginx TLS stage and the systemd markets-worker deploy. Use this when Coolify is configured to host markets.sosservices.online directly. The two stages collide with Coolify-Traefik on :443.')
         booleanParam(name: 'ENABLE_ANDROID_RELEASE', defaultValue: false, description: 'Build a signed Android Release AAB (requires JDK 17 + Android SDK + Jenkins credentials android-keystore-file / android-keystore-password / android-key-alias / android-key-password)')
         string(name: 'AMRO_API_UPSTREAM', defaultValue: 'host.docker.internal:8031', description: 'AMRO API upstream for logicpro-web container')
         choice(name: 'DB_TARGET', choices: ['auto', 'local', 'cloud'], description: 'Select Supabase instance for build')
@@ -450,6 +451,9 @@ fi
             }
         }
         stage('Setup TLS (markets.sosservices.online)') {
+            when {
+                expression { return !params.COOLIFY_OWNS_MARKETS_WORKER }
+            }
             steps {
                 script {
                     echo "Configuring host nginx + Let's Encrypt cert..."
@@ -467,6 +471,9 @@ fi
         }
 
         stage('Deploy Markets Worker to VPS') {
+            when {
+                expression { return !params.COOLIFY_OWNS_MARKETS_WORKER }
+            }
             steps {
                 script {
                     echo "Installing/restarting markets-worker (FastAPI) on VPS host..."
