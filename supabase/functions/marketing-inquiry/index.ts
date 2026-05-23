@@ -12,6 +12,9 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:4322",
 ]);
 
+const NOTIFY_RECIPIENTS = ["bahuguna.vimal@gmail.com", "hello@sosservices.online"];
+const NOTIFY_FROM = "SOS Services <onboarding@resend.dev>";
+
 function corsHeaders(origin: string): Record<string, string> {
   const allow = ALLOWED_ORIGINS.has(origin) ? origin : "https://sosservices.online";
   return {
@@ -34,6 +37,111 @@ async function sha256(s: string): Promise<string> {
   return Array.from(new Uint8Array(digest))
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
+}
+
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+async function notifyByEmail(payload: {
+  sourceSite: string;
+  name: string;
+  email: string;
+  company: string | null;
+  role: string | null;
+  topic: string | null;
+  message: string;
+  inquiryId: string;
+}): Promise<void> {
+  const apiKey = Deno.env.get("RESEND_API_KEY");
+  if (!apiKey) {
+    console.warn("RESEND_API_KEY not set — skipping email notification");
+    return;
+  }
+
+  const siteTag = payload.sourceSite.split(".")[0] || payload.sourceSite;
+  const companyTag = payload.company ? ` at ${payload.company}` : "";
+  const subject = `[${siteTag}] New inquiry from ${payload.name}${companyTag}`;
+
+  const fields: [string, string | null][] = [
+    ["Source site", payload.sourceSite],
+    ["Name", payload.name],
+    ["Email", payload.email],
+    ["Company", payload.company],
+    ["Role", payload.role],
+    ["Topic", payload.topic],
+  ];
+
+  const rows = fields
+    .filter(([, v]) => v)
+    .map(
+      ([k, v]) =>
+        `<tr><td style="padding:6px 12px 6px 0;color:#64748b;font-size:13px;">${k}</td><td style="padding:6px 0;color:#0f172a;font-size:14px;font-weight:500;">${escapeHtml(
+          v as string,
+        )}</td></tr>`,
+    )
+    .join("");
+
+  const html = `<!doctype html>
+<html><body style="margin:0;font-family:ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f8fafc;padding:24px;">
+  <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
+    <div style="background:#0f172a;color:#fff;padding:16px 24px;font-size:13px;letter-spacing:0.05em;text-transform:uppercase;">
+      Marketing inquiry · ${escapeHtml(payload.sourceSite)}
+    </div>
+    <div style="padding:24px;">
+      <h1 style="margin:0 0 16px 0;font-size:20px;color:#0f172a;">New inquiry from ${escapeHtml(payload.name)}</h1>
+      <table style="border-collapse:collapse;width:100%;margin-bottom:20px;">${rows}</table>
+      <div style="border-top:1px solid #e2e8f0;padding-top:16px;">
+        <div style="color:#64748b;font-size:13px;margin-bottom:8px;">Message</div>
+        <div style="color:#0f172a;font-size:14px;line-height:1.6;white-space:pre-wrap;">${escapeHtml(payload.message)}</div>
+      </div>
+      <div style="margin-top:24px;font-size:12px;color:#94a3b8;">
+        Inquiry ID: <code>${payload.inquiryId}</code>
+      </div>
+    </div>
+  </div>
+</body></html>`;
+
+  const text = [
+    `New inquiry from ${payload.name}${payload.company ? " at " + payload.company : ""}`,
+    "",
+    ...fields.filter(([, v]) => v).map(([k, v]) => `${k}: ${v}`),
+    "",
+    "Message:",
+    payload.message,
+    "",
+    `Inquiry ID: ${payload.inquiryId}`,
+  ].join("\n");
+
+  try {
+    const res = await fetch("https://api.resend.com/emails", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        from: NOTIFY_FROM,
+        to: NOTIFY_RECIPIENTS,
+        reply_to: payload.email,
+        subject,
+        html,
+        text,
+      }),
+    });
+
+    if (!res.ok) {
+      const errBody = await res.text();
+      console.error(`Resend send failed (${res.status}):`, errBody);
+    }
+  } catch (err) {
+    console.error("Resend send threw:", err);
+  }
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
@@ -82,27 +190,47 @@ Deno.serve(async (req: Request): Promise<Response> => {
     .trim() || "unknown";
   const ipHash = await sha256(ip);
 
+  const company = body.company ? String(body.company).trim().slice(0, 200) : null;
+  const role = body.role ? String(body.role).trim().slice(0, 100) : null;
+  const topic = body.topic ? String(body.topic).trim().slice(0, 100) : null;
+
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL") ?? "",
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
   );
 
-  const { error } = await supabase.from("marketing_inquiries").insert({
-    source_site: sourceSite,
-    name,
-    email,
-    company: body.company ? String(body.company).trim().slice(0, 200) : null,
-    role: body.role ? String(body.role).trim().slice(0, 100) : null,
-    topic: body.topic ? String(body.topic).trim().slice(0, 100) : null,
-    message,
-    user_agent: (req.headers.get("user-agent") ?? "").slice(0, 500),
-    ip_hash: ipHash,
-  });
+  const { data: inserted, error } = await supabase
+    .from("marketing_inquiries")
+    .insert({
+      source_site: sourceSite,
+      name,
+      email,
+      company,
+      role,
+      topic,
+      message,
+      user_agent: (req.headers.get("user-agent") ?? "").slice(0, 500),
+      ip_hash: ipHash,
+    })
+    .select("id")
+    .single();
 
   if (error) {
     console.error("marketing-inquiry insert error:", error);
     return jsonResp(500, { error: "storage failed" }, origin);
   }
+
+  // Fire-and-forget email notification — failure here does NOT fail the form
+  notifyByEmail({
+    sourceSite,
+    name,
+    email,
+    company,
+    role,
+    topic,
+    message,
+    inquiryId: inserted?.id ?? "unknown",
+  }).catch((err) => console.error("notifyByEmail unhandled:", err));
 
   return jsonResp(200, { ok: true }, origin);
 });
