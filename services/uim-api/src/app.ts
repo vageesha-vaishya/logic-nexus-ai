@@ -16,6 +16,7 @@ const NODE_KEYS = new Set([
 export type StoredRecord = {
   id: string;
   tenant_id: string;
+  domain_id?: string;
   franchise_id: string | null;
   node_key: string;
   payload: Record<string, unknown>;
