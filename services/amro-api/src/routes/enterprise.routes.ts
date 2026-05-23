@@ -67,8 +67,7 @@ router.post('/materials/search', asyncHandler(async (req: AuthRequest, res) => {
   let supabaseQuery = supabase
     .from('parts_inventory')
     .select('*', { count: 'exact' })
-    .limit(limit)
-    .offset(offset);
+    .range(offset, offset + limit - 1);
 
   // Search
   if (query) {
@@ -264,8 +263,7 @@ router.post('/tooling/search', asyncHandler(async (req: AuthRequest, res) => {
   let supabaseQuery = supabase
     .from('amro_tooling_registry')
     .select('*', { count: 'exact' })
-    .limit(limit)
-    .offset(offset);
+    .range(offset, offset + limit - 1);
 
   if (query) {
     supabaseQuery = supabaseQuery.or(

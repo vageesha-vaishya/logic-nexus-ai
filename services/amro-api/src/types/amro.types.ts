@@ -61,7 +61,6 @@ export interface WorkOrder {
   franchise_id?: string;
   aircraft_id: string;
   work_order_number: string;
-  work_order_number?: string;
   work_order_template_id?: string;
   work_order_title_id?: string;
   title: string;
@@ -91,7 +90,6 @@ export interface Task {
   id: string;
   tenant_id: string;
   franchise_id?: string;
-  work_order_id?: string;
   work_order_id?: string;
   task_number: string;
   title: string;
@@ -230,7 +228,6 @@ export interface UpdateWorkOrderRequest {
 }
 
 export interface CreateTaskRequest {
-  work_order_id?: string;
   work_order_id?: string;
   title: string;
   description?: string;
