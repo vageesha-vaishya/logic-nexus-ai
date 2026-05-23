@@ -24,6 +24,19 @@ class RegisterRequest(BaseModel):
     device_name:  str | None = None
 
 
+# The DB column `markets.push_tokens.platform` is mis-named — it actually
+# stores the TRANSPORT (fcm / apns / web), enforced by the check constraint
+# push_tokens_platform_check = ('expo', 'fcm', 'apns', 'web'). The client
+# sends the OS it's running on (android / ios / web) because that's what
+# it knows about itself. Translate at the boundary so the column stores
+# what fan_out_push expects to find.
+PLATFORM_TO_TRANSPORT: dict[str, str] = {
+    "android": "fcm",
+    "ios":     "apns",
+    "web":     "web",
+}
+
+
 class TestRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     title: str = "Logic Nexus"
@@ -40,7 +53,7 @@ def register(body: RegisterRequest, auth: Auth) -> dict[str, Any]:
     sb = get_supabase()
     payload = {
         "user_id":      user_id,
-        "platform":     body.platform,
+        "platform":     PLATFORM_TO_TRANSPORT[body.platform],
         "token":        body.token,
         "device_name":  body.device_name,
         "is_active":    True,
