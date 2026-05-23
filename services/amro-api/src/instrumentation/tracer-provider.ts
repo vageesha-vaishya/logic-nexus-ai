@@ -7,7 +7,7 @@
 import { NodeSDK } from '@opentelemetry/sdk-node';
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-http';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 
 let sdk: NodeSDK | null = null;
 

@@ -6,14 +6,14 @@
 
 import { Kafka, Producer, logLevel } from 'kafkajs';
 import { randomUUID } from 'crypto';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 import {
   AmroEvent,
   AmroEventType,
   AmroWorkOrderEvent,
   AmroTaskEvent,
   AmroMaintenanceEvent,
-} from './amro-events.types';
+} from './amro-events.types.js';
 
 /**
  * Configuration constants

@@ -1,5 +1,5 @@
 import { EventEmitter } from 'events';
-import { WorkOrder } from '../types/amro.types';
+import { WorkOrder } from '../types/amro.types.js';
 
 export type WorkOrderStreamEventType = 'created' | 'updated' | 'deleted';
 

@@ -6,8 +6,8 @@ import {
   TaxExemptionCertificate,
   TaxExemptionCertificateUploadRequest,
   TaxNexusAddress
-} from '../types/crm.types';
-import { logger } from '../utils/logger';
+} from '../types/crm.types.js';
+import { logger } from '../utils/logger.js';
 
 type TaxRuleRow = {
   rate: number | string;

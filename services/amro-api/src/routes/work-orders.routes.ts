@@ -4,8 +4,8 @@
  */
 
 import { Router, Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { WorkOrdersService } from '../services/work-orders.service';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+import { WorkOrdersService } from '../services/work-orders.service.js';
 import {
   CreateWorkOrderRequest,
   UpdateWorkOrderRequest,
@@ -13,9 +13,9 @@ import {
   UpdateTaskRequest,
   ErrorResponse,
   MaintenanceType,
-} from '../types/amro.types';
-import { asyncHandler } from '../utils/asyncHandler';
-import { workOrdersStream } from '../realtime/work-orders-stream';
+} from '../types/amro.types.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { workOrdersStream } from '../realtime/work-orders-stream.js';
 
 const router = Router();
 const workOrdersService = new WorkOrdersService();

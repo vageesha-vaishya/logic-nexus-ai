@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { CreateLeadRequest, LeadRecord, UpdateLeadRequest } from '../types/crm.types';
+import { CreateLeadRequest, LeadRecord, UpdateLeadRequest } from '../types/crm.types.js';
 
 export class LeadsService {
   private getClient() {

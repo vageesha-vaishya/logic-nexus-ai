@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
-import { InvoiceFinalizedEvent } from '../../events/finance-events.types';
-import { MockERPConnector } from './MockERPConnector';
+import { InvoiceFinalizedEvent } from '../../events/finance-events.types.js';
+import { MockERPConnector } from './MockERPConnector.js';
 
 export class GLPosterService {
   private static supabase = GLPosterService.createSupabaseClient();

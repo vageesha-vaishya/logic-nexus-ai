@@ -5,8 +5,8 @@
 
 import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { logger } from '../utils/logger';
-import { executeWithResilience } from '../utils/resilience';
+import { logger } from '../utils/logger.js';
+import { executeWithResilience } from '../utils/resilience.js';
 
 interface AuthRequest extends Request {
   tenantId?: string;

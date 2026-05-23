@@ -1,6 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { logger } from '../utils/logger';
+import { logger } from '../utils/logger.js';
 
 interface AuthRequest extends Request {
   tenantId?: string;

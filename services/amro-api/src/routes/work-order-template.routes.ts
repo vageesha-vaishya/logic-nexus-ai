@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { createClient } from '@supabase/supabase-js';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { asyncHandler } from '../utils/asyncHandler';
-import { logger } from '../utils/logger';
-import { ErrorResponse } from '../types/amro.types';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { logger } from '../utils/logger.js';
+import { ErrorResponse } from '../types/amro.types.js';
 
 const router = Router();
 

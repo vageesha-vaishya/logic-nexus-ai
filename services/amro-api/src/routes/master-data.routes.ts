@@ -1,9 +1,9 @@
 import { NextFunction, Router, Response } from 'express';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { asyncHandler } from '../utils/asyncHandler';
-import { logger } from '../utils/logger';
-import { executeWithResilience } from '../utils/resilience';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { logger } from '../utils/logger.js';
+import { executeWithResilience } from '../utils/resilience.js';
 
 type JsonRecord = Record<string, unknown>;
 

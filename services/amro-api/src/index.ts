@@ -41,10 +41,10 @@ const kafkaEnabled = isTruthy(process.env.AMRO_KAFKA_ENABLED ?? process.env.KAFK
 async function startServer() {
   try {
     const [{ initializeTracing }, { default: app }, { logger }, { amroEventsProducer }] = await Promise.all([
-      import('./instrumentation/tracer-provider'),
-      import('./app'),
-      import('./utils/logger'),
-      import('./events/amro-events.producer'),
+      import('./instrumentation/tracer-provider.js'),
+      import('./app.js'),
+      import('./utils/logger.js'),
+      import('./events/amro-events.producer.js'),
     ]);
     await initializeTracing();
     logger.info('OpenTelemetry tracing initialized');

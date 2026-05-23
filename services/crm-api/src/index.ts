@@ -1,7 +1,7 @@
 import dotenv from 'dotenv';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { logger } from './utils/logger';
+import { logger } from './utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -24,10 +24,10 @@ async function startServer(): Promise<void> {
   try {
     const [{ default: app }, { crmEventsProducer }, { financeEventsProducer }, { financeEventsConsumer }] =
       await Promise.all([
-        import('./app'),
-        import('./events/crm-events.producer'),
-        import('./events/finance-events.producer'),
-        import('./events/finance-events.consumer'),
+        import('./app.js'),
+        import('./events/crm-events.producer.js'),
+        import('./events/finance-events.producer.js'),
+        import('./events/finance-events.consumer.js'),
       ]);
 
     if (kafkaEnabled) {

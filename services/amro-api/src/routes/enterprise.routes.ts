@@ -11,9 +11,9 @@
 
 import { Router } from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { AuthRequest } from '../middleware/auth.middleware';
-import { asyncHandler } from '../utils/asyncHandler';
-import { logger } from '../utils/logger';
+import type { AuthRequest } from '../middleware/auth.middleware.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 

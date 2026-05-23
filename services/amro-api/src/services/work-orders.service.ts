@@ -17,12 +17,12 @@ import {
   AmroComplianceSummary,
   AmroEvidenceSummary,
   AmroForecastRecommendation,
-} from '../types/amro.types';
-import { amroEventsProducer } from '../events/amro-events.producer';
-import { AmroEventType } from '../events/amro-events.types';
-import { withSpan } from '../instrumentation/amro-tracing';
-import { workOrdersStream } from '../realtime/work-orders-stream';
-import { logger } from '../utils/logger';
+} from '../types/amro.types.js';
+import { amroEventsProducer } from '../events/amro-events.producer.js';
+import { AmroEventType } from '../events/amro-events.types.js';
+import { withSpan } from '../instrumentation/amro-tracing.js';
+import { workOrdersStream } from '../realtime/work-orders-stream.js';
+import { logger } from '../utils/logger.js';
 
 type WorkOrderTemplateTaskItem = {
   task_template_id: string | null;

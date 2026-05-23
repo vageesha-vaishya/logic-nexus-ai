@@ -1,7 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
-import { InvoiceRecord, FinalizeInvoiceResponse, InvoiceStatus } from '../types/crm.types';
-import { financeEventsProducer } from '../events/finance-events.producer';
-import { BillingEngineService } from './billing/billing-engine.service';
+import { InvoiceRecord, FinalizeInvoiceResponse, InvoiceStatus } from '../types/crm.types.js';
+import { financeEventsProducer } from '../events/finance-events.producer.js';
+import { BillingEngineService } from './billing/billing-engine.service.js';
 
 type FinalizationMetadata = {
   idempotency_key?: string;

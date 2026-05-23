@@ -1,8 +1,8 @@
 import { randomUUID } from 'crypto';
 import { Kafka, Producer, logLevel } from 'kafkajs';
-import { logger } from '../utils/logger';
-import { FinanceEventType, InvoiceFinalizedEvent } from './finance-events.types';
-import { GLPosterService } from '../services/gl/GLPosterService';
+import { logger } from '../utils/logger.js';
+import { FinanceEventType, InvoiceFinalizedEvent } from './finance-events.types.js';
+import { GLPosterService } from '../services/gl/GLPosterService.js';
 
 const KAFKA_BROKERS = process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'];
 const KAFKA_CLIENT_ID = process.env.KAFKA_CLIENT_ID || 'crm-api-finance-producer';

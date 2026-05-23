@@ -1,7 +1,7 @@
 import { Kafka, Producer, logLevel } from 'kafkajs';
 import { randomUUID } from 'crypto';
-import { logger } from '../utils/logger';
-import { CrmEventType, CrmLeadEvent } from './crm-events.types';
+import { logger } from '../utils/logger.js';
+import { CrmEventType, CrmLeadEvent } from './crm-events.types.js';
 
 const KAFKA_BROKERS = process.env.KAFKA_BROKERS?.split(',') || ['localhost:9092'];
 const KAFKA_CLIENT_ID = process.env.KAFKA_CLIENT_ID || 'crm-api-producer';

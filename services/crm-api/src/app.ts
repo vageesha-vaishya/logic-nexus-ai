@@ -2,12 +2,12 @@ import express, { Express, NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
-import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware';
-import leadsRoutes from './routes/leads.routes';
-import invoicesRoutes from './routes/invoices.routes';
-import taxRoutes from './routes/tax.routes';
-import { ErrorResponse } from './types/crm.types';
-import { logger } from './utils/logger';
+import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
+import leadsRoutes from './routes/leads.routes.js';
+import invoicesRoutes from './routes/invoices.routes.js';
+import taxRoutes from './routes/tax.routes.js';
+import { ErrorResponse } from './types/crm.types.js';
+import { logger } from './utils/logger.js';
 
 const app: Express = express();
 type RequestWithCorrelation = Request & { correlationId?: string };

@@ -1,6 +1,6 @@
 import { Router, Response } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { InvoicesService } from '../services/invoices.service';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+import { InvoicesService } from '../services/invoices.service.js';
 
 const router = Router();
 const invoicesService = new InvoicesService();

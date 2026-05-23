@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { AuthRequest } from '../middleware/auth.middleware';
-import { asyncHandler } from '../utils/asyncHandler';
+import type { AuthRequest } from '../middleware/auth.middleware.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
 
 type JsonRecord = Record<string, unknown>;
 

@@ -1,10 +1,10 @@
 import { Router } from 'express';
-import { AuthRequest } from '../middleware/auth.middleware';
-import { LeadsService } from '../services/leads.service';
-import { CreateLeadRequest, DeleteLeadsRequest, ErrorResponse, UpdateLeadRequest } from '../types/crm.types';
-import { asyncHandler } from '../utils/asyncHandler';
-import { CrmEventType } from '../events/crm-events.types';
-import { crmEventsProducer } from '../events/crm-events.producer';
+import { AuthRequest } from '../middleware/auth.middleware.js';
+import { LeadsService } from '../services/leads.service.js';
+import { CreateLeadRequest, DeleteLeadsRequest, ErrorResponse, UpdateLeadRequest } from '../types/crm.types.js';
+import { asyncHandler } from '../utils/asyncHandler.js';
+import { CrmEventType } from '../events/crm-events.types.js';
+import { crmEventsProducer } from '../events/crm-events.producer.js';
 
 const router = Router();
 const leadsService = new LeadsService();
