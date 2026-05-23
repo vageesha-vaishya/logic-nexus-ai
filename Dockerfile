@@ -42,8 +42,8 @@ COPY --from=builder /app/dist /usr/share/nginx/html
 # Copy custom Nginx template for runtime env substitution
 COPY nginx.conf /etc/nginx/templates/default.conf.template
 
-# Expose port 80
-EXPOSE 80
+# Expose port 4173 (Coolify hardcodes this in Traefik labels for this app)
+EXPOSE 4173
 
 # Start Nginx
 CMD ["nginx", "-g", "daemon off;"]
