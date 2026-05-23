@@ -12,7 +12,11 @@ const ALLOWED_ORIGINS = new Set([
   "http://localhost:4322",
 ]);
 
-const NOTIFY_RECIPIENTS = ["bahuguna.vimal@gmail.com", "hello@sosservices.online"];
+// While we use Resend's test from-address (onboarding@resend.dev), Resend only allows
+// sending to the signup email. Multi-recipient sends are rejected with 403. Once
+// sosservices.online is verified as a Resend sending domain, add "hello@sosservices.online"
+// back here and change NOTIFY_FROM to "noreply@sosservices.online".
+const NOTIFY_RECIPIENTS = ["bahuguna.vimal@gmail.com"];
 const NOTIFY_FROM = "SOS Services <onboarding@resend.dev>";
 
 function corsHeaders(origin: string): Record<string, string> {
