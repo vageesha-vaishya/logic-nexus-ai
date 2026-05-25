@@ -24,7 +24,7 @@ export function LeadsKanbanBoard() {
       
       const { data, error } = await scopedDb
         .from('leads')
-        .select('id, first_name, last_name, company, status, estimated_value')
+        .select('id, first_name, last_name, company, status, estimated_value, expected_close_date')
         .eq('owner_id', context.userId)
         .order('created_at', { ascending: false });
 
@@ -38,7 +38,8 @@ export function LeadsKanbanBoard() {
           subtitle: lead.company,
           status: lead.status,
           value: lead.estimated_value,
-          currency: 'USD'
+          currency: 'USD',
+          dueDate: lead.expected_close_date ?? null,
         }));
         setItems(kanbanItems);
       }

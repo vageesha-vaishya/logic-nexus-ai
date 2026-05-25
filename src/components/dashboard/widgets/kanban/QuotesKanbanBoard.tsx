@@ -24,7 +24,7 @@ export function QuotesKanbanBoard() {
       
       const { data, error } = await scopedDb
         .from('quotes')
-        .select('id, quote_number, title, sell_price:total, status')
+        .select('id, quote_number, title, sell_price:total, status, valid_until')
         //.eq('owner_id', context.userId) // Quotes don't have owner_id directly
         .order('created_at', { ascending: false });
 
@@ -42,7 +42,8 @@ export function QuotesKanbanBoard() {
           subtitle: quote.quote_number,
           status: quote.status,
           value: quote.sell_price,
-          currency: 'USD'
+          currency: 'USD',
+          dueDate: quote.valid_until ?? null,
         }));
         setItems(kanbanItems);
       }

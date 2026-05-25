@@ -19,6 +19,8 @@ import {
   type ForecastHorizon,
   type ForecastItem,
 } from '@/components/forecast-due-list';
+import { Badge } from '@/components/ui/badge';
+import { LegendPopover, type LegendSection } from '@/components/legend-popover';
 import type { GridColumnDefinition } from '@/features/module-amro/components/templates/AmroInventoryDataGridTemplate';
 import { AmroRecordWizard } from '@/features/module-amro/components/data-grid/AmroRecordWizard';
 import {
@@ -59,6 +61,48 @@ const PRIORITY_CONFIG: Record<WorkOrderPriority, { label: string; color: string 
   4: { label: 'P4 - Low', color: 'text-blue-600' },
   5: { label: 'P5 - Routine', color: 'text-slate-600' },
 };
+
+// Legend popover content derived directly from STATUS_CONFIG + PRIORITY_CONFIG
+// above — single source of truth, won't drift if a status/priority gets added.
+const STATUS_DESCRIPTIONS: Partial<Record<WorkOrderStatus, string>> = {
+  planning: 'Scoping; not yet approved for execution',
+  approved: 'Approved, awaiting scheduling',
+  scheduled: 'Scheduled into the maintenance plan',
+  in_progress: 'Work is actively being performed',
+  on_hold: 'Paused; awaiting parts, approval, or input',
+  blocked: 'Blocked on an external dependency',
+  completed: 'Work signed off but not yet closed',
+  closed: 'Closed and archived',
+  cancelled: 'Cancelled before completion',
+};
+
+const LEGEND_SECTIONS: LegendSection[] = [
+  {
+    title: 'Status',
+    items: (Object.keys(STATUS_CONFIG) as WorkOrderStatus[]).map((status) => {
+      const cfg = STATUS_CONFIG[status];
+      return {
+        id: status,
+        swatch: <Badge variant={cfg.badge}>{cfg.label}</Badge>,
+        label: cfg.label,
+        description: STATUS_DESCRIPTIONS[status],
+      };
+    }),
+  },
+  {
+    title: 'Priority',
+    items: (Object.keys(PRIORITY_CONFIG) as Array<keyof typeof PRIORITY_CONFIG>).map(
+      (key) => {
+        const cfg = PRIORITY_CONFIG[key as unknown as WorkOrderPriority];
+        return {
+          id: `priority-${key}`,
+          swatch: <span className={`font-bold ${cfg.color}`}>P{key}</span>,
+          label: cfg.label,
+        };
+      },
+    ),
+  },
+];
 
 const MAINTENANCE_LABELS: Record<MaintenanceType, string> = {
   line: 'Line',
@@ -348,6 +392,10 @@ export function AmroWorkOrdersListPage() {
         moduleId="amro.work-orders"
         status={error ? 'warning' : loading ? 'loading' : 'ready'}
       >
+        <div className="mb-3 flex justify-end">
+          <LegendPopover sections={LEGEND_SECTIONS} triggerLabel="Status & priority" />
+        </div>
+
         <ForecastDueList
           title="Work packages coming due"
           items={forecastItems}

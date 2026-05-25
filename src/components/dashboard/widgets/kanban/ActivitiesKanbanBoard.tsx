@@ -46,7 +46,8 @@ export function ActivitiesKanbanBoard() {
           title: activity.subject || 'Untitled Activity',
           subtitle: activity.due_date ? new Date(activity.due_date).toLocaleDateString() : 'No Due Date',
           status: activity.status || 'planned',
-          tags: [activity.activity_type]
+          tags: [activity.activity_type],
+          dueDate: activity.due_date ?? null,
         }));
         setItems(kanbanItems);
       }

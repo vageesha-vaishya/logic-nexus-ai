@@ -24,7 +24,7 @@ export function OpportunitiesKanbanBoard() {
       
       const { data, error } = await scopedDb
         .from('opportunities')
-        .select('id, name, amount, stage')
+        .select('id, name, amount, stage, close_date')
         .eq('owner_id', context.userId)
         .order('created_at', { ascending: false });
 
@@ -37,7 +37,8 @@ export function OpportunitiesKanbanBoard() {
           title: opp.name,
           status: opp.stage,
           value: opp.amount,
-          currency: 'USD'
+          currency: 'USD',
+          dueDate: opp.close_date ?? null,
         }));
         setItems(kanbanItems);
       }
