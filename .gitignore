@@ -68,3 +68,13 @@ capacitor.config.local.ts
 **/service-account*.json
 **/serviceAccountKey*.json
 !android/app/google-services.json
+
+# Python build artifacts (services/markets-worker, services/amro-api, etc.)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
