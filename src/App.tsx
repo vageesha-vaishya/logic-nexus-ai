@@ -201,6 +201,7 @@ const DatabaseExport = lazy(() => import("./pages/dashboard/data-management/Data
 const MasterDataSubscriptionPlans = lazy(() => import("./pages/dashboard/MasterDataSubscriptionPlans"));
 const QuotationTests = lazy(() => import("./pages/testing/QuotationTests"));
 const QuotePortal = lazy(() => import("./pages/portal/QuotePortal"));
+const VolatilityMethodology = lazy(() => import("./pages/methodology/VolatilityMethodology"));
 const SystemLogs = lazy(() => import("./pages/dashboard/SystemLogs"));
 const RolesPermissions = lazy(() => import("./pages/dashboard/RolesPermissions"));
 const TransferCenter = lazy(() => import("./pages/dashboard/TransferCenter"));
@@ -1028,6 +1029,8 @@ const App = () => (
             />
             {/* Public customer portal */}
             <Route path="/portal/quote/:token" element={<QuotePortal />} />
+            {/* Public methodology pages — SEBI-defensible, no auth gate */}
+            <Route path="/methodology/volatility" element={<VolatilityMethodology />} />
             <Route 
               path="/dashboard/transfers" 
               element={
