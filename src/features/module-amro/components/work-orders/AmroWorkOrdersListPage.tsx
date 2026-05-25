@@ -11,6 +11,14 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { AmroKpiGrid, AmroModuleSurface } from '@/features/module-amro/components/parts/AmroPartsUiStandards';
 import { AmroCrudMessageBanner } from '@/features/module-amro/components/parts/AmroCrudPrimitives';
 import { AmroUnifiedGridRecordDetailShell } from '@/features/module-amro/components/parts/AmroUnifiedGridRecordDetailShell';
+import { Button } from '@/components/ui/button';
+import { PreviewSlideOver, type PreviewField } from '@/components/preview-slide-over';
+import { UrgencyDot, computeUrgency } from '@/components/urgency-dot';
+import {
+  ForecastDueList,
+  type ForecastHorizon,
+  type ForecastItem,
+} from '@/components/forecast-due-list';
 import type { GridColumnDefinition } from '@/features/module-amro/components/templates/AmroInventoryDataGridTemplate';
 import { AmroRecordWizard } from '@/features/module-amro/components/data-grid/AmroRecordWizard';
 import {
@@ -113,6 +121,8 @@ export function AmroWorkOrdersListPage() {
   const [deleteCandidate, setDeleteCandidate] = useState<WorkOrderListItem | null>(null);
   const [titleOptions, setTitleOptions] = useState<Array<{ value: string; label: string; title: string; wp_title: string }>>([]);
   const [titleOptionsLoading, setTitleOptionsLoading] = useState(false);
+  const [previewRecord, setPreviewRecord] = useState<WorkOrderListItem | null>(null);
+  const [forecastHorizon, setForecastHorizon] = useState<ForecastHorizon>('30d');
 
   const { invalidate } = useWorkOrderActions();
   const createMutation = useCreateWorkOrder();
@@ -281,6 +291,36 @@ export function AmroWorkOrdersListPage() {
   }, [invalidate, updateMutation]);
   const gridRecords = useMemo<WorkOrderGridRow[]>(() => records as WorkOrderGridRow[], [records]);
 
+  // Veryon-style forward-looking forecast: WPs with a planned end-date, still
+  // open (not completed/closed/cancelled). Caller filters out null due-dates.
+  const forecastItems = useMemo<ForecastItem[]>(() => {
+    const TERMINAL: WorkOrderStatus[] = ['completed', 'closed', 'cancelled'];
+    return records
+      .filter(
+        (r) =>
+          Boolean(r.planned_end_date) &&
+          !TERMINAL.includes(r.status as WorkOrderStatus),
+      )
+      .map((r) => {
+        const priorityCfg = PRIORITY_CONFIG[r.priority as WorkOrderPriority];
+        return {
+          id: r.id,
+          label: r.work_order_number || r.title || `WP ${r.id}`,
+          sublabel: r.aircraft_registration
+            ? `${r.aircraft_registration}${r.title ? ` · ${r.title}` : ''}`
+            : r.title || undefined,
+          dueDate: r.planned_end_date as string,
+          groupKey: r.aircraft_registration || 'Unassigned',
+          groupLabel: r.aircraft_registration || 'Unassigned aircraft',
+          badge: priorityCfg ? (
+            <span className={`text-[10px] font-semibold ${priorityCfg.color}`}>
+              {priorityCfg.label.split(' ')[0]}
+            </span>
+          ) : undefined,
+        } satisfies ForecastItem;
+      });
+  }, [records]);
+
   const stats = useMemo(() => {
     const activeRecords = records.filter((r) => !['completed', 'closed', 'cancelled'].includes(r.status));
     const inProgress = records.filter((r) => r.status === 'in_progress').length;
@@ -308,6 +348,19 @@ export function AmroWorkOrdersListPage() {
         moduleId="amro.work-orders"
         status={error ? 'warning' : loading ? 'loading' : 'ready'}
       >
+        <ForecastDueList
+          title="Work packages coming due"
+          items={forecastItems}
+          horizon={forecastHorizon}
+          onHorizonChange={setForecastHorizon}
+          onItemClick={(item) => {
+            const wo = records.find((r) => r.id === item.id);
+            if (wo) setPreviewRecord(wo);
+          }}
+          emptyMessage="No open work packages with a planned end-date in this window."
+          className="mb-3"
+        />
+
         <AmroKpiGrid
           items={[
             { label: 'Total Work Packages', value: String(stats.total) },
@@ -338,7 +391,7 @@ export function AmroWorkOrdersListPage() {
           ariaLabel="Work package advanced grid"
           enableDetailPanelToggle={false}
           onCreateRecord={openCreateDialog}
-          onReadRecord={(record) => handleView(String(record.id))}
+          onReadRecord={(record) => setPreviewRecord(record as WorkOrderListItem)}
           onDeleteRecord={(record) => setDeleteCandidate(record as WorkOrderListItem)}
           onSaveRecord={(record) => { void handleInlineSave(record); }}
           onCancelRecord={() => {
@@ -371,6 +424,67 @@ export function AmroWorkOrdersListPage() {
           ]}
         />
       </AmroModuleSurface>
+
+      {/* Quick-preview slide-over (HubSpot-style associated-record preview) */}
+      {previewRecord && (
+        <PreviewSlideOver
+          open
+          onOpenChange={(open) => {
+            if (!open) setPreviewRecord(null);
+          }}
+          title={previewRecord.work_order_number || 'Work Package'}
+          subtitle={previewRecord.title || undefined}
+          fields={[
+            { label: 'Work Package #', value: previewRecord.work_order_number || '—' },
+            {
+              label: 'Status',
+              value:
+                STATUS_CONFIG[previewRecord.status as WorkOrderStatus]?.label ??
+                previewRecord.status ??
+                '—',
+            },
+            {
+              label: 'Priority',
+              value:
+                PRIORITY_CONFIG[previewRecord.priority as WorkOrderPriority]?.label ??
+                `P${previewRecord.priority}`,
+            },
+            { label: 'Aircraft', value: previewRecord.aircraft_registration || '—' },
+            {
+              label: 'Planned End',
+              value: (
+                <span className="inline-flex items-center gap-2">
+                  <UrgencyDot urgency={computeUrgency(previewRecord.planned_end_date)} />
+                  {previewRecord.planned_end_date
+                    ? new Date(previewRecord.planned_end_date).toLocaleDateString()
+                    : 'Not scheduled'}
+                </span>
+              ),
+            },
+            {
+              label: 'Title',
+              value: previewRecord.title || '—',
+              fullWidth: true,
+            },
+          ] satisfies PreviewField[]}
+          actions={
+            <div className="flex w-full justify-end gap-2">
+              <Button variant="outline" onClick={() => setPreviewRecord(null)}>
+                Close
+              </Button>
+              <Button
+                onClick={() => {
+                  const id = String(previewRecord.id);
+                  setPreviewRecord(null);
+                  handleView(id);
+                }}
+              >
+                Open full record
+              </Button>
+            </div>
+          }
+        />
+      )}
 
       {/* Delete Confirmation Dialog */}
       <AlertDialog open={!!deleteCandidate} onOpenChange={() => setDeleteCandidate(null)}>

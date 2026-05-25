@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/sheet';
 
 import { requireBiometric } from '@/lib/biometric';
+import { useSebiDisclaimerTimer } from '@/components/sebi-disclaimer';
 
 import { CoolingOffScreen } from '../behavioral/CoolingOffScreen';
 import type { AlertTier } from '../behavioral/types';
@@ -51,6 +52,10 @@ export function ExecutionBottomSheet({
   const [orderOpen, setOrderOpen] = useState(false);
   const [coolingOpen, setCoolingOpen] = useState(false);
   const [biometricError, setBiometricError] = useState<string | null>(null);
+  // SEBI ad-code 5-second minimum visibility for audio-visual disclaimers.
+  // Timer resets each time the sheet opens because the hook re-mounts.
+  const { canProceed: disclaimerReady, secondsRemaining } =
+    useSebiDisclaimerTimer({ minVisibleMs: open ? 5000 : undefined });
 
   if (!signal) return null;
 
@@ -127,11 +132,22 @@ export function ExecutionBottomSheet({
               </div>
             </div>
 
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Past performance is not indicative of future results. This signal is
-              for informational purposes only and does not constitute investment
-              advice. Invest only what you can afford to lose.
-            </p>
+            <div className="space-y-1">
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                Past performance is not indicative of future results. This signal is
+                for informational purposes only and does not constitute investment
+                advice. Invest only what you can afford to lose.
+              </p>
+              {!disclaimerReady && (
+                <p
+                  className="text-[11px] text-muted-foreground"
+                  role="status"
+                  aria-live="polite"
+                >
+                  Please review for {secondsRemaining}s before continuing.
+                </p>
+              )}
+            </div>
 
             {biometricError && (
               <p className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
@@ -143,12 +159,14 @@ export function ExecutionBottomSheet({
               className="w-full"
               variant={side === 'BUY' ? 'default' : 'destructive'}
               onClick={handleProceed}
-              disabled={!canProceed}
+              disabled={!canProceed || !disclaimerReady}
             >
               {!connection
                 ? 'Connect a broker to trade'
                 : !canProceed
                 ? 'Signal not actionable'
+                : !disclaimerReady
+                ? `Proceed to ${side} (${secondsRemaining}s)`
                 : `Proceed to ${side}`}
             </Button>
           </div>

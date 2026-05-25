@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 
@@ -52,6 +52,18 @@ const mockSignal = {
 
 const wrap = (ui: React.ReactNode) => <MemoryRouter>{ui}</MemoryRouter>;
 
+// SebiDisclaimer gates the Proceed button for 5s. Tests that click Proceed
+// wait for the gate to elapse on the real clock — fake timers don't compose
+// with the awaited biometric prompt inside handleProceed.
+const waitForSebiGate = async (label: RegExp) => {
+  await waitFor(
+    () => {
+      expect(screen.getByRole('button', { name: label })).toBeEnabled();
+    },
+    { timeout: 6500 },
+  );
+};
+
 describe('ExecutionBottomSheet', () => {
   it('shows the signal summary and SEBI disclaimer', () => {
     render(
@@ -70,7 +82,9 @@ describe('ExecutionBottomSheet', () => {
     expect(screen.getByText(/73%/)).toBeInTheDocument();
   });
 
-  it('hands off to OrderFormSheet when Proceed is clicked', async () => {
+  // Each `Proceed` test waits ~5s on the real clock for the SEBI gate to elapse,
+  // so bump the per-test timeout above the default 5000ms.
+  it('hands off to OrderFormSheet when Proceed is clicked', { timeout: 10_000 }, async () => {
     const onOpenChange = vi.fn();
     const { default: userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
@@ -78,6 +92,7 @@ describe('ExecutionBottomSheet', () => {
     render(
       wrap(<ExecutionBottomSheet signal={mockSignal} open onOpenChange={onOpenChange} />),
     );
+    await waitForSebiGate(/proceed to buy/i);
     await user.click(screen.getByRole('button', { name: /proceed to buy/i }));
 
     expect(onOpenChange).toHaveBeenCalledWith(false);
@@ -91,7 +106,7 @@ describe('ExecutionBottomSheet', () => {
     expect(container.firstChild).toBeNull();
   });
 
-  it('skips cooling-off and goes straight to OrderFormSheet for a BUY', async () => {
+  it('skips cooling-off and goes straight to OrderFormSheet for a BUY', { timeout: 10_000 }, async () => {
     const onOpenChange = vi.fn();
     const { default: userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
@@ -108,6 +123,7 @@ describe('ExecutionBottomSheet', () => {
         />,
       ),
     );
+    await waitForSebiGate(/proceed to buy/i);
     await user.click(screen.getByRole('button', { name: /proceed to buy/i }));
 
     expect(screen.getByTestId('order-form')).toBeInTheDocument();
@@ -115,7 +131,7 @@ describe('ExecutionBottomSheet', () => {
     expect(screen.queryByRole('button', { name: /proceed anyway/i })).not.toBeInTheDocument();
   });
 
-  it('interposes the CoolingOffScreen for a SELL during a red-tier drawdown', async () => {
+  it('interposes the CoolingOffScreen for a SELL during a red-tier drawdown', { timeout: 10_000 }, async () => {
     const onOpenChange = vi.fn();
     const { default: userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
@@ -134,6 +150,7 @@ describe('ExecutionBottomSheet', () => {
         />,
       ),
     );
+    await waitForSebiGate(/proceed to sell/i);
     await user.click(screen.getByRole('button', { name: /proceed to sell/i }));
 
     // The OrderFormSheet should NOT be open yet; cooling-off intervened.
@@ -142,7 +159,7 @@ describe('ExecutionBottomSheet', () => {
     expect(screen.getByRole('button', { name: /wait 24 hours/i })).toBeInTheDocument();
   });
 
-  it('does NOT interpose cooling-off for a SELL when drawdown is below red', async () => {
+  it('does NOT interpose cooling-off for a SELL when drawdown is below red', { timeout: 10_000 }, async () => {
     const onOpenChange = vi.fn();
     const { default: userEvent } = await import('@testing-library/user-event');
     const user = userEvent.setup();
@@ -161,9 +178,20 @@ describe('ExecutionBottomSheet', () => {
         />,
       ),
     );
+    await waitForSebiGate(/proceed to sell/i);
     await user.click(screen.getByRole('button', { name: /proceed to sell/i }));
 
     expect(screen.getByTestId('order-form')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /proceed anyway/i })).not.toBeInTheDocument();
+  });
+
+  it('keeps the Proceed button disabled during the SEBI 5-second gate', () => {
+    render(
+      wrap(<ExecutionBottomSheet signal={mockSignal} open onOpenChange={vi.fn()} />),
+    );
+    // The button is rendered but disabled until the 5s timer elapses.
+    const button = screen.getByRole('button', { name: /proceed to buy/i });
+    expect(button).toBeDisabled();
+    expect(screen.getByText(/Please review for/)).toBeInTheDocument();
   });
 });

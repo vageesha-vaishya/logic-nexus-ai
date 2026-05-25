@@ -93,7 +93,7 @@ export function AmroStandardToolbar({
 
 export function AmroKpiGrid({ items }: { items: Array<{ label: string; value: string; tone?: 'default' | 'success' | 'warning' | 'critical' }> }): JSX.Element {
   return (
-    <div className="mb-3 grid grid-cols-1 gap-2 md:grid-cols-3">
+    <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
       {items.map((item) => {
         // Issue VH-03: Semantic KPI variants with proper visual weight
         const urgency = item.tone === 'critical' ? 'critical' : item.tone === 'warning' ? 'warning' : item.tone === 'success' ? 'success' : 'healthy';

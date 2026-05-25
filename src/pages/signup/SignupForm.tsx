@@ -131,6 +131,9 @@ export default function SignupForm() {
     return (
       <div className="min-h-screen bg-background">
         <div className="mx-auto max-w-md px-4 py-16 text-center">
+          <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground mb-6" aria-label="Step 3 of 3">
+            Step 3 of 3 · Verify your email
+          </p>
           <CheckCircle2 className="mx-auto h-12 w-12 text-primary" aria-hidden="true" />
           <h1 className="mt-4 text-2xl font-semibold tracking-tight">Check your email</h1>
           <p className="mt-3 text-sm text-muted-foreground">
@@ -167,8 +170,8 @@ export default function SignupForm() {
 
         <header className="mt-6 mb-6 space-y-2">
           <SosLogo size={40} />
-          <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground pt-2">
-            Register {brochure.name}
+          <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground pt-2" aria-label="Step 2 of 3">
+            Step 2 of 3 · Register {brochure.name}
           </p>
           <h1 className="text-2xl font-semibold tracking-tight">
             Create your {brochure.name} account
@@ -187,13 +190,15 @@ export default function SignupForm() {
               type="email"
               autoComplete="email"
               inputMode="email"
+              autoFocus
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               placeholder="you@company.com"
               aria-invalid={Boolean(errors.email)}
+              aria-describedby={errors.email ? "signup-email-error" : undefined}
               disabled={submitting}
             />
-            {errors.email && <p className="text-xs text-destructive">{errors.email}</p>}
+            {errors.email && <p id="signup-email-error" role="alert" className="text-xs text-destructive">{errors.email}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -206,9 +211,10 @@ export default function SignupForm() {
               onChange={(e) => setPassword(e.target.value)}
               placeholder="At least 8 characters"
               aria-invalid={Boolean(errors.password)}
+              aria-describedby={errors.password ? "signup-password-error" : undefined}
               disabled={submitting}
             />
-            {errors.password && <p className="text-xs text-destructive">{errors.password}</p>}
+            {errors.password && <p id="signup-password-error" role="alert" className="text-xs text-destructive">{errors.password}</p>}
           </div>
 
           <div className="space-y-1.5">
@@ -219,9 +225,10 @@ export default function SignupForm() {
               onChange={(e) => setOrgName(e.target.value)}
               placeholder={orgNamePlaceholder}
               aria-invalid={Boolean(errors.orgName)}
+              aria-describedby={errors.orgName ? "signup-org-error" : undefined}
               disabled={submitting}
             />
-            {errors.orgName && <p className="text-xs text-destructive">{errors.orgName}</p>}
+            {errors.orgName && <p id="signup-org-error" role="alert" className="text-xs text-destructive">{errors.orgName}</p>}
           </div>
 
           <div className="space-y-1.5">

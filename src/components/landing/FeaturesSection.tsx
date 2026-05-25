@@ -66,14 +66,14 @@ export const FeaturesSection = () => {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {features.map((feature, index) => (
-            <Card 
+            <Card
               key={index}
               className="p-6 hover:shadow-primary transition-all duration-300 hover:-translate-y-1 border-border"
             >
               <div className="w-12 h-12 rounded-lg bg-gradient-primary flex items-center justify-center mb-4">
-                <feature.icon className="w-6 h-6 text-primary-foreground" />
+                <feature.icon className="w-6 h-6 text-primary-foreground" aria-hidden="true" />
               </div>
               <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
               <p className="text-sm text-muted-foreground">{feature.description}</p>

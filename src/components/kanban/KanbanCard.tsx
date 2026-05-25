@@ -10,6 +10,7 @@ import { memo } from "react";
 import { EditableText } from "@/components/ui/editable-text";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { ExternalLink, MoreHorizontal, Trash2 } from "lucide-react";
+import { UrgencyDot, computeUrgency } from "@/components/urgency-dot";
 
 export interface KanbanItem {
   id: string;
@@ -30,6 +31,12 @@ export interface KanbanItem {
   }[];
   tags?: string[];
   updatedAt?: string;
+  /**
+   * Optional next-action / due-date for this card. When provided, the card
+   * surfaces a colored urgency dot per Pipedrive's pattern:
+   * red = overdue, amber = today, green = upcoming, grey = none.
+   */
+  dueDate?: string | null;
 }
 
 interface KanbanCardProps {
@@ -121,15 +128,25 @@ export const KanbanCard = memo(function KanbanCard({ item, isOverlay, onUpdate, 
             <div className="flex justify-between items-start gap-2">
               <div className="space-y-1 flex-1">
                 <div className="flex items-center gap-2">
-                   <Badge 
-                    variant="outline" 
+                   <Badge
+                    variant="outline"
                     className={cn(
-                      "text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0 h-5 border-0 transition-all duration-300 ease-in-out group-hover:scale-105 group-hover:-translate-y-px group-active:scale-95", 
+                      "text-[10px] font-semibold uppercase tracking-wider px-1.5 py-0 h-5 border-0 transition-all duration-300 ease-in-out group-hover:scale-105 group-hover:-translate-y-px group-active:scale-95",
                       priorityColors[item.priority || "low"]
                     )}
                   >
                     {item.priority || "Normal"}
                   </Badge>
+                  {item.dueDate !== undefined && (
+                    <UrgencyDot
+                      urgency={computeUrgency(item.dueDate)}
+                      srLabel={
+                        item.dueDate
+                          ? `Due ${new Date(item.dueDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`
+                          : 'No activity scheduled'
+                      }
+                    />
+                  )}
                   {item.updatedAt && (
                     <span className="text-[10px] text-muted-foreground tabular-nums">
                       {new Date(item.updatedAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}

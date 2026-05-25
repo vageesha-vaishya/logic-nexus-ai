@@ -39,8 +39,8 @@ export default function SignupDomainPicker() {
         </div>
 
         <header className="mt-6 mb-10 space-y-2 md:mb-12">
-          <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground">
-            Register an organization on SOS Services
+          <p className="text-xs uppercase tracking-[0.32em] text-muted-foreground" aria-label="Step 1 of 3">
+            Step 1 of 3 · Register an organization on SOS Services
           </p>
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
             Which product are you signing up for?

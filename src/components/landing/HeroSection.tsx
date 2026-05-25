@@ -28,7 +28,7 @@ export const HeroSection = () => {
           </div>
           
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-primary/10 rounded-full mb-6 border border-primary/20">
-            <Sparkles className="w-4 h-4 text-primary" />
+            <Sparkles className="w-4 h-4 text-primary" aria-hidden="true" />
             <span className="text-sm font-medium text-primary">Multi-domain business platform</span>
           </div>
 
@@ -50,29 +50,29 @@ export const HeroSection = () => {
               asChild
             >
               <Link to="/register-organization">
-                <Building2 className="mr-2 w-5 h-5" />
+                <Building2 className="mr-2 w-5 h-5" aria-hidden="true" />
                 Register Organization
               </Link>
             </Button>
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               variant="outline"
               className="border-primary/30 hover:bg-primary/10 transition-all"
               asChild
             >
               <Link to="/auth">
                 Sign In
-                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+                <ArrowRight className="ml-2 w-5 h-5 group-hover:translate-x-1 transition-transform" aria-hidden="true" />
               </Link>
             </Button>
-            <Button 
-              size="lg" 
+            <Button
+              size="lg"
               variant="outline"
               className="border-primary/30 hover:bg-primary/10 transition-all"
               asChild
             >
               <Link to="/setup-admin">
-                <Shield className="mr-2 w-4 h-4" />
+                <Shield className="mr-2 w-4 h-4" aria-hidden="true" />
                 Setup Admin
               </Link>
             </Button>

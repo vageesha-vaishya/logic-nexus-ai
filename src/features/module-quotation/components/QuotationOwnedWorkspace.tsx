@@ -5,8 +5,17 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PathTracker, type PathTrackerStage } from '@/components/path-tracker';
 import { useQuotationWorkspaceState } from '../hooks/useQuotationWorkspaceState';
 import type { QuotationPricingIntent } from '../workspace/quotationWorkspaceModel';
+
+const QUOTE_PIPELINE_STAGES: PathTrackerStage[] = [
+  { id: 'draft', label: 'Draft' },
+  { id: 'sent', label: 'Sent' },
+  { id: 'accepted', label: 'Accepted' },
+];
+const TERMINAL_QUOTE_STATUSES = new Set(['expired', 'cancelled']);
+const PIPELINE_ORDER = ['draft', 'sent', 'accepted'] as const;
 
 const pricingIntentLabels: Record<QuotationPricingIntent, string> = {
   cost_plus: 'Cost Plus',
@@ -73,6 +82,29 @@ export function QuotationOwnedWorkspace() {
               <p className="text-xs text-muted-foreground">Status {state.activeQuote?.status || 'draft'}</p>
             </div>
           </div>
+          {(() => {
+            const status = state.activeQuote?.status || 'draft';
+            if (TERMINAL_QUOTE_STATUSES.has(status)) {
+              return (
+                <div className="rounded-md border bg-muted/40 p-3 text-sm">
+                  <span className="font-medium capitalize">{status}</span>
+                  <span className="text-muted-foreground"> — this quote is no longer in the active pipeline.</span>
+                </div>
+              );
+            }
+            const currentStageId = PIPELINE_ORDER.includes(status as (typeof PIPELINE_ORDER)[number])
+              ? status
+              : 'draft';
+            const currentIdx = PIPELINE_ORDER.indexOf(currentStageId as (typeof PIPELINE_ORDER)[number]);
+            const completed = PIPELINE_ORDER.slice(0, Math.max(currentIdx, 0));
+            return (
+              <PathTracker
+                stages={QUOTE_PIPELINE_STAGES}
+                currentStageId={currentStageId}
+                completedStageIds={[...completed]}
+              />
+            );
+          })()}
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="outline">Base Quotation Pipeline Preserved</Badge>
             <Badge variant={state.pluginValidation.isValid ? 'secondary' : 'destructive'}>
