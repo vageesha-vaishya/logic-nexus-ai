@@ -31,6 +31,7 @@ import {
 import { useMfFunds, type MfFund } from "../hooks/useMf";
 import { MfOrderSheet } from "./MfOrderSheet";
 import { useBrokerConnections } from "../hooks/useBrokerConnections";
+import { RiskPill, type RiskLevel } from "@/components/risk-pill";
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -102,6 +103,48 @@ const SORT_OPTIONS: { label: string; value: SortKey }[] = [
 ];
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
+
+/**
+ * Heuristic risk mapping from category + raw scheme text. Aligned with the
+ * "typical examples" table on /methodology/volatility. When real per-fund
+ * annualised-volatility data becomes available on MfFund, swap this for a
+ * threshold-based computation against the methodology's < 10% / 10–20% / > 20%
+ * buckets.
+ */
+function deriveRisk(fund: MfFund, category: string | null): RiskLevel | null {
+  if (!category) return null;
+  const raw = (fund.scheme_category ?? fund.instrument_type ?? "").toLowerCase();
+
+  // High-volatility equity sub-categories — keyword sweep on the raw scheme text.
+  if (
+    raw.includes("small cap") || raw.includes("smallcap") ||
+    raw.includes("mid cap") || raw.includes("midcap") ||
+    raw.includes("sector") || raw.includes("thematic")
+  ) {
+    return "high";
+  }
+
+  switch (category) {
+    case "Liquid":
+    case "Overnight":
+      return "low";
+    case "Arbitrage":
+      return "low";
+    case "Debt":
+      // Long-duration / credit-risk funds swing more than short/liquid debt.
+      return raw.includes("long") || raw.includes("credit") || raw.includes("dynamic")
+        ? "medium"
+        : "low";
+    case "Hybrid":
+    case "FoF":
+    case "Index":
+    case "ELSS":
+    case "Equity":
+      return "medium";
+    default:
+      return null;
+  }
+}
 
 function deriveCategory(fund: MfFund): string | null {
   const raw = fund.scheme_category ?? fund.instrument_type ?? "";
@@ -491,14 +534,18 @@ export function MfScreener() {
                 <TableBody>
                   {filtered.map((fund) => {
                     const name = fund.scheme_name ?? fund.metadata?.scheme_name ?? fund.symbol;
+                    const risk = deriveRisk(fund, fund.category ?? null);
                     return (
                       <TableRow key={fund.symbol}>
                         <TableCell>
-                          <div className="space-y-0.5">
+                          <div className="space-y-1">
                             <p className="text-sm font-medium leading-snug max-w-[220px] truncate" title={name}>
                               {name}
                             </p>
-                            <CategoryBadge category={fund.category ?? null} />
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <CategoryBadge category={fund.category ?? null} />
+                              {risk && <RiskPill risk={risk} size="sm" />}
+                            </div>
                           </div>
                         </TableCell>
                         <TableCell className="text-sm text-muted-foreground max-w-[120px] truncate">
