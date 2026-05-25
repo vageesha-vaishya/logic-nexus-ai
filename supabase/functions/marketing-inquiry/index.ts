@@ -8,8 +8,14 @@ const ALLOWED_ORIGINS = new Set([
   "https://www.sosservices.in",
   "https://marketing.sosservices.online",
   "https://logicnexus.sosservices.online",
+  "https://aviation.sosservices.online",
+  "https://sthira.sosservices.online",
+  "https://amropro.sosservices.online",
   "http://localhost:4321",
   "http://localhost:4322",
+  "http://localhost:4323",
+  "http://localhost:4324",
+  "http://localhost:4325",
 ]);
 
 // sosservices.online verified as a Resend sending domain 2026-05-23, so we now send
