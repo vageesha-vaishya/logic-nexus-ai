@@ -76,6 +76,35 @@ bottom (`Home | Portfolio | Signals | Goals | More`), the Groww
 connection card with its full action row inside the card boundary
 (`Portfolio | Routing | Data ›   ↻ 🔌`), and the broker grid below.
 
+## 07 — Portfolio button lands on retail tab
+
+`07-portfolio-button-lands-on-retail-tab.png`
+
+After commit `9eebd65f fix(markets): bottom nav lost on portfolio
+detail + domain-only fallback`. Two more sites of the same
+retail-strands-on-Sthira bug:
+
+- `PortfolioDetailPage` (the desktop-only target of the broker
+  card's "View Portfolio" button) had the same unconditional
+  `DashboardLayout` wrapper.
+- `DomainOnlyNotFound` (the markets-only-build fallback rendered
+  for routes not in the manifest) had no nav at all.
+
+Fixes:
+- Extracted the per-page shell into a shared `AudiencePageShell`
+  component; all three pages (BrokerConnections, BrokerPortfolio,
+  PortfolioDetail) now use it.
+- `DomainOnlyNotFound` conditionally renders `RetailBottomNav`.
+- The broker card's "View Portfolio" handler now routes retail
+  users to `/dashboard/markets/retail/portfolio` (the mobile-tuned
+  Portfolio tab), avoiding the desktop-only detail page entirely
+  in the happy path.
+
+The screenshot shows the retail Portfolio tab — LTCG tracker,
+Harvest opportunities, Worst-case scenario, three-tier breakdown —
+reached via the broker card's Portfolio button, with the 5-tab
+bottom nav present and Portfolio active.
+
 ## Reproduction
 
 ```bash
