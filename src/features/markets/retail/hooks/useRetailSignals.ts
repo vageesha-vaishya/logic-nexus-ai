@@ -1,18 +1,25 @@
 /**
- * useRetailSignals — fetches GET /v1/retail/signals from markets-worker.
+ * useRetailSignals — reads markets.signals directly from Supabase.
  *
  * Returns RetailSignal[] decorated with metadata.explanations (Task 5) so
  * the UI can switch reading levels based on the user's experience_level.
  *
- * Filters map 1:1 to the worker's query params:
- *   assetClass    → asset_class
- *   horizon       → horizon
- *   minConfidence → min_confidence
- *   limit         → limit
+ * Originally proxied through GET /v1/retail/signals on the FastAPI
+ * markets-worker. That worker endpoint was a pure SELECT with no
+ * compute (auth check + filter parsing + Supabase query), so we now
+ * query Supabase directly. Same RLS, same response shape, same default
+ * filters — and it works from any network (LTE, hotel Wi-Fi, prod)
+ * without LAN routing to the laptop.
  *
- * Token is read from the live Supabase session (not the useAuth snapshot)
- * to match the convention in useBacktests / usePortfolioAttribution — that
- * way an expired access_token in React state can't poison a fresh request.
+ * Filters map 1:1 to the original worker params:
+ *   assetClass    → asset_class (defaults to all six classes)
+ *   horizon       → horizon
+ *   minConfidence → confidence >= value (default 0.60)
+ *   limit         → row limit (default 20)
+ *
+ * Only signals that are still live are returned — expires_at must be
+ * non-NULL and >= now() (matches the Python; expired rows stay in the
+ * table for backtesting but never surface in the UI).
  */
 import { useQuery } from '@tanstack/react-query';
 
@@ -20,11 +27,16 @@ import { supabase } from '@/integrations/supabase/client';
 import { marketsKeys } from '../../hooks/queryKeys';
 import type { RetailSignal } from '../types';
 
-const WORKER_URL = import.meta.env.VITE_MARKETS_WORKER_URL ?? 'http://localhost:8001';
-
 /** Worker vocabulary (matches _derive_asset_class in jobs/signal_generator.py). */
 export type RetailAssetClass = 'equity' | 'mf' | 'fo' | 'fx' | 'bond' | 'commodity';
 export type RetailHorizon    = 'intraday' | 'short_term' | 'medium_term' | 'long_term';
+
+const ALL_ASSET_CLASSES: readonly RetailAssetClass[] = [
+  'equity', 'mf', 'fo', 'fx', 'bond', 'commodity',
+];
+
+const DEFAULT_LIMIT          = 20;
+const DEFAULT_MIN_CONFIDENCE = 0.60;
 
 export interface RetailSignalFilters {
   assetClass?: RetailAssetClass;
@@ -40,41 +52,38 @@ export function useRetailSignals(filters: RetailSignalFilters = {}) {
     refetchInterval: 60_000,
     queryFn: async (): Promise<RetailSignal[]> => {
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error('Not authenticated');
+      if (!session?.access_token) throw new Error('Not authenticated');
 
-      const params = new URLSearchParams();
-      if (filters.assetClass)    params.set('asset_class',    filters.assetClass);
-      if (filters.horizon)       params.set('horizon',        filters.horizon);
-      if (filters.minConfidence !== undefined) params.set('min_confidence', String(filters.minConfidence));
-      if (filters.limit !== undefined)         params.set('limit',          String(filters.limit));
+      const assetClasses = filters.assetClass
+        ? [filters.assetClass]
+        : [...ALL_ASSET_CLASSES];
+      const minConfidence = filters.minConfidence ?? DEFAULT_MIN_CONFIDENCE;
+      const limit         = filters.limit         ?? DEFAULT_LIMIT;
 
-      const url = `${WORKER_URL}/v1/retail/signals${params.size ? `?${params}` : ''}`;
-      const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok) {
-        let detail = '';
-        try {
-          const body = await resp.json();
-          // FastAPI 422 returns detail as an Array<{loc, msg, type}>; everything else
-          // is usually a string. Format both shapes so the UI never shows [object Object].
-          if (Array.isArray(body?.detail)) {
-            detail = ' — ' + body.detail
-              .map((d: { loc?: unknown[]; msg?: string }) => {
-                const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : '?';
-                return `${field}: ${d.msg ?? 'invalid'}`;
-              })
-              .join('; ');
-          } else if (typeof body?.detail === 'string') {
-            detail = ` — ${body.detail}`;
-          }
-        } catch {
-          // non-JSON body — ignore
-        }
-        throw new Error(`retail signals: ${resp.status}${detail}`);
-      }
-      return (await resp.json()) as RetailSignal[];
+      let q = (supabase as any)
+        .schema('markets')
+        .from('signals')
+        .select(
+          'id, ts, instrument_id, signal_type, direction, confidence, ' +
+          'rationale, price_at_signal, expires_at, metadata, horizon, ' +
+          'asset_class, risk_params, score, ' +
+          'instrument:instruments(symbol, exchange, instrument_type)',
+        )
+        .gte('confidence', minConfidence)
+        .in('asset_class', assetClasses)
+        // PostgREST accepts `now()` as a bind value for timestamp columns —
+        // matches the Python (`.gte("expires_at", "now()")`). Server-side
+        // evaluation avoids a client-clock dependency.
+        .not('expires_at', 'is', null)
+        .gte('expires_at', 'now()')
+        .order('ts', { ascending: false })
+        .limit(limit);
+
+      if (filters.horizon) q = q.eq('horizon', filters.horizon);
+
+      const { data, error } = await q;
+      if (error) throw new Error(error.message ?? 'Failed to load signals');
+      return (data ?? []) as RetailSignal[];
     },
   });
 }
