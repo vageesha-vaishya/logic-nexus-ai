@@ -46,7 +46,9 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useIsRetailOnly } from "@/hooks/useIsRetailOnly";
 import { openExternal } from "@/lib/openExternal";
+import { RetailBottomNav } from "../retail/layouts/RetailNavLayout";
 import { RoutingRulesSheet } from "../components/RoutingRulesSheet";
 import {
   AlertDialog,
@@ -759,6 +761,30 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
+/**
+ * Render the page inside the correct shell for the current audience.
+ *   • Retail-only users get the 5-tab bottom nav (mobile) / side rail
+ *     (desktop) so they can leave the broker page without using the
+ *     system back button. The heavy CRM sidebar is skipped.
+ *   • Everyone else (admins, advisors, multi-domain operators) gets the
+ *     normal DashboardLayout with CRM sidebar.
+ *
+ * Routed via `/dashboard/markets/settings/brokers` which is reachable
+ * from both audiences (allow-listed in RetailAudienceGuard).
+ */
+function BrokerPageShell({ children }: { children: React.ReactNode }) {
+  const isRetail = useIsRetailOnly();
+  if (isRetail) {
+    return (
+      <>
+        <main className="min-h-screen pb-20 md:pb-0 md:pl-20">{children}</main>
+        <RetailBottomNav />
+      </>
+    );
+  }
+  return <DashboardLayout>{children}</DashboardLayout>;
+}
+
 export default function BrokerConnectionsPage() {
   const navigate        = useNavigate();
   const connections     = useBrokerConnections();
@@ -820,7 +846,7 @@ export default function BrokerConnectionsPage() {
   }
 
   return (
-    <DashboardLayout>
+    <BrokerPageShell>
       <div className="mx-auto max-w-3xl space-y-8 p-4 md:p-6">
 
         {/* ── Header ─────────────────────────────────────────────────── */}
@@ -1073,6 +1099,6 @@ export default function BrokerConnectionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </DashboardLayout>
+    </BrokerPageShell>
   );
 }

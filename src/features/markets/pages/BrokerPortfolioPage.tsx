@@ -15,6 +15,8 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useIsRetailOnly } from "@/hooks/useIsRetailOnly";
+import { RetailBottomNav } from "../retail/layouts/RetailNavLayout";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import {
@@ -766,7 +768,7 @@ export default function BrokerPortfolioPage() {
     : "Never synced";
 
   return (
-    <DashboardLayout>
+    <BrokerPageShell>
       <TooltipProvider>
         <div className="mx-auto max-w-6xl space-y-6 p-4 md:p-6">
 
@@ -975,6 +977,24 @@ export default function BrokerPortfolioPage() {
           defaultQty={gttSheet.qty}
         />
       )}
-    </DashboardLayout>
+    </BrokerPageShell>
   );
+}
+
+/**
+ * Audience-aware page shell. See BrokerConnectionsPage for the same
+ * pattern — retail users get the 5-tab bottom nav so they don't lose
+ * their navigation when drilling into broker data.
+ */
+function BrokerPageShell({ children }: { children: React.ReactNode }) {
+  const isRetail = useIsRetailOnly();
+  if (isRetail) {
+    return (
+      <>
+        <main className="min-h-screen pb-20 md:pb-0 md:pl-20">{children}</main>
+        <RetailBottomNav />
+      </>
+    );
+  }
+  return <DashboardLayout>{children}</DashboardLayout>;
 }

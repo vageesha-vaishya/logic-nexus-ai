@@ -69,10 +69,51 @@ function TabLink({ tab, vertical }: { tab: RetailTab; vertical: boolean }) {
   );
 }
 
+/**
+ * Standalone bottom-nav (mobile) + side-rail (desktop) renderer.
+ *
+ * Pulled out of RetailNavLayout so retail-eligible pages OUTSIDE the
+ * /dashboard/markets/retail/* subtree (broker connections, broker
+ * portfolio detail, etc.) can still show the 5-tab nav. Without this,
+ * a retail user navigating to /dashboard/markets/settings/brokers
+ * lost the bottom nav entirely (DashboardLayout doesn't render one).
+ *
+ * Pages that use this should also add `pb-20 md:pb-0` to their main
+ * content wrapper so the fixed bottom nav doesn't overlap.
+ */
+export function RetailBottomNav() {
+  return (
+    <>
+      {/* Desktop side-rail */}
+      <nav
+        aria-label="Retail sections"
+        className="hidden md:fixed md:left-0 md:top-16 md:bottom-0 md:flex md:w-20 md:flex-col md:gap-1 md:border-r md:bg-background md:py-3 md:z-30"
+      >
+        {RETAIL_TABS.map((tab) => (
+          <TabLink key={tab.to} tab={tab} vertical />
+        ))}
+      </nav>
+
+      {/* Mobile bottom-nav */}
+      <nav
+        aria-label="Retail sections"
+        className="fixed inset-x-0 bottom-0 z-40 flex border-t bg-background shadow-[0_-1px_3px_0_rgba(0,0,0,0.05)] md:hidden"
+      >
+        {RETAIL_TABS.map((tab) => (
+          <TabLink key={tab.to} tab={tab} vertical={false} />
+        ))}
+      </nav>
+    </>
+  );
+}
+
 export function RetailNavLayout() {
   return (
     <div className="flex min-h-[calc(100vh-4rem)] md:flex-row flex-col">
-      {/* Desktop: vertical sidebar to the left, fixed-width. */}
+      {/* Desktop: vertical sidebar to the left, fixed-width.
+          (Inline rather than via RetailBottomNav so its width takes
+          part in the flex layout; RetailBottomNav's side-rail is
+          position:fixed and used by detached pages.) */}
       <nav
         aria-label="Retail sections"
         className="hidden md:flex md:w-20 md:flex-col md:gap-1 md:border-r md:bg-background md:py-3"
