@@ -198,6 +198,10 @@ All colors MUST be HSL.
        Tokens are HSL triples (no hsl() wrapper) so they compose with the
        existing tailwind setup (colors use `hsl(var(--token))`).
        ========================================================================== */
+    /* Defaults below = "classic" theme. User-pickable variants live under
+       :root[data-sthira-theme="..."] at the bottom of this file. Sage +
+       terracotta stay constant across themes — they encode P&L semantics
+       (positive / negative) and must not change with the user's pick. */
     --sthira-navy:       222 51% 12%;   /* #0F1A2E primary surface, status bar */
     --sthira-cream:      37 41% 94%;    /* #F7F3EB default background, cards */
     --sthira-copper:     27 47% 48%;    /* #B07645 primary action, active states */
@@ -286,6 +290,39 @@ All colors MUST be HSL.
     --menu-strip-amro: 190 85% 60%;
     --menu-strip-administration: 310 78% 70%;
     --menu-strip-other: 220 15% 72%;
+  }
+
+  /* ==========================================================================
+     STHIRA — user-pickable theme variants
+     Driven by `data-sthira-theme` on <html>; default = classic (the :root
+     palette above). useSthiraTheme writes the attribute + persists choice.
+     Only --sthira-cream / --sthira-copper / --sthira-ink / --sthira-fog /
+     --sthira-navy swap — sage + terracotta stay constant so P&L colors
+     never confuse the user across themes.
+     ========================================================================== */
+
+  :root[data-sthira-theme="midnight"] {
+    --sthira-navy:   222 51% 12%;   /* #0F1A2E — splash kept dark */
+    --sthira-cream:  222 35% 14%;   /* #17223A — dark surface */
+    --sthira-copper: 27 60% 58%;    /* #C68A5A — lifted for contrast on dark */
+    --sthira-ink:    37 41% 94%;    /* #F7F3EB — cream-on-dark body text */
+    --sthira-fog:    217 15% 70%;   /* #A6B0BF — secondary text */
+  }
+
+  :root[data-sthira-theme="ocean"] {
+    --sthira-navy:   216 58% 18%;   /* #1E3A5F — deeper blue splash */
+    --sthira-cream:  213 48% 96%;   /* #F0F4FA — pearl */
+    --sthira-copper: 217 58% 41%;   /* #2C5AA6 — royal blue accent */
+    --sthira-ink:    216 33% 14%;   /* #1A2638 — body text */
+    --sthira-fog:    216 14% 50%;   /* #6E7B92 — secondary text */
+  }
+
+  :root[data-sthira-theme="forest"] {
+    --sthira-navy:   132 27% 14%;   /* #1A2D1F — deep forest splash */
+    --sthira-cream:  39 36% 94%;    /* #F5F1E8 — sand */
+    --sthira-copper: 117 19% 35%;   /* #4A6B47 — sage-green accent */
+    --sthira-ink:    132 14% 14%;   /* #1F2A1F — body text */
+    --sthira-fog:    117 8% 45%;    /* #6B776D — secondary text */
   }
 }
 

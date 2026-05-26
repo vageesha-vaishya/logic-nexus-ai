@@ -21,6 +21,12 @@ if (typeof window !== "undefined") {
     document.documentElement.classList.add("dark");
   }
 }
+
+// Apply the persisted Sthira theme before first render so users with
+// a non-default pick (e.g. Midnight) don't flash the Classic palette.
+import { applyPersistedSthiraTheme } from "./features/markets/sthira/useSthiraTheme";
+applyPersistedSthiraTheme();
+
 import "./lib/i18n";
 import { initSentry } from "./lib/sentry";
 import { initPostHog } from "./lib/posthog";

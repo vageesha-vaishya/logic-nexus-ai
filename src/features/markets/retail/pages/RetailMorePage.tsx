@@ -6,6 +6,7 @@ import {
   BookOpen,
   ChevronRight,
   LogOut,
+  Palette,
   Settings,
   TrendingDown,
   Wallet,
@@ -13,6 +14,9 @@ import {
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
+import { ThemePickerSheet } from "@/features/markets/sthira/ThemePickerSheet";
+import { getSthiraThemeMeta } from "@/features/markets/sthira/themes";
+import { useSthiraTheme } from "@/features/markets/sthira/useSthiraTheme";
 
 import { GLOSSARY, lookupTerm, Term } from "../glossary";
 
@@ -99,6 +103,9 @@ function Row({ Icon, label, hint, to, onClick, disabled }: RowProps) {
 export default function RetailMorePage() {
   const { signOut, user } = useAuth();
   const [showGlossary, setShowGlossary] = useState(false);
+  const [themePickerOpen, setThemePickerOpen] = useState(false);
+  const { theme } = useSthiraTheme();
+  const themeMeta = getSthiraThemeMeta(theme);
 
   const entries = Object.values(GLOSSARY);
 
@@ -131,6 +138,12 @@ export default function RetailMorePage() {
           disabled
         />
         <Row
+          Icon={Palette}
+          label="Appearance"
+          hint={`Theme — ${themeMeta.name}`}
+          onClick={() => setThemePickerOpen(true)}
+        />
+        <Row
           Icon={BookOpen}
           label={showGlossary ? "Hide glossary" : "Glossary"}
           hint={`${entries.length} terms — tap a word in the app to see its definition`}
@@ -151,6 +164,8 @@ export default function RetailMorePage() {
           }}
         />
       </div>
+
+      <ThemePickerSheet open={themePickerOpen} onOpenChange={setThemePickerOpen} />
 
       {showGlossary && (
         <div className="space-y-2 rounded-md border bg-muted/30 p-3">
