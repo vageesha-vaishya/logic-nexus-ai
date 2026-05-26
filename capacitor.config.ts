@@ -40,11 +40,11 @@ const config: CapacitorConfig = {
       // Sthira splash — navy background, copper wordmark.
       // See docs/plans/2026-05-20-sthira-mobile-onboarding-and-markets-ux-design.md
       //
-      // PR 1: launchAutoHide stays true so the native splash dismisses on
-      // its own after launchShowDuration. PR 2 will flip this to false and
-      // call hideSthiraSplash() once session + tenant config resolve.
-      // Without that programmatic hide, false would freeze the app on the
-      // splash forever — observed today on Nord after PR 1 install.
+      // launchAutoHide must stay true: SthiraSplashRoute is the only
+      // place that calls hideSthiraSplash(), and existing users with
+      // onboarding_complete=true route straight to /dashboard/... and
+      // never mount it. Setting this to false freezes the app on the
+      // native splash for those users — verified on Nord 2026-05-26.
       launchShowDuration:        1500,
       launchAutoHide:            true,
       backgroundColor:           "#0F1A2E",
