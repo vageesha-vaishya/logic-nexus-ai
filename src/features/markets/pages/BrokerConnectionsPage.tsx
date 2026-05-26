@@ -152,7 +152,7 @@ function ConnectionCard({
   return (
     <Card>
       <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
+        <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
           <div className="flex items-start gap-3">
             <div className="mt-0.5">
               <StatusIcon status={conn.status} />
@@ -198,18 +198,18 @@ function ConnectionCard({
             </div>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex flex-wrap items-center gap-1 sm:shrink-0">
             <Button variant="outline" size="sm" className="h-8 text-xs"
               onClick={onViewPortfolio} title="Open linked portfolio">
-              View Portfolio
+              Portfolio
             </Button>
-            <Button variant="ghost" size="sm" className="h-8 text-xs"
+            <Button variant="outline" size="sm" className="h-8 text-xs"
               onClick={onRouting} title="Routing rules">
               Routing
             </Button>
             <Button variant="ghost" size="sm" className="h-8 text-xs"
               onClick={onViewBroker} title="View broker data">
-              Broker Data
+              Data
               <ChevronRight className="h-3.5 w-3.5 ml-1" />
             </Button>
             {conn.status === "active" && (
