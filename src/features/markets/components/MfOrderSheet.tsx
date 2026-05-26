@@ -10,6 +10,7 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
 
 import { useSthiraShell } from "@/hooks/use-sthira-shell";
+import { WhyButton } from "@/features/markets/retail/glossary";
 
 import {
   Button,
@@ -316,10 +317,11 @@ export function MfOrderSheet({
             <div className="space-y-1">
               <p className="text-xs text-muted-foreground uppercase tracking-wide">Fund</p>
               <p className="text-sm font-medium leading-snug line-clamp-2">{schemeName}</p>
-              <p className="text-xs text-muted-foreground">
-                Current NAV: <span className="font-mono">{fmtNav(currentNav)}</span>
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                Current <WhyButton term="nav" srLabel="What is NAV?" />:&nbsp;
+                <span className="font-mono">{fmtNav(currentNav)}</span>
                 {fund?.nav_date && (
-                  <span> · as of {fund.nav_date}</span>
+                  <span>&nbsp;· as of {fund.nav_date}</span>
                 )}
               </p>
             </div>

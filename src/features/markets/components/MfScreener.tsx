@@ -7,6 +7,8 @@
 
 import { useMemo, useState } from "react";
 import { Filter, PiggyBank, Star } from "lucide-react";
+
+import { useSthiraShell } from "@/hooks/use-sthira-shell";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Badge,
@@ -233,6 +235,11 @@ function CategoryBadge({ category }: { category: string | null }) {
 // ── Main component ────────────────────────────────────────────────────────────
 
 export function MfScreener() {
+  // Sthira shell trims the screener to 4 dimensions (Category + AMC +
+  // 1Y + 3Y returns) — Expense Ratio + AUM are advisor-grade filters
+  // most layman users don't need. Desktop keeps all 6 for power users.
+  const isSthiraShell = useSthiraShell();
+
   // ── Filters state ─────────────────────────────────────────────────────────
   const [categories,   setCategories]   = useState<Set<string>>(new Set());
   const [amcSearch,    setAmcSearch]    = useState("");
@@ -416,43 +423,47 @@ export function MfScreener() {
               </Select>
             </div>
 
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Expense Ratio</p>
-              <Select
-                value={maxExpense == null ? "__any__" : String(maxExpense)}
-                onValueChange={v => setMaxExpense(v === "__any__" ? null : Number(v))}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  {EXPENSE_OPTIONS.map(o => (
-                    <SelectItem key={o.label} value={o.value == null ? "__any__" : String(o.value)}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!isSthiraShell && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Expense Ratio</p>
+                <Select
+                  value={maxExpense == null ? "__any__" : String(maxExpense)}
+                  onValueChange={v => setMaxExpense(v === "__any__" ? null : Number(v))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {EXPENSE_OPTIONS.map(o => (
+                      <SelectItem key={o.label} value={o.value == null ? "__any__" : String(o.value)}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
-            <div>
-              <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">AUM</p>
-              <Select
-                value={minAum == null ? "__any__" : String(minAum)}
-                onValueChange={v => setMinAum(v === "__any__" ? null : Number(v))}
-              >
-                <SelectTrigger className="h-8 text-xs">
-                  <SelectValue placeholder="Any" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AUM_OPTIONS.map(o => (
-                    <SelectItem key={o.label} value={o.value == null ? "__any__" : String(o.value)}>
-                      {o.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            {!isSthiraShell && (
+              <div>
+                <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">AUM</p>
+                <Select
+                  value={minAum == null ? "__any__" : String(minAum)}
+                  onValueChange={v => setMinAum(v === "__any__" ? null : Number(v))}
+                >
+                  <SelectTrigger className="h-8 text-xs">
+                    <SelectValue placeholder="Any" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {AUM_OPTIONS.map(o => (
+                      <SelectItem key={o.label} value={o.value == null ? "__any__" : String(o.value)}>
+                        {o.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
 
           </div>
 

@@ -20,6 +20,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 import { useMfPortfolio } from "../../hooks/useMf";
+import { WhyButton } from "../glossary";
 
 const MF_HUB = "/dashboard/markets/mf";
 
@@ -56,7 +57,10 @@ export function MfHoldingsCard() {
         <div className="flex items-start gap-3">
           <PiggyBank className="h-5 w-5 text-sthira-copper mt-0.5" aria-hidden="true" />
           <div className="flex-1 min-w-0">
-            <h3 className="font-sthiraSerif italic text-base">Mutual Funds</h3>
+            <h3 className="flex items-center gap-1.5 font-sthiraSerif italic text-base">
+              Mutual Funds
+              <WhyButton term="mf" srLabel="What is a mutual fund?" />
+            </h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Direct plans, live NAV. SIPs from ₹500/month.
             </p>
