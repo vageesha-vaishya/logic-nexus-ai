@@ -59,11 +59,9 @@ NAV  (slim, sticky)
   Logo · Products · Engineering · About · Contact      [Talk to founder] CTA
 
 HERO  (dark bg, full viewport on desktop)
-  Eyebrow: VENTURE STUDIO · 5 PRODUCTS · ONE ENGINEERING TEAM
-  H1: Practical SaaS for operators who'd rather get things done.
-  Sub: One studio building five focused platforms — logistics CRM, retail
-       investing, aviation analytics, MRO. Real software, real customers,
-       real compliance.
+  Eyebrow: VENTURE STUDIO · ONE ENGINEERING TEAM
+  H1: For operators, not pitch decks.
+  Sub: One studio. Every platform built to ship.
   CTA primary:   [See products ↓]
   CTA secondary: [Talk to founder →]
   Visual:        Screenshot carousel cycling through 5 product UIs

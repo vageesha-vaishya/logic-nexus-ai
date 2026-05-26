@@ -57,15 +57,14 @@ const config: CapacitorConfig = {
   },
 
   android: {
-    // The native shell loads bundled dist/ at https://localhost/ but the
-    // markets-worker fetches go to plain http://localhost:8001 (no TLS in
-    // local dev; the adb-reverse tunnel makes this loopback-only on the
-    // device). Chromium blocks http XHR from https origins by default,
-    // which breaks broker tiles + signals + holdings entirely. Allow
-    // mixed content so the WebView can reach the worker.
-    // Note: in production the worker must be HTTPS for this to be
-    // truly safe — re-evaluate when the worker moves off localhost.
-    allowMixedContent: true,
+    // Production builds bake VITE_MARKETS_WORKER_URL=https://markets.sosservices.online
+    // (see scripts/mobile-build-markets.sh + Play Store release flow), so the
+    // WebView never needs to load mixed content at runtime. For LAN-IP dev
+    // (npm run mobile:build:markets without the prod URL override), the
+    // worker is plain http://<lan-ip>:8001 — in that case, override this
+    // value via the gitignored capacitor.config.local.ts instead of flipping
+    // it back here, so the production AAB stays HTTPS-only by default.
+    allowMixedContent: false,
     captureInput: true,
   },
 };
