@@ -2,7 +2,6 @@ import { useState, useEffect, useMemo, type ReactNode } from 'react';
 import { useNavigate, useLocation, useSearchParams, Link } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
-import { invokeFunction } from '@/lib/supabase-functions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -228,33 +227,12 @@ export default function Auth() {
 
       if (error) {
         logger.error('Sign in error:', error);
-        const isAdminEmail = email.trim().toLowerCase() === 'bahuguna.vimal@gmail.com';
-        if (error.message.includes('Invalid login credentials') && isAdminEmail) {
-          try {
-            logger.debug('Attempting to seed admin account...');
-            const seedResult = await Promise.race([
-              invokeFunction('seed-platform-admin', { body: { email, password } }),
-              new Promise((_, reject) => setTimeout(() => reject(new Error('Seeding timed out')), 10000))
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            ]) as { data: any, error: any };
-            const { data, error: seedError } = seedResult;
-            if (seedError) {
-              logger.error('Seeding error:', seedError);
-              toast.error('Admin account not found. Use Setup to create it.');
-            } else if (data?.success) {
-              toast.success('Admin created. Signing you in...');
-              const { error: retryError } = await signIn(email, password);
-              if (!retryError) {
-                navigate(next, { replace: true });
-                setLoading(false);
-                return;
-              }
-            }
-          } catch (err) {
-            logger.error('Seeding failed:', err);
-            toast.error('Setup required. Please run Platform Setup.');
-          }
-        } else if (error.message.includes('Email not confirmed')) {
+        // Auto-seeding the platform admin on failed sign-in used to live
+        // here gated on a hardcoded email. That implicit seed path leaked
+        // the admin's identity through the JS bundle and is now removed:
+        // platform bootstrap is /setup-admin only (and that page is
+        // blocked on the Sthira native shell). Removed 2026-05-26.
+        if (error.message.includes('Email not confirmed')) {
           toast.error('Please verify your email address');
         } else if (error.message.includes('Failed to fetch')) {
           toast.error('Connection Error', {
