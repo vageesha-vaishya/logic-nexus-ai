@@ -35,7 +35,11 @@ from markets_worker.routers import stress_test as stress_test_router
 from markets_worker.routers import holdings_news as holdings_news_router
 from markets_worker.routers import retail as retail_router
 from markets_worker.routers import behavioral as behavioral_router
-from markets_worker.routers import risk as risk_router
+# risk router retired 2026-05-26: the GET /v1/retail/risk-score endpoint
+# moved to the `retail-risk-score` Supabase Edge Function (see
+# supabase/functions/retail-risk-score/). The compute logic still lives at
+# markets_worker.jobs.risk_score_compute and is used by rebalance,
+# drift_detector, and the T19 nightly diagnostic.
 from markets_worker.routers import rebalance as rebalance_router
 from markets_worker.routers import push as push_router
 
@@ -121,7 +125,7 @@ def create_app() -> FastAPI:
     app.include_router(holdings_news_router.router,         tags=["retail-news"])
     app.include_router(retail_router.router,                tags=["retail"])
     app.include_router(behavioral_router.router,            tags=["retail-behavioral"])
-    app.include_router(risk_router.router,                  tags=["retail-risk"])
+    # retail-risk router retired — see import comment above
     app.include_router(rebalance_router.router,             tags=["retail-rebalance"])
     app.include_router(push_router.router,                  tags=["retail-push"])
 
