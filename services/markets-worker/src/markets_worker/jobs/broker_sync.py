@@ -220,17 +220,20 @@ def _upsert_holdings(db, holdings, portfolio_id, owner_id, tenant_id, franchise_
     if not holdings:
         return
 
-    # Upsert into markets.holdings (the existing table)
+    # Upsert into markets.holdings. broker_connection_id lives in its own
+    # column (since 2026-05-21) AND in metadata for backward-compat with
+    # readers that still look in metadata.
     rows = []
     for h in holdings:
         rows.append({
-            "portfolio_id":  portfolio_id,
-            "owner_user_id": owner_id,
-            "tenant_id":     tenant_id,
-            "franchise_id":  franchise_id,
-            "qty":           float(h.quantity),
-            "avg_cost":      float(h.avg_cost),
-            "metadata":      {
+            "portfolio_id":         portfolio_id,
+            "owner_user_id":        owner_id,
+            "tenant_id":            tenant_id,
+            "franchise_id":         franchise_id,
+            "broker_connection_id": connection_id,
+            "qty":                  float(h.quantity),
+            "avg_cost":             float(h.avg_cost),
+            "metadata":             {
                 "broker_connection_id": connection_id,
                 "last_price":   float(h.last_price),
                 "pnl":          float(h.pnl),
@@ -274,9 +277,16 @@ def _upsert_holdings(db, holdings, portfolio_id, owner_id, tenant_id, franchise_
 
     valid_rows = [r for r in rows if r.get("instrument_id")]
     if valid_rows:
+        # Conflict target matches the partial unique index
+        # holdings_broker_scoped_uniq (portfolio_id, broker_connection_id,
+        # instrument_id) WHERE broker_connection_id IS NOT NULL. The
+        # broker_sync path always sets broker_connection_id, so this is
+        # the only target it ever hits. Manual entries live under the
+        # other partial index (holdings_manual_uniq) and are upserted
+        # by the manual-entry flow, not here.
         db.schema("markets").from_("holdings").upsert(
             valid_rows,
-            on_conflict="portfolio_id,instrument_id",
+            on_conflict="portfolio_id,broker_connection_id,instrument_id",
             ignore_duplicates=False,
         ).execute()
 

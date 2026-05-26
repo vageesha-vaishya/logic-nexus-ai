@@ -38,7 +38,13 @@ export interface PlanGateResult {
 
 /** Limits applied when no subscription exists (implicit free/trial). */
 const DEFAULT_TRIAL_LIMITS: Record<PlanFeature, number | boolean> = {
-  broker_connections: 1,
+  // -1 = unlimited. Trial users can connect every broker they actually
+  // own; the friction we're protecting against (live_trading, fno_access,
+  // mf_orders) is the trade-execution surface, not the read-only sync
+  // surface. Capping broker count was an artificial gate that blocked
+  // legitimate multi-broker users from validating the platform before
+  // they upgraded.
+  broker_connections: -1,
   live_trading:       false,
   fno_access:         false,
   mf_orders:          false,

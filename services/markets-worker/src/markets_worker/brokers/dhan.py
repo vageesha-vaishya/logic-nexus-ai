@@ -337,7 +337,7 @@ class DhanAdapter(BrokerAdapter):
             # Dhan forever order uses place_order with order_type="SL" + validity
             # Map GTT to a Dhan stop-loss order with extended validity
             raw = await asyncio.to_thread(
-                self._client.place_order,
+                self._dhan.place_order,
                 security_id=req.tradingsymbol,
                 exchange_segment=f"{req.exchange}_EQ",
                 transaction_type=t.transaction_type,
@@ -360,7 +360,7 @@ class DhanAdapter(BrokerAdapter):
     async def cancel_gtt(self, gtt_id: str) -> "GTTResult":
         try:
             from markets_worker.brokers.base import GTTResult
-            raw = await asyncio.to_thread(self._client.cancel_order, gtt_id)
+            raw = await asyncio.to_thread(self._dhan.cancel_order, gtt_id)
             status = "cancelled" if (raw and raw.get("status") == "success") else "error"
             return GTTResult(gtt_id=gtt_id, status=status)
         except Exception as exc:

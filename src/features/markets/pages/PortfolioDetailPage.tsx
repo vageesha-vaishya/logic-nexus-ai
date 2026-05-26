@@ -45,10 +45,11 @@ import {
   Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/design-system";
 import type {
-  Brief, BriefSource, HoldingWithPrice,
+  Brief, BriefSource, HoldingWithPrice, AggregatedHolding,
   AssetClass, TransactionType, CreateTransactionInput,
   ASSET_CLASS_LABELS, TXN_TYPE_LABELS, TXN_TYPES_NEED_INSTRUMENT,
 } from "../types";
+import { useBrokerConnections } from "../hooks/useBrokerConnections";
 import {
   ASSET_CLASS_LABELS as ACL,
   TXN_TYPE_LABELS    as TTL,
@@ -660,6 +661,12 @@ interface HoldingsTableProps {
 
 function HoldingsTable({ holdings, currency, transactions, grouping, onBuy, onSell }: HoldingsTableProps) {
   const [menuOpen, setMenuOpen] = useState<string | null>(null);
+  const connectionsQuery = useBrokerConnections();
+  const brokerLabel = (conn_id?: string | null): string => {
+    if (!conn_id) return "Manual entry";
+    const c = (connectionsQuery.data ?? []).find(x => x.id === conn_id);
+    return c?.display_name ?? c?.broker ?? conn_id.slice(0, 8);
+  };
 
   // Build groups
   const grouped = useMemo(() => {
@@ -759,6 +766,16 @@ function HoldingsTable({ holdings, currency, transactions, grouping, onBuy, onSe
                       <div className="flex items-center gap-1.5">
                         <span className="text-foreground">{h.instrument?.symbol ?? "—"}</span>
                         <span className="text-muted-foreground text-xs">{h.instrument?.exchange ?? ""}</span>
+                        {(h as AggregatedHolding).source_count > 1 && (
+                          <span
+                            className="ml-1 inline-flex items-center rounded border border-amber-200 bg-amber-50 px-1.5 py-0 text-[9px] font-medium text-amber-800 dark:bg-amber-950 dark:text-amber-300"
+                            title={(h as AggregatedHolding).sources
+                              .map(s => `${brokerLabel(s.broker_connection_id)}: ${s.qty} @ ₹${fmtINR(s.avg_cost)}`)
+                              .join("\n")}
+                          >
+                            {(h as AggregatedHolding).source_count} brokers
+                          </span>
+                        )}
                       </div>
                     </TableCell>
 

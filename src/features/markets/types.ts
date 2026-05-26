@@ -467,6 +467,12 @@ export interface Holding {
   realized_pnl: number;
   last_updated_at: string;
   instrument: Instrument | null;
+  /**
+   * Which broker connection produced this row, if any. NULL on manual
+   * entries. Broker-sync rows always set it (top-level column since
+   * 2026-05-21; populated by broker_sync.py).
+   */
+  broker_connection_id?: string | null;
 }
 
 export interface HoldingWithPrice extends Holding {
@@ -474,8 +480,27 @@ export interface HoldingWithPrice extends Holding {
   prev_price: number | null;
 }
 
+/**
+ * One row per instrument, aggregated across all broker_connection_id
+ * sources. Sum of per-source qty, weighted-avg cost, and the per-source
+ * rows kept on `sources` so the UI can expand to show a per-broker
+ * breakdown ("RELIANCE — 5 via Zerodha + 5 via Groww = 10").
+ */
+export interface AggregatedHolding extends HoldingWithPrice {
+  /** Number of distinct broker connections (incl. null = manual) contributing. */
+  source_count: number;
+  /** Per-source rows, sorted by qty desc. */
+  sources: HoldingWithPrice[];
+}
+
 export interface PortfolioHoldingsResult {
-  holdings:         HoldingWithPrice[];
+  /**
+   * One entry per instrument, aggregated across all broker connections
+   * feeding this portfolio. Consumers that only care about
+   * (qty, avg_cost, last_price) can treat these as HoldingWithPrice;
+   * the per-source breakdown is available on .sources for expandable UIs.
+   */
+  holdings:         AggregatedHolding[];
   nav:              number;
   todayPnl:         number;
   sinceInceptionPct: number;

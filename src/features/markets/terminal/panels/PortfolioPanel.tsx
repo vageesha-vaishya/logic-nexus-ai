@@ -1,10 +1,13 @@
 /**
  * PortfolioPanel — compact holdings summary panel for the terminal workspace.
- * Shows holdings from the first active portfolio with NAV and P&L.
+ * Shows holdings from the currently-active portfolio. When the user owns
+ * more than one portfolio, an inline picker lets them switch — the choice
+ * is persisted in localStorage via useActivePortfolio().
  */
 
-import { usePortfolios } from "../../hooks/usePortfolios";
+import { useActivePortfolio } from "../../hooks/useActivePortfolio";
 import { usePortfolioHoldings } from "../../hooks/usePortfolio";
+import { ActivePortfolioPicker } from "../../components/ActivePortfolioPicker";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
@@ -127,7 +130,7 @@ function FirstPortfolioHoldings({ portfolioId }: { portfolioId: string }) {
 }
 
 export function PortfolioPanel() {
-  const { data: portfolios, isLoading } = usePortfolios();
+  const { activePortfolio, hasMultiple, isLoading } = useActivePortfolio();
 
   if (isLoading) {
     return (
@@ -139,9 +142,7 @@ export function PortfolioPanel() {
     );
   }
 
-  const firstPortfolio = portfolios?.[0];
-
-  if (!firstPortfolio) {
+  if (!activePortfolio) {
     return (
       <div className="flex items-center justify-center h-full text-xs text-muted-foreground p-4 text-center">
         No portfolios found. Create one in Portfolios.
@@ -152,21 +153,25 @@ export function PortfolioPanel() {
   return (
     <div className="flex flex-col h-full min-h-0">
       <div className="flex items-center px-2 pb-1 shrink-0 gap-2">
-        <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide truncate">
-          {firstPortfolio.name}
-        </span>
+        {hasMultiple ? (
+          <ActivePortfolioPicker className="h-6 text-[10px] w-auto min-w-[110px]" />
+        ) : (
+          <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide truncate">
+            {activePortfolio.name}
+          </span>
+        )}
         <span
           className={cn(
             "text-[9px] px-1.5 py-0.5 rounded-full font-medium",
-            firstPortfolio.mode === "paper"
+            activePortfolio.mode === "paper"
               ? "bg-amber-500/15 text-amber-600"
               : "bg-emerald-500/15 text-emerald-600",
           )}
         >
-          {firstPortfolio.mode}
+          {activePortfolio.mode}
         </span>
       </div>
-      <FirstPortfolioHoldings portfolioId={firstPortfolio.id} />
+      <FirstPortfolioHoldings portfolioId={activePortfolio.id} />
     </div>
   );
 }

@@ -7,7 +7,12 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { marketsKeys } from "./queryKeys";
-import type { Portfolio, PortfolioHoldingsResult } from "../types";
+import type {
+  AggregatedHolding,
+  HoldingWithPrice,
+  Portfolio,
+  PortfolioHoldingsResult,
+} from "../types";
 
 // Triggers a server-side NAV refresh for one or all portfolios, then
 // invalidates the portfolio list so the updated metadata appears immediately.
@@ -68,12 +73,21 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
       const { data: holdings, error: holdingsErr } = await (supabase as any)
         .schema("markets")
         .from("holdings")
-        .select("id, instrument_id, qty, avg_cost, realized_pnl, last_updated_at")
+        .select(
+          "id, instrument_id, qty, avg_cost, realized_pnl, last_updated_at, broker_connection_id",
+        )
         .eq("portfolio_id", portfolioId);
 
       if (holdingsErr) throw new Error(holdingsErr.message);
       if (!holdings?.length) {
-        return { holdings: [], nav: 0, todayPnl: 0, sinceInceptionPct: 0 };
+        return {
+          holdings: [],
+          nav: 0,
+          todayPnl: 0,
+          sinceInceptionPct: 0,
+          investedValue: 0,
+          bonusValue: 0,
+        };
       }
 
       const instrumentIds: string[] = holdings.map((h: any) => h.instrument_id);
@@ -131,7 +145,10 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
       let bonusCurrentValue     = 0;  // current value of bonus/free shares
       let totalRealizedPnl      = 0;
 
-      const enriched = holdings.map((h: any) => {
+      // Per-source enrichment first — one row per (instrument_id,
+      // broker_connection_id). Two connections holding the same symbol
+      // both feed this list; aggregation by instrument happens below.
+      const perSource: HoldingWithPrice[] = holdings.map((h: any) => {
         const pts = priceMap[h.instrument_id] ?? [];
         const lastPrice: number | null = pts[0] ?? null;
         const prevPrice: number | null = pts[1] ?? null;
@@ -158,8 +175,49 @@ export function usePortfolioHoldings(portfolioId: string | undefined) {
           instrument: instrumentMap[h.instrument_id] ?? null,
           last_price: lastPrice,
           prev_price: prevPrice,
+          broker_connection_id: h.broker_connection_id ?? null,
         };
       });
+
+      // Roll up by instrument: sum qty, weighted-avg cost, sum realized_pnl,
+      // keep per-source rows so the UI can expand. With the new
+      // (portfolio_id, broker_connection_id, instrument_id) partial unique
+      // index, the DB now legitimately produces multiple rows for the same
+      // (portfolio, symbol) when more than one broker feeds the portfolio.
+      const byInstrument = new Map<string, HoldingWithPrice[]>();
+      for (const row of perSource) {
+        const bucket = byInstrument.get(row.instrument_id) ?? [];
+        bucket.push(row);
+        byInstrument.set(row.instrument_id, bucket);
+      }
+      const enriched: AggregatedHolding[] = [];
+      for (const [iid, rows] of byInstrument) {
+        rows.sort((a, b) => b.qty - a.qty);
+        const totalQty = rows.reduce((s, r) => s + r.qty, 0);
+        // Weighted-avg cost: ignore rows with qty<=0 to avoid division
+        // weirdness. Bonus rows (avg_cost=0) still count in qty but pull
+        // the weighted cost down — that matches what a broker would show.
+        const totalCostBasis = rows.reduce((s, r) => s + r.qty * r.avg_cost, 0);
+        const wAvg = totalQty > 0 ? totalCostBasis / totalQty : 0;
+        const sumRealized = rows.reduce((s, r) => s + (r.realized_pnl ?? 0), 0);
+        const head = rows[0];
+        enriched.push({
+          // identity: use the lead row's id so consumers that key off `id`
+          // (signals deep-links, etc.) still resolve to a real row.
+          id:              head.id,
+          instrument_id:   iid,
+          qty:             totalQty,
+          avg_cost:        wAvg,
+          realized_pnl:    sumRealized,
+          last_updated_at: head.last_updated_at,
+          instrument:      head.instrument,
+          last_price:      head.last_price,
+          prev_price:      head.prev_price,
+          broker_connection_id: rows.length === 1 ? head.broker_connection_id ?? null : null,
+          source_count:    rows.length,
+          sources:         rows,
+        });
+      }
 
       // sinceInceptionPct: return on PURCHASED positions only.
       // Bonus / gifted shares have avg_cost = 0 — they cannot contribute to a

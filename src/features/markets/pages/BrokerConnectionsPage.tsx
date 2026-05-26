@@ -46,6 +46,7 @@ import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { openExternal } from "@/lib/openExternal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -90,6 +91,7 @@ import {
   useSupportedBrokers,
   useTriggerBrokerSync,
 } from "../hooks/useBrokerConnections";
+import { Info } from "lucide-react";
 import { useCreatePortfolio, usePortfolios } from "../hooks/usePortfolios";
 
 // ── Status helpers ────────────────────────────────────────────────────────────
@@ -276,16 +278,65 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
   const [portfolioChoice, setPortfolioChoice] = useState<string>(NEW_PORTFOLIO);
   const [newPortfolioName, setNewPortfolioName] = useState<string>("");
 
-  const portfoliosQuery = usePortfolios();
-  const createPortfolio = useCreatePortfolio();
-  const addConn      = useAddBrokerConnection();
-  const exchangeCode = useExchangeBrokerCode();
-  const triggerSync  = useTriggerBrokerSync();
+  const portfoliosQuery   = usePortfolios();
+  const createPortfolio   = useCreatePortfolio();
+  const addConn           = useAddBrokerConnection();
+  const exchangeCode      = useExchangeBrokerCode();
+  const triggerSync       = useTriggerBrokerSync();
+  const connectionsQuery  = useBrokerConnections();
 
   if (!broker) return null;
 
+  // Advisory: when the chosen portfolio is already linked to one or more
+  // active broker connections, surface it so the user knows their holdings
+  // will merge by symbol within the portfolio (positions/orders stay
+  // scoped per-connection). Non-blocking — multi-broker → one-portfolio
+  // is a legitimate consolidation pattern.
+  const sharedConnections = (() => {
+    if (portfolioChoice === NEW_PORTFOLIO) return [];
+    const all = connectionsQuery.data ?? [];
+    return all.filter(c => c.portfolio_id === portfolioChoice && c.status !== "revoked");
+  })();
+
   const set = (k: string, v: string) => setForm(p => ({ ...p, [k]: v }));
   const busy = addConn.isPending || exchangeCode.isPending;
+
+  // Required fields per (broker, step). Submit is blocked until all are filled.
+  function requiredFields(): string[] {
+    if (!broker) return [];
+    if (broker.auth_type === "api_key")        return ["client_id", "access_token"];
+    if (broker.auth_type === "api_key_secret") return ["api_key", "api_secret"];
+    if (broker.auth_type === "totp")           return ["api_key", "client_id", "password", "totp_secret"];
+    if (broker.auth_type === "session_token") {
+      if (step === 0) return ["client_id", "api_key", "api_secret"];
+      return ["session_token"];
+    }
+    if (broker.auth_type === "oauth") {
+      if (step === 0) return ["client_id", "api_key", "api_secret"];
+      return ["auth_code"];
+    }
+    if (broker.auth_type === "otp") {
+      if (step === 0) return ["consumer_key", "consumer_secret", "mobile_number", "password", "mpin"];
+      return ["otp"];
+    }
+    return [];
+  }
+  const missing = requiredFields().filter(k => !(form[k] ?? "").trim());
+  const canSubmit = missing.length === 0 && !busy;
+
+  async function fetchAuthUrl(params: URLSearchParams): Promise<string> {
+    const res = await fetch(
+      `${import.meta.env.VITE_MARKETS_WORKER_URL ?? "http://localhost:8001"}/v1/brokers/auth-url?${params}`,
+    );
+    const data = await res.json().catch(() => ({} as any));
+    if (!res.ok) {
+      throw new Error(data?.detail ?? data?.error ?? `Could not get login URL (HTTP ${res.status})`);
+    }
+    if (!data.auth_url) {
+      throw new Error("Broker returned an empty login URL — check your API key.");
+    }
+    return String(data.auth_url);
+  }
 
   // ── Step definitions per auth type ────────────────────────────────────────
 
@@ -322,15 +373,11 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
       else if (broker.auth_type === "session_token") {
         if (step === 0) {
           // Step 1: fetch the login URL, show it to user
-          const params = new URLSearchParams({
+          const url = await fetchAuthUrl(new URLSearchParams({
             broker:   broker.id,
             api_key:  form.api_key,
-          });
-          const res = await fetch(
-            `${import.meta.env.VITE_MARKETS_WORKER_URL ?? "http://localhost:8001"}/v1/brokers/auth-url?${params}`,
-          );
-          const data = await res.json();
-          setAuthUrl(data.auth_url ?? "");
+          }));
+          setAuthUrl(url);
           setStep(1);
           return;
         }
@@ -345,17 +392,13 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
       else if (broker.auth_type === "oauth") {
         if (step === 0) {
           // Step 1: get auth URL and open it
-          const params = new URLSearchParams({
+          const url = await fetchAuthUrl(new URLSearchParams({
             broker:       broker.id,
             api_key:      form.api_key,
             redirect_uri: form.redirect_uri || "https://127.0.0.1/",
-          });
-          const res = await fetch(
-            `${import.meta.env.VITE_MARKETS_WORKER_URL ?? "http://localhost:8001"}/v1/brokers/auth-url?${params}`,
-          );
-          const data = await res.json();
-          setAuthUrl(data.auth_url ?? "");
-          window.open(data.auth_url, "_blank");
+          }));
+          setAuthUrl(url);
+          await openExternal(url);
           setStep(1);
           return;
         }
@@ -526,10 +569,10 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
               and copy the <code>token</code> value from the redirect URL.
             </p>
             {authUrl && (
-              <a href={authUrl} target="_blank" rel="noopener noreferrer"
-                 className="flex items-center gap-1 text-xs text-primary hover:underline break-all">
+              <button type="button" onClick={() => openExternal(authUrl)}
+                 className="flex items-center gap-1 text-xs text-primary hover:underline break-all text-left">
                 Open ICICI Direct login <ExternalLink className="h-3 w-3 shrink-0" />
-              </a>
+              </button>
             )}
           </div>
           <Field id="session_token" label="Session token" type="password"
@@ -566,7 +609,7 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
                 : "Copy the auth_code= value from the redirect URL."}
             </p>
             {authUrl && (
-              <button onClick={() => window.open(authUrl, "_blank")}
+              <button type="button" onClick={() => openExternal(authUrl)}
                 className="flex items-center gap-1 text-xs text-primary hover:underline">
                 Re-open {broker.name} login <ExternalLink className="h-3 w-3" />
               </button>
@@ -631,7 +674,12 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
         <div className="mt-6 space-y-6">
           {renderForm()}
 
-          {/* ── Portfolio binding (1:1) ─────────────────────────────────── */}
+          {/* ── Portfolio binding ───────────────────────────────────────── */}
+          {/* Many-to-many: one broker can target one portfolio (default),    */}
+          {/* and one portfolio can receive holdings from many brokers (a    */}
+          {/* "consolidated" view). When two brokers point at the same       */}
+          {/* portfolio, holdings rows are kept per-(connection, symbol) so  */}
+          {/* nothing clobbers; the UI aggregates by symbol for display.     */}
           <div className="space-y-2 border-t pt-4">
             <Label htmlFor="portfolio">Portfolio</Label>
             <Select value={portfolioChoice} onValueChange={setPortfolioChoice}>
@@ -653,8 +701,22 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
                 autoComplete="off"
               />
             )}
+            {sharedConnections.length > 0 && (
+              <div className="flex items-start gap-2 rounded border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
+                <div>
+                  This portfolio is already receiving holdings from{" "}
+                  <span className="font-medium">
+                    {sharedConnections.map(c => c.display_name).join(", ")}
+                  </span>
+                  . Holdings will be tracked per-broker (no clobber); positions
+                  and orders stay scoped to each connection.
+                </div>
+              </div>
+            )}
             <p className="text-xs text-muted-foreground">
-              Holdings synced from this broker will land in this portfolio. Orders placed via this connection will be tagged with it.
+              Holdings synced from this broker will land in this portfolio.
+              Orders placed via this connection will be tagged with it.
             </p>
           </div>
 
@@ -672,7 +734,7 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
             <Button variant="outline" className="flex-1" onClick={handleClose} disabled={busy}>
               Cancel
             </Button>
-            <Button className="flex-1" onClick={handleSubmit} disabled={busy}>
+            <Button className="flex-1" onClick={handleSubmit} disabled={!canSubmit}>
               {submitLabel()}
             </Button>
           </div>
@@ -806,6 +868,13 @@ export default function BrokerConnectionsPage() {
             Add a broker account
           </h2>
           {supportedQuery.isPending && <SkeletonCard lines={2} />}
+          {supportedQuery.isError && (
+            <ErrorState
+              title="Could not load broker list"
+              message={supportedQuery.error?.message ?? "The markets worker is unreachable."}
+              onRetry={() => supportedQuery.refetch()}
+            />
+          )}
           {fullApi.length > 0 && (
             <TooltipProvider>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -906,10 +975,13 @@ export default function BrokerConnectionsPage() {
                     </div>
                   </div>
                   {broker.request_url && (
-                    <Button variant="outline" size="sm" asChild className="shrink-0 gap-1.5">
-                      <a href={broker.request_url} target="_blank" rel="noopener noreferrer">
-                        Request API keys
-                      </a>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 gap-1.5"
+                      onClick={() => openExternal(broker.request_url!)}
+                    >
+                      Request API keys
                     </Button>
                   )}
                 </div>

@@ -7,6 +7,7 @@ import {
   ChevronRight,
   LogOut,
   Palette,
+  Plug,
   TrendingDown,
   Wallet,
   type LucideIcon,
@@ -124,6 +125,12 @@ export default function RetailMorePage() {
             row when account-management UI is needed (profile edit, password
             change, etc.). Broker connections + theme are reachable directly
             from this More tab; sign-out is the LogOut row below. */}
+        <Row
+          Icon={Plug}
+          label="Broker accounts"
+          hint="Connect or manage your trading accounts"
+          to="/dashboard/markets/settings/brokers"
+        />
         <Row
           Icon={Wallet}
           label="Withdraw"

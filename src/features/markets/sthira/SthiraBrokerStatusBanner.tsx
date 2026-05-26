@@ -24,25 +24,12 @@
 import { useMemo } from "react";
 import { Link } from "react-router-dom";
 import { ExternalLink, AlertTriangle } from "lucide-react";
-import { Capacitor } from "@capacitor/core";
 import { Button } from "@/components/ui/button";
+import { openExternal } from "@/lib/openExternal";
 
 import { useBrokerConnections } from "@/features/markets/hooks/useBrokerConnections";
 
 const GROWW_APPROVE_URL = "https://groww.in/trade-api/api-keys";
-
-async function openExternal(url: string): Promise<void> {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const { Browser } = await import("@capacitor/browser");
-      await Browser.open({ url });
-      return;
-    } catch {
-      // Plugin not available — fall back to window.open
-    }
-  }
-  window.open(url, "_blank", "noopener,noreferrer");
-}
 
 export function SthiraBrokerStatusBanner() {
   const { data } = useBrokerConnections();

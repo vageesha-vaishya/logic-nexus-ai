@@ -92,3 +92,33 @@ if [ -z "${SKIP_BUDGET:-}" ]; then
 fi
 
 npx cap sync android
+
+# When the worker URL is plain http:// (LAN dev), the WebView would
+# otherwise block all worker fetches as Mixed Content (page is served
+# from https://localhost/, fetches go to http://<lan-ip>:8001). The
+# Android NSC permits the host at the system layer, but Chromium has
+# its own W3C Mixed Content gate that requires `allowMixedContent: true`
+# on the Capacitor WebView. capacitor.config.ts intentionally keeps
+# this false so prod AABs never load mixed content. Post-process the
+# generated capacitor.config.json here instead, so the toggle is bound
+# to the dev URL and isn't accidentally committed back to source.
+case "$WORKER_URL" in
+  http://*)
+    CAP_JSON="android/app/src/main/assets/capacitor.config.json"
+    if [ -f "$CAP_JSON" ]; then
+      python3 - "$CAP_JSON" <<'PY'
+import json, sys
+p = sys.argv[1]
+with open(p) as f: cfg = json.load(f)
+cfg.setdefault("android", {})["allowMixedContent"] = True
+with open(p, "w") as f: json.dump(cfg, f, indent=2)
+print(f"✓ {p}: android.allowMixedContent → true (LAN dev override)")
+PY
+    else
+      echo "⚠ $CAP_JSON not found — cap sync may have failed; skipping mixed-content toggle" >&2
+    fi
+    ;;
+  *)
+    echo "Prod-style HTTPS worker — leaving android.allowMixedContent at its capacitor.config.ts default (false)."
+    ;;
+esac
