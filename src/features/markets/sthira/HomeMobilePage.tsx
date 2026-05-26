@@ -134,16 +134,15 @@ export default function HomeMobilePage() {
             const current = v?.current_value ?? 0;
             const pnl     = v?.pnl ?? 0;
             const pct = target > 0 ? Math.min(100, Math.round((current / target) * 100)) : 0;
-            return (
-              <Link
-                key={def.tier_number}
-                to={`/dashboard/markets/portfolios${row?.portfolio_id ? `/${row.portfolio_id}` : ""}`}
-                className="
-                  block rounded-xl border border-sthira-navy/15 bg-white/60
-                  p-5 transition-colors hover:bg-white/80
-                  focus:outline-none focus-visible:ring-2 focus-visible:ring-sthira-copper
-                "
-              >
+            const portfolioId = row?.portfolio_id;
+            const cardClassName = cn(
+              "block rounded-xl border border-sthira-navy/15 bg-white/60 p-5 transition-colors",
+              portfolioId
+                ? "hover:bg-white/80 focus:outline-none focus-visible:ring-2 focus-visible:ring-sthira-copper"
+                : "cursor-default",
+            );
+            const cardBody = (
+              <>
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <h2 className="font-sthiraSerif italic text-lg text-sthira-ink">
@@ -151,7 +150,9 @@ export default function HomeMobilePage() {
                     </h2>
                     <p className="mt-0.5 text-xs text-sthira-fog">{def.description}</p>
                   </div>
-                  <ChevronRight className="h-4 w-4 mt-1 shrink-0 text-sthira-fog" aria-hidden="true" />
+                  {portfolioId && (
+                    <ChevronRight className="h-4 w-4 mt-1 shrink-0 text-sthira-fog" aria-hidden="true" />
+                  )}
                 </div>
                 <div className="mt-4 flex items-end justify-between gap-3 tabular-nums">
                   <div>
@@ -180,7 +181,20 @@ export default function HomeMobilePage() {
                 <p className="mt-2 text-[11px] tracking-wide uppercase text-sthira-fog">
                   {pct}% funded
                 </p>
+              </>
+            );
+            return portfolioId ? (
+              <Link
+                key={def.tier_number}
+                to={`/dashboard/markets/portfolios/${portfolioId}`}
+                className={cardClassName}
+              >
+                {cardBody}
               </Link>
+            ) : (
+              <div key={def.tier_number} className={cardClassName} aria-disabled="true">
+                {cardBody}
+              </div>
             );
           })}
         </section>
