@@ -450,7 +450,7 @@ function SosChrome({ title, subtitle, children, domainHint }: ChromeProps) {
   const productName = domainHint?.sidebar?.label ?? domainHint?.name;
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
+    <div className="min-h-screen w-full flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5 p-4">
       <Card className="relative w-full max-w-md overflow-hidden">
         {/* MV-5 — domain accent strip at the top of the login card. */}
         {accentHex && (
@@ -482,7 +482,12 @@ function SthiraChrome({ title, subtitle, children }: ChromeProps) {
   return (
     <div
       className={cn(
-        'min-h-screen flex items-center justify-center p-4',
+        // w-full is load-bearing: Auth is rendered inside SidebarProvider's
+        // flex row container (see src/components/ui/sidebar.tsx). Without
+        // an explicit width, flex items default to `flex: 0 1 auto` and
+        // shrink to their content's natural width — leaving the cream
+        // background painting only ~77% of the viewport on mobile.
+        'min-h-screen w-full flex items-center justify-center p-4',
         'bg-[hsl(var(--sthira-cream))] text-[hsl(var(--sthira-ink))]',
       )}
     >
