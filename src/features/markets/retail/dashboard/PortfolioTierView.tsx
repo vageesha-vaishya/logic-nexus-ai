@@ -230,14 +230,32 @@ function TierCard({ tier }: { tier: PortfolioTier }) {
   const pnlPositive = summary ? summary.total_pnl >= 0 : true;
   const [isEditing, setIsEditing] = useState(false);
 
+  // When linked to a portfolio, the title row becomes a tap target that
+  // opens the mobile detail page (RetailPortfolioDetailPage). When
+  // unlinked, it's a plain heading so the user can still see the tier
+  // name + blurb while picking a portfolio to link.
+  const titleBlock = (
+    <div className="min-w-0">
+      <CardTitle className="text-base">{tier.name}</CardTitle>
+      <p className="text-xs text-muted-foreground">{tierBlurb(tier.tier_number)}</p>
+    </div>
+  );
+
   return (
     <Card>
       <CardHeader className="pb-2">
         <div className="flex items-start justify-between gap-2">
-          <div className="min-w-0">
-            <CardTitle className="text-base">{tier.name}</CardTitle>
-            <p className="text-xs text-muted-foreground">{tierBlurb(tier.tier_number)}</p>
-          </div>
+          {tier.portfolio_id ? (
+            <Link
+              to={`/dashboard/markets/retail/portfolio/${tier.portfolio_id}`}
+              className="min-w-0 flex-1 rounded -m-1 p-1 hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              aria-label={`Open ${tier.name} portfolio details`}
+            >
+              {titleBlock}
+            </Link>
+          ) : (
+            titleBlock
+          )}
           {summary && (
             <Badge
               variant={pnlPositive ? 'default' : 'destructive'}

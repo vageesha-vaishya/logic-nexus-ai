@@ -1,3 +1,4 @@
+import { PortfoliosListCard } from "../components/PortfoliosListCard";
 import { HarvestOpportunitiesCard } from "../dashboard/HarvestOpportunitiesCard";
 import { LtcgTrackerCard } from "../dashboard/LtcgTrackerCard";
 import { MfHoldingsCard } from "../dashboard/MfHoldingsCard";
@@ -25,6 +26,7 @@ export default function RetailPortfolioPage() {
           job.
         </p>
       </header>
+      <PortfoliosListCard />
       <LtcgTrackerCard />
       <HarvestOpportunitiesCard />
       <StressTestPreviewCard />
