@@ -17,10 +17,19 @@
  *
  * See docs/plans/2026-05-22-unified-platform-onboarding-design.md.
  */
-import { Link } from "react-router-dom";
+import { Link, Navigate } from "react-router-dom";
 import { ArrowRight, Building2, Mail, TrendingUp } from "lucide-react";
+import { Capacitor } from "@capacitor/core";
 
 import { SosLogo } from "@/components/branding";
+
+function isNativeShell(): boolean {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
 
 interface Tile {
   to:          string;
@@ -59,6 +68,13 @@ const TILES: readonly Tile[] = [
 ] as const;
 
 export default function Welcome() {
+  // Native shell (Sthira APK) must never see the SOS B2B audience picker.
+  // It's a retail-only mobile app — send through the splash, which will
+  // route to /auth?intent=retail (Sthira chrome) or onboarding.
+  if (isNativeShell()) {
+    return <Navigate to="/sthira/splash" replace />;
+  }
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto max-w-5xl px-4 py-10 md:py-16">
