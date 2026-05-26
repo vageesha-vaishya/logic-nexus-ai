@@ -21,6 +21,7 @@ import { ErrorState, SkeletonCard } from "@/design-system";
 import { Numeric } from "@/components/system/Numeric";
 
 import { MobileHoldingsList } from "../components/MobileHoldingsList";
+import { PortfolioActionsMenu } from "../components/PortfolioActionsMenu";
 import { PortfolioBriefSheet } from "../components/PortfolioBriefSheet";
 import { PortfolioChartsModal } from "../components/PortfolioChartsModal";
 import { PortfolioPerformanceCard } from "../components/PortfolioPerformanceCard";
@@ -93,21 +94,26 @@ export default function RetailPortfolioDetailPage() {
 
       {/* Header */}
       <header className="space-y-1">
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl font-semibold">{p.name}</h1>
-          <span
-            className={
-              p.mode === "paper"
-                ? "rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
-                : "rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400"
-            }
-          >
-            {p.mode}
-          </span>
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-semibold truncate">{p.name}</h1>
+              <span
+                className={
+                  p.mode === "paper"
+                    ? "rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-700 dark:text-amber-400"
+                    : "rounded-full bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-medium text-emerald-700 dark:text-emerald-400"
+                }
+              >
+                {p.mode}
+              </span>
+            </div>
+            {p.description && (
+              <p className="text-xs text-muted-foreground">{p.description}</p>
+            )}
+          </div>
+          <PortfolioActionsMenu portfolio={p} />
         </div>
-        {p.description && (
-          <p className="text-xs text-muted-foreground">{p.description}</p>
-        )}
       </header>
 
       {/* Summary strip — three big numbers */}
