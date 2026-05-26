@@ -57,7 +57,12 @@ export default function Auth() {
   const [recoveryPassword, setRecoveryPassword] = useState('');
   const [recoveryConfirmPassword, setRecoveryConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const { signIn, user } = useAuth();
+  // Sthira signup toggle — flips the retail-variant form between sign-in
+  // and "open an account". On success we render the email-verification
+  // screen until the user comes back.
+  const [signupMode, setSignupMode] = useState(false);
+  const [signupSuccess, setSignupSuccess] = useState(false);
+  const { signIn, signUp, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   const [searchParams] = useSearchParams();
@@ -165,6 +170,43 @@ export default function Auth() {
     }
   };
 
+  const handleSignupSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      loginSchema.parse({ email, password });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        toast.error(error.errors[0].message);
+        return;
+      }
+    }
+    setLoading(true);
+    try {
+      // domain_code routes the post-signup provision-retail-user hook to
+      // markets.provision_new_retail_user, which seeds the paper portfolio +
+      // NIFTY ETF + retail_profile. No org_name / country needed for retail.
+      const { error } = await signUp(email.trim(), password, { domain_code: 'sthira-retail' });
+      if (error) {
+        const msg = error.message ?? 'Signup failed';
+        if (/already.*registered|exists/i.test(msg)) {
+          toast.error('This email already has an account. Sign in instead?');
+          setSignupMode(false);
+        } else if (/failed to fetch/i.test(msg)) {
+          toast.error('Connection error — check your network and try again.');
+        } else {
+          toast.error(msg);
+        }
+        return;
+      }
+      setSignupSuccess(true);
+    } catch (err) {
+      logger.error('Signup error:', err);
+      toast.error(err instanceof Error ? err.message : 'Signup failed. Try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
@@ -234,9 +276,36 @@ export default function Auth() {
   };
 
   const ChromeComponent = isRetailVariant ? SthiraChrome : SosChrome;
+  const isSignupView = isRetailVariant && signupMode && !recoveryMode;
+  const isSignupDone = isRetailVariant && signupSuccess && !recoveryMode;
 
   // Build the form once and slot it into whichever chrome the audience earned.
-  const formBody = recoveryMode ? (
+  const formBody = isSignupDone ? (
+    <div className="space-y-4 text-center">
+      <p className="text-sm text-[hsl(var(--sthira-ink))]">
+        We sent a verification link to{' '}
+        <span className="font-medium">{email}</span>. Tap it on this device
+        to finish setup — we&apos;ll seed your paper portfolio and drop you
+        into the onboarding wizard.
+      </p>
+      <p className="text-xs text-[hsl(var(--sthira-fog))]">
+        Didn&apos;t get it? Check spam, or come back and sign in once your
+        email is verified.
+      </p>
+      <Button
+        type="button"
+        variant="outline"
+        className="w-full border-[hsl(var(--sthira-copper))] text-[hsl(var(--sthira-copper))] hover:bg-[hsl(var(--sthira-copper)/0.08)]"
+        onClick={() => {
+          setSignupSuccess(false);
+          setSignupMode(false);
+          setPassword('');
+        }}
+      >
+        Back to sign in
+      </Button>
+    </div>
+  ) : recoveryMode ? (
     <form onSubmit={handleRecoverySubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="recovery-password">New password</Label>
@@ -266,13 +335,15 @@ export default function Auth() {
       </Button>
     </form>
   ) : (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={isSignupView ? handleSignupSubmit : handleSubmit} className="space-y-4">
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
           id="email"
           data-testid="email-input"
           type="email"
+          autoComplete="email"
+          inputMode="email"
           placeholder="you@example.com"
           value={email}
           onChange={(e) => setEmail(e.target.value)}
@@ -286,7 +357,8 @@ export default function Auth() {
           id="password"
           data-testid="password-input"
           type="password"
-          placeholder="••••••••"
+          autoComplete={isSignupView ? 'new-password' : 'current-password'}
+          placeholder={isSignupView ? 'At least 8 characters' : '••••••••'}
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
@@ -301,9 +373,13 @@ export default function Auth() {
             "bg-[hsl(var(--sthira-copper))] text-white hover:bg-[hsl(var(--sthira-copper)/0.9)] focus-visible:ring-[hsl(var(--sthira-copper))]",
         )}
         disabled={loading}
-        data-testid="login-btn"
+        data-testid={isSignupView ? 'signup-btn' : 'login-btn'}
       >
-        {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : 'Sign in'}
+        {loading ? (
+          <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> {isSignupView ? 'Creating account…' : 'Signing in…'}</>
+        ) : (
+          isSignupView ? 'Create account' : 'Sign in'
+        )}
       </Button>
       {!isRetailVariant && (
         <>
@@ -319,11 +395,37 @@ export default function Auth() {
           </div>
         </>
       )}
-      {isRetailVariant && (
+      {isRetailVariant && !isSignupView && (
         <div className="pt-2 text-center text-sm text-sthira-fog">
           New to Sthira?{' '}
-          <Link to="/sthira/onboarding" className="text-sthira-copper underline">Open an account</Link>
+          <button
+            type="button"
+            onClick={() => setSignupMode(true)}
+            className="text-sthira-copper underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sthira-copper rounded"
+          >
+            Open an account
+          </button>
         </div>
+      )}
+      {isRetailVariant && isSignupView && (
+        <div className="pt-2 text-center text-sm text-sthira-fog">
+          Already have an account?{' '}
+          <button
+            type="button"
+            onClick={() => setSignupMode(false)}
+            className="text-sthira-copper underline focus:outline-none focus-visible:ring-2 focus-visible:ring-sthira-copper rounded"
+          >
+            Sign in
+          </button>
+        </div>
+      )}
+      {isRetailVariant && isSignupView && (
+        <p className="pt-1 text-center text-[11px] text-sthira-fog">
+          By continuing you agree to our{' '}
+          <a href="/legal/terms" target="_blank" rel="noopener noreferrer" className="underline">terms</a>
+          {' '}and{' '}
+          <a href="/legal/privacy" target="_blank" rel="noopener noreferrer" className="underline">privacy policy</a>.
+        </p>
       )}
     </form>
   );
@@ -336,10 +438,18 @@ export default function Auth() {
       ? `SOS ${domainHint.sidebar?.label ?? domainHint.name}`
       : 'SOS Services';
 
+  const subtitle = recoveryMode
+    ? 'Set a new password for your account'
+    : isSignupDone
+      ? 'Check your email to finish setup'
+      : isSignupView
+        ? 'Open an account to start investing'
+        : 'Sign in to continue';
+
   return (
     <ChromeComponent
       title={title}
-      subtitle={recoveryMode ? 'Set a new password for your account' : 'Sign in to continue'}
+      subtitle={subtitle}
       domainHint={isRetailVariant ? null : domainHint}
     >
       {formBody}
