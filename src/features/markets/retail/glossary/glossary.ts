@@ -61,10 +61,8 @@ export const GLOSSARY: Readonly<Record<string, GlossaryEntry>> = Object.freeze({
     title: "Target Price",
     body: "The price at which you plan to book profit. Helps lock gains instead of holding out for more and watching it slip.",
   },
-  ltcg: {
-    title: "LTCG (Long-Term Capital Gains)",
-    body: "Profit on equity held over 1 year. In India, gains over ₹1L per FY are taxed at 12.5%.",
-  },
+  // (ltcg moved further down — kept the more detailed entry that mentions the
+  // ₹1,25,000 tax-free pool and the FY-reset behaviour.)
   stcg: {
     title: "STCG (Short-Term Capital Gains)",
     body: "Profit on equity held 1 year or less. Taxed at 20% in India — much higher than LTCG.",
