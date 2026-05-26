@@ -52,6 +52,7 @@ const SthiraSplashRoute = lazy(() => import("./features/markets/sthira/SthiraSpl
 const SthiraOnboardingRoute = lazy(() => import("./features/markets/sthira/SthiraOnboardingRoute"));
 const SthiraBrokerRoute = lazy(() => import("./features/markets/sthira/SthiraBrokerRoute"));
 import { SthiraMobileGuard } from "./features/markets/sthira/SthiraMobileGuard";
+import { RetailAudienceGuard } from "./components/auth/RetailAudienceGuard";
 
 // Path A Phase 2.2 — manifest-driven route builder. Gated by
 // VITE_USE_DOMAIN_MANIFESTS so the unified web build can opt into the
@@ -352,6 +353,7 @@ const App = () => (
                         <PipelineProvider>
                         <Sonner />
                         <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
+                        <RetailAudienceGuard>
                         <Routes>
             {/* `/` routes by auth state: signed-out → /welcome, signed-in
                 → /dashboard. The old Landing page stays available at
@@ -1236,6 +1238,7 @@ const App = () => (
             
             <Route path="*" element={<NotFound />} />
                         </Routes>
+                        </RetailAudienceGuard>
                       </Suspense>
                       </PipelineProvider>
                     </LeadsViewStateProvider>

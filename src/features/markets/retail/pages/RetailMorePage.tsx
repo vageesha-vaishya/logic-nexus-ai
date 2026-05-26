@@ -7,7 +7,6 @@ import {
   ChevronRight,
   LogOut,
   Palette,
-  Settings,
   TrendingDown,
   Wallet,
   type LucideIcon,
@@ -119,12 +118,12 @@ export default function RetailMorePage() {
       </header>
 
       <div className="space-y-2">
-        <Row
-          Icon={Settings}
-          label="Settings"
-          hint="Profile, notifications, broker connections"
-          to="/dashboard/settings"
-        />
+        {/* Settings row removed in v1: it linked to /dashboard/settings
+            which renders the CRM DashboardLayout sidebar — brand bleed for
+            retail users. A retail-specific settings page can replace this
+            row when account-management UI is needed (profile edit, password
+            change, etc.). Broker connections + theme are reachable directly
+            from this More tab; sign-out is the LogOut row below. */}
         <Row
           Icon={Wallet}
           label="Withdraw"
