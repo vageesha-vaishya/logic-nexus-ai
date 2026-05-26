@@ -18,11 +18,12 @@
  *
  * See docs/plans/2026-05-21-self-onboarding-wizard-design.md.
  */
-import { useMemo, useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 
 import { Progress } from '@/components/ui/progress';
 import { Button } from '@/components/ui/button';
+import { useAndroidBack } from '@/lib/use-android-back';
 
 import { useRiskProfile } from '../hooks/useRiskProfile';
 import { usePortfolioTiers } from '../hooks/usePortfolioTiers';
@@ -78,6 +79,18 @@ export function SelfOnboardingWizard({ onComplete }: SelfOnboardingWizardProps) 
   useEffect(() => {
     if (dataReady && resumeStep === null) onComplete();
   }, [dataReady, resumeStep, onComplete]);
+
+  // Android hardware Back: walk back through wizard steps instead of
+  // exiting the app from the middle of onboarding. Returning false on
+  // step 0 lets Capacitor's default exit behaviour run.
+  useAndroidBack(useCallback(() => {
+    if (step === null) return false;
+    const idx = STEP_ORDER.indexOf(step);
+    if (idx <= 0) return false;
+    const prev = STEP_ORDER[idx - 1];
+    if (prev) setStep(prev);
+    return true;
+  }, [step]));
 
   if (provision.status === 'error') {
     return (
