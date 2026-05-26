@@ -7,6 +7,7 @@ import {
 } from "../behavioral/useBehavioralEvents";
 import { useDrawdownState } from "../behavioral/useDrawdownAlerts";
 import { useMarketStress } from "../behavioral/useMarketStress";
+import { WatchlistsCard } from "../dashboard/WatchlistsCard";
 import { RetailSignalFeed } from "../feed/RetailSignalFeed";
 import { usePortfolioTiers } from "../hooks/usePortfolioTiers";
 import { useRiskProfile } from "../hooks/useRiskProfile";
@@ -38,7 +39,7 @@ export default function RetailSignalsPage() {
   if (!profile) return null;
 
   return (
-    <div className="mx-auto max-w-2xl p-4 md:p-6">
+    <div className="mx-auto max-w-2xl space-y-4 p-4 md:p-6">
       <RetailSignalFeed
         experienceLevel={profile.experience_level}
         isHighStress={isHighStress}
@@ -47,6 +48,10 @@ export default function RetailSignalsPage() {
         coreDrawdownPct={drawdown.drawdownPct}
         corePortfolioId={coreTier?.portfolio_id ?? ""}
       />
+      {/* Watchlists — semantic neighbour to signals (both are "things to
+          monitor"). Allow-listed mobile variant lives at the same route
+          desktop uses. */}
+      <WatchlistsCard />
     </div>
   );
 }

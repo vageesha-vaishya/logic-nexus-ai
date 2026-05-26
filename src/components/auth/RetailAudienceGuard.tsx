@@ -43,6 +43,7 @@ const RETAIL_ALLOWED: ReadonlyArray<RegExp> = [
   /^\/dashboard\/markets\/instruments\//,          // signal-driven detail
   /^\/dashboard\/markets\/signals(?:\?|$)/,        // signals index
   /^\/dashboard\/markets\/mf(?:\/|$|\?)/,          // mutual funds (retail-safe surface, mobile variant)
+  /^\/dashboard\/markets\/watchlists(?:\/|$|\?)/,  // watchlists index + detail (retail-safe — user-scoped, no advisor concept)
   /^\/legal\//,                                    // T&C / privacy / disclosures
   /^\/methodology\//,                              // public methodology pages
 ];

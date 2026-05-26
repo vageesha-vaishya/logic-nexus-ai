@@ -11,6 +11,7 @@
 
 import { useMemo, useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useSthiraShell } from "@/hooks/use-sthira-shell";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { toast } from "sonner";
 import {
@@ -73,13 +74,16 @@ import { cn } from "@/lib/utils";
 import { QuickTradeButton } from "../components/QuickTradeButton";
 
 export default function WatchlistDetailPage() {
+  // Sthira mobile shell: skip DashboardLayout, narrow container, drop the
+  // NewsPanel rail. The ItemsTable already collapses some columns at md/sm
+  // breakpoints; the mobile card-stack reflow is a follow-up commit.
+  const isSthiraShell = useSthiraShell();
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const watchlist = useWatchlist(id);
 
-  return (
-    <DashboardLayout>
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+  const content = (
+    <div className={`mx-auto ${isSthiraShell ? "max-w-2xl" : "max-w-7xl"} space-y-6 ${isSthiraShell ? "p-4" : "p-6"}`}>
       <div>
         <button
           onClick={() => navigate("/dashboard/markets/watchlists")}
@@ -126,22 +130,26 @@ export default function WatchlistDetailPage() {
             <AddItemPicker watchlistId={watchlist.data.id} />
           </header>
 
-          <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+          <div className={isSthiraShell ? "min-w-0" : "grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]"}>
             <div className="min-w-0">
               <ItemsTable
                 watchlistId={watchlist.data.id}
                 items={watchlist.data.items}
               />
             </div>
-            <aside>
-              <NewsPanel limit={10} />
-            </aside>
+            {!isSthiraShell && (
+              <aside>
+                <NewsPanel limit={10} />
+              </aside>
+            )}
           </div>
         </>
       )}
     </div>
-    </DashboardLayout>
   );
+
+  if (isSthiraShell) return content;
+  return <DashboardLayout>{content}</DashboardLayout>;
 }
 
 // ─── Items table ───────────────────────────────────────────────────────

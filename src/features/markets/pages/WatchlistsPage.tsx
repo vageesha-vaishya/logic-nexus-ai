@@ -10,6 +10,7 @@
 
 import { useState } from "react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useSthiraShell } from "@/hooks/use-sthira-shell";
 import { useForm } from "react-hook-form";
 import { Link } from "react-router-dom";
 import { toast } from "sonner";
@@ -48,12 +49,15 @@ interface WatchlistFormValues {
 }
 
 export default function WatchlistsPage() {
+  // Sthira mobile shell: skip DashboardLayout, narrow container, drop
+  // the NewsPanel rail (Sthira surfaces news via the Signals tab; the
+  // dedicated rail is desktop-grade clutter on a phone).
+  const isSthiraShell = useSthiraShell();
   const watchlists = useWatchlists();
   const [createOpen, setCreateOpen] = useState(false);
 
-  return (
-    <DashboardLayout>
-    <div className="mx-auto max-w-7xl space-y-6 p-6">
+  const content = (
+    <div className={`mx-auto ${isSthiraShell ? "max-w-2xl" : "max-w-7xl"} space-y-6 ${isSthiraShell ? "p-4" : "p-6"}`}>
       <header className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Watchlists</h1>
@@ -68,7 +72,7 @@ export default function WatchlistsPage() {
         </Button>
       </header>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]">
+      <div className={isSthiraShell ? "min-w-0 space-y-6" : "grid grid-cols-1 gap-6 lg:grid-cols-[1fr_360px]"}>
         <div className="min-w-0 space-y-6">
           {watchlists.isPending && <WatchlistsSkeleton />}
 
@@ -91,20 +95,25 @@ export default function WatchlistsPage() {
           )}
 
           {watchlists.isSuccess && watchlists.data.length > 0 && (
-            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <div className={isSthiraShell ? "space-y-3" : "grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3"}>
               {watchlists.data.map((w) => (
                 <WatchlistCard key={w.id} watchlist={w} />
               ))}
             </div>
           )}
         </div>
-        <aside className="space-y-6">
-          <NewsPanel limit={10} />
-        </aside>
+        {!isSthiraShell && (
+          <aside className="space-y-6">
+            <NewsPanel limit={10} />
+          </aside>
+        )}
       </div>
 
       <Sheet open={createOpen} onOpenChange={setCreateOpen}>
-        <SheetContent side="right" className="w-full sm:max-w-md">
+        <SheetContent
+          side={isSthiraShell ? "bottom" : "right"}
+          className={isSthiraShell ? "h-[60vh] rounded-t-2xl" : "w-full sm:max-w-md"}
+        >
           <SheetHeader>
             <SheetTitle>Create a watchlist</SheetTitle>
           </SheetHeader>
@@ -112,8 +121,10 @@ export default function WatchlistsPage() {
         </SheetContent>
       </Sheet>
     </div>
-    </DashboardLayout>
   );
+
+  if (isSthiraShell) return content;
+  return <DashboardLayout>{content}</DashboardLayout>;
 }
 
 function WatchlistsSkeleton() {
