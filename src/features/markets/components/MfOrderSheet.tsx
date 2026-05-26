@@ -6,8 +6,10 @@
  */
 
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertTriangle } from "lucide-react";
 import { toast } from "sonner";
+
+import { useSthiraShell } from "@/hooks/use-sthira-shell";
 
 import {
   Button,
@@ -94,6 +96,10 @@ export function MfOrderSheet({
   defaultOrderType = "PURCHASE",
   holding = null,
 }: MfOrderSheetProps) {
+  // Sthira mobile shell renders the sheet as a full-height bottom drawer
+  // instead of a 440px right-side panel — easier to reach + matches
+  // mobile platform conventions.
+  const isSthiraShell = useSthiraShell();
   const [activeTab,    setActiveTab]    = useState<TabKey>(orderTypeToTab(defaultOrderType));
 
   // Buy form state
@@ -142,6 +148,18 @@ export function MfOrderSheet({
   const schemeName   = fund?.scheme_name ?? fund?.metadata?.scheme_name ?? "—";
   const amfiCode     = fund?.symbol ?? "";
   const isin         = fund?.isin ?? "";
+  const instrumentType = fund?.instrument_type ?? "mf_equity";
+
+  // SEBI-flavoured plain-English category explainer shown above the
+  // Place Order button. Helps a layman investor understand suitability
+  // *before* they tap. Equity = volatile, long horizon; debt = lower
+  // risk, shorter horizon; hybrid = blend; index = passive equity.
+  const categoryExplainer: { label: string; risk: string; horizon: string } = {
+    mf_equity: { label: "Equity fund",  risk: "high",       horizon: "5+ years" },
+    mf_debt:   { label: "Debt fund",    risk: "lower",      horizon: "1–3 years" },
+    mf_hybrid: { label: "Hybrid fund",  risk: "medium",     horizon: "3–5 years" },
+    mf_index:  { label: "Index fund",   risk: "high",       horizon: "5+ years" },
+  }[instrumentType] ?? { label: "Mutual fund", risk: "varies", horizon: "—" };
 
   // ── Estimated unit hints ──────────────────────────────────────────────────────
 
@@ -275,8 +293,12 @@ export function MfOrderSheet({
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
-        side="right"
-        className="w-[440px] sm:w-[440px] flex flex-col p-0 overflow-hidden"
+        side={isSthiraShell ? "bottom" : "right"}
+        className={
+          isSthiraShell
+            ? "h-[92vh] rounded-t-2xl flex flex-col p-0 overflow-hidden"
+            : "w-[440px] sm:w-[440px] flex flex-col p-0 overflow-hidden"
+        }
       >
         {/* ── Header ─────────────────────────────────────────────────── */}
         <SheetHeader className="px-6 pt-6 pb-4 border-b">
@@ -366,6 +388,22 @@ export function MfOrderSheet({
                   </CardContent>
                 </Card>
 
+                {/* SEBI-flavoured plain-English suitability gate. Keeps the
+                    layman aware of risk + horizon before they commit. */}
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-3 text-xs text-amber-900 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <p>
+                      <strong>{categoryExplainer.label}</strong> — {categoryExplainer.risk} risk,
+                      best held {categoryExplainer.horizon}.
+                    </p>
+                    <p>
+                      Mutual fund investments are subject to market risk. Read all
+                      scheme-related documents carefully.
+                    </p>
+                  </div>
+                </div>
+
                 <Button
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white"
                   onClick={handleBuy}
@@ -432,6 +470,21 @@ export function MfOrderSheet({
                       onChange={(e) => setSipFolioText(e.target.value)}
                     />
                   )}
+                </div>
+
+                {/* SEBI-flavoured suitability gate — same copy as Buy tab. */}
+                <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 p-3 text-xs text-amber-900 dark:text-amber-300">
+                  <AlertTriangle className="h-4 w-4 mt-0.5 shrink-0" aria-hidden="true" />
+                  <div className="space-y-1">
+                    <p>
+                      <strong>{categoryExplainer.label}</strong> — {categoryExplainer.risk} risk,
+                      best held {categoryExplainer.horizon}.
+                    </p>
+                    <p>
+                      Mutual fund investments are subject to market risk. Read all
+                      scheme-related documents carefully.
+                    </p>
+                  </div>
                 </div>
 
                 <Button

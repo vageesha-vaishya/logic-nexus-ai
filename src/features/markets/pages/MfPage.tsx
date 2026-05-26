@@ -441,6 +441,59 @@ export default function MfPage() {
                       No MF holdings found. Import from CAMS/NSDL or buy your first fund in Discover.
                     </p>
                   </div>
+                ) : isSthiraShell ? (
+                  /* Mobile: card stack — touch-sized, no horizontal scroll. */
+                  <div className="space-y-2 p-3">
+                    {holdings.map((h) => {
+                      const name = h.scheme_name ?? h.instrument?.metadata?.scheme_name ?? h.instrument?.symbol ?? "—";
+                      const positive = (h.gain ?? 0) >= 0;
+                      return (
+                        <div key={h.id} className="rounded-lg border bg-card p-3 space-y-2">
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0 flex-1">
+                              <p className="text-sm font-medium leading-snug line-clamp-2">{name}</p>
+                              <div className="mt-1 flex items-center gap-2">
+                                {categoryBadge(h.instrument?.instrument_type ?? "mf_equity")}
+                                {h.folio_number && (
+                                  <span className="text-[11px] text-muted-foreground truncate">Folio {h.folio_number}</span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex items-end justify-between gap-2 tabular-nums">
+                            <div>
+                              <p className="text-[11px] text-muted-foreground">Current</p>
+                              <p className="text-base font-semibold">{fmtINR(h.current_value)}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-[11px] text-muted-foreground">Invested {fmtINR(h.invested_value)}</p>
+                              <p className={`text-xs font-medium ${positive ? "text-sthira-sage" : "text-sthira-terracotta"}`}>
+                                {positive ? "+" : ""}{fmtINR(h.gain)} · {fmtPct(h.return_pct)}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 pt-1">
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 h-9"
+                              onClick={() => openTopUpSheet(h)}
+                            >
+                              Buy More
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="flex-1 h-9 border-red-200 text-red-600 hover:bg-red-50 dark:border-red-800 dark:text-red-400 dark:hover:bg-red-900/20"
+                              onClick={() => openRedeemSheet(h)}
+                            >
+                              Redeem
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 ) : (
                   <div className="overflow-x-auto">
                     <Table>
