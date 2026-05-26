@@ -13,24 +13,32 @@
  */
 import { Link } from "react-router-dom";
 
+import { RetailBottomNav } from "@/features/markets/retail/layouts/RetailNavLayout";
+import { useIsRetailOnly } from "@/hooks/useIsRetailOnly";
+
 import { DOMAIN_ONLY } from "./buildDomainRoutes";
 
 export function DomainOnlyNotFound() {
   const friendly = DOMAIN_ONLY ? DOMAIN_ONLY.toUpperCase() : "this domain";
+  const isRetail = useIsRetailOnly();
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-sthira-cream px-6 text-center">
-      <h1 className="font-sthiraSerif text-3xl text-sthira-ink">Not available here</h1>
-      <p className="max-w-sm text-sm text-sthira-fog">
-        This page is part of a different module. You're on the {friendly} build,
-        which ships only the routes designed for this experience.
-      </p>
-      <Link
-        to="/dashboard/markets/retail/home"
-        className="mt-4 inline-block rounded-md bg-sthira-copper px-5 py-2 text-sm font-medium text-sthira-cream hover:bg-sthira-copper/90"
-      >
-        Back to home
-      </Link>
-    </div>
+    <>
+      {/* Reserve room for the bottom nav so the CTA isn't trapped beneath it. */}
+      <div className="flex min-h-screen flex-col items-center justify-center gap-3 bg-sthira-cream px-6 pb-24 md:pb-6 md:pl-20 text-center">
+        <h1 className="font-sthiraSerif text-3xl text-sthira-ink">Not available here</h1>
+        <p className="max-w-sm text-sm text-sthira-fog">
+          This page is part of a different module. You're on the {friendly} build,
+          which ships only the routes designed for this experience.
+        </p>
+        <Link
+          to="/dashboard/markets/retail/home"
+          className="mt-4 inline-block rounded-md bg-sthira-copper px-5 py-2 text-sm font-medium text-sthira-cream hover:bg-sthira-copper/90"
+        >
+          Back to home
+        </Link>
+      </div>
+      {isRetail && <RetailBottomNav />}
+    </>
   );
 }
 

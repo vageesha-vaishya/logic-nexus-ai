@@ -45,10 +45,9 @@ import {
 import { formatDistanceToNow } from "date-fns";
 import { toast } from "sonner";
 
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { useIsRetailOnly } from "@/hooks/useIsRetailOnly";
 import { openExternal } from "@/lib/openExternal";
-import { RetailBottomNav } from "../retail/layouts/RetailNavLayout";
+import { AudiencePageShell } from "../components/AudiencePageShell";
 import { RoutingRulesSheet } from "../components/RoutingRulesSheet";
 import {
   AlertDialog,
@@ -761,30 +760,6 @@ function ConnectSheet({ broker, open, onClose, onSuccess }: ConnectSheetProps) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-/**
- * Render the page inside the correct shell for the current audience.
- *   • Retail-only users get the 5-tab bottom nav (mobile) / side rail
- *     (desktop) so they can leave the broker page without using the
- *     system back button. The heavy CRM sidebar is skipped.
- *   • Everyone else (admins, advisors, multi-domain operators) gets the
- *     normal DashboardLayout with CRM sidebar.
- *
- * Routed via `/dashboard/markets/settings/brokers` which is reachable
- * from both audiences (allow-listed in RetailAudienceGuard).
- */
-function BrokerPageShell({ children }: { children: React.ReactNode }) {
-  const isRetail = useIsRetailOnly();
-  if (isRetail) {
-    return (
-      <>
-        <main className="min-h-screen pb-20 md:pb-0 md:pl-20">{children}</main>
-        <RetailBottomNav />
-      </>
-    );
-  }
-  return <DashboardLayout>{children}</DashboardLayout>;
-}
-
 export default function BrokerConnectionsPage() {
   const navigate        = useNavigate();
   const connections     = useBrokerConnections();
@@ -792,6 +767,7 @@ export default function BrokerConnectionsPage() {
   const removeConn      = useRemoveBrokerConnection();
   const triggerSync     = useTriggerBrokerSync();
   const portfoliosQuery = usePortfolios();
+  const isRetail        = useIsRetailOnly();
 
   // Plan gate for broker connections
   const brokerGate = usePlanGate("broker_connections");
@@ -846,7 +822,7 @@ export default function BrokerConnectionsPage() {
   }
 
   return (
-    <BrokerPageShell>
+    <AudiencePageShell>
       <div className="mx-auto max-w-3xl space-y-8 p-4 md:p-6">
 
         {/* ── Header ─────────────────────────────────────────────────── */}
@@ -885,9 +861,19 @@ export default function BrokerConnectionsPage() {
                   onSync={() => handleSync(conn.id)}
                   onReauth={() => handleReauth(conn)}
                   onRemove={() => setRemoveId(conn.id)}
-                  onViewPortfolio={() => conn.portfolio_id
-                    ? navigate(`/dashboard/markets/portfolios/${conn.portfolio_id}`)
-                    : navigate("/dashboard/markets/portfolios")}
+                  onViewPortfolio={() => {
+                    // Retail users get their mobile-tuned portfolio tab —
+                    // PortfolioDetailPage is desktop-only on the Markets
+                    // mobile build, so this avoids the "Not available here"
+                    // fallback when they tap View Portfolio.
+                    if (isRetail) {
+                      navigate("/dashboard/markets/retail/portfolio");
+                    } else if (conn.portfolio_id) {
+                      navigate(`/dashboard/markets/portfolios/${conn.portfolio_id}`);
+                    } else {
+                      navigate("/dashboard/markets/portfolios");
+                    }
+                  }}
                   onViewBroker={() => navigate(`/dashboard/markets/settings/brokers/${conn.id}`)}
                   onRouting={() => setRoutingConn(conn)}
                   isSyncing={syncingId === conn.id}
@@ -1099,6 +1085,6 @@ export default function BrokerConnectionsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </BrokerPageShell>
+    </AudiencePageShell>
   );
 }

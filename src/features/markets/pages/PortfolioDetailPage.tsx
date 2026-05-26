@@ -6,7 +6,7 @@
  */
 
 import { useRef, useMemo, useState } from "react";
-import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { AudiencePageShell } from "../components/AudiencePageShell";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import {
@@ -128,9 +128,9 @@ export default function PortfolioDetailPage() {
     });
   }, [id]);
 
-  if (portfolio.isPending) return <DashboardLayout><div className="mx-auto max-w-7xl p-6"><SkeletonCard withHeader lines={5} /></div></DashboardLayout>;
-  if (portfolio.isError)   return <DashboardLayout><div className="mx-auto max-w-7xl p-6"><ErrorState title="Failed to load portfolio" message={portfolio.error?.message ?? "Unknown error"} onRetry={() => portfolio.refetch()} /></div></DashboardLayout>;
-  if (!portfolio.data)     return <DashboardLayout><div className="mx-auto max-w-7xl p-6"><EmptyState title="Portfolio not found" description="This portfolio doesn't exist or you don't have access." actionLabel="Back to portfolios" onAction={() => { window.location.href = "/dashboard/markets/portfolios"; }} /></div></DashboardLayout>;
+  if (portfolio.isPending) return <AudiencePageShell><div className="mx-auto max-w-7xl p-6"><SkeletonCard withHeader lines={5} /></div></AudiencePageShell>;
+  if (portfolio.isError)   return <AudiencePageShell><div className="mx-auto max-w-7xl p-6"><ErrorState title="Failed to load portfolio" message={portfolio.error?.message ?? "Unknown error"} onRetry={() => portfolio.refetch()} /></div></AudiencePageShell>;
+  if (!portfolio.data)     return <AudiencePageShell><div className="mx-auto max-w-7xl p-6"><EmptyState title="Portfolio not found" description="This portfolio doesn't exist or you don't have access." actionLabel="Back to portfolios" onAction={() => { window.location.href = "/dashboard/markets/portfolios"; }} /></div></AudiencePageShell>;
 
   const p = portfolio.data;
 
@@ -144,7 +144,7 @@ export default function PortfolioDetailPage() {
   };
 
   return (
-    <DashboardLayout>
+    <AudiencePageShell>
     <div className="mx-auto max-w-7xl space-y-6 p-6">
       {/* Back nav */}
       <Link to="/dashboard/markets/portfolios" className="inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground">
@@ -548,7 +548,7 @@ export default function PortfolioDetailPage() {
         />
       )}
     </div>
-    </DashboardLayout>
+    </AudiencePageShell>
   );
 }
 
