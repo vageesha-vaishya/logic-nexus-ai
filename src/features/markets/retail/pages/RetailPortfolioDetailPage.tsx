@@ -22,6 +22,8 @@ import { Numeric } from "@/components/system/Numeric";
 
 import { MobileHoldingsList } from "../components/MobileHoldingsList";
 import { PortfolioBriefSheet } from "../components/PortfolioBriefSheet";
+import { PortfolioChartsModal } from "../components/PortfolioChartsModal";
+import { PortfolioPerformanceCard } from "../components/PortfolioPerformanceCard";
 import { useBriefs } from "../../hooks/useBriefs";
 import { usePortfolio, usePortfolioHoldings } from "../../hooks/usePortfolio";
 
@@ -31,7 +33,8 @@ export default function RetailPortfolioDetailPage() {
   const portfolio         = usePortfolio(portfolioId);
   const holdings          = usePortfolioHoldings(portfolioId);
   const briefs            = useBriefs(portfolioId);
-  const [briefOpen, setBriefOpen] = useState(false);
+  const [briefOpen, setBriefOpen]   = useState(false);
+  const [chartsOpen, setChartsOpen] = useState(false);
 
   if (portfolio.isPending || holdings.isPending) {
     return (
@@ -166,6 +169,13 @@ export default function RetailPortfolioDetailPage() {
         </div>
       )}
 
+      {/* Performance sparkline trigger */}
+      <PortfolioPerformanceCard
+        portfolioId={portfolioId}
+        currency={cur}
+        onOpen={() => setChartsOpen(true)}
+      />
+
       {/* Brief trigger */}
       <BriefCard
         latestBriefTs={briefs.data?.[0]?.ts ?? null}
@@ -194,6 +204,13 @@ export default function RetailPortfolioDetailPage() {
         portfolioId={portfolioId}
         open={briefOpen}
         onClose={() => setBriefOpen(false)}
+      />
+
+      <PortfolioChartsModal
+        portfolioId={portfolioId}
+        portfolioName={p.name}
+        open={chartsOpen}
+        onClose={() => setChartsOpen(false)}
       />
     </div>
   );
