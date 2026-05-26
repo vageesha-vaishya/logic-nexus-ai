@@ -53,6 +53,7 @@ const SthiraOnboardingRoute = lazy(() => import("./features/markets/sthira/Sthir
 const SthiraBrokerRoute = lazy(() => import("./features/markets/sthira/SthiraBrokerRoute"));
 import { SthiraMobileGuard } from "./features/markets/sthira/SthiraMobileGuard";
 import { RetailAudienceGuard } from "./components/auth/RetailAudienceGuard";
+import { WebOnlyRoute } from "./components/auth/WebOnlyRoute";
 
 // Path A Phase 2.2 — manifest-driven route builder. Gated by
 // VITE_USE_DOMAIN_MANIFESTS so the unified web build can opt into the
@@ -360,16 +361,18 @@ const App = () => (
                 /landing for the future marketing-site graduation path
                 (see docs/plans/2026-05-22-unified-platform-onboarding-design.md). */}
             <Route path="/"        element={<RootRedirect />} />
-            <Route path="/welcome" element={<Welcome />} />
-            <Route path="/landing" element={<Landing />} />
+            <Route path="/welcome" element={<WebOnlyRoute><Welcome /></WebOnlyRoute>} />
+            <Route path="/landing" element={<WebOnlyRoute><Landing /></WebOnlyRoute>} />
             <Route path="/auth" element={<Auth />} />
 
             {/* Unified B2B signup (U-A4). /signup picks a domain (logistics
                 / markets-advisor); /signup/:domain is the single-form
                 wizard that submits to Supabase Auth + dispatcher (see
-                supabase/functions/provision-retail-user/index.ts). */}
-            <Route path="/signup"          element={<SignupDomainPicker />} />
-            <Route path="/signup/:domain"  element={<SignupForm />} />
+                supabase/functions/provision-retail-user/index.ts).
+                Both wrapped in WebOnlyRoute — the Sthira native shell uses
+                /auth?intent=retail (signup toggle) instead. */}
+            <Route path="/signup"          element={<WebOnlyRoute><SignupDomainPicker /></WebOnlyRoute>} />
+            <Route path="/signup/:domain"  element={<WebOnlyRoute><SignupForm /></WebOnlyRoute>} />
 
             {/* Legacy /register-organization (the 5-step duplicate-Starter
                 page from the 2026-05-22 screenshot). Kept as a redirect so
@@ -379,10 +382,10 @@ const App = () => (
 
             {/* Magic-link invite landing (U-B2). Handles signed-in /
                 signed-out / wrong-email / expired all in one component. */}
-            <Route path="/invite/:token" element={<InviteAccept />} />
-            <Route path="/invite"        element={<Navigate to="/welcome" replace />} />
+            <Route path="/invite/:token" element={<WebOnlyRoute><InviteAccept /></WebOnlyRoute>} />
+            <Route path="/invite"        element={<WebOnlyRoute><Navigate to="/welcome" replace /></WebOnlyRoute>} />
             <Route path="/oauth/callback" element={<OAuthCallback />} />
-            <Route path="/setup-admin" element={<SetupAdmin />} />
+            <Route path="/setup-admin" element={<WebOnlyRoute><SetupAdmin /></WebOnlyRoute>} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 
             {/* Path A Phase 2.2 — manifest-driven routes for the Markets
