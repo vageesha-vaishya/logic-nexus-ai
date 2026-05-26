@@ -1,10 +1,11 @@
 /**
  * RootRedirect — what visitors see when they hit `sosservices.online/`.
  *
- * Signed-out → /welcome (three-tile branch: retail / register org / invite).
- * Signed-in  → /dashboard (the existing post-login surface; once the topbar
- *              context switcher lands in U-A5 it routes from there to the
- *              user's last-used membership).
+ * Native Capacitor shell (Sthira APK) → /sthira/splash regardless of auth.
+ *     The splash itself runs useSthiraOnboardingProgress and routes to
+ *     /auth, /sthira/onboarding, or /dashboard/markets/retail/home.
+ * Web signed-out → /welcome (retail / register org / invite tiles).
+ * Web signed-in  → /dashboard (existing post-login surface).
  *
  * Replaces the old marketing-style Landing page that used to sit at `/`.
  * Landing.tsx is preserved for the future graduation to a separate
@@ -12,11 +13,24 @@
  */
 import { Loader2 } from "lucide-react";
 import { Navigate } from "react-router-dom";
+import { Capacitor } from "@capacitor/core";
 
 import { useAuth } from "@/hooks/useAuth";
 
+function isNativeShell(): boolean {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
+
 export default function RootRedirect() {
   const { user, loading } = useAuth();
+
+  if (isNativeShell()) {
+    return <Navigate to="/sthira/splash" replace />;
+  }
 
   if (loading) {
     return (

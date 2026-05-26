@@ -17,6 +17,15 @@ import { resolveActiveDomain } from '@/platform/domains/resolver';
 import { getDomainManifest } from '@/platform/domains/registry';
 import type { DomainManifest } from '@/platform/domains/types';
 import { logger } from '@/lib/logger';
+import { Capacitor } from '@capacitor/core';
+
+function isNativeShell(): boolean {
+  try {
+    return Capacitor.isNativePlatform();
+  } catch {
+    return false;
+  }
+}
 
 const loginSchema = z.object({
   email: z.string().email('Invalid email address'),
@@ -53,12 +62,18 @@ export default function Auth() {
   const location = useLocation();
   const [searchParams] = useSearchParams();
 
-  // Audience detection: ?intent=retail OR navigated from a Sthira route.
-  // `next` is the post-login destination — also doubles as a Sthira hint
-  // when it points at /sthira or /dashboard/markets/retail.
+  // Audience detection: ?intent=retail OR navigated from a Sthira route
+  // OR running in the Capacitor native shell (Sthira APK) — the latter
+  // forces retail chrome even when the splash hasn't passed ?intent, so
+  // CRM-branded signup can never leak into the mobile app. Native shells
+  // also default `next` to the splash so post-login routes back through
+  // onboarding evaluation instead of /dashboard (CRM home).
   const intent = searchParams.get('intent');
-  const next   = searchParams.get('next') ?? (location.state as { from?: { pathname?: string } })?.from?.pathname ?? '/dashboard';
+  const native = useMemo(isNativeShell, []);
+  const nextFallback = native ? '/sthira/splash' : '/dashboard';
+  const next   = searchParams.get('next') ?? (location.state as { from?: { pathname?: string } })?.from?.pathname ?? nextFallback;
   const isRetailVariant =
+    native ||
     intent === 'retail' ||
     next.startsWith('/sthira/') ||
     next.startsWith('/dashboard/markets/retail');
@@ -278,7 +293,16 @@ export default function Auth() {
           disabled={loading}
         />
       </div>
-      <Button type="submit" className="w-full" disabled={loading} data-testid="login-btn">
+      <Button
+        type="submit"
+        className={cn(
+          "w-full",
+          isRetailVariant &&
+            "bg-[hsl(var(--sthira-copper))] text-white hover:bg-[hsl(var(--sthira-copper)/0.9)] focus-visible:ring-[hsl(var(--sthira-copper))]",
+        )}
+        disabled={loading}
+        data-testid="login-btn"
+      >
         {loading ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Signing in…</> : 'Sign in'}
       </Button>
       {!isRetailVariant && (

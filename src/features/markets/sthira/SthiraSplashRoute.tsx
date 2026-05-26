@@ -12,8 +12,11 @@
  *      complete -> /dashboard/markets/retail/home
  *
  * While the hook returns "loading", the splash visual stays put. A 4s
- * watchdog redirects to /dashboard on the assumption that something is
- * stuck (covers the rare case where Supabase auth state never resolves).
+ * watchdog (only armed while step === "loading") redirects to the retail
+ * Home, where SthiraMobileGuard re-runs the routing decision. Stays inside
+ * the Sthira shell so a stuck user never sees CRM branding. The cleanup
+ * clears the timer the moment step resolves, so a slow-but-eventually-
+ * successful resolution never races into the wrong redirect.
  */
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
@@ -23,7 +26,11 @@ import { useSthiraOnboardingProgress } from "./useSthiraOnboardingProgress";
 const WATCHDOG_MS = 4000;
 
 const NEXT_PATH: Record<string, string> = {
-  auth:     "/auth",
+  // ?intent=retail flips Auth.tsx to SthiraChrome (cream + copper + serif)
+  // instead of SosChrome (CRM-branded). ?next routes the post-login user
+  // back through this splash so it re-evaluates onboarding state — without
+  // it the default `/dashboard` takes them straight into CRM.
+  auth:     "/auth?intent=retail&next=/sthira/splash",
   risk:     "/sthira/onboarding",
   broker:   "/sthira/broker",
   complete: "/dashboard/markets/retail/home",
@@ -43,14 +50,20 @@ export default function SthiraSplashRoute() {
     if (dest) navigate(dest, { replace: true });
   }, [step, navigate]);
 
-  // Watchdog: if we're still showing the splash after 4s (something hung),
-  // fall through to the dashboard rather than leaving the user stranded.
+  // Watchdog: if step is still "loading" after 4s (auth/profile query hung),
+  // fall through to the retail Home — SthiraMobileGuard there re-runs the
+  // routing decision and either renders Home (queries resolved by then) or
+  // bounces back to this splash. Stays inside the Sthira shell, never lands
+  // on the CRM-branded /auth. The effect cleanup clears the timer the moment
+  // step resolves, avoiding a race where the watchdog and the resolved
+  // redirect both fire.
   useEffect(() => {
+    if (step !== "loading") return;
     const t = window.setTimeout(() => {
       navigate("/dashboard/markets/retail/home", { replace: true });
     }, WATCHDOG_MS);
     return () => window.clearTimeout(t);
-  }, [navigate]);
+  }, [step, navigate]);
 
   return (
     <div
