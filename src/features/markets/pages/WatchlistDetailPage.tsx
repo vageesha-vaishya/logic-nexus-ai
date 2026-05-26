@@ -190,6 +190,9 @@ function ItemsTable({
   watchlistId: string;
   items: import("../types").WatchlistItem[];
 }) {
+  // Sthira mobile shell uses a card stack instead of the 8-column
+  // table — touch-sized actions, no horizontal scroll.
+  const isSthiraShell = useSthiraShell();
   const remove = useRemoveWatchlistItem(watchlistId);
   const marketOpen = isMarketOpen();
   const [alertSheet, setAlertSheet] = useState<{ symbol: string; exchange: string; ltp: number | null } | null>(null);
@@ -259,6 +262,79 @@ function ItemsTable({
         </span>
       </CardHeader>
       <CardContent className="p-0">
+        {isSthiraShell ? (
+          /* Mobile card stack — symbol + price + change + actions per card.
+              Signal/High/Low/Type are omitted on mobile; tap the symbol to
+              open the instrument detail for the full view. */
+          <div className="space-y-2 p-3">
+            {items.map((item) => {
+              const inst = item.instrument;
+              const quote = inst?.symbol ? ltpMap?.[inst.symbol] : undefined;
+              const positive = (quote?.change ?? 0) >= 0;
+              return (
+                <div key={item.id} className="rounded-lg border bg-card p-3 space-y-2">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0 flex-1">
+                      {inst ? (
+                        <Link
+                          to={`/dashboard/markets/instruments/${inst.id}`}
+                          className="font-mono text-sm font-medium hover:underline"
+                        >
+                          {inst.symbol}
+                        </Link>
+                      ) : (
+                        <span className="font-mono text-sm text-muted-foreground">unknown</span>
+                      )}
+                      {item.note && (
+                        <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{item.note}</p>
+                      )}
+                    </div>
+                    <SignalBadge signal={inst?.symbol ? signalMap?.[inst.symbol] : undefined} size="sm" />
+                  </div>
+                  <div className="flex items-end justify-between gap-2 tabular-nums">
+                    <span className="font-mono text-base font-semibold">
+                      {quote?.ltp != null ? `₹${fmtINR(quote.ltp)}` : "—"}
+                    </span>
+                    {quote?.change != null && quote?.change_pct != null && (
+                      <span className={`text-xs font-medium ${positive ? "text-sthira-sage" : "text-sthira-terracotta"}`}>
+                        {positive ? "+" : ""}{fmtINR(quote.change)} · {positive ? "+" : ""}{quote.change_pct.toFixed(2)}%
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    {inst?.symbol && (
+                      <QuickTradeButton
+                        symbol={inst.symbol}
+                        exchange={inst.exchange ?? "NSE"}
+                        size="sm"
+                      />
+                    )}
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9"
+                      onClick={() => setAlertSheet({ symbol: inst?.symbol ?? "", exchange: inst?.exchange ?? "NSE", ltp: quote?.ltp ?? null })}
+                      disabled={!inst?.symbol}
+                      aria-label="Set price alert"
+                    >
+                      <Bell className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-9 ml-auto text-destructive hover:text-destructive"
+                      onClick={() => onRemove(item.id, inst?.symbol)}
+                      disabled={remove.isPending}
+                      aria-label="Remove from watchlist"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                    </Button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
         <Table>
           <TableHeader>
             <TableRow>
@@ -344,6 +420,7 @@ function ItemsTable({
             })}
           </TableBody>
         </Table>
+        )}
       </CardContent>
     </Card>
 
