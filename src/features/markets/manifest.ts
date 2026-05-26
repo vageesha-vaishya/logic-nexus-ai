@@ -84,6 +84,8 @@ export const marketsManifest: DomainManifest = {
       children: [
         { path: "home", component: () => import("./retail/pages/RetailHomePage"), mobile: true },
         { path: "portfolio", component: () => import("./retail/pages/RetailPortfolioPage"), mobile: true },
+        { path: "portfolio/:portfolioId",
+          component: () => import("./retail/pages/RetailPortfolioDetailPage"), mobile: true },
         { path: "signals", component: () => import("./retail/pages/RetailSignalsPage"), mobile: true,
           moduleCode: "markets.signals" },
         { path: "goals", component: () => import("./retail/pages/RetailGoalsPage"), mobile: true },

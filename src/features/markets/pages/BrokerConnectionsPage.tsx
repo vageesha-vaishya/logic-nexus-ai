@@ -862,12 +862,15 @@ export default function BrokerConnectionsPage() {
                   onReauth={() => handleReauth(conn)}
                   onRemove={() => setRemoveId(conn.id)}
                   onViewPortfolio={() => {
-                    // Retail users get their mobile-tuned portfolio tab —
-                    // PortfolioDetailPage is desktop-only on the Markets
-                    // mobile build, so this avoids the "Not available here"
-                    // fallback when they tap View Portfolio.
+                    // Retail: mobile-tuned RetailPortfolioDetailPage at
+                    //   /dashboard/markets/retail/portfolio/:portfolioId
+                    // Falls back to the tier-view (no :id) if no portfolio
+                    // is bound. Admin/advisor users go to the desktop
+                    // PortfolioDetailPage as before.
                     if (isRetail) {
-                      navigate("/dashboard/markets/retail/portfolio");
+                      navigate(conn.portfolio_id
+                        ? `/dashboard/markets/retail/portfolio/${conn.portfolio_id}`
+                        : "/dashboard/markets/retail/portfolio");
                     } else if (conn.portfolio_id) {
                       navigate(`/dashboard/markets/portfolios/${conn.portfolio_id}`);
                     } else {
