@@ -6,7 +6,7 @@
  * 2. Queries useSthiraOnboardingProgress to find out which step the user
  *    needs next.
  * 3. Redirects accordingly:
- *      auth     -> /auth/login (existing web auth)
+ *      auth     -> /auth (existing web auth route)
  *      risk     -> /sthira/onboarding
  *      broker   -> /sthira/broker
  *      complete -> /dashboard/markets/retail/home
@@ -23,7 +23,7 @@ import { useSthiraOnboardingProgress } from "./useSthiraOnboardingProgress";
 const WATCHDOG_MS = 4000;
 
 const NEXT_PATH: Record<string, string> = {
-  auth:     "/auth/login",
+  auth:     "/auth",
   risk:     "/sthira/onboarding",
   broker:   "/sthira/broker",
   complete: "/dashboard/markets/retail/home",
