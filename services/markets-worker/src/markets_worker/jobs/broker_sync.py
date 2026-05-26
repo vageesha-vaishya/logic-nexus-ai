@@ -121,6 +121,17 @@ def sync_broker_connection(connection_id: str) -> dict:
     tenant_id    = row["tenant_id"]
     franchise_id = row["franchise_id"]
 
+    # Load m:n routing overrides for this connection. Empty list means the
+    # legacy 1:1 contract — every holding goes to broker_connections.portfolio_id.
+    # See docs/plans/2026-05-26-broker-portfolio-routing-design.md.
+    links = (
+        db.schema("markets").from_("broker_portfolio_links")
+        .select("portfolio_id, sync_filter")
+        .eq("broker_connection_id", connection_id)
+        .eq("is_active", True)
+        .execute()
+    ).data or []
+
     try:
         creds   = decrypt_credentials(row["credentials_enc"])
         adapter = build_adapter(broker, creds)
@@ -132,7 +143,10 @@ def sync_broker_connection(connection_id: str) -> dict:
         if "equity" in (row.get("segments") or ["equity"]):
             try:
                 holdings = _run_sync(adapter.get_holdings)
-                _upsert_holdings(db, holdings, portfolio_id, owner_id, tenant_id, franchise_id, connection_id)
+                _route_and_upsert_holdings(
+                    db, holdings, portfolio_id, links,
+                    owner_id, tenant_id, franchise_id, connection_id,
+                )
                 synced["holdings"] = len(holdings)
             except Exception as exc:
                 logger.warning("broker_sync.holdings_failed",
@@ -210,6 +224,105 @@ def sync_all_active_connections() -> dict:
 
     logger.info("broker_sync.all_enqueued", queued=queued)
     return {"queued": queued}
+
+
+# ── Routing helpers ───────────────────────────────────────────────────────────
+
+def _segment_for(exchange: str) -> str:
+    """Map a broker-reported exchange code to one of our routing segments.
+
+    Mirrors the labels in the connect-flow UI (broker.supports) and the
+    chip set in RoutingRulesSheet on the frontend. Anything that doesn't
+    match a known exchange falls through to "other" and routes via the
+    default portfolio (never via an override rule).
+    """
+    exch = (exchange or "").upper()
+    if exch in ("NSE", "BSE"):
+        return "equity"
+    if exch in ("NFO", "BFO"):
+        return "fno"
+    if exch in ("CDS", "BCD"):
+        return "currency"
+    if exch in ("MCX",):
+        return "commodity"
+    if exch in ("MF", "AMFI"):
+        return "mf"
+    return "other"
+
+
+def _route_and_upsert_holdings(
+    db, holdings, default_portfolio_id, links,
+    owner_id, tenant_id, franchise_id, connection_id,
+):
+    """Group holdings by destination portfolio and call _upsert_holdings per group.
+
+    Routing rule: walk `links` (already filtered to is_active=True) for the
+    first whose sync_filter.segments[] contains the holding's segment. If
+    none matches, fall back to default_portfolio_id. If both are unset,
+    drop the holding with a `holding_unrouted` warning.
+
+    Also wipes any pre-existing rows for this connection that no longer
+    belong in their current portfolio (stranded after a routing change).
+    """
+    # Build per-holding target portfolio.
+    grouped: dict[str, list] = {}
+    for h in holdings:
+        seg = _segment_for(getattr(h, "exchange", ""))
+        target_pid: str | None = None
+        first_match: dict | None = None
+        match_count = 0
+        for link in links:
+            segs = ((link.get("sync_filter") or {}).get("segments") or [])
+            if seg in segs:
+                match_count += 1
+                if first_match is None:
+                    first_match = link
+        if first_match is not None:
+            target_pid = first_match["portfolio_id"]
+            if match_count > 1:
+                logger.warning(
+                    "broker_sync.rule_conflict",
+                    connection_id=connection_id,
+                    segment=seg,
+                    chosen_portfolio_id=target_pid,
+                    matching_rules=match_count,
+                )
+        if target_pid is None:
+            target_pid = default_portfolio_id
+        if target_pid is None:
+            logger.warning(
+                "broker_sync.holding_unrouted",
+                connection_id=connection_id,
+                tradingsymbol=getattr(h, "tradingsymbol", ""),
+                segment=seg,
+            )
+            continue
+        grouped.setdefault(target_pid, []).append(h)
+
+    # Stranded rows: anything this connection previously wrote into a
+    # portfolio that is no longer a target.
+    target_pids = list(grouped.keys())
+    if target_pids:
+        try:
+            (
+                db.schema("markets").from_("holdings")
+                .delete()
+                .eq("broker_connection_id", connection_id)
+                .not_.in_("portfolio_id", target_pids)
+                .execute()
+            )
+        except Exception as exc:
+            logger.warning(
+                "broker_sync.stranded_cleanup_failed",
+                connection_id=connection_id,
+                error=str(exc),
+            )
+
+    # Per-portfolio upsert.
+    for pid, group in grouped.items():
+        _upsert_holdings(
+            db, group, pid, owner_id, tenant_id, franchise_id, connection_id,
+        )
 
 
 # ── DB upsert helpers ─────────────────────────────────────────────────────────

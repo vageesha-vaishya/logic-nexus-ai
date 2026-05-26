@@ -47,6 +47,7 @@ import { toast } from "sonner";
 
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { openExternal } from "@/lib/openExternal";
+import { RoutingRulesSheet } from "../components/RoutingRulesSheet";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -126,6 +127,7 @@ function ConnectionCard({
   onRemove,
   onViewPortfolio,
   onViewBroker,
+  onRouting,
   isSyncing,
 }: {
   conn:             BrokerConnection;
@@ -136,6 +138,7 @@ function ConnectionCard({
   onRemove:         () => void;
   onViewPortfolio:  () => void;
   onViewBroker:     () => void;
+  onRouting:        () => void;
   isSyncing:        boolean;
 }) {
   const maskedClientId = (() => {
@@ -199,6 +202,10 @@ function ConnectionCard({
             <Button variant="outline" size="sm" className="h-8 text-xs"
               onClick={onViewPortfolio} title="Open linked portfolio">
               View Portfolio
+            </Button>
+            <Button variant="ghost" size="sm" className="h-8 text-xs"
+              onClick={onRouting} title="Routing rules">
+              Routing
             </Button>
             <Button variant="ghost" size="sm" className="h-8 text-xs"
               onClick={onViewBroker} title="View broker data">
@@ -770,6 +777,7 @@ export default function BrokerConnectionsPage() {
   const [removeId, setRemoveId]             = useState<string | null>(null);
   const [syncingId, setSyncingId]           = useState<string | null>(null);
   const [reauthBroker, setReauthBroker]     = useState<SupportedBroker | null>(null);
+  const [routingConn, setRoutingConn]       = useState<BrokerConnection | null>(null);
 
   const supported   = supportedQuery.data ?? [];
   const fullApi     = supported.filter(b => b.tier === "full_api");
@@ -855,6 +863,7 @@ export default function BrokerConnectionsPage() {
                     ? navigate(`/dashboard/markets/portfolios/${conn.portfolio_id}`)
                     : navigate("/dashboard/markets/portfolios")}
                   onViewBroker={() => navigate(`/dashboard/markets/settings/brokers/${conn.id}`)}
+                  onRouting={() => setRoutingConn(conn)}
                   isSyncing={syncingId === conn.id}
                 />
               ))}
@@ -1032,6 +1041,14 @@ export default function BrokerConnectionsPage() {
         open={Boolean(selectedBroker) || Boolean(reauthBroker)}
         onClose={() => { setSelectedBroker(null); setReauthBroker(null); }}
         onSuccess={() => { setSelectedBroker(null); setReauthBroker(null); }}
+      />
+
+      {/* ── Routing rules sheet ────────────────────────────────────────── */}
+      <RoutingRulesSheet
+        connection={routingConn}
+        broker={routingConn ? brokerMeta(routingConn.broker) ?? null : null}
+        open={Boolean(routingConn)}
+        onClose={() => setRoutingConn(null)}
       />
 
       {/* ── Disconnect confirm ─────────────────────────────────────────── */}

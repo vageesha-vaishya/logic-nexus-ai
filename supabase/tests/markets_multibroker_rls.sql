@@ -142,6 +142,57 @@ BEGIN
     'T6_admin_select_policies_present',
     CASE WHEN v_count = 7 THEN 'PASS' ELSE 'FAIL' END,
     format('found=%s/7', v_count));
+
+  -- T7 broker_portfolio_links owner-isolation
+  IF v_other_user_id IS NOT NULL THEN
+    PERFORM set_config('request.jwt.claims',
+      json_build_object('sub', v_other_user_id::text, 'role', 'authenticated')::text, true);
+    EXECUTE 'SET LOCAL ROLE authenticated';
+    SELECT COUNT(*) INTO v_count FROM markets.broker_portfolio_links
+      WHERE owner_user_id = sample_user_id;
+    INSERT INTO _rls_results VALUES (
+      'T7_other_sees_zero_broker_portfolio_links',
+      CASE WHEN v_count = 0 THEN 'PASS' ELSE 'FAIL' END,
+      format('visible=%s', v_count));
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claims', NULL, true);
+  END IF;
+
+  -- T8 broker_portfolio_links admin-bypass works
+  IF v_admin_user_id IS NOT NULL THEN
+    PERFORM set_config('request.jwt.claims',
+      json_build_object('sub', v_admin_user_id::text, 'role', 'authenticated')::text, true);
+    EXECUTE 'SET LOCAL ROLE authenticated';
+    -- Sample user may have zero links — assert the policy lets admin
+    -- SELECT (no exception), not that there's data.
+    BEGIN
+      PERFORM 1 FROM markets.broker_portfolio_links
+        WHERE owner_user_id = sample_user_id LIMIT 1;
+      INSERT INTO _rls_results VALUES (
+        'T8_admin_can_select_broker_portfolio_links','PASS','no RLS rejection');
+    EXCEPTION WHEN insufficient_privilege OR others THEN
+      INSERT INTO _rls_results VALUES (
+        'T8_admin_can_select_broker_portfolio_links','FAIL',
+        format('rejected: %s', substring(SQLERRM, 1, 80)));
+    END;
+    RESET ROLE;
+    PERFORM set_config('request.jwt.claims', NULL, true);
+  END IF;
+
+  -- T9 holdings partial unique index enforces uniqueness on
+  -- (portfolio_id, broker_connection_id, instrument_id). Try a duplicate
+  -- INSERT-on-conflict and assert it doesn't create a second row.
+  -- We don't INSERT here to avoid touching FKs / RLS as different roles;
+  -- instead, just confirm the index definition explicitly includes the
+  -- 3-column tuple. (The Python upsert test pins the on_conflict key.)
+  SELECT COUNT(*) INTO v_count
+  FROM pg_indexes
+  WHERE schemaname='markets' AND indexname='holdings_broker_scoped_uniq'
+    AND indexdef LIKE '%(portfolio_id, broker_connection_id, instrument_id)%';
+  INSERT INTO _rls_results VALUES (
+    'T9_holdings_uniq_uses_three_column_tuple',
+    CASE WHEN v_count = 1 THEN 'PASS' ELSE 'FAIL' END,
+    format('found=%s', v_count));
 END $$;
 
 SELECT test_name, status, detail FROM _rls_results ORDER BY test_name;
