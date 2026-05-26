@@ -12,20 +12,26 @@
  * See docs/plans/2026-05-26-broker-portfolio-routing-design.md and
  * the session-level mobile-portfolio analysis for the contract.
  */
+import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, ChevronRight, Sparkles } from "lucide-react";
+import { formatDistanceToNow } from "date-fns";
 
 import { ErrorState, SkeletonCard } from "@/design-system";
 import { Numeric } from "@/components/system/Numeric";
 
 import { MobileHoldingsList } from "../components/MobileHoldingsList";
+import { PortfolioBriefSheet } from "../components/PortfolioBriefSheet";
+import { useBriefs } from "../../hooks/useBriefs";
 import { usePortfolio, usePortfolioHoldings } from "../../hooks/usePortfolio";
 
 export default function RetailPortfolioDetailPage() {
-  const { portfolioId } = useParams<{ portfolioId: string }>();
-  const navigate         = useNavigate();
-  const portfolio        = usePortfolio(portfolioId);
-  const holdings         = usePortfolioHoldings(portfolioId);
+  const { portfolioId }   = useParams<{ portfolioId: string }>();
+  const navigate          = useNavigate();
+  const portfolio         = usePortfolio(portfolioId);
+  const holdings          = usePortfolioHoldings(portfolioId);
+  const briefs            = useBriefs(portfolioId);
+  const [briefOpen, setBriefOpen] = useState(false);
 
   if (portfolio.isPending || holdings.isPending) {
     return (
@@ -160,6 +166,14 @@ export default function RetailPortfolioDetailPage() {
         </div>
       )}
 
+      {/* Brief trigger */}
+      <BriefCard
+        latestBriefTs={briefs.data?.[0]?.ts ?? null}
+        latestBriefTitle={briefs.data?.[0]?.title ?? null}
+        hasAny={Boolean(briefs.data && briefs.data.length > 0)}
+        onOpen={() => setBriefOpen(true)}
+      />
+
       {/* Holdings list */}
       <section aria-label="Holdings" className="space-y-2">
         <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
@@ -175,6 +189,50 @@ export default function RetailPortfolioDetailPage() {
           <MobileHoldingsList holdings={h?.holdings ?? []} currency={cur} />
         )}
       </section>
+
+      <PortfolioBriefSheet
+        portfolioId={portfolioId}
+        open={briefOpen}
+        onClose={() => setBriefOpen(false)}
+      />
     </div>
+  );
+}
+
+interface BriefCardProps {
+  latestBriefTs:    string | null;
+  latestBriefTitle: string | null;
+  hasAny:           boolean;
+  onOpen:           () => void;
+}
+
+function BriefCard({ latestBriefTs, latestBriefTitle, hasAny, onOpen }: BriefCardProps) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="flex w-full items-center gap-3 rounded-md border bg-card p-3 text-left transition-colors hover:bg-accent focus:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label="Open portfolio brief"
+    >
+      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+        <Sparkles className="h-4 w-4" aria-hidden="true" />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium">
+          {hasAny ? "Portfolio Brief" : "Generate Portfolio Brief"}
+        </span>
+        <span className="block text-[11px] text-muted-foreground truncate">
+          {hasAny
+            ? <>
+                {latestBriefTitle ?? "Latest AI narrative"}
+                {latestBriefTs && (
+                  <> · {formatDistanceToNow(new Date(latestBriefTs), { addSuffix: true })}</>
+                )}
+              </>
+            : "AI narrative of how this portfolio is positioned"}
+        </span>
+      </span>
+      <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden="true" />
+    </button>
   );
 }

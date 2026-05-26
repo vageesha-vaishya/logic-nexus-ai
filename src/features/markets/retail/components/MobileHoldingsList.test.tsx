@@ -10,9 +10,8 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 
-import type { AggregatedHolding, BrokerConnection } from "../../types";
-// Note: BrokerConnection lives in the broker hook file, not in types. Re-import:
-// We mock useBrokerConnections directly so the type import is decorative.
+import type { AggregatedHolding } from "../../types";
+import type { BrokerConnection } from "../../hooks/useBrokerConnections";
 
 const mockConnections: BrokerConnection[] = [
   {
