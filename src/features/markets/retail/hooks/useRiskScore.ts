@@ -30,18 +30,19 @@ export interface RiskScoreResponse {
   history: Array<Omit<RiskScoreSnapshot, "components"> & { components: RiskScoreComponents }>;
 }
 
-const WORKER_URL = import.meta.env.VITE_MARKETS_WORKER_URL ?? "http://localhost:8001";
-
 /**
  * Dynamic risk score (Phase 1 Addendum T17).
  *
- * GETs the markets-worker's compute-and-persist endpoint. We deliberately
- * use a 5-minute staleTime: the inputs (tier values, drawdown) don't change
- * intraday, and every call appends to portfolio_risk_history — over-fetching
- * would just inflate the sparkline with noise.
+ * Invokes the `retail-risk-score` Supabase Edge Function (read + compute +
+ * persist). Originally a fetch against the FastAPI markets-worker via
+ * VITE_MARKETS_WORKER_URL, but that required the device to share a LAN with
+ * the laptop — Sthira on LTE couldn't load this card. The edge function
+ * lives on the public Supabase URL and works from any network. Maths and
+ * response shape are identical (see supabase/functions/retail-risk-score/).
  *
- * Skips when there's no live Supabase session (the worker requires a user
- * JWT) so we don't spam 401s on the public login path.
+ * 5-minute staleTime because every call appends to portfolio_risk_history,
+ * and the inputs don't change intraday — over-fetching just inflates the
+ * sparkline. Gated on a live session so we don't 401-spam the login path.
  */
 export function useRiskScore() {
   return useQuery<RiskScoreResponse, Error>({
@@ -49,25 +50,33 @@ export function useRiskScore() {
     staleTime: 5 * 60_000,
     queryFn: async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      const token = session?.access_token;
-      if (!token) throw new Error("Not authenticated");
+      if (!session?.access_token) throw new Error("Not authenticated");
 
-      const resp = await fetch(`${WORKER_URL}/v1/retail/risk-score`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      if (!resp.ok) {
-        // 412 = onboarding not yet complete — let the caller decide whether
-        // to render a hint or just hide the card.
+      const { data, error } = await supabase.functions.invoke<RiskScoreResponse>(
+        "retail-risk-score",
+        { method: "GET" },
+      );
+
+      if (error) {
+        // FunctionsHttpError exposes the underlying Response on .context so
+        // callers can still tell 412 = onboarding-not-complete apart from a
+        // generic failure. We surface the server `detail` when available.
+        const ctxResp = (error as { context?: Response }).context;
         let detail = "";
-        try {
-          const body = await resp.json();
-          if (typeof body?.detail === "string") detail = ` — ${body.detail}`;
-        } catch {
-          // non-JSON body — ignore
+        let status = 0;
+        if (ctxResp) {
+          status = ctxResp.status;
+          try {
+            const body = await ctxResp.clone().json();
+            if (typeof body?.detail === "string") detail = ` — ${body.detail}`;
+          } catch {
+            // non-JSON body — ignore
+          }
         }
-        throw new Error(`risk-score: ${resp.status}${detail}`);
+        throw new Error(`risk-score: ${status || error.message}${detail}`);
       }
-      return (await resp.json()) as RiskScoreResponse;
+      if (!data) throw new Error("risk-score: empty response");
+      return data;
     },
   });
 }
