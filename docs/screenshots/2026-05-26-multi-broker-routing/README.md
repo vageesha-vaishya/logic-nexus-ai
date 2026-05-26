@@ -60,6 +60,22 @@ live trading toggle. The "Get login URL" CTA opens the Breeze login
 page via Capacitor Browser (Custom Tabs) thanks to `openExternal`
 plugged in earlier in this session.
 
+## 06 — Bottom nav restored on broker page
+
+`06-bottom-nav-restored-on-broker-page.png`
+
+After commit `8e542cee fix(markets): retail bottom nav disappeared on
+broker pages`. Pre-fix, BrokerConnectionsPage wrapped itself in
+`DashboardLayout` (CRM/admin sidebar) which on a retail-only user
+hid the 5-tab bottom nav entirely — leaving the user stranded with
+only the Android system back button.
+
+Post-fix: a new `BrokerPageShell` swaps to a `RetailBottomNav` for
+retail audiences. The screenshot shows the 5-tab nav present at the
+bottom (`Home | Portfolio | Signals | Goals | More`), the Groww
+connection card with its full action row inside the card boundary
+(`Portfolio | Routing | Data ›   ↻ 🔌`), and the broker grid below.
+
 ## Reproduction
 
 ```bash
