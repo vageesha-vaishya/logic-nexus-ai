@@ -1,5 +1,6 @@
 import { HarvestOpportunitiesCard } from "../dashboard/HarvestOpportunitiesCard";
 import { LtcgTrackerCard } from "../dashboard/LtcgTrackerCard";
+import { MfHoldingsCard } from "../dashboard/MfHoldingsCard";
 import { PortfolioTierView } from "../dashboard/PortfolioTierView";
 import { StressTestPreviewCard } from "../dashboard/StressTestPreviewCard";
 import { WhyButton } from "../glossary";
@@ -28,6 +29,8 @@ export default function RetailPortfolioPage() {
       <HarvestOpportunitiesCard />
       <StressTestPreviewCard />
       <PortfolioTierView />
+      {/* Mutual Funds — parallel to the 3 tiers in v1, integrated later. */}
+      <MfHoldingsCard />
     </div>
   );
 }

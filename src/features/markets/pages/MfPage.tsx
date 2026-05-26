@@ -10,7 +10,10 @@
 import { useState, useRef } from "react";
 import { PiggyBank, AlertTriangle, Info } from "lucide-react";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
+import { useSthiraShell } from "@/hooks/use-sthira-shell";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Badge,
   Button,
@@ -182,6 +185,13 @@ function FundCardSkeleton() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function MfPage() {
+  // Sthira mobile shell skips DashboardLayout (no CRM chrome leak) and
+  // hides advanced surfaces (Screener) behind a "Show advanced" toggle.
+  // Layman retail users see Discover / Portfolio / SIPs by default;
+  // power users can opt into the screener.
+  const isSthiraShell = useSthiraShell();
+  const [showAdvanced, setShowAdvanced] = useState(false);
+
   const [searchQ,   setSearchQ]   = useState("");
   const [category,  setCategory]  = useState("");
   const [debouncedQ, setDebouncedQ] = useState("");
@@ -257,9 +267,8 @@ export default function MfPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  return (
-    <DashboardLayout>
-      <div className="mx-auto max-w-[1400px] space-y-4 p-4 lg:p-6">
+  const content = (
+      <div className={`mx-auto ${isSthiraShell ? "max-w-2xl" : "max-w-[1400px]"} space-y-4 p-4 ${!isSthiraShell ? "lg:p-6" : ""}`}>
 
         {/* ── Page header ───────────────────────────────────────────── */}
         <header className="flex flex-wrap items-start justify-between gap-3">
@@ -269,6 +278,18 @@ export default function MfPage() {
               Mutual Funds
             </h1>
             <p className="text-sm text-muted-foreground">Direct plans · Live NAV via AMFI</p>
+          </div>
+          {/* Advanced toggle — surfaces the Screener tab. Off by default
+              so the layman audience sees Discover / Portfolio / SIPs. */}
+          <div className="flex items-center gap-2">
+            <Switch
+              id="mf-advanced"
+              checked={showAdvanced}
+              onCheckedChange={setShowAdvanced}
+            />
+            <Label htmlFor="mf-advanced" className="text-xs text-muted-foreground cursor-pointer">
+              Show advanced
+            </Label>
           </div>
         </header>
 
@@ -291,7 +312,7 @@ export default function MfPage() {
         <Tabs defaultValue="discover">
           <TabsList>
             <TabsTrigger value="discover">Discover</TabsTrigger>
-            <TabsTrigger value="screener">Screener</TabsTrigger>
+            {showAdvanced && <TabsTrigger value="screener">Screener</TabsTrigger>}
             <TabsTrigger value="portfolio">Portfolio</TabsTrigger>
             <TabsTrigger value="sips">SIPs</TabsTrigger>
           </TabsList>
@@ -357,10 +378,12 @@ export default function MfPage() {
             )}
           </TabsContent>
 
-          {/* ── Screener tab ────────────────────────────────────────── */}
-          <TabsContent value="screener" className="mt-4">
-            <MfScreener />
-          </TabsContent>
+          {/* ── Screener tab — only rendered when Advanced is on ───── */}
+          {showAdvanced && (
+            <TabsContent value="screener" className="mt-4">
+              <MfScreener />
+            </TabsContent>
+          )}
 
           {/* ── Portfolio tab ───────────────────────────────────────── */}
           <TabsContent value="portfolio" className="space-y-4 mt-4">
@@ -495,17 +518,36 @@ export default function MfPage() {
           </TabsContent>
         </Tabs>
       </div>
+  );
 
-      {/* ── MF Order Sheet ───────────────────────────────────────────────── */}
-      <MfOrderSheet
-        open={orderSheet.open}
-        onOpenChange={(v) => setOrderSheet(prev => ({ ...prev, open: v }))}
-        fund={sheetFund}
-        connectionId={tradeConnection?.id ?? ""}
-        connectionName={tradeConnection?.display_name ?? "No broker connected"}
-        defaultOrderType={orderSheet.orderType}
-        holding={orderSheet.holding}
-      />
+  // ── MF Order Sheet (shared across both shells) ────────────────────────
+  const orderSheetEl = (
+    <MfOrderSheet
+      open={orderSheet.open}
+      onOpenChange={(v) => setOrderSheet(prev => ({ ...prev, open: v }))}
+      fund={sheetFund}
+      connectionId={tradeConnection?.id ?? ""}
+      connectionName={tradeConnection?.display_name ?? "No broker connected"}
+      defaultOrderType={orderSheet.orderType}
+      holding={orderSheet.holding}
+    />
+  );
+
+  // Sthira shell renders raw (its own chrome handles nav). Desktop wraps
+  // in DashboardLayout so the CRM sidebar + header stay consistent with
+  // the rest of the markets dashboard.
+  if (isSthiraShell) {
+    return (
+      <>
+        {content}
+        {orderSheetEl}
+      </>
+    );
+  }
+  return (
+    <DashboardLayout>
+      {content}
+      {orderSheetEl}
     </DashboardLayout>
   );
 }
