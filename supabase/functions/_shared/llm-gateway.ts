@@ -172,6 +172,20 @@ const PROMPTS: Record<LlmTaskId, PromptTemplate> = {
 
 // Pricing tables — best-effort; reconciled against invoices in T3.
 interface ModelPricing { inputPerMillion: number; outputPerMillion: number; cachedInputPerMillion?: number; }
+// Google Gemini direct (generativelanguage.googleapis.com). Pricing per
+// Google's "AI Studio" rates as of 2026-05; if the model name is missing
+// here we still bill 0 (zero cost recorded) rather than failing the call.
+const GEMINI_PRICING: Record<string, ModelPricing> = {
+  "gemini-1.5-flash":         { inputPerMillion: 0.075, outputPerMillion: 0.30 },
+  "gemini-1.5-flash-002":     { inputPerMillion: 0.075, outputPerMillion: 0.30 },
+  "gemini-1.5-flash-8b":      { inputPerMillion: 0.0375, outputPerMillion: 0.15 },
+  "gemini-1.5-pro":           { inputPerMillion: 1.25,  outputPerMillion: 5.00 },
+  "gemini-1.5-pro-002":       { inputPerMillion: 1.25,  outputPerMillion: 5.00 },
+  "gemini-2.0-flash":         { inputPerMillion: 0.10,  outputPerMillion: 0.40 },
+  "gemini-2.0-flash-exp":     { inputPerMillion: 0.10,  outputPerMillion: 0.40 },
+  "gemini-2.5-flash":         { inputPerMillion: 0.10,  outputPerMillion: 0.40 },
+  "gemini-2.5-flash-lite":    { inputPerMillion: 0.075, outputPerMillion: 0.30 },
+};
 const ANTHROPIC_PRICING: Record<string, ModelPricing> = {
   "claude-opus-4-7":   { inputPerMillion: 15, outputPerMillion: 75, cachedInputPerMillion: 1.5 },
   "claude-sonnet-4-6": { inputPerMillion:  3, outputPerMillion: 15, cachedInputPerMillion: 0.3 },
@@ -308,6 +322,8 @@ export async function callLLM(
         result = await callOpenAiCompatible(config, prompt.system, userMsg, "openai");
         break;
       case "gemini":
+        result = await callGemini(config, prompt.system, userMsg);
+        break;
       case "local-qwen":
       case "custom":
         throw new LlmGatewayError(
@@ -502,6 +518,85 @@ async function callOpenAiCompatible(
   };
 }
 
+// ─── Google Gemini (direct, not via OpenRouter) ────────────────────────
+//
+// Hits generativelanguage.googleapis.com directly so a tenant who configured
+// their own Gemini API key in Settings → LLM Providers gets used. Without
+// this path, gemini-provider configs resolve to 501 even though they're
+// valid choices in the Settings UI.
+//
+// Docs: https://ai.google.dev/api/generate-content
+
+async function callGemini(
+  cfg: ResolvedConfig,
+  system: string,
+  user: string,
+): Promise<LlmCallResult> {
+  const base = cfg.baseUrl ?? "https://generativelanguage.googleapis.com";
+  // model names in the DB may or may not be prefixed with `models/`
+  const modelPath = cfg.model.startsWith("models/") ? cfg.model : `models/${cfg.model}`;
+  const url = `${base}/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
+
+  // Gemini API takes `systemInstruction` separately and `contents[]` for the
+  // turn-by-turn conversation. We send a single user turn.
+  const body: any = {
+    contents: [
+      { role: "user", parts: [{ text: user }] },
+    ],
+    generationConfig: {
+      maxOutputTokens: cfg.maxOutputTokens,
+    },
+  };
+  if (system && system.trim().length > 0) {
+    body.systemInstruction = { parts: [{ text: system }] };
+  }
+
+  const resp = await fetch(url, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    throw new LlmGatewayError(
+      `gemini_${resp.status}`,
+      `Gemini ${resp.status}: ${txt.slice(0, 300)}`,
+      resp.status >= 500 ? 502 : 400,
+    );
+  }
+
+  const json: any = await resp.json();
+  // Response shape: candidates[0].content.parts[].text
+  const text: string = Array.isArray(json?.candidates)
+    ? (json.candidates[0]?.content?.parts ?? [])
+        .filter((p: any) => typeof p?.text === "string")
+        .map((p: any) => p.text)
+        .join("")
+    : "";
+
+  const usage = json?.usageMetadata ?? {};
+  const inputTokens  = Number(usage.promptTokenCount     ?? 0);
+  const outputTokens = Number(usage.candidatesTokenCount ?? 0);
+  const cachedInputTokens = Number(usage.cachedContentTokenCount ?? 0);
+
+  const p = GEMINI_PRICING[cfg.model] ?? GEMINI_PRICING[cfg.model.replace(/^models\//, "")];
+  const costUsd = p
+    ? ((inputTokens - cachedInputTokens) * p.inputPerMillion +
+       cachedInputTokens * (p.cachedInputPerMillion ?? p.inputPerMillion) +
+       outputTokens * p.outputPerMillion) / 1_000_000
+    : 0;
+
+  return {
+    text,
+    provider: "gemini",
+    model: cfg.model,
+    inputTokens, outputTokens, cachedInputTokens,
+    costUsd: Math.round(costUsd * 1e6) / 1e6,
+    latencyMs: 0, promptVersion: "", raw: json,
+  };
+}
+
 // ─── Usage logging ─────────────────────────────────────────────────────
 
 interface UsageRow {
@@ -663,6 +758,54 @@ export async function callLLMConversation(
         const json: any = await resp.json();
         const text = json?.choices?.[0]?.message?.content ?? "";
         result = { text, provider: config.provider, model: config.model, inputTokens: Number(json?.usage?.prompt_tokens ?? 0), outputTokens: Number(json?.usage?.completion_tokens ?? 0), cachedInputTokens: 0, costUsd: 0, latencyMs: 0, promptVersion: "", raw: json };
+        break;
+      }
+      case "gemini": {
+        // Conversation-mode Gemini. Same generateContent endpoint as the
+        // single-turn path; the multi-turn shape is just `contents[]` of
+        // {role, parts[{text}]} per https://ai.google.dev/api/generate-content.
+        const base = config.baseUrl ?? "https://generativelanguage.googleapis.com";
+        const modelPath = config.model.startsWith("models/") ? config.model : `models/${config.model}`;
+        const url = `${base}/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+        const contents = validMessages.map((m) => ({
+          // Gemini uses "user" / "model" (not "assistant")
+          role: m.role === "assistant" ? "model" : m.role,
+          parts: [{ text: m.content }],
+        }));
+        const body: any = {
+          contents,
+          generationConfig: { maxOutputTokens: config.maxOutputTokens },
+        };
+        if (system && system.trim().length > 0) {
+          body.systemInstruction = { parts: [{ text: system }] };
+        }
+        const resp = await fetch(url, {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        if (!resp.ok) {
+          const txt = await resp.text().catch(() => "");
+          throw new LlmGatewayError(`gemini_${resp.status}`, `Gemini ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
+        }
+        const json: any = await resp.json();
+        const text = Array.isArray(json?.candidates)
+          ? (json.candidates[0]?.content?.parts ?? [])
+              .filter((p: any) => typeof p?.text === "string")
+              .map((p: any) => p.text)
+              .join("")
+          : "";
+        const usage = json?.usageMetadata ?? {};
+        const inputTokens  = Number(usage.promptTokenCount     ?? 0);
+        const outputTokens = Number(usage.candidatesTokenCount ?? 0);
+        const cachedInputTokens = Number(usage.cachedContentTokenCount ?? 0);
+        const p = GEMINI_PRICING[config.model] ?? GEMINI_PRICING[config.model.replace(/^models\//, "")];
+        const costUsd = p
+          ? ((inputTokens - cachedInputTokens) * p.inputPerMillion +
+             cachedInputTokens * (p.cachedInputPerMillion ?? p.inputPerMillion) +
+             outputTokens * p.outputPerMillion) / 1_000_000
+          : 0;
+        result = { text, provider: "gemini", model: config.model, inputTokens, outputTokens, cachedInputTokens, costUsd: Math.round(costUsd * 1e6) / 1e6, latencyMs: 0, promptVersion: "", raw: json };
         break;
       }
       default:
