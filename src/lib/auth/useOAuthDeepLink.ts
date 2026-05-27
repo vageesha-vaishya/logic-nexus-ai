@@ -32,6 +32,19 @@ import { Capacitor } from "@capacitor/core";
 
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
+import {
+  readPendingSignupContext,
+  clearPendingSignupContext,
+} from "@/lib/auth/oauthSignIn";
+
+function deriveOrgNameFromEmail(email: string | undefined | null): string {
+  if (!email) return "My organization";
+  const at = email.indexOf("@");
+  if (at < 0 || at === email.length - 1) return "My organization";
+  const sld = email.slice(at + 1).split(".")[0] || "";
+  if (!sld) return "My organization";
+  return sld.charAt(0).toUpperCase() + sld.slice(1);
+}
 
 const SCHEME_PREFIX = "com.sos.sthira://auth-callback";
 
@@ -117,6 +130,38 @@ export function useOAuthDeepLink() {
       // routed to our scheme, but iOS SFSafariViewController needs the
       // explicit close call to dismiss).
       await Browser.close().catch(() => undefined);
+
+      // Native domain-aware provisioning. Same logic as the web
+      // callback (AuthOAuthCallback): if the kickoff originated from
+      // /signup/:domain, the sessionStorage breadcrumb tells us to
+      // create a B2B tenant instead of taking the retail default. The
+      // edge function is idempotent and the call is fire-and-await so
+      // RootRedirect sees the membership immediately on landing.
+      try {
+        const ctx = readPendingSignupContext();
+        if (ctx && (ctx.domain_code === "logistics" || ctx.domain_code === "markets")) {
+          clearPendingSignupContext();
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            await supabase.functions.invoke("provision-retail-user", {
+              body: {
+                user_id: user.id,
+                meta: {
+                  domain_code: ctx.domain_code,
+                  org_name:    deriveOrgNameFromEmail(user.email),
+                  country:     ctx.country ?? "IN",
+                },
+              },
+            }).catch((e) => logger.warn("[auth-oauth] domain provisioning failed", { error: e?.message ?? String(e) }));
+          }
+        } else if (ctx) {
+          clearPendingSignupContext();
+        }
+      } catch (e) {
+        logger.warn("[auth-oauth] native domain dispatch threw", {
+          error: e instanceof Error ? e.message : String(e),
+        });
+      }
 
       // RootRedirect at "/" routes the now-signed-in user to the right
       // shell based on their active membership (retail → Sthira;

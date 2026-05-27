@@ -26,6 +26,61 @@ import { Loader2 } from "lucide-react";
 
 import { supabase } from "@/integrations/supabase/client";
 import { logger } from "@/lib/logger";
+import {
+  readPendingSignupContext,
+  clearPendingSignupContext,
+} from "@/lib/auth/oauthSignIn";
+
+function deriveOrgNameFromEmail(email: string | undefined | null): string {
+  if (!email) return "My organization";
+  const at = email.indexOf("@");
+  if (at < 0 || at === email.length - 1) return "My organization";
+  const host = email.slice(at + 1);
+  // Drop the TLD ("acme.co.in" → "acme") and capitalize. Best-effort —
+  // user will edit in Settings → Organization if the guess is wrong.
+  const sld = host.split(".")[0] || "";
+  if (!sld) return "My organization";
+  return sld.charAt(0).toUpperCase() + sld.slice(1);
+}
+
+async function dispatchDomainProvisionIfNeeded(
+  userId: string,
+  email: string | undefined | null,
+): Promise<void> {
+  const ctx = readPendingSignupContext();
+  if (!ctx) return;
+  // Clear immediately so a refresh-loop can't fire the call twice.
+  clearPendingSignupContext();
+
+  if (ctx.domain_code !== "logistics" && ctx.domain_code !== "markets") {
+    // Retail or unknown — the Auth-hook already ran retail provisioning.
+    return;
+  }
+
+  const orgName = deriveOrgNameFromEmail(email);
+  try {
+    const { error } = await supabase.functions.invoke("provision-retail-user", {
+      body: {
+        user_id: userId,
+        meta: {
+          domain_code: ctx.domain_code,
+          org_name:    orgName,
+          country:     ctx.country ?? "IN",
+        },
+      },
+    });
+    if (error) {
+      logger.warn("[auth-oauth] domain provisioning failed", {
+        userId, domain_code: ctx.domain_code, error: error.message,
+      });
+    }
+  } catch (e) {
+    logger.warn("[auth-oauth] domain provisioning threw", {
+      userId, domain_code: ctx.domain_code,
+      error: e instanceof Error ? e.message : String(e),
+    });
+  }
+}
 
 type State = "processing" | "error";
 
@@ -60,6 +115,17 @@ export default function AuthOAuthCallback() {
       if (cancelled) return;
 
       if (session) {
+        // If this OAuth roundtrip originated from /signup/:domain, the
+        // sessionStorage breadcrumb tells us which B2B tenant to
+        // provision. Fire-and-await before routing — the call is fast
+        // (single RPC) and idempotent. RootRedirect uses memberships
+        // to pick the right shell, so we want them written before
+        // it runs. Failures degrade gracefully: the user still has the
+        // default retail membership from the Auth hook.
+        await dispatchDomainProvisionIfNeeded(
+          session.user.id,
+          session.user.email,
+        );
         // RootRedirect handles the rest (Sthira vs CRM, multi-membership).
         navigate("/", { replace: true });
         return;

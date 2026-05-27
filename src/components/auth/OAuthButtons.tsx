@@ -33,10 +33,18 @@ export interface OAuthButtonsProps {
   showDivider?: boolean;
   /** Tailwind override for the divider+button stack. */
   className?: string;
+  /**
+   * Signup-time context: domain + country. When rendered on
+   * /signup/:domain we want the post-OAuth provisioner to create the
+   * right B2B tenant instead of defaulting to retail. Omit on /auth
+   * (sign-in) — OAuth users from there land on the default retail
+   * membership the Auth hook provisions.
+   */
+  signupContext?: { domain_code: string; country?: string };
 }
 
 export function OAuthButtons({
-  disabled, showDivider = true, className,
+  disabled, showDivider = true, className, signupContext,
 }: OAuthButtonsProps) {
   const [pending, setPending] = useState<OAuthProvider | null>(null);
 
@@ -46,7 +54,7 @@ export function OAuthButtons({
     if (pending) return;
     setPending(provider);
     try {
-      await signInWithProviderOAuth(provider);
+      await signInWithProviderOAuth(provider, { signupContext });
       // Web: supabase-js navigated the tab away — we won't reach here.
       // Native: Capacitor Browser is now showing the provider sheet;
       //   the deep-link handler (useOAuthDeepLink in App.tsx) will pick

@@ -184,7 +184,10 @@ export default function SignupForm() {
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
-          <OAuthButtons disabled={submitting} />
+          <OAuthButtons
+            disabled={submitting}
+            signupContext={{ domain_code: domain, country }}
+          />
           <div className="space-y-1.5">
             <Label htmlFor="signup-email">Work email</Label>
             <Input

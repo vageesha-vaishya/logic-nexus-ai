@@ -32,6 +32,48 @@ export type OAuthProvider = "google" | "azure";
 export interface SignInOptions {
   /** Override the default redirectTo (testing / staging). */
   redirectTo?: string;
+  /**
+   * Optional signup-time context. When the click originates from
+   * /signup/:domain we want the post-OAuth provisioner to create a B2B
+   * tenant for the right domain instead of defaulting to retail. We
+   * persist this to sessionStorage before redirecting, and
+   * AuthOAuthCallback reads it back after the OAuth roundtrip.
+   *
+   * sessionStorage is the right shelf for this: it's per-tab, survives
+   * the cross-origin redirect to the provider and back, and clears
+   * automatically when the tab closes. No PII is stored — just the
+   * domain slug + country code.
+   */
+  signupContext?: { domain_code: string; country?: string };
+}
+
+const SIGNUP_CONTEXT_KEY = "sos.oauth.signupContext";
+
+export function readPendingSignupContext():
+  | { domain_code: string; country?: string }
+  | null
+{
+  if (typeof sessionStorage === "undefined") return null;
+  try {
+    const raw = sessionStorage.getItem(SIGNUP_CONTEXT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (
+      parsed &&
+      typeof parsed === "object" &&
+      typeof (parsed as { domain_code?: unknown }).domain_code === "string"
+    ) {
+      return parsed as { domain_code: string; country?: string };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
+export function clearPendingSignupContext(): void {
+  if (typeof sessionStorage === "undefined") return;
+  try { sessionStorage.removeItem(SIGNUP_CONTEXT_KEY); } catch { /* ignore */ }
 }
 
 /**
@@ -88,6 +130,23 @@ export async function signInWithProviderOAuth(
     throw new Error("OAuth sign-in needs a redirectTo (no window.location available)");
   }
   const isNative = Capacitor.isNativePlatform();
+
+  // Persist signup-time context before redirecting. The OAuth callback
+  // reads this back to dispatch domain-aware provisioning. Clear any
+  // stale value first so a previous /signup/* click that the user
+  // abandoned can't leak into a later /auth (sign-in) OAuth roundtrip.
+  if (typeof sessionStorage !== "undefined") {
+    try {
+      if (options.signupContext) {
+        sessionStorage.setItem(
+          SIGNUP_CONTEXT_KEY,
+          JSON.stringify(options.signupContext),
+        );
+      } else {
+        sessionStorage.removeItem(SIGNUP_CONTEXT_KEY);
+      }
+    } catch { /* private mode / storage full — provisioner falls back to retail */ }
+  }
 
   const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
