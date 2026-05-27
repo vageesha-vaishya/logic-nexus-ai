@@ -32,6 +32,7 @@ const BillingSettings  = lazy(() => import("./pages/dashboard/BillingSettings"))
 const BrandingSettings = lazy(() => import("./pages/dashboard/BrandingSettings"));
 import Auth from "./pages/Auth";
 import OAuthCallback from "./pages/OAuthCallback";
+import AuthOAuthCallback from "./pages/AuthOAuthCallback";
 import SetupAdmin from "./pages/SetupAdmin";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -386,6 +387,11 @@ const App = () => (
             <Route path="/invite/:token" element={<WebOnlyRoute><InviteAccept /></WebOnlyRoute>} />
             <Route path="/invite"        element={<WebOnlyRoute><Navigate to="/welcome" replace /></WebOnlyRoute>} />
             <Route path="/oauth/callback" element={<OAuthCallback />} />
+            {/* Sign-in OAuth callback (Google / Microsoft via Supabase Auth).
+                Distinct from /oauth/callback which is the email-account
+                connection flow. See
+                docs/plans/2026-05-27-google-microsoft-auth-design.md */}
+            <Route path="/auth/callback" element={<AuthOAuthCallback />} />
             <Route path="/setup-admin" element={<WebOnlyRoute><SetupAdmin /></WebOnlyRoute>} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 

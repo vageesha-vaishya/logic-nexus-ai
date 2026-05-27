@@ -17,6 +17,7 @@ import { getDomainManifest } from '@/platform/domains/registry';
 import type { DomainManifest } from '@/platform/domains/types';
 import { logger } from '@/lib/logger';
 import { Capacitor } from '@capacitor/core';
+import { OAuthButtons } from '@/components/auth/OAuthButtons';
 
 function isNativeShell(): boolean {
   try {
@@ -314,6 +315,7 @@ export default function Auth() {
     </form>
   ) : (
     <form onSubmit={isSignupView ? handleSignupSubmit : handleSubmit} className="space-y-4">
+      <OAuthButtons disabled={loading} />
       <div className="space-y-2">
         <Label htmlFor="email">Email</Label>
         <Input
