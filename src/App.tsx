@@ -33,6 +33,7 @@ const BrandingSettings = lazy(() => import("./pages/dashboard/BrandingSettings")
 import Auth from "./pages/Auth";
 import OAuthCallback from "./pages/OAuthCallback";
 import AuthOAuthCallback from "./pages/AuthOAuthCallback";
+import AuthChooseAccount from "./pages/AuthChooseAccount";
 import { useOAuthDeepLink } from "./lib/auth/useOAuthDeepLink";
 
 /**
@@ -406,6 +407,11 @@ const App = () => (
                 connection flow. See
                 docs/plans/2026-05-27-google-microsoft-auth-design.md */}
             <Route path="/auth/callback" element={<AuthOAuthCallback />} />
+            {/* Login-time membership chooser. Reached automatically from
+                RootRedirect when a signed-in user has >=2 memberships and
+                no explicit row in public.user_active_membership. See
+                docs/plans/2026-05-27-google-microsoft-auth-design.md §4. */}
+            <Route path="/auth/choose-account" element={<AuthChooseAccount />} />
             <Route path="/setup-admin" element={<WebOnlyRoute><SetupAdmin /></WebOnlyRoute>} />
             <Route path="/unauthorized" element={<Unauthorized />} />
 

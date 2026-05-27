@@ -179,9 +179,20 @@ export function useMemberships() {
     [activeMembership?.id, switchMutation],
   );
 
+  /**
+   * True when public.user_active_membership has an explicit row for this
+   * user. Distinct from activeMembership (which falls back to memberships[0]
+   * when no row exists). RootRedirect uses this to decide whether to show
+   * the login-time membership chooser to new multi-membership users —
+   * without it, single-membership users would still see the chooser when
+   * they have no row yet, which is needless friction.
+   */
+  const hasExplicitActive = Boolean(activeQuery.data);
+
   return {
     memberships,
     activeMembership,
+    hasExplicitActive,
     isLoading: membershipsQuery.isLoading || activeQuery.isLoading,
     isSwitching: switchMutation.isPending,
     switchTo,
