@@ -90,10 +90,27 @@ const PROVIDER_HINT: Record<LlmProviderKind, string> = {
   anthropic:   "Direct Claude API. Get a key at console.anthropic.com.",
   openrouter:  "One key, many models. Models named like 'anthropic/claude-3.5-sonnet'. Get a key at openrouter.ai/keys.",
   openai:      "OpenAI native API.",
-  gemini:      "Google Gemini API (not yet wired in Gateway).",
+  gemini:      "Google Gemini API. Get a key at aistudio.google.com/apikey.",
   "local-qwen":"Your local Qwen server (must speak OpenAI chat-completions). Set base_url.",
   custom:      "Any OpenAI-compatible chat-completions endpoint. Set base_url and a model name the upstream understands.",
 };
+
+/**
+ * Known-good Gemini models on the v1beta `generateContent` endpoint as of
+ * 2026-05. Surfaced as a Select to prevent users from typing a retired
+ * model name (e.g. `gemini-1.5-flash-002`) and hitting a 404 at
+ * generation time. The "Custom…" sentinel lets power users still paste
+ * any model id (e.g. a newly-released model not yet on this list).
+ */
+const GEMINI_KNOWN_MODELS = [
+  "gemini-2.5-flash",
+  "gemini-2.5-flash-lite",
+  "gemini-2.0-flash",
+  "gemini-1.5-flash",
+  "gemini-1.5-flash-8b",
+  "gemini-1.5-pro",
+] as const;
+const GEMINI_CUSTOM_SENTINEL = "__custom__";
 
 export default function LlmSettingsPage() {
   const configs = useLlmConfigs();
@@ -421,6 +438,11 @@ function LlmConfigForm({
             onChange={(v) => setValue("default_model", v, { shouldValidate: true })}
             baseUrl={watch("base_url")}
           />
+        ) : provider === "gemini" ? (
+          <GeminiModelPicker
+            value={watch("default_model")}
+            onChange={(v) => setValue("default_model", v, { shouldValidate: true })}
+          />
         ) : (
           <Input
             id="default_model"
@@ -430,8 +452,8 @@ function LlmConfigForm({
             {...register("default_model", { required: "Default model is required" })}
           />
         )}
-        {/* Keep the field registered for validation even when the picker is shown */}
-        {provider === "openrouter" && (
+        {/* Keep the field registered for validation even when a picker is shown */}
+        {(provider === "openrouter" || provider === "gemini") && (
           <input
             type="hidden"
             {...register("default_model", { required: "Default model is required" })}
@@ -443,7 +465,9 @@ function LlmConfigForm({
         <p className="text-xs text-muted-foreground">
           {provider === "openrouter"
             ? "Searchable catalog of all OpenRouter models with live context-window and pricing. You can also paste any id."
-            : "Provider-native model name."}
+            : provider === "gemini"
+              ? "Known-good Gemini models on the v1beta generateContent endpoint. Choose Custom to paste any model id."
+              : "Provider-native model name."}
         </p>
       </div>
 
@@ -514,6 +538,66 @@ function LlmConfigForm({
         </Button>
       </div>
     </form>
+  );
+}
+
+// ─── Gemini model picker ───────────────────────────────────────────────
+//
+// Curated Select of known-good Gemini models on the v1beta generateContent
+// endpoint. Prevents the failure mode that hit us 2026-05-27: a tenant
+// saved `gemini-1.5-flash-002` (deprecated) and every brief 404'd at
+// call time. The "Custom…" option preserves the escape hatch — paste any
+// model id (useful when Google ships a new one before this list is updated).
+
+function GeminiModelPicker({
+  value,
+  onChange,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  // If the saved value isn't in the known list and isn't empty, surface it
+  // as a Custom selection so the user sees what they have and can edit it.
+  const isKnown = (GEMINI_KNOWN_MODELS as readonly string[]).includes(value);
+  const [mode, setMode] = useState<"known" | "custom">(
+    !value || isKnown ? "known" : "custom",
+  );
+
+  return (
+    <div className="space-y-1.5">
+      <Select
+        value={mode === "custom" ? GEMINI_CUSTOM_SENTINEL : value || GEMINI_KNOWN_MODELS[0]}
+        onValueChange={(v) => {
+          if (v === GEMINI_CUSTOM_SENTINEL) {
+            setMode("custom");
+            // Don't wipe the existing custom value; only seed if empty.
+            if (!value) onChange("");
+          } else {
+            setMode("known");
+            onChange(v);
+          }
+        }}
+      >
+        <SelectTrigger className="font-mono">
+          <SelectValue placeholder="Pick a Gemini model" />
+        </SelectTrigger>
+        <SelectContent>
+          {GEMINI_KNOWN_MODELS.map((m) => (
+            <SelectItem key={m} value={m} className="font-mono">{m}</SelectItem>
+          ))}
+          <SelectItem value={GEMINI_CUSTOM_SENTINEL}>Custom…</SelectItem>
+        </SelectContent>
+      </Select>
+      {mode === "custom" && (
+        <Input
+          className="font-mono"
+          autoComplete="off"
+          placeholder="e.g. gemini-3.0-flash-preview"
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+        />
+      )}
+    </div>
   );
 }
 
