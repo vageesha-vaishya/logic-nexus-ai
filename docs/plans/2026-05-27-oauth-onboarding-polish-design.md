@@ -131,16 +131,42 @@ Need to grep the SQL to confirm; if there's a real race, a
 | Stale banner flag (>30 days) | Component auto-hides. No explicit cleanup; metadata stays but UI ignores it. |
 | Dismissal race across tabs | Tab A clears flag → Tab B still has stale `getUser()` cache → banner shows again until next refresh. Acceptable. |
 
-## Verification needed before code
+## Verification — done 2026-05-27
 
-- [ ] `provision_org_tenant` SQL function returns `membership_id` (or
-      add it).
-- [ ] `provision_new_retail_user` write of `user_active_membership` —
-      confirm timing relative to our write; add NOT EXISTS guard if
-      racing.
-- [ ] `Settings → Organization` route exists and the name field is
-      focusable via URL parameter (e.g. `?focus=name`); if not, that's
-      a 30-line UI add.
+- [x] `provision_org_tenant` returns
+      `{ tenant_id, franchise_id, role_id, assignment_id, created }`.
+      `role_id` is the new `user_roles.id` (== our membership_id). No
+      SQL migration needed; client just reads `result.role_id`.
+- [x] **Surprise win:** `provision_org_tenant` already writes
+      `user_active_membership` when `created=true`. And
+      `provision_new_retail_user` (the Auth-hook retail call) does NOT
+      write `user_active_membership`. So there is no race, and the
+      planned client-side `user_active_membership.upsert` is
+      **redundant** — drop it from the plan.
+- [x] No `Settings → Organization` rename route exists. Existing
+      `BrandingSettings`/`Tenants` pages are general or admin-only.
+      Cleaner approach: **inline rename dialog** triggered directly
+      from the banner. Skips a route, skips Settings refactor, keeps
+      the rename inside the welcome moment.
+
+## Plan changes from verification
+
+1. **Drop client-side `user_active_membership.upsert`** — the SQL
+   function already handles it. AuthOAuthCallback + useOAuthDeepLink
+   only need to invoke the edge function and trust its work.
+2. **Move welcome-flag write into the edge function** (service-role
+   context). Detection logic:
+   - If called by Auth hook (payload shape `{ record: { id } }`): new
+     user by definition (Auth hook only fires on user creation).
+     Always write the flag for retail flow.
+   - If called by frontend (`{ user_id, meta }`): for B2B flow, the
+     RPC's own `created` boolean tells us whether it was new. For
+     retail flow via frontend (rare — /onboarding fallback only),
+     skip the flag.
+3. **Inline rename dialog** in the banner — direct
+   `UPDATE tenants SET name WHERE id = …` via supabase-js. RLS already
+   allows `tenant_admin` to update their own tenant (confirmed at code
+   level by existing branding/settings flows).
 
 ## Out of scope
 

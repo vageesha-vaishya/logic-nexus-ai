@@ -59,6 +59,7 @@ import { DarkModeToggle } from '@/components/system/DarkModeToggle';
 import { TradingModeToggle } from '@/components/system/TradingModeToggle';
 import { AIAssistantPanel } from '@/features/markets/components/AIAssistantPanel';
 import { InAppNotificationBell, useNotificationsRealtime } from '@/features/notifications';
+import { OAuthWelcomeBanner } from '@/components/onboarding/OAuthWelcomeBanner';
 
 interface DashboardLayoutProps {
   children: React.ReactNode;
@@ -785,6 +786,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
             </div>
           </header>
           <main id="main-content" role="main" className="flex-1 p-4 bg-muted/30 pb-24 outline-none overflow-x-hidden" style={{ backgroundImage: 'var(--app-background, none)' }} tabIndex={-1}>
+            <OAuthWelcomeBanner />
             <FeatureErrorBoundary featureName="Dashboard Content">
               {children}
             </FeatureErrorBoundary>

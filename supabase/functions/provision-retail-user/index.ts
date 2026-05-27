@@ -45,6 +45,21 @@ function extractUserId(body: any): string | null {
   return null;
 }
 
+/**
+ * True when the payload came from Supabase's "After user is created"
+ * Auth hook — that hook only fires on genuine user creation, so we
+ * can treat this as authoritative for "is this a new user."
+ *
+ * Frontend-fallback payloads (`{ user_id, meta }`) might be hitting
+ * an existing user (e.g. retry after a network blip), so we fall back
+ * to the RPC's own `created` boolean (B2B flow) or skip the welcome
+ * flag (retail flow via frontend, which is the rare /onboarding
+ * fallback path).
+ */
+function isAuthHookPayload(body: any): boolean {
+  return Boolean(body?.record?.id);
+}
+
 // Extract the signup metadata that the wizard wrote into raw_user_meta_data
 // (see /signup/[domain] form: domain_code, org_name, country, first_name,
 // last_name). The Auth-hook payload exposes it on body.record.raw_user_meta_data;
@@ -106,6 +121,7 @@ Deno.serve(async (req: Request) => {
 
   const meta = extractMeta(body);
   const flow = pickFlow(meta.domain_code);
+  const fromAuthHook = isAuthHookPayload(body);
 
   const supabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
   const serviceKey  = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
@@ -139,16 +155,36 @@ Deno.serve(async (req: Request) => {
       }), { status: 500, headers: jsonHeaders });
     }
 
+    // Welcome flag: retail signups via the Auth hook are always new
+    // users. Skip for frontend-fallback retail calls (rare; the
+    // /onboarding wizard handles its own first-run UX). Surfaces a
+    // retail-flavored OAuthWelcomeBanner on first dashboard landing.
+    let welcomePending = false;
+    if (fromAuthHook) {
+      const { error: metaErr } = await writeWelcomePending(
+        supabase, userId, "sthira-retail", null,
+      );
+      if (metaErr) {
+        console.warn("provision-on-signup: retail welcome flag write failed", {
+          user_id: userId, error: metaErr,
+        });
+      } else {
+        welcomePending = true;
+      }
+    }
+
     console.log("provision-on-signup: retail ok", {
-      user_id:      userId,
-      portfolio_id: portfolioId,
-      duration_ms:  Date.now() - t0,
+      user_id:        userId,
+      portfolio_id:   portfolioId,
+      welcome_pending: welcomePending,
+      duration_ms:    Date.now() - t0,
     });
     return new Response(JSON.stringify({
-      ok:           true,
-      flow:         "retail",
-      user_id:      userId,
-      portfolio_id: portfolioId,
+      ok:              true,
+      flow:            "retail",
+      user_id:         userId,
+      portfolio_id:    portfolioId,
+      welcome_pending: welcomePending,
     }), { status: 200, headers: jsonHeaders });
   }
 
@@ -188,16 +224,78 @@ Deno.serve(async (req: Request) => {
     }), { status: 500, headers: jsonHeaders });
   }
 
+  // Welcome flag for B2B: only when the RPC says it newly created the
+  // tenant. created=false means an existing tenant was reused (idempotent
+  // retry, second-OAuth-call-for-same-user, etc.) and the banner has
+  // already shown or is no longer relevant.
+  const wasNewTenant = Boolean(
+    result && typeof result === "object" && (result as any).created === true,
+  );
+  let welcomePending = false;
+  if (wasNewTenant) {
+    const { error: metaErr } = await writeWelcomePending(
+      supabase, userId, flow, meta.org_name,
+    );
+    if (metaErr) {
+      console.warn("provision-on-signup: org welcome flag write failed", {
+        user_id: userId, domain_code: flow, error: metaErr,
+      });
+    } else {
+      welcomePending = true;
+    }
+  }
+
   console.log("provision-on-signup: org ok", {
-    user_id:     userId,
+    user_id:         userId,
     flow,
     result,
-    duration_ms: Date.now() - t0,
+    welcome_pending: welcomePending,
+    duration_ms:     Date.now() - t0,
   });
   return new Response(JSON.stringify({
-    ok:      true,
+    ok:              true,
     flow,
-    user_id: userId,
+    user_id:         userId,
+    welcome_pending: welcomePending,
     ...(typeof result === "object" && result !== null ? result : {}),
   }), { status: 200, headers: jsonHeaders });
 });
+
+/**
+ * Write the OAuthWelcomeBanner trigger to auth.users.raw_user_meta_data.
+ * Service-role required (auth.admin namespace). The banner component
+ * on the dashboard reads this and clears it via supabase.auth.updateUser
+ * — which the user is allowed to do for their own metadata.
+ *
+ * Merges into existing raw_user_meta_data rather than overwriting, so
+ * we don't clobber domain_code / first_name / etc. that signup flows
+ * already wrote.
+ */
+async function writeWelcomePending(
+  supabase: ReturnType<typeof createClient>,
+  userId: string,
+  domainCode: string,
+  orgName: string | null,
+): Promise<{ error?: string }> {
+  // Read current metadata so we can merge — the admin API replaces the
+  // whole user_metadata object if you don't.
+  const { data: userResp, error: getErr } = await supabase.auth.admin.getUserById(userId);
+  if (getErr) return { error: getErr.message };
+
+  const existing = (userResp?.user?.user_metadata ?? {}) as Record<string, unknown>;
+  const merged   = {
+    ...existing,
+    oauth_welcome_pending: {
+      domain_code: domainCode,
+      org_name:    orgName,
+      created_at:  new Date().toISOString(),
+    },
+  };
+
+  const { error: updErr } = await supabase.auth.admin.updateUserById(userId, {
+    user_metadata: merged,
+  });
+  if (updErr) return { error: updErr.message };
+
+  return {};
+}
