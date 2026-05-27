@@ -9,11 +9,14 @@ import {
   Palette,
   Plug,
   TrendingDown,
+  Users,
   Wallet,
   type LucideIcon,
 } from "lucide-react";
 
 import { useAuth } from "@/hooks/useAuth";
+import { useMemberships } from "@/hooks/useMemberships";
+import { SthiraMembershipSwitcherSheet } from "@/features/markets/sthira/SthiraMembershipSwitcherSheet";
 import { ThemePickerSheet } from "@/features/markets/sthira/ThemePickerSheet";
 import { getSthiraThemeMeta } from "@/features/markets/sthira/themes";
 import { useSthiraTheme } from "@/features/markets/sthira/useSthiraTheme";
@@ -104,8 +107,13 @@ export default function RetailMorePage() {
   const { signOut, user } = useAuth();
   const [showGlossary, setShowGlossary] = useState(false);
   const [themePickerOpen, setThemePickerOpen] = useState(false);
+  const [switcherOpen, setSwitcherOpen] = useState(false);
   const { theme } = useSthiraTheme();
   const themeMeta = getSthiraThemeMeta(theme);
+  const { memberships } = useMemberships();
+  // Only surface the switcher when the user actually holds ≥2 memberships.
+  // Retail-only users with a single membership get no extra noise.
+  const hasMultipleMemberships = memberships.length >= 2;
 
   const entries = Object.values(GLOSSARY);
 
@@ -161,6 +169,14 @@ export default function RetailMorePage() {
           hint="Open your email app with diagnostic info pre-filled"
           onClick={() => openBugReport(user ? { id: user.id, email: user.email } : null)}
         />
+        {hasMultipleMemberships && (
+          <Row
+            Icon={Users}
+            label="Switch account"
+            hint={`You hold ${memberships.length} memberships — tap to switch`}
+            onClick={() => setSwitcherOpen(true)}
+          />
+        )}
         <Row
           Icon={LogOut}
           label="Log out"
@@ -170,6 +186,11 @@ export default function RetailMorePage() {
           }}
         />
       </div>
+
+      <SthiraMembershipSwitcherSheet
+        open={switcherOpen}
+        onClose={() => setSwitcherOpen(false)}
+      />
 
       <ThemePickerSheet open={themePickerOpen} onOpenChange={setThemePickerOpen} />
 
