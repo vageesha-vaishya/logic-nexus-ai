@@ -34,6 +34,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { SosLogo } from "@/components/branding";
 
 import { SIGNUP_DOMAINS, isSignupDomain, type SignupDomain } from "./types";
+import { OAuthButtons } from "@/components/auth/OAuthButtons";
 
 const COUNTRIES: ReadonlyArray<{ code: string; label: string }> = [
   { code: "IN", label: "India" },
@@ -183,6 +184,7 @@ export default function SignupForm() {
         </header>
 
         <form onSubmit={handleSubmit} className="space-y-4" noValidate>
+          <OAuthButtons disabled={submitting} />
           <div className="space-y-1.5">
             <Label htmlFor="signup-email">Work email</Label>
             <Input
