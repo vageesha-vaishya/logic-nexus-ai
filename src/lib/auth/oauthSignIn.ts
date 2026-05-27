@@ -13,15 +13,18 @@
  *   session. AuthOAuthCallback then routes to "/".
  *
  * Native (Capacitor) behaviour:
- *   The library returns the authorize URL instead of redirecting.
- *   We open it in Chrome Custom Tabs / SFSafariViewController via
- *   @capacitor/browser. The OS deep-link handler at app boot picks up
- *   the callback URL (com.sos.sthira://auth-callback#…) and calls
- *   supabase.auth.setSession() — Slice 3 wires that part.
- *
- * Slice 1 (this commit): web path only. Native path emits a warning
- * toast directing the user to the web until Slice 3 ships.
+ *   We pass skipBrowserRedirect:true so supabase-js returns the
+ *   authorize URL without navigating the WebView. We open that URL in
+ *   Chrome Custom Tabs (Android) / SFSafariViewController (iOS) via
+ *   @capacitor/browser. After the user signs in, the provider redirects
+ *   to Supabase, which redirects to com.sos.sthira://auth-callback#…
+ *   — the OS hands that URL to our app via App.addListener('appUrlOpen'),
+ *   the useOAuthDeepLink hook parses the hash and calls
+ *   supabase.auth.setSession() to establish the session.
  */
+import { Browser } from "@capacitor/browser";
+import { Capacitor } from "@capacitor/core";
+
 import { supabase } from "@/integrations/supabase/client";
 
 export type OAuthProvider = "google" | "azure";
@@ -52,16 +55,18 @@ function providerScopes(provider: OAuthProvider): string {
   return "email openid profile";
 }
 
+/** Native deep-link target. Registered in AndroidManifest + iOS Info.plist. */
+const NATIVE_REDIRECT_URI = "com.sos.sthira://auth-callback";
+
 /**
- * Default redirect target. Pure function of window.location.origin so
- * staging/preview deploys work without env-specific config. Tests can
- * override via the SignInOptions.redirectTo escape hatch.
+ * Default redirect target. On native (Capacitor), points at our custom
+ * URL scheme so the OS routes the callback back to the app. On web,
+ * uses window.location.origin so staging/preview deploys work without
+ * env-specific config. Tests override via SignInOptions.redirectTo.
  */
 function defaultRedirectTo(): string {
-  if (typeof window === "undefined") {
-    // SSR / Node test env — caller must override.
-    return "";
-  }
+  if (Capacitor.isNativePlatform()) return NATIVE_REDIRECT_URI;
+  if (typeof window === "undefined") return "";  // SSR / Node test env
   return `${window.location.origin}/auth/callback`;
 }
 
@@ -82,13 +87,20 @@ export async function signInWithProviderOAuth(
   if (!redirectTo) {
     throw new Error("OAuth sign-in needs a redirectTo (no window.location available)");
   }
+  const isNative = Capacitor.isNativePlatform();
 
-  const { error } = await supabase.auth.signInWithOAuth({
+  const { data, error } = await supabase.auth.signInWithOAuth({
     provider,
     options: {
       redirectTo,
       queryParams: providerHints(provider),
       scopes: providerScopes(provider),
+      // On native we MUST suppress the auto-redirect: supabase-js would
+      // try to navigate the WebView's location to the provider URL,
+      // which on Capacitor means changing the host-page URL —
+      // wrong-place, wrong-behavior. We want the URL returned to us so
+      // we can open it via Capacitor Browser (Custom Tabs / SFSafari).
+      skipBrowserRedirect: isNative,
     },
   });
 
@@ -96,8 +108,22 @@ export async function signInWithProviderOAuth(
     throw new Error(error.message || `${provider} sign-in failed`);
   }
 
-  // On web, supabase-js navigates the current tab to the provider URL —
-  // execution effectively halts here. On native (Capacitor), Slice 3
-  // will open data.url in @capacitor/browser; until then, the call
-  // resolves with no navigation and the caller surfaces an error toast.
+  if (isNative) {
+    if (!data?.url) {
+      throw new Error(
+        "OAuth provider did not return an authorize URL. " +
+        "Check the Supabase Auth provider configuration.",
+      );
+    }
+    await Browser.open({ url: data.url, presentationStyle: "popover" });
+    // Execution returns here immediately; the user signs in inside the
+    // Custom Tab / Safari sheet. When they're done, Supabase redirects
+    // to the NATIVE_REDIRECT_URI custom scheme; the OS hands it to the
+    // app via App.addListener('appUrlOpen'); useOAuthDeepLink picks it
+    // up and calls supabase.auth.setSession().
+    return;
+  }
+
+  // Web: supabase-js navigated the current tab to the provider URL.
+  // Execution effectively halts after the redirect commits.
 }

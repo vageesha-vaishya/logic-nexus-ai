@@ -33,6 +33,19 @@ const BrandingSettings = lazy(() => import("./pages/dashboard/BrandingSettings")
 import Auth from "./pages/Auth";
 import OAuthCallback from "./pages/OAuthCallback";
 import AuthOAuthCallback from "./pages/AuthOAuthCallback";
+import { useOAuthDeepLink } from "./lib/auth/useOAuthDeepLink";
+
+/**
+ * OAuthDeepLinkMount — invisible mount point for the Capacitor
+ * appUrlOpen listener that catches com.sos.sthira://auth-callback and
+ * establishes the Supabase session. Mounted inside BrowserRouter so
+ * the hook's useNavigate() resolves; rendered as a sibling to Routes
+ * so it's never unmounted by route changes mid-OAuth-flow.
+ */
+function OAuthDeepLinkMount() {
+  useOAuthDeepLink();
+  return null;
+}
 import SetupAdmin from "./pages/SetupAdmin";
 import Unauthorized from "./pages/Unauthorized";
 import NotFound from "./pages/NotFound";
@@ -355,6 +368,7 @@ const App = () => (
                       <LeadsViewStateProvider>
                         <PipelineProvider>
                         <Sonner />
+                        <OAuthDeepLinkMount />
                         <Suspense fallback={<div className="flex items-center justify-center h-screen"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" /></div>}>
                         <RetailAudienceGuard>
                         <Routes>

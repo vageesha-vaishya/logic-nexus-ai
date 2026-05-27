@@ -18,7 +18,6 @@
  */
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
-import { Capacitor } from "@capacitor/core";
 import { toast } from "sonner";
 
 import {
@@ -45,19 +44,16 @@ export function OAuthButtons({
 
   async function handleClick(provider: OAuthProvider) {
     if (pending) return;
-    // Slice 1 ships web only; native deep-link handling lands in Slice 3.
-    if (Capacitor.isNativePlatform()) {
-      toast.info(
-        "Google / Microsoft sign-in on the app is coming soon. " +
-        "Please use email and password for now.",
-      );
-      return;
-    }
     setPending(provider);
     try {
       await signInWithProviderOAuth(provider);
-      // On web, signInWithOAuth navigates the tab away; we won't reach
-      // here unless something prevented the redirect.
+      // Web: supabase-js navigated the tab away — we won't reach here.
+      // Native: Capacitor Browser is now showing the provider sheet;
+      //   the deep-link handler (useOAuthDeepLink in App.tsx) will pick
+      //   up the callback URL and establish the session. Reset the
+      //   spinner so the buttons re-enable if the user backs out of
+      //   the Custom Tab without completing sign-in.
+      setPending(null);
     } catch (e: any) {
       toast.error(e?.message ?? `${provider} sign-in failed`);
       setPending(null);
