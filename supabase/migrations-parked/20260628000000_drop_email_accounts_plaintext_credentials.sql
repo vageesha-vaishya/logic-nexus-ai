@@ -33,11 +33,9 @@
 --       column reads on public.email_accounts.
 --
 -- 3. ✓  Office 365 OAuth path in send-email/index.ts cut over to vault.
---       As of commit cfb50945 the Office 365 provider STILL reads
---       account.access_token and account.refresh_token directly (lines
---       ~464+). Move it to getEmailCredential / setEmailCredential
---       mirroring the Gmail provider rewrite from the same commit before
---       unparking.
+--       Done 2026-05-29: Office365Provider now reads + rotates via
+--       getEmailCredential / setEmailCredential, including the rolled-
+--       refresh-token capture Microsoft sometimes returns on refresh.
 --
 -- 4. ✓  src/components/email/EmailAccounts.tsx — the
 --       `!account.access_token` UI check that gates the "Connect" button

@@ -461,12 +461,24 @@ export class Office365Provider extends EmailProvider {
     const account = this.config.account;
     const supabase = this.config.adminSupabase || this.config.supabase;
 
-    if (!account.access_token) throw new Error("Office 365 account not connected.");
+    // Phase 1 Slice C — vault-backed credential read with column fallback
+    // during the deploy → NULL-out transition window. Mirrors the Gmail
+    // provider rewrite in the same file.
+    let accessToken = await getEmailCredential(
+      supabase,
+      { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
+      this.config.logger,
+    );
+    if (!accessToken) throw new Error("Office 365 account not connected.");
 
-    let accessToken = account.access_token;
     if (account.token_expires_at && new Date(account.token_expires_at) < new Date()) {
       await this.config.logger.info("Refreshing Office 365 token...");
-      if (!account.refresh_token) throw new Error("Office 365 token expired and no refresh token.");
+      const refreshToken = await getEmailCredential(
+        supabase,
+        { account_id: account.id, purpose: "oauth_refresh_token", fallback: account.refresh_token ?? null },
+        this.config.logger,
+      );
+      if (!refreshToken) throw new Error("Office 365 token expired and no refresh token.");
 
       const { data: oauthConfig } = await supabase
         .from("oauth_configurations")
@@ -488,7 +500,7 @@ export class Office365Provider extends EmailProvider {
         body: new URLSearchParams({
           client_id: oauthConfig.client_id,
           client_secret: oauthConfig.client_secret,
-          refresh_token: account.refresh_token,
+          refresh_token: refreshToken,
           grant_type: "refresh_token",
           scope: "https://graph.microsoft.com/Mail.Read https://graph.microsoft.com/Mail.Send https://graph.microsoft.com/Mail.ReadWrite offline_access openid profile email",
         }),
@@ -498,13 +510,37 @@ export class Office365Provider extends EmailProvider {
 
       const tokenData = await tokenResponse.json();
       accessToken = tokenData.access_token;
+      const expiresIso = new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString();
 
+      // Persist new access token to vault (canonical). Microsoft may
+      // also return a rolled refresh token on refresh — capture it when
+      // present so the next refresh has the latest.
+      await setEmailCredential(
+        supabase,
+        {
+          account_id:  account.id,
+          purpose:     "oauth_access_token",
+          value:       accessToken!,
+          tenant_id:   account.tenant_id ?? null,
+          expires_at:  expiresIso,
+        },
+        this.config.logger,
+      );
+      if (tokenData.refresh_token && tokenData.refresh_token !== refreshToken) {
+        await setEmailCredential(
+          supabase,
+          {
+            account_id:  account.id,
+            purpose:     "oauth_refresh_token",
+            value:       tokenData.refresh_token,
+            tenant_id:   account.tenant_id ?? null,
+          },
+          this.config.logger,
+        );
+      }
       await supabase
         .from("email_accounts")
-        .update({
-          access_token: accessToken,
-          token_expires_at: new Date(Date.now() + (tokenData.expires_in || 3600) * 1000).toISOString(),
-        })
+        .update({ token_expires_at: expiresIso })
         .eq("id", account.id);
     }
 
