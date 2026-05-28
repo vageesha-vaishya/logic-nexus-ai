@@ -2,6 +2,10 @@ import { serveWithLogger } from "../_shared/logger.ts";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireServiceRoleOrAdmin } from "../_shared/auth.ts";
 import { checkRateLimit, rlKey, POLICIES } from "../_shared/rate-limit.ts";
+import {
+  isAddressSuppressed,
+  PLATFORM_OPS_TENANT_ID,
+} from "../_shared/comms-suppression.ts";
 
 declare const Deno: any;
 
@@ -101,6 +105,17 @@ serveWithLogger(async (req, logger, supabase) => {
 
   // 2. Send Email Alert (via Resend)
   if (RESEND_API_KEY && ALERT_EMAIL_TO) {
+    // Phase 1 Slice C — honour the suppression list. ALERT_EMAIL_TO is an
+    // ops address, scoped under PLATFORM_OPS_TENANT_ID.
+    const suppressed = await isAddressSuppressed(
+      supabase,
+      { tenant_id: PLATFORM_OPS_TENANT_ID, channel_kind: "email", address: ALERT_EMAIL_TO },
+      logger,
+    );
+    if (suppressed) {
+      logger.warn("alert-notifier: ALERT_EMAIL_TO is suppressed, skipping email alert", { address: ALERT_EMAIL_TO });
+      results.email = false;
+    } else {
     try {
       const emailRes = await fetch("https://api.resend.com/emails", {
         method: "POST",
@@ -129,10 +144,11 @@ serveWithLogger(async (req, logger, supabase) => {
       
       if (emailRes.ok) results.email = true;
       else logger.error("Resend API failed", { status: emailRes.status });
-      
+
     } catch (e) {
       logger.error("Failed to send Email alert", { error: e });
     }
+    }   // close suppression-not-suppressed else
   }
 
   return new Response(JSON.stringify({ success: true, results }), {

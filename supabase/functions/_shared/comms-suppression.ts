@@ -12,6 +12,16 @@ import type { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 export type ChannelKind = "email" | "sms" | "whatsapp" | "push" | "in_app";
 
+/**
+ * Sentinel tenant UUID for platform-level outbound sends that don't belong
+ * to any tenant (ops alerts, marketing-inquiry notifications to the SOS
+ * Services inbox, build-failure pings, etc.). Allows the platform team to
+ * unsubscribe an ops address by inserting one row keyed on this UUID
+ * without polluting any real tenant's suppression list.
+ */
+export const PLATFORM_OPS_TENANT_ID =
+  "00000000-0000-0000-0000-000000000000";
+
 function normalise(channelKind: ChannelKind, address: string): string {
   if (channelKind === "email") return address.trim().toLowerCase();
   return address.trim();

@@ -1,5 +1,9 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import {
+  filterSuppressed,
+  PLATFORM_OPS_TENANT_ID,
+} from "../_shared/comms-suppression.ts";
 
 const ALLOWED_ORIGINS = new Set([
   "https://sosservices.online",
@@ -127,6 +131,39 @@ async function notifyByEmail(payload: {
     `Inquiry ID: ${payload.inquiryId}`,
   ].join("\n");
 
+  // Phase 1 Slice C — honour the comms.suppressions list before sending.
+  // Recipients here are platform-ops addresses (NOTIFY_RECIPIENTS), so they
+  // ride under PLATFORM_OPS_TENANT_ID. An ops user unsubscribing through the
+  // one-click flow inserts a row keyed on that sentinel and is dropped here.
+  let recipients = NOTIFY_RECIPIENTS;
+  const SUPABASE_URL       = Deno.env.get("SUPABASE_URL");
+  const SERVICE_ROLE_KEY   = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+  if (SUPABASE_URL && SERVICE_ROLE_KEY) {
+    const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false },
+    });
+    const { allowed, suppressed } = await filterSuppressed(
+      admin,
+      {
+        tenant_id:    PLATFORM_OPS_TENANT_ID,
+        channel_kind: "email",
+        addresses:    NOTIFY_RECIPIENTS,
+      },
+      { error: (m, meta) => console.error(m, meta) },
+    );
+    if (suppressed.length > 0) {
+      console.warn("marketing-inquiry: suppressed recipients", { suppressed });
+    }
+    recipients = allowed;
+  } else {
+    console.warn("marketing-inquiry: SUPABASE_URL/SERVICE_ROLE_KEY missing — skipping suppression check");
+  }
+
+  if (recipients.length === 0) {
+    console.warn("marketing-inquiry: all recipients suppressed, no email sent");
+    return;
+  }
+
   try {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
@@ -136,7 +173,7 @@ async function notifyByEmail(payload: {
       },
       body: JSON.stringify({
         from: NOTIFY_FROM,
-        to: NOTIFY_RECIPIENTS,
+        to: recipients,
         reply_to: payload.email,
         subject,
         html,
