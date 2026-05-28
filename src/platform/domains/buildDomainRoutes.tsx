@@ -68,8 +68,16 @@ function wrapInProtected(
   manifestCode: string,
   perms: readonly string[] | undefined,
 ): React.ReactNode {
+  // Phase 1 Slice E Part 2 — flip to the unified module gate. Manifest
+  // codes are uppercase ("MARKETS", "LOGISTICS"); core.modules.module_code
+  // is lowercase, so we downcase here. tenant_module_access was seeded for
+  // every live tenant by migration 20260528240000 so this gate matches the
+  // legacy requiredDomainCode behaviour.
   return (
-    <ProtectedRoute requiredDomainCode={manifestCode} requiredPermissions={perms as string[] | undefined}>
+    <ProtectedRoute
+      requiredModule={manifestCode.toLowerCase()}
+      requiredPermissions={perms as string[] | undefined}
+    >
       {element}
     </ProtectedRoute>
   );

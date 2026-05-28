@@ -1155,66 +1155,66 @@ const App = () => (
             <Route path="/dashboard/log-test" element={<ProtectedRoute><LogTestPage /></ProtectedRoute>} />
             <Route path="/dashboard/debug-console" element={<ProtectedRoute><DebugConsole /></ProtectedRoute>} />
             <Route path="/dashboard/amro" element={<Navigate to="/dashboard/amro/overview" replace />} />
-            <Route path="/dashboard/amro/overview" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroOverview /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/aircraft" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/aircraft/:view" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/plan-directives-bulletin" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroPlanDirectivesBulletin /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/plan-directives-bulletin/mpd" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroMpdManagement /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/plan-directives-bulletin/configure_mpd" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroConfigureMpdManagement /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/plan-directives-bulletin/configure_directives" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroConfigureDirectivesManagement /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/plan-directives-bulletin/directives" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroDirectivesManagement /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/aircraft/work-orders" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkOrders /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/work-orders" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkOrders /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/work-orders/:id" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkOrderDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/overview" element={<ProtectedRoute requiredModule="amro"><AmroOverview /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/aircraft" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/aircraft/:view" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftSubModule /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/plan-directives-bulletin" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroPlanDirectivesBulletin /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/plan-directives-bulletin/mpd" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroMpdManagement /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/plan-directives-bulletin/configure_mpd" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroConfigureMpdManagement /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/plan-directives-bulletin/configure_directives" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroConfigureDirectivesManagement /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/plan-directives-bulletin/directives" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroDirectivesManagement /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/aircraft/work-orders" element={<ProtectedRoute requiredModule="amro"><AmroWorkOrders /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/work-orders" element={<ProtectedRoute requiredModule="amro"><AmroWorkOrders /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/work-orders/:id" element={<ProtectedRoute requiredModule="amro"><AmroWorkOrderDetail /></ProtectedRoute>} />
             <Route path="/dashboard/amro/work-orders" element={<Navigate to="/dashboard/amro/work-orders" replace />} />
             <Route path="/dashboard/amro/work-orders/:id" element={<Navigate to="/dashboard/amro/work-orders" replace />} />
-            <Route path="/dashboard/amro/task-execution" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroTaskExecution /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/scheduling" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroScheduling /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/parts" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroParts /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/compliance" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroCompliance /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/certification" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroCertification /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/audit" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroAudit /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/integration" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroIntegration /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/intelligence" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroIntelligence /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroSettings /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><Navigate to="/dashboard/amro/settings/master-data/aircraft" replace /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/aircraft" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/ata-codes" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroAtaCodesMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/parts-inventory" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroPartsInventoryMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/suppliers" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroSuppliersMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/maintenance-facilities" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroMaintenanceFacilitiesMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/work-centers" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkCentersMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/skill-codes" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroSkillCodesMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/manufacturers" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroManufacturersMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/model" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroModelMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/regulator-profiles" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroRegulatorProfilesMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/shift-calendars" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroShiftCalendarsMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/work-orders" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrdersMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/work-order-templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/work-order-templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroTemplateCatalog /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/work-order-templates/new" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/work-order-templates/:id" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/task-execution" element={<ProtectedRoute requiredModule="amro"><AmroTaskExecution /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/scheduling" element={<ProtectedRoute requiredModule="amro"><AmroScheduling /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/parts" element={<ProtectedRoute requiredModule="amro"><AmroParts /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/compliance" element={<ProtectedRoute requiredModule="amro"><AmroCompliance /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/certification" element={<ProtectedRoute requiredModule="amro"><AmroCertification /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/audit" element={<ProtectedRoute requiredModule="amro"><AmroAudit /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/integration" element={<ProtectedRoute requiredModule="amro"><AmroIntegration /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/intelligence" element={<ProtectedRoute requiredModule="amro"><AmroIntelligence /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroSettings /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><Navigate to="/dashboard/amro/settings/master-data/aircraft" replace /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/aircraft" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroAircraftMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/ata-codes" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroAtaCodesMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/parts-inventory" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroPartsInventoryMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/suppliers" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroSuppliersMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/maintenance-facilities" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroMaintenanceFacilitiesMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/work-centers" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroWorkCentersMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/skill-codes" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroSkillCodesMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/manufacturers" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroManufacturersMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/model" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroModelMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/regulator-profiles" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroRegulatorProfilesMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/shift-calendars" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroShiftCalendarsMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/work-orders" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrdersMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/work-order-templates" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/work-order-templates" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroTemplateCatalog /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/work-order-templates/new" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/work-order-templates/:id" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplatesMasterData /></ProtectedRoute>} />
             {/* Enterprise Work Package Templates Module */}
-            <Route path="/dashboard/amro/templates" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplates /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/settings/master-data/:entity" element={<ProtectedRoute requiredDomainCode="AMRO" requiredPermissions={["edit_aircraft_records"]}><AmroMasterData /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/master-data" element={<ProtectedRoute requiredDomainCode="AMRO"><Navigate to="/dashboard/amro/settings/master-data/aircraft" replace /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/workspace-documentation" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroWorkspaceDocumentation /></ProtectedRoute>} />
-            <Route path="/dashboard/amro/design-system-showcase" element={<ProtectedRoute requiredDomainCode="AMRO"><AmroDesignSystemShowcase /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/templates" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroWorkOrderTemplates /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/settings/master-data/:entity" element={<ProtectedRoute requiredModule="amro" requiredPermissions={["edit_aircraft_records"]}><AmroMasterData /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/master-data" element={<ProtectedRoute requiredModule="amro"><Navigate to="/dashboard/amro/settings/master-data/aircraft" replace /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/workspace-documentation" element={<ProtectedRoute requiredModule="amro"><AmroWorkspaceDocumentation /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/design-system-showcase" element={<ProtectedRoute requiredModule="amro"><AmroDesignSystemShowcase /></ProtectedRoute>} />
             <Route path="/dashboard/amro/changes" element={<Navigate to="/dashboard/amro/work-orders" replace />} />
 
             {/* Markets domain (Multi-Asset Trading Platform) — per design doc 2026-05-14 */}
-            <Route path="/dashboard/markets/terminal" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsTerminal /></ProtectedRoute>} />
-            <Route path="/dashboard/markets" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsHome /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/portfolios" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsPortfolios /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/portfolios/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsPortfolioDetail /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/watchlists" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsWatchlists /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/watchlists/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsWatchlistDetail /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/instruments/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsInstrumentDetail /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/research" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsResearch /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/strategies" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsStrategies /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/backtests" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBacktests /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSignals /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/retail" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRetail /></ProtectedRoute>}>
+            <Route path="/dashboard/markets/terminal" element={<ProtectedRoute requiredModule="markets"><MarketsTerminal /></ProtectedRoute>} />
+            <Route path="/dashboard/markets" element={<ProtectedRoute requiredModule="markets"><MarketsHome /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/portfolios" element={<ProtectedRoute requiredModule="markets"><MarketsPortfolios /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/portfolios/:id" element={<ProtectedRoute requiredModule="markets"><MarketsPortfolioDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/watchlists" element={<ProtectedRoute requiredModule="markets"><MarketsWatchlists /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/watchlists/:id" element={<ProtectedRoute requiredModule="markets"><MarketsWatchlistDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/instruments/:id" element={<ProtectedRoute requiredModule="markets"><MarketsInstrumentDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/research" element={<ProtectedRoute requiredModule="markets"><MarketsResearch /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/strategies" element={<ProtectedRoute requiredModule="markets"><MarketsStrategies /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/backtests" element={<ProtectedRoute requiredModule="markets"><MarketsBacktests /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/signals" element={<ProtectedRoute requiredModule="markets"><MarketsSignals /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/retail" element={<ProtectedRoute requiredModule="markets"><MarketsRetail /></ProtectedRoute>}>
               <Route index             element={<Navigate to="home" replace />} />
               <Route path="home"       element={<SthiraMobileGuard fallback={<RetailHomeTab />} />} />
               <Route path="portfolio"               element={<RetailPortfolioTab />} />
@@ -1224,27 +1224,27 @@ const App = () => (
               <Route path="more"       element={<RetailMoreTab />} />
               <Route path="withdraw"   element={<RetailWithdrawTab />} />
             </Route>
-            <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsLlmSettings /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerConnections /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/settings/brokers/:connectionId" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsBrokerPortfolio /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/fno" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsFno /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/strategy-builder" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsStrategyBuilder /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/mf" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsMf /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/alerts" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsAlerts /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/risk" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRisk /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/calendar" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsCalendar /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/fii-dii" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsFiiDii /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/scanner" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsScanner /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/span" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsSpan /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/journal" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsTradeJournal /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/ideas" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsIdeas /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/ideas/:id" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsIdeaDetail /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/ai-chat" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsAIChat /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/copy-trading" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsCopyTrading /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/portfolios/:id/tax" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsTaxPnL /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/portfolios/:id/rebalancing" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsRebalancing /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/options-payoff" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsOptionsPayoff /></ProtectedRoute>} />
-            <Route path="/dashboard/markets/breadth" element={<ProtectedRoute requiredDomainCode="MARKETS"><MarketsMarketBreadth /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredModule="markets"><MarketsLlmSettings /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredModule="markets"><MarketsBrokerConnections /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/settings/brokers/:connectionId" element={<ProtectedRoute requiredModule="markets"><MarketsBrokerPortfolio /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/fno" element={<ProtectedRoute requiredModule="markets"><MarketsFno /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/strategy-builder" element={<ProtectedRoute requiredModule="markets"><MarketsStrategyBuilder /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/mf" element={<ProtectedRoute requiredModule="markets"><MarketsMf /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/alerts" element={<ProtectedRoute requiredModule="markets"><MarketsAlerts /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/risk" element={<ProtectedRoute requiredModule="markets"><MarketsRisk /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/calendar" element={<ProtectedRoute requiredModule="markets"><MarketsCalendar /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/fii-dii" element={<ProtectedRoute requiredModule="markets"><MarketsFiiDii /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/scanner" element={<ProtectedRoute requiredModule="markets"><MarketsScanner /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/span" element={<ProtectedRoute requiredModule="markets"><MarketsSpan /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/journal" element={<ProtectedRoute requiredModule="markets"><MarketsTradeJournal /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/ideas" element={<ProtectedRoute requiredModule="markets"><MarketsIdeas /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/ideas/:id" element={<ProtectedRoute requiredModule="markets"><MarketsIdeaDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/ai-chat" element={<ProtectedRoute requiredModule="markets"><MarketsAIChat /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/copy-trading" element={<ProtectedRoute requiredModule="markets"><MarketsCopyTrading /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/portfolios/:id/tax" element={<ProtectedRoute requiredModule="markets"><MarketsTaxPnL /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/portfolios/:id/rebalancing" element={<ProtectedRoute requiredModule="markets"><MarketsRebalancing /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/options-payoff" element={<ProtectedRoute requiredModule="markets"><MarketsOptionsPayoff /></ProtectedRoute>} />
+            <Route path="/dashboard/markets/breadth" element={<ProtectedRoute requiredModule="markets"><MarketsMarketBreadth /></ProtectedRoute>} />
             <Route path="/dashboard/settings/feature-flags" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><FeatureFlagsAdmin /></ProtectedRoute>} />
 
             {/* Sales Dashboard Routes */}
