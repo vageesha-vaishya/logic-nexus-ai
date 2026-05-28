@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/event-contracts/core.party.updated.v1.json",
+  "title": "core.party.updated v1",
+  "description": "Emitted when one or more fields on a core.parties row change. Payload carries a diff.",
+  "type": "object",
+  "required": ["changes"],
+  "additionalProperties": false,
+  "properties": {
+    "changes": {
+      "type": "object",
+      "description": "Map of field-name → {before, after}. Field names match column names on core.parties.",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "object",
+        "required": ["before", "after"],
+        "properties": {
+          "before": {},
+          "after": {}
+        }
+      }
+    }
+  }
+}

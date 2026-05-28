@@ -1,0 +1,20 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/event-contracts/core.user.invited.v1.json",
+  "title": "core.user.invited v1",
+  "description": "Emitted when an invitation is created. Precedes core.user.created when the invitee accepts.",
+  "type": "object",
+  "required": ["email", "invited_by_user_id", "expires_at"],
+  "additionalProperties": false,
+  "properties": {
+    "email": { "type": "string", "format": "email" },
+    "invited_by_user_id": { "type": "string", "format": "uuid" },
+    "role_id": { "type": ["string", "null"], "format": "uuid" },
+    "module_codes": {
+      "type": "array",
+      "items": { "type": "string" },
+      "uniqueItems": true
+    },
+    "expires_at": { "type": "string", "format": "date-time" }
+  }
+}

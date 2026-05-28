@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/event-contracts/core.user.created.v1.json",
+  "title": "core.user.created v1",
+  "description": "Emitted when a new user record exists. May be preceded by core.user.invited for invited flows, or fired directly for self-signup.",
+  "type": "object",
+  "required": ["email", "display_name", "provisioning_kind"],
+  "additionalProperties": false,
+  "properties": {
+    "email": { "type": "string", "format": "email" },
+    "display_name": { "type": "string", "minLength": 1 },
+    "provisioning_kind": {
+      "type": "string",
+      "enum": ["self_signup", "invited", "sso_jit", "admin_created"]
+    },
+    "oauth_provider": { "type": ["string", "null"], "enum": ["google", "microsoft", null] },
+    "invited_by_user_id": { "type": ["string", "null"], "format": "uuid" }
+  }
+}

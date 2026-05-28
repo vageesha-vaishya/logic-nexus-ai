@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/event-contracts/core.tenant.created.v1.json",
+  "title": "core.tenant.created v1",
+  "description": "Emitted when a new tenant organisation is registered.",
+  "type": "object",
+  "required": ["name", "status", "created_by_user_id"],
+  "additionalProperties": false,
+  "properties": {
+    "name": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "status": { "type": "string", "enum": ["trial", "active"] },
+    "created_by_user_id": { "type": "string", "format": "uuid" },
+    "residency_region": { "type": "string", "enum": ["ap-south-1", "eu-west-1", "us-east-1"] },
+    "plan_id": { "type": ["string", "null"] }
+  }
+}

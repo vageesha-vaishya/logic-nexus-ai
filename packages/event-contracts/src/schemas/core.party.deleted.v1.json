@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/event-contracts/core.party.deleted.v1.json",
+  "title": "core.party.deleted v1",
+  "description": "Emitted when a party is soft-deleted (GDPR/DPDP right-to-deletion). Hard deletion follows after the grace period via a separate process; this event is the trigger for downstream PII scrubs.",
+  "type": "object",
+  "required": ["soft_delete_at", "hard_delete_eligible_at"],
+  "additionalProperties": false,
+  "properties": {
+    "soft_delete_at": { "type": "string", "format": "date-time" },
+    "hard_delete_eligible_at": { "type": "string", "format": "date-time" },
+    "requested_by_user_id": { "type": ["string", "null"], "format": "uuid" },
+    "reason": {
+      "type": "string",
+      "enum": ["user_request", "tenant_admin_purge", "compliance_purge", "merge_consolidation"]
+    },
+    "retention_class_override": {
+      "type": ["string", "null"],
+      "description": "If non-null, overrides default retention; e.g. finance.invoices keep records 7 years even after party delete."
+    }
+  }
+}

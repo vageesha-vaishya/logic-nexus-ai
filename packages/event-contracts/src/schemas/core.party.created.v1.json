@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/event-contracts/core.party.created.v1.json",
+  "title": "core.party.created v1",
+  "description": "Emitted when a core.parties row is inserted.",
+  "type": "object",
+  "required": ["party_type", "display_name", "source_kind"],
+  "additionalProperties": false,
+  "properties": {
+    "party_type": { "type": "string", "enum": ["person", "organization"] },
+    "display_name": { "type": "string", "minLength": 1 },
+    "legal_name": { "type": ["string", "null"] },
+    "first_name": { "type": ["string", "null"] },
+    "last_name": { "type": ["string", "null"] },
+    "source_kind": {
+      "type": "string",
+      "description": "Where this party originated. Lets downstream modules attribute the entry.",
+      "enum": [
+        "sales_lead_conversion",
+        "self_signup",
+        "manual_create",
+        "import",
+        "integration_sync",
+        "logistics_party_promotion"
+      ]
+    },
+    "source_id": {
+      "type": ["string", "null"],
+      "description": "Opaque id from the source system (e.g. sales.leads.id for conversion-originated parties)"
+    }
+  }
+}
