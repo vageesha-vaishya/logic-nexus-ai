@@ -29,11 +29,11 @@ Tracked in priority order (most-written tables first, since they generate the mo
 | ✅ 1 | `platform.audit_log` | varies (legacy `domain` → first segment) | Example template; canonical. | **Done** (mig 20260528150100) |
 | 2 | `public.audit_log` | varies | Legacy duplicate of `audit_logs` below; both exist. Audit which is active before triggering. | TODO |
 | 3 | `public.audit_logs` | varies | Same — the `s`-suffixed variant. | TODO |
-| 4 | `public.email_audit_log` | `'comms.email'` | Email-level audit events. Maps recipient + action. | TODO |
-| 5 | `public.domain_audit_log` | `'core.domain'` | Domain-config change events. | TODO |
-| 6 | `public.admin_override_audit` | `'core.admin_override'` | Manual admin overrides (forensic-heavy). | TODO |
+| ✅ 4 | `public.email_audit_log` | `'comms.email'` | event_type→action; subject_id = email_id OR scheduled_email_id; `general_2y`. | **Done** (mig 20260528160000) |
+| ✅ 5 | `public.domain_audit_log` | `'core.domain'` | Clean source schema with actor_user_id + batch_id + metadata jsonb merged into core metadata; `general_2y`. | **Done** (mig 20260528160100) |
+| ✅ 6 | `public.admin_override_audit` | `'core.user'` | Sparse source (just `enabled` bool); subject is the TARGET user; action `'rls_override_enabled/disabled'`; `compliance_evidence_7y` — forensic-heavy. **Gap:** source doesn't capture actor; trigger writes actor_kind='system'. | **Done** (mig 20260528160200) |
 | 7 | `public.ai_audit_logs` | `'core.llm_invocation'` | AI-call audit. Migrate after `core.llm_invocations` consumers cut over (avoid double-writing). | TODO |
-| 8 | `public.amro_work_order_audit_log` | `'amro.work_order'` | AMRO WO state changes. | TODO |
+| ✅ 8 | `public.amro_work_order_audit_log` | `'amro.' \|\| entity_type` (work_order/task/material/compliance/certificate/resource_assignment) | Rich source with old_values/new_values/changed_fields + checksum; `compliance_evidence_7y` — aviation regulator-evidence (FAA/EASA/CAAC/SACAA). | **Done** (mig 20260528160300) |
 | 9 | `public.amro_stock_audit_timeline` | `'amro.stock_movement'` | AMRO stock events. | TODO |
 | 10 | `public.quotation_audit_log` | `'quotation.quote'` | Quote-level audit. | TODO |
 | 11 | `public.quotation_version_audit_logs` | `'quotation.version'` | Per-version audit; distinct from `quote_audits`. | TODO |
