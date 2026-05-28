@@ -27,8 +27,8 @@ Tracked in priority order (most-written tables first, since they generate the mo
 | # | Source table | Probable `subject_type` | Notes / blockers | Status |
 |---|---|---|---|---|
 | ✅ 1 | `platform.audit_log` | varies (legacy `domain` → first segment) | Example template; canonical. | **Done** (mig 20260528150100) |
-| 2 | `public.audit_log` | varies | Legacy duplicate of `audit_logs` below; both exist. Audit which is active before triggering. | TODO |
-| 3 | `public.audit_logs` | varies | Same — the `s`-suffixed variant. | TODO |
+| 💀 2 | `public.audit_log` (no `s`) | n/a | **DEAD** — zero writers in source code or any later migration. Created once in `20260327121500_amro_ata_hierarchy_and_planning_engine.sql:462` and never used. No shadow trigger; will be dropped in the Phase 11 cleanup sweep without a shadow window. Verified via INSERT-grep across all migrations + `src/`/`services/`/edge functions. | **Skipped — drop candidate** |
+| ✅ 3 | `public.audit_logs` (with `s`) | `'<resource_type>'` (taken as-is if schema-qualified) \| `'platform.' \|\| resource_type` (else) | The ACTIVE table — UnifiedQuoteComposer.tsx writes here + 8+ migration scripts. Live schema has tenant_id + franchise_id + resource_id (added via `20260114000002_enhance_audit_logs.sql` after the original 20251001011353 create). tenant_id NULLABLE on source — skip rows that lack it. Per types.ts canonical truth. `general_2y`. | **Done** (mig 20260528200000) |
 | ✅ 4 | `public.email_audit_log` | `'comms.email'` | event_type→action; subject_id = email_id OR scheduled_email_id; `general_2y`. | **Done** (mig 20260528160000) |
 | ✅ 5 | `public.domain_audit_log` | `'core.domain'` | Clean source schema with actor_user_id + batch_id + metadata jsonb merged into core metadata; `general_2y`. | **Done** (mig 20260528160100) |
 | ✅ 6 | `public.admin_override_audit` | `'core.user'` | Sparse source (just `enabled` bool); subject is the TARGET user; action `'rls_override_enabled/disabled'`; `compliance_evidence_7y` — forensic-heavy. **Gap:** source doesn't capture actor; trigger writes actor_kind='system'. | **Done** (mig 20260528160200) |
