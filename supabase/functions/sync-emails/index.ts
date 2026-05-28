@@ -3,6 +3,7 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { isServiceRoleAuthorizationHeader, requireAuth } from '../_shared/auth.ts';
+import { getEmailCredential, setEmailCredential } from '../_shared/email-credentials.ts';
 
 type GmailHeader = { name: string; value: string };
 type GmailMessagePart = {
@@ -165,11 +166,17 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     // Sync emails based on provider
     if (account.provider === "smtp_imap") {
       // Use IMAP to fetch emails
+      // Phase 1 Slice C — vault read with column fallback during transition.
+      const imapPassword = await getEmailCredential(
+        supabase,
+        { account_id: account.id, purpose: "imap_password", fallback: account.imap_password ?? null },
+        logger,
+      );
       const imapConfig = {
         hostname: account.imap_host,
         port: account.imap_port,
         username: account.imap_username,
-        password: account.imap_password,
+        password: imapPassword,
         ssl: account.imap_use_ssl,
       };
 
@@ -531,10 +538,23 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       // Use Gmail API
       logger.info(`Syncing via Gmail API for account: ${account.email_address}`);
       
+      // Phase 1 Slice C — vault read with column fallback during transition.
+      const vaultAccessToken = await getEmailCredential(
+        supabase,
+        { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
+        logger,
+      );
+      if (vaultAccessToken) account.access_token = vaultAccessToken;
+
       // Helper to refresh Gmail access token using stored refresh_token and oauth config
       const refreshGmailToken = async (): Promise<boolean> => {
         try {
-          if (!account.refresh_token) {
+          const refreshToken = await getEmailCredential(
+            supabase,
+            { account_id: account.id, purpose: "oauth_refresh_token", fallback: account.refresh_token ?? null },
+            logger,
+          );
+          if (!refreshToken) {
             logger.warn("No refresh token available for Gmail account");
             return false;
           }
@@ -561,7 +581,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
               client_id: oauthCfg.client_id,
               client_secret: oauthCfg.client_secret,
               grant_type: "refresh_token",
-              refresh_token: account.refresh_token!,
+              refresh_token: refreshToken,
             }),
           });
 
@@ -580,9 +600,20 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
           }
 
           const expiryIso = new Date(Date.now() + expiresIn * 1000).toISOString();
+          await setEmailCredential(
+            supabase,
+            {
+              account_id:  account.id,
+              purpose:     "oauth_access_token",
+              value:       newAccess,
+              tenant_id:   account.tenant_id ?? null,
+              expires_at:  expiryIso,
+            },
+            logger,
+          );
           await supabase
             .from("email_accounts")
-            .update({ access_token: newAccess, token_expires_at: expiryIso })
+            .update({ token_expires_at: expiryIso })
             .eq("id", account.id);
 
           account.access_token = newAccess;

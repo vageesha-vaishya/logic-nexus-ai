@@ -2,6 +2,7 @@
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { serveWithLogger } from "../_shared/logger.ts";
+import { setEmailCredential } from "../_shared/email-credentials.ts";
 
 declare const Deno: any;
 
@@ -208,6 +209,10 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       }
     }
 
+    // Phase 1 Slice C — tokens go to vault via setEmailCredential, NOT
+    // to the email_accounts plaintext columns (which are about to be
+    // NULLed). The email_accounts row carries only metadata + expiry.
+    const tokenExpiryIso = new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString();
     const emailAccountPayload = {
       user_id: userId,
       tenant_id: userRole?.tenant_id,
@@ -216,9 +221,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       email_address: (resolvedEmail || emailAddress || "") as string,
       display_name: resolvedName || displayName || null,
       is_primary: isPrimary,
-      access_token: tokens.access_token,
-      refresh_token: tokens.refresh_token || null,
-      token_expires_at: new Date(Date.now() + (tokens.expires_in || 3600) * 1000).toISOString(),
+      token_expires_at: tokenExpiryIso,
       is_active: true,
       updated_at: new Date().toISOString(), // Ensure updated_at is set
     };
@@ -240,6 +243,37 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
     if (accountError) {
       throw accountError;
+    }
+
+    // Persist the freshly-issued tokens to vault, keyed on the new (or
+    // existing) account id. Refresh-token writes can be skipped when the
+    // provider didn't return one (Google omits it on subsequent grants).
+    if (account?.id && tokens.access_token) {
+      await setEmailCredential(
+        supabaseAdmin,
+        {
+          account_id:  account.id,
+          purpose:     "oauth_access_token",
+          value:       tokens.access_token,
+          tenant_id:   userRole?.tenant_id ?? null,
+          expires_at:  tokenExpiryIso,
+          metadata:    { provider, email_address: account.email_address },
+        },
+        logger,
+      );
+    }
+    if (account?.id && tokens.refresh_token) {
+      await setEmailCredential(
+        supabaseAdmin,
+        {
+          account_id:  account.id,
+          purpose:     "oauth_refresh_token",
+          value:       tokens.refresh_token,
+          tenant_id:   userRole?.tenant_id ?? null,
+          metadata:    { provider, email_address: account.email_address },
+        },
+        logger,
+      );
     }
 
     return new Response(

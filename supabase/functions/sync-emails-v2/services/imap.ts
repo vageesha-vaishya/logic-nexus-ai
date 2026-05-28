@@ -3,6 +3,7 @@ import { EmailAccount, saveEmailToDb, SupabaseClient } from "../utils/db.ts";
 import { ImapFlow } from "npm:imapflow";
 import { parseEmail } from "../utils/parser.ts";
 import { Logger } from "../../_shared/logger.ts";
+import { getEmailCredential } from "../../_shared/email-credentials.ts";
 
 export class ImapService {
   private account: EmailAccount;
@@ -18,13 +19,24 @@ export class ImapService {
   }
 
   async syncEmails(forceFullSync: boolean = false): Promise<{ syncedCount: number, debug?: any }> {
+    // Phase 1 Slice C — vault read with column fallback during transition.
+    const imapPassword = await getEmailCredential(
+      this.adminSupabase ?? this.supabase,
+      {
+        account_id: (this.account as any).id,
+        purpose:    "imap_password",
+        fallback:   this.account.imap_password || (this.account as any).password || null,
+      },
+      this.logger,
+    );
+
     const client = new ImapFlow({
       host: this.account.imap_host,
       port: this.account.imap_port || 993,
       secure: this.account.imap_use_ssl ?? true,
       auth: {
         user: this.account.imap_username || this.account.email_address,
-        pass: this.account.imap_password || this.account.password,
+        pass: imapPassword,
       },
       logger: false,
     });

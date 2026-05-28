@@ -12,6 +12,10 @@ import {
   filterSuppressed,
   type ChannelKind,
 } from "../_shared/comms-suppression.ts";
+import {
+  getEmailCredential,
+  setEmailCredential,
+} from "../_shared/email-credentials.ts";
 
 declare const Deno: any;
 
@@ -198,15 +202,26 @@ export class GmailProvider extends EmailProvider {
     const account = this.config.account;
     const supabase = this.config.adminSupabase || this.config.supabase;
 
-    if (!account.access_token) {
+    // Phase 1 Slice C — vault-backed credential read (fallback to the
+    // plaintext column during the transition window).
+    let accessToken = await getEmailCredential(
+      supabase,
+      { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
+      this.config.logger,
+    );
+    if (!accessToken) {
       throw new Error("Gmail account not connected.");
     }
 
     // Token Refresh Logic
-    let accessToken = account.access_token;
     if (account.token_expires_at && new Date(account.token_expires_at) < new Date()) {
       await this.config.logger.info("Refreshing Gmail token...");
-      if (!account.refresh_token) throw new Error("Gmail token expired and no refresh token.");
+      const refreshToken = await getEmailCredential(
+        supabase,
+        { account_id: account.id, purpose: "oauth_refresh_token", fallback: account.refresh_token ?? null },
+        this.config.logger,
+      );
+      if (!refreshToken) throw new Error("Gmail token expired and no refresh token.");
 
       const { data: oauthConfig } = await supabase
         .from("oauth_configurations")
@@ -224,7 +239,7 @@ export class GmailProvider extends EmailProvider {
         body: new URLSearchParams({
           client_id: oauthConfig.client_id,
           client_secret: oauthConfig.client_secret,
-          refresh_token: account.refresh_token,
+          refresh_token: refreshToken,
           grant_type: "refresh_token",
         }),
       });
@@ -233,13 +248,24 @@ export class GmailProvider extends EmailProvider {
 
       const tokenData = await tokenResponse.json();
       accessToken = tokenData.access_token;
+      const expiresIso = new Date(Date.now() + tokenData.expires_in * 1000).toISOString();
 
+      // Persist to vault (canonical) + keep the expiry column updated so
+      // future refresh-window checks still work without reading from vault.
+      await setEmailCredential(
+        supabase,
+        {
+          account_id:  account.id,
+          purpose:     "oauth_access_token",
+          value:       accessToken!,
+          tenant_id:   account.tenant_id ?? null,
+          expires_at:  expiresIso,
+        },
+        this.config.logger,
+      );
       await supabase
         .from("email_accounts")
-        .update({
-          access_token: accessToken,
-          token_expires_at: new Date(Date.now() + tokenData.expires_in * 1000).toISOString(),
-        })
+        .update({ token_expires_at: expiresIso })
         .eq("id", account.id);
     }
 
@@ -364,8 +390,15 @@ export class SMTPProvider extends EmailProvider {
   async send(req: EmailRequest): Promise<EmailResponse> {
     await this.config.logger.info("Sending via SMTP");
     const account = this.config.account;
+    const supabase = this.config.adminSupabase || this.config.supabase;
 
-    if (!account.smtp_host || !account.smtp_username || !account.smtp_password) {
+    // Phase 1 Slice C — vault read with column fallback during transition.
+    const smtpPassword = await getEmailCredential(
+      supabase,
+      { account_id: account.id, purpose: "smtp_password", fallback: account.smtp_password ?? null },
+      this.config.logger,
+    );
+    if (!account.smtp_host || !account.smtp_username || !smtpPassword) {
       throw new Error("SMTP settings incomplete.");
     }
 
@@ -375,7 +408,7 @@ export class SMTPProvider extends EmailProvider {
       secure: account.smtp_port === 465, // true for 465, false for other ports
       auth: {
         user: account.smtp_username,
-        pass: account.smtp_password,
+        pass: smtpPassword,
       },
       tls: {
           rejectUnauthorized: false // Often needed for self-signed certs or some providers

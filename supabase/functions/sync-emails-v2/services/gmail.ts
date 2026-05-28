@@ -2,6 +2,10 @@
 import { EmailAccount, saveEmailToDb, SupabaseClient, uploadAttachments } from "../utils/db.ts";
 import { ParsedEmail, parseEmail } from "../utils/parser.ts";
 import { Logger } from "../../_shared/logger.ts";
+import {
+  getEmailCredential,
+  setEmailCredential,
+} from "../../_shared/email-credentials.ts";
 
 export class GmailService {
   private account: EmailAccount;
@@ -18,8 +22,10 @@ export class GmailService {
 
   async syncEmails(forceFullSync: boolean = false): Promise<{ syncedCount: number }> {
     this.logger?.info(`Starting Gmail sync for ${this.account.email_address}`);
-    await this.refreshAccessTokenIfNeeded();
-    
+    // Resolve the current access token through vault first; refresh if
+    // close to expiry per the existing 5-minute window.
+    await this.ensureAccessToken();
+
     let count = 0;
     count += await this.syncLabel("INBOX", "inbox", "inbound");
     count += await this.syncLabel("SENT", "sent", "outbound");
@@ -27,17 +33,34 @@ export class GmailService {
     return { syncedCount: count };
   }
 
-  private async refreshAccessTokenIfNeeded() {
-    if (this.account.access_token && this.account.token_expires_at) {
-        // Refresh if expiring in less than 5 minutes
-        if (new Date(this.account.token_expires_at).getTime() - Date.now() > 5 * 60 * 1000) return;
-    }
-    
-    this.logger?.info("Refreshing Gmail access token...");
-    
-    // Get OAuth config
-    // Use admin client if available to ensure we can read secrets
+  /**
+   * Phase 1 Slice C — resolve access_token via vault on entry, then refresh
+   * if expiring. `this.account.access_token` is kept as the live in-memory
+   * value so the per-message fetch calls keep using `Authorization: Bearer …`
+   * without round-tripping vault on every request.
+   */
+  private async ensureAccessToken() {
     const dbClient = this.adminSupabase || this.supabase;
+
+    const cached = await getEmailCredential(
+      dbClient,
+      {
+        account_id: this.account.id,
+        purpose:    "oauth_access_token",
+        fallback:   this.account.access_token ?? null,
+      },
+      this.logger,
+    );
+    if (cached) this.account.access_token = cached;
+
+    if (this.account.access_token && this.account.token_expires_at) {
+      if (new Date(this.account.token_expires_at).getTime() - Date.now() > 5 * 60 * 1000) return;
+    }
+    await this.refreshAccessToken(dbClient);
+  }
+
+  private async refreshAccessToken(dbClient: SupabaseClient) {
+    this.logger?.info("Refreshing Gmail access token...");
 
     const { data: oauthCfg } = await dbClient
         .from("oauth_configurations")
@@ -48,11 +71,20 @@ export class GmailService {
         .order("created_at", { ascending: false })
         .limit(1)
         .single();
-        
-    if (!oauthCfg || !this.account.refresh_token) {
-        throw new Error("Cannot refresh token: missing config or refresh token");
+
+    const refreshToken = await getEmailCredential(
+      dbClient,
+      {
+        account_id: this.account.id,
+        purpose:    "oauth_refresh_token",
+        fallback:   this.account.refresh_token ?? null,
+      },
+      this.logger,
+    );
+    if (!oauthCfg || !refreshToken) {
+      throw new Error("Cannot refresh token: missing config or refresh token");
     }
-    
+
     const resp = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -60,22 +92,33 @@ export class GmailService {
             client_id: oauthCfg.client_id,
             client_secret: oauthCfg.client_secret,
             grant_type: "refresh_token",
-            refresh_token: this.account.refresh_token
+            refresh_token: refreshToken,
         })
     });
-    
+
     if (!resp.ok) throw new Error(`Token refresh failed: ${await resp.text()}`);
-    
+
     const data = await resp.json();
     const newAccess = data.access_token;
     const expiresIn = data.expires_in || 3600;
     const expiryIso = new Date(Date.now() + expiresIn * 1000).toISOString();
-    
+
+    await setEmailCredential(
+      dbClient,
+      {
+        account_id:  this.account.id,
+        purpose:     "oauth_access_token",
+        value:       newAccess,
+        tenant_id:   (this.account as any).tenant_id ?? null,
+        expires_at:  expiryIso,
+      },
+      this.logger,
+    );
     await dbClient
         .from("email_accounts")
-        .update({ access_token: newAccess, token_expires_at: expiryIso })
+        .update({ token_expires_at: expiryIso })
         .eq("id", this.account.id);
-        
+
     this.account.access_token = newAccess;
     this.account.token_expires_at = expiryIso;
   }
@@ -89,7 +132,7 @@ export class GmailService {
     
     if (!resp.ok) {
         if (resp.status === 401) {
-            await this.refreshAccessTokenIfNeeded();
+            await this.ensureAccessToken();
             // Retry once
              const retryResp = await fetch(url, {
                 headers: { Authorization: `Bearer ${this.account.access_token}` }
