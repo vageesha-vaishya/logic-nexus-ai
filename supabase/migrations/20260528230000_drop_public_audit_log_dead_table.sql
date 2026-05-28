@@ -1,0 +1,25 @@
+-- Phase 1 Slice B tail — drop the dead public.audit_log (no-`s`) table
+-- Per master design doc §1B.8(1) + comms-infrastructure backlog §7.4
+--
+-- Two similarly-named tables sat in public.* for months:
+--
+--   public.audit_log   (no `s`) — created 2026-03-27 by the
+--                       amro_ata_hierarchy_and_planning_engine migration;
+--                       zero writers in source code or later migrations;
+--                       zero rows on prod at the time of this drop.
+--                       Confirmed dead during the Phase 1 Slice B Part 2
+--                       resolution (commit 8d33c0e9 added the shadow-write
+--                       for public.audit_logs only, after deciding this
+--                       table is unused).
+--
+--   public.audit_logs  (with `s`) — active. Shadow-writing to core.audit_log
+--                       since 20260528200000. Keep.
+--
+-- Safe to drop now: row count 0, no FKs into it, no triggers, no views
+-- referencing it, no code paths under `git grep public\.audit_log\b`. The
+-- two RLS policies attached by the creating migration drop with the table.
+--
+-- No data-loss risk; if someone re-introduces the column-set later they
+-- should use core.audit_log per the Phase 1 unification design.
+
+DROP TABLE IF EXISTS public.audit_log;
