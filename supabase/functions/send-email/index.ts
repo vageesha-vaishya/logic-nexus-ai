@@ -4,6 +4,14 @@ import nodemailer from "nodemailer";
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { isServiceRoleAuthorizationHeader, requireAuth } from "../_shared/auth.ts";
 import { Logger, serveWithLogger } from "../_shared/logger.ts";
+import {
+  generateUnsubscribeUrl,
+  buildListUnsubscribeHeaders,
+} from "../_shared/comms-unsubscribe-token.ts";
+import {
+  filterSuppressed,
+  type ChannelKind,
+} from "../_shared/comms-suppression.ts";
 
 declare const Deno: any;
 
@@ -26,6 +34,24 @@ export interface EmailRequest {
   variables?: Record<string, string>;
   priority?: 'high' | 'normal' | 'low';
   isVip?: boolean;
+
+  // Phase 1 Slice D additions — see comms-infrastructure.md §4.6.
+  // When provided, the send path will:
+  //   1. Check comms.suppressions for each recipient; filter out suppressed.
+  //   2. Generate a token-based List-Unsubscribe URL for the primary recipient.
+  //   3. Inject List-Unsubscribe + List-Unsubscribe-Post headers (RFC 8058).
+  // If absent, falls back to legacy static EMAIL_UNSUBSCRIBE_URL behaviour.
+  tenant_id?: string;
+  /** Override the base URL used for the unsubscribe link. Defaults to the
+   *  edge-functions root derived from SUPABASE_URL. */
+  unsubscribe_base_url?: string;
+  /** Set to true on transactional sends (password reset, OTP, security alert)
+   *  to bypass the suppression check + omit List-Unsubscribe headers. */
+  is_transactional?: boolean;
+  /** Pre-computed List-Unsubscribe headers (RFC 8058). Set by the main
+   *  handler after consulting comms.suppressions. Providers (Resend, SMTP)
+   *  inject these into the outbound mail. */
+  list_unsubscribe_headers?: Record<string, string>;
 }
 
 export interface EmailResponse {
@@ -114,6 +140,11 @@ export class ResendProvider extends EmailProvider {
                             filename: a.filename,
                             content: a.content,
                         })),
+                        // Phase 1 Slice D — RFC 8058 List-Unsubscribe headers
+                        // (when present; Resend forwards arbitrary headers to the recipient).
+                        ...(req.list_unsubscribe_headers
+                            ? { headers: req.list_unsubscribe_headers }
+                            : {}),
                     }),
                 });
                 return res;
@@ -832,16 +863,23 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
     }
 
     const payload = await req.json();
-    const { 
-      accountId, 
-      to, cc, bcc, 
-      subject: reqSubject, 
-      body: reqBody, 
-      from, reply_to, 
+    let {
+      to,
+      variables,
+    } = payload;
+    const {
+      accountId,
+      cc, bcc,
+      subject: reqSubject,
+      body: reqBody,
+      from, reply_to,
       provider: requestedProvider,
       templateId,
-      variables,
-      attachments
+      attachments,
+      // Phase 1 Slice D additions:
+      tenant_id,
+      unsubscribe_base_url,
+      is_transactional,
     } = payload;
 
     // Create a context-aware logger
@@ -849,6 +887,69 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
     await logger.info(`Processing email request`);
 
     if (!to) throw new Error("Missing required field: to");
+
+    // ── Phase 1 Slice D — suppression filter + token-based List-Unsubscribe ──
+    // Per comms-infrastructure.md §4.6 + master §7.4 Phase 1 Slice C/D.
+    //
+    // Marketing/notification sends MUST consult comms.suppressions before
+    // delivery. Transactional sends (password reset, OTP, security alert)
+    // bypass via is_transactional=true.
+    let listUnsubHeaders: Record<string, string> | null = null;
+    let suppressedRecipients: string[] = [];
+    if (tenant_id && !is_transactional) {
+      // 1. Suppression filter — remove any address on the suppression list.
+      const baseSupabaseUrl = Deno.env.get("SUPABASE_URL") ?? "";
+      const toList = Array.isArray(to) ? to : [to];
+      const filter = await filterSuppressed(
+        adminSupabase,
+        { tenant_id, channel_kind: "email" as ChannelKind, addresses: toList },
+        logger,
+      );
+      if (filter.suppressed.length > 0) {
+        await logger.info(`Suppressed ${filter.suppressed.length} recipient(s); not sending to them`, {
+          suppressed: filter.suppressed,
+        });
+        suppressedRecipients = filter.suppressed;
+      }
+      if (filter.allowed.length === 0) {
+        return new Response(
+          JSON.stringify({
+            success: false,
+            error: "all recipients are suppressed",
+            suppressed: filter.suppressed,
+          }),
+          { status: 200, headers: { ...headers, "Content-Type": "application/json" } },
+        );
+      }
+      // Reassign so downstream send code uses the filtered list.
+      to = filter.allowed;
+
+      // 2. Build a token-based List-Unsubscribe URL for the primary recipient
+      //    + standard mailto fallback. Only if COMMS_UNSUBSCRIBE_HMAC_SECRET is configured.
+      if (Deno.env.get("COMMS_UNSUBSCRIBE_HMAC_SECRET")) {
+        try {
+          const base = (unsubscribe_base_url || `${baseSupabaseUrl}/functions/v1`).replace(/\/$/, "");
+          const tokenUrl = await generateUnsubscribeUrl({
+            base_url: base,
+            tenant_id,
+            address: filter.allowed[0],
+            channel_kind: "email",
+          });
+          listUnsubHeaders = (await buildListUnsubscribeHeaders({
+            base_url: base,
+            tenant_id,
+            address: filter.allowed[0],
+            channel_kind: "email",
+            mailto_address: Deno.env.get("EMAIL_UNSUBSCRIBE_MAILTO") || undefined,
+          })) as Record<string, string>;
+          // Pass through to the existing variable system so the rendered email
+          // body and the SMTP MIME headers pick the same URL.
+          variables = { ...(variables ?? {}), unsubscribe_url: tokenUrl };
+        } catch (err) {
+          await logger.warn("Failed to build List-Unsubscribe headers; falling back to legacy static URL", { error: err });
+        }
+      }
+    }
 
     // Process attachments
     const { processed: processedAttachments, errors: attachmentErrors } = await prepareAttachments(supabase, attachments, logger);
@@ -976,7 +1077,11 @@ serveWithLogger(async (req: Request, baseLogger: Logger, _adminSupabase: Supabas
                 from,
                 replyTo: finalReplyTo,
                 variables,
-                attachments: processedAttachments
+                attachments: processedAttachments,
+                // Phase 1 Slice D — RFC 8058 headers (built upstream after suppression check)
+                list_unsubscribe_headers: listUnsubHeaders ?? undefined,
+                tenant_id,
+                is_transactional,
             });
             
             if (response.success) {
