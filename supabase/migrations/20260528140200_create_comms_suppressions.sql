@@ -65,11 +65,12 @@ COMMENT ON COLUMN comms.suppressions.expires_at IS
   'NULL = permanent. Soft-bounce-repeat suppressions may expire after 30d to allow re-engagement attempts. Unsubscribes are permanent.';
 
 -- The hot read path: send-gateway looks up by (tenant, channel, address)
--- before every outbound. UNIQUE constraint covers this naturally; an extra
--- partial index on non-expired rows keeps lookup tight even with millions of rows.
+-- before every outbound. UNIQUE constraint covers this naturally; we add
+-- expires_at as a trailing column so the index-only scan can apply the
+-- non-expired filter without a heap fetch. (Partial-WHERE with now() is
+-- not IMMUTABLE, so Postgres rejects it as a predicate.)
 CREATE INDEX suppressions_active_lookup_idx
-  ON comms.suppressions (tenant_id, channel_kind, address)
-  WHERE expires_at IS NULL OR expires_at > now();
+  ON comms.suppressions (tenant_id, channel_kind, address, expires_at);
 
 -- Browsing by reason for admin dashboards
 CREATE INDEX suppressions_reason_idx

@@ -85,10 +85,28 @@ EXCEPTION
 END;
 $$;
 
-CREATE TRIGGER trg_mgl_quotation_audit_logs_shadow_to_core
-  AFTER INSERT ON public.mgl_quotation_audit_logs
-  FOR EACH ROW EXECUTE FUNCTION core.shadow_write_from_mgl_quotation_audit_logs();
+-- The source table was dropped before Phase 1 in some environments (prod
+-- inclusive — see [[supabase-migration-drift]]). Skip the trigger create
+-- when the table is absent; the function + parity helper still install for
+-- environments that still have it.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM information_schema.tables
+    WHERE table_schema = 'public' AND table_name = 'mgl_quotation_audit_logs'
+  ) THEN
+    EXECUTE $trg$
+      CREATE TRIGGER trg_mgl_quotation_audit_logs_shadow_to_core
+        AFTER INSERT ON public.mgl_quotation_audit_logs
+        FOR EACH ROW EXECUTE FUNCTION core.shadow_write_from_mgl_quotation_audit_logs()
+    $trg$;
+  END IF;
+END $$;
 
+-- Parity helper is plpgsql so its body parses lazily — installs cleanly even
+-- when public.mgl_quotation_audit_logs is absent. Calling it in that case
+-- raises at runtime, which is the correct behaviour (parity check requires
+-- the source table).
 CREATE OR REPLACE FUNCTION core.audit_shadow_parity_mgl_quotation_audit_logs(
   p_start timestamptz,
   p_end   timestamptz
@@ -98,9 +116,11 @@ CREATE OR REPLACE FUNCTION core.audit_shadow_parity_mgl_quotation_audit_logs(
   unshadowed_rows    bigint,
   shadow_unique_rows bigint
 )
-LANGUAGE sql STABLE SECURITY DEFINER
+LANGUAGE plpgsql STABLE SECURITY DEFINER
 SET search_path = core, pg_catalog
 AS $$
+BEGIN
+  RETURN QUERY
   WITH
     src AS (
       SELECT id::text AS src_id
@@ -120,6 +140,7 @@ AS $$
     (SELECT count(*) FROM shadow),
     (SELECT count(*) FROM src WHERE src_id NOT IN (SELECT src_id FROM shadow)),
     (SELECT count(*) FROM shadow WHERE src_id NOT IN (SELECT src_id FROM src));
+END;
 $$;
 
 GRANT EXECUTE ON FUNCTION core.audit_shadow_parity_mgl_quotation_audit_logs

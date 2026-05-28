@@ -26,10 +26,11 @@ CREATE INDEX idempotency_keys_tenant_recorded_idx
   WHERE tenant_id IS NOT NULL;
 
 -- Cleanup index: a periodic job deletes rows older than the longest
--- Kafka retention window (30 days). Partial index supports the WHERE clause.
+-- Kafka retention window (30 days). Indexed on recorded_at so the
+-- range scan during cleanup stays cheap. (Partial-WHERE with now() is
+-- not IMMUTABLE, so Postgres rejects it.)
 CREATE INDEX idempotency_keys_old_idx
-  ON core.idempotency_keys (recorded_at)
-  WHERE recorded_at < (now() - INTERVAL '7 days');
+  ON core.idempotency_keys (recorded_at);
 
 ALTER TABLE core.idempotency_keys ENABLE ROW LEVEL SECURITY;
 
