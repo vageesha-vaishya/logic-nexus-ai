@@ -35,10 +35,10 @@ Tracked in priority order (most-written tables first, since they generate the mo
 | 7 | `public.ai_audit_logs` | `'core.llm_invocation'` | AI-call audit. Migrate after `core.llm_invocations` consumers cut over (avoid double-writing). | TODO |
 | ✅ 8 | `public.amro_work_order_audit_log` | `'amro.' \|\| entity_type` (work_order/task/material/compliance/certificate/resource_assignment) | Rich source with old_values/new_values/changed_fields + checksum; `compliance_evidence_7y` — aviation regulator-evidence (FAA/EASA/CAAC/SACAA). | **Done** (mig 20260528160300) |
 | 9 | `public.amro_stock_audit_timeline` | `'amro.stock_movement'` | AMRO stock events. | TODO |
-| 10 | `public.quotation_audit_log` | `'quotation.quote'` | Quote-level audit. | TODO |
-| 11 | `public.quotation_version_audit_logs` | `'quotation.version'` | Per-version audit; distinct from `quote_audits`. | TODO |
-| 12 | `public.quote_audits` | `'quotation.quote'` | Possible duplicate of `quotation_audit_log`. Audit which is the canonical source. | TODO |
-| 13 | `public.mgl_quotation_audit_logs` | `'quotation.mgl_quote'` | MGL pricing-engine audit. | TODO |
+| ✅ 10 | `public.quotation_audit_log` | `'quotation.' \|\| lower(entity_type)` | Rich source with polymorphic entity_type/entity_id; tenant_id NOT NULL; changes → diff; parent refs preserved in metadata; `general_2y`. | **Done** (mig 20260528170000) |
+| ✅ 11 | `public.quotation_version_audit_logs` | `'quotation.version'` | No tenant_id column — JOIN to quotation_versions to derive. action UPPERCASE → lowercased in core; raw preserved in metadata. `general_2y`. | **Done** (mig 20260528170100) |
+| ✅ 12 | `public.quote_audits` | `'quotation.quote'` | Predates quotation_audit_log — different shape, NOT a strict duplicate. No tenant_id — JOIN to quotes. old_value/new_value → diff; metadata.source_table_legacy=true distinguishes from quotation_audit_log writes. `general_2y`. | **Done** (mig 20260528170200) |
+| ✅ 13 | `public.mgl_quotation_audit_logs` | `'quotation.mgl_rate_option' \| 'quotation.version' \| 'quotation.quote'` (fallback chain) | MGL pricing-engine specific; rich source with actor_email + request_id; subject_id picks first non-null in {rate_option_id, quote_version_id, quote_id}. `general_2y`. | **Done** (mig 20260528170300) |
 | 14 | `public.mapping_audit_logs` | `'uim.field_mapping'` | UIM connector field-mapping changes. | TODO |
 | 15 | `public.engine_seed_audit_runs` | `'core.engine_seed'` | Seeding/migration runs. Low priority — internal tool audit. | TODO |
 | 16 | `public.uim_amro_sync_audit` | `'uim.amro_sync'` | AMRO↔UIM sync. | TODO |
