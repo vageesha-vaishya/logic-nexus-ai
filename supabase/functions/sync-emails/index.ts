@@ -1011,9 +1011,24 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       // Use Microsoft Outlook REST API (v2.0) with OAuth v2 tokens
       logger.info(`Syncing via Office365 (Outlook API) for: ${account.email_address}`);
 
+      // Phase 1 Slice C — vault-backed credential read with column fallback
+      // during the deploy → NULL-out transition window. Mirrors the Gmail
+      // path above + the Office365Provider in send-email.
+      const vaultAccessToken = await getEmailCredential(
+        supabase,
+        { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
+        logger,
+      );
+      if (vaultAccessToken) account.access_token = vaultAccessToken;
+
       const refreshOfficeToken = async (): Promise<{ accessToken?: string }> => {
         try {
-          if (!account.refresh_token) {
+          const refreshToken = await getEmailCredential(
+            supabase,
+            { account_id: account.id, purpose: "oauth_refresh_token", fallback: account.refresh_token ?? null },
+            logger,
+          );
+          if (!refreshToken) {
             logger.warn("No refresh token available for Office365 account");
             return {};
           }
@@ -1037,9 +1052,9 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
           const lowerEmail = String(account.email_address || "").toLowerCase();
           const isMSA = /@(hotmail|outlook|live|msn)\.com$/.test(lowerEmail);
           const tenant = isMSA ? "consumers" : (oauthCfg.tenant_id_provider || "common");
-          
+
           logger.info(`Refreshing token for ${account.email_address} using tenant: ${tenant}`);
-          
+
           const tokenResp = await fetch(`https://login.microsoftonline.com/${tenant}/oauth2/v2.0/token`, {
             method: "POST",
             headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -1047,7 +1062,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
               client_id: oauthCfg.client_id,
               client_secret: oauthCfg.client_secret,
               grant_type: "refresh_token",
-              refresh_token: account.refresh_token!,
+              refresh_token: refreshToken,
               scope: [
                 "https://graph.microsoft.com/Mail.Read",
                 "https://graph.microsoft.com/Mail.Send",
@@ -1068,14 +1083,36 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
           const tData = await tokenResp.json();
           const accessToken = tData.access_token as string;
+          const expiryIso = new Date(Date.now() + (tData.expires_in ?? 3600) * 1000).toISOString();
 
-          // Persist updated token and expiry
+          await setEmailCredential(
+            supabase,
+            {
+              account_id:  account.id,
+              purpose:     "oauth_access_token",
+              value:       accessToken,
+              tenant_id:   account.tenant_id ?? null,
+              expires_at:  expiryIso,
+            },
+            logger,
+          );
+          // Microsoft may roll the refresh token on the v2 endpoint —
+          // capture the new one when it differs from what we sent in.
+          if (tData.refresh_token && tData.refresh_token !== refreshToken) {
+            await setEmailCredential(
+              supabase,
+              {
+                account_id:  account.id,
+                purpose:     "oauth_refresh_token",
+                value:       tData.refresh_token,
+                tenant_id:   account.tenant_id ?? null,
+              },
+              logger,
+            );
+          }
           await supabase
             .from("email_accounts")
-            .update({
-              access_token: accessToken,
-              token_expires_at: new Date(Date.now() + (tData.expires_in ?? 3600) * 1000).toISOString(),
-            })
+            .update({ token_expires_at: expiryIso })
             .eq("id", account.id);
 
           return { accessToken };

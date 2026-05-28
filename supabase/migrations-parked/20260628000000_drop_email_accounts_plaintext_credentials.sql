@@ -56,7 +56,29 @@
 --       tries `account.imap_password` is a type error, not a silent
 --       undefined.
 --
--- Once 1–6 are checked, `git mv` this file into
+-- 7. ✓  POP3 dead branch in sync-emails/index.ts (~line 865+,
+--       `else if (account.provider === "pop3")`). Reads
+--       `account.pop3_password` directly. Prod has zero pop3 accounts
+--       per [[phase1-implementation-state]], the credential RPC
+--       validator doesn't accept 'pop3_password' as a purpose, and the
+--       parked DROP removes the column. Pick one before unparking:
+--         (a) delete the dead branch outright, OR
+--         (b) extend the RPC + core.secrets purpose CHECK to allow
+--             'pop3_password' and wire it through getEmailCredential.
+--       (a) is the recommended path given zero live users.
+--
+-- 8. ✓  In-memory `account.access_token` mutations in
+--       sync-emails-v2/services/gmail.ts (~lines 54, 122, 130, 138, 177)
+--       and sync-emails/index.ts (~lines 547, 619, 656+) write the
+--       freshly-resolved vault value back onto the account object so
+--       downstream `Authorization: Bearer ${account.access_token}`
+--       fetches use it without re-querying vault. After this DROP, the
+--       TS type loses access_token (per gates 5 + 6) and those
+--       assignments + reads are type errors. Refactor to a local
+--       variable (e.g. `let accessToken = …; …Authorization: Bearer
+--       ${accessToken}`) in the same PR that unparks.
+--
+-- Once 1–8 are checked, `git mv` this file into
 -- `supabase/migrations/`, keeping the timestamp prefix (it's late enough
 -- to sort after every migration that landed since), apply to local
 -- (`npx supabase migration up`), and then apply to prod via MCP.
