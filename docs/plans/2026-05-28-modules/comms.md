@@ -167,14 +167,22 @@ comms.message_attachments_link (
   id, message_id, file_id REFERENCES core.files(id), filename, inline_cid text
 )
 
--- Templates (multi-channel)
+-- Templates (multi-channel) + versioned content (per comms-infrastructure.md §4.5)
 comms.templates (
   id, tenant_id, name, channel_kind text,
-  subject_template text, body_template text,
-  variables jsonb,                                                    -- {required:[party_name,…]}
+  current_version_id uuid REFERENCES comms.template_versions(id),    -- the pointer; mutable
+  variables_schema jsonb,                                              -- {required:[party_name,…]}, declared once
   language text DEFAULT 'en',
   is_active boolean, created_at, updated_at
 )
+comms.template_versions (
+  id, tenant_id, template_id, version_number int,
+  subject_template text, body_template text,                          -- Handlebars source; auto-escape HTML
+  variables_schema jsonb,
+  created_at, created_by, active_at, deprecated_at
+)
+-- Sent messages reference template_version_id (immutable) — never template_id directly.
+-- This keeps the audit trail reproducible even if the template is edited later.
 
 -- Inbound filters / routing
 comms.inbound_filters (
@@ -217,10 +225,37 @@ comms.sync_runs (
 -- Deliveries (per-notification per-channel; the link to core.notifications)
 comms.deliveries (
   id, tenant_id, notification_id REFERENCES core.notifications(id),
-  channel_kind text, recipient_address text,
-  status text,                                                        -- 'pending','sent','delivered','failed','suppressed'
-  sent_at, delivered_at, failed_at, error_text,
-  related_message_id uuid REFERENCES comms.messages(id)
+  channel_kind text, provider text, provider_message_id text,
+  recipient_address text,
+  status text,                                                        -- 'pending','sent','delivered','failed','suppressed','bounced','complained'
+  bounce_kind text,                                                    -- 'hard','soft' (when status='bounced')
+  sent_at, delivered_at, failed_at, bounced_at, complained_at, opened_at, clicked_at,
+  error_text,
+  related_message_id uuid REFERENCES comms.messages(id),
+  created_at, updated_at
+)
+comms.delivery_events (
+  -- Per-event log per delivery (one row per webhook event from a provider).
+  -- deliveries holds the latest aggregated status; delivery_events is the history.
+  id, tenant_id, delivery_id REFERENCES comms.deliveries(id),
+  event_type text,                                                     -- 'sent','delivered','bounced','complained','opened','clicked','delivery_delayed','failed'
+  provider_event_id text,                                              -- de-dup key from provider
+  payload jsonb,                                                       -- raw provider payload
+  occurred_at timestamptz,
+  ingested_at timestamptz
+)
+
+-- Suppression list (per comms-infrastructure.md §4.6) — checked before EVERY outbound
+comms.suppressions (
+  id, tenant_id,
+  address text NOT NULL,                                               -- email | phone | push_token
+  channel_kind text NOT NULL,
+  reason text,                                                         -- 'bounce_hard','complaint','unsubscribe','manual','invalid_format'
+  source_event_id uuid REFERENCES comms.delivery_events(id),
+  added_at timestamptz, expires_at timestamptz,
+  added_by_user_id uuid,
+  notes text,
+  UNIQUE (tenant_id, channel_kind, address)
 )
 ```
 
@@ -373,14 +408,18 @@ All routed through `packages/llm-client` → `core.llm_usage`.
 
 Done when:
 
-- [ ] `comms` schema exists with ~12 tables from §3.
+- [ ] `comms` schema exists with ~15 tables from §3 (12 original + `template_versions`, `delivery_events`, `suppressions`).
 - [ ] `services/comms-api/` exists; hosts inbound fetchers, outbound worker, `core.notifications` → `comms.deliveries` dispatcher, OAuth callbacks.
 - [ ] `EmailInbox.tsx` split per §6; no file > 300 LOC.
 - [ ] All `public.email_*`, `public.notifications`, `public.vendor_notifications` dropped (after 30-day window).
 - [ ] `core.notifications` inserts trigger exactly one `comms.deliveries` row per channel-preference per recipient.
 - [ ] At least 3 cross-module event chains tested end-to-end: `quotation.quote.sent` → email; `finance.invoice.overdue` → dunning email; `logistics.shipment.exception` → multi-channel notify.
 - [ ] At least 3 of §7 LLM features shipped (recommend #1 inbound classification, #2 reply drafting, #4 thread summarisation).
-- [ ] DKIM/SPF/DMARC health visible in `/dashboard/comms/settings/domains`.
+- [ ] DKIM/SPF/DMARC health visible in `/dashboard/comms/settings/domains`; daily re-check cron alerts on degradation per [`comms-infrastructure.md §4.8`](./comms-infrastructure.md).
 - [ ] Per-tenant suppression list works; respects `crm.do_not_contact.set` events.
+- [ ] Resend webhook receiver writes to `comms.delivery_events`; hard bounces + complaints auto-add to `comms.suppressions` per [`comms-infrastructure.md §4.3`](./comms-infrastructure.md).
+- [ ] Every outbound email carries `List-Unsubscribe` + `List-Unsubscribe-Post: List-Unsubscribe=One-Click` per RFC 8058; one-click unsubscribe page works.
+- [ ] CI lint forbids direct provider SDK imports (`resend`, `nodemailer`, `@twilio/*`, `firebase-admin`, etc.) outside `services/comms-api/src/providers/` — mirrors the LLM-SDK lint.
+- [ ] Sent messages reference `template_version_id` (immutable), not `template_id` (mutable). Audit trail reproducible.
 
 ---

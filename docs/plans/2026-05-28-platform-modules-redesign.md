@@ -1183,9 +1183,16 @@ Lift cross-cutting infra into `core.*` *without* moving party data yet.
 | `core.secrets` | New; provider creds, oauth tokens, integration credentials move here | Medium — security-critical |
 | `core.notifications` | New table; no producers yet | Low |
 | `core.files` + `core.file_links` | New tables; no producers yet | Low |
+| `comms.suppressions` | **Slice C extension** — fast-tracked from Phase 6 per [`comms-infrastructure.md §5`](../2026-05-28-modules/comms-infrastructure.md). DPDP/GDPR/CAN-SPAM compliance gate. | Low |
+| `comms.deliveries` + `comms.delivery_events` (minimal) | **Slice C extension** — receives Resend webhook payloads. Phase 6 extends with full schema. | Low |
+| `comms-webhook-resend` edge function | **Slice C extension** — Svix-signed Resend webhook receiver. Hard bounces + complaints auto-write `comms.suppressions`. Closes G-CR-2 from comms-infrastructure audit. | Medium — security-critical (verify signatures correctly) |
+| `email_accounts` plaintext credentials migrated to `core.secrets` | **Slice C extension** — closes G-CR-1 (plaintext OAuth tokens + SMTP/IMAP passwords). | Medium — security-critical migration |
+| `List-Unsubscribe` headers + unsubscribe edge function | **Slice C extension** — RFC 8058 compliance for bulk senders. Closes G-CR-3. | Low |
 | **Drop `platform.*` schema** | After all lifts complete, integration tables routed to UIM (Phase 7) | Low |
 
-**Gating exit criteria**: every existing audit-event write also lands in `core.audit_log` (shadow); `platform.*` is empty.
+**Gating exit criteria**: every existing audit-event write also lands in `core.audit_log` (shadow); `platform.*` is empty; the three CRITICAL items from [`comms-infrastructure.md §3`](../2026-05-28-modules/comms-infrastructure.md) (plaintext secrets, no bounce ingestion, no suppression list) are resolved.
+
+**Why the comms items are in Phase 1 not Phase 6:** the original plan put all comms work in Phase 6. The comms-infrastructure audit surfaced three security/compliance issues that cannot wait — they're customer-credential exposure + regulatory exposure today, not future risk. The minimum-viable infra to close them (`core.secrets`, `comms.suppressions`, webhook receiver, unsubscribe flow) is small enough to ship now; the full `services/comms-api/` greenfield still happens in Phase 6.
 
 #### Phase 2 — Identity & parties (Weeks 6–16) — *the long pole*
 
@@ -1489,6 +1496,8 @@ If items 1–10 are complete in **4 weeks**, the project is on track for the 12-
 ## §8 — Production-readiness cross-cutting concerns
 
 The 12-module redesign is necessary but not sufficient for "production-ready". Six platform-wide concerns must be designed at the same depth as the modules. Each subsection states the current state, the target contract, and what every module must do to comply.
+
+**See also: [`comms-infrastructure.md`](../2026-05-28-modules/comms-infrastructure.md)** — companion to `comms.md` covering email/messaging/notification *delivery infrastructure* (providers, queues, webhooks, deliverability, domain auth, suppression). Three critical issues there (plaintext credentials, no bounce ingestion, no suppression list) fast-track into Phase 1 Slice C alongside `core.secrets`. The observability and DR/backup concerns below intersect with comms-infra deliverability monitoring.
 
 ### 8.1 Observability — tracing, logging, metrics, SLOs
 
