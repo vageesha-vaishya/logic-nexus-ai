@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
 import { Loader2 } from 'lucide-react';
@@ -5,6 +6,7 @@ import { PLATFORM_ADMIN_ROLE, type AppRole, type Permission } from '@/config/per
 import { logger } from '@/lib/logger';
 import { useDomain } from '@/contexts/DomainContext';
 import { useModuleAccess } from '@/hooks/useModuleAccess';
+import { useCoreDomainAccess, useCoreModuleAccess } from '@/hooks/useCoreAccess';
 import {
   AddDomainPrompt,
   RequestAccessPrompt,
@@ -29,6 +31,16 @@ interface ProtectedRouteProps {
   moduleCode?: string;
   /** Optional human-readable label for the module (used in remedy copy). */
   moduleLabel?: string;
+  /**
+   * Phase 1 Slice E Part 2 — the new unified module gate per master
+   * design §8.2.2. When set, ProtectedRoute calls
+   * `core.has_module_access(tenant, code, action)` and enforces the
+   * boolean directly. Use this on NEW routes; legacy props remain for
+   * existing ones until tenant_module_access is populated and the
+   * shadow-mode parity check (logged below) shows agreement.
+   */
+  requiredModule?: string;
+  requiredAction?: 'read' | 'write' | 'delete';
 }
 
 export function ProtectedRoute({
@@ -40,6 +52,8 @@ export function ProtectedRoute({
   requiredDomainCode,
   moduleCode,
   moduleLabel,
+  requiredModule,
+  requiredAction = 'read',
 }: ProtectedRouteProps) {
   const { user, loading, hasRole, hasPermission, isPlatformAdmin } = useAuth();
   const { isLoading: loadingDomains, availableDomains } = useDomain();
@@ -168,6 +182,57 @@ export function ProtectedRoute({
         />
       );
     }
+    // Phase 1 Slice E Part 2 — shadow parity log via a sub-component so
+    // the useQuery only runs when requiredDomainCode is set (legacy
+    // callers without QueryClientProvider in tests stay unaffected).
+    return (
+      <DomainShadowParity
+        requiredDomainCode={normalizedRequiredDomainCode}
+        localAllowed={true}
+      >
+        {requiredModule ? (
+          <RequiredModuleGate
+            requiredModule={requiredModule}
+            requiredAction={requiredAction}
+            moduleLabel={moduleLabel}
+          >
+            {moduleCode ? (
+              <ModuleAccessGate moduleCode={moduleCode} moduleLabel={moduleLabel}>
+                {children}
+              </ModuleAccessGate>
+            ) : (
+              children
+            )}
+          </RequiredModuleGate>
+        ) : moduleCode ? (
+          <ModuleAccessGate moduleCode={moduleCode} moduleLabel={moduleLabel}>
+            {children}
+          </ModuleAccessGate>
+        ) : (
+          children
+        )}
+      </DomainShadowParity>
+    );
+  }
+
+  // Phase 1 Slice E Part 2 — `requiredModule` is the new unified gate
+  // (master design §8.2.2). Enforced via core.has_module_access.
+  if (requiredModule) {
+    return (
+      <RequiredModuleGate
+        requiredModule={requiredModule}
+        requiredAction={requiredAction}
+        moduleLabel={moduleLabel}
+      >
+        {moduleCode ? (
+          <ModuleAccessGate moduleCode={moduleCode} moduleLabel={moduleLabel}>
+            {children}
+          </ModuleAccessGate>
+        ) : (
+          children
+        )}
+      </RequiredModuleGate>
+    );
   }
 
   // MV-4 — moduleCode-driven access check + smart remedy pages.
@@ -188,6 +253,93 @@ export function ProtectedRoute({
   return <>{children}</>;
 }
 
+/**
+ * Phase 1 Slice E Part 2 — runs `core.user_has_domain_access` as a
+ * shadow check next to the legacy `availableDomains` decision. Only
+ * mounts when ProtectedRoute determined `requiredDomainCode` allowed
+ * via the legacy path, so the comparison is meaningful (both sides
+ * answered yes/no for the same user). Logs parity drift; does not
+ * affect rendering.
+ */
+function DomainShadowParity({
+  requiredDomainCode,
+  localAllowed,
+  children,
+}: {
+  requiredDomainCode: string;
+  localAllowed:       boolean;
+  children:           React.ReactNode;
+}) {
+  const { user } = useAuth();
+  const location = useLocation();
+  const core     = useCoreDomainAccess(requiredDomainCode);
+
+  useEffect(() => {
+    if (core.allowed === null) return;
+    if (core.allowed !== localAllowed) {
+      logger.warn(
+        'ProtectedRoute domain-gate parity drift (Slice E shadow mode)',
+        {
+          userId:    user?.id,
+          path:      location.pathname,
+          requiredDomainCode,
+          localAllowed,
+          coreAllowed: core.allowed,
+          component: 'ProtectedRoute',
+        },
+      );
+    }
+  }, [core.allowed, localAllowed, requiredDomainCode, user?.id, location.pathname]);
+
+  return <>{children}</>;
+}
+
+/**
+ * Phase 1 Slice E Part 2 — enforces the new `requiredModule` gate via
+ * `core.has_module_access`. Platform admins bypass. On deny we render
+ * the same RequestAccessPrompt the legacy moduleCode path uses for the
+ * 'role' reason — closest match until we expand the helper to return
+ * a reason code.
+ */
+function RequiredModuleGate({
+  requiredModule,
+  requiredAction,
+  moduleLabel,
+  children,
+}: {
+  requiredModule: string;
+  requiredAction: 'read' | 'write' | 'delete';
+  moduleLabel?:   string;
+  children:       React.ReactNode;
+}) {
+  const { user, isPlatformAdmin } = useAuth();
+  const location = useLocation();
+  const core     = useCoreModuleAccess(requiredModule, requiredAction);
+
+  if (isPlatformAdmin()) return <>{children}</>;
+  if (core.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+  if (core.allowed === false) {
+    logger.warn(
+      'ProtectedRoute denied requiredModule via core.has_module_access',
+      {
+        userId:    user?.id,
+        path:      location.pathname,
+        requiredModule,
+        requiredAction,
+        component: 'ProtectedRoute',
+      },
+    );
+    return <RequestAccessPrompt moduleLabel={moduleLabel ?? requiredModule} />;
+  }
+  return <>{children}</>;
+}
+
 interface ModuleAccessGateProps {
   moduleCode:   string;
   moduleLabel?: string;
@@ -198,6 +350,33 @@ function ModuleAccessGate({ moduleCode, moduleLabel, children }: ModuleAccessGat
   const { user } = useAuth();
   const location = useLocation();
   const moduleAccess = useModuleAccess(moduleCode);
+
+  // Phase 1 Slice E Part 2 — shadow-mode parity log against
+  // core.has_module_access. Runs alongside the legacy resolver; logs
+  // disagreement when both sides have a definite answer. Enforcement
+  // still rides on the legacy resolver.
+  const core = useCoreModuleAccess(moduleCode, 'read');
+  useEffect(() => {
+    const localAllowed = moduleAccess.access?.allowed;
+    if (
+      typeof localAllowed === 'boolean' &&
+      typeof core.allowed === 'boolean' &&
+      localAllowed !== core.allowed
+    ) {
+      logger.warn(
+        'ProtectedRoute module-gate parity drift (Slice E shadow mode)',
+        {
+          userId:    user?.id,
+          path:      location.pathname,
+          moduleCode,
+          localAllowed,
+          coreAllowed: core.allowed,
+          reason:    moduleAccess.access?.reason ?? null,
+          component: 'ProtectedRoute',
+        },
+      );
+    }
+  }, [moduleAccess.access, core.allowed, moduleCode, user?.id, location.pathname]);
 
   if (moduleAccess.loading) {
     return (

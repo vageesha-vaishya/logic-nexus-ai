@@ -9,6 +9,14 @@ import * as domainContext from '@/contexts/DomainContext';
 vi.mock('@/hooks/useAuth');
 vi.mock('@/contexts/DomainContext');
 
+// Phase 1 Slice E Part 2 — DomainShadowParity calls useQuery, which
+// needs a QueryClientProvider in the test tree. Mock the helper so
+// existing assertions don't need a real RPC round-trip.
+vi.mock('@/hooks/useCoreAccess', () => ({
+  useCoreDomainAccess: () => ({ loading: false, allowed: null }),
+  useCoreModuleAccess: () => ({ loading: false, allowed: null }),
+}));
+
 describe('ProtectedRoute', () => {
   beforeEach(() => {
     vi.clearAllMocks();
