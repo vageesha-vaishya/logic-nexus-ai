@@ -160,7 +160,7 @@ async function applyUnsubscribe(args: {
   });
 
   // Upsert ignoring duplicates — the recipient may click the link more than once.
-  await admin
+  const { error } = await admin
     .from("suppressions")
     .upsert(
       {
@@ -173,6 +173,10 @@ async function applyUnsubscribe(args: {
       },
       { onConflict: "tenant_id,channel_kind,address", ignoreDuplicates: true },
     );
+  if (error) {
+    // Surface the error so callers (and the smoke-test) don't see a false 200.
+    throw new Error(`comms.suppressions upsert failed: ${error.message} (code=${error.code})`);
+  }
 }
 
 async function handleRequest(req: Request): Promise<Response> {
