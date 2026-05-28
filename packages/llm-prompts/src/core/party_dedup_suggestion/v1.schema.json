@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/llm-prompts/core.party.dedup_suggestion.v1.json",
+  "title": "core.party.dedup_suggestion output v1",
+  "type": "object",
+  "required": ["verdict", "confidence", "reasoning"],
+  "additionalProperties": false,
+  "properties": {
+    "verdict": { "type": "string", "enum": ["no_match", "likely_match", "needs_review"] },
+    "match_party_id": { "type": ["string", "null"] },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "reasoning": { "type": "string", "minLength": 1 },
+    "match_signals": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}

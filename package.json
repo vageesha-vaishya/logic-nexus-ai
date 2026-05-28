@@ -21,6 +21,8 @@
     "lint:remark": "remark . --frail",
     "lint:domain-manifests": "node scripts/lint-domain-manifests.mjs",
     "lint:llm-imports": "node scripts/lint-llm-imports.mjs",
+    "db-types:generate:core": "npm exec -- supabase gen types typescript --project-id ${VITE_SUPABASE_PROJECT_ID} --schema core > packages/db-types-core/src/database.ts",
+    "db-types:generate:all": "npm run supabase:types:gen && npm run db-types:generate:core",
     "lint:remark:fix": "remark . -o",
     "test": "vitest run",
     "test:ci": "vitest run --reporter=dot --bail=1 --test-timeout=30000",
