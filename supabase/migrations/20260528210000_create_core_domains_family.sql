@@ -24,7 +24,12 @@
 
 CREATE TABLE core.domains (
   id                  uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  code                text NOT NULL UNIQUE,                          -- 'AMRO', 'MARKETS', 'LOGISTICS' (matches requiredDomainCode)
+  -- Nullable to match public.platform_domains reality — prod has at least one
+  -- row (key='healthcare') where code was never populated. Backfill below
+  -- copies through as-is rather than coalescing so the dual-write trigger can
+  -- keep parity intact. The route-guard cutover (Slice E Part 2) treats a
+  -- NULL code as "not selectable from UI" and continues to gate on key.
+  code                text UNIQUE,                                    -- 'AMRO', 'MARKETS', 'LOGISTICS' (matches requiredDomainCode)
   key                 text UNIQUE,                                    -- machine-friendly alias from later ALTER on platform_domains
   name                text NOT NULL,
   description         text,
