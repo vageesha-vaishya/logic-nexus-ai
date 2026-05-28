@@ -1,0 +1,12 @@
+{
+  "name": "@platform/db-types-core",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Generated TypeScript types for the core.* Postgres schema. Regenerated via supabase:types:gen once core.* tables exist.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

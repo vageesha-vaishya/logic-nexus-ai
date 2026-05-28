@@ -1,0 +1,12 @@
+{
+  "name": "@platform/llm-client",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "The only legal path from any module to any LLM provider. CI lint forbids direct provider SDK imports outside this package.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}

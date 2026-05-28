@@ -1,0 +1,12 @@
+{
+  "name": "@platform/llm-prompts",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Versioned prompt repository: frontmatter parser, prompt loader, fixture runner. Per-module ownership tracked by owner_module frontmatter field.",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  }
+}
