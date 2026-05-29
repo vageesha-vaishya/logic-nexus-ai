@@ -8,24 +8,26 @@ import { ParsedEmail, ParsedAttachment } from "./parser.ts";
 
 export type { SupabaseClient };
 
+// Phase 1 Slice C — vault is now the canonical store for OAuth tokens and
+// SMTP/IMAP/POP3 passwords. The four credential columns were dropped from
+// public.email_accounts by migration
+// 20260529010000_drop_email_accounts_plaintext_credentials.sql, so this
+// interface intentionally has NO {access,refresh}_token / *_password fields.
+// Use core.read_email_account_credential() via getEmailCredential() to fetch
+// the live value.
 export interface EmailAccount {
   id: string;
   email_address: string;
   provider: string;
-  password?: string; // Decrypted password for IMAP/POP3
   imap_host?: string;
   imap_port?: number;
   imap_username?: string;
-  imap_password?: string;
   imap_use_ssl?: boolean;
   pop3_host?: string;
   pop3_port?: number;
   pop3_username?: string;
-  pop3_password?: string;
   pop3_use_ssl?: boolean;
   pop3_delete_policy?: string;
-  access_token?: string;
-  refresh_token?: string;
   token_expires_at?: string;
   user_id: string;
   tenant_id?: string;

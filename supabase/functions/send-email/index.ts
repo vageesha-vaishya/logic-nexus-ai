@@ -206,7 +206,7 @@ export class GmailProvider extends EmailProvider {
     // plaintext column during the transition window).
     let accessToken = await getEmailCredential(
       supabase,
-      { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
+      { account_id: account.id, purpose: "oauth_access_token" },
       this.config.logger,
     );
     if (!accessToken) {
@@ -218,7 +218,7 @@ export class GmailProvider extends EmailProvider {
       await this.config.logger.info("Refreshing Gmail token...");
       const refreshToken = await getEmailCredential(
         supabase,
-        { account_id: account.id, purpose: "oauth_refresh_token", fallback: account.refresh_token ?? null },
+        { account_id: account.id, purpose: "oauth_refresh_token" },
         this.config.logger,
       );
       if (!refreshToken) throw new Error("Gmail token expired and no refresh token.");
@@ -395,7 +395,7 @@ export class SMTPProvider extends EmailProvider {
     // Phase 1 Slice C — vault read with column fallback during transition.
     const smtpPassword = await getEmailCredential(
       supabase,
-      { account_id: account.id, purpose: "smtp_password", fallback: account.smtp_password ?? null },
+      { account_id: account.id, purpose: "smtp_password" },
       this.config.logger,
     );
     if (!account.smtp_host || !account.smtp_username || !smtpPassword) {
@@ -466,7 +466,7 @@ export class Office365Provider extends EmailProvider {
     // provider rewrite in the same file.
     let accessToken = await getEmailCredential(
       supabase,
-      { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
+      { account_id: account.id, purpose: "oauth_access_token" },
       this.config.logger,
     );
     if (!accessToken) throw new Error("Office 365 account not connected.");
@@ -475,7 +475,7 @@ export class Office365Provider extends EmailProvider {
       await this.config.logger.info("Refreshing Office 365 token...");
       const refreshToken = await getEmailCredential(
         supabase,
-        { account_id: account.id, purpose: "oauth_refresh_token", fallback: account.refresh_token ?? null },
+        { account_id: account.id, purpose: "oauth_refresh_token" },
         this.config.logger,
       );
       if (!refreshToken) throw new Error("Office 365 token expired and no refresh token.");

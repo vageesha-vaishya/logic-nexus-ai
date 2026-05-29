@@ -20,13 +20,12 @@ interface EmailAccount {
   is_active: boolean;
   last_sync_at: string;
   created_at: string;
-  // Phase 1 Slice C — access_token column NULLed by migration 20260528260000
-  // and dropped in supabase/migrations-parked/20260628000000. UI now derives
-  // "is OAuth-connected" from the connectedAccountIds set populated by
-  // core.my_oauth_connected_email_accounts(). Field kept in the type until
-  // the DROP lands so existing local code still compiles.
-  access_token: string | null;
   user_id: string;
+  // Phase 1 Slice C — access_token / refresh_token / smtp_password /
+  // imap_password / pop3_password columns were dropped from
+  // public.email_accounts by migration 20260529010000. The UI derives
+  // "is OAuth-connected" from connectedAccountIds, populated by
+  // core.my_oauth_connected_email_accounts() — never from the row itself.
 }
 
 export function EmailAccounts() {

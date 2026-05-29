@@ -169,7 +169,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       // Phase 1 Slice C — vault read with column fallback during transition.
       const imapPassword = await getEmailCredential(
         supabase,
-        { account_id: account.id, purpose: "imap_password", fallback: account.imap_password ?? null },
+        { account_id: account.id, purpose: "imap_password" },
         logger,
       );
       const imapConfig = {
@@ -543,7 +543,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       // valid even after access_token leaves the EmailAccount type.
       let currentAccessToken: string | undefined = (await getEmailCredential(
         supabase,
-        { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
+        { account_id: account.id, purpose: "oauth_access_token" },
         logger,
       )) ?? undefined;
 
@@ -552,7 +552,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         try {
           const refreshToken = await getEmailCredential(
             supabase,
-            { account_id: account.id, purpose: "oauth_refresh_token", fallback: account.refresh_token ?? null },
+            { account_id: account.id, purpose: "oauth_refresh_token" },
             logger,
           );
           if (!refreshToken) {
@@ -889,7 +889,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       // variable (gate #8) so this branch compiles after the column DROP.
       let officeToken: string | undefined = (await getEmailCredential(
         supabase,
-        { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
+        { account_id: account.id, purpose: "oauth_access_token" },
         logger,
       )) ?? undefined;
 
@@ -897,7 +897,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         try {
           const refreshToken = await getEmailCredential(
             supabase,
-            { account_id: account.id, purpose: "oauth_refresh_token", fallback: account.refresh_token ?? null },
+            { account_id: account.id, purpose: "oauth_refresh_token" },
             logger,
           );
           if (!refreshToken) {

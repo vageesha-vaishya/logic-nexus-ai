@@ -19,13 +19,13 @@ export class ImapService {
   }
 
   async syncEmails(forceFullSync: boolean = false): Promise<{ syncedCount: number, debug?: any }> {
-    // Phase 1 Slice C — vault read with column fallback during transition.
+    // Phase 1 Slice C — imap_password lives in vault now. Plaintext column
+    // was dropped 2026-05-29 by migration 20260529010000.
     const imapPassword = await getEmailCredential(
       this.adminSupabase ?? this.supabase,
       {
         account_id: (this.account as any).id,
         purpose:    "imap_password",
-        fallback:   this.account.imap_password || (this.account as any).password || null,
       },
       this.logger,
     );

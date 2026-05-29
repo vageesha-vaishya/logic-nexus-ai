@@ -54,7 +54,6 @@ export class GmailService {
       {
         account_id: this.account.id,
         purpose:    "oauth_access_token",
-        fallback:   this.account.access_token ?? null,
       },
       this.logger,
     );
@@ -84,7 +83,6 @@ export class GmailService {
       {
         account_id: this.account.id,
         purpose:    "oauth_refresh_token",
-        fallback:   this.account.refresh_token ?? null,
       },
       this.logger,
     );
