@@ -142,6 +142,8 @@ export const APP_MENU: MenuModule[] = [
     label: 'Finance',
     items: [
       { name: 'Invoices', path: '/dashboard/finance/invoices', icon: FileText, description: 'Manage invoices', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
+      { name: 'Commissions', path: '/dashboard/finance/commissions', icon: Wallet, description: 'Review computed commissions; approve, pay, or cancel' },
+      { name: 'Commission Rules', path: '/dashboard/finance/commission-rules', icon: Calculator, description: 'Configure per-tenant commission rates' },
       { name: 'Margin Rules', path: '/dashboard/finance/margin-rules', icon: TrendingUp, description: 'Dynamic pricing rules', roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Tax Jurisdictions', path: '/dashboard/finance/tax-jurisdictions', icon: Landmark, description: 'Manage tax jurisdictions', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
     ],
