@@ -43,6 +43,23 @@ export default tseslint.config(
       "@typescript-eslint/ban-ts-comment": ["error", { "ts-ignore": "allow-with-description" }],
       // P5 — log discipline: use logger from @/lib/logger, never raw console
       "no-console": "error",
+      // Phase 2 Step 7 — ban direct reads of the legacy public.accounts /
+      // public.contacts tables. The cutover to public.v_accounts /
+      // public.v_contacts shipped 2026-05-29 (commits d9378420 + 57fda103);
+      // dual-write triggers keep core.parties in sync. Direct reads of the
+      // legacy tables defeat the cutover and bind callers to schema slated
+      // for removal in Step 9. Use .from('v_accounts') / .from('v_contacts')
+      // instead. RLS-regression tests are exempted in the override below.
+      "no-restricted-syntax": ["error",
+        {
+          "selector": "CallExpression[callee.type='MemberExpression'][callee.property.name='from'][arguments.0.type='Literal'][arguments.0.value='accounts']",
+          "message": "Phase 2 Step 7: use .from('v_accounts') instead of .from('accounts'). The public.accounts table is being dropped in Step 9; reads should go through public.v_accounts which sources identity from core.parties."
+        },
+        {
+          "selector": "CallExpression[callee.type='MemberExpression'][callee.property.name='from'][arguments.0.type='Literal'][arguments.0.value='contacts']",
+          "message": "Phase 2 Step 7: use .from('v_contacts') instead of .from('contacts'). The public.contacts table is being dropped in Step 9; reads should go through public.v_contacts which sources identity from core.parties."
+        }
+      ],
     },
     settings: {},
   },
@@ -102,6 +119,20 @@ export default tseslint.config(
       "**/*.stories.tsx",
     ],
     rules: { "no-console": "off" },
+  },
+  {
+    // Phase 2 Step 7 exemption — RLS-regression and access tests assert
+    // behaviour on the underlying public.accounts / public.contacts tables,
+    // not on the v_* views. The accounts/contacts string-literal bans
+    // (no-restricted-syntax above) are off for tests.
+    files: [
+      "**/*.test.ts",
+      "**/*.test.tsx",
+      "**/*.spec.ts",
+      "**/*.spec.tsx",
+      "**/__tests__/**",
+    ],
+    rules: { "no-restricted-syntax": "off" },
   },
   {
     // Console output is the legitimate API in scripts, edge functions, build
