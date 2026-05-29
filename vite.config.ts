@@ -50,6 +50,7 @@ function createServiceProxy(definition: ProxyServiceDefinition) {
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const crmApiProxyTarget = process.env.VITE_CRM_API_PROXY_TARGET || env.VITE_CRM_API_PROXY_TARGET || 'http://localhost:3011';
+  const salesApiProxyTarget = process.env.VITE_SALES_API_PROXY_TARGET || env.VITE_SALES_API_PROXY_TARGET || 'http://localhost:3201';
   const amroApiProxyTarget = process.env.VITE_AMRO_API_PROXY_TARGET || env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
   const uimApiProxyTarget = process.env.VITE_UIM_API_PROXY_TARGET || env.VITE_UIM_API_PROXY_TARGET || 'http://localhost:3000';
   const tenantBrandingProxyTarget =
@@ -63,6 +64,13 @@ export default defineConfig(({ mode }) => {
     startCommand: 'cd services/crm-api && npm run dev',
     target: crmApiProxyTarget,
     targetEnvVar: 'VITE_CRM_API_PROXY_TARGET',
+    healthPathHint: '/health',
+  });
+  const salesProxy = createServiceProxy({
+    serviceName: 'Sales API',
+    startCommand: 'cd services/sales-api && npm run dev',
+    target: salesApiProxyTarget,
+    targetEnvVar: 'VITE_SALES_API_PROXY_TARGET',
     healthPathHint: '/health',
   });
   const amroProxy = createServiceProxy({
@@ -693,7 +701,12 @@ export default defineConfig(({ mode }) => {
       "Cross-Origin-Resource-Policy":    "same-site",
     },
     proxy: {
+      // Phase 4 Sales Step 4: lifted leads endpoints go to sales-api. Order
+      // matters — Vite picks the first matching prefix, so this entry must
+      // sit before '/api/crm' for the override to win.
+      '/api/crm/v1/leads': salesProxy,
       '/api/crm': crmProxy,
+      '/api/sales': salesProxy,
       '/api/markets-worker': {
         ...marketsWorkerProxy,
         rewrite: (path: string) => path.replace(/^\/api\/markets-worker/, ''),
@@ -730,7 +743,10 @@ export default defineConfig(({ mode }) => {
     port: 4173,
     strictPort: true,
     proxy: {
+      // Phase 4 Sales Step 4: lifted leads endpoints go to sales-api.
+      '/api/crm/v1/leads': salesProxy,
       '/api/crm': crmProxy,
+      '/api/sales': salesProxy,
       '/api/markets-worker': {
         ...marketsWorkerProxy,
         rewrite: (path: string) => path.replace(/^\/api\/markets-worker/, ''),

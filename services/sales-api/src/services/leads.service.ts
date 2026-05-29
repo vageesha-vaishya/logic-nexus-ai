@@ -1,5 +1,10 @@
+// Phase 4 Sales Step 4 — lifted from services/crm-api/src/services/leads.service.ts.
+// Reads/writes still target public.leads on Supabase because that table is
+// authoritative-for-writes until Phase 2 Step 9 unparks; the sales.leads
+// mirror stays current via the dual-write trigger installed in
+// supabase/migrations/20260529110000.
 import { createClient } from '@supabase/supabase-js';
-import { CreateLeadRequest, LeadRecord, UpdateLeadRequest } from '../types/crm.types.js';
+import { CreateLeadRequest, LeadRecord, UpdateLeadRequest } from '../types/sales.types.js';
 
 export class LeadsService {
   private getClient() {

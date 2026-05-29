@@ -3,7 +3,9 @@ import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
-import leadsRoutes from './routes/leads.routes.js';
+// Phase 4 Sales Step 4: leads.routes.ts + leads.service.ts lifted to
+// services/sales-api/. The vite proxy directs /api/crm/v1/leads to
+// sales-api now; invoices + tax remain here.
 import invoicesRoutes from './routes/invoices.routes.js';
 import taxRoutes from './routes/tax.routes.js';
 import { ErrorResponse } from './types/crm.types.js';
@@ -88,7 +90,7 @@ function auditApiRequest(req: Request, res: Response, next: NextFunction): void 
   next();
 }
 
-app.use('/api', authMiddleware, auditApiRequest, leadsRoutes, invoicesRoutes, taxRoutes);
+app.use('/api', authMiddleware, auditApiRequest, invoicesRoutes, taxRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
