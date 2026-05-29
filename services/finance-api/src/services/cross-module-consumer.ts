@@ -149,7 +149,18 @@ export class CrossModuleConsumer {
   private async handleOpportunityWon(event: OutboxEvent): Promise<void> {
     const payload = event.payload as unknown as OpportunityPayload;
     const baseAmount = numberOrNull(payload.expected_revenue) ?? numberOrNull(payload.amount) ?? 0;
-    const commissionAmount = round2(baseAmount * (COMMISSION_RATE_PERCENT / 100));
+
+    // Resolve commission rate via the per-tenant rules table. The
+    // resolver returns NULL when no rule matches; fall back to env
+    // default (FINANCE_COMMISSION_RATE_PERCENT, 5%).
+    const { rate: ruleRate, ruleId } = await this.resolveCommissionRate(
+      event.tenant_id,
+      payload.owner_id ?? null,
+      payload.account_id ?? null,
+      event.occurred_at,
+    );
+    const ratePercent = ruleRate ?? COMMISSION_RATE_PERCENT;
+    const commissionAmount = round2(baseAmount * (ratePercent / 100));
 
     const { error } = await this.supabase
       .schema('finance')
@@ -160,17 +171,19 @@ export class CrossModuleConsumer {
         account_id: payload.account_id ?? null,
         owner_id: payload.owner_id ?? null,
         amount_base: baseAmount,
-        rate_percent: COMMISSION_RATE_PERCENT,
+        rate_percent: ratePercent,
         amount: commissionAmount,
         currency: payload.currency || 'INR',
         status: 'pending',
         source_outbox_id: event.id,
+        commission_rule_id: ruleId,
         metadata: {
           opportunity_name: payload.name ?? null,
           close_date: payload.close_date ?? null,
           contact_id: payload.contact_id ?? null,
           lead_id: payload.lead_id ?? null,
           computed_by: 'finance-api.cross-module-consumer',
+          rate_source: ruleRate !== null ? 'commission_rule' : 'env_default',
         },
       });
 
@@ -189,8 +202,65 @@ export class CrossModuleConsumer {
     logger.info('commission created', {
       opportunityId: payload.opportunity_id,
       amount: commissionAmount,
-      ratePercent: COMMISSION_RATE_PERCENT,
+      ratePercent,
+      ruleId,
     });
+  }
+
+  // Picks the best-matching active rule from finance.commission_rules.
+  // Returns the rate + rule id, or {rate: null, ruleId: null} when no rule
+  // matches. Looking up the rate via RPC + the rule id via a follow-up
+  // select keeps the consumer code simple; both calls hit indexed
+  // primary keys so the cost is negligible.
+  private async resolveCommissionRate(
+    tenantId: string,
+    ownerId: string | null,
+    accountId: string | null,
+    occurredAt: string,
+  ): Promise<{ rate: number | null; ruleId: string | null }> {
+    try {
+      const { data: rate, error: rateError } = await this.supabase
+        .schema('finance')
+        .rpc('resolve_commission_rate', {
+          p_tenant_id: tenantId,
+          p_owner_id: ownerId,
+          p_account_id: accountId,
+          p_occurred_at: occurredAt,
+        });
+      if (rateError) {
+        logger.warn('resolve_commission_rate RPC failed; falling back to env default', { error: rateError.message });
+        return { rate: null, ruleId: null };
+      }
+      if (rate === null || rate === undefined) {
+        return { rate: null, ruleId: null };
+      }
+      // Re-query the matching rule's id so we can store the back-link.
+      // Same ORDER BY semantics as the resolver function — keep them in
+      // sync if the resolver tiebreakers change.
+      const { data: ruleRows } = await this.supabase
+        .schema('finance')
+        .from('commission_rules')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .eq('status', 'active')
+        .lte('effective_from', occurredAt)
+        .or(`effective_to.is.null,effective_to.gt.${occurredAt}`)
+        .or(`owner_id.is.null,owner_id.eq.${ownerId ?? '00000000-0000-0000-0000-000000000000'}`)
+        .or(`account_id.is.null,account_id.eq.${accountId ?? '00000000-0000-0000-0000-000000000000'}`)
+        .eq('rate_percent', rate)
+        .order('priority', { ascending: true })
+        .order('effective_from', { ascending: false })
+        .limit(1);
+      return {
+        rate: Number(rate),
+        ruleId: ruleRows && ruleRows.length > 0 ? (ruleRows[0] as { id: string }).id : null,
+      };
+    } catch (err) {
+      logger.warn('resolve_commission_rate threw; falling back to env default', {
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return { rate: null, ruleId: null };
+    }
   }
 
   private async handleShipmentDelivered(event: OutboxEvent): Promise<void> {
