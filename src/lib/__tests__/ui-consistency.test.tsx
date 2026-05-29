@@ -1,22 +1,22 @@
 
 import { render, screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { QuoteResultsList } from '@/components/sales/shared/QuoteResultsList';
-import { QuoteOptionsOverview } from '@/components/sales/composer/QuoteOptionsOverview';
+import { QuoteResultsList } from '@/components/quotation/shared/QuoteResultsList';
+import { QuoteOptionsOverview } from '@/components/quotation/composer/QuoteOptionsOverview';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
-import { useQuoteStore } from '@/components/sales/composer/store/QuoteStore';
+import { useQuoteStore } from '@/components/quotation/composer/store/QuoteStore';
 import { useCRM } from '@/hooks/useCRM';
 
 // Mock UI components that might cause issues in testing environment
-vi.mock('@/components/sales/shared/QuoteMapVisualizer', () => ({
+vi.mock('@/components/quotation/shared/QuoteMapVisualizer', () => ({
   QuoteMapVisualizer: () => <div data-testid="map-visualizer">Map Visualizer</div>
 }));
 
-vi.mock('@/components/sales/shared/QuoteLegsVisualizer', () => ({
+vi.mock('@/components/quotation/shared/QuoteLegsVisualizer', () => ({
   QuoteLegsVisualizer: () => <div data-testid="legs-visualizer">Legs Visualizer</div>
 }));
 
-vi.mock('@/components/sales/composer/store/QuoteStore', () => ({
+vi.mock('@/components/quotation/composer/store/QuoteStore', () => ({
   useQuoteStore: vi.fn()
 }));
 

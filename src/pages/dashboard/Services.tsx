@@ -16,7 +16,7 @@ import { toast } from 'sonner';
 import { useDebug } from '@/hooks/useDebug';
 
 import { ServiceAttributeRenderer } from '@/components/services/ServiceAttributeRenderer';
-import { ServiceHistoryPanel } from '@/components/sales/history/ServiceHistoryPanel';
+import { ServiceHistoryPanel } from '@/components/quotation/history/ServiceHistoryPanel';
 import { ServiceVendorsPanel } from '@/components/logistics/ServiceVendorsPanel';
 
 type ServiceRow = {

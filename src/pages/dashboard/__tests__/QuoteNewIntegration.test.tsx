@@ -8,7 +8,7 @@ import { QuoteTransformService } from '@/lib/services/quote-transform.service';
 
 // Mock UnifiedQuoteComposer (QuoteNew now renders this instead of QuoteFormRefactored)
 const MockUnifiedComposer = vi.fn((props: any) => <div data-testid="mock-unified-composer">Unified Composer</div>);
-vi.mock('@/components/sales/unified-composer/UnifiedQuoteComposer', () => ({
+vi.mock('@/components/quotation/unified-composer/UnifiedQuoteComposer', () => ({
   UnifiedQuoteComposer: (props: any) => MockUnifiedComposer(props)
 }));
 

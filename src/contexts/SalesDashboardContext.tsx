@@ -3,7 +3,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 import { useNavigate } from 'react-router-dom';
-import { AIQuotationModal } from '@/components/sales/modals/AIQuotationModal';
+import { AIQuotationModal } from '@/components/quotation/modals/AIQuotationModal';
 import { logger } from "@/lib/logger";
 
 interface SalesDashboardContextType {

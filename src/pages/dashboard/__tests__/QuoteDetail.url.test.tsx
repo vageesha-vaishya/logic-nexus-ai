@@ -6,7 +6,7 @@ import QuoteDetail from '../QuoteDetail';
 import * as CRMHooks from '@/hooks/useCRM';
 
 // Mock child component to inspect props
-vi.mock('@/components/sales/unified-composer/UnifiedQuoteComposer', () => ({
+vi.mock('@/components/quotation/unified-composer/UnifiedQuoteComposer', () => ({
   UnifiedQuoteComposer: ({ quoteId, versionId }: any) => (
     <div data-testid="composer">
       Composer: quoteId={quoteId}, versionId={versionId}
@@ -35,9 +35,9 @@ vi.mock('@/components/layout/DashboardLayout', () => ({
 }));
 
 // Mock other components to avoid rendering issues
-vi.mock('@/components/sales/quotation-versions/VersionHistoryPanel', () => ({ VersionHistoryPanel: () => <div>VersionHistoryPanel</div> }));
-vi.mock('@/components/sales/quotation-versions/SaveVersionDialog', () => ({ SaveVersionDialog: () => <div>SaveVersionDialog</div> }));
-vi.mock('@/components/sales/quotation-versions/QuotationComparisonDashboard', () => ({
+vi.mock('@/components/quotation/quotation-versions/VersionHistoryPanel', () => ({ VersionHistoryPanel: () => <div>VersionHistoryPanel</div> }));
+vi.mock('@/components/quotation/quotation-versions/SaveVersionDialog', () => ({ SaveVersionDialog: () => <div>SaveVersionDialog</div> }));
+vi.mock('@/components/quotation/quotation-versions/QuotationComparisonDashboard', () => ({
   QuotationComparisonDashboard: ({ selectedOptionId, options, onSelect }: any) => {
     const selectedOption = options?.find((option: any) => option.id === selectedOptionId) || options?.[0];
     return (
@@ -54,10 +54,10 @@ vi.mock('@/components/sales/quotation-versions/QuotationComparisonDashboard', ()
     );
   },
 }));
-vi.mock('@/components/sales/QuotationVersionHistory', () => ({ QuotationVersionHistory: () => <div>History</div> }));
-vi.mock('@/components/sales/QuotePreviewModal', () => ({ QuotePreviewModal: () => <div>Preview</div> }));
-vi.mock('@/components/sales/portal/ShareQuoteDialog', () => ({ ShareQuoteDialog: () => <div>Share</div> }));
-vi.mock('@/components/sales/SendQuoteDialog', () => ({ SendQuoteDialog: () => <div>Send</div> }));
+vi.mock('@/components/quotation/QuotationVersionHistory', () => ({ QuotationVersionHistory: () => <div>History</div> }));
+vi.mock('@/components/quotation/QuotePreviewModal', () => ({ QuotePreviewModal: () => <div>Preview</div> }));
+vi.mock('@/components/quotation/portal/ShareQuoteDialog', () => ({ ShareQuoteDialog: () => <div>Share</div> }));
+vi.mock('@/components/quotation/SendQuoteDialog', () => ({ SendQuoteDialog: () => <div>Send</div> }));
 const toastSuccess = vi.fn();
 const toastError = vi.fn();
 vi.mock('sonner', () => ({

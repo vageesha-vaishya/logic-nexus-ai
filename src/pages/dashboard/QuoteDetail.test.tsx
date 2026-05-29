@@ -8,13 +8,13 @@ import { QuotationRankingService } from '@/services/quotation/QuotationRankingSe
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: { children: React.ReactNode }) => <div data-testid="dashboard-layout">{children}</div>
 }));
-vi.mock('@/components/sales/quotation-versions/VersionHistoryPanel', () => ({
+vi.mock('@/components/quotation/quotation-versions/VersionHistoryPanel', () => ({
   VersionHistoryPanel: () => <div data-testid="version-history-panel" />
 }));
-vi.mock('@/components/sales/quotation-versions/SaveVersionDialog', () => ({
+vi.mock('@/components/quotation/quotation-versions/SaveVersionDialog', () => ({
   SaveVersionDialog: () => <div data-testid="save-version-dialog" />
 }));
-vi.mock('@/components/sales/quotation-versions/QuotationComparisonDashboard', () => ({
+vi.mock('@/components/quotation/quotation-versions/QuotationComparisonDashboard', () => ({
   QuotationComparisonDashboard: ({ options }: { options: any[] }) => (
     <div data-testid="comparison-dashboard">
       {options.map(o => (
@@ -25,19 +25,19 @@ vi.mock('@/components/sales/quotation-versions/QuotationComparisonDashboard', ()
     </div>
   )
 }));
-vi.mock('@/components/sales/QuotationVersionHistory', () => ({
+vi.mock('@/components/quotation/QuotationVersionHistory', () => ({
   QuotationVersionHistory: () => <div data-testid="quotation-version-history" />
 }));
-vi.mock('@/components/sales/unified-composer/UnifiedQuoteComposer', () => ({
+vi.mock('@/components/quotation/unified-composer/UnifiedQuoteComposer', () => ({
   UnifiedQuoteComposer: () => <div data-testid="unified-quote-composer" />
 }));
-vi.mock('@/components/sales/portal/ShareQuoteDialog', () => ({
+vi.mock('@/components/quotation/portal/ShareQuoteDialog', () => ({
   ShareQuoteDialog: () => <div />
 }));
-vi.mock('@/components/sales/SendQuoteDialog', () => ({
+vi.mock('@/components/quotation/SendQuoteDialog', () => ({
   SendQuoteDialog: () => <div />
 }));
-vi.mock('@/components/sales/QuotePreviewModal', () => ({
+vi.mock('@/components/quotation/QuotePreviewModal', () => ({
   QuotePreviewModal: () => <div />
 }));
 vi.mock('@/components/system/DetailScreenTemplate', () => ({

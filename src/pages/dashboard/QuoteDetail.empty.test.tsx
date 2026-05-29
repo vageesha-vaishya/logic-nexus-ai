@@ -16,7 +16,7 @@ vi.mock('@/hooks/useDebug', () => ({
 }));
 
 // Mock UnifiedQuoteComposer to inspect props
-vi.mock('@/components/sales/unified-composer/UnifiedQuoteComposer', () => ({
+vi.mock('@/components/quotation/unified-composer/UnifiedQuoteComposer', () => ({
   UnifiedQuoteComposer: (props: any) => (
     <div data-testid="unified-quote-composer">
       <span data-testid="composer-quote-id">{props.quoteId}</span>
@@ -29,29 +29,29 @@ vi.mock('@/components/sales/unified-composer/UnifiedQuoteComposer', () => ({
 vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: any) => <div data-testid="dashboard-layout">{children}</div>,
 }));
-vi.mock('@/components/sales/quotation-versions/VersionHistoryPanel', () => ({
+vi.mock('@/components/quotation/quotation-versions/VersionHistoryPanel', () => ({
   VersionHistoryPanel: () => <div data-testid="version-history-panel" />,
 }));
-vi.mock('@/components/sales/quotation-versions/QuotationComparisonDashboard', () => ({
+vi.mock('@/components/quotation/quotation-versions/QuotationComparisonDashboard', () => ({
   QuotationComparisonDashboard: ({ options }: any) => (
     <div data-testid="comparison-dashboard">
       Comparison Dashboard: {options?.length || 0} options
     </div>
   ),
 }));
-vi.mock('@/components/sales/quotation-versions/SaveVersionDialog', () => ({
+vi.mock('@/components/quotation/quotation-versions/SaveVersionDialog', () => ({
   SaveVersionDialog: () => <div data-testid="save-version-dialog" />,
 }));
-vi.mock('@/components/sales/QuotationVersionHistory', () => ({
+vi.mock('@/components/quotation/QuotationVersionHistory', () => ({
   QuotationVersionHistory: () => <div data-testid="quotation-version-history" />,
 }));
-vi.mock('@/components/sales/portal/ShareQuoteDialog', () => ({
+vi.mock('@/components/quotation/portal/ShareQuoteDialog', () => ({
   ShareQuoteDialog: () => <div data-testid="share-quote-dialog" />,
 }));
-vi.mock('@/components/sales/SendQuoteDialog', () => ({
+vi.mock('@/components/quotation/SendQuoteDialog', () => ({
   SendQuoteDialog: () => <div data-testid="send-quote-dialog" />,
 }));
-vi.mock('@/components/sales/QuotePreviewModal', () => ({
+vi.mock('@/components/quotation/QuotePreviewModal', () => ({
   QuotePreviewModal: () => <div data-testid="quote-preview-modal" />,
 }));
 vi.mock('@/components/system/DetailScreenTemplate', () => ({

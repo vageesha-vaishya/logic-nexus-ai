@@ -3,7 +3,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 import { useCRM } from "@/hooks/useCRM";
 import { useAuth } from "@/hooks/useAuth";
 import { DashboardLayout } from "@/components/layout/DashboardLayout";
-import { QuotesKanbanBoard } from "@/components/sales/kanban/QuotesKanbanBoard";
+import { QuotesKanbanBoard } from "@/components/quotation/kanban/QuotesKanbanBoard";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { AlertCircle, CalendarDays, CheckSquare, ChevronLeft, ChevronRight, Download, RefreshCcw, Trash2 } from "lucide-react";

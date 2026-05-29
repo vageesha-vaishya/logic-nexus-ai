@@ -1,7 +1,7 @@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { QuoteTemplateList } from '@/components/sales/templates/QuoteTemplateList';
-import { QuoteTemplateEditor } from '@/components/sales/templates/QuoteTemplateEditor';
-import { QuoteTemplate } from '@/components/sales/templates/types';
+import { QuoteTemplateList } from '@/components/quotation/templates/QuoteTemplateList';
+import { QuoteTemplateEditor } from '@/components/quotation/templates/QuoteTemplateEditor';
+import { QuoteTemplate } from '@/components/quotation/templates/types';
 import { useState } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { useNavigate } from 'react-router-dom';

@@ -1,5 +1,5 @@
 import { QuoteTransferData, QuoteTransferSchema, RateOption } from '@/lib/schemas/quote-transfer';
-import { QuoteFormValues, QuoteItem } from '@/components/sales/quote-form/types';
+import { QuoteFormValues, QuoteItem } from '@/components/quotation/quote-form/types';
 import { z } from 'zod';
 import { logger } from '@/lib/logger';
 import { SupabaseClient } from '@supabase/supabase-js';
