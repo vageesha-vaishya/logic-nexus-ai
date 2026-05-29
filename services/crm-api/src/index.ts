@@ -21,27 +21,16 @@ const isTruthy = (value: string | undefined, fallback: boolean): boolean => {
 const kafkaEnabled = isTruthy(process.env.CRM_KAFKA_ENABLED ?? process.env.KAFKA_ENABLED, process.env.NODE_ENV === 'production');
 
 async function startServer(): Promise<void> {
+  // Post-Phase-5 crm-api is an auth+audit shim — leads moved to
+  // sales-api (commit 37778d2c) and invoices/tax/billing/gl moved to
+  // finance-api (commit 54e8ed0b). No Kafka producer or consumer left
+  // here. The CRM_KAFKA_ENABLED env stays read-but-unused so existing
+  // deployment configs don't break, but no behaviour hangs off it.
+  if (kafkaEnabled) {
+    logger.info('CRM_KAFKA_ENABLED is set, but crm-api no longer owns any Kafka publishers — value ignored.');
+  }
   try {
-    // Finance event producer/consumer moved to services/finance-api/ in Phase 5.
-    // crm-events.producer is dead post-Phase-4 (sales-api owns lead events now)
-    // but the import stays until a separate cleanup retires it.
-    const [{ default: app }, { crmEventsProducer }] = await Promise.all([
-      import('./app.js'),
-      import('./events/crm-events.producer.js'),
-    ]);
-
-    if (kafkaEnabled) {
-      try {
-        await crmEventsProducer.initialize();
-      } catch (error) {
-        logger.warn('CRM events producer unavailable. Starting API without Kafka publishing.', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    } else {
-      logger.info('Kafka bootstrap disabled for crm-api');
-    }
-
+    const { default: app } = await import('./app.js');
     app.listen(PORT, '0.0.0.0', () => {
       logger.info(`crm-api listening on port ${PORT}`);
     });
