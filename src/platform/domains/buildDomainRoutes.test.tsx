@@ -78,9 +78,19 @@ describe("buildAllDomainRoutes", () => {
   it("respects mobile filter across all manifests", () => {
     const elements = buildAllDomainRoutes([marketsManifest, amroManifest], { mobile: true });
     const paths = elements.map((el) => (el.props as { path: string }).path);
-    // AMRO has no mobile routes; Markets has several. So result is Markets-only mobile.
-    expect(paths.every((p) => p.startsWith("/sthira") || p.includes("/markets/retail") || p.includes("/markets/settings/brokers")))
-      .toBe(true);
+    // AMRO has no mobile routes; Markets has several. The mobile-flagged set
+    // includes the /sthira/* paths, the /dashboard/markets/retail subtree,
+    // /dashboard/markets/settings/brokers, and the standalone /onboarding
+    // alias (friendlier URL for email copy; mounted on the same Sthira
+    // onboarding component per src/features/markets/manifest.ts).
+    expect(
+      paths.every((p) =>
+        p.startsWith("/sthira") ||
+        p === "/onboarding" ||
+        p.includes("/markets/retail") ||
+        p.includes("/markets/settings/brokers"),
+      ),
+    ).toBe(true);
   });
 
   it("returns an empty array when no manifests have routes", () => {
