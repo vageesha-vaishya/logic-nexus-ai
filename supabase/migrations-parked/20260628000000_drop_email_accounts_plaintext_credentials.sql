@@ -37,12 +37,13 @@
 --       getEmailCredential / setEmailCredential, including the rolled-
 --       refresh-token capture Microsoft sometimes returns on refresh.
 --
--- 4. ✓  src/components/email/EmailAccounts.tsx — the
---       `!account.access_token` UI check that gates the "Connect" button
---       (lines ~303 and ~317) must move off the column. A small helper
---       hook (e.g. useEmailAccountConnected(account_id)) that queries
---       core.secrets for an active oauth_access_token row is the natural
---       replacement.
+-- 4. ✓  src/components/email/EmailAccounts.tsx UI check moved off the
+--       access_token column. Done 2026-05-29 via the new RPC
+--       core.my_oauth_connected_email_accounts() (migration
+--       20260529000000) — owner-scoped, returns IDs that have an active
+--       oauth_access_token row in core.secrets. The component populates
+--       a connectedAccountIds Set on every fetch and the
+--       "Re-authorize" gate now reads from it.
 --
 -- 5. ✓  src/integrations/supabase/types.ts regenerated AFTER this drop
 --       applies so the EmailAccount row type loses the four columns.

@@ -20,12 +20,23 @@ interface EmailAccount {
   is_active: boolean;
   last_sync_at: string;
   created_at: string;
+  // Phase 1 Slice C — access_token column NULLed by migration 20260528260000
+  // and dropped in supabase/migrations-parked/20260628000000. UI now derives
+  // "is OAuth-connected" from the connectedAccountIds set populated by
+  // core.my_oauth_connected_email_accounts(). Field kept in the type until
+  // the DROP lands so existing local code still compiles.
   access_token: string | null;
   user_id: string;
 }
 
 export function EmailAccounts() {
   const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+  // Phase 1 Slice C — IDs of the caller's email_accounts that have an active
+  // OAuth access token in vault. Replaces the legacy `!account.access_token`
+  // check; populated by core.my_oauth_connected_email_accounts() on every
+  // fetch so the "Re-authorize" button reacts to vault state, not to the
+  // (soon-to-be-NULL) plaintext column.
+  const [connectedAccountIds, setConnectedAccountIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [showDialog, setShowDialog] = useState(false);
   const [showDelegationDialog, setShowDelegationDialog] = useState(false);
@@ -43,6 +54,31 @@ export function EmailAccounts() {
 
       if (error) throw error;
       setAccounts(data || []);
+
+      // Resolve vault-connected OAuth accounts in one round-trip. Falls open
+      // on RPC failure (empty set → "Re-authorize" shown for everyone)
+      // rather than hiding the button when vault is briefly unreachable.
+      try {
+        const { data: connectedRows, error: rpcError } = await supabase
+          .schema("core")
+          .rpc("my_oauth_connected_email_accounts");
+        if (rpcError) {
+          logger.error("Failed to load OAuth-connected accounts", { error: rpcError });
+          setConnectedAccountIds(new Set());
+        } else {
+          // RPC returns SETOF uuid → array of { my_oauth_connected_email_accounts: uuid }
+          // depending on supabase-js shape. Coerce defensively.
+          const ids = (connectedRows ?? []).map((r: unknown) =>
+            typeof r === "string" ? r : (r as { [k: string]: string })[
+              "my_oauth_connected_email_accounts"
+            ],
+          ).filter((v): v is string => typeof v === "string" && v.length > 0);
+          setConnectedAccountIds(new Set(ids));
+        }
+      } catch (rpcErr) {
+        logger.error("OAuth-connected accounts lookup threw", { error: rpcErr });
+        setConnectedAccountIds(new Set());
+      }
     } catch (error: any) {
       toast({
         title: "Error",
@@ -300,7 +336,7 @@ export function EmailAccounts() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                {!account.access_token && (account.provider === 'gmail' || account.provider === 'office365') && (
+                {!connectedAccountIds.has(account.id) && (account.provider === 'gmail' || account.provider === 'office365') && (
                   <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-md p-3 mb-2">
                     <p className="text-xs text-yellow-600 dark:text-yellow-500 font-medium">
                       ⚠️ Authorization Required: Click 'Re-authorize' to complete OAuth setup
@@ -314,7 +350,7 @@ export function EmailAccounts() {
                   </div>
                 )}
                 <div className="flex gap-2">
-                  {!account.access_token && (account.provider === 'gmail' || account.provider === 'office365') ? (
+                  {!connectedAccountIds.has(account.id) && (account.provider === 'gmail' || account.provider === 'office365') ? (
                     <Button
                       variant="default"
                       size="sm"
