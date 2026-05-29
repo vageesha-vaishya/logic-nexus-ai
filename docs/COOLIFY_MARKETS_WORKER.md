@@ -32,7 +32,7 @@ The Sthira APK and the unified web SPA both need `markets-worker` reachable at `
    | `ANTHROPIC_API_KEY` | no | LLM-backed routes (`/v1/portfolio/brief`, `/v1/research/*`) |
    | `OPENAI_API_KEY` | no | Same |
    | `OPENROUTER_API_KEY` | no | Same |
-   | `FCM_SERVICE_ACCOUNT_JSON` | no | Push fan-out (currently key `bc63ee42f1` — rotate before Play Store per `project_fcm_key_rotation` memory) |
+   | `FCM_SERVICE_ACCOUNT_JSON` | no | Push fan-out. ⚠ When set via a systemd `EnvironmentFile=` the value MUST be wrapped in single quotes: `FCM_SERVICE_ACCOUNT_JSON='{...}'`. systemd's env-file parser otherwise strips backslashes from unquoted values, destroying the `\n` escapes in the JSON `private_key` and producing `cryptography.InvalidPadding` at startup. In Coolify env-var UI the value goes in raw (no surrounding quotes); Coolify handles escaping itself. |
    | `GROWW_*` | no | Broker integration |
    | `BROKER_ENCRYPTION_KEY` | yes if broker creds stored | Symmetric key for at-rest broker secrets |
    | `WORKER_CONCURRENCY` | no | Default 4 |
