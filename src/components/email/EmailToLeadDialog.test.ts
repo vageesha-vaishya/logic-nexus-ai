@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import type { LeadFormData } from "@/components/crm/LeadForm";
+import type { LeadFormData } from "@/features/module-sales/components/LeadForm";
 import { sanitizeLeadDataForInsert, extractEmailAddress } from "./email-to-lead-helpers";
 
 describe("sanitizeLeadDataForInsert", () => {

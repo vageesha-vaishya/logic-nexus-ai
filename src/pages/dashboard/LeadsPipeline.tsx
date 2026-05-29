@@ -18,7 +18,7 @@ import { Tabs, TabsContent } from '@/components/ui/tabs';
 import { Lead, LeadStatus, stages, statusConfig } from './leads-data';
 import { usePerformanceMonitor } from '@/hooks/usePerformanceMonitor';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
-import { DashboardOverview, ContactsSection, TasksSection, DashboardStats, CreateTaskDialog } from '@/components/crm/LeadsPipelineComponents';
+import { DashboardOverview, ContactsSection, TasksSection, DashboardStats, CreateTaskDialog } from '@/features/module-sales/components/LeadsPipelineComponents';
 import { Task } from '@/components/crm/TaskScheduler';
 import { useLeadsViewState, LeadsPrimaryView } from '@/hooks/useLeadsViewState';
 import { logger } from '@/lib/logger';

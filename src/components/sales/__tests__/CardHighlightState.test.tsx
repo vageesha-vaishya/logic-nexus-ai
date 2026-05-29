@@ -2,7 +2,7 @@ import React from 'react';
 import { describe, it, expect } from 'vitest';
 import { render } from '@testing-library/react';
 import { QuoteCard } from '@/components/sales/QuoteCard';
-import { LeadCard } from '@/components/crm/LeadCard';
+import { LeadCard } from '@/features/module-sales/components/LeadCard';
 
 describe('Lead and Quote card highlight states', () => {
   it('applies highlighted and active match styling to QuoteCard', () => {

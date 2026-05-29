@@ -1,6 +1,6 @@
 import { type KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { LeadForm, type LeadFormData } from '@/components/crm/LeadForm';
-import { LeadActivitiesTimeline } from '@/components/crm/LeadActivitiesTimeline';
+import { LeadForm, type LeadFormData } from '@/features/module-sales/components/LeadForm';
+import { LeadActivitiesTimeline } from '@/features/module-sales/components/LeadActivitiesTimeline';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import { Bold, Italic, List, ListOrdered, Plus, Save, Trash2, Underline, Pencil, Send } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
-import { createLeadWorkspaceEventBus } from '@/components/crm/lead-workspace-bus';
+import { createLeadWorkspaceEventBus } from '@/features/module-sales/components/lead-workspace-bus';
 import { cn } from '@/lib/utils';
 import { sanitizeRichTextHtml, stripHtmlTags } from '@/lib/utils/sanitizer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';

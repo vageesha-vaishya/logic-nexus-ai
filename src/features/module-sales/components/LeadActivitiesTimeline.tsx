@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
-import type { LeadWorkspaceEventBus } from '@/components/crm/lead-workspace-bus';
+import type { LeadWorkspaceEventBus } from '@/features/module-sales/components/lead-workspace-bus';
 import {
   classifyFetchFailure,
   describeFetchFailure,

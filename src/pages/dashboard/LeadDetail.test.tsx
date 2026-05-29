@@ -10,15 +10,15 @@ vi.mock('@/components/layout/DashboardLayout', () => ({
   DashboardLayout: ({ children }: any) => <div data-testid="dashboard-layout">{children}</div>,
 }));
 
-vi.mock('@/components/crm/LeadScoringCard', () => ({
+vi.mock('@/features/module-sales/components/LeadScoringCard', () => ({
   LeadScoringCard: () => <div data-testid="lead-scoring-card" />,
 }));
 
-vi.mock('@/components/crm/LeadActivitiesTimeline', () => ({
+vi.mock('@/features/module-sales/components/LeadActivitiesTimeline', () => ({
   LeadActivitiesTimeline: () => <div data-testid="lead-activities-timeline" />,
 }));
 
-vi.mock('@/components/crm/LeadForm', () => ({
+vi.mock('@/features/module-sales/components/LeadForm', () => ({
   LeadForm: () => <div data-testid="lead-form" />,
 }));
 
@@ -26,7 +26,7 @@ vi.mock('@/components/email/EmailHistoryPanel', () => ({
   EmailHistoryPanel: () => <div data-testid="email-history-panel" />,
 }));
 
-vi.mock('@/components/crm/LeadConversionDialog', () => ({
+vi.mock('@/features/module-sales/components/LeadConversionDialog', () => ({
   LeadConversionDialog: () => null,
 }));
 
@@ -38,7 +38,7 @@ vi.mock('@/components/layout/StickyActionsContext', () => ({
   }),
 }));
 
-vi.mock('@/components/assignment/ManualAssignment', () => ({
+vi.mock('@/features/module-sales/components/assignment/ManualAssignment', () => ({
   ManualAssignment: () => <div data-testid="manual-assignment" />,
 }));
 

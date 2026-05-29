@@ -1,5 +1,5 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { LeadForm, LeadFormData } from "@/components/crm/LeadForm";
+import { LeadForm, LeadFormData } from "@/features/module-sales/components/LeadForm";
 import { useCRM } from "@/hooks/useCRM";
 import { toast } from "sonner";
 import { useState, useEffect } from "react";

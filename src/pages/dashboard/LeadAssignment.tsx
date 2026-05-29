@@ -12,12 +12,12 @@ import {
 import { useCRM } from '@/hooks/useCRM';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { toast } from 'sonner';
-import { AssignmentRules } from '@/components/assignment/AssignmentRules';
-import { TerritoryManagement } from '@/components/assignment/TerritoryManagement';
-import { UserCapacity } from '@/components/assignment/UserCapacity';
-import { AssignmentQueue } from '@/components/assignment/AssignmentQueue';
-import { AssignmentHistory } from '@/components/assignment/AssignmentHistory';
-import { AssignmentAnalytics } from '@/components/assignment/AssignmentAnalytics';
+import { AssignmentRules } from '@/features/module-sales/components/assignment/AssignmentRules';
+import { TerritoryManagement } from '@/features/module-sales/components/assignment/TerritoryManagement';
+import { UserCapacity } from '@/features/module-sales/components/assignment/UserCapacity';
+import { AssignmentQueue } from '@/features/module-sales/components/assignment/AssignmentQueue';
+import { AssignmentHistory } from '@/features/module-sales/components/assignment/AssignmentHistory';
+import { AssignmentAnalytics } from '@/features/module-sales/components/assignment/AssignmentAnalytics';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { LeadsPrimaryView, useLeadsViewState } from '@/hooks/useLeadsViewState';

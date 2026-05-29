@@ -173,7 +173,7 @@ vi.mock('@/lib/feature-flags', async () => {
   };
 });
 
-vi.mock('@/components/crm/LeadForm', () => ({
+vi.mock('@/features/module-sales/components/LeadForm', () => ({
   LeadForm: ({ sectionDescription, hideNarrativeFields }: { sectionDescription?: string; hideNarrativeFields?: boolean }) => (
     <div data-testid="lead-form-mock">
       <span>{sectionDescription}</span>
@@ -182,7 +182,7 @@ vi.mock('@/components/crm/LeadForm', () => ({
   ),
 }));
 
-vi.mock('@/components/crm/LeadActivitiesTimeline', () => ({
+vi.mock('@/features/module-sales/components/LeadActivitiesTimeline', () => ({
   LeadActivitiesTimeline: () => <div data-testid="lead-activities-timeline" />,
 }));
 

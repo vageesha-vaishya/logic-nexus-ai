@@ -1,4 +1,4 @@
-import type { LeadFormData } from "@/components/crm/LeadForm";
+import type { LeadFormData } from "@/features/module-sales/components/LeadForm";
 import { cleanEmail } from "@/lib/data-cleaning";
 
 export function sanitizeLeadDataForInsert(data: LeadFormData) {
