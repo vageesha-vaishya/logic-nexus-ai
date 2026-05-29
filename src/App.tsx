@@ -132,6 +132,7 @@ const ThemeManagement = lazy(() => import("./pages/dashboard/ThemeManagement"));
 const Files = lazy(() => import("./pages/dashboard/Files"));
 const Campaigns = lazy(() => import("./pages/dashboard/Campaigns"));
 const CommissionRules = lazy(() => import("./pages/dashboard/CommissionRules"));
+const Commissions = lazy(() => import("./pages/dashboard/Commissions"));
 const Reports = lazy(() => import("./pages/dashboard/Reports"));
 const Chatter = lazy(() => import("./pages/dashboard/Chatter"));
 const Groups = lazy(() => import("./pages/dashboard/Groups"));
@@ -1085,6 +1086,7 @@ const App = () => (
             <Route path="/dashboard/files" element={<ProtectedRoute requiredPermissions={["files.view"]}><Files /></ProtectedRoute>} />
             <Route path="/dashboard/campaigns" element={<ProtectedRoute requiredPermissions={["campaigns.view"]}><Campaigns /></ProtectedRoute>} />
             <Route path="/dashboard/finance/commission-rules" element={<ProtectedRoute><CommissionRules /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
             <Route path="/dashboard/reports" element={<ProtectedRoute requiredPermissions={["reports.view"]}><Reports /></ProtectedRoute>} />
             <Route path="/dashboard/chatter" element={<ProtectedRoute requiredPermissions={["chatter.view"]}><Chatter /></ProtectedRoute>} />
             <Route path="/dashboard/groups" element={<ProtectedRoute requiredPermissions={["groups.view"]}><Groups /></ProtectedRoute>} />
