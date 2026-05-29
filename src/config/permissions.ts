@@ -82,6 +82,7 @@ export type Permission =
   | 'finance.commissions.view' | 'finance.commissions.manage'
   | 'finance.commission_rules.view' | 'finance.commission_rules.manage'
   | 'finance.draft_invoices.view' | 'finance.draft_invoices.manage'
+  | 'finance.outbox_retries.view' | 'finance.outbox_retries.manage'
   | 'view_amro_dashboard'
   | 'create_maintenance_request'
   | 'edit_aircraft_records'
@@ -120,7 +121,7 @@ export const ROLE_PERMISSIONS: Record<
     'shipments.reports.view','shipments.reports.manage',
     'shipments.config.manage',
     'shipments.audit.view','shipments.audit.manage',
-    'finance.commissions.view','finance.commissions.manage','finance.commission_rules.view','finance.commission_rules.manage','finance.draft_invoices.view','finance.draft_invoices.manage',
+    'finance.commissions.view','finance.commissions.manage','finance.commission_rules.view','finance.commission_rules.manage','finance.draft_invoices.view','finance.draft_invoices.manage','finance.outbox_retries.view','finance.outbox_retries.manage',
     'view_amro_dashboard','create_maintenance_request','edit_aircraft_records','delete_flight_logs','approve_work_orders',
   ],
   super_admin: [
@@ -149,7 +150,7 @@ export const ROLE_PERMISSIONS: Record<
     'shipments.reports.view','shipments.reports.manage',
     'shipments.config.manage',
     'shipments.audit.view','shipments.audit.manage',
-    'finance.commissions.view','finance.commissions.manage','finance.commission_rules.view','finance.commission_rules.manage','finance.draft_invoices.view','finance.draft_invoices.manage',
+    'finance.commissions.view','finance.commissions.manage','finance.commission_rules.view','finance.commission_rules.manage','finance.draft_invoices.view','finance.draft_invoices.manage','finance.outbox_retries.view','finance.outbox_retries.manage',
     'view_amro_dashboard','create_maintenance_request','edit_aircraft_records','delete_flight_logs','approve_work_orders',
   ],
   tenant_admin: [
@@ -177,7 +178,7 @@ export const ROLE_PERMISSIONS: Record<
     'shipments.reports.view','shipments.reports.manage',
     'shipments.config.manage',
     'shipments.audit.view',
-    'finance.commissions.view','finance.commissions.manage','finance.commission_rules.view','finance.commission_rules.manage','finance.draft_invoices.view','finance.draft_invoices.manage',
+    'finance.commissions.view','finance.commissions.manage','finance.commission_rules.view','finance.commission_rules.manage','finance.draft_invoices.view','finance.draft_invoices.manage','finance.outbox_retries.view','finance.outbox_retries.manage',
     'view_amro_dashboard','create_maintenance_request','edit_aircraft_records','approve_work_orders',
   ],
   franchise_admin: [

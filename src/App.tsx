@@ -134,6 +134,7 @@ const Campaigns = lazy(() => import("./pages/dashboard/Campaigns"));
 const CommissionRules = lazy(() => import("./pages/dashboard/CommissionRules"));
 const Commissions = lazy(() => import("./pages/dashboard/Commissions"));
 const DraftInvoices = lazy(() => import("./pages/dashboard/DraftInvoices"));
+const OutboxRetries = lazy(() => import("./pages/dashboard/OutboxRetries"));
 const Reports = lazy(() => import("./pages/dashboard/Reports"));
 const Chatter = lazy(() => import("./pages/dashboard/Chatter"));
 const Groups = lazy(() => import("./pages/dashboard/Groups"));
@@ -1089,6 +1090,7 @@ const App = () => (
             <Route path="/dashboard/finance/commission-rules" element={<ProtectedRoute requiredPermissions={["finance.commission_rules.manage"]}><CommissionRules /></ProtectedRoute>} />
             <Route path="/dashboard/finance/commissions" element={<ProtectedRoute requiredPermissions={["finance.commissions.view"]}><Commissions /></ProtectedRoute>} />
             <Route path="/dashboard/finance/draft-invoices" element={<ProtectedRoute requiredPermissions={["finance.draft_invoices.view"]}><DraftInvoices /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/retry-queue" element={<ProtectedRoute requiredPermissions={["finance.outbox_retries.view"]}><OutboxRetries /></ProtectedRoute>} />
             <Route path="/dashboard/reports" element={<ProtectedRoute requiredPermissions={["reports.view"]}><Reports /></ProtectedRoute>} />
             <Route path="/dashboard/chatter" element={<ProtectedRoute requiredPermissions={["chatter.view"]}><Chatter /></ProtectedRoute>} />
             <Route path="/dashboard/groups" element={<ProtectedRoute requiredPermissions={["groups.view"]}><Groups /></ProtectedRoute>} />
