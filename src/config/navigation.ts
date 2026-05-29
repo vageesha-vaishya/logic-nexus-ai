@@ -142,9 +142,9 @@ export const APP_MENU: MenuModule[] = [
     label: 'Finance',
     items: [
       { name: 'Invoices', path: '/dashboard/finance/invoices', icon: FileText, description: 'Manage invoices', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
-      { name: 'Draft Invoices', path: '/dashboard/finance/draft-invoices', icon: FileCheck, description: 'Review drafts auto-generated from shipment delivery' },
-      { name: 'Commissions', path: '/dashboard/finance/commissions', icon: Wallet, description: 'Review computed commissions; approve, pay, or cancel' },
-      { name: 'Commission Rules', path: '/dashboard/finance/commission-rules', icon: Calculator, description: 'Configure per-tenant commission rates' },
+      { name: 'Draft Invoices', path: '/dashboard/finance/draft-invoices', icon: FileCheck, description: 'Review drafts auto-generated from shipment delivery', permissions: ['finance.draft_invoices.view'] },
+      { name: 'Commissions', path: '/dashboard/finance/commissions', icon: Wallet, description: 'Review computed commissions; approve, pay, or cancel', permissions: ['finance.commissions.view'] },
+      { name: 'Commission Rules', path: '/dashboard/finance/commission-rules', icon: Calculator, description: 'Configure per-tenant commission rates', permissions: ['finance.commission_rules.manage'] },
       { name: 'Margin Rules', path: '/dashboard/finance/margin-rules', icon: TrendingUp, description: 'Dynamic pricing rules', roles: ['platform_admin', 'tenant_admin'], permissions: ['admin.settings.manage'] },
       { name: 'Tax Jurisdictions', path: '/dashboard/finance/tax-jurisdictions', icon: Landmark, description: 'Manage tax jurisdictions', roles: ['platform_admin'], permissions: ['admin.settings.manage'] },
     ],

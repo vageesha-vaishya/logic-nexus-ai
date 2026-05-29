@@ -1086,9 +1086,9 @@ const App = () => (
             {/* Salesforce-style navigation placeholder routes */}
             <Route path="/dashboard/files" element={<ProtectedRoute requiredPermissions={["files.view"]}><Files /></ProtectedRoute>} />
             <Route path="/dashboard/campaigns" element={<ProtectedRoute requiredPermissions={["campaigns.view"]}><Campaigns /></ProtectedRoute>} />
-            <Route path="/dashboard/finance/commission-rules" element={<ProtectedRoute><CommissionRules /></ProtectedRoute>} />
-            <Route path="/dashboard/finance/commissions" element={<ProtectedRoute><Commissions /></ProtectedRoute>} />
-            <Route path="/dashboard/finance/draft-invoices" element={<ProtectedRoute><DraftInvoices /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/commission-rules" element={<ProtectedRoute requiredPermissions={["finance.commission_rules.manage"]}><CommissionRules /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/commissions" element={<ProtectedRoute requiredPermissions={["finance.commissions.view"]}><Commissions /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/draft-invoices" element={<ProtectedRoute requiredPermissions={["finance.draft_invoices.view"]}><DraftInvoices /></ProtectedRoute>} />
             <Route path="/dashboard/reports" element={<ProtectedRoute requiredPermissions={["reports.view"]}><Reports /></ProtectedRoute>} />
             <Route path="/dashboard/chatter" element={<ProtectedRoute requiredPermissions={["chatter.view"]}><Chatter /></ProtectedRoute>} />
             <Route path="/dashboard/groups" element={<ProtectedRoute requiredPermissions={["groups.view"]}><Groups /></ProtectedRoute>} />
