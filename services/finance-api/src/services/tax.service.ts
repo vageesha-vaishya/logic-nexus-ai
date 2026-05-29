@@ -6,7 +6,7 @@ import {
   TaxExemptionCertificate,
   TaxExemptionCertificateUploadRequest,
   TaxNexusAddress
-} from '../types/crm.types.js';
+} from '../types/finance.types.js';
 import { logger } from '../utils/logger.js';
 
 type TaxRuleRow = {

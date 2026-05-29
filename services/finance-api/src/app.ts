@@ -1,13 +1,18 @@
+// Phase 5 finance-api — Express app.
+// Mounts the lifted invoices.routes.ts + tax.routes.ts under /api with
+// the same auth middleware shape as crm-api so callers don't observe a
+// behavioural difference. The vite proxy directs /api/v1/invoices and
+// /api/v1/tax to this service (more-specific prefix wins over the
+// /api/v1 → amro-api catch-all).
+
 import express, { Express, NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
-// Phase 4 Sales Step 4: leads.routes.ts + leads.service.ts lifted to services/sales-api/.
-// Phase 5 finance-api extraction: invoices/tax routes + billing/gl services + finance-events
-// pipeline all lifted to services/finance-api/. crm-api is now effectively an auth+audit
-// shim; future slices will retire the service or repurpose it for true crm.* concerns.
-import { ErrorResponse } from './types/crm.types.js';
+import invoicesRoutes from './routes/invoices.routes.js';
+import taxRoutes from './routes/tax.routes.js';
+import { ErrorResponse } from './types/finance.types.js';
 import { logger } from './utils/logger.js';
 
 const app: Express = express();
@@ -29,21 +34,20 @@ app.use(
       'X-Tenant-Id',
       'X-Franchise-Id',
       'X-User-Id',
-      'X-Correlation-Id'
+      'X-Correlation-Id',
     ],
-    exposedHeaders: ['x-correlation-id', 'x-request-id', 'x-api-version', 'x-compat-mode']
-  })
+    exposedHeaders: ['x-correlation-id', 'x-request-id', 'x-api-version', 'x-compat-mode'],
+  }),
 );
 
-app.use((req: Request, _res: Response, next: NextFunction) => {
+app.use((req: Request, res: Response, next: NextFunction) => {
   const request = req as RequestWithCorrelation;
   const correlationIdHeader = req.header('x-correlation-id')?.trim();
   request.correlationId = correlationIdHeader || randomUUID();
-  _res.setHeader('x-correlation-id', request.correlationId);
+  res.setHeader('x-correlation-id', request.correlationId);
   logger.info(`${req.method} ${req.path}`, {
     correlationId: request.correlationId,
     authorizationHeaderPresent: Boolean(String(req.headers.authorization || '').trim()),
-    authorizationScheme: String(req.headers.authorization || '').trim().split(/\s+/)[0]?.toLowerCase() || null,
   });
   next();
 });
@@ -51,9 +55,36 @@ app.use((req: Request, _res: Response, next: NextFunction) => {
 app.get('/health', (_req: Request, res: Response) => {
   res.json({
     status: 'ok',
-    service: 'crm-api',
+    service: 'finance-api',
     timestamp: new Date().toISOString(),
     authHeaderMonitoring: getAuthHeaderMonitoringSnapshot(),
+  });
+});
+
+app.get('/finance/v1/_status', (_req: Request, res: Response) => {
+  res.json({
+    service: 'finance-api',
+    schema: 'finance',
+    tables: [
+      'finance.invoices',
+      'finance.invoice_lines',
+      'finance.payments',
+      'finance.subscriptions',
+      'finance.subscription_plans',
+      'finance.subscription_invoices',
+      'finance.subscription_features',
+      'finance.gl_accounts',
+      'finance.journal_entries',
+      'finance.tax_codes',
+      'finance.tax_jurisdictions',
+      'finance.tax_rules',
+      'finance.tenant_nexus',
+    ],
+    routes: [
+      'POST /api/v1/invoices/:id/finalize (lifted from crm-api 2026-05-29)',
+      'POST /api/v1/tax/calculate         (lifted from crm-api 2026-05-29)',
+      'POST /api/v1/tax/exemptions/certificates (lifted from crm-api 2026-05-29)',
+    ],
   });
 });
 
@@ -71,7 +102,7 @@ function auditApiRequest(req: Request, res: Response, next: NextFunction): void 
         tenant_id: request.tenantId || null,
         franchise_id: request.franchiseId || null,
         action: 'API_REQUEST',
-        resource_type: 'crm-api',
+        resource_type: 'finance-api',
         details: {
           correlationId: request.correlationId || null,
           method: req.method,
@@ -89,16 +120,7 @@ function auditApiRequest(req: Request, res: Response, next: NextFunction): void 
   next();
 }
 
-// All routes lifted to per-domain services. crm-api keeps /health for orchestrator
-// probing only. Future cleanup may retire this service entirely; until then, an empty
-// /api/_status under auth confirms the shim is alive.
-app.get('/api/_status', authMiddleware, auditApiRequest, (_req: Request, res: Response) => {
-  res.json({
-    service: 'crm-api',
-    routes_lifted: ['leads → sales-api', 'invoices/tax → finance-api'],
-    notes: 'crm-api is a shim post-Phase-5; no first-party routes remain.',
-  });
-});
+app.use('/api', authMiddleware, auditApiRequest, invoicesRoutes, taxRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
@@ -106,7 +128,7 @@ app.use((_req: Request, res: Response) => {
     error: 'Route not found',
     code: 'NOT_FOUND',
     statusCode: 404,
-    requestId: req.correlationId || null
+    requestId: req.correlationId || null,
   } as ErrorResponse);
 });
 
@@ -122,7 +144,7 @@ app.use((error: Error & { statusCode?: number; code?: string }, req: Request, re
     code,
     statusCode,
     path: req.path,
-    requestId: (req as RequestWithCorrelation).correlationId || null
+    requestId: (req as RequestWithCorrelation).correlationId || null,
   };
   res.status(statusCode).json(response);
 });

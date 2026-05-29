@@ -1,7 +1,7 @@
 import { Router, Response } from 'express';
 import { AuthRequest } from '../middleware/auth.middleware.js';
 import { TaxService } from '../services/tax.service.js';
-import { ErrorResponse, TaxCalculationRequest, TaxExemptionCertificateUploadRequest } from '../types/crm.types.js';
+import { ErrorResponse, TaxCalculationRequest, TaxExemptionCertificateUploadRequest } from '../types/finance.types.js';
 
 const router = Router();
 const taxService = new TaxService();

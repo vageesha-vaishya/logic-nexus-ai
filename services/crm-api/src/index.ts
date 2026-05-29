@@ -22,33 +22,19 @@ const kafkaEnabled = isTruthy(process.env.CRM_KAFKA_ENABLED ?? process.env.KAFKA
 
 async function startServer(): Promise<void> {
   try {
-    const [{ default: app }, { crmEventsProducer }, { financeEventsProducer }, { financeEventsConsumer }] =
-      await Promise.all([
-        import('./app.js'),
-        import('./events/crm-events.producer.js'),
-        import('./events/finance-events.producer.js'),
-        import('./events/finance-events.consumer.js'),
-      ]);
+    // Finance event producer/consumer moved to services/finance-api/ in Phase 5.
+    // crm-events.producer is dead post-Phase-4 (sales-api owns lead events now)
+    // but the import stays until a separate cleanup retires it.
+    const [{ default: app }, { crmEventsProducer }] = await Promise.all([
+      import('./app.js'),
+      import('./events/crm-events.producer.js'),
+    ]);
 
     if (kafkaEnabled) {
       try {
         await crmEventsProducer.initialize();
       } catch (error) {
         logger.warn('CRM events producer unavailable. Starting API without Kafka publishing.', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-      try {
-        await financeEventsProducer.initialize();
-      } catch (error) {
-        logger.warn('Finance events producer unavailable. Falling back to in-process GL posting.', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-      try {
-        await financeEventsConsumer.initialize();
-      } catch (error) {
-        logger.warn('Finance events consumer unavailable. Kafka GL events will not be processed.', {
           error: error instanceof Error ? error.message : String(error),
         });
       }

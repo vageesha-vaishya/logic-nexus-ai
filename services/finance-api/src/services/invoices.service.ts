@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { InvoiceRecord, FinalizeInvoiceResponse, InvoiceStatus } from '../types/crm.types.js';
+import { InvoiceRecord, FinalizeInvoiceResponse, InvoiceStatus } from '../types/finance.types.js';
 import { financeEventsProducer } from '../events/finance-events.producer.js';
 import { BillingEngineService } from './billing/billing-engine.service.js';
 

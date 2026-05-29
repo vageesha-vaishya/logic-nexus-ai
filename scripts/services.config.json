@@ -33,6 +33,22 @@
       "dependsOn": []
     },
     {
+      "id": "finance",
+      "name": "Finance API",
+      "command": "cd services/finance-api && npx tsx watch src/index.ts",
+      "urlEnv": "VITE_FINANCE_API_PROXY_TARGET",
+      "defaultUrl": "http://localhost:3301",
+      "remoteUrlEnv": "VITE_FINANCE_API_PROXY_TARGET_REMOTE",
+      "remoteDefaultUrl": "",
+      "preferEndpoint": "local",
+      "healthPath": "/health",
+      "okStatus": [200],
+      "required": false,
+      "requiredWhenRemote": true,
+      "retry": { "attempts": 12, "baseDelayMs": 500, "timeoutMs": 30000 },
+      "dependsOn": []
+    },
+    {
       "id": "amro",
       "name": "AMRO API",
       "command": "cd services/amro-api && npx tsx watch src/index.ts",

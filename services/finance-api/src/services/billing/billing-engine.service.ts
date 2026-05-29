@@ -1,4 +1,4 @@
-import { BillingDocument, InvoiceRecord } from '../../types/crm.types.js';
+import { BillingDocument, InvoiceRecord } from '../../types/finance.types.js';
 
 type BillingFormatter = {
   readonly format: string;

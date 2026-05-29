@@ -51,6 +51,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
   const crmApiProxyTarget = process.env.VITE_CRM_API_PROXY_TARGET || env.VITE_CRM_API_PROXY_TARGET || 'http://localhost:3011';
   const salesApiProxyTarget = process.env.VITE_SALES_API_PROXY_TARGET || env.VITE_SALES_API_PROXY_TARGET || 'http://localhost:3201';
+  const financeApiProxyTarget = process.env.VITE_FINANCE_API_PROXY_TARGET || env.VITE_FINANCE_API_PROXY_TARGET || 'http://localhost:3301';
   const amroApiProxyTarget = process.env.VITE_AMRO_API_PROXY_TARGET || env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
   const uimApiProxyTarget = process.env.VITE_UIM_API_PROXY_TARGET || env.VITE_UIM_API_PROXY_TARGET || 'http://localhost:3000';
   const tenantBrandingProxyTarget =
@@ -71,6 +72,13 @@ export default defineConfig(({ mode }) => {
     startCommand: 'cd services/sales-api && npm run dev',
     target: salesApiProxyTarget,
     targetEnvVar: 'VITE_SALES_API_PROXY_TARGET',
+    healthPathHint: '/health',
+  });
+  const financeProxy = createServiceProxy({
+    serviceName: 'Finance API',
+    startCommand: 'cd services/finance-api && npm run dev',
+    target: financeApiProxyTarget,
+    targetEnvVar: 'VITE_FINANCE_API_PROXY_TARGET',
     healthPathHint: '/health',
   });
   const amroProxy = createServiceProxy({
@@ -718,6 +726,12 @@ export default defineConfig(({ mode }) => {
       '/api/v1/domain-assignments': uimProxy,
       '/api/v1/domain-config': uimProxy,
       '/api/v1/franchises': uimProxy,
+      // Phase 5 finance-api lift: invoice + tax routes were under /api/v1/* in
+      // crm-api but never reachable via the dev proxy. Route them to finance-api
+      // explicitly before the /api/v1 → amro catch-all wins.
+      '/api/v1/invoices': financeProxy,
+      '/api/v1/tax': financeProxy,
+      '/api/finance': financeProxy,
       '/api/v1': amroProxy,
       '/api/v2/amro': amroProxy,
       '/api/v2/uim': uimProxy,
@@ -757,6 +771,12 @@ export default defineConfig(({ mode }) => {
       '/api/v1/domain-assignments': uimProxy,
       '/api/v1/domain-config': uimProxy,
       '/api/v1/franchises': uimProxy,
+      // Phase 5 finance-api lift: invoice + tax routes were under /api/v1/* in
+      // crm-api but never reachable via the dev proxy. Route them to finance-api
+      // explicitly before the /api/v1 → amro catch-all wins.
+      '/api/v1/invoices': financeProxy,
+      '/api/v1/tax': financeProxy,
+      '/api/finance': financeProxy,
       '/api/v1': amroProxy,
       '/api/v2/amro': amroProxy,
       '/api/v2/uim': uimProxy,
