@@ -863,150 +863,22 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       await syncGmailLabel("INBOX", "inbox", "inbound");
       await syncGmailLabel("SENT", "sent", "outbound");
     } else if (account.provider === "pop3") {
-      // POP3: Simple inbox fetch with optional delete-after-fetch policy
-      logger.info(`Syncing via POP3 for account: ${account.email_address}`);
-      const pop3 = {
-        hostname: account.pop3_host,
-        port: account.pop3_port || (account.pop3_use_ssl ? 995 : 110),
-        username: account.pop3_username,
-        password: account.pop3_password,
-        ssl: !!account.pop3_use_ssl,
-        deletePolicy: (account.pop3_delete_policy || "keep") as "keep" | "delete_after_fetch",
-      };
-      try {
-        const encoder = new TextEncoder();
-        const decoder = new TextDecoder();
-        const conn = pop3.ssl
-          ? await Deno.connectTls({ hostname: pop3.hostname, port: pop3.port })
-          : await Deno.connect({ hostname: pop3.hostname, port: pop3.port });
-        const readLine = async () => {
-          const buf = new Uint8Array(8192);
-          const n = await conn.read(buf);
-          if (n === null) throw new Error("Connection closed");
-          return decoder.decode(buf.subarray(0, n));
-        };
-        const send = async (cmd: string) => {
-          await conn.write(encoder.encode(`${cmd}\r\n`));
-          return await readLine();
-        };
-        const greet = await readLine();
-        if (!/^\+OK/.test(greet)) throw new Error(`POP3 greeting failed: ${greet}`);
-        const userResp = await send(`USER ${pop3.username}`);
-        if (!/^\+OK/.test(userResp)) throw new Error(`POP3 USER failed: ${userResp}`);
-        const passResp = await send(`PASS ${pop3.password}`);
-        if (!/^\+OK/.test(passResp)) throw new Error(`POP3 PASS failed: ${passResp}`);
-        const statResp = await send("STAT");
-        if (!/^\+OK/.test(statResp)) throw new Error(`POP3 STAT failed: ${statResp}`);
-        const count = Number(statResp.split(" ")[1] || "0");
-        logger.info(`POP3 mailbox has ${count} messages`);
-        const listResp = await send("LIST");
-        const lines = listResp.split("\r\n");
-        const ids = lines
-          .map((l) => l.match(/^(\d+)\s+(\d+)/))
-          .filter(Boolean)
-          .map((m) => Number((m as RegExpMatchArray)[1]));
-        for (const id of ids.slice(0, 50)) {
-          try {
-            await conn.write(encoder.encode(`RETR ${id}\r\n`));
-            let raw = "";
-            while (true) {
-              const chunk = await readLine();
-              raw += chunk;
-              if (/\r\n\.\r\n$/.test(raw)) break;
-              if (raw.length > 10 * 1024 * 1024) throw new Error("POP3 message too large");
-            }
-            const messageRaw = raw.replace(/\r\n\.\r\n$/, "");
-            let parsed: any = null;
-            try {
-              const parserMod = await (0, eval)('import("https://esm.sh/postal-mime@2.2.0")');
-              const ParserCtor = (parserMod as any).default as new () => any;
-              const parser = new ParserCtor();
-              parsed = await parser.parse(messageRaw);
-            } catch { parsed = null; }
-            
-            const messageId = parsed?.messageId ? String(parsed.messageId).replace(/[<>]/g, "") : `pop3-${id}-${Date.now()}`;
-            const subject = parsed?.subject || "(No Subject)";
-            
-            const parsedFrom = parsed?.from;
-            const fromEmail = String(parsedFrom?.address || "").toLowerCase();
-            const fromName = (parsedFrom?.name || "").trim() || fromEmail;
-            
-            const toEmails = (parsed?.to || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
-            const ccEmails = (parsed?.cc || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
-            const bccEmails = (parsed?.bcc || []).map((v: any) => ({ email: String(v.address || "").toLowerCase(), name: (v.name || "").trim() || undefined })).filter((v: any) => v.email);
-            
-            const bodyText = (parsed?.text || "").trim();
-            const bodyHtml = typeof parsed?.html === "string" ? parsed.html : "";
-            const receivedAt = parsed?.date ? new Date(parsed.date).toISOString() : new Date().toISOString();
-            
-            const getHeader = (key: string) => {
-               if (Array.isArray(parsed?.headers)) {
-                 return parsed.headers.find((h: any) => h.key.toLowerCase() === key.toLowerCase())?.value;
-               }
-               return null;
-            };
-
-            const inReplyTo = parsed?.inReplyTo 
-              ? String(parsed.inReplyTo).replace(/[<>]/g, "") 
-              : (getHeader("in-reply-to") ? String(getHeader("in-reply-to")).replace(/[<>]/g, "") : null);
-            
-            const referencesHeader = parsed?.references || getHeader("references");
-            const references = Array.isArray(referencesHeader) 
-              ? referencesHeader.map((r: string) => r.replace(/[<>]/g, "")).filter(Boolean)
-              : (typeof referencesHeader === "string" 
-                  ? referencesHeader.split(/\s+/).map((s: string) => s.replace(/[<>]/g, "")).filter(Boolean)
-                  : []);
-            const conversationId = references.length ? references[0] : (inReplyTo || messageId);
-            const { data: existing } = await supabase
-              .from("emails")
-              .select("id")
-              .eq("message_id", messageId)
-              .eq("account_id", account.id)
-              .single();
-            if (existing) continue;
-            const { error: insErr } = await supabase.from("emails").insert({
-              account_id: account.id,
-              tenant_id: account.tenant_id ?? null,
-              franchise_id: account.franchise_id ?? null,
-              message_id: messageId,
-              internet_message_id: messageId,
-              conversation_id: conversationId,
-              in_reply_to: inReplyTo,
-              email_references: references,
-              subject,
-              from_email: fromEmail,
-              from_name: fromName,
-              to_emails: toEmails,
-              cc_emails: ccEmails,
-              bcc_emails: bccEmails,
-              body_text: bodyText,
-              body_html: bodyHtml || bodyText,
-              snippet: String(bodyText || "").substring(0, 200),
-              has_attachments: Array.isArray(parsed?.attachments) ? parsed.attachments.length > 0 : false,
-              attachments: [],
-              direction: "inbound",
-              status: "received",
-              is_read: false,
-              folder: "inbox",
-              received_at: receivedAt,
-              last_sync_attempt: new Date().toISOString(),
-              lead_id: await findLinkedLeadId(fromEmail),
-            });
-            if (!insErr && pop3.deletePolicy === "delete_after_fetch") {
-              await send(`DELE ${id}`);
-            }
-            if (insErr) logger.error(`POP3 insert error: ${insErr.message}`);
-            else syncedCount++;
-          } catch (e) {
-            logger.error(`POP3 retrieval error for id ${id}:`, { error: e instanceof Error ? e.message : String(e) });
-          }
-        }
-        await send("QUIT");
-        conn.close();
-      } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e);
-        throw new Error(`POP3 sync failed: ${msg}`);
-      }
+      // POP3 branch removed 2026-05-29 as part of Phase 1 Slice C wind-down.
+      // Reason: pop3_password is not modelled in core.{read,write}_email_account_credential
+      // (the four supported purposes are oauth_access_token, oauth_refresh_token,
+      // smtp_password, imap_password); prod had zero email_accounts with
+      // pop3_password set; the column is dropped by
+      // supabase/migrations-parked/20260628000000. If POP3 ingestion is ever
+      // wanted again, sync-emails-v2 already has a pop3.ts skeleton and the
+      // credential RPCs can be extended at that time.
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: "POP3 sync is no longer supported. Re-create the mailbox as IMAP.",
+          code: "POP3_RETIRED",
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 410 },
+      );
     } else if (account.provider === "office365") {
       // Use Microsoft Outlook REST API (v2.0) with OAuth v2 tokens
       logger.info(`Syncing via Office365 (Outlook API) for: ${account.email_address}`);

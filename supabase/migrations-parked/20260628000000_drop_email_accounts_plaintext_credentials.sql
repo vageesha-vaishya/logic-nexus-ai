@@ -57,16 +57,14 @@
 --       tries `account.imap_password` is a type error, not a silent
 --       undefined.
 --
--- 7. ✓  POP3 dead branch in sync-emails/index.ts (~line 865+,
---       `else if (account.provider === "pop3")`). Reads
---       `account.pop3_password` directly. Prod has zero pop3 accounts
---       per [[phase1-implementation-state]], the credential RPC
---       validator doesn't accept 'pop3_password' as a purpose, and the
---       parked DROP removes the column. Pick one before unparking:
---         (a) delete the dead branch outright, OR
---         (b) extend the RPC + core.secrets purpose CHECK to allow
---             'pop3_password' and wire it through getEmailCredential.
---       (a) is the recommended path given zero live users.
+-- 7. ✓  POP3 dead branch in sync-emails/index.ts removed 2026-05-29.
+--       Replaced with a 410 GONE response carrying code POP3_RETIRED
+--       so any orphaned client request lands with a clear signal.
+--       The pop3_host / pop3_port / pop3_use_ssl / pop3_username /
+--       pop3_delete_policy columns aren't dropped by this migration —
+--       only the credential columns are. A future cleanup can prune
+--       the rest of the pop3_* columns once the UI strips the POP3
+--       provider option.
 --
 -- 8. ✓  In-memory `account.access_token` mutations in
 --       sync-emails-v2/services/gmail.ts (~lines 54, 122, 130, 138, 177)
