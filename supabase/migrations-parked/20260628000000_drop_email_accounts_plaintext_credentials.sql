@@ -66,16 +66,14 @@
 --       the rest of the pop3_* columns once the UI strips the POP3
 --       provider option.
 --
--- 8. ✓  In-memory `account.access_token` mutations in
---       sync-emails-v2/services/gmail.ts (~lines 54, 122, 130, 138, 177)
---       and sync-emails/index.ts (~lines 547, 619, 656+) write the
---       freshly-resolved vault value back onto the account object so
---       downstream `Authorization: Bearer ${account.access_token}`
---       fetches use it without re-querying vault. After this DROP, the
---       TS type loses access_token (per gates 5 + 6) and those
---       assignments + reads are type errors. Refactor to a local
---       variable (e.g. `let accessToken = …; …Authorization: Bearer
---       ${accessToken}`) in the same PR that unparks.
+-- 8. ✓  In-memory access_token mutations refactored to locals 2026-05-29.
+--       sync-emails-v2/services/gmail.ts now keeps the live token on a
+--       `private currentAccessToken` instance field; sync-emails/index.ts
+--       Gmail branch uses `let currentAccessToken` and the Office 365
+--       branch uses `let officeToken`. No more `account.access_token = …`
+--       assignments anywhere. The only column reads that remain are the
+--       `fallback:` args passed to getEmailCredential — those vanish in
+--       this PR alongside gate #6.
 --
 -- Once 1–8 are checked, `git mv` this file into
 -- `supabase/migrations/`, keeping the timestamp prefix (it's late enough

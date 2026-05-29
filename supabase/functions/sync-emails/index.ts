@@ -539,12 +539,13 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       logger.info(`Syncing via Gmail API for account: ${account.email_address}`);
       
       // Phase 1 Slice C — vault read with column fallback during transition.
-      const vaultAccessToken = await getEmailCredential(
+      // Lives in a local variable (gate #8) so the post-DROP TS state stays
+      // valid even after access_token leaves the EmailAccount type.
+      let currentAccessToken: string | undefined = (await getEmailCredential(
         supabase,
         { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
         logger,
-      );
-      if (vaultAccessToken) account.access_token = vaultAccessToken;
+      )) ?? undefined;
 
       // Helper to refresh Gmail access token using stored refresh_token and oauth config
       const refreshGmailToken = async (): Promise<boolean> => {
@@ -616,7 +617,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
             .update({ token_expires_at: expiryIso })
             .eq("id", account.id);
 
-          account.access_token = newAccess;
+          currentAccessToken = newAccess;
           account.token_expires_at = expiryIso;
           logger.info("Gmail access token refreshed");
           return true;
@@ -627,9 +628,9 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       };
 
       // Ensure we have a valid token (refresh if expired/missing)
-      if (!account.access_token || (account.token_expires_at && new Date(account.token_expires_at) < new Date())) {
+      if (!currentAccessToken || (account.token_expires_at && new Date(account.token_expires_at) < new Date())) {
         const ok = await refreshGmailToken();
-        if (!ok && !account.access_token) {
+        if (!ok && !currentAccessToken) {
           throw new Error("No access token available for Gmail account");
         }
       }
@@ -653,7 +654,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       const syncGmailLabel = async (labelId: string, folder: string, direction: "inbound" | "outbound") => {
         const gmailApiUrl = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=${encodeURIComponent(labelId)}`;
         let listResponse = await fetch(gmailApiUrl, {
-          headers: { Authorization: `Bearer ${account.access_token}` },
+          headers: { Authorization: `Bearer ${currentAccessToken}` },
         });
 
         if (!listResponse.ok) {
@@ -663,7 +664,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
             const refreshed = await refreshGmailToken();
             if (refreshed) {
               listResponse = await fetch(gmailApiUrl, {
-                headers: { Authorization: `Bearer ${account.access_token}` },
+                headers: { Authorization: `Bearer ${currentAccessToken}` },
               });
             }
           }
@@ -684,7 +685,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
           try {
             const msgResponse = await fetch(
               `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msg.id}?format=full`,
-              { headers: { Authorization: `Bearer ${account.access_token}` } }
+              { headers: { Authorization: `Bearer ${currentAccessToken}` } }
             );
 
             if (!msgResponse.ok) {
@@ -729,7 +730,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
                 try {
                   const attResp = await fetch(
                     `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgData.id}/attachments/${part.body.attachmentId}`,
-                    { headers: { Authorization: `Bearer ${account.access_token}` } }
+                    { headers: { Authorization: `Bearer ${currentAccessToken}` } }
                   );
 
                   if (attResp.ok) {
@@ -884,14 +885,13 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       logger.info(`Syncing via Office365 (Outlook API) for: ${account.email_address}`);
 
       // Phase 1 Slice C — vault-backed credential read with column fallback
-      // during the deploy → NULL-out transition window. Mirrors the Gmail
-      // path above + the Office365Provider in send-email.
-      const vaultAccessToken = await getEmailCredential(
+      // during the deploy → NULL-out transition window. Lives in a local
+      // variable (gate #8) so this branch compiles after the column DROP.
+      let officeToken: string | undefined = (await getEmailCredential(
         supabase,
         { account_id: account.id, purpose: "oauth_access_token", fallback: account.access_token ?? null },
         logger,
-      );
-      if (vaultAccessToken) account.access_token = vaultAccessToken;
+      )) ?? undefined;
 
       const refreshOfficeToken = async (): Promise<{ accessToken?: string }> => {
         try {
@@ -994,8 +994,8 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         }
       };
 
-      // Ensure we have a valid token (refresh if expired/missing)
-      let officeToken = account.access_token as string | undefined;
+      // Ensure we have a valid token (refresh if expired/missing).
+      // officeToken is set from vault above; refresh into the same local.
       if (!officeToken || (account.token_expires_at && new Date(account.token_expires_at) < new Date())) {
         const { accessToken } = await refreshOfficeToken();
         officeToken = accessToken || officeToken;

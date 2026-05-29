@@ -12,6 +12,11 @@ export class GmailService {
   private supabase: SupabaseClient;
   private adminSupabase?: SupabaseClient;
   private logger?: Logger;
+  // Phase 1 Slice C — live access token, kept on the instance so a single
+  // sync run doesn't round-trip vault for every Gmail API call. Replaces
+  // the prior pattern of mutating this.account.access_token, which
+  // becomes a type error once the column is dropped.
+  private currentAccessToken: string | undefined;
 
   constructor(account: EmailAccount, supabase: SupabaseClient, adminSupabase?: SupabaseClient, logger?: Logger) {
     this.account = account;
@@ -35,9 +40,11 @@ export class GmailService {
 
   /**
    * Phase 1 Slice C — resolve access_token via vault on entry, then refresh
-   * if expiring. `this.account.access_token` is kept as the live in-memory
-   * value so the per-message fetch calls keep using `Authorization: Bearer …`
-   * without round-tripping vault on every request.
+   * if expiring. The resolved value lives on this.currentAccessToken
+   * (an instance field) so the per-message fetch calls keep using
+   * `Authorization: Bearer …` without round-tripping vault on every
+   * request. Does not mutate this.account.access_token — that column
+   * is being dropped.
    */
   private async ensureAccessToken() {
     const dbClient = this.adminSupabase || this.supabase;
@@ -51,9 +58,9 @@ export class GmailService {
       },
       this.logger,
     );
-    if (cached) this.account.access_token = cached;
+    if (cached) this.currentAccessToken = cached;
 
-    if (this.account.access_token && this.account.token_expires_at) {
+    if (this.currentAccessToken && this.account.token_expires_at) {
       if (new Date(this.account.token_expires_at).getTime() - Date.now() > 5 * 60 * 1000) return;
     }
     await this.refreshAccessToken(dbClient);
@@ -119,7 +126,7 @@ export class GmailService {
         .update({ token_expires_at: expiryIso })
         .eq("id", this.account.id);
 
-    this.account.access_token = newAccess;
+    this.currentAccessToken = newAccess;
     this.account.token_expires_at = expiryIso;
   }
 
@@ -127,7 +134,7 @@ export class GmailService {
     // Max 20 messages for now
     const url = `https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=20&labelIds=${labelId}`;
     const resp = await fetch(url, {
-        headers: { Authorization: `Bearer ${this.account.access_token}` }
+        headers: { Authorization: `Bearer ${this.currentAccessToken}` }
     });
     
     if (!resp.ok) {
@@ -135,7 +142,7 @@ export class GmailService {
             await this.ensureAccessToken();
             // Retry once
              const retryResp = await fetch(url, {
-                headers: { Authorization: `Bearer ${this.account.access_token}` }
+                headers: { Authorization: `Bearer ${this.currentAccessToken}` }
             });
             if (!retryResp.ok) throw new Error(`Gmail API error: ${await retryResp.text()}`);
              // Process retryResp
@@ -174,7 +181,7 @@ export class GmailService {
 
             const resp = await fetch(
                 `https://gmail.googleapis.com/gmail/v1/users/me/messages/${msgStub.id}?format=raw`,
-                { headers: { Authorization: `Bearer ${this.account.access_token}` } }
+                { headers: { Authorization: `Bearer ${this.currentAccessToken}` } }
             );
             
             if (!resp.ok) continue;
