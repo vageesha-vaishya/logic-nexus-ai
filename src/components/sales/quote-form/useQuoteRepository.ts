@@ -197,7 +197,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
       if (!tenantId) return [];
       try {
         const { data, error } = await supabase
-          .from('accounts')
+          .from('v_accounts')
           .select('id, name')
           .eq('tenant_id', tenantId)
           .order('name');
@@ -336,7 +336,7 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
       if (!tenantId) return [];
       try {
         const { data, error } = await supabase
-          .from('contacts')
+          .from('v_contacts')
           .select('id, first_name, last_name, account_id')
           .eq('tenant_id', tenantId)
           .order('first_name');
@@ -1002,7 +1002,7 @@ export function useQuoteRepositoryForm(opts: {
       if (accId && !accounts.some((a) => String(a.id) === accId)) {
         requests.push((async () => {
           const { data: acc } = await scopedDb
-            .from('accounts')
+            .from('v_accounts')
             .select('id, name')
             .eq('id', accId)
             .maybeSingle();
@@ -1018,7 +1018,7 @@ export function useQuoteRepositoryForm(opts: {
       if (conId && !contacts.some((c) => String(c.id) === conId)) {
         requests.push((async () => {
           const { data: con } = await scopedDb
-            .from('contacts')
+            .from('v_contacts')
             .select('id, first_name, last_name, account_id')
             .eq('id', conId)
             .maybeSingle();

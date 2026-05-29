@@ -42,7 +42,7 @@ export class AccountService {
 
   async getAccountWithDetails(accountId: string) {
     const { data, error } = await this.supabase
-      .from('accounts')
+      .from('v_accounts')
       .select(`
         *,
         contacts(*),

@@ -87,7 +87,7 @@ export default function AccountDetailLegacy() {
   const fetchAccount = async () => {
     try {
       const { data, error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .select('*')
         .eq('id', id)
         .maybeSingle();
@@ -98,7 +98,7 @@ export default function AccountDetailLegacy() {
       // Fetch parent account if exists
       if (data?.parent_account_id) {
         const { data: parentData } = await scopedDb
-          .from('accounts')
+          .from('v_accounts')
           .select('id, name')
           .eq('id', data.parent_account_id)
           .maybeSingle();
@@ -174,7 +174,7 @@ export default function AccountDetailLegacy() {
   const fetchRelatedContacts = async (accountId: string) => {
     try {
       const { data, error } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .select('id, first_name, last_name, email, phone')
         .eq('account_id', accountId)
         .limit(5);
@@ -202,7 +202,7 @@ export default function AccountDetailLegacy() {
   const fetchChildAccounts = async (accountId: string) => {
     try {
       const { data, error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .select('id, name, account_type, status')
         .eq('parent_account_id', accountId)
         .order('name');
@@ -232,7 +232,7 @@ export default function AccountDetailLegacy() {
       });
 
       const { error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .update(payload)
         .eq('id', id);
 
@@ -250,7 +250,7 @@ export default function AccountDetailLegacy() {
   const handleDelete = async () => {
     try {
       const { error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .delete()
         .eq('id', id);
 
@@ -291,7 +291,7 @@ export default function AccountDetailLegacy() {
         },
       };
       const { error: updateError } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .update(payload)
         .eq('id', id);
       if (updateError) throw updateError;

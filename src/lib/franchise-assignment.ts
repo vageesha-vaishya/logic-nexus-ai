@@ -81,7 +81,7 @@ export async function verifyAssignment(
 }> {
   // Check Account
   const { data: account, error: accountError } = await supabase
-    .from('accounts')
+    .from('v_accounts')
     .select('id, tenant_id, franchise_id, name')
     .eq('id', accountId)
     .single();
@@ -90,7 +90,7 @@ export async function verifyAssignment(
 
   // Check Contact
   const { data: contact, error: contactError } = await supabase
-    .from('contacts')
+    .from('v_contacts')
     .select('id, tenant_id, franchise_id, account_id, email')
     .eq('id', contactId)
     .single();

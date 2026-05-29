@@ -88,14 +88,14 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
     const fetchData = async () => {
       // Fetch accounts
       const { data: accountsData } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .select('id, name')
         .order('name');
       if (accountsData) setAccounts(accountsData);
 
       // Fetch contacts (include account_id for filtering)
       const { data: contactsData } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .select('id, first_name, last_name, account_id')
         .order('first_name');
       if (contactsData) setContacts(contactsData);

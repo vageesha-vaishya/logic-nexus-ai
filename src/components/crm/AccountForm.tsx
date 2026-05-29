@@ -101,7 +101,7 @@ export function AccountForm({ initialData, onSubmit, onCancel }: AccountFormProp
 
   const loadParentAccounts = async () => {
     let query = scopedDb
-      .from('accounts')
+      .from('v_accounts')
       .select('id, name')
       .eq('status', 'active')
       .order('name');

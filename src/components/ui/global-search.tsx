@@ -103,12 +103,12 @@ export function GlobalSearch() {
           .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern},company.ilike.${searchPattern},email.ilike.${searchPattern}`)
           .range(0, PER_ENTITY_LIMIT - 1),
         scopedDb
-          .from("accounts")
+          .from('v_accounts')
           .select("id, name", { count: "exact" })
           .ilike("name", searchPattern)
           .range(0, PER_ENTITY_LIMIT - 1),
         scopedDb
-          .from("contacts")
+          .from('v_contacts')
           .select("id, first_name, last_name, email", { count: "exact" })
           .or(`first_name.ilike.${searchPattern},last_name.ilike.${searchPattern},email.ilike.${searchPattern}`)
           .range(0, PER_ENTITY_LIMIT - 1),

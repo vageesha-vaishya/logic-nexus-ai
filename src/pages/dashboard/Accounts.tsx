@@ -146,12 +146,12 @@ export default function Accounts() {
         const secondaries = group.filter((g) => g.id !== primary.id);
         for (const s of secondaries) {
           // Re-link related entities to primary account
-          await scopedDb.from('contacts').update({ account_id: primary.id }).eq('account_id', s.id);
+          await scopedDb.from('v_contacts').update({ account_id: primary.id }).eq('account_id', s.id);
           await scopedDb.from('opportunities').update({ account_id: primary.id }).eq('account_id', s.id);
           await scopedDb.from('quotes').update({ account_id: primary.id }).eq('account_id', s.id);
           await scopedDb.from('activities').update({ account_id: primary.id }).eq('account_id', s.id);
           // Delete secondary account
-          await scopedDb.from('accounts').delete().eq('id', s.id);
+          await scopedDb.from('v_accounts').delete().eq('id', s.id);
         }
       }
       toast.success('Duplicates merged successfully');

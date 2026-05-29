@@ -34,14 +34,14 @@ export default function ContactSelectDialogList({ open, onOpenChange, onSelect }
       setLoading(true);
       try {
         const { data: contactsData, error: contactsErr } = await scopedDb
-          .from('contacts')
+          .from('v_contacts')
           .select('*, accounts(*)')
           .order('created_at', { ascending: false })
           .limit(200);
         if (contactsErr) throw contactsErr;
 
         const { data: accountsData, error: accountsErr } = await scopedDb
-          .from('accounts')
+          .from('v_accounts')
           .select('id, name')
           .order('name', { ascending: true })
           .limit(200);

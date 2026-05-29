@@ -22,7 +22,7 @@ export function MyAccounts() {
       try {
         setLoading(true);
         const { data, error } = await scopedDb
-          .from('accounts')
+          .from('v_accounts')
           .select('id, company_name, industry, status, annual_revenue')
           .limit(4);
 

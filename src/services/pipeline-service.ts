@@ -938,7 +938,7 @@ export const PipelineService = {
     const to = from + pageSize - 1;
 
     let query = scopedDb
-      .from('accounts')
+      .from('v_accounts')
       .select('*, contacts:contacts(id)', { count: 'exact' });
 
     if (search.trim()) {
@@ -967,7 +967,7 @@ export const PipelineService = {
     }
 
     let fallbackQuery = scopedDb
-      .from('accounts')
+      .from('v_accounts')
       .select('*', { count: 'exact' });
 
     if (search.trim()) {
@@ -1015,7 +1015,7 @@ export const PipelineService = {
     const to = from + pageSize - 1;
 
     let query = scopedDb
-      .from('contacts')
+      .from('v_contacts')
       .select('*, accounts(name)', { count: 'exact' });
 
     if (search.trim()) {
@@ -1040,7 +1040,7 @@ export const PipelineService = {
     }
 
     let fallbackQuery = scopedDb
-      .from('contacts')
+      .from('v_contacts')
       .select('*', { count: 'exact' });
 
     if (search.trim()) {

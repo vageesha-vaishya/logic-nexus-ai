@@ -253,7 +253,7 @@ export default function Quotes() {
         // Account name filter fallback: resolve matching account IDs first.
         const accountNameFilter = activeFilters.find((f) => f.field === 'account_name' && f.value);
         if (accountNameFilter) {
-          let accountsQuery = scopedDb.from('accounts').select('id');
+          let accountsQuery = scopedDb.from('v_accounts').select('id');
           switch (accountNameFilter.operator) {
             case 'equals':
               accountsQuery = accountsQuery.eq('name', accountNameFilter.value);
@@ -313,10 +313,10 @@ export default function Quotes() {
           ? scopedDb.from('carriers').select('id, carrier_name').in('id', carrierIds)
           : Promise.resolve({ data: [], error: null } as any),
         accountIds.length > 0
-          ? scopedDb.from('accounts').select('id, name').in('id', accountIds)
+          ? scopedDb.from('v_accounts').select('id, name').in('id', accountIds)
           : Promise.resolve({ data: [], error: null } as any),
         contactIds.length > 0
-          ? scopedDb.from('contacts').select('id, first_name, last_name').in('id', contactIds)
+          ? scopedDb.from('v_contacts').select('id, first_name, last_name').in('id', contactIds)
           : Promise.resolve({ data: [], error: null } as any),
         opportunityIds.length > 0
           ? scopedDb.from('opportunities').select('id, name').in('id', opportunityIds)

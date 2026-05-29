@@ -33,7 +33,7 @@ export default function AccountSelectDialogList({ open, onOpenChange, onSelect }
       setLoading(true);
       try {
         const { data, error } = await scopedDb
-          .from('accounts')
+          .from('v_accounts')
           .select('*')
           .order('created_at', { ascending: false })
           .limit(200);

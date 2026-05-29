@@ -74,7 +74,7 @@ export function ContactForm({ initialData, onSubmit, onCancel }: ContactFormProp
 
   const fetchAccounts = async () => {
     const { data } = await scopedDb
-      .from('accounts')
+      .from('v_accounts')
       .select('id, name')
       .order('name');
     if (data) setAccounts(data as any[]);

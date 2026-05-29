@@ -80,7 +80,7 @@ export default function ActivityDetail() {
           }
         } else if (formData.account_id && formData.account_id !== 'none') {
           const { data: account } = await supabase
-            .from('accounts')
+            .from('v_accounts')
             .select('tenant_id, franchise_id')
             .eq('id', formData.account_id)
             .single();
@@ -90,7 +90,7 @@ export default function ActivityDetail() {
           }
         } else if (formData.contact_id && formData.contact_id !== 'none') {
           const { data: contact } = await supabase
-            .from('contacts')
+            .from('v_contacts')
             .select('tenant_id, franchise_id')
             .eq('id', formData.contact_id)
             .single();

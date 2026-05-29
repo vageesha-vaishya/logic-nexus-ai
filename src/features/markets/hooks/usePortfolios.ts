@@ -202,7 +202,7 @@ export function useCrmContactSearch(query: string) {
       // see only their own). Adding a client-side filter would break platform admins
       // whose active-scope tenant differs from the tenant that owns the contacts.
       const { data, error } = await (supabase as any)
-        .from("contacts")
+        .from('v_contacts')
         .select("id, first_name, last_name, email, account_id, account:accounts(name)")
         .or(`first_name.ilike.%${debounced}%,last_name.ilike.%${debounced}%,email.ilike.%${debounced}%`)
         .limit(20);

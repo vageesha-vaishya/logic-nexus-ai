@@ -191,7 +191,7 @@ export default function AccountsPipeline() {
     else if (newStage === 'active' || newStage === 'vip') updates.status = 'active';
     else updates.status = 'pending';
     try {
-      const { error } = await scopedDb.from('accounts').update(updates).eq('id', accountId);
+      const { error } = await scopedDb.from('v_accounts').update(updates).eq('id', accountId);
       if (error) throw error;
       setAccounts((prev) => prev.map((a) => a.id === accountId ? { ...a, ...updates } : a));
       toast({ title: 'Success', description: 'Account stage updated' });
@@ -209,7 +209,7 @@ export default function AccountsPipeline() {
       else updates.status = 'pending';
 
       const { error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .update(updates)
         .in('id', Array.from(selected));
 

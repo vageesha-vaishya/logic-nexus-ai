@@ -56,7 +56,7 @@ export default function ContactDetail() {
   const fetchContact = async () => {
     try {
       const { data, error } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .select(`
           *,
           accounts (name)
@@ -154,7 +154,7 @@ export default function ContactDetail() {
       };
 
       const { error } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .update(payload)
         .eq('id', id);
 
@@ -172,7 +172,7 @@ export default function ContactDetail() {
   const handleDelete = async () => {
     try {
       const { error } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .delete()
         .eq('id', id);
 

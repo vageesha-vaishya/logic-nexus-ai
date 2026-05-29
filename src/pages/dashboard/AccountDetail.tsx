@@ -50,7 +50,7 @@ export default function AccountDetail() {
   const fetchAccount = async () => {
     try {
       const { data, error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .select('*')
         .eq('id', id)
         .maybeSingle();
@@ -72,7 +72,7 @@ export default function AccountDetail() {
   const fetchRelatedContacts = async (accountId: string) => {
     try {
       const { data } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .select('id, first_name, last_name, email, phone, title')
         .eq('account_id', accountId)
         .limit(10);
@@ -109,7 +109,7 @@ export default function AccountDetail() {
         // Remove form-specific fields
         delete updateData.type;
 
-        const { error } = await scopedDb.from('accounts').update(updateData).eq('id', id);
+        const { error } = await scopedDb.from('v_accounts').update(updateData).eq('id', id);
         if (error) throw error;
         toast.success('Account updated');
         if (returnTo) {
@@ -125,7 +125,7 @@ export default function AccountDetail() {
 
   const handleDelete = async () => {
      try {
-         await scopedDb.from('accounts').delete().eq('id', id);
+         await scopedDb.from('v_accounts').delete().eq('id', id);
          navigate('/dashboard/accounts');
      } catch (e) {
          toast.error('Delete failed');

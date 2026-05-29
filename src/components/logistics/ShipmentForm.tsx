@@ -104,7 +104,7 @@ export function ShipmentForm({ initialData, onSubmit, onCancel }: ShipmentFormPr
 
   useEffect(() => {
     (async () => {
-      const { data } = await scopedDb.from('accounts').select('id, name').order('name');
+      const { data } = await scopedDb.from('v_accounts').select('id, name').order('name');
       if (data) setAccounts(data as unknown as { id: string; name: string }[]);
     })();
   }, [scopedDb]);

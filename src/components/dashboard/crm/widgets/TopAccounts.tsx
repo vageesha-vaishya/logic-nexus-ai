@@ -22,7 +22,7 @@ export function TopAccounts() {
       try {
         setLoading(true);
         const { data, error: err } = await scopedDb
-          .from('accounts')
+          .from('v_accounts')
           .select('id, company_name, annual_revenue, status')
           .order('annual_revenue', { ascending: false })
           .limit(10);

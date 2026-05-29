@@ -202,7 +202,7 @@ export function KanbanDashboard() {
   useEffect(() => {
     const loadAccounts = async () => {
       const db = new ScopedDataAccess(supabase as any, context as unknown as DataAccessContext);
-      const query = (db.from("accounts") as any).select("id, name").limit(200).order("name");
+      const query = (db.from('v_accounts') as any).select("id, name").limit(200).order("name");
       const { data } = await query;
       setAccounts(data || []);
     };

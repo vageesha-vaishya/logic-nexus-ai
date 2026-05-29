@@ -48,7 +48,10 @@ const mockScopedDb = {
       };
     }
 
-    if (table === 'accounts') {
+    // Phase 2 Step 4b — frontend reads switched to v_accounts. The
+    // mock accepts both names so this test stays decoupled from the
+    // legacy/view transition.
+    if (table === 'accounts' || table === 'v_accounts') {
       return {
         select: () => ({
           order: () => ({
@@ -84,7 +87,7 @@ const mockScopedDb = {
       };
     }
 
-    if (table === 'contacts') {
+    if (table === 'contacts' || table === 'v_contacts') {
       return {
         select: () => ({
           order: () => ({
@@ -239,8 +242,10 @@ describe('LeadWorkspaceSections', () => {
     expect(screen.getByLabelText('Communication section')).toHaveClass('overflow-y-auto', 'scroll-smooth');
 
     await waitFor(() => {
-      expect(mockScopedDb.from).toHaveBeenCalledWith('accounts');
-      expect(mockScopedDb.from).toHaveBeenCalledWith('contacts');
+      // Phase 2 Step 4b — component reads from v_accounts / v_contacts
+      // views; legacy table names accepted by the mock dispatcher above.
+      expect(mockScopedDb.from).toHaveBeenCalledWith('v_accounts');
+      expect(mockScopedDb.from).toHaveBeenCalledWith('v_contacts');
     });
   });
 

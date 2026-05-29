@@ -126,7 +126,7 @@ export default function OpportunitiesPipeline() {
   const fetchAccounts = useCallback(async () => {
     try {
       const { data, error } = await scopedDb
-        .from("accounts")
+        .from('v_accounts')
         .select("id, name")
         .limit(100)
         .order("name");

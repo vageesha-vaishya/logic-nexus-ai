@@ -365,7 +365,7 @@ export function LeadWorkspaceSections({
     setAccountsError(null);
     try {
       const { data, error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .select('id, name, industry, phone, website')
         .order('updated_at', { ascending: false })
         .limit(100);
@@ -384,7 +384,7 @@ export function LeadWorkspaceSections({
     setContactsError(null);
     try {
       const baseQuery = scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .select('id, account_id, first_name, last_name, title, email, phone')
         .order('updated_at', { ascending: false })
         .limit(150);
@@ -742,7 +742,7 @@ export function LeadWorkspaceSections({
     try {
       setAccountActionLoading('create');
       const { data, error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .insert({
           tenant_id: context.tenantId,
           franchise_id: context.franchiseId,
@@ -789,7 +789,7 @@ export function LeadWorkspaceSections({
     try {
       setAccountActionLoading('update');
       const { data, error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .update({
           name,
           industry: accountDraft.industry || null,
@@ -817,7 +817,7 @@ export function LeadWorkspaceSections({
     try {
       setAccountActionLoading('delete');
       const { error } = await scopedDb
-        .from('accounts')
+        .from('v_accounts')
         .delete()
         .eq('id', selectedAccountId);
       if (error) throw error;
@@ -872,7 +872,7 @@ export function LeadWorkspaceSections({
     try {
       setContactActionLoading('create');
       const { data, error } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .insert({
           tenant_id: context.tenantId,
           franchise_id: context.franchiseId,
@@ -924,7 +924,7 @@ export function LeadWorkspaceSections({
     try {
       setContactActionLoading('update');
       const { data, error } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .update({
           account_id: selectedAccountId,
           first_name: firstName,
@@ -955,7 +955,7 @@ export function LeadWorkspaceSections({
     try {
       setContactActionLoading('delete');
       const { error } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .delete()
         .eq('id', selectedContactId);
       if (error) throw error;

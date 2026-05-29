@@ -177,7 +177,7 @@ export function UnifiedPartnerForm({
       if (!scopedDb) return;
       try {
         const { data, error } = await scopedDb
-          .from('accounts')
+          .from('v_accounts')
           .select('id, name')
           .order('name');
         

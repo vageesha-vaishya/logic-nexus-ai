@@ -22,7 +22,7 @@ export function KeyAccounts() {
         setLoading(true);
         // Fetch accounts sorted by revenue
         const { data, error } = await scopedDb
-          .from('accounts')
+          .from('v_accounts')
           .select('id, company_name, industry, annual_revenue')
           .order('annual_revenue', { ascending: false })
           .limit(5);

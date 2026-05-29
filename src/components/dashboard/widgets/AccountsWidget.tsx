@@ -25,7 +25,7 @@ export function AccountsWidget() {
       
       try {
         const { data, error } = await scopedDb
-          .from('accounts')
+          .from('v_accounts')
           .select('id, name, industry, status')
           .order('created_at', { ascending: false })
           .limit(5);

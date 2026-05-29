@@ -182,7 +182,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
       // 1. Create Account
       if (createAccount && accountPayload) {
         const { data: accData, error: accError } = await supabase
-          .from('accounts')
+          .from('v_accounts')
           .insert({
             ...accountPayload,
             tenant_id: tenantId,
@@ -204,7 +204,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
           throw new Error('Cannot create a contact without a parent account. Enable "Create Account" and try again.');
         }
         const { data: conData, error: conError } = await supabase
-          .from('contacts')
+          .from('v_contacts')
           .insert({
             ...contactPayload,
             account_id: newAccountId,

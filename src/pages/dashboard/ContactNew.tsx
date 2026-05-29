@@ -54,7 +54,7 @@ export default function ContactNew() {
       };
 
       const { data, error } = await scopedDb
-        .from('contacts')
+        .from('v_contacts')
         .insert(contactData)
         .select()
         .single();

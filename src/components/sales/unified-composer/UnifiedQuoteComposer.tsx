@@ -450,12 +450,12 @@ function UnifiedQuoteComposerContent({
         logger.debug('Fetching CRM data and ports');
 
         const deferredFetch = retryFetch(() => Promise.all([
-          scopedDb.from('contacts').select('id, first_name, last_name, account_id').order('last_name'),
+          scopedDb.from('v_contacts').select('id, first_name, last_name, account_id').order('last_name'),
           scopedDb.from('opportunities').select('id, name, account_id, contact_id').order('created_at', { ascending: false }),
         ]));
 
         const [accRes, ports] = await retryFetch(() => Promise.all([
-          scopedDb.from('accounts').select('id, name').order('name'),
+          scopedDb.from('v_accounts').select('id, name').order('name'),
           portsService.getAllPorts()
         ]));
 

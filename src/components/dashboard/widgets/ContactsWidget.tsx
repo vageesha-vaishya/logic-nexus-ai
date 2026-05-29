@@ -26,7 +26,7 @@ export function ContactsWidget() {
       
       try {
         const { data, error } = await scopedDb
-          .from('contacts')
+          .from('v_contacts')
           .select('id, first_name, last_name, email, title')
           .order('created_at', { ascending: false })
           .limit(5);

@@ -445,7 +445,7 @@ export default function LeadDetail() {
       const data = await runWithRetry(
         async () => {
           const { data: accountData, error } = await scopedDb
-            .from('accounts')
+            .from('v_accounts')
             .select('id, name, industry, phone, website, annual_revenue')
             .eq('id', accountId)
             .maybeSingle();

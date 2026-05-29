@@ -24,7 +24,7 @@ export function MyActiveLeads() {
       try {
         setLoading(true);
         const { data, error: err } = await scopedDb
-          .from('contacts')
+          .from('v_contacts')
           .select('id, first_name, last_name, email, phone, created_at')
           .order('created_at', { ascending: false })
           .limit(10);
