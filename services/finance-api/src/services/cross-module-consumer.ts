@@ -121,12 +121,17 @@ export class CrossModuleConsumer {
       for (const row of data as OutboxEvent[]) {
         try {
           await this.dispatch(row);
+          // dispatch() stamps published_at on success; flip any
+          // pre-existing retry row to 'resolved' for monitoring history.
+          await this.markRetryResolved(row.id);
         } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
           logger.error('cross-module consumer dispatch failed', {
             outboxId: row.id,
             eventType: row.event_type,
-            error: err instanceof Error ? err.message : String(err),
+            error: message,
           });
+          await this.recordRetry(row, message);
         }
       }
     } finally {
@@ -329,6 +334,42 @@ export class CrossModuleConsumer {
         outboxId,
         error: error.message,
       });
+    }
+  }
+
+  // Calls core.record_outbox_retry(). Upserts a retry row with
+  // exponential backoff; flips to 'exhausted' after max_attempts. If
+  // this RPC itself fails (e.g., DB unreachable), log + continue — the
+  // event stays unpublished and will retry on the next poll regardless
+  // (without backoff in that case, but at least we don't lose it).
+  private async recordRetry(event: OutboxEvent, errorMessage: string): Promise<void> {
+    try {
+      const { error } = await this.supabase.schema('core').rpc('record_outbox_retry', {
+        p_outbox_id: event.id,
+        p_tenant_id: event.tenant_id,
+        p_error_message: errorMessage,
+      });
+      if (error) {
+        logger.error('cross-module consumer failed to record retry', {
+          outboxId: event.id,
+          error: error.message,
+        });
+      }
+    } catch (err) {
+      logger.error('cross-module consumer record_outbox_retry threw', {
+        outboxId: event.id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+  }
+
+  // Calls core.mark_outbox_resolved() on success. No-op when no retry
+  // row exists (first-attempt success — the happy path).
+  private async markRetryResolved(outboxId: string): Promise<void> {
+    try {
+      await this.supabase.schema('core').rpc('mark_outbox_resolved', { p_outbox_id: outboxId });
+    } catch {
+      // Non-load-bearing: outbox.published_at is the truth. Just swallow.
     }
   }
 }
