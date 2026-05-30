@@ -44,6 +44,10 @@ export interface SendResult {
   errorText?: string;
   // Provider name as it goes into comms.deliveries.provider.
   providerName: string;
+  // Phase 6 Step 10 — when true, the delivery-worker skips retries and
+  // transitions the row to status='failed' immediately. Use for clear
+  // 4xx-class errors (bad payload, unverified domain, invalid recipient).
+  permanent?: boolean;
 }
 
 export interface EmailProvider {
@@ -63,6 +67,8 @@ export class NullEmailProvider implements EmailProvider {
       providerName: this.name,
       errorText:
         'no email provider configured (set COMMS_EMAIL_PROVIDER=resend + RESEND_API_KEY to enable real sends)',
+      // Misconfiguration, not a transient network error — don't retry.
+      permanent: true,
     };
   }
 }

@@ -64,10 +64,17 @@ export class ResendEmailProvider implements EmailProvider {
       });
       const json = (await res.json().catch(() => ({}))) as { id?: string; message?: string; name?: string };
       if (!res.ok) {
+        // 4xx (except 408/429) are caller-fault — don't retry. 5xx + 408/429
+        // are transient. 401/403 typically means a bad/rotated API key —
+        // also caller-fault.
+        const permanent =
+          (res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429) ||
+          /domain is not verified|invalid.*from address|API key/i.test(json.message || '');
         return {
           ok: false,
           providerName: this.name,
           errorText: json.message || json.name || `Resend HTTP ${res.status}`,
+          permanent,
         };
       }
       return {
@@ -76,10 +83,12 @@ export class ResendEmailProvider implements EmailProvider {
         providerMessageId: json.id,
       };
     } catch (err) {
+      // Network / DNS / TLS errors are transient — let the worker back off.
       return {
         ok: false,
         providerName: this.name,
         errorText: err instanceof Error ? err.message : String(err),
+        permanent: false,
       };
     }
   }

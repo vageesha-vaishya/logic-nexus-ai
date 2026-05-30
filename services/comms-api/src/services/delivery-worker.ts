@@ -14,9 +14,15 @@
 //   - RFC 8058 List-Unsubscribe URL: stub points at /api/comms/unsubscribe
 //     with the delivery id — the unsubscribe page lands in a later slice.
 //
-// Retry: failed sends transition to status='failed' with error_text.
-// Re-queue / exponential backoff is a follow-up — for now, an operator
-// can flip the row back to 'pending' to retry.
+// Retry (Step 10): transient send failures stay status='pending' with
+// attempt_count incremented and next_retry_at set to now() + backoff.
+// The pickup query filters by next_retry_at <= now() so the row sits
+// out the backoff window. attempt_count >= max_attempts moves to
+// status='failed' permanently.
+//
+// Backoff curve (seconds): 30, 120, 480, 1800, 7200 — base 4, ceiling 2h.
+// Permanent errors (e.g., 4xx classified as bad-payload) skip retry by
+// returning ok:false + permanent:true from the provider.
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
@@ -87,12 +93,18 @@ export class DeliveryWorker {
 
   private async fetchPending(): Promise<DeliveryWithIntent[]> {
     if (!this.supabase) return [];
+    // Pickup criteria: pending + email + retry window elapsed.
+    // next_retry_at is NOT NULL with '-infinity' as the "ready now"
+    // sentinel — keeps this a single inequality (PostgREST .or() with
+    // is.null + timestamp literals is brittle).
+    const nowIso = new Date().toISOString();
     const { data, error } = await (this.supabase as any)
       .schema('comms')
       .from('deliveries')
       .select('*')
       .eq('status', 'pending')
       .eq('channel_kind', 'email')
+      .lte('next_retry_at', nowIso)
       .order('created_at', { ascending: true })
       .limit(BATCH_SIZE);
     if (error) {
@@ -157,13 +169,50 @@ export class DeliveryWorker {
         provider: result.providerName,
         provider_message_id: result.providerMessageId ?? null,
         sent_at: new Date().toISOString(),
+        attempt_count: (delivery.attempt_count ?? 0) + 1,
       });
-    } else {
+      return;
+    }
+
+    // Failure path. Decide retry vs permanent based on attempt cap + provider hint.
+    const nextAttempt = (delivery.attempt_count ?? 0) + 1;
+    const maxAttempts = delivery.max_attempts ?? 5;
+    const isPermanent = result.permanent === true || nextAttempt >= maxAttempts;
+
+    if (isPermanent) {
       await this.markStatus(delivery.id, 'failed', {
         provider: result.providerName,
         error_text: result.errorText ?? 'unknown provider error',
         failed_at: new Date().toISOString(),
+        attempt_count: nextAttempt,
       });
+      return;
+    }
+
+    const nextRetryAt = new Date(Date.now() + computeBackoffMs(nextAttempt)).toISOString();
+    await this.updateRow(delivery.id, {
+      // Stays status='pending' — the next tick will re-evaluate at next_retry_at.
+      provider: result.providerName,
+      error_text: result.errorText ?? 'unknown provider error',
+      attempt_count: nextAttempt,
+      next_retry_at: nextRetryAt,
+    });
+    logger.info('delivery scheduled for retry', {
+      id: delivery.id,
+      attempt: nextAttempt,
+      nextRetryAt,
+    });
+  }
+
+  private async updateRow(id: string, patch: Record<string, unknown>): Promise<void> {
+    if (!this.supabase) return;
+    const { error } = await (this.supabase as any)
+      .schema('comms')
+      .from('deliveries')
+      .update(patch)
+      .eq('id', id);
+    if (error) {
+      logger.warn('delivery row update failed', { id, error: error.message });
     }
   }
 
@@ -189,6 +238,15 @@ export class DeliveryWorker {
       failed_at: new Date().toISOString(),
     });
   }
+}
+
+// Exponential backoff: 30s, 2m, 8m, 30m, 2h. base=4, ceiling=2h.
+function computeBackoffMs(attempt: number): number {
+  const baseSeconds = 30;
+  const factor = 4;
+  const ceilingSeconds = 7200;
+  const delay = Math.min(baseSeconds * Math.pow(factor, attempt - 1), ceilingSeconds);
+  return delay * 1000;
 }
 
 function renderFromIntent(

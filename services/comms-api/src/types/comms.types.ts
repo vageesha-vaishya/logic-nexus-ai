@@ -54,6 +54,11 @@ export interface DeliveryRow {
   error_text: string | null;
   subject_type: string | null;
   subject_id: string | null;
+  // Phase 6 Step 10 — retry bookkeeping
+  attempt_count: number;
+  // NOT NULL with '-infinity' sentinel meaning "ready immediately".
+  next_retry_at: string;
+  max_attempts: number;
   created_at: string;
   updated_at: string;
 }
