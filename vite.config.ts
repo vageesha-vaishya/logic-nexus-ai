@@ -53,6 +53,7 @@ export default defineConfig(({ mode }) => {
   const salesApiProxyTarget = process.env.VITE_SALES_API_PROXY_TARGET || env.VITE_SALES_API_PROXY_TARGET || 'http://localhost:3201';
   const financeApiProxyTarget = process.env.VITE_FINANCE_API_PROXY_TARGET || env.VITE_FINANCE_API_PROXY_TARGET || 'http://localhost:3301';
   const logisticsApiProxyTarget = process.env.VITE_LOGISTICS_API_PROXY_TARGET || env.VITE_LOGISTICS_API_PROXY_TARGET || 'http://localhost:3401';
+  const complianceApiProxyTarget = process.env.VITE_COMPLIANCE_API_PROXY_TARGET || env.VITE_COMPLIANCE_API_PROXY_TARGET || 'http://localhost:3501';
   const amroApiProxyTarget = process.env.VITE_AMRO_API_PROXY_TARGET || env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
   const uimApiProxyTarget = process.env.VITE_UIM_API_PROXY_TARGET || env.VITE_UIM_API_PROXY_TARGET || 'http://localhost:3000';
   const tenantBrandingProxyTarget =
@@ -87,6 +88,13 @@ export default defineConfig(({ mode }) => {
     startCommand: 'cd services/logistics-api && npm run dev',
     target: logisticsApiProxyTarget,
     targetEnvVar: 'VITE_LOGISTICS_API_PROXY_TARGET',
+    healthPathHint: '/health',
+  });
+  const complianceProxy = createServiceProxy({
+    serviceName: 'Compliance API',
+    startCommand: 'cd services/compliance-api && npm run dev',
+    target: complianceApiProxyTarget,
+    targetEnvVar: 'VITE_COMPLIANCE_API_PROXY_TARGET',
     healthPathHint: '/health',
   });
   const amroProxy = createServiceProxy({
@@ -741,6 +749,10 @@ export default defineConfig(({ mode }) => {
       '/api/v1/tax': financeProxy,
       '/api/finance': financeProxy,
       '/api/logistics': logisticsProxy,
+      // Phase 6 compliance-api: screening reads + gating saga consumer.
+      // /api/v1/compliance/* must win over the /api/v1 → amro catch-all.
+      '/api/v1/compliance': complianceProxy,
+      '/api/compliance': complianceProxy,
       '/api/v1': amroProxy,
       '/api/v2/amro': amroProxy,
       '/api/v2/uim': uimProxy,
@@ -787,6 +799,10 @@ export default defineConfig(({ mode }) => {
       '/api/v1/tax': financeProxy,
       '/api/finance': financeProxy,
       '/api/logistics': logisticsProxy,
+      // Phase 6 compliance-api: screening reads + gating saga consumer.
+      // /api/v1/compliance/* must win over the /api/v1 → amro catch-all.
+      '/api/v1/compliance': complianceProxy,
+      '/api/compliance': complianceProxy,
       '/api/v1': amroProxy,
       '/api/v2/amro': amroProxy,
       '/api/v2/uim': uimProxy,
