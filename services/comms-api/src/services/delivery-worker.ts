@@ -29,6 +29,7 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { getEmailProvider } from '../providers/email-provider.js';
 import type { EmailProvider, OutboundEmail } from '../providers/email-provider.js';
 import { isSuppressed } from './suppressions.js';
+import { TemplateRenderer } from './template-renderer.js';
 import { logger } from '../utils/logger.js';
 import type { ChannelKind, DeliveryRow, NotificationIntent } from '../types/comms.types.js';
 
@@ -44,6 +45,7 @@ interface DeliveryWithIntent extends DeliveryRow {
 export class DeliveryWorker {
   private supabase: SupabaseClient | null = null;
   private emailProvider: EmailProvider | null = null;
+  private templateRenderer: TemplateRenderer | null = null;
   private running = false;
   private intervalHandle: NodeJS.Timeout | null = null;
 
@@ -56,6 +58,7 @@ export class DeliveryWorker {
     }
     this.supabase = createClient(url, key);
     this.emailProvider = getEmailProvider();
+    this.templateRenderer = new TemplateRenderer(this.supabase);
     logger.info('comms delivery worker starting', {
       pollMs: POLL_INTERVAL_MS,
       batch: BATCH_SIZE,
@@ -150,8 +153,22 @@ export class DeliveryWorker {
       return;
     }
 
-    // 2. Render. Minimal fallback only — templates wire-up is next slice.
-    const rendered = renderFromIntent(delivery.intent);
+    // 2. Render. Prefer a versioned template per (tenant, intent, channel,
+    // language); fall back to payload-supplied subject/html for ad-hoc
+    // intents (test rows, one-off emits).
+    const renderResult =
+      delivery.intent && this.templateRenderer
+        ? await this.templateRenderer.render({
+            tenantId: delivery.tenant_id,
+            intentKind: delivery.intent.intent_kind,
+            channelKind: channel,
+            language: ((delivery.intent.payload as Record<string, unknown> | null)?.['language'] as string) || 'en',
+            variables: { ...(delivery.intent.payload || {}), recipient_address: address },
+          })
+        : { rendered: null };
+
+    const rendered = renderResult.rendered ?? renderFromIntent(delivery.intent);
+    const templateVersionId = renderResult.rendered?.templateVersionId ?? null;
 
     // 3. Send.
     const email: OutboundEmail = {
@@ -170,6 +187,7 @@ export class DeliveryWorker {
         provider_message_id: result.providerMessageId ?? null,
         sent_at: new Date().toISOString(),
         attempt_count: (delivery.attempt_count ?? 0) + 1,
+        template_version_id: templateVersionId,
       });
       return;
     }
@@ -185,6 +203,7 @@ export class DeliveryWorker {
         error_text: result.errorText ?? 'unknown provider error',
         failed_at: new Date().toISOString(),
         attempt_count: nextAttempt,
+        template_version_id: templateVersionId,
       });
       return;
     }
@@ -196,6 +215,7 @@ export class DeliveryWorker {
       error_text: result.errorText ?? 'unknown provider error',
       attempt_count: nextAttempt,
       next_retry_at: nextRetryAt,
+      template_version_id: templateVersionId,
     });
     logger.info('delivery scheduled for retry', {
       id: delivery.id,
