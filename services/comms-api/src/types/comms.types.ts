@@ -15,6 +15,9 @@ export interface NotificationIntent {
   recipient_user_id: string | null;
   recipient_role_id: string | null;
   recipient_team_id: string | null;
+  // Phase 6 Step 6 — customer/vendor recipient
+  recipient_party_id: string | null;
+  recipient_address: string | null;
   subject_type: string;
   subject_id: string;
   intent_kind: string;
