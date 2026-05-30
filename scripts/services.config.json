@@ -81,6 +81,22 @@
       "dependsOn": []
     },
     {
+      "id": "comms",
+      "name": "Comms API",
+      "command": "cd services/comms-api && npx tsx watch src/index.ts",
+      "urlEnv": "VITE_COMMS_API_PROXY_TARGET",
+      "defaultUrl": "http://localhost:3601",
+      "remoteUrlEnv": "VITE_COMMS_API_PROXY_TARGET_REMOTE",
+      "remoteDefaultUrl": "",
+      "preferEndpoint": "local",
+      "healthPath": "/health",
+      "okStatus": [200],
+      "required": false,
+      "requiredWhenRemote": true,
+      "retry": { "attempts": 12, "baseDelayMs": 500, "timeoutMs": 30000 },
+      "dependsOn": []
+    },
+    {
       "id": "amro",
       "name": "AMRO API",
       "command": "cd services/amro-api && npx tsx watch src/index.ts",

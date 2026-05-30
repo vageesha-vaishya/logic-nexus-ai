@@ -54,6 +54,7 @@ export default defineConfig(({ mode }) => {
   const financeApiProxyTarget = process.env.VITE_FINANCE_API_PROXY_TARGET || env.VITE_FINANCE_API_PROXY_TARGET || 'http://localhost:3301';
   const logisticsApiProxyTarget = process.env.VITE_LOGISTICS_API_PROXY_TARGET || env.VITE_LOGISTICS_API_PROXY_TARGET || 'http://localhost:3401';
   const complianceApiProxyTarget = process.env.VITE_COMPLIANCE_API_PROXY_TARGET || env.VITE_COMPLIANCE_API_PROXY_TARGET || 'http://localhost:3501';
+  const commsApiProxyTarget = process.env.VITE_COMMS_API_PROXY_TARGET || env.VITE_COMMS_API_PROXY_TARGET || 'http://localhost:3601';
   const amroApiProxyTarget = process.env.VITE_AMRO_API_PROXY_TARGET || env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
   const uimApiProxyTarget = process.env.VITE_UIM_API_PROXY_TARGET || env.VITE_UIM_API_PROXY_TARGET || 'http://localhost:3000';
   const tenantBrandingProxyTarget =
@@ -95,6 +96,13 @@ export default defineConfig(({ mode }) => {
     startCommand: 'cd services/compliance-api && npm run dev',
     target: complianceApiProxyTarget,
     targetEnvVar: 'VITE_COMPLIANCE_API_PROXY_TARGET',
+    healthPathHint: '/health',
+  });
+  const commsProxy = createServiceProxy({
+    serviceName: 'Comms API',
+    startCommand: 'cd services/comms-api && npm run dev',
+    target: commsApiProxyTarget,
+    targetEnvVar: 'VITE_COMMS_API_PROXY_TARGET',
     healthPathHint: '/health',
   });
   const amroProxy = createServiceProxy({
@@ -753,6 +761,9 @@ export default defineConfig(({ mode }) => {
       // /api/v1/compliance/* must win over the /api/v1 → amro catch-all.
       '/api/v1/compliance': complianceProxy,
       '/api/compliance': complianceProxy,
+      // Phase 6 comms-api: delivery reads + core.notifications → comms.deliveries dispatcher.
+      '/api/v1/comms': commsProxy,
+      '/api/comms': commsProxy,
       '/api/v1': amroProxy,
       '/api/v2/amro': amroProxy,
       '/api/v2/uim': uimProxy,
@@ -803,6 +814,9 @@ export default defineConfig(({ mode }) => {
       // /api/v1/compliance/* must win over the /api/v1 → amro catch-all.
       '/api/v1/compliance': complianceProxy,
       '/api/compliance': complianceProxy,
+      // Phase 6 comms-api: delivery reads + core.notifications → comms.deliveries dispatcher.
+      '/api/v1/comms': commsProxy,
+      '/api/comms': commsProxy,
       '/api/v1': amroProxy,
       '/api/v2/amro': amroProxy,
       '/api/v2/uim': uimProxy,
