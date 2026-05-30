@@ -57,7 +57,9 @@ export async function addSuppression(
     reason: SuppressionReason;
     sourceEventId?: string | null;
     notes?: string | null;
-    addedByKind?: 'webhook' | 'manual' | 'system';
+    // CHECK constraint on comms.suppressions allows: system | admin | recipient_unsubscribe.
+    // 'system' covers anything auto-derived (webhook events, hard-bounce, complaint).
+    addedByKind?: 'system' | 'admin' | 'recipient_unsubscribe';
   },
 ): Promise<void> {
   const payload = {

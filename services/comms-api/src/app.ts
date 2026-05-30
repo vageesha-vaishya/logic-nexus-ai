@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
 import deliveriesRoutes from './routes/deliveries.routes.js';
+import unsubscribeRoutes from './routes/unsubscribe.routes.js';
 import webhooksRoutes from './routes/webhooks.routes.js';
 import type { ErrorResponse } from './types/comms.types.js';
 import { logger } from './utils/logger.js';
@@ -38,6 +39,10 @@ app.use(
     },
   }),
 );
+
+// RFC 8058 unsubscribe-post sends application/x-www-form-urlencoded.
+// Tiny limit — the body is decorative; the trust comes from the URL.
+app.use(express.urlencoded({ extended: false, limit: '1kb' }));
 
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 app.use(
@@ -140,9 +145,11 @@ function auditApiRequest(req: Request, res: Response, next: NextFunction): void 
   next();
 }
 
-// Webhook routes (no auth — Resend has no JWT) must mount BEFORE the
-// auth-gated /api stack. Signature verification is the trust boundary.
+// Webhook + unsubscribe routes (no auth — mail clients have no JWT)
+// must mount BEFORE the auth-gated /api stack. Resend webhook trusts
+// the Svix HMAC; unsubscribe trusts the unguessable delivery_id UUID.
 app.use('/api', webhooksRoutes);
+app.use('/api', unsubscribeRoutes);
 
 app.use('/api', authMiddleware, auditApiRequest, deliveriesRoutes);
 

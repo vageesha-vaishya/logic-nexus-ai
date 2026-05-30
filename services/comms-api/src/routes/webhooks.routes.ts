@@ -211,7 +211,7 @@ router.post(
         reason,
         sourceEventId: null,
         notes: `auto: resend ${event.type} ${event.data.bounce?.message || ''}`.trim(),
-        addedByKind: 'webhook',
+        addedByKind: 'system',
       });
     }
 
