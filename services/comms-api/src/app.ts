@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
 import deliveriesRoutes from './routes/deliveries.routes.js';
+import webhooksRoutes from './routes/webhooks.routes.js';
 import type { ErrorResponse } from './types/comms.types.js';
 import { logger } from './utils/logger.js';
 
@@ -27,7 +28,16 @@ type RequestWithScope = RequestWithCorrelation & {
   franchiseId?: string | null;
 };
 
-app.use(express.json());
+// Capture the raw body string on every parsed JSON request so the
+// webhook receiver can verify Svix HMAC signatures (which sign the
+// pre-parse bytes). Cheap — one Buffer.toString per request.
+app.use(
+  express.json({
+    verify: (req, _res, buf) => {
+      (req as Request & { rawBody?: string }).rawBody = buf.toString('utf8');
+    },
+  }),
+);
 
 const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
 app.use(
@@ -84,13 +94,15 @@ app.get('/comms/v1/_status', (_req: Request, res: Response) => {
       'comms.webhook_outbox',
     ],
     routes: [
-      'GET /api/v1/comms/deliveries',
-      'GET /api/v1/comms/notifications/:id/deliveries',
+      'GET  /api/v1/comms/deliveries',
+      'GET  /api/v1/comms/notifications/:id/deliveries',
+      'POST /api/comms/webhooks/resend  (Svix-signed, no auth)',
     ],
     consumers: [
       'notification-dispatcher (polls core.notifications, fans out into comms.deliveries via UNIQUE intent dedup index)',
+      'delivery-worker (picks up status=pending email deliveries, suppression-checks, sends via configured provider, writes status back)',
     ],
-    providers: ['null (no real provider wired yet — Step 4 lands Resend)'],
+    providers: [process.env.COMMS_EMAIL_PROVIDER || 'null'],
   });
 });
 
@@ -127,6 +139,10 @@ function auditApiRequest(req: Request, res: Response, next: NextFunction): void 
   });
   next();
 }
+
+// Webhook routes (no auth — Resend has no JWT) must mount BEFORE the
+// auth-gated /api stack. Signature verification is the trust boundary.
+app.use('/api', webhooksRoutes);
 
 app.use('/api', authMiddleware, auditApiRequest, deliveriesRoutes);
 

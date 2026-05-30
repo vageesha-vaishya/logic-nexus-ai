@@ -1,5 +1,12 @@
 // Phase 6 comms-api — email provider abstraction.
 //
+// Imports of provider implementations are restricted to this directory.
+// CI lint forbids importing `./resend.js`, `nodemailer`, `@aws-sdk/client-ses`
+// etc. from anywhere outside services/comms-api/src/providers/ — keep all
+// call sites routed through getEmailProvider() per comms.md §10.
+
+import { ResendEmailProvider } from './resend.js';
+//
 // The send-gateway calls EmailProvider.send() and never knows whether it
 // hit Resend, SES, nodemailer SMTP, etc. CI lint forbids any direct
 // import of 'resend' / 'nodemailer' / '@aws-sdk/client-ses' outside
@@ -60,7 +67,16 @@ export class NullEmailProvider implements EmailProvider {
 }
 
 export function getEmailProvider(): EmailProvider {
-  // Step 4 will read process.env.COMMS_EMAIL_PROVIDER (resend|ses|smtp)
-  // and return the corresponding implementation. Until then, no-op.
+  const kind = String(process.env.COMMS_EMAIL_PROVIDER || '').toLowerCase().trim();
+  if (kind === 'resend') {
+    const key = process.env.RESEND_API_KEY;
+    if (!key) {
+      // Falling through to the null provider keeps the worker running in
+      // environments without secrets — the delivery row lands with
+      // status='failed' and a descriptive error_text rather than crashing.
+      return new NullEmailProvider();
+    }
+    return new ResendEmailProvider(key);
+  }
   return new NullEmailProvider();
 }
