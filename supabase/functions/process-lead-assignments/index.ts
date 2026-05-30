@@ -132,15 +132,22 @@ serveWithLogger(async (req, logger, supabase) => {
         if (assignedUserId) {
              // Assign lead
              await supabase.from('leads').update({ owner_id: assignedUserId, status: 'new' }).eq('id', lead.id);
-             
-             // Create notification
-             await supabase.from('notifications').insert({
-                 user_id: assignedUserId,
-                 title: 'New Lead Assigned',
-                 message: `Lead ${lead.first_name} ${lead.last_name} has been assigned to you.`,
-                 type: 'lead_assignment',
-                 reference_id: lead.id
-             });
+
+             // Create in-app notification (markets.notifications is the in-app sink read by useNotifications).
+             // public.notifications was dropped — frontend never read it. Phase 6 (comms-api) will fan out
+             // to email/push via core.notifications intent.
+             await (supabase as any)
+                 .schema('markets')
+                 .from('notifications')
+                 .insert({
+                     user_id: assignedUserId,
+                     category: 'lead_assignment',
+                     severity: 'info',
+                     title: 'New Lead Assigned',
+                     body: `Lead ${lead.first_name} ${lead.last_name} has been assigned to you.`,
+                     data: { lead_id: lead.id },
+                     link_url: `/dashboard/sales/leads/${lead.id}`,
+                 });
         }
 
         // Update Queue

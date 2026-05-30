@@ -54,23 +54,8 @@ serveWithLogger(async (req, logger, supabase) => {
       for (const doc of documents) {
         const notificationType = `expiration_${days}`;
 
-        // Check if already notified
-        const { data: existing, error: checkError } = await supabase
-          .from('vendor_notifications')
-          .select('id')
-          .eq('document_id', doc.id)
-          .eq('notification_type', notificationType)
-          .single();
-
-        if (checkError && checkError.code !== 'PGRST116') { // PGRST116 is "no rows returned"
-           logger.error(`Error checking notification for doc ${doc.id}:`, { error: checkError });
-           continue;
-        }
-
-        if (existing) {
-          logger.info(`Already notified for doc ${doc.id} (${notificationType})`);
-          continue;
-        }
+        // Date-exact match query above means at most one notification per doc per day per threshold.
+        // Idempotent dedup will move to comms.deliveries (provider_message_id key) in Phase 6.
 
         // Send Email
         // @ts-ignore: Handle Supabase response structure (object or array)
@@ -104,14 +89,6 @@ serveWithLogger(async (req, logger, supabase) => {
         } else {
             logger.warn(`No email found for vendor ${vendorName} (${doc.vendor_id})`);
         }
-
-        // Log Notification
-        await supabase.from('vendor_notifications').insert({
-          vendor_id: doc.vendor_id,
-          document_id: doc.id,
-          notification_type: notificationType,
-          status: vendorEmail ? 'sent' : 'skipped_no_email'
-        });
 
         results.push({ doc_id: doc.id, type: notificationType, sent: !!vendorEmail });
       }

@@ -6686,157 +6686,6 @@ export type Database = {
         }
         Relationships: []
       }
-      billing_invoices: {
-        Row: {
-          created_at: string
-          currency: string
-          due_date: string | null
-          gst_amount: number | null
-          gst_rate: number
-          gstin_buyer: string | null
-          gstin_seller: string | null
-          id: string
-          invoice_number: string
-          is_b2b: boolean
-          issued_at: string | null
-          line_items: Json
-          paid_at: string | null
-          period_end: string | null
-          period_start: string | null
-          place_of_supply: string | null
-          razorpay_order_id: string | null
-          razorpay_payment_id: string | null
-          sac_code: string
-          status: string
-          subscription_id: string | null
-          subtotal_inr: number
-          tenant_id: string
-          total_inr: number | null
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          currency?: string
-          due_date?: string | null
-          gst_amount?: number | null
-          gst_rate?: number
-          gstin_buyer?: string | null
-          gstin_seller?: string | null
-          id?: string
-          invoice_number?: string
-          is_b2b?: boolean
-          issued_at?: string | null
-          line_items?: Json
-          paid_at?: string | null
-          period_end?: string | null
-          period_start?: string | null
-          place_of_supply?: string | null
-          razorpay_order_id?: string | null
-          razorpay_payment_id?: string | null
-          sac_code?: string
-          status?: string
-          subscription_id?: string | null
-          subtotal_inr: number
-          tenant_id: string
-          total_inr?: number | null
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          currency?: string
-          due_date?: string | null
-          gst_amount?: number | null
-          gst_rate?: number
-          gstin_buyer?: string | null
-          gstin_seller?: string | null
-          id?: string
-          invoice_number?: string
-          is_b2b?: boolean
-          issued_at?: string | null
-          line_items?: Json
-          paid_at?: string | null
-          period_end?: string | null
-          period_start?: string | null
-          place_of_supply?: string | null
-          razorpay_order_id?: string | null
-          razorpay_payment_id?: string | null
-          sac_code?: string
-          status?: string
-          subscription_id?: string | null
-          subtotal_inr?: number
-          tenant_id?: string
-          total_inr?: number | null
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "billing_invoices_subscription_id_fkey"
-            columns: ["subscription_id"]
-            isOneToOne: false
-            referencedRelation: "tenant_subscriptions"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      billing_payments: {
-        Row: {
-          amount_inr: number
-          captured_at: string | null
-          created_at: string
-          currency: string
-          failure_reason: string | null
-          id: string
-          invoice_id: string | null
-          metadata: Json
-          method: string | null
-          razorpay_order_id: string | null
-          razorpay_payment_id: string | null
-          razorpay_signature: string | null
-          status: string
-          tenant_id: string
-        }
-        Insert: {
-          amount_inr: number
-          captured_at?: string | null
-          created_at?: string
-          currency?: string
-          failure_reason?: string | null
-          id?: string
-          invoice_id?: string | null
-          metadata?: Json
-          method?: string | null
-          razorpay_order_id?: string | null
-          razorpay_payment_id?: string | null
-          razorpay_signature?: string | null
-          status?: string
-          tenant_id: string
-        }
-        Update: {
-          amount_inr?: number
-          captured_at?: string | null
-          created_at?: string
-          currency?: string
-          failure_reason?: string | null
-          id?: string
-          invoice_id?: string | null
-          metadata?: Json
-          method?: string | null
-          razorpay_order_id?: string | null
-          razorpay_payment_id?: string | null
-          razorpay_signature?: string | null
-          status?: string
-          tenant_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "billing_payments_invoice_id_fkey"
-            columns: ["invoice_id"]
-            isOneToOne: false
-            referencedRelation: "billing_invoices"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       booking_agents: {
         Row: {
           configuration: Json | null
@@ -7687,6 +7536,7 @@ export type Database = {
           mode: Database["public"]["Enums"]["transport_mode"]
           name: string | null
           notes: string | null
+          party_id: string | null
           rating: number | null
           scac: string | null
           scac_code: string | null
@@ -7712,6 +7562,7 @@ export type Database = {
           mode: Database["public"]["Enums"]["transport_mode"]
           name?: string | null
           notes?: string | null
+          party_id?: string | null
           rating?: number | null
           scac?: string | null
           scac_code?: string | null
@@ -7737,6 +7588,7 @@ export type Database = {
           mode?: Database["public"]["Enums"]["transport_mode"]
           name?: string | null
           notes?: string | null
+          party_id?: string | null
           rating?: number | null
           scac?: string | null
           scac_code?: string | null
@@ -7745,7 +7597,22 @@ export type Database = {
           updated_at?: string | null
           website?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "carriers_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "carriers_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       certification_actions: {
         Row: {
@@ -15950,42 +15817,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      notifications: {
-        Row: {
-          created_at: string | null
-          id: string
-          link: string | null
-          message: string | null
-          metadata: Json | null
-          read: boolean | null
-          title: string
-          type: string
-          user_id: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          link?: string | null
-          message?: string | null
-          metadata?: Json | null
-          read?: boolean | null
-          title: string
-          type: string
-          user_id?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          link?: string | null
-          message?: string | null
-          metadata?: Json | null
-          read?: boolean | null
-          title?: string
-          type?: string
-          user_id?: string | null
-        }
-        Relationships: []
       }
       nyc_ded_routing_matrix: {
         Row: {
@@ -29939,51 +29770,6 @@ export type Database = {
           },
         ]
       }
-      vendor_notifications: {
-        Row: {
-          document_id: string | null
-          error_message: string | null
-          id: string
-          notification_type: string
-          sent_at: string | null
-          status: string | null
-          vendor_id: string | null
-        }
-        Insert: {
-          document_id?: string | null
-          error_message?: string | null
-          id?: string
-          notification_type: string
-          sent_at?: string | null
-          status?: string | null
-          vendor_id?: string | null
-        }
-        Update: {
-          document_id?: string | null
-          error_message?: string | null
-          id?: string
-          notification_type?: string
-          sent_at?: string | null
-          status?: string | null
-          vendor_id?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vendor_notifications_document_id_fkey"
-            columns: ["document_id"]
-            isOneToOne: false
-            referencedRelation: "vendor_documents"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "vendor_notifications_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       vendor_performance_metrics: {
         Row: {
           cost_score: number | null
@@ -30090,41 +29876,6 @@ export type Database = {
           },
           {
             foreignKeyName: "vendor_performance_reviews_vendor_id_fkey"
-            columns: ["vendor_id"]
-            isOneToOne: false
-            referencedRelation: "vendors"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      vendor_portal_activity: {
-        Row: {
-          activity_type: string
-          created_at: string | null
-          id: string
-          metadata: Json | null
-          user_id: string | null
-          vendor_id: string
-        }
-        Insert: {
-          activity_type: string
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          user_id?: string | null
-          vendor_id: string
-        }
-        Update: {
-          activity_type?: string
-          created_at?: string | null
-          id?: string
-          metadata?: Json | null
-          user_id?: string | null
-          vendor_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "vendor_portal_activity_vendor_id_fkey"
             columns: ["vendor_id"]
             isOneToOne: false
             referencedRelation: "vendors"
@@ -30280,6 +30031,7 @@ export type Database = {
           name: string
           onboarding_status: string | null
           operational_data: Json | null
+          party_id: string | null
           payment_terms: string | null
           performance_metrics: Json | null
           performance_rating: number | null
@@ -30304,6 +30056,7 @@ export type Database = {
           name: string
           onboarding_status?: string | null
           operational_data?: Json | null
+          party_id?: string | null
           payment_terms?: string | null
           performance_metrics?: Json | null
           performance_rating?: number | null
@@ -30328,6 +30081,7 @@ export type Database = {
           name?: string
           onboarding_status?: string | null
           operational_data?: Json | null
+          party_id?: string | null
           payment_terms?: string | null
           performance_metrics?: Json | null
           performance_rating?: number | null
@@ -30345,6 +30099,20 @@ export type Database = {
             columns: ["franchise_id"]
             isOneToOne: false
             referencedRelation: "franchises"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "v_accounts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vendors_party_id_fkey"
+            columns: ["party_id"]
+            isOneToOne: false
+            referencedRelation: "v_contacts"
             referencedColumns: ["id"]
           },
           {
@@ -31861,6 +31629,64 @@ export type Database = {
         }
         Relationships: []
       }
+      v_accounts: {
+        Row: {
+          account_number: string | null
+          account_site: string | null
+          account_type: string | null
+          active: boolean | null
+          annual_revenue: number | null
+          billing_address: Json | null
+          billing_city: string | null
+          billing_country: string | null
+          billing_postal_code: string | null
+          billing_state: string | null
+          billing_street: string | null
+          created_at: string | null
+          created_by: string | null
+          custom_fields: Json | null
+          customer_priority: string | null
+          description: string | null
+          duns_number: string | null
+          email: string | null
+          employee_count: number | null
+          external_refs: Json | null
+          fax: string | null
+          franchise_id: string | null
+          id: string | null
+          industry: string | null
+          last_activity_at: string | null
+          legacy_json: Json | null
+          legal_name: string | null
+          naics_code: string | null
+          name: string | null
+          number_of_locations: number | null
+          owner_id: string | null
+          ownership: string | null
+          parent_account_id: string | null
+          phone: string | null
+          rating: string | null
+          shipping_address: Json | null
+          shipping_city: string | null
+          shipping_country: string | null
+          shipping_postal_code: string | null
+          shipping_state: string | null
+          shipping_street: string | null
+          sic_code: string | null
+          sla: string | null
+          sla_expiration_date: string | null
+          social_profiles: Json | null
+          status: string | null
+          support_tier: string | null
+          tax_id: string | null
+          tenant_id: string | null
+          ticker_symbol: string | null
+          updated_at: string | null
+          upsell_opportunity: string | null
+          website: string | null
+        }
+        Relationships: []
+      }
       v_aircraft_maintenance_status: {
         Row: {
           alert_message: string | null
@@ -31873,6 +31699,419 @@ export type Database = {
           tail_number: string | null
           task_code: string | null
           which_comes_first: string | null
+        }
+        Relationships: []
+      }
+      v_campaign_members: {
+        Row: {
+          added_at: string | null
+          campaign_id: string | null
+          clicked_at: string | null
+          converted_at: string | null
+          created_at: string | null
+          delivered_at: string | null
+          id: string | null
+          last_error: string | null
+          metadata: Json | null
+          opened_at: string | null
+          opted_out_at: string | null
+          party_id: string | null
+          responded_at: string | null
+          sent_at: string | null
+          status: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          added_at?: string | null
+          campaign_id?: string | null
+          clicked_at?: string | null
+          converted_at?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          id?: string | null
+          last_error?: string | null
+          metadata?: Json | null
+          opened_at?: string | null
+          opted_out_at?: string | null
+          party_id?: string | null
+          responded_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          added_at?: string | null
+          campaign_id?: string | null
+          clicked_at?: string | null
+          converted_at?: string | null
+          created_at?: string | null
+          delivered_at?: string | null
+          id?: string | null
+          last_error?: string | null
+          metadata?: Json | null
+          opened_at?: string | null
+          opted_out_at?: string | null
+          party_id?: string | null
+          responded_at?: string | null
+          sent_at?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      v_campaigns: {
+        Row: {
+          budget: number | null
+          channel: string | null
+          clicked_count: number | null
+          converted_count: number | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          custom_fields: Json | null
+          delivered_count: number | null
+          description: string | null
+          end_at: string | null
+          franchise_id: string | null
+          id: string | null
+          name: string | null
+          opened_count: number | null
+          owner_id: string | null
+          sent_count: number | null
+          spend_to_date: number | null
+          start_at: string | null
+          status: string | null
+          tags: string[] | null
+          target_audience: Json | null
+          target_count: number | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          budget?: number | null
+          channel?: string | null
+          clicked_count?: number | null
+          converted_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          custom_fields?: Json | null
+          delivered_count?: number | null
+          description?: string | null
+          end_at?: string | null
+          franchise_id?: string | null
+          id?: string | null
+          name?: string | null
+          opened_count?: number | null
+          owner_id?: string | null
+          sent_count?: number | null
+          spend_to_date?: number | null
+          start_at?: string | null
+          status?: string | null
+          tags?: string[] | null
+          target_audience?: Json | null
+          target_count?: number | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          budget?: number | null
+          channel?: string | null
+          clicked_count?: number | null
+          converted_count?: number | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          custom_fields?: Json | null
+          delivered_count?: number | null
+          description?: string | null
+          end_at?: string | null
+          franchise_id?: string | null
+          id?: string | null
+          name?: string | null
+          opened_count?: number | null
+          owner_id?: string | null
+          sent_count?: number | null
+          spend_to_date?: number | null
+          start_at?: string | null
+          status?: string | null
+          tags?: string[] | null
+          target_audience?: Json | null
+          target_count?: number | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      v_commission_rules: {
+        Row: {
+          account_id: string | null
+          created_at: string | null
+          created_by: string | null
+          effective_from: string | null
+          effective_to: string | null
+          id: string | null
+          metadata: Json | null
+          name: string | null
+          owner_id: string | null
+          priority: number | null
+          rate_percent: number | null
+          status: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string | null
+          metadata?: Json | null
+          name?: string | null
+          owner_id?: string | null
+          priority?: number | null
+          rate_percent?: number | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          effective_from?: string | null
+          effective_to?: string | null
+          id?: string | null
+          metadata?: Json | null
+          name?: string | null
+          owner_id?: string | null
+          priority?: number | null
+          rate_percent?: number | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      v_commissions: {
+        Row: {
+          account_id: string | null
+          amount: number | null
+          amount_base: number | null
+          commission_rule_id: string | null
+          computed_at: string | null
+          created_at: string | null
+          currency: string | null
+          id: string | null
+          metadata: Json | null
+          opportunity_id: string | null
+          owner_id: string | null
+          rate_percent: number | null
+          source_outbox_id: string | null
+          status: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          account_id?: string | null
+          amount?: number | null
+          amount_base?: number | null
+          commission_rule_id?: string | null
+          computed_at?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string | null
+          metadata?: Json | null
+          opportunity_id?: string | null
+          owner_id?: string | null
+          rate_percent?: number | null
+          source_outbox_id?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          account_id?: string | null
+          amount?: number | null
+          amount_base?: number | null
+          commission_rule_id?: string | null
+          computed_at?: string | null
+          created_at?: string | null
+          currency?: string | null
+          id?: string | null
+          metadata?: Json | null
+          opportunity_id?: string | null
+          owner_id?: string | null
+          rate_percent?: number | null
+          source_outbox_id?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      v_contacts: {
+        Row: {
+          account_id: string | null
+          address: Json | null
+          created_at: string | null
+          created_by: string | null
+          custom_fields: Json | null
+          department: string | null
+          email: string | null
+          external_refs: Json | null
+          first_name: string | null
+          franchise_id: string | null
+          id: string | null
+          is_primary: boolean | null
+          last_activity_at: string | null
+          last_name: string | null
+          lead_source: string | null
+          legacy_json: Json | null
+          lifecycle_stage: string | null
+          linkedin_url: string | null
+          mobile: string | null
+          name: string | null
+          notes: string | null
+          owner_id: string | null
+          phone: string | null
+          reports_to: string | null
+          social_profiles: Json | null
+          status: string | null
+          tenant_id: string | null
+          title: string | null
+          title_level: string | null
+          updated_at: string | null
+        }
+        Relationships: []
+      }
+      v_finance_invoices: {
+        Row: {
+          balance_due: number | null
+          billing_address: Json | null
+          created_at: string | null
+          created_by: string | null
+          currency: string | null
+          customer_id: string | null
+          due_date: string | null
+          exchange_rate: number | null
+          franchise_id: string | null
+          id: string | null
+          invoice_number: string | null
+          issue_date: string | null
+          metadata: Json | null
+          notes: string | null
+          shipment_id: string | null
+          shipping_address: Json | null
+          status: Database["public"]["Enums"]["invoice_status"] | null
+          subtotal: number | null
+          tax_total: number | null
+          tenant_id: string | null
+          terms: string | null
+          total: number | null
+          type: Database["public"]["Enums"]["invoice_type"] | null
+          updated_at: string | null
+        }
+        Insert: {
+          balance_due?: number | null
+          billing_address?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          customer_id?: string | null
+          due_date?: string | null
+          exchange_rate?: number | null
+          franchise_id?: string | null
+          id?: string | null
+          invoice_number?: string | null
+          issue_date?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          shipment_id?: string | null
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["invoice_status"] | null
+          subtotal?: number | null
+          tax_total?: number | null
+          tenant_id?: string | null
+          terms?: string | null
+          total?: number | null
+          type?: Database["public"]["Enums"]["invoice_type"] | null
+          updated_at?: string | null
+        }
+        Update: {
+          balance_due?: number | null
+          billing_address?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          currency?: string | null
+          customer_id?: string | null
+          due_date?: string | null
+          exchange_rate?: number | null
+          franchise_id?: string | null
+          id?: string | null
+          invoice_number?: string | null
+          issue_date?: string | null
+          metadata?: Json | null
+          notes?: string | null
+          shipment_id?: string | null
+          shipping_address?: Json | null
+          status?: Database["public"]["Enums"]["invoice_status"] | null
+          subtotal?: number | null
+          tax_total?: number | null
+          tenant_id?: string | null
+          terms?: string | null
+          total?: number | null
+          type?: Database["public"]["Enums"]["invoice_type"] | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      v_outbox_retries: {
+        Row: {
+          attempt_count: number | null
+          created_at: string | null
+          id: string | null
+          last_attempt_at: string | null
+          last_error: string | null
+          max_attempts: number | null
+          metadata: Json | null
+          next_attempt_at: string | null
+          outbox_id: string | null
+          status: string | null
+          tenant_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          attempt_count?: number | null
+          created_at?: string | null
+          id?: string | null
+          last_attempt_at?: string | null
+          last_error?: string | null
+          max_attempts?: number | null
+          metadata?: Json | null
+          next_attempt_at?: string | null
+          outbox_id?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          attempt_count?: number | null
+          created_at?: string | null
+          id?: string | null
+          last_attempt_at?: string | null
+          last_error?: string | null
+          max_attempts?: number | null
+          metadata?: Json | null
+          next_attempt_at?: string | null
+          outbox_id?: string | null
+          status?: string | null
+          tenant_id?: string | null
+          updated_at?: string | null
         }
         Relationships: []
       }
