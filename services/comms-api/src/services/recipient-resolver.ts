@@ -46,15 +46,66 @@ export class RecipientResolver {
     if (intent.recipient_party_id) {
       return this.resolveParty(intent.recipient_party_id);
     }
-    if (intent.recipient_role_id || intent.recipient_team_id) {
-      logger.info('recipient resolver: role/team fan-out not implemented yet', {
+    if (intent.recipient_role_id) {
+      // The platform doesn't carry a roles-as-table model — public.user_roles
+      // stores role as an enum (tenant_admin | platform_admin | sales_manager |
+      // user | viewer | franchise_admin | platform_domain_admin |
+      // compliance_officer). The intent producer passes the desired role
+      // name in payload.role_name; recipient_role_id is a stable marker
+      // (any uuid the producer wants — typically gen_random_uuid()) that
+      // keeps the CHECK constraint happy.
+      const roleName = (intent.payload as Record<string, unknown> | null)?.['role_name'] as string | undefined;
+      if (!roleName) {
+        logger.info('recipient resolver: role fan-out skipped (payload.role_name not set)', {
+          notificationId: intent.id,
+          roleId: intent.recipient_role_id,
+        });
+        return [];
+      }
+      return this.resolveRole(intent.tenant_id, roleName);
+    }
+    if (intent.recipient_team_id) {
+      // No teams/team_members table exists yet — drops cleanly.
+      logger.info('recipient resolver: team fan-out unavailable (no teams table)', {
         notificationId: intent.id,
-        roleId: intent.recipient_role_id,
         teamId: intent.recipient_team_id,
       });
       return [];
     }
     return [];
+  }
+
+  private async resolveRole(tenantId: string, roleName: string): Promise<ResolvedRecipient[]> {
+    try {
+      // public.user_roles → set of user_ids with this role in the tenant.
+      const { data: rows, error } = await (this.supabase as any)
+        .from('user_roles')
+        .select('user_id')
+        .eq('tenant_id', tenantId)
+        .eq('role', roleName);
+      if (error || !rows?.length) {
+        logger.info('recipient resolver: no users in role', {
+          tenantId,
+          roleName,
+          error: error?.message,
+          count: rows?.length ?? 0,
+        });
+        return [];
+      }
+      // De-duplicate user_ids (a user can hold the same role twice across
+      // franchises) and resolve each to an email. resolveUser already
+      // handles the auth.users lookup + WARN-on-miss.
+      const uniqueIds = Array.from(new Set(rows.map((r: { user_id: string }) => r.user_id)));
+      const resolved = await Promise.all(uniqueIds.map((id) => this.resolveUser(id as string)));
+      return resolved.flat();
+    } catch (err) {
+      logger.warn('recipient resolver: role fan-out threw', {
+        tenantId,
+        roleName,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
   }
 
   private async resolveParty(partyId: string): Promise<ResolvedRecipient[]> {
