@@ -61,7 +61,8 @@ export class NullEmailProvider implements EmailProvider {
     return {
       ok: false,
       providerName: this.name,
-      errorText: 'no email provider configured (Phase 6 Step 3 skeleton — provider integration is the next slice)',
+      errorText:
+        'no email provider configured (set COMMS_EMAIL_PROVIDER=resend + RESEND_API_KEY to enable real sends)',
     };
   }
 }
