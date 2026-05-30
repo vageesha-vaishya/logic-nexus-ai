@@ -44,15 +44,7 @@ export class RecipientResolver {
       return this.resolveUser(intent.recipient_user_id);
     }
     if (intent.recipient_party_id) {
-      // Party-only path. core.parties → primary email bridge doesn't
-      // exist yet (external_refs carries vendor/carrier/franchise IDs,
-      // not contact_id). The trigger should always co-set recipient_address
-      // until that bridge lands; if we got here, the producer didn't.
-      logger.info('recipient resolver: party-only resolution not implemented; recipient_address must be co-set', {
-        notificationId: intent.id,
-        partyId: intent.recipient_party_id,
-      });
-      return [];
+      return this.resolveParty(intent.recipient_party_id);
     }
     if (intent.recipient_role_id || intent.recipient_team_id) {
       logger.info('recipient resolver: role/team fan-out not implemented yet', {
@@ -63,6 +55,65 @@ export class RecipientResolver {
       return [];
     }
     return [];
+  }
+
+  private async resolveParty(partyId: string): Promise<ResolvedRecipient[]> {
+    try {
+      // core.parties.external_refs.legacy_contact_id → public.contacts.email
+      // Backfilled + maintained by core.dual_write_from_contacts (Phase 6 Step 7).
+      const { data: party, error: partyErr } = await (this.supabase as any)
+        .schema('core')
+        .from('parties')
+        .select('id, party_type, external_refs, display_name')
+        .eq('id', partyId)
+        .maybeSingle();
+      if (partyErr || !party) {
+        logger.warn('recipient resolver: party not found', {
+          partyId,
+          error: partyErr?.message,
+        });
+        return [];
+      }
+      const legacyContactId = (party.external_refs as Record<string, unknown> | null)?.['legacy_contact_id'] as
+        | string
+        | undefined;
+      if (!legacyContactId) {
+        logger.info('recipient resolver: party has no legacy_contact_id', {
+          partyId,
+          partyType: party.party_type,
+        });
+        return [];
+      }
+      const { data: contact, error: contactErr } = await (this.supabase as any)
+        .from('contacts')
+        .select('email, first_name, last_name')
+        .eq('id', legacyContactId)
+        .maybeSingle();
+      if (contactErr || !contact?.email) {
+        logger.info('recipient resolver: contact has no email', {
+          partyId,
+          legacyContactId,
+          error: contactErr?.message,
+        });
+        return [];
+      }
+      const displayName =
+        [contact.first_name, contact.last_name].filter(Boolean).join(' ').trim() || party.display_name || null;
+      return [
+        {
+          userId: partyId,
+          channel: 'email',
+          address: contact.email as string,
+          displayName,
+        },
+      ];
+    } catch (err) {
+      logger.warn('recipient resolver: party lookup threw', {
+        partyId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      return [];
+    }
   }
 
   private async resolveUser(userId: string): Promise<ResolvedRecipient[]> {
