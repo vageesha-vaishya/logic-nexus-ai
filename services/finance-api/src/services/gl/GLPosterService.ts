@@ -1,19 +1,22 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { InvoiceFinalizedEvent } from '../../events/finance-events.types.js';
 import { MockERPConnector } from './MockERPConnector.js';
 
 export class GLPosterService {
-  private static supabase = GLPosterService.createSupabaseClient();
+  // Lazy: defer client creation to first use so module-load doesn't
+  // crash when env vars aren't set yet (e.g., during container boot
+  // before secrets land, or during local typecheck without .env).
+  private static _supabase: SupabaseClient | null = null;
 
-  private static createSupabaseClient() {
+  private static get supabase(): SupabaseClient {
+    if (this._supabase) return this._supabase;
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing Supabase configuration');
     }
-
-    return createClient(supabaseUrl, supabaseServiceKey);
+    this._supabase = createClient(supabaseUrl, supabaseServiceKey);
+    return this._supabase;
   }
 
   static async postInvoiceFinalized(event: InvoiceFinalizedEvent): Promise<void> {

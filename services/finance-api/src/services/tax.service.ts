@@ -1,4 +1,4 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import {
   TaxCalculationItem,
   TaxCalculationRequest,
@@ -28,17 +28,19 @@ export class TaxService {
   private static taxRuleCache = new Map<string, CacheEntry<TaxRuleRow[]>>();
   private static cacheTtlMs = Number(process.env.TAX_CACHE_TTL_MS || 60000);
   private static latencyWarnMs = Number(process.env.TAX_LATENCY_WARN_MS || 200);
-  private supabase = this.createSupabaseClient();
+  // Lazy — defer until first method call so module-load doesn't crash
+  // when env isn't set yet (container boot before secrets land).
+  private _supabase: SupabaseClient | null = null;
 
-  private createSupabaseClient() {
+  private get supabase(): SupabaseClient {
+    if (this._supabase) return this._supabase;
     const supabaseUrl = process.env.SUPABASE_URL;
     const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
     if (!supabaseUrl || !supabaseServiceKey) {
       throw new Error('Missing Supabase configuration');
     }
-
-    return createClient(supabaseUrl, supabaseServiceKey);
+    this._supabase = createClient(supabaseUrl, supabaseServiceKey);
+    return this._supabase;
   }
 
   async calculateTax(tenantId: string, request: TaxCalculationRequest): Promise<TaxCalculationResponse> {

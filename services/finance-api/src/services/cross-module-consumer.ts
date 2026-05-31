@@ -68,21 +68,26 @@ interface ShipmentPayload {
 }
 
 export class CrossModuleConsumer {
-  private supabase: SupabaseClient;
+  // Defer client creation to start() so module-load (`new CrossModuleConsumer()`
+  // at file bottom) doesn't crash when env isn't set yet — same pattern
+  // the comms-api dispatcher uses. The getter throws if accessed before
+  // start() so call sites stay non-null without polluting them with `!`.
+  private _supabase: SupabaseClient | null = null;
+  private get supabase(): SupabaseClient {
+    if (!this._supabase) throw new Error('cross-module consumer used before start()');
+    return this._supabase;
+  }
   private running = false;
   private intervalHandle: NodeJS.Timeout | null = null;
 
-  constructor() {
+  start(): void {
+    if (this.intervalHandle) return;
     const url = process.env.SUPABASE_URL;
     const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
     if (!url || !key) {
       throw new Error('cross-module consumer requires SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY');
     }
-    this.supabase = createClient(url, key, { auth: { persistSession: false } });
-  }
-
-  start(): void {
-    if (this.intervalHandle) return;
+    this._supabase = createClient(url, key, { auth: { persistSession: false } });
     logger.info('cross-module consumer starting', {
       pollIntervalMs: POLL_INTERVAL_MS,
       batchSize: BATCH_SIZE,
