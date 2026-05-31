@@ -18,6 +18,62 @@ try {
 }
 const storybookFlatRecommended = storybook?.configs?.["flat/recommended"] ?? {};
 
+// Phase 2 Step 7 — direct reads of public.accounts / public.contacts.
+// Hoisted to a const so the providers-dir override below (which re-enables
+// the parties bans while allowing SDK imports) can't silently drift from
+// the base config when one side is edited.
+const PARTIES_BANS = [
+  {
+    selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='from'][arguments.0.type='Literal'][arguments.0.value='accounts']",
+    message: "Phase 2 Step 7: use .from('v_accounts') instead of .from('accounts'). The public.accounts table is being dropped in Step 9; reads should go through public.v_accounts which sources identity from core.parties.",
+  },
+  {
+    selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='from'][arguments.0.type='Literal'][arguments.0.value='contacts']",
+    message: "Phase 2 Step 7: use .from('v_contacts') instead of .from('contacts'). The public.contacts table is being dropped in Step 9; reads should go through public.v_contacts which sources identity from core.parties.",
+  },
+];
+
+// Phase 6 Step 32 — direct imports of comms provider SDKs.
+//
+// Only services/comms-api/src/providers/ may import these. Everyone else
+// goes through the comms-api HTTP surface (or the core.notifications →
+// comms-api dispatcher chain — see comms.md §5). Mirrors the architectural
+// guarantee written into services/comms-api/src/providers/email-provider.ts
+// header comment that lint would enforce. Stops a future contributor from
+// dropping `import { Resend } from 'resend'` into a feature module and
+// bypassing the comms.suppressions / delivery_events / template versioning
+// the dispatcher provides.
+//
+// Covers both ESM `import` and CommonJS `require()` forms. Patterns
+// include sub-imports (`firebase-admin/auth`, `@twilio/voice-sdk`) plus
+// type-only imports (TS still emits an ImportDeclaration node for those).
+const COMMS_PROVIDER_SDK_BANS = [
+  {
+    selector: "ImportDeclaration[source.value=/^(resend|nodemailer|twilio|firebase-admin|mailgun\\.js|postmark|sendgrid|@sendgrid\\u002Fmail|@sendgrid\\u002Fclient)$/]",
+    message: "Phase 6 Step 32: comms provider SDKs may only be imported from services/comms-api/src/providers/. Use the comms-api dispatch path (core.notifications → comms.deliveries) instead so suppressions, delivery_events, template versioning, and RFC 8058 unsubscribe headers are applied. See comms.md §5.",
+  },
+  {
+    selector: "ImportDeclaration[source.value=/^(@twilio|@mailgun)\\u002F/]",
+    message: "Phase 6 Step 32: comms provider SDKs may only be imported from services/comms-api/src/providers/. See comms.md §5.",
+  },
+  {
+    selector: "ImportDeclaration[source.value=/^firebase-admin\\u002F/]",
+    message: "Phase 6 Step 32: firebase-admin (incl. sub-imports like firebase-admin/messaging) may only be imported from services/comms-api/src/providers/. See comms.md §5.",
+  },
+  {
+    selector: "CallExpression[callee.name='require'][arguments.0.value=/^(resend|nodemailer|twilio|firebase-admin|mailgun\\.js|postmark|sendgrid|@sendgrid\\u002Fmail|@sendgrid\\u002Fclient)$/]",
+    message: "Phase 6 Step 32: comms provider SDKs may only be imported from services/comms-api/src/providers/. See comms.md §5.",
+  },
+  {
+    selector: "CallExpression[callee.name='require'][arguments.0.value=/^(@twilio|@mailgun)\\u002F/]",
+    message: "Phase 6 Step 32: comms provider SDKs may only be imported from services/comms-api/src/providers/. See comms.md §5.",
+  },
+  {
+    selector: "CallExpression[callee.name='require'][arguments.0.value=/^firebase-admin\\u002F/]",
+    message: "Phase 6 Step 32: firebase-admin (incl. sub-imports) may only be imported from services/comms-api/src/providers/. See comms.md §5.",
+  },
+];
+
 export default tseslint.config(
   { ignores: ["dist", "storybook-static", "test-results", "docs", ".worktrees", ".claude", "coverage", "playwright-report", "**/.venv/**", "**/node_modules/**", "CHANGELOG.md", "RUN_MIGRATION.md", "dataentry/dataEntryInstructions.md"] },
   {
@@ -43,23 +99,10 @@ export default tseslint.config(
       "@typescript-eslint/ban-ts-comment": ["error", { "ts-ignore": "allow-with-description" }],
       // P5 — log discipline: use logger from @/lib/logger, never raw console
       "no-console": "error",
-      // Phase 2 Step 7 — ban direct reads of the legacy public.accounts /
-      // public.contacts tables. The cutover to public.v_accounts /
-      // public.v_contacts shipped 2026-05-29 (commits d9378420 + 57fda103);
-      // dual-write triggers keep core.parties in sync. Direct reads of the
-      // legacy tables defeat the cutover and bind callers to schema slated
-      // for removal in Step 9. Use .from('v_accounts') / .from('v_contacts')
-      // instead. RLS-regression tests are exempted in the override below.
-      "no-restricted-syntax": ["error",
-        {
-          "selector": "CallExpression[callee.type='MemberExpression'][callee.property.name='from'][arguments.0.type='Literal'][arguments.0.value='accounts']",
-          "message": "Phase 2 Step 7: use .from('v_accounts') instead of .from('accounts'). The public.accounts table is being dropped in Step 9; reads should go through public.v_accounts which sources identity from core.parties."
-        },
-        {
-          "selector": "CallExpression[callee.type='MemberExpression'][callee.property.name='from'][arguments.0.type='Literal'][arguments.0.value='contacts']",
-          "message": "Phase 2 Step 7: use .from('v_contacts') instead of .from('contacts'). The public.contacts table is being dropped in Step 9; reads should go through public.v_contacts which sources identity from core.parties."
-        }
-      ],
+      // Phase 2 Step 7 + Phase 6 Step 32 — composed bans (see consts at top
+      // of file for the full rationale on each set). Tests + the providers
+      // dir + supabase/functions get scoped overrides below.
+      "no-restricted-syntax": ["error", ...PARTIES_BANS, ...COMMS_PROVIDER_SDK_BANS],
     },
     settings: {},
   },
@@ -345,6 +388,27 @@ export default tseslint.config(
           "@/features/module-communications/**"
         ]
       }]
+    },
+  },
+  {
+    // Phase 6 Step 32 — provider SDK ban exemption.
+    //
+    // services/comms-api/src/providers/ is the ONE canonical home for
+    // direct provider SDK code. Re-enable the parties bans (which would
+    // otherwise be silently dropped by this override) but drop the SDK
+    // ban so the providers may import resend / nodemailer / twilio / etc.
+    //
+    // supabase/functions/ is also exempted: edge functions run under
+    // Deno (npm: prefix module resolution), not Node, and the ban is
+    // not enforceable there. The legacy supabase/functions/send-email/
+    // is the only existing direct-SDK importer; its migration into
+    // comms-api or deletion is tracked as a Phase 6 follow-up.
+    files: [
+      "services/comms-api/src/providers/**/*.{ts,tsx}",
+      "supabase/functions/**/*.{ts,tsx}",
+    ],
+    rules: {
+      "no-restricted-syntax": ["error", ...PARTIES_BANS],
     },
   },
   {
