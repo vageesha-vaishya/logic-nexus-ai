@@ -1,21 +1,20 @@
-// Phase 6 Step 30b — comms-api do_not_contact consumer.
+// Phase 6 Step 30b + Step 43b — comms-api do_not_contact consumer.
 //
-// CRM → comms suppression bridge. Subscribes to crm.do_not_contact.set
-// events from core.outbox and upserts comms.suppressions rows for
-// every email + phone address linked to the party. Closes the bridge
-// the compliance.md §5/§10 documented but didn't implement (gap
-// identified by the slice survey on 2026-05-31).
+// CRM → comms suppression bridge. Subscribes to both
+// crm.do_not_contact.set and crm.do_not_contact.cleared events from
+// core.outbox, branches to the right RPC:
+//
+//   .set     → comms.upsert_do_not_contact_suppressions   (Step 30a)
+//   .cleared → comms.remove_do_not_contact_suppressions   (Step 43a)
+//
+// Closes the bidirectional bridge — a customer who said "stop
+// contacting me" gets every linked address suppressed; one who later
+// says "actually contact me again" gets only their do_not_contact
+// rows removed (bounce/complaint/unsubscribe survive).
 //
 // Same shape as the compliance gating-consumer (gating-consumer.ts):
-//   1. Poll core.v_cross_module_pending_events filtered to the one
-//      event type we own.
-//   2. For each event, call the SECURITY DEFINER rpc that does the
-//      address resolution + suppression upsert in one txn.
-//   3. Mark the outbox row published.
-//
-// The actual work lives in comms.upsert_do_not_contact_suppressions
-// (migration 20260531001100) — see fn header there for the resolution
-// chain. This TS is intentionally dumb.
+// poll → per-event RPC → mark outbox published. TS is intentionally
+// dumb; the address-resolution + diff work lives in the SQL fns.
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
@@ -24,7 +23,8 @@ import { logger } from '../utils/logger.js';
 const POLL_INTERVAL_MS = parseInt(process.env.COMMS_DNC_CONSUMER_POLL_INTERVAL_MS || '5000', 10);
 const BATCH_SIZE = parseInt(process.env.COMMS_DNC_CONSUMER_BATCH_SIZE || '50', 10);
 
-const EVENT_TYPE = 'crm.do_not_contact.set';
+const EVENT_TYPES = ['crm.do_not_contact.set', 'crm.do_not_contact.cleared'] as const;
+type EventType = (typeof EVENT_TYPES)[number];
 
 interface OutboxEvent {
   id: string;
@@ -75,7 +75,7 @@ export class DoNotContactConsumer {
         .schema('core')
         .from('v_cross_module_pending_events')
         .select('*')
-        .eq('event_type', EVENT_TYPE)
+        .in('event_type', EVENT_TYPES as readonly string[])
         .limit(BATCH_SIZE);
       if (error) {
         logger.warn('do-not-contact consumer poll error', { error: error.message });
@@ -104,28 +104,38 @@ export class DoNotContactConsumer {
       return;
     }
 
+    // Branch on event type — set adds suppressions, cleared removes them.
+    // Both RPCs take the same 4-arg signature for consumer symmetry.
+    const isCleared = event.event_type === ('crm.do_not_contact.cleared' as EventType);
+    const rpcName = isCleared
+      ? 'remove_do_not_contact_suppressions'
+      : 'upsert_do_not_contact_suppressions';
+
     try {
       const { data: rpcRows, error: rpcErr } = await (this.supabase as any)
         .schema('comms')
-        .rpc('upsert_do_not_contact_suppressions', {
+        .rpc(rpcName, {
           p_tenant_id: event.tenant_id,
           p_party_id: partyId,
           p_party_kind: partyKind,
           p_source_outbox_id: event.id,
         });
       if (rpcErr) {
-        logger.warn('upsert_do_not_contact_suppressions rpc failed', {
+        logger.warn('do-not-contact rpc failed', {
+          rpc: rpcName,
           outboxId: event.id,
           error: rpcErr.message,
         });
         return;
       }
       const result = Array.isArray(rpcRows) ? rpcRows[0] : rpcRows;
-      logger.info('do-not-contact suppressions upserted', {
+      logger.info('do-not-contact suppressions changed', {
         outboxId: event.id,
+        eventType: event.event_type,
         partyId,
         partyKind,
-        insertedCount: result?.inserted_count,
+        // upsert returns inserted_count; remove returns deleted_count
+        affectedCount: result?.inserted_count ?? result?.deleted_count,
         emailCount: result?.email_count,
         phoneCount: result?.phone_count,
       });
