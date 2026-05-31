@@ -1,5 +1,6 @@
 import app from './app.js';
 import { deliveryWorker } from './services/delivery-worker.js';
+import { doNotContactConsumer } from './services/do-not-contact-consumer.js';
 import { notificationDispatcher } from './services/notification-dispatcher.js';
 import { logger } from './utils/logger.js';
 
@@ -20,6 +21,13 @@ async function bootstrap(): Promise<void> {
     deliveryWorker.start();
   } catch (err) {
     logger.warn('comms delivery worker failed to start; pending deliveries will not be sent', {
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+  try {
+    doNotContactConsumer.start();
+  } catch (err) {
+    logger.warn('comms do-not-contact consumer failed to start; CRM do_not_contact flags will not propagate to suppressions', {
       error: err instanceof Error ? err.message : String(err),
     });
   }
