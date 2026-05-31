@@ -75,12 +75,15 @@ pipeline {
                     // is resolved as a Groovy property and crashes the pipeline with
                     // MissingPropertyException before the shell ever runs.
                     sh """
-set -euo pipefail
+set -eu
 mkdir -p "${env.WORKSPACE}/.jenkins"
+echo "Preparing Node ${env.NODE_VERSION} in ${nodeRoot}"
 if [ ! -x "${nodeRoot}/bin/node" ]; then
   NODE_TGZ="${env.WORKSPACE}/.jenkins/node-v${env.NODE_VERSION}-${nodeDist}.tar.gz"
   NODE_URL="https://nodejs.org/dist/v${env.NODE_VERSION}/node-v${env.NODE_VERSION}-${nodeDist}.tar.gz"
   rm -f "\$NODE_TGZ"
+  rm -rf "${nodeRoot}"
+  echo "Downloading Node from \$NODE_URL"
   if command -v curl >/dev/null 2>&1; then
     curl -fL --retry 5 --retry-all-errors --connect-timeout 10 --max-time 300 -o "\$NODE_TGZ" "\$NODE_URL"
   elif command -v wget >/dev/null 2>&1; then
@@ -89,8 +92,12 @@ if [ ! -x "${nodeRoot}/bin/node" ]; then
     echo "Neither curl nor wget is available on this Jenkins agent."
     exit 2
   fi
+  echo "Extracting \$NODE_TGZ"
   tar -xzf "\$NODE_TGZ" -C "${env.WORKSPACE}/.jenkins"
+else
+  echo "Reusing cached Node at ${nodeRoot}"
 fi
+test -x "${nodeRoot}/bin/node"
 "${nodeRoot}/bin/node" -v
 "${nodeRoot}/bin/npm" -v
 """
