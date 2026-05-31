@@ -1,9 +1,10 @@
 # Phase 6 Step 16 — comms-api container image.
-# Mirrors the amro-api shape: Node 20 bullseye-slim, multi-stage to
-# strip dev deps + ts sources from the final layer. tsc runs in stage 1;
-# stage 2 only carries production node_modules + dist/.
+# Multi-stage to strip dev deps + ts sources from the final layer.
+# tsc runs in stage 1; stage 2 only carries production node_modules + dist/.
+# Node 22 LTS — needed for native WebSocket (supabase-js realtime client
+# crashes on Node <22 without the `ws` package).
 
-FROM node:20-bullseye-slim AS builder
+FROM node:22-bullseye-slim AS builder
 
 WORKDIR /app
 
@@ -14,7 +15,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-FROM node:20-bullseye-slim
+FROM node:22-bullseye-slim
 
 WORKDIR /app
 
