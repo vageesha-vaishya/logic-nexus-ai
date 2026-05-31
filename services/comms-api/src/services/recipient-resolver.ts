@@ -110,12 +110,25 @@ export class RecipientResolver {
 
   private async resolveParty(partyId: string): Promise<ResolvedRecipient[]> {
     try {
-      // core.parties.external_refs.legacy_contact_id → public.contacts.email
-      // Backfilled + maintained by core.dual_write_from_contacts (Phase 6 Step 7).
+      // Phase 6 Step 37 — canonical party → email path: core.parties for
+      // display_name, core.email_links + core.email_addresses for the
+      // primary address. Replaces the pre-Phase-2 detour through
+      // party.external_refs.legacy_contact_id → public.contacts which
+      // (a) violates the Phase 2 Step 7 .from('contacts') ban and
+      // (b) breaks for any party created post-Phase-2 cutover that
+      // doesn't carry a legacy_contact_id pointer.
+      //
+      // Same address-resolution pattern as the do_not_contact consumer
+      // (services/comms-api/src/services/do-not-contact-consumer.ts via
+      // comms.upsert_do_not_contact_suppressions): if a party has a
+      // suppression on an address, the dispatcher will fan out here
+      // and the delivery worker's isSuppressed() check (Step 30) will
+      // block the send — consistent end-to-end.
+
       const { data: party, error: partyErr } = await (this.supabase as any)
         .schema('core')
         .from('parties')
-        .select('id, party_type, external_refs, display_name')
+        .select('id, party_type, display_name')
         .eq('id', partyId)
         .maybeSingle();
       if (partyErr || !party) {
@@ -125,37 +138,49 @@ export class RecipientResolver {
         });
         return [];
       }
-      const legacyContactId = (party.external_refs as Record<string, unknown> | null)?.['legacy_contact_id'] as
-        | string
-        | undefined;
-      if (!legacyContactId) {
-        logger.info('recipient resolver: party has no legacy_contact_id', {
+
+      // Pick the primary email link if present; otherwise the most
+      // recently linked one. is_primary DESC sorts true ahead of false.
+      const { data: link, error: linkErr } = await (this.supabase as any)
+        .schema('core')
+        .from('email_links')
+        .select('email_id, is_primary, role')
+        .eq('subject_type', 'core.party')
+        .eq('subject_id', partyId)
+        .order('is_primary', { ascending: false })
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (linkErr || !link?.email_id) {
+        logger.info('recipient resolver: party has no linked email', {
           partyId,
           partyType: party.party_type,
+          error: linkErr?.message,
         });
         return [];
       }
-      const { data: contact, error: contactErr } = await (this.supabase as any)
-        .from('contacts')
-        .select('email, first_name, last_name')
-        .eq('id', legacyContactId)
+
+      const { data: emailRow, error: emailErr } = await (this.supabase as any)
+        .schema('core')
+        .from('email_addresses')
+        .select('email')
+        .eq('id', link.email_id)
         .maybeSingle();
-      if (contactErr || !contact?.email) {
-        logger.info('recipient resolver: contact has no email', {
+      if (emailErr || !emailRow?.email) {
+        logger.info('recipient resolver: email_addresses row missing for link', {
           partyId,
-          legacyContactId,
-          error: contactErr?.message,
+          emailId: link.email_id,
+          error: emailErr?.message,
         });
         return [];
       }
-      const displayName =
-        [contact.first_name, contact.last_name].filter(Boolean).join(' ').trim() || party.display_name || null;
+
       return [
         {
           userId: partyId,
           channel: 'email',
-          address: contact.email as string,
-          displayName,
+          address: emailRow.email as string,
+          displayName: party.display_name || null,
         },
       ];
     } catch (err) {
