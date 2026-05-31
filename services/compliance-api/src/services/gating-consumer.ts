@@ -1,26 +1,23 @@
-// Phase 6 compliance-api — cross-module gating consumer (skeleton).
+// Phase 6 compliance-api — cross-module gating consumer.
 //
-// This is the first cross-module *saga* in the platform (per master plan
-// §7.4 + compliance.md §5). It subscribes to events that touch a party
-// (lead created, quote about to send, booking created, payment created),
-// runs a screening, and writes the result to compliance.screenings +
-// compliance.records. Downstream modules read compliance.records before
-// allowing the next state transition.
+// First cross-module saga in the platform (master plan §7.4 +
+// compliance.md §5). Subscribes to events that touch a party (lead
+// created, quote about to send, booking created, payment created),
+// runs a screening via compliance.screen_subject, marks the source
+// outbox event published.
 //
-// Phase 6 Step 1 of the consumer:
-//   - Poll core.v_cross_module_pending_events filtered to GATING_EVENT_TYPES.
-//   - For each event, create a compliance.screenings row with status='pending'.
-//   - Mark the outbox entry published (the screening row is the durable
-//     side-effect; provider invocation happens in Step 2).
+// Phase 6 Step 22 split:
+//   22a — compliance.screen_subject(...) SECURITY DEFINER fn does the
+//         insert-or-noop + screen + decision-tier work in one txn
+//         (migration 20260531000300).
+//   22b — this TS shrinks to a 3-step loop per event: derive screening
+//         args from payload → call screen_subject rpc → mark outbox
+//         published.
 //
-// Step 2 (next slice) wires actual providers (Dow Jones, World-Check) and
-// transitions screenings from pending → passed/flagged/failed. Step 3
-// adds compliance.records upserts + the downstream gate-read API.
-//
-// Idempotency: compliance.screenings will get a UNIQUE partial index on
-// (tenant_id, subject_type, subject_id, triggered_by_event,
-//  metadata->>'source_outbox_id') in the next migration; INSERT uses
-// ON CONFLICT DO NOTHING so a re-run of the same outbox event is safe.
+// The unique partial index on (metadata->>'source_outbox_id') from
+// Step 14's realign (20260530130000) is what makes re-polling after a
+// mid-tick crash safe — screen_subject's ON CONFLICT branch reuses
+// the existing pending row instead of double-inserting.
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
@@ -57,6 +54,25 @@ function subjectTypeFor(eventType: GatingEventType): string {
     case 'finance.payment.created':
       return 'finance.payment';
   }
+}
+
+// Pull a screening search_name and country out of the event payload.
+// Step 19's emitter sets these explicitly; later emitters for
+// quote.send_requested / booking.created / payment.created may carry a
+// different shape — accept any of search_name | company | name as the
+// label, and country_code | country as the jurisdiction.
+function extractScreeningInputs(payload: Record<string, unknown>): {
+  searchName: string | null;
+  countryCode: string | null;
+} {
+  const pick = (k: string): string | null => {
+    const v = payload?.[k];
+    return typeof v === 'string' && v.trim().length > 0 ? v.trim() : null;
+  };
+  return {
+    searchName: pick('search_name') ?? pick('company') ?? pick('name'),
+    countryCode: pick('country_code') ?? pick('country'),
+  };
 }
 
 export class ComplianceGatingConsumer {
@@ -117,25 +133,39 @@ export class ComplianceGatingConsumer {
   private async processEvent(event: OutboxEvent): Promise<void> {
     if (!isGatingEvent(event.event_type)) return;
     const subjectType = subjectTypeFor(event.event_type);
-    const partyId = (event.payload?.party_id as string | undefined) || null;
+    const payload = event.payload ?? {};
+    const partyId = (payload.party_id as string | undefined) || null;
+    const { searchName, countryCode } = extractScreeningInputs(payload);
 
     try {
-      const { error: insertErr } = await (this.supabase as any)
+      // Step 22a — one RPC call does the insert-or-noop + screen +
+      // decision-tier work inside a Postgres txn. Returns a single row
+      // with the terminal status; we log and move on.
+      const { data: decisionRows, error: rpcErr } = await (this.supabase as any)
         .schema('compliance')
-        .from('screenings')
-        .insert({
-          tenant_id: event.tenant_id,
-          subject_type: subjectType,
-          subject_id: event.entity_id,
-          subject_party_id: partyId,
-          triggered_by_event: event.event_type,
-          status: 'pending',
-          metadata: { source_outbox_id: event.id },
+        .rpc('screen_subject', {
+          p_tenant_id: event.tenant_id,
+          p_subject_type: subjectType,
+          p_subject_id: event.entity_id,
+          p_subject_party_id: partyId,
+          p_triggered_by_event: event.event_type,
+          p_source_outbox_id: event.id,
+          p_search_name: searchName,
+          p_country_code: countryCode,
         });
-      if (insertErr && !/duplicate key|already exists/i.test(insertErr.message || '')) {
-        logger.warn('screening insert failed', { outboxId: event.id, error: insertErr.message });
+      if (rpcErr) {
+        logger.warn('screen_subject rpc failed', { outboxId: event.id, error: rpcErr.message });
         return;
       }
+      const decision = Array.isArray(decisionRows) ? decisionRows[0] : decisionRows;
+      logger.info('screening decided', {
+        outboxId: event.id,
+        eventType: event.event_type,
+        screeningId: decision?.screening_id,
+        status: decision?.status,
+        hitCount: decision?.hit_count,
+        maxSimilarity: decision?.max_similarity,
+      });
 
       const { error: markErr } = await (this.supabase as any)
         .schema('core')
