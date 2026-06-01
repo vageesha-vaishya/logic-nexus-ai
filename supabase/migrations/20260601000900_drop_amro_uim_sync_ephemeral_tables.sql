@@ -1,0 +1,31 @@
+-- Phase 6 Step 65 — drop the ephemeral AMRO↔UIM sync tables.
+--
+-- Implements ADR-0013 step 5: with the parts_consumed outbox emitter
+-- live (Step 64), the legacy polling table public.amro_uim_inventory_
+-- sync_events has nothing left to do. The validation view
+-- public.amro_uim_seed_validation is a one-off seed-time diagnostic
+-- and has no runtime consumers.
+--
+-- Dependency audit (run pre-drop):
+--   - public.amro_uim_inventory_sync_events: 0 rows in prod
+--   - public.amro_uim_seed_validation:       1 row (it's a view)
+--   - Runtime code references: NONE
+--   - References found:
+--       * Historical seed migrations (20260406, 20260407, 20260406193000)
+--         — past data; can't undo and don't need to
+--       * scripts/sql/{validate_uim_amro_seed,verify_uim_amro_deccan_seed,
+--                       seed_uim_amro_deccan,uim_cleanup_truncate_with_audit,
+--                       diagnose_uim_amro_deccan_visibility}.sql
+--         — one-off ops diagnostic scripts; will fail on next run.
+--         These are not part of the runtime contract; treat as broken
+--         tooling and update separately when re-needed.
+--       * src/integrations/supabase/types.ts — auto-generated;
+--         regenerate via `npm run supabase:types:gen` after deploy.
+--
+-- The ADR allowed a "parity window" on the table. We're collapsing it
+-- to zero because: (a) the table is empty in prod, so there's no
+-- parity to maintain, and (b) the outbox emitter has been live since
+-- Step 64. No application is reading sync_events; nothing to fall back to.
+
+DROP VIEW  IF EXISTS public.amro_uim_seed_validation;
+DROP TABLE IF EXISTS public.amro_uim_inventory_sync_events;
