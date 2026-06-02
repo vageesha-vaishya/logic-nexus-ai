@@ -239,6 +239,8 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
     let rendered_body: string | undefined;
     let prompt_version_id: string | undefined;
     let prompt_version_number: number | undefined;
+    let experiment_id: string | undefined;
+    let variant_label: 'a' | 'b' | undefined;
     const promptWarnings: string[] = [];
     try {
       const { active_version } = await getInvokePromptStore().getActive(safeRequest.prompt_key);
@@ -250,6 +252,8 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
       const experiment = await getExperimentStore().getActiveFor(safeRequest.prompt_key);
       if (experiment) {
         const pick = pickVariant(experiment, invocation_id);
+        experiment_id = experiment.id;
+        variant_label = pick.variant_label;
         if (pick.variant_version_id !== active_version.id) {
           try {
             chosen_version = await getInvokePromptStore().getVersionById(pick.variant_version_id);
@@ -365,6 +369,9 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
         cost_usd: result.cost_usd,
         latency_ms,
         warnings: combinedWarnings,
+        experiment_id,
+        variant_label,
+        prompt_version_id,
       }),
     );
   } catch (err) {

@@ -181,9 +181,10 @@ export class LlmClient {
   }
 
   async recordOutcome(invocation_id: string, outcome: Outcome): Promise<void> {
-    // POST /v1/outcomes is not implemented gateway-side yet (lands in a
-    // future slice). For now we hit the endpoint and swallow 404 / 503
-    // as a warning so outcome telemetry never crashes a caller workflow.
+    // Hits the gateway's POST /v1/outcomes (live since P3.4). Swallows
+    // 404 INVOCATION_NOT_FOUND on the assumption the caller may be
+    // recording an outcome for a request that didn't hit the audit log
+    // (e.g. dev/test); for any other error the exception bubbles up.
     try {
       await this.request<void>("/v1/outcomes", {
         method: "POST",
@@ -191,8 +192,7 @@ export class LlmClient {
         body: JSON.stringify({ invocation_id, outcome }),
       });
     } catch (err) {
-      if (err instanceof LlmGatewayError && (err.status === 404 || err.status === 503)) {
-        // expected until the endpoint exists; silently degrade
+      if (err instanceof LlmGatewayError && err.status === 404) {
         return;
       }
       throw err;

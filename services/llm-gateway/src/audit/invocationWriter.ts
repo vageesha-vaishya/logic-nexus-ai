@@ -41,6 +41,10 @@ export interface InvocationAuditPayload {
   warnings?: string[] | null;
   parent_invocation_id?: string | null;
   trace_id?: string | null;
+  // P3.4: first-class experiment context (was in `warnings` text only)
+  experiment_id?: string | null;
+  variant_label?: 'a' | 'b' | null;
+  prompt_version_id?: string | null;
 }
 
 export type InvocationWriter = (payload: InvocationAuditPayload) => void;
@@ -105,6 +109,9 @@ export function buildInvocationWriter(): InvocationWriter {
           warnings: payload.warnings ?? null,
           parent_invocation_id: payload.parent_invocation_id ?? null,
           trace_id: payload.trace_id ?? null,
+          experiment_id: payload.experiment_id ?? null,
+          variant_label: payload.variant_label ?? null,
+          prompt_version_id: payload.prompt_version_id ?? null,
         });
         if (error) {
           logger.error('invocation audit insert failed', {
@@ -138,6 +145,9 @@ export function buildAuditPayload(args: {
   warnings?: string[];
   cache_hit?: boolean;
   fallback_used?: boolean;
+  experiment_id?: string | null;
+  variant_label?: 'a' | 'b' | null;
+  prompt_version_id?: string | null;
 }): InvocationAuditPayload {
   return {
     id: args.invocation_id,
@@ -164,5 +174,8 @@ export function buildAuditPayload(args: {
     warnings: args.warnings ?? null,
     parent_invocation_id: null,             // P3+ when agent chains land
     trace_id: null,                          // P10 with OpenTelemetry
+    experiment_id: args.experiment_id ?? null,
+    variant_label: args.variant_label ?? null,
+    prompt_version_id: args.prompt_version_id ?? null,
   };
 }

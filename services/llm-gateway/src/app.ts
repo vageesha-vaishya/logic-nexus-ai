@@ -6,6 +6,7 @@ import { errorMiddleware } from './middleware/error.js';
 import { healthRouter } from './routes/health.js';
 import { invokeRouter, getAuthLookupForApp } from './routes/invoke.js';
 import { mountPromptRoutes } from './routes/prompts.js';
+import { mountOutcomeRoutes } from './routes/outcomes.js';
 
 export function createApp(): Express {
   const app: Express = express();
@@ -36,6 +37,7 @@ export function createApp(): Express {
   // Versioned API surface
   app.use('/v1', invokeRouter);
   app.use('/v1', mountPromptRoutes(getAuthLookupForApp));
+  app.use('/v1', mountOutcomeRoutes(getAuthLookupForApp));
 
   app.use(errorMiddleware);
 
