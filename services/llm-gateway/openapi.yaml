@@ -1,13 +1,22 @@
 openapi: 3.1.0
 info:
   title: LLM Gateway
-  version: 0.1.0-p0
+  version: 0.3.5
   description: |
-    Unified LLM gateway for the multi-platform SaaS estate. P0 scaffold ships
-    `/v1/invoke` backed by the `echo` provider only. P1 onwards adds real
-    providers (Anthropic, OpenAI, Gemini, Mistral, Ollama, vLLM, Azure
-    OpenAI), the 6-layer provider resolution cascade, prompt management,
-    budgets, quotas, PII redaction, audit log, and cost attribution.
+    Unified LLM gateway for the multi-platform SaaS estate. As of v0.3.5,
+    every layer described in the design doc is wired:
+      - 6 chat providers (echo, replay, anthropic, openai, google_gemini, mistral)
+        + 2 embedding providers (echo, openai)
+      - 6-layer cascade resolution with pin + capability + egress validation
+      - Service-token auth with 8 scopes
+      - PII redaction with strict/moderate/pass_through/custom policies
+      - Prompt management (versioned bodies + variants + A/B experiments)
+      - Outcome capture + chi-square auto-promote
+      - Hierarchical budget caps + quota caps (platform/tenant/feature/franchisee)
+      - Append-only audit log on every invocation
+      - GDPR right-to-be-forgotten
+      - W3C traceparent propagation
+      - Tool use / function calling
 
     Canonical design: docs/plans/2026-06-02-unified-llm-gateway-design.md
   contact:
@@ -16,12 +25,14 @@ servers:
   - url: http://localhost:3020
     description: Local dev
   - url: https://llm-gateway.sosservices.online
-    description: Production (post-P5 deployment)
+    description: Production
 
+# ─── Paths ──────────────────────────────────────────────────────────
 paths:
   /healthz:
     get:
       summary: Liveness probe
+      description: Always 200 when the process is up. Includes provider registry snapshot.
       responses:
         '200':
           description: Healthy
@@ -31,7 +42,8 @@ paths:
 
   /readyz:
     get:
-      summary: Readiness probe (external deps reachable)
+      summary: Readiness probe
+      description: 200 when external dependencies are reachable.
       responses:
         '200':
           description: Ready
@@ -43,30 +55,22 @@ paths:
                 properties:
                   status: { type: string, enum: [ready, not_ready] }
 
+  # ───── Invoke ─────
   /v1/invoke:
     post:
       summary: Synchronous LLM invocation
       description: |
-        Resolve provider via the cascade (P0: hardcoded to `echo`), invoke,
-        return structured response. P0 has no DB writes / cache / budget
-        enforcement; gate is `echo p99 ≤ 50ms at 100 req/s`.
+        Full pipeline: auth → PII redact → 6-layer cascade resolve →
+        budget+quota enforcement → prompt render + A/B variant pick →
+        provider call (with optional tools) → unredact response →
+        audit log write → counter increment.
+      security: [{ BearerServiceToken: [] }]
       parameters:
-        - in: header
-          name: Authorization
-          description: Bearer service-token (enforced from P2)
-          schema: { type: string }
-        - in: header
-          name: X-Platform-Id
-          description: Calling platform id (e.g. `logic-nexus-ai`)
-          schema: { type: string }
-        - in: header
-          name: X-Tenant-Id
-          description: Tenant uuid (mirrored from request body)
-          schema: { type: string, format: uuid }
-        - in: header
-          name: Idempotency-Key
-          description: ULID for 24h-TTL deduplication (enforced from P1)
-          schema: { type: string }
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/XPlatformId'
+        - $ref: '#/components/parameters/XTenantId'
+        - $ref: '#/components/parameters/Traceparent'
+        - $ref: '#/components/parameters/IdempotencyKey'
       requestBody:
         required: true
         content:
@@ -74,27 +78,380 @@ paths:
             schema: { $ref: '#/components/schemas/InvokeRequest' }
       responses:
         '200':
-          description: Successful invocation
+          description: Success
           headers:
             X-Correlation-Id:
               schema: { type: string, format: uuid }
-            X-Request-Id:
-              schema: { type: string, format: uuid }
+            X-Trace-Id:
+              schema: { type: string, pattern: '^[0-9a-f]{32}$' }
           content:
             application/json:
               schema: { $ref: '#/components/schemas/InvokeResponse' }
-        '400':
-          description: Invalid request
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
-        '500':
-          description: Internal error
-          content:
-            application/json:
-              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '429': { $ref: '#/components/responses/RateLimitedOrBudget' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
 
+  # ───── Embeddings ─────
+  /v1/embed:
+    post:
+      summary: Embed text inputs into vectors
+      description: Caller stores the resulting vectors; gateway is stateless for embeddings.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - $ref: '#/components/parameters/Traceparent'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EmbedRequest' }
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EmbedResponse' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ───── Outcomes ─────
+  /v1/outcomes:
+    post:
+      summary: Record the downstream outcome of an invocation
+      description: |
+        Caller records whether the LLM result was accepted/rejected/etc.
+        Gateway joins to gateway.llm_invocations to recover experiment context
+        and writes one row to gateway.outcomes (append-only).
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [invocation_id, outcome]
+              properties:
+                invocation_id: { type: string, format: uuid }
+                outcome: { $ref: '#/components/schemas/Outcome' }
+      responses:
+        '201':
+          description: Recorded
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [outcome_id, invocation_id, kind]
+                properties:
+                  outcome_id: { type: string }
+                  invocation_id: { type: string, format: uuid }
+                  kind: { $ref: '#/components/schemas/OutcomeKind' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ───── Prompts ─────
+  /v1/prompts/{key}:
+    get:
+      summary: Fetch the active version of a registered prompt
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+          description: Canonical prompt key (e.g. compliance.screening.hit_reasoning)
+      responses:
+        '200':
+          description: Active version
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [prompt, active_version]
+                properties:
+                  prompt: { $ref: '#/components/schemas/Prompt' }
+                  active_version: { $ref: '#/components/schemas/PromptVersion' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/prompts/{key}/render:
+    post:
+      summary: Render a prompt with variables, NO LLM call
+      description: Dev tool. Useful for previewing template substitution before /v1/invoke.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: path
+          name: key
+          required: true
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [variables]
+              properties:
+                variables:
+                  type: object
+                  additionalProperties: true
+                provider_kind: { $ref: '#/components/schemas/ProviderKind' }
+      responses:
+        '200':
+          description: Rendered
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [prompt_key, version_id, version_number, rendered, missing_paths, applied_paths]
+                properties:
+                  prompt_key: { type: string }
+                  version_id: { type: string }
+                  version_number: { type: integer }
+                  rendered: { type: string }
+                  missing_paths:
+                    type: array
+                    items: { type: string }
+                  applied_paths:
+                    type: array
+                    items: { type: string }
+                  provider_kind: { $ref: '#/components/schemas/ProviderKind' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/admin/prompts:
+    post:
+      summary: Create or bump a prompt version
+      description: |
+        Requires `admin_prompts` scope. Idempotent on (key, body): each call
+        creates a new version row; promote_active=true (default) flips
+        gateway.prompts.active_version_id.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PromptUpsertInput' }
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [version_id, version_number]
+                properties:
+                  version_id: { type: string }
+                  version_number: { type: integer }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ───── Experiments (A/B + auto-promote) ─────
+  /v1/admin/experiments/{id}/evaluate:
+    post:
+      summary: Evaluate an A/B experiment (read-only)
+      description: |
+        Returns the 2×2 contingency table from gateway.evaluate_experiment +
+        the chi-square verdict. Does NOT mutate state.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvalOptions' }
+      responses:
+        '200':
+          description: Verdict
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EvalResponse' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/admin/experiments/{id}/auto-promote:
+    post:
+      summary: Evaluate + promote winner if verdict is significant
+      description: |
+        Atomic: if verdict.kind=='significant', flips active_version_id
+        and marks the experiment 'completed'. Otherwise 202 with reason.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/EvalOptions' }
+      responses:
+        '200':
+          description: Promoted
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  experiment_id: { type: string }
+                  promoted: { type: boolean, enum: [true] }
+                  winner_version_id: { type: string }
+                  loser_version_id: { type: string }
+                  prior_active_version_id: { type: string, nullable: true }
+                  verdict: { $ref: '#/components/schemas/EvalVerdict' }
+        '202':
+          description: Not promoted (verdict not significant)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  experiment_id: { type: string }
+                  promoted: { type: boolean, enum: [false] }
+                  reason: { type: string }
+                  verdict: { $ref: '#/components/schemas/EvalVerdict' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+
+  # ───── GDPR right-to-be-forgotten ─────
+  /v1/admin/right-to-be-forgotten:
+    post:
+      summary: Scrub PII columns for a subject
+      description: |
+        Per design §9.5. NULLs identifying columns on gateway.llm_invocations +
+        gateway.outcomes for the given subject. Preserves metadata for audit
+        integrity. Idempotent. Logs every call to gateway.rtbf_log.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [tenant_id, subject_type, subject_id]
+              properties:
+                tenant_id: { type: string, format: uuid }
+                subject_type:
+                  type: string
+                  enum: [user, party]
+                  description: When 'user', subject_id must be a uuid.
+                subject_id: { type: string, maxLength: 256 }
+                actor_user_id: { type: string, format: uuid, nullable: true }
+                reason: { type: string, nullable: true }
+      responses:
+        '200':
+          description: Scrubbed
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  tenant_id: { type: string }
+                  subject_type: { type: string }
+                  subject_id_prefix:
+                    type: string
+                    description: First 8 chars + '…'. Full subject_id NEVER echoed.
+                  scrubbed_invocations: { type: integer }
+                  scrubbed_outcomes: { type: integer }
+                  rtbf_log_id: { type: string }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+# ─── Reusable components: parameters, security, responses, schemas ──
 components:
+  parameters:
+    Authorization:
+      in: header
+      name: Authorization
+      schema: { type: string }
+      description: Bearer service-token. Required scope per endpoint.
+    XPlatformId:
+      in: header
+      name: X-Platform-Id
+      schema: { type: string }
+      description: Calling platform id (e.g. `logic-nexus-ai`)
+    XTenantId:
+      in: header
+      name: X-Tenant-Id
+      schema: { type: string, format: uuid }
+      description: Tenant uuid (mirror of body.tenant_id when present)
+    Traceparent:
+      in: header
+      name: traceparent
+      schema: { type: string, pattern: '^00-[0-9a-f]{32}-[0-9a-f]{16}-[0-9a-f]{2}$' }
+      description: W3C Trace Context. Parsed; trace_id flows to gateway.llm_invocations.
+    IdempotencyKey:
+      in: header
+      name: Idempotency-Key
+      schema: { type: string }
+      description: ULID for 24h-TTL deduplication (P2 onward)
+
+  securitySchemes:
+    BearerServiceToken:
+      type: http
+      scheme: bearer
+      bearerFormat: lngw_<base64url>
+
+  responses:
+    InvalidRequest:
+      description: Validation error
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Unauthorized:
+      description: Missing or invalid auth
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: Token lacks required scope, or X-Platform-Id mismatch
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Conflict:
+      description: State conflict (e.g. experiment not in 'active' status)
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Unprocessable:
+      description: |
+        Semantic rejection: egress forbidden, model capability mismatch,
+        PII pass-through not consented.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    RateLimitedOrBudget:
+      description: Budget or quota exceeded; or rate-limited
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    ProviderUnavailable:
+      description: Provider not configured or 5xx
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
   schemas:
     HealthResponse:
       type: object
@@ -102,7 +459,7 @@ components:
       properties:
         status: { type: string, enum: [ok] }
         service: { type: string, enum: [llm-gateway] }
-        phase: { type: string, enum: [P0, P1, P2, P3, P4, P5, P6, P7] }
+        phase: { type: string }
         providers_available:
           type: array
           items: { $ref: '#/components/schemas/ProviderKind' }
@@ -115,37 +472,42 @@ components:
       type: string
       enum: [platform_paid, tenant_paid]
 
+    # ── Invoke ──
     InvokeRequest:
       type: object
       required: [tenant_id, module, feature, prompt_key, variables]
       properties:
         tenant_id: { type: string, format: uuid }
-        module:
-          type: string
-          example: compliance
-          description: Owning module (compliance, sales, comms, ...)
-        feature:
-          type: string
-          example: screening.hit_reasoning
+        module: { type: string, example: compliance }
+        feature: { type: string, example: screening.hit_reasoning }
         prompt_key:
           type: string
           example: compliance.screening.hit_reasoning
-          description: Canonical prompt identifier — usually `<module>.<feature>`
         variables:
           type: object
           additionalProperties: true
-          description: Per-prompt template variables
         subject:
           type: object
           required: [type, id]
           properties:
-            type: { type: string, example: party }
+            type: { type: string }
             id: { type: string }
-        options:
-          $ref: '#/components/schemas/InvokeOptions'
+        options: { $ref: '#/components/schemas/InvokeOptions' }
         required_capabilities:
           type: array
-          items: { type: string, enum: [tools, vision, json_mode, streaming, embeddings, fine_tuning] }
+          items:
+            type: string
+            enum: [tools, vision, json_mode, streaming, embeddings, fine_tuning]
+        tools:
+          type: array
+          items: { $ref: '#/components/schemas/ToolDef' }
+        tool_choice:
+          oneOf:
+            - { type: string, enum: [auto, required, none] }
+            - type: object
+              required: [name]
+              properties:
+                name: { type: string }
 
     InvokeOptions:
       type: object
@@ -156,6 +518,26 @@ components:
         timeout_ms: { type: integer, minimum: 100 }
         temperature: { type: number, minimum: 0, maximum: 2 }
         max_tokens: { type: integer, minimum: 1 }
+
+    ToolDef:
+      type: object
+      required: [name, parameters_schema]
+      properties:
+        name: { type: string }
+        description: { type: string }
+        parameters_schema:
+          type: object
+          description: JSON Schema for tool arguments
+
+    ToolCall:
+      type: object
+      required: [id, name, args]
+      properties:
+        id: { type: string }
+        name: { type: string }
+        args:
+          type: object
+          additionalProperties: true
 
     InvokeUsage:
       type: object
@@ -178,8 +560,7 @@ components:
         - latency_ms
       properties:
         invocation_id: { type: string, format: uuid }
-        output:
-          description: Provider-typed output (echo returns a structured loopback)
+        output: { description: Provider-typed output }
         cache_hit: { type: boolean }
         model_used: { type: string }
         provider_kind: { $ref: '#/components/schemas/ProviderKind' }
@@ -189,11 +570,199 @@ components:
         warnings:
           type: array
           items: { type: string }
+        tool_calls:
+          type: array
+          items: { $ref: '#/components/schemas/ToolCall' }
         scaffold_phase:
           type: string
-          enum: [P0]
-          description: Present only while the gateway is in P0 scaffold mode
+          deprecated: true
 
+    # ── Embed ──
+    EmbedRequest:
+      type: object
+      required: [tenant_id, inputs]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        model: { type: string, default: text-embedding-3-small }
+        inputs:
+          type: array
+          minItems: 1
+          maxItems: 256
+          items: { type: string, maxLength: 32768 }
+        metadata:
+          type: object
+          additionalProperties: true
+
+    EmbedResponse:
+      type: object
+      required: [invocation_id, model_used, provider_kind, embeddings, usage, cost_usd, latency_ms]
+      properties:
+        invocation_id: { type: string, format: uuid }
+        model_used: { type: string }
+        provider_kind: { $ref: '#/components/schemas/ProviderKind' }
+        embeddings:
+          type: array
+          items:
+            type: array
+            items: { type: number }
+        usage:
+          type: object
+          properties:
+            prompt_tokens: { type: integer }
+            total_tokens: { type: integer }
+        cost_usd: { type: number }
+        latency_ms: { type: integer }
+        warnings: { type: array, items: { type: string } }
+
+    # ── Outcomes ──
+    Outcome:
+      oneOf:
+        - { type: object, required: [kind, user_id], properties: { kind: { const: accepted }, user_id: { type: string }, notes: { type: string } } }
+        - { type: object, required: [kind, user_id, edited_output], properties: { kind: { const: accepted_after_edit }, user_id: { type: string }, edited_output: {}, notes: { type: string } } }
+        - { type: object, required: [kind, user_id], properties: { kind: { const: rejected }, user_id: { type: string }, notes: { type: string } } }
+        - { type: object, required: [kind, user_id, edited_output], properties: { kind: { const: overridden }, user_id: { type: string }, edited_output: {}, notes: { type: string } } }
+        - { type: object, required: [kind], properties: { kind: { const: ignored }, notes: { type: string } } }
+
+    OutcomeKind:
+      type: string
+      enum: [accepted, accepted_after_edit, rejected, overridden, ignored]
+
+    # ── Prompts ──
+    Prompt:
+      type: object
+      required: [key, module, feature, status, active_version_id, created_at, updated_at]
+      properties:
+        key: { type: string }
+        module: { type: string }
+        feature: { type: string }
+        description: { type: string, nullable: true }
+        status: { type: string, enum: [active, deprecated, archived] }
+        active_version_id: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+
+    PromptVersion:
+      type: object
+      required: [id, prompt_key, version_number, body, body_variants, frontmatter, cache_ttl_seconds, safety_class, status, source, created_at]
+      properties:
+        id: { type: string }
+        prompt_key: { type: string }
+        version_number: { type: integer }
+        body: { type: string }
+        body_variants:
+          type: object
+          additionalProperties: { type: string }
+        frontmatter:
+          type: object
+          additionalProperties: true
+        default_capability: { type: string, nullable: true }
+        default_temperature: { type: number, nullable: true }
+        default_max_tokens: { type: integer, nullable: true }
+        cache_ttl_seconds: { type: integer }
+        safety_class: { type: string, enum: [standard, elevated, restricted] }
+        status: { type: string, enum: [draft, active, superseded, rolled_back] }
+        source: { type: string, enum: [git, admin_ui] }
+        created_at: { type: string, format: date-time }
+        promoted_at: { type: string, format: date-time, nullable: true }
+
+    PromptUpsertInput:
+      type: object
+      required: [key, module, feature, body]
+      properties:
+        key: { type: string }
+        module: { type: string }
+        feature: { type: string }
+        body: { type: string }
+        description: { type: string }
+        body_variants:
+          type: object
+          additionalProperties: { type: string }
+        frontmatter:
+          type: object
+          additionalProperties: true
+        input_schema: { type: object, additionalProperties: true }
+        output_schema: { type: object, additionalProperties: true }
+        default_capability: { type: string }
+        default_temperature: { type: number }
+        default_max_tokens: { type: integer }
+        cache_ttl_seconds: { type: integer }
+        safety_class: { type: string, enum: [standard, elevated, restricted] }
+        source: { type: string, enum: [git, admin_ui] }
+        git_sha: { type: string }
+        promote_active: { type: boolean, default: true }
+
+    # ── Experiments ──
+    EvalOptions:
+      type: object
+      properties:
+        p_threshold:
+          type: number
+          minimum: 0
+          maximum: 1
+          default: 0.05
+        min_per_variant:
+          type: integer
+          minimum: 0
+          default: 30
+
+    EvalVerdict:
+      oneOf:
+        - type: object
+          required: [kind, have, need]
+          properties:
+            kind: { const: insufficient_invocations }
+            have: { type: integer }
+            need: { type: integer }
+        - type: object
+          required: [kind, have_a, have_b, need]
+          properties:
+            kind: { const: insufficient_outcomes_per_variant }
+            have_a: { type: integer }
+            have_b: { type: integer }
+            need: { type: integer }
+        - type: object
+          required: [kind, chi2, p_value, accept_rate_a, accept_rate_b]
+          properties:
+            kind: { const: inconclusive }
+            chi2: { type: number }
+            p_value: { type: number }
+            accept_rate_a: { type: number }
+            accept_rate_b: { type: number }
+        - type: object
+          required: [kind, chi2, p_value, accept_rate_a, accept_rate_b, winner_label, winner_version_id, loser_version_id]
+          properties:
+            kind: { const: significant }
+            chi2: { type: number }
+            p_value: { type: number }
+            accept_rate_a: { type: number }
+            accept_rate_b: { type: number }
+            winner_label: { type: string, enum: [a, b] }
+            winner_version_id: { type: string }
+            loser_version_id: { type: string }
+
+    EvalResponse:
+      type: object
+      required: [experiment_id, prompt_key, stats, verdict, options]
+      properties:
+        experiment_id: { type: string }
+        prompt_key: { type: string }
+        stats:
+          type: object
+          properties:
+            invocations_a: { type: integer }
+            invocations_b: { type: integer }
+            accepted_a: { type: integer }
+            accepted_b: { type: integer }
+            rejected_a: { type: integer }
+            rejected_b: { type: integer }
+            ignored_a: { type: integer }
+            ignored_b: { type: integer }
+            total_outcomes_a: { type: integer }
+            total_outcomes_b: { type: integer }
+        verdict: { $ref: '#/components/schemas/EvalVerdict' }
+        options: { $ref: '#/components/schemas/EvalOptions' }
+
+    # ── Error envelope ──
     ErrorEnvelope:
       type: object
       required: [error]
@@ -218,8 +787,14 @@ components:
                 - PROVIDER_TIMEOUT
                 - PROVIDER_NOT_CONFIGURED
                 - MODEL_CAPABILITY_MISMATCH
+                - MODEL_DEPRECATED
+                - PII_PASS_THROUGH_NOT_CONSENTED
+                - PII_PATTERN_INVALID
+                - PII_UNREDACTABLE
                 - INVOCATION_NOT_FOUND
                 - INTERNAL
             message: { type: string }
-            details: { type: object, additionalProperties: true }
+            details:
+              type: object
+              additionalProperties: true
             request_id: { type: string }
