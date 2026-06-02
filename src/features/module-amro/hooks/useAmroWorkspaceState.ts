@@ -20,495 +20,65 @@ import {
   canTransitionWorkOrderLifecycle,
   getNextWorkOrderLifecycleStage,
 } from '../workspace/amroWorkspaceModel';
+import type {
+  ApiWorkOrder,
+  WorkOrderStatus,
+  ApiTask,
+  ApiAsset,
+  ApiQualification,
+  ApiComplianceSummary,
+  ApiEvidence,
+  ApiMaterial,
+  ApiRecommendation,
+  ComplianceRegulatorProfile,
+  ApiScheduleRow,
+  ApiScheduleOptimizationRecommendation,
+  ApiWorkOrderReplanOption,
+  ApiEnvelope,
+  V2WorkOrderItem,
+  V2TaskItem,
+  V2SavedWorkOrderView,
+  V2SchedulesResponse,
+  V2WorkOrdersResponse,
+  V2ScheduleOptimizationResponse,
+  ComplianceExplainabilityState,
+  ComplianceAuditReplayState,
+  ComplianceAnomalyAlert,
+  ComplianceRegulatorProfilePackState,
+  CertificationAuthorityProfile,
+  CertificationDecisionOption,
+  CertificationQualificationStatusState,
+  CertificationDecisionState,
+  CertificationExpiryAutomationState,
+  CertificationCompetencyAnalyticsState,
+  CertificationTemplateState,
+  CreateWorkOrderOptions,
+} from './amroWorkspaceTypes';
+import { DEFAULT_WORK_PACKAGE_SAVED_VIEW } from './amroWorkspaceTypes';
+import {
+  parseJsonSafe,
+  isNetworkConnectivityError,
+  isNotFoundErrorMessage,
+  isMissingAircraftIdErrorMessage,
+  mapV2StatusToV1Status,
+  getAmroApiBaseUrl,
+  mapStatusToLifecycle,
+  mapLifecycleToStatus,
+  sanitizeSavedWorkOrderViews,
+  resolveRoleTransitionTargets,
+} from './amroWorkspaceHelpers';
+import {
+  initialAssets,
+  initialQualifications,
+  initialRulePacks,
+  initialEvidenceChain,
+  initialMaterials,
+  initialPredictiveRecommendations,
+} from './amroWorkspaceFixtures';
 
-const initialAssets: AmroAssetRegistryRecord[] = [
-  {
-    id: 'asset-1',
-    assetTag: 'A320-9M-ANX',
-    assetType: 'aircraft',
-    serialNumber: 'MSN-20411',
-    configurationState: 'Line maintenance configuration baseline v12',
-    tenantId: 'tenant-ops-01',
-    franchiseId: 'franchise-gulf-01',
-  },
-  {
-    id: 'asset-2',
-    assetTag: 'CFM56-7B-ENG-442',
-    assetType: 'engine',
-    serialNumber: 'ENG-SN-884214',
-    configurationState: 'Engine LLP tracking profile v7',
-    tenantId: 'tenant-ops-01',
-    franchiseId: 'franchise-gulf-01',
-  },
-  {
-    id: 'asset-3',
-    assetTag: 'SER-COMP-ATA27-991',
-    assetType: 'serialized_component',
-    serialNumber: 'CMP-SN-112390',
-    configurationState: 'Flight control component revision C',
-    tenantId: 'tenant-ops-01',
-    franchiseId: 'franchise-gulf-01',
-  },
-  {
-    id: 'asset-4',
-    assetTag: 'HEAVY-RIG-DOCK-10',
-    assetType: 'heavy_asset',
-    serialNumber: 'HA-SN-44291',
-    configurationState: 'Hangar dock tooling calibration active',
-    tenantId: 'tenant-ops-01',
-    franchiseId: 'franchise-gulf-01',
-  },
-];
+// Old in-file definitions removed; see ./amroWorkspaceTypes,
+// ./amroWorkspaceHelpers, ./amroWorkspaceFixtures.
 
-type ApiWorkOrder = {
-  id: string;
-  aircraft_id: string;
-  work_order_number?: string;
-  work_order_number?: string;
-  status: string;
-  title: string;
-  maintenance_type?: string;
-};
-
-type WorkOrderStatus = 'planning' | 'scheduled' | 'in_progress' | 'completed' | 'blocked' | 'cancelled';
-
-type ApiTask = {
-  id: string;
-  work_order_id: string;
-  title: string;
-  status: string;
-};
-
-type ApiAsset = {
-  id: string;
-  tenant_id: string;
-  franchise_id?: string | null;
-  registration: string;
-  aircraft_type: string;
-  serial_number: string;
-  status: string;
-};
-
-type ApiQualification = {
-  id: string;
-  qualification_name: string;
-  rating: string;
-  can_certify_release: boolean;
-  expiration_date?: string | null;
-};
-
-type ApiComplianceSummary = {
-  authorityCoverage?: string[];
-  activeRulePacks?: number;
-};
-
-type ApiEvidence = {
-  id: string;
-  entity_type: 'work_order' | 'task' | 'inspection' | 'release';
-  entity_id: string;
-  hash: string;
-  immutable: boolean;
-  created_at: string;
-};
-
-type ApiMaterial = {
-  id: string;
-  part_number: string;
-  status: 'pending' | 'ordered' | 'received' | 'installed' | 'cancelled' | 'returned';
-  action: 'install' | 'remove' | 'inspect' | 'repair';
-  received_date?: string | null;
-};
-
-type ApiRecommendation = {
-  id: string;
-  digital_twin_reference: string;
-  risk_score: number;
-  trigger: 'telemetry' | 'calendar' | 'reliability';
-  recommendation: string;
-};
-
-type ComplianceRegulatorProfile = 'FAA' | 'EASA' | 'CAAC';
-
-type ApiScheduleRow = {
-  schedule_id: string;
-  work_order_id: string;
-  station_code: string;
-  slot_start: string;
-  slot_end: string;
-  assigned_team_size: number;
-  capacity: number;
-  status: string;
-};
-
-type ApiScheduleOptimizationRecommendation = {
-  recommendation_id: string;
-  title: string;
-  station_code: string;
-  schedule_date: string;
-  expected_delay_reduction_pct: number;
-  confidence: number;
-  rationale: string;
-};
-
-type ApiWorkOrderReplanOption = {
-  option_id: string;
-  title: string;
-  impact_score: number;
-};
-
-type ApiEnvelope<T> = {
-  data: T;
-};
-
-type V2WorkOrderItem = {
-  id: string;
-  code?: string;
-  status: string;
-};
-
-type V2TaskItem = {
-  id: string;
-  workOrderId: string;
-  title: string;
-  status: string;
-};
-
-type V2SavedWorkOrderView = {
-  id: string;
-  name: string;
-  filters: {
-    status: string;
-    search: string;
-  };
-};
-
-const DEFAULT_WORK_PACKAGE_SAVED_VIEW: V2SavedWorkOrderView = {
-  id: 'default-all',
-  name: 'All Work Packages',
-  filters: {
-    status: 'all',
-    search: '',
-  },
-};
-
-type V2SchedulesResponse = {
-  output?: {
-    schedules?: ApiScheduleRow[];
-  };
-  error?: string;
-};
-
-type V2WorkOrdersResponse = {
-  data?: {
-    workOrders?: V2WorkOrderItem[];
-  };
-  savedViews?: V2SavedWorkOrderView[];
-  error?: string;
-};
-
-type V2ScheduleOptimizationResponse = {
-  output?: {
-    recommendations?: ApiScheduleOptimizationRecommendation[];
-  };
-  error?: string;
-};
-
-type ComplianceExplainabilityState = {
-  decision: 'pass' | 'fail';
-  blockerCount: number;
-  blockers: string[];
-  policyVersion: string;
-};
-
-type ComplianceAuditReplayState = {
-  capability: 'work-orders' | 'tasks' | 'compliance-gates';
-  format: 'csv' | 'json';
-  eventCount: number;
-  events: Array<{ sequence: number; recordId: string; action: string; createdAt: string }>;
-};
-
-type ComplianceAnomalyAlert = {
-  severity: string;
-  code: string;
-  metric: number;
-};
-
-type ComplianceRegulatorProfilePackState = {
-  regulatorProfile: ComplianceRegulatorProfile;
-  obligations: string[];
-  gateRules: string[];
-};
-
-type CertificationAuthorityProfile = 'FAA' | 'EASA' | 'CAAC';
-
-type CertificationDecisionOption = 'approve' | 'reject' | 'defer';
-
-type CertificationQualificationStatusState = {
-  lifecycle: 'active' | 'warning' | 'suspended';
-  daysUntilExpiry: number;
-  reason: string;
-};
-
-type CertificationDecisionState = {
-  actionStatus: string;
-  nextAction: string;
-  blockers: string[];
-};
-
-type CertificationExpiryAutomationState = {
-  warningCount: number;
-  suspensionCount: number;
-  evaluatedCount: number;
-};
-
-type CertificationCompetencyAnalyticsState = {
-  totalQualifiedStaff: number;
-  activeCertifiers: number;
-  warningWindowStaff: number;
-  suspendedCertifiers: number;
-  authorityDistribution: Record<string, number>;
-};
-
-type CertificationTemplateState = {
-  templateId: string;
-  authorityProfile: CertificationAuthorityProfile;
-  requiredSignatures: string[];
-  mandatoryChecks: string[];
-  deferMaxDays: number;
-};
-
-type CreateWorkOrderOptions = {
-  aircraftId?: string;
-  maintenanceType?: 'line' | 'base' | 'hangar' | 'shop';
-  priority?: 'low' | 'medium' | 'high' | 'critical';
-  plannedStartIso?: string;
-  plannedEndIso?: string;
-  station?: string;
-  scopeItems?: string[];
-  taskPlan?: string[];
-  revision?: string;
-  assignedRole?: string;
-  workflowStatus?: 'planning' | 'scheduled' | 'in_progress' | 'blocked';
-  taskSnapshot?: Array<{
-    id: string;
-    taskNumber: string;
-    title: string;
-    dueBasis: string;
-    estimatedManHours: string;
-    category: string;
-  }>;
-  clientMetadata?: Record<string, unknown>;
-};
-
-async function parseJsonSafe<T>(response: Response): Promise<T | null> {
-  const raw = await response.text();
-  if (!raw.trim()) {
-    return null;
-  }
-  return JSON.parse(raw) as T;
-}
-
-function isNetworkConnectivityError(error: unknown): boolean {
-  if (!(error instanceof Error)) {
-    return false;
-  }
-  const normalized = error.message.toLowerCase();
-  return normalized.includes('failed to fetch') || normalized.includes('networkerror') || normalized.includes('econnrefused');
-}
-
-function isNotFoundErrorMessage(message: string): boolean {
-  const normalized = message.trim().toLowerCase();
-  return normalized === 'not found' || normalized.includes('(404)') || normalized.includes('404 not found');
-}
-
-function isMissingAircraftIdErrorMessage(message: string): boolean {
-  const normalized = message.trim().toLowerCase();
-  return normalized.includes('missing required field: aircraft_id') || normalized.includes('missing required fields: aircraft_id');
-}
-
-function mapV2StatusToV1Status(status: string): string {
-  const normalized = status.trim().toLowerCase();
-  if (normalized === 'planned') return 'planning';
-  if (normalized === 'blocked') return 'on_hold';
-  return normalized;
-}
-
-function getAmroApiBaseUrl(): string {
-  const runtimeEnv =
-    typeof window !== 'undefined'
-      ? ((window as unknown as { __ENV__?: Record<string, unknown>; __APP_CONFIG__?: Record<string, unknown> }).__ENV__ ||
-        (window as unknown as { __APP_CONFIG__?: Record<string, unknown> }).__APP_CONFIG__ ||
-        {})
-      : {};
-  const rawBase = String(import.meta.env.VITE_AMRO_API_BASE_URL || runtimeEnv.VITE_AMRO_API_BASE_URL || '/api/amro').trim();
-  const normalizedBase = rawBase === '' || rawBase === '/' ? '/api/amro' : rawBase;
-  const withoutTrailingSlash = normalizedBase.replace(/\/$/, '');
-  const withoutLegacyProxyPrefix = withoutTrailingSlash.replace(/\/api\/amro$/i, '').replace(/\/api$/i, '');
-  return withoutLegacyProxyPrefix === '/' ? '' : withoutLegacyProxyPrefix;
-}
-
-function mapStatusToLifecycle(status: string): AmroWorkOrderLifecycleStage {
-  const normalized = status.trim().toLowerCase();
-  if (normalized === 'approved') return 'plan';
-  if (normalized === 'planning') return 'create';
-  if (normalized === 'scheduled') return 'schedule';
-  if (normalized === 'blocked' || normalized === 'on_hold') return 'blocked';
-  if (normalized === 'in_progress') return 'execute';
-  if (normalized === 'completed' || normalized === 'closed' || normalized === 'cancelled') return 'close';
-  return 'create';
-}
-
-function mapLifecycleToStatus(stage: AmroWorkOrderLifecycleStage): string {
-  if (stage === 'create') return 'planning';
-  if (stage === 'plan') return 'approved';
-  if (stage === 'schedule') return 'scheduled';
-  if (stage === 'execute') return 'in_progress';
-  if (stage === 'blocked') return 'blocked';
-  return 'closed';
-}
-
-function sanitizeSavedWorkOrderViews(views: unknown): V2SavedWorkOrderView[] {
-  if (!Array.isArray(views)) {
-    return [DEFAULT_WORK_PACKAGE_SAVED_VIEW];
-  }
-  const dedupe = new Map<string, V2SavedWorkOrderView>();
-  views.forEach((entry) => {
-    if (!entry || typeof entry !== 'object') {
-      return;
-    }
-    const item = entry as Partial<V2SavedWorkOrderView>;
-    const id = String(item.id || '').trim();
-    const name = String(item.name || '').trim();
-    if (!id || !name) {
-      return;
-    }
-    dedupe.set(id, {
-      id,
-      name,
-      filters: {
-        status: String(item.filters?.status || 'all').trim() || 'all',
-        search: String(item.filters?.search || ''),
-      },
-    });
-  });
-  if (!dedupe.has(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id)) {
-    dedupe.set(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id, DEFAULT_WORK_PACKAGE_SAVED_VIEW);
-  }
-  return Array.from(dedupe.values());
-}
-
-function resolveRoleTransitionTargets(role: string): string[] {
-  if (role === 'tenant_admin') return ['planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'];
-  if (role === 'planner') return ['planning', 'scheduled', 'blocked'];
-  if (role === 'engineer') return ['scheduled', 'in_progress', 'blocked'];
-  if (role === 'technician') return ['in_progress'];
-  if (role === 'inspector') return ['completed', 'blocked'];
-  return [];
-}
-
-const initialQualifications: AmroQualification[] = [
-  {
-    id: 'qual-1',
-    staffName: 'Alex Santos',
-    authorityLevel: 'supervisor',
-    roleConstraint: 'B1 mechanical certifier',
-    signOffAuthority: true,
-    validUntil: '2027-05-01T00:00:00.000Z',
-  },
-  {
-    id: 'qual-2',
-    staffName: 'Meera Patel',
-    authorityLevel: 'compliance',
-    roleConstraint: 'Regulatory release verifier',
-    signOffAuthority: true,
-    validUntil: '2028-02-15T00:00:00.000Z',
-  },
-  {
-    id: 'qual-3',
-    staffName: 'Jonah Wright',
-    authorityLevel: 'technician',
-    roleConstraint: 'Powerplant technician',
-    signOffAuthority: false,
-    validUntil: '2026-09-01T00:00:00.000Z',
-  },
-];
-
-const initialRulePacks: AmroComplianceRulePack[] = [
-  { id: 'rc-1', authority: 'FAA', ruleVersion: '2026.1', active: true },
-  { id: 'rc-2', authority: 'EASA', ruleVersion: '2026.2', active: true },
-  { id: 'rc-3', authority: 'CAAC', ruleVersion: '2026.1', active: true },
-  { id: 'rc-4', authority: 'SACAA', ruleVersion: '2026.1', active: true },
-  { id: 'rc-5', authority: 'ISO_55000', ruleVersion: '2014.9', active: true },
-];
-
-const initialEvidenceChain: AmroEvidenceRecord[] = [
-  { id: 'ev-1', entityType: 'work_order', entityId: 'wp-1', hash: 'sha256:8df2a39aaad9', immutable: true, createdAt: '2026-03-20T11:40:00.000Z' },
-  { id: 'ev-2', entityType: 'task', entityId: 'task-3', hash: 'sha256:9ab12cdaa8be', immutable: true, createdAt: '2026-03-20T12:30:00.000Z' },
-  { id: 'ev-3', entityType: 'inspection', entityId: 'task-4', hash: 'sha256:5a72c3ef8a71', immutable: true, createdAt: '2026-03-20T12:55:00.000Z' },
-];
-
-const initialMaterials: AmroMaterialPlanningRecord[] = [
-  {
-    id: 'mat-1',
-    partNumber: 'PN-ATA72-889',
-    reservationStatus: 'reserved',
-    repairAction: 'install',
-    supplierEta: '2026-03-24T09:00:00.000Z',
-    shortageSeverity: 'none',
-    etaStatus: 'on_time',
-    rotableStatus: 'serviceable',
-    llpRemainingCycles: 1240,
-    traceabilityStatus: 'verified',
-  },
-  {
-    id: 'mat-2',
-    partNumber: 'PN-ATA27-190',
-    reservationStatus: 'pending',
-    repairAction: 'repair',
-    supplierEta: '2026-03-26T09:00:00.000Z',
-    shortageSeverity: 'watch',
-    etaStatus: 'at_risk',
-    rotableStatus: 'serviceable',
-    llpRemainingCycles: 620,
-    traceabilityStatus: 'verified',
-  },
-  {
-    id: 'mat-3',
-    partNumber: 'PN-ATA32-672',
-    reservationStatus: 'shortage',
-    repairAction: 'remove',
-    supplierEta: '2026-03-29T09:00:00.000Z',
-    shortageSeverity: 'critical',
-    etaStatus: 'late',
-    rotableStatus: 'quarantined',
-    llpRemainingCycles: 420,
-    traceabilityStatus: 'quarantined',
-  },
-];
-
-const initialPredictiveRecommendations: AmroPredictiveRecommendation[] = [
-  {
-    id: 'pr-1',
-    digitalTwinReference: 'DT-A320-9M-ANX',
-    riskScore: 0.87,
-    trigger: 'telemetry',
-    recommendation: 'Advance hydraulic line inspection before next 50-cycle check',
-  },
-  {
-    id: 'pr-2',
-    digitalTwinReference: 'DT-CFM56-7B-442',
-    riskScore: 0.72,
-    trigger: 'reliability',
-    recommendation: 'Schedule compressor wash at next available night stop',
-  },
-  {
-    id: 'pr-3',
-    digitalTwinReference: 'DT-COMP-ATA27-991',
-    riskScore: 0.65,
-    trigger: 'calendar',
-    recommendation: 'Run calibration verification in upcoming maintenance window',
-  },
-];
 
 export function useAmroWorkspaceState() {
   const { hasPermission, hasRole, isPlatformAdmin: isAuthPlatformAdmin, session } = useAuth();
