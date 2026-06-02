@@ -44,6 +44,18 @@ export interface FineTuneCreateInput {
   created_by_user_id?: string;
 }
 
+/** Patch applied by the poller after fetching provider status. */
+export interface ProviderStatusPatch {
+  /** Mapped gateway status (must be reachable from the current one). */
+  status: FineTuneStatus;
+  /** Free-form status string from the provider (for audit). */
+  status_message?: string | null;
+  /** Set when the provider reports the final fine-tuned model name. */
+  fine_tuned_model_id?: string | null;
+  /** Provider-reported eval metrics, merged into result_metrics. */
+  result_metrics?: Record<string, unknown>;
+}
+
 export interface FineTuneStore {
   create(input: FineTuneCreateInput): Promise<FineTuneJob>;
   get(id: string): Promise<FineTuneJob | null>;
@@ -59,6 +71,17 @@ export interface FineTuneStore {
     provider_job_id: string;
     effective_model_id?: string;
   }): Promise<FineTuneJob | null>;
+  /**
+   * Apply a provider-polled status update to a job. Idempotent: a no-op
+   * if the new state matches the current one. Refuses to overwrite a
+   * terminal state (succeeded/failed/cancelled) — those are final.
+   */
+  applyProviderStatus(id: string, patch: ProviderStatusPatch): Promise<FineTuneJob | null>;
+  /**
+   * Return non-terminal jobs with a provider_job_id set, oldest first,
+   * up to `limit`. Used by the poller worker.
+   */
+  listInFlight(limit?: number): Promise<FineTuneJob[]>;
 }
 
 function readEnv(): { url: string; key: string } | null {
@@ -133,6 +156,39 @@ export function buildInMemoryFineTuneStore(): FineTuneStore & { clear(): void; l
       };
       byId.set(args.id, updated);
       return updated;
+    },
+    async applyProviderStatus(id, patch) {
+      const job = byId.get(id);
+      if (!job) return null;
+      if (TERMINAL.has(job.status)) return job; // final — refuse overwrite
+      if (job.status === patch.status
+        && (patch.status_message ?? null) === (job.status_message ?? null)
+        && (patch.fine_tuned_model_id ?? null) === (job.fine_tuned_model_id ?? null)
+        && !patch.result_metrics) {
+        return job; // no-op
+      }
+      const now = new Date().toISOString();
+      const isTerminal = TERMINAL.has(patch.status);
+      const updated: FineTuneJob = {
+        ...job,
+        status: patch.status,
+        status_message: patch.status_message ?? job.status_message ?? null,
+        fine_tuned_model_id: patch.fine_tuned_model_id ?? job.fine_tuned_model_id ?? null,
+        result_metrics: patch.result_metrics
+          ? { ...job.result_metrics, ...patch.result_metrics }
+          : job.result_metrics,
+        finished_at: isTerminal ? (job.finished_at ?? now) : job.finished_at,
+        updated_at: now,
+      };
+      byId.set(id, updated);
+      return updated;
+    },
+    async listInFlight(limit = 50) {
+      const inFlight = Array.from(byId.values()).filter(
+        j => !TERMINAL.has(j.status) && (j.provider_job_id ?? null) !== null,
+      );
+      inFlight.sort((a, b) => a.updated_at.localeCompare(b.updated_at));
+      return inFlight.slice(0, limit);
     },
     clear() {
       byId.clear();
@@ -217,6 +273,54 @@ export function buildSupabaseFineTuneStore(): FineTuneStore | null {
       if (data) return data as FineTuneJob;
       // Job exists but already past 'queued' — return current state.
       return this.get(args.id);
+    },
+    async applyProviderStatus(id, patch) {
+      // Fetch current row to merge result_metrics without clobbering.
+      const current = await this.get(id);
+      if (!current) return null;
+      if (TERMINAL.has(current.status)) return current; // final — refuse overwrite
+
+      const isTerminal = TERMINAL.has(patch.status);
+      const mergedMetrics = patch.result_metrics
+        ? { ...current.result_metrics, ...patch.result_metrics }
+        : current.result_metrics;
+
+      const updatePayload: Record<string, unknown> = {
+        status: patch.status,
+        status_message: patch.status_message ?? current.status_message ?? null,
+      };
+      if (patch.fine_tuned_model_id !== undefined) {
+        updatePayload.fine_tuned_model_id = patch.fine_tuned_model_id;
+      }
+      if (patch.result_metrics) {
+        updatePayload.result_metrics = mergedMetrics;
+      }
+      if (isTerminal && !current.finished_at) {
+        updatePayload.finished_at = new Date().toISOString();
+      }
+
+      const { data, error } = await client
+        .from('fine_tune_jobs')
+        .update(updatePayload)
+        .eq('id', id)
+        .not('status', 'in', '(succeeded,failed,cancelled)')
+        .select('*')
+        .maybeSingle();
+      if (error) return null;
+      if (data) return data as FineTuneJob;
+      // Race: job became terminal between our read + write — return latest.
+      return this.get(id);
+    },
+    async listInFlight(limit = 50) {
+      const { data, error } = await client
+        .from('fine_tune_jobs')
+        .select('*')
+        .not('status', 'in', '(succeeded,failed,cancelled)')
+        .not('provider_job_id', 'is', null)
+        .order('updated_at', { ascending: true })
+        .limit(limit);
+      if (error || !data) return [];
+      return data as FineTuneJob[];
     },
   };
 }

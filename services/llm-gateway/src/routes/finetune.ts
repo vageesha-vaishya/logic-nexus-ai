@@ -22,6 +22,7 @@ import {
   type DatasetFormat,
 } from '../finetune/store.js';
 import { submitOpenAIFineTune, FineTuneSubmitError } from '../finetune/openaiSubmit.js';
+import { runPollTick } from '../finetune/pollWorker.js';
 import type { ProviderKind } from '../types/gateway.types.js';
 
 export const fineTuneRouter = Router();
@@ -189,6 +190,27 @@ export function mountFineTuneRoutes(authLookup: () => AuthLookup): Router {
           provider_job_id: submitted.provider_job_id,
           effective_model_id: submitted.effective_model_id,
         });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  // POST /v1/fine-tunes/poll — run one polling tick against the
+  // provider for every non-terminal job with a provider_job_id. Returns
+  // observability counts. Admin-scoped because each tick spends provider
+  // quota.
+  fineTuneRouter.post(
+    '/fine-tunes/poll',
+    requireScope('admin_configs', authLookup),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const limitRaw = (req.body as { limit?: unknown })?.limit;
+        const limit = typeof limitRaw === 'number' && Number.isFinite(limitRaw) && limitRaw > 0
+          ? Math.min(Math.floor(limitRaw), 200)
+          : undefined;
+        const tick = await runPollTick({ store: getStore(), limit });
+        res.json(tick);
       } catch (err) {
         next(err);
       }
