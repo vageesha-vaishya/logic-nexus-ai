@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { logger } from "@/lib/logger";
+import { gateCheck } from '@/features/module-compliance/lib/complianceApi';
 
 type VersionStatus = 'draft' | 'sent' | 'internal_review' | 'accepted' | 'rejected' | 'expired' | 'cancelled';
 
@@ -32,6 +33,38 @@ export function useVersionStatus() {
   const updateVersionStatus = async (versionId: string, newStatus: VersionStatus) => {
     setIsUpdating(true);
     try {
+      // Phase 6 Compliance Step 5 — optimistic gate-check before the
+      // sent transition. The DB-level trigger (Step 4) is the source of
+      // truth; this just keeps the user from clicking through a server
+      // raise. Failures fall open (allow DB attempt) — the server side
+      // will still block if the verdict is failed/flagged.
+      if (newStatus === 'sent') {
+        const { data: versionRow } = await scopedDb
+          .from('quotation_versions')
+          .select('quote_id')
+          .eq('id', versionId)
+          .maybeSingle();
+        const quoteId = (versionRow as { quote_id?: string } | null)?.quote_id;
+        if (quoteId) {
+          try {
+            const verdict = await gateCheck('quotation.quote', quoteId);
+            if (verdict.verdict === 'failed' || verdict.verdict === 'flagged') {
+              toast.error('Compliance gate blocked this send', {
+                description:
+                  verdict.verdict === 'failed'
+                    ? 'The most recent screening for this quote failed. Resolve it via the compliance officer page before sending.'
+                    : 'The screening is flagged. A compliance officer must override it before this quote can be sent.',
+              });
+              return false;
+            }
+          } catch (gateErr) {
+            // Gate-check itself failed (network, 5xx). Log and fall
+            // through to the DB write — the trigger will still enforce.
+            logger.warn('compliance gate-check failed (falling open to server enforcement)', { gateErr: String(gateErr) });
+          }
+        }
+      }
+
       const { error } = await scopedDb
         .from('quotation_versions')
         .update({ status: newStatus })
@@ -43,6 +76,16 @@ export function useVersionStatus() {
           toast.error('Invalid Status Transition', {
             description: error.message,
           });
+        } else if (
+          /compliance gate blocked quote send/i.test(error.message) ||
+          (error as { code?: string }).code === 'P0001'
+        ) {
+          // Server-side gate raise (Phase 6 Step 4 trigger). The
+          // optimistic check above missed it (race or fallback path).
+          toast.error('Compliance gate blocked this send', {
+            description: 'A failed or flagged screening exists for this quote. Open the compliance officer page to override or remediate.',
+          });
+          return false;
         } else {
           throw error;
         }
