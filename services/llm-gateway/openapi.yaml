@@ -1,0 +1,225 @@
+openapi: 3.1.0
+info:
+  title: LLM Gateway
+  version: 0.1.0-p0
+  description: |
+    Unified LLM gateway for the multi-platform SaaS estate. P0 scaffold ships
+    `/v1/invoke` backed by the `echo` provider only. P1 onwards adds real
+    providers (Anthropic, OpenAI, Gemini, Mistral, Ollama, vLLM, Azure
+    OpenAI), the 6-layer provider resolution cascade, prompt management,
+    budgets, quotas, PII redaction, audit log, and cost attribution.
+
+    Canonical design: docs/plans/2026-06-02-unified-llm-gateway-design.md
+  contact:
+    name: Platform team
+servers:
+  - url: http://localhost:3020
+    description: Local dev
+  - url: https://llm-gateway.sosservices.online
+    description: Production (post-P5 deployment)
+
+paths:
+  /healthz:
+    get:
+      summary: Liveness probe
+      responses:
+        '200':
+          description: Healthy
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/HealthResponse' }
+
+  /readyz:
+    get:
+      summary: Readiness probe (external deps reachable)
+      responses:
+        '200':
+          description: Ready
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [ready, not_ready] }
+
+  /v1/invoke:
+    post:
+      summary: Synchronous LLM invocation
+      description: |
+        Resolve provider via the cascade (P0: hardcoded to `echo`), invoke,
+        return structured response. P0 has no DB writes / cache / budget
+        enforcement; gate is `echo p99 ≤ 50ms at 100 req/s`.
+      parameters:
+        - in: header
+          name: Authorization
+          description: Bearer service-token (enforced from P2)
+          schema: { type: string }
+        - in: header
+          name: X-Platform-Id
+          description: Calling platform id (e.g. `logic-nexus-ai`)
+          schema: { type: string }
+        - in: header
+          name: X-Tenant-Id
+          description: Tenant uuid (mirrored from request body)
+          schema: { type: string, format: uuid }
+        - in: header
+          name: Idempotency-Key
+          description: ULID for 24h-TTL deduplication (enforced from P1)
+          schema: { type: string }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/InvokeRequest' }
+      responses:
+        '200':
+          description: Successful invocation
+          headers:
+            X-Correlation-Id:
+              schema: { type: string, format: uuid }
+            X-Request-Id:
+              schema: { type: string, format: uuid }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/InvokeResponse' }
+        '400':
+          description: Invalid request
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '500':
+          description: Internal error
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+components:
+  schemas:
+    HealthResponse:
+      type: object
+      required: [status, service, phase, providers_available]
+      properties:
+        status: { type: string, enum: [ok] }
+        service: { type: string, enum: [llm-gateway] }
+        phase: { type: string, enum: [P0, P1, P2, P3, P4, P5, P6, P7] }
+        providers_available:
+          type: array
+          items: { $ref: '#/components/schemas/ProviderKind' }
+
+    ProviderKind:
+      type: string
+      enum: [anthropic, openai, google_gemini, mistral, ollama, vllm, azure_openai, echo, replay]
+
+    BillingMode:
+      type: string
+      enum: [platform_paid, tenant_paid]
+
+    InvokeRequest:
+      type: object
+      required: [tenant_id, module, feature, prompt_key, variables]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        module:
+          type: string
+          example: compliance
+          description: Owning module (compliance, sales, comms, ...)
+        feature:
+          type: string
+          example: screening.hit_reasoning
+        prompt_key:
+          type: string
+          example: compliance.screening.hit_reasoning
+          description: Canonical prompt identifier — usually `<module>.<feature>`
+        variables:
+          type: object
+          additionalProperties: true
+          description: Per-prompt template variables
+        subject:
+          type: object
+          required: [type, id]
+          properties:
+            type: { type: string, example: party }
+            id: { type: string }
+        options:
+          $ref: '#/components/schemas/InvokeOptions'
+        required_capabilities:
+          type: array
+          items: { type: string, enum: [tools, vision, json_mode, streaming, embeddings, fine_tuning] }
+
+    InvokeOptions:
+      type: object
+      properties:
+        model_override: { type: string }
+        provider_override: { $ref: '#/components/schemas/ProviderKind' }
+        cache_ttl_seconds: { type: integer, minimum: 0 }
+        timeout_ms: { type: integer, minimum: 100 }
+        temperature: { type: number, minimum: 0, maximum: 2 }
+        max_tokens: { type: integer, minimum: 1 }
+
+    InvokeUsage:
+      type: object
+      required: [prompt_tokens, completion_tokens, total_tokens]
+      properties:
+        prompt_tokens: { type: integer }
+        completion_tokens: { type: integer }
+        total_tokens: { type: integer }
+
+    InvokeResponse:
+      type: object
+      required:
+        - invocation_id
+        - output
+        - cache_hit
+        - model_used
+        - provider_kind
+        - usage
+        - cost_usd
+        - latency_ms
+      properties:
+        invocation_id: { type: string, format: uuid }
+        output:
+          description: Provider-typed output (echo returns a structured loopback)
+        cache_hit: { type: boolean }
+        model_used: { type: string }
+        provider_kind: { $ref: '#/components/schemas/ProviderKind' }
+        usage: { $ref: '#/components/schemas/InvokeUsage' }
+        cost_usd: { type: number }
+        latency_ms: { type: integer }
+        warnings:
+          type: array
+          items: { type: string }
+        scaffold_phase:
+          type: string
+          enum: [P0]
+          description: Present only while the gateway is in P0 scaffold mode
+
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message, request_id]
+          properties:
+            code:
+              type: string
+              enum:
+                - INVALID_REQUEST
+                - UNAUTHORIZED
+                - FORBIDDEN
+                - TENANT_NOT_FOUND
+                - PROMPT_NOT_FOUND
+                - BUDGET_EXCEEDED
+                - QUOTA_EXCEEDED
+                - RATE_LIMITED
+                - EGRESS_FORBIDDEN
+                - PROVIDER_UNAVAILABLE
+                - PROVIDER_TIMEOUT
+                - PROVIDER_NOT_CONFIGURED
+                - MODEL_CAPABILITY_MISMATCH
+                - INVOCATION_NOT_FOUND
+                - INTERNAL
+            message: { type: string }
+            details: { type: object, additionalProperties: true }
+            request_id: { type: string }
