@@ -211,8 +211,33 @@ export function buildSupabasePromptStore(): PromptStore | null {
 
 /** Build the store: prefer supabase; fall back to in-memory. */
 export function buildPromptStore(): PromptStore {
-  const supa = buildSupabasePromptStore();
-  if (supa) return supa;
-  logger.info('prompt store: env vars missing, using in-memory store');
-  return buildInMemoryPromptStore();
+  return getProcessPromptStore();
+}
+
+// ── Process-wide singleton ─────────────────────────────────────────
+// Both /v1/admin/prompts (write) and /v1/invoke (read) MUST see the
+// same store. Per-route singletons (each calling buildPromptStore
+// independently) caused a silent divergence when running without a
+// shared backing DB: admin POST went to instance A, invoke read from
+// instance B, and the prompt was never found. The process singleton
+// fixes that without touching the per-route test escape hatches.
+
+let _processStore: PromptStore | null = null;
+
+export function getProcessPromptStore(): PromptStore {
+  if (!_processStore) {
+    const supa = buildSupabasePromptStore();
+    if (supa) {
+      _processStore = supa;
+    } else {
+      logger.info('prompt store: env vars missing, using in-memory store');
+      _processStore = buildInMemoryPromptStore();
+    }
+  }
+  return _processStore;
+}
+
+/** Test helper: clear the process singleton so each test starts clean. */
+export function _resetProcessPromptStoreForTesting(store: PromptStore | null): void {
+  _processStore = store;
 }
