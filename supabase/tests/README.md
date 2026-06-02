@@ -26,7 +26,7 @@ DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supab
 Harness exits 0 if every test passes, 1 if any fails. Pass it through CI
 to catch regressions on schema/trigger/RPC changes.
 
-## Suite manifest (19 tests)
+## Suite manifest (20 tests)
 
 | File | Slice | Verifies |
 |---|---|---|
@@ -49,6 +49,7 @@ to catch regressions on schema/trigger/RPC changes.
 | `core_gen_dual_write_trigger.sql` | Step 57 | codegen mirrors INSERT/UPDATE/DELETE; UPDATE replaces stale target row |
 | `core_roles_permissions.sql` | Step 56 | user_has_permission wildcards (module:*, *:*, action=*); status/expires gates |
 | `markets_multibroker_rls.sql` | (pre-session) | markets multi-broker portfolio RLS routing |
+| `finance_missing_schema.sql` | Slice A (gap-fill) | 13 finance.* tables exist + RLS + policies + FK + updated_at triggers + CHECK constraints |
 
 ## Authoring conventions
 
