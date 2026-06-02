@@ -23,6 +23,7 @@ import { ResolverError } from '../resolver/errors.js';
 import { buildInMemoryStores } from '../resolver/inMemoryStores.js';
 import { buildSupabaseStores } from '../resolver/supabaseStores.js';
 import type { CallContext, ResolverStores } from '../resolver/types.js';
+import { buildAuditPayload, buildInvocationWriter, type InvocationWriter } from '../audit/invocationWriter.js';
 
 export const invokeRouter = Router();
 
@@ -40,6 +41,18 @@ function getResolverStores(): ResolverStores {
 /** Test helper: inject custom stores. Production code never calls this. */
 export function setResolverStoresForTesting(stores: ResolverStores | null): void {
   resolverStores = stores;
+}
+
+// Module-singleton audit-log writer. No-op when SUPABASE env unset.
+let invocationWriter: InvocationWriter | null = null;
+function getInvocationWriter(): InvocationWriter {
+  if (!invocationWriter) invocationWriter = buildInvocationWriter();
+  return invocationWriter;
+}
+
+/** Test helper: inject custom writer. Production code never calls this. */
+export function setInvocationWriterForTesting(writer: InvocationWriter | null): void {
+  invocationWriter = writer;
 }
 
 function asString(value: unknown): string | null {
@@ -167,6 +180,20 @@ invokeRouter.post('/invoke', async (req: Request, res: Response, next: NextFunct
     });
 
     res.json(body);
+
+    // Fire-and-forget audit log AFTER response — never blocks the client.
+    getInvocationWriter()(
+      buildAuditPayload({
+        invocation_id,
+        request_id: requestId,
+        request: parsed,
+        resolved,
+        usage: result.usage,
+        cost_usd: result.cost_usd,
+        latency_ms,
+        warnings: result.warnings,
+      }),
+    );
   } catch (err) {
     next(err);
   }
