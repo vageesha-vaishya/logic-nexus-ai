@@ -1,0 +1,11 @@
+node_modules
+dist
+coverage
+.git
+.env
+.env.local
+*.log
+tests
+jest.config.cjs
+README.md
+.gitignore

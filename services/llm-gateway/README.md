@@ -93,21 +93,51 @@ tests/
   setup-env.ts                # Test env vars
 ```
 
-## What's NOT here yet (deferred to later phases)
+## Production deploy (Coolify / Docker)
 
-- Real LLM provider adapters (P1)
-- 6-layer provider resolution cascade (P1)
-- Supabase Vault BYO-key credential storage (P1)
-- Prompt management (`gateway.prompts`) (P3)
-- A/B promotion via improver loop (P3)
-- Service-token auth + scopes (P2)
-- Rate limits, budgets, quotas (P2)
-- PII redaction (P2)
-- Append-only audit log (`gateway.llm_invocations`) (P2)
-- Egress controls / per-tenant data residency (P2)
-- Cost attribution + daily rollup (P5)
-- Per-language SDK codegen (P4)
-- `/v1/invoke/stream` SSE (P2)
-- `/v1/embed`, `/v1/estimate`, `/v1/fine-tunes`, agent workflows (P5+)
+The repo ships a multi-stage `Dockerfile` matching the other Phase-6 services
+(comms-api, compliance-api, …). Build + run locally:
 
-Each phase has its own gate and rollback story documented in the design doc.
+```bash
+docker build -t llm-gateway:latest .
+docker run --rm -p 3020:3020 \
+  -e LLM_GATEWAY_AUTH_MODE=enforced \
+  -e SUPABASE_URL=https://… \
+  -e SUPABASE_SERVICE_ROLE_KEY=… \
+  -e ANTHROPIC_API_KEY=… \
+  -e OPENAI_API_KEY=… \
+  llm-gateway:latest
+```
+
+Coolify deploy checklist:
+- Service type: Docker image (Dockerfile in repo)
+- Build context: `services/llm-gateway`
+- Port: 3020
+- Healthcheck: container `HEALTHCHECK` already configured (GET /healthz)
+- Required env vars:
+  - `LLM_GATEWAY_AUTH_MODE=enforced` (fail-closed in prod)
+  - `LLM_GATEWAY_PORT=3020` (matches `EXPOSE`)
+  - `SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` (for DB-backed stores)
+- Optional provider env vars (set only the ones you want to enable):
+  - `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY`, `MISTRAL_API_KEY`
+- One-time DB tasks (already in `supabase/migrations/`):
+  - Apply gateway.* migrations (15+ tables, 9 RPCs)
+  - Add `gateway` to the project's PostgREST exposed-schemas list
+  - Mint at least one service token:
+    `SELECT * FROM gateway.mint_service_token('logic-nexus-ai', ARRAY['invoke'], 'first prod')`
+
+After deploy:
+- Verify: `curl https://<your-gateway-url>/healthz`
+- Smoke any callsite that hits `/v1/invoke` (e.g. compliance "Explain with AI"
+  on `/dashboard/compliance/screenings/:id`).
+
+## What's NOT here yet (operational follow-ups)
+
+- Provider fine-tune submission worker (storage live; training submission pending)
+- Real-time WebSocket / SSE `/v1/invoke/stream`
+- Redis-backed budget counters (Postgres-backed shipped; Redis is a perf upgrade)
+- OpenTelemetry SDK initialization (W3C traceparent propagation already
+  ships; full span emission needs a collector deployment)
+- Gateway admin UI (currently admin via direct DB)
+- Per-tenant data residency enforcement at routing-time (egress policy is
+  in place; multi-region deployment is operational work)
