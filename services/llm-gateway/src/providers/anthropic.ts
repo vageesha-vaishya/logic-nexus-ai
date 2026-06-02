@@ -88,7 +88,37 @@ export function makeAnthropicProvider(config: AnthropicConfig = {}): ProviderAda
 
       // P3.2: prefer pre-rendered prompt body from the gateway prompt store;
       // fall back to the JSON-stringify scaffold when no prompt is registered.
-      const userContent = ctx.rendered_body ?? renderPromptBody(req);
+      const textBody = ctx.rendered_body ?? renderPromptBody(req);
+
+      // §9.4 multi-modal — translate gateway Attachment[] → Anthropic blocks.
+      // Anthropic supports image blocks (base64 or url) on its messages.create
+      // API. Audio + document aren't directly first-class today, so they pass
+      // through as text-block notes for now until Anthropic ships them.
+      const attachmentBlocks: Anthropic.Messages.ImageBlockParam[] = [];
+      const unsupportedAttachmentWarnings: string[] = [];
+      for (const att of req.attachments ?? []) {
+        if (att.kind !== 'image') {
+          unsupportedAttachmentWarnings.push(`anthropic_attachment_kind_unsupported:${att.kind}`);
+          continue;
+        }
+        if (att.content_base64) {
+          attachmentBlocks.push({
+            type: 'image',
+            source: { type: 'base64', media_type: att.mime_type as Anthropic.Base64ImageSource['media_type'], data: att.content_base64 },
+          });
+        } else if (att.url) {
+          attachmentBlocks.push({
+            type: 'image',
+            source: { type: 'url', url: att.url },
+          });
+        }
+      }
+      // Anthropic content order: text first, then images. Pre-pending text means
+      // the caller's prompt frames what the images show.
+      const userContent: Array<Anthropic.TextBlockParam | Anthropic.Messages.ImageBlockParam> = [
+        { type: 'text', text: textBody },
+        ...attachmentBlocks,
+      ];
 
       // §9.3 tool use — translate gateway ToolDef → Anthropic's `tools` shape.
       const tools = (req.tools ?? []).map((t) => ({
@@ -112,7 +142,7 @@ export function makeAnthropicProvider(config: AnthropicConfig = {}): ProviderAda
           max_tokens,
           temperature,
           system: config.system,
-          messages: [{ role: 'user', content: userContent }],
+          messages: [{ role: 'user', content: userContent.length === 1 ? textBody : userContent }],
           ...(passTools ? { tools: passTools } : {}),
           ...(tool_choice && passTools ? { tool_choice } : {}),
         },
@@ -145,12 +175,16 @@ export function makeAnthropicProvider(config: AnthropicConfig = {}): ProviderAda
         (usage.prompt_tokens * (config.input_cost_per_million_tokens ?? 0)) / 1_000_000 +
         (usage.completion_tokens * (config.output_cost_per_million_tokens ?? 0)) / 1_000_000;
 
+      const baseWarnings: string[] = [];
+      if (textBlocks.length === 0 && tool_calls.length === 0) baseWarnings.push('anthropic_no_text_blocks');
+      baseWarnings.push(...unsupportedAttachmentWarnings);
+
       return {
         output: { text: output_text, raw_content: message.content },
         model_used: message.model,
         usage,
         cost_usd: Number(cost_usd.toFixed(6)),
-        warnings: textBlocks.length === 0 && tool_calls.length === 0 ? ['anthropic_no_text_blocks'] : undefined,
+        warnings: baseWarnings.length > 0 ? baseWarnings : undefined,
         ...(tool_calls.length > 0 ? { tool_calls } : {}),
       };
     },

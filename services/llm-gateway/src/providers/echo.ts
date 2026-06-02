@@ -55,6 +55,15 @@ export const echoProvider: ProviderAdapter = {
         // the caller's request reached the provider unmodified.
         tools: req.tools ?? null,
         tool_choice: req.tool_choice ?? null,
+        // §9.4: surface attachments[]. base64 content is truncated so the
+        // echo response stays compact in logs/tests.
+        attachments: (req.attachments ?? []).map((a) => ({
+          kind: a.kind,
+          mime_type: a.mime_type,
+          content_base64_length: a.content_base64?.length ?? 0,
+          has_url: Boolean(a.url),
+          label: a.label ?? null,
+        })),
       },
       message: `echo: ${req.prompt_key}`,
     };

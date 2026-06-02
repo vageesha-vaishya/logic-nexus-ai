@@ -32,6 +32,31 @@ export interface InvokeRequest {
    */
   tools?: ToolDef[];
   tool_choice?: ToolChoice;
+  /**
+   * Multi-modal attachments — images, audio, documents — passed to the
+   * provider in addition to the text prompt. Per design §9.4. Each
+   * attachment carries either `content_base64` (inline) or `url`
+   * (remote fetch); providers vary in support but the gateway shape
+   * is unified.
+   *
+   * Capability validation runs against `required_capabilities` so a
+   * model without `vision` rejects at config-time if an image is sent.
+   */
+  attachments?: Attachment[];
+}
+
+export type AttachmentKind = 'image' | 'audio' | 'document';
+
+export interface Attachment {
+  kind: AttachmentKind;
+  /** IANA media type: image/png, image/jpeg, audio/mpeg, application/pdf, ... */
+  mime_type: string;
+  /** Inline base64-encoded content. Exclusive with `url`. */
+  content_base64?: string;
+  /** Remote URL the provider fetches. Exclusive with `content_base64`. */
+  url?: string;
+  /** Optional caller-supplied label (alt-text); never sent to provider. */
+  label?: string;
 }
 
 export interface ToolDef {

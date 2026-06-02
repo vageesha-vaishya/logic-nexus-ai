@@ -61,10 +61,30 @@ export function makeOpenAIProvider(config: OpenAIConfig = {}): ProviderAdapter {
       const temperature = req.options?.temperature ?? DEFAULT_TEMPERATURE;
       const timeout_ms = req.options?.timeout_ms ?? 30_000;
 
-      const messages: { role: 'system' | 'user'; content: string }[] = [];
+      // §9.4 multi-modal: build the user content as either plain text (when
+      // no attachments) or the multi-part array (when images are present).
+      const textBody = ctx.rendered_body ?? renderPromptBody(req);
+      const attachmentParts: OpenAI.Chat.ChatCompletionContentPart[] = [];
+      const unsupportedAttachmentWarnings: string[] = [];
+      for (const att of req.attachments ?? []) {
+        if (att.kind !== 'image') {
+          unsupportedAttachmentWarnings.push(`openai_attachment_kind_unsupported:${att.kind}`);
+          continue;
+        }
+        const url = att.url ?? (att.content_base64 ? `data:${att.mime_type};base64,${att.content_base64}` : '');
+        if (!url) continue;
+        attachmentParts.push({ type: 'image_url', image_url: { url } });
+      }
+      const userContent: OpenAI.Chat.ChatCompletionUserMessageParam['content'] =
+        attachmentParts.length > 0
+          ? [{ type: 'text' as const, text: textBody }, ...attachmentParts]
+          : textBody;
+
+      const messages: Array<
+        OpenAI.Chat.ChatCompletionSystemMessageParam | OpenAI.Chat.ChatCompletionUserMessageParam
+      > = [];
       if (config.system) messages.push({ role: 'system', content: config.system });
-      // P3.2: prefer pre-rendered prompt body from the gateway prompt store.
-      messages.push({ role: 'user', content: ctx.rendered_body ?? renderPromptBody(req) });
+      messages.push({ role: 'user', content: userContent });
 
       // §9.3 tool use — translate gateway ToolDef → OpenAI's `tools` shape
       // (each tool wrapped in { type: 'function', function: { name, description, parameters } }).
@@ -120,12 +140,16 @@ export function makeOpenAIProvider(config: OpenAIConfig = {}): ProviderAdapter {
         (usage.prompt_tokens * (config.input_cost_per_million_tokens ?? 0)) / 1_000_000 +
         (usage.completion_tokens * (config.output_cost_per_million_tokens ?? 0)) / 1_000_000;
 
+      const baseWarnings: string[] = [];
+      if (text.length === 0 && tool_calls.length === 0) baseWarnings.push('openai_empty_response');
+      baseWarnings.push(...unsupportedAttachmentWarnings);
+
       return {
         output: { text, raw_choice: completion.choices[0] },
         model_used: completion.model,
         usage,
         cost_usd: Number(cost_usd.toFixed(6)),
-        warnings: text.length === 0 && tool_calls.length === 0 ? ['openai_empty_response'] : undefined,
+        warnings: baseWarnings.length > 0 ? baseWarnings : undefined,
         ...(tool_calls.length > 0 ? { tool_calls } : {}),
       };
     },

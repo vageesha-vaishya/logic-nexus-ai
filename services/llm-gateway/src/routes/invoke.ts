@@ -182,6 +182,49 @@ function validateInvokeRequest(raw: unknown): InvokeRequest {
   const tools = (r.tools as InvokeRequest['tools']) ?? undefined;
   const tool_choice = (r.tool_choice as InvokeRequest['tool_choice']) ?? undefined;
 
+  // §9.4 multi-modal attachments validation
+  const attachmentsRaw = r.attachments as unknown[] | undefined;
+  let attachments: InvokeRequest['attachments'];
+  if (attachmentsRaw !== undefined) {
+    if (!Array.isArray(attachmentsRaw)) {
+      throw new GatewayError('INVALID_REQUEST', 'attachments must be an array', 400);
+    }
+    if (attachmentsRaw.length > 16) {
+      throw new GatewayError('INVALID_REQUEST', 'attachments exceeds max=16', 400, { max: 16 });
+    }
+    attachments = attachmentsRaw.map((a, i) => {
+      if (!a || typeof a !== 'object') {
+        throw new GatewayError('INVALID_REQUEST', `attachments[${i}] must be an object`, 400);
+      }
+      const att = a as Record<string, unknown>;
+      const kind = att.kind;
+      if (kind !== 'image' && kind !== 'audio' && kind !== 'document') {
+        throw new GatewayError('INVALID_REQUEST', `attachments[${i}].kind must be image|audio|document`, 400);
+      }
+      if (typeof att.mime_type !== 'string' || att.mime_type.length === 0) {
+        throw new GatewayError('INVALID_REQUEST', `attachments[${i}].mime_type required`, 400);
+      }
+      const hasBase64 = typeof att.content_base64 === 'string' && (att.content_base64 as string).length > 0;
+      const hasUrl = typeof att.url === 'string' && (att.url as string).length > 0;
+      if (hasBase64 === hasUrl) {
+        throw new GatewayError('INVALID_REQUEST',
+          `attachments[${i}] must have exactly one of content_base64 or url`, 400);
+      }
+      // Cap inline base64 at 8 MiB (about 6 MiB binary) per attachment.
+      if (hasBase64 && (att.content_base64 as string).length > 8 * 1024 * 1024) {
+        throw new GatewayError('INVALID_REQUEST',
+          `attachments[${i}].content_base64 exceeds 8 MiB`, 400);
+      }
+      return {
+        kind,
+        mime_type: att.mime_type,
+        ...(hasBase64 ? { content_base64: att.content_base64 as string } : {}),
+        ...(hasUrl ? { url: att.url as string } : {}),
+        ...(typeof att.label === 'string' ? { label: att.label } : {}),
+      } as NonNullable<InvokeRequest['attachments']>[number];
+    });
+  }
+
   return {
     tenant_id: tenant_id!,
     module: module_!,
@@ -193,6 +236,7 @@ function validateInvokeRequest(raw: unknown): InvokeRequest {
     required_capabilities,
     tools,
     tool_choice,
+    attachments,
   };
 }
 
