@@ -10,6 +10,7 @@ import { mountOutcomeRoutes } from './routes/outcomes.js';
 import { mountExperimentRoutes } from './routes/experiments.js';
 import { mountEmbedRoutes } from './routes/embed.js';
 import { mountRtbfRoutes } from './routes/rtbf.js';
+import { mountFineTuneRoutes } from './routes/finetune.js';
 
 export function createApp(): Express {
   const app: Express = express();
@@ -46,6 +47,7 @@ export function createApp(): Express {
   app.use('/v1', mountExperimentRoutes(getAuthLookupForApp));
   app.use('/v1', mountEmbedRoutes(getAuthLookupForApp));
   app.use('/v1', mountRtbfRoutes(getAuthLookupForApp));
+  app.use('/v1', mountFineTuneRoutes(getAuthLookupForApp));
 
   app.use(errorMiddleware);
 
