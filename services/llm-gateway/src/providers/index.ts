@@ -8,11 +8,17 @@ import type { ProviderAdapter, ProviderKind } from '../types/gateway.types.js';
 import { echoProvider } from './echo.js';
 import { replayProvider } from './replay.js';
 import { anthropicProvider } from './anthropic.js';
+import { openaiProvider } from './openai.js';
+import { geminiProvider } from './gemini.js';
+import { mistralProvider } from './mistral.js';
 
 const registry: Partial<Record<ProviderKind, ProviderAdapter>> = {
   echo: echoProvider,
   replay: replayProvider,
   anthropic: anthropicProvider,
+  openai: openaiProvider,
+  google_gemini: geminiProvider,
+  mistral: mistralProvider,
 };
 
 export function resolveProvider(kind: ProviderKind): ProviderAdapter {
