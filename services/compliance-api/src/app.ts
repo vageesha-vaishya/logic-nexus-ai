@@ -87,6 +87,7 @@ app.get('/compliance/v1/_status', (_req: Request, res: Response) => {
       'POST /api/v1/compliance/screenings/:id/revoke-override',
       'GET  /api/v1/compliance/records/:subject_type/:subject_id',
       'GET  /api/v1/compliance/blocked-parties',
+      'GET  /api/v1/compliance/gate-check?subject_type=&subject_id=',
     ],
     consumers: [
       'gating-consumer (polls core.v_cross_module_pending_events for sales.lead.created, quotation.quote.send_requested, logistics.booking.created, finance.payment.created)',

@@ -83,6 +83,23 @@ export async function overrideScreening(input: { screening_id: string; reason: s
   return body.data;
 }
 
+export type GateVerdict = 'pass' | 'flagged' | 'failed' | 'no_screening_yet';
+export interface GateCheckResult {
+  subject_type: string;
+  subject_id: string;
+  verdict: GateVerdict;
+}
+
+export async function gateCheck(subjectType: string, subjectId: string): Promise<GateCheckResult> {
+  const params = new URLSearchParams({ subject_type: subjectType, subject_id: subjectId });
+  const res = await fetch(`${BASE}/gate-check?${params.toString()}`, {
+    method: 'GET',
+    credentials: 'include',
+    headers: await authHeaders(),
+  });
+  return parseOrThrow<GateCheckResult>(res);
+}
+
 export async function revokeOverride(input: { screening_id: string; reason: string }): Promise<unknown> {
   const res = await fetch(`${BASE}/screenings/${encodeURIComponent(input.screening_id)}/revoke-override`, {
     method: 'POST',

@@ -22,6 +22,8 @@ import {
   getScreeningDecisions,
   overrideScreening,
   revokeOverride,
+  gateCheck,
+  type GateCheckResult,
 } from '../lib/complianceApi';
 
 export type BlockedPartyStatus = 'all' | 'failed' | 'overridden' | 'expired';
@@ -137,6 +139,44 @@ export function useScreeningDecisions(id: string | undefined) {
         throw e;
       }
     },
+  });
+}
+
+export type ComplianceGateSubjectType =
+  | 'sales.lead'
+  | 'quotation.quote'
+  | 'logistics.booking'
+  | 'finance.payment';
+
+const gateCheckKey = (t: ComplianceGateSubjectType, id: string) =>
+  ['compliance', 'gate-check', t, id] as const;
+
+/**
+ * Polls the verdict of the most recent screening for a subject so a
+ * caller can refuse to commit a send / create / release transition
+ * when verdict is 'failed' or 'flagged' (without override).
+ *
+ * Pass disabled=true to suspend the query (initiating modules typically
+ * only want to check right before a Send button is clicked).
+ */
+export function useGateCheck(
+  subjectType: ComplianceGateSubjectType,
+  subjectId: string | undefined,
+  opts: { enabled?: boolean } = {},
+) {
+  const enabled = (opts.enabled ?? true) && Boolean(subjectId);
+  return useQuery({
+    queryKey: gateCheckKey(subjectType, subjectId ?? ''),
+    enabled,
+    queryFn: async (): Promise<GateCheckResult> => {
+      try {
+        return await gateCheck(subjectType, subjectId!);
+      } catch (e) {
+        logger.error({ event: 'compliance.gate_check.failed', subjectType, subjectId, error: String(e) });
+        throw e;
+      }
+    },
+    staleTime: 10_000,
   });
 }
 

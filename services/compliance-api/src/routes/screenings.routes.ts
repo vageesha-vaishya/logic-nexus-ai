@@ -45,6 +45,18 @@ function getServiceRoleClient() {
 // arbitrary filter values into the underlying query.
 const BLOCKED_PARTY_STATUS_VALUES = new Set(['failed', 'overridden', 'expired']);
 
+// Subject_type strings the compliance.gate_check fn accepts. The fn
+// itself is permissive (any text passes through to the screenings
+// lookup) but we constrain HTTP callers to the documented set so a
+// typo doesn't silently return 'no_screening_yet' forever.
+const GATE_CHECK_SUBJECT_TYPES = new Set([
+  'sales.lead',
+  'quotation.quote',
+  'logistics.booking',
+  'finance.payment',
+]);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 router.get(
   '/v1/compliance/screenings',
   asyncHandler(async (req, res) => {
@@ -252,6 +264,55 @@ router.post(
     } catch (err) {
       logger.error('compliance.override_screening rpc error', err);
       return serverError(res, 'COMPLIANCE_OVERRIDE_ERROR', err);
+    }
+  }),
+);
+
+// GET /v1/compliance/gate-check?subject_type=&subject_id=
+//   Returns the verdict for the most-recent screening on the subject.
+//   { verdict: 'pass' | 'flagged' | 'failed' | 'no_screening_yet' }
+//   Wraps the compliance.gate_check SQL fn.
+router.get(
+  '/v1/compliance/gate-check',
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    if (!authReq.userId || !authReq.tenantId) return unauthorized(res);
+
+    const subjectType = String(req.query.subject_type || '').trim();
+    const subjectId = String(req.query.subject_id || '').trim();
+    if (!GATE_CHECK_SUBJECT_TYPES.has(subjectType)) {
+      return res.status(400).json({
+        error: `subject_type must be one of: ${Array.from(GATE_CHECK_SUBJECT_TYPES).join(', ')}`,
+        code: 'INVALID_SUBJECT_TYPE',
+        statusCode: 400,
+      } as ErrorResponse);
+    }
+    if (!UUID_RE.test(subjectId)) {
+      return res.status(400).json({
+        error: 'subject_id must be a uuid',
+        code: 'INVALID_SUBJECT_ID',
+        statusCode: 400,
+      } as ErrorResponse);
+    }
+
+    try {
+      const supabase = getServiceRoleClient();
+      const { data, error } = await (supabase as any)
+        .schema('compliance')
+        .rpc('gate_check', {
+          p_tenant_id: authReq.tenantId,
+          p_subject_type: subjectType,
+          p_subject_id: subjectId,
+        });
+      if (error) throw error;
+      return res.json({
+        subject_type: subjectType,
+        subject_id: subjectId,
+        verdict: data as string,
+      });
+    } catch (err) {
+      logger.error('compliance.gate_check rpc error', err);
+      return serverError(res, 'COMPLIANCE_GATE_CHECK_ERROR', err);
     }
   }),
 );
