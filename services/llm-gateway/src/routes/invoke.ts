@@ -179,6 +179,8 @@ function validateInvokeRequest(raw: unknown): InvokeRequest {
 
   const options = (r.options ?? undefined) as InvokeRequest['options'];
   const required_capabilities = r.required_capabilities as string[] | undefined;
+  const tools = (r.tools as InvokeRequest['tools']) ?? undefined;
+  const tool_choice = (r.tool_choice as InvokeRequest['tool_choice']) ?? undefined;
 
   return {
     tenant_id: tenant_id!,
@@ -189,6 +191,8 @@ function validateInvokeRequest(raw: unknown): InvokeRequest {
     subject,
     options,
     required_capabilities,
+    tools,
+    tool_choice,
   };
 }
 

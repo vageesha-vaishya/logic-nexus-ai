@@ -51,6 +51,10 @@ export const echoProvider: ProviderAdapter = {
         rendered_body: ctx.rendered_body ?? null,
         prompt_version_id: ctx.prompt_version_id ?? null,
         prompt_version_number: ctx.prompt_version_number ?? null,
+        // §9.3: surface the tools[] + tool_choice so tests can verify
+        // the caller's request reached the provider unmodified.
+        tools: req.tools ?? null,
+        tool_choice: req.tool_choice ?? null,
       },
       message: `echo: ${req.prompt_key}`,
     };

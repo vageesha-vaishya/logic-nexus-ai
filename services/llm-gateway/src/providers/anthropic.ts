@@ -90,6 +90,22 @@ export function makeAnthropicProvider(config: AnthropicConfig = {}): ProviderAda
       // fall back to the JSON-stringify scaffold when no prompt is registered.
       const userContent = ctx.rendered_body ?? renderPromptBody(req);
 
+      // §9.3 tool use — translate gateway ToolDef → Anthropic's `tools` shape.
+      const tools = (req.tools ?? []).map((t) => ({
+        name: t.name,
+        description: t.description ?? '',
+        input_schema: t.parameters_schema as Anthropic.Tool['input_schema'],
+      }));
+      // Anthropic's tool_choice: { type: 'auto' | 'any' | 'tool', name? }
+      let tool_choice: Anthropic.MessageCreateParams['tool_choice'];
+      if (req.tool_choice === 'required') tool_choice = { type: 'any' };
+      else if (req.tool_choice === 'auto') tool_choice = { type: 'auto' };
+      else if (req.tool_choice && typeof req.tool_choice === 'object' && 'name' in req.tool_choice) {
+        tool_choice = { type: 'tool', name: req.tool_choice.name };
+      }
+      // 'none' is honored by simply NOT passing the tools[] field
+      const passTools = req.tool_choice === 'none' ? undefined : (tools.length > 0 ? tools : undefined);
+
       const message = await client.messages.create(
         {
           model,
@@ -97,16 +113,27 @@ export function makeAnthropicProvider(config: AnthropicConfig = {}): ProviderAda
           temperature,
           system: config.system,
           messages: [{ role: 'user', content: userContent }],
+          ...(passTools ? { tools: passTools } : {}),
+          ...(tool_choice && passTools ? { tool_choice } : {}),
         },
         { timeout: timeout_ms },
       );
 
-      // Anthropic returns content as an array of typed blocks. P1.2 we
-      // only handle 'text'; tool-use blocks come in P3.
+      // Anthropic returns content as an array of typed blocks. §9.3:
+      // both 'text' and 'tool_use' blocks now flow through.
       const textBlocks = message.content
         .filter((b): b is Anthropic.TextBlock => b.type === 'text')
         .map((b) => b.text);
       const output_text = textBlocks.join('\n');
+
+      const tool_use_blocks = message.content.filter(
+        (b): b is Anthropic.ToolUseBlock => b.type === 'tool_use',
+      );
+      const tool_calls = tool_use_blocks.map((b) => ({
+        id: b.id,
+        name: b.name,
+        args: (b.input ?? {}) as Record<string, unknown>,
+      }));
 
       const usage: InvokeUsage = {
         prompt_tokens: message.usage.input_tokens,
@@ -123,7 +150,8 @@ export function makeAnthropicProvider(config: AnthropicConfig = {}): ProviderAda
         model_used: message.model,
         usage,
         cost_usd: Number(cost_usd.toFixed(6)),
-        warnings: textBlocks.length === 0 ? ['anthropic_no_text_blocks'] : undefined,
+        warnings: textBlocks.length === 0 && tool_calls.length === 0 ? ['anthropic_no_text_blocks'] : undefined,
+        ...(tool_calls.length > 0 ? { tool_calls } : {}),
       };
     },
   };

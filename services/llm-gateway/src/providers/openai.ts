@@ -66,17 +66,50 @@ export function makeOpenAIProvider(config: OpenAIConfig = {}): ProviderAdapter {
       // P3.2: prefer pre-rendered prompt body from the gateway prompt store.
       messages.push({ role: 'user', content: ctx.rendered_body ?? renderPromptBody(req) });
 
+      // §9.3 tool use — translate gateway ToolDef → OpenAI's `tools` shape
+      // (each tool wrapped in { type: 'function', function: { name, description, parameters } }).
+      const tools = (req.tools ?? []).map((t) => ({
+        type: 'function' as const,
+        function: {
+          name: t.name,
+          description: t.description ?? '',
+          parameters: t.parameters_schema,
+        },
+      }));
+      let tool_choice: OpenAI.Chat.ChatCompletionToolChoiceOption | undefined;
+      if (req.tool_choice === 'required') tool_choice = 'required';
+      else if (req.tool_choice === 'auto') tool_choice = 'auto';
+      else if (req.tool_choice === 'none') tool_choice = 'none';
+      else if (req.tool_choice && typeof req.tool_choice === 'object' && 'name' in req.tool_choice) {
+        tool_choice = { type: 'function', function: { name: req.tool_choice.name } };
+      }
+      const passTools = req.tool_choice === 'none' ? undefined : (tools.length > 0 ? tools : undefined);
+
       const completion = await client.chat.completions.create(
         {
           model,
           max_tokens,
           temperature,
           messages,
+          ...(passTools ? { tools: passTools } : {}),
+          ...(tool_choice && passTools ? { tool_choice } : {}),
         },
         { timeout: timeout_ms },
       );
 
-      const text = completion.choices[0]?.message?.content ?? '';
+      const choice = completion.choices[0];
+      const text = choice?.message?.content ?? '';
+      const tool_calls = (choice?.message?.tool_calls ?? [])
+        .filter((tc): tc is OpenAI.Chat.ChatCompletionMessageFunctionToolCall => tc.type === 'function')
+        .map((tc) => ({
+          id: tc.id,
+          name: tc.function.name,
+          args: (() => {
+            try { return JSON.parse(tc.function.arguments) as Record<string, unknown>; }
+            catch { return {} as Record<string, unknown>; }
+          })(),
+        }));
+
       const usage: InvokeUsage = {
         prompt_tokens: completion.usage?.prompt_tokens ?? 0,
         completion_tokens: completion.usage?.completion_tokens ?? 0,
@@ -92,7 +125,8 @@ export function makeOpenAIProvider(config: OpenAIConfig = {}): ProviderAdapter {
         model_used: completion.model,
         usage,
         cost_usd: Number(cost_usd.toFixed(6)),
-        warnings: text.length === 0 ? ['openai_empty_response'] : undefined,
+        warnings: text.length === 0 && tool_calls.length === 0 ? ['openai_empty_response'] : undefined,
+        ...(tool_calls.length > 0 ? { tool_calls } : {}),
       };
     },
   };

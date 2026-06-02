@@ -24,6 +24,29 @@ export interface InvokeRequest {
   subject?: { type: string; id: string };
   options?: InvokeOptions;
   required_capabilities?: string[];   // e.g. ['tools', 'vision', 'json_mode']
+  /**
+   * Tool definitions exposed to the model. Per design §9.3.
+   * When the model decides to call a tool, the response's `tool_calls`
+   * array enumerates the (name, args) pairs the caller must execute
+   * out-of-band before re-invoking with tool results.
+   */
+  tools?: ToolDef[];
+  tool_choice?: ToolChoice;
+}
+
+export interface ToolDef {
+  name: string;
+  description?: string;
+  /** JSON-Schema shape for arguments. */
+  parameters_schema: Record<string, unknown>;
+}
+
+export type ToolChoice = 'auto' | 'required' | 'none' | { name: string };
+
+export interface ToolCall {
+  id: string;
+  name: string;
+  args: Record<string, unknown>;
 }
 
 export interface InvokeOptions {
@@ -53,6 +76,8 @@ export interface InvokeResponse<TOutput = unknown> {
   warnings?: string[];
   // P0 only: surface that this is the scaffold + which provider served the call
   scaffold_phase?: 'P0';
+  /** Tool calls the model wants the caller to execute. Per design §9.3. */
+  tool_calls?: ToolCall[];
 }
 
 // Outcome recorded by the caller via /v1/outcomes (post-P0)
@@ -124,4 +149,5 @@ export interface ProviderResult<TOutput = unknown> {
   usage: InvokeUsage;
   cost_usd: number;
   warnings?: string[];
+  tool_calls?: ToolCall[];
 }
