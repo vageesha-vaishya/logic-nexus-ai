@@ -33,6 +33,18 @@ const PARTIES_BANS = [
   },
 ];
 
+// Phase 6 Compliance Step 2 — direct reads of compliance.* tables/views
+// from the frontend. Now that useComplianceOfficer goes through
+// /api/compliance/v1/* (services/compliance-api), nothing in src/ should
+// be calling `supabase.schema('compliance')` any more — the API enforces
+// tenant scoping, audit logging, and the override RPCs in one place.
+const COMPLIANCE_SCHEMA_BANS = [
+  {
+    selector: "CallExpression[callee.type='MemberExpression'][callee.property.name='schema'][arguments.0.type='Literal'][arguments.0.value='compliance']",
+    message: "Phase 6 Compliance Step 2: do not call `supabase.schema('compliance')` from the frontend. Route reads + writes through src/features/module-compliance/lib/complianceApi.ts so compliance-api enforces tenant scoping, audit logging, and the override RPCs centrally.",
+  },
+];
+
 // Phase 6 Step 32 — direct imports of comms provider SDKs.
 //
 // Only services/comms-api/src/providers/ may import these. Everyone else
@@ -102,7 +114,7 @@ export default tseslint.config(
       // Phase 2 Step 7 + Phase 6 Step 32 — composed bans (see consts at top
       // of file for the full rationale on each set). Tests + the providers
       // dir + supabase/functions get scoped overrides below.
-      "no-restricted-syntax": ["error", ...PARTIES_BANS, ...COMMS_PROVIDER_SDK_BANS],
+      "no-restricted-syntax": ["error", ...PARTIES_BANS, ...COMMS_PROVIDER_SDK_BANS, ...COMPLIANCE_SCHEMA_BANS],
     },
     settings: {},
   },

@@ -1,21 +1,28 @@
 // Data layer for the compliance-officer UI (Slice B of Phase 6).
 //
-// Backs onto:
-//   - compliance.v_blocked_parties     (officer inbox feed)
-//   - compliance.v_screening_decisions (per-screening decision history)
-//   - compliance.screenings            (per-screening detail)
-//   - compliance.override_screening    (RPC)
-//   - compliance.revoke_override       (RPC)
+// Step 2 cutover: now goes through services/compliance-api via
+// /api/compliance/v1/* instead of reading the compliance schema
+// directly from PostgREST. Mirrors how finance / logistics / sales
+// hooks talk to their dedicated APIs.
 //
-// Schema is exposed via PostgREST (see memory: project_postgrest_exposed_schemas).
+// Upstream routes (services/compliance-api/src/routes/screenings.routes.ts):
+//   GET  /api/v1/compliance/blocked-parties
+//   GET  /api/v1/compliance/screenings/:id
+//   GET  /api/v1/compliance/screenings/:id/decisions
+//   POST /api/v1/compliance/screenings/:id/override
+//   POST /api/v1/compliance/screenings/:id/revoke-override
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { logger } from '@/lib/logger';
-
-const compliance = () => (supabase as unknown as { schema: (s: string) => typeof supabase }).schema('compliance');
+import {
+  getBlockedParties,
+  getScreening,
+  getScreeningDecisions,
+  overrideScreening,
+  revokeOverride,
+} from '../lib/complianceApi';
 
 export type BlockedPartyStatus = 'all' | 'failed' | 'overridden' | 'expired';
 
@@ -92,20 +99,12 @@ export function useBlockedParties(status: BlockedPartyStatus = 'failed') {
   return useQuery({
     queryKey: blockedPartiesKey(status),
     queryFn: async (): Promise<BlockedPartyRow[]> => {
-      let q = compliance()
-        .from('v_blocked_parties')
-        .select(
-          'screening_id, tenant_id, subject_type, subject_id, party_id, party_display_name, account_id, account_name, lead_id, lead_company_name, lead_email, status, decision, triggered_at, triggered_by_event, provider, hit_count, max_similarity, hits, expires_at',
-        )
-        .order('triggered_at', { ascending: false })
-        .limit(500);
-      if (status !== 'all') q = q.eq('status', status);
-      const { data, error } = await q;
-      if (error) {
-        logger.error({ event: 'compliance.officer.list.failed', error: String(error) });
-        throw error;
+      try {
+        return await getBlockedParties<BlockedPartyRow>(status === 'all' ? undefined : status, 500);
+      } catch (e) {
+        logger.error({ event: 'compliance.officer.list.failed', error: String(e) });
+        throw e;
       }
-      return (data ?? []) as BlockedPartyRow[];
     },
     staleTime: 30_000,
   });
@@ -116,18 +115,12 @@ export function useScreening(id: string | undefined) {
     queryKey: screeningKey(id ?? ''),
     enabled: Boolean(id),
     queryFn: async (): Promise<ScreeningDetail | null> => {
-      const { data, error } = await compliance()
-        .from('screenings')
-        .select(
-          'id, tenant_id, subject_type, subject_id, subject_party_id, search_name, search_country, status, decision, match_score, hits, provider, provider_request_id, triggered_by_event, performed_at, decided_by_user_id, decided_at, decision_notes, evidence_file_ids, expires_at, metadata, notes',
-        )
-        .eq('id', id!)
-        .maybeSingle();
-      if (error) {
-        logger.error({ event: 'compliance.screening.fetch.failed', id, error: String(error) });
-        throw error;
+      try {
+        return await getScreening<ScreeningDetail>(id!);
+      } catch (e) {
+        logger.error({ event: 'compliance.screening.fetch.failed', id, error: String(e) });
+        throw e;
       }
-      return (data ?? null) as ScreeningDetail | null;
     },
   });
 }
@@ -137,18 +130,12 @@ export function useScreeningDecisions(id: string | undefined) {
     queryKey: decisionsKey(id ?? ''),
     enabled: Boolean(id),
     queryFn: async (): Promise<ScreeningDecisionRow[]> => {
-      const { data, error } = await compliance()
-        .from('v_screening_decisions')
-        .select(
-          'audit_decision_id, screening_id, screening_subject_id, screening_subject_type, screening_current_status, override_decision, previous_status, new_status, reason, decided_by_user_id, decided_at, evidence_file_ids, evidence_file_count, metadata',
-        )
-        .eq('screening_id', id!)
-        .order('decided_at', { ascending: false });
-      if (error) {
-        logger.error({ event: 'compliance.decisions.fetch.failed', id, error: String(error) });
-        throw error;
+      try {
+        return await getScreeningDecisions<ScreeningDecisionRow>(id!);
+      } catch (e) {
+        logger.error({ event: 'compliance.decisions.fetch.failed', id, error: String(e) });
+        throw e;
       }
-      return (data ?? []) as ScreeningDecisionRow[];
     },
   });
 }
@@ -165,14 +152,7 @@ export function useOverrideScreening() {
   return useMutation({
     mutationFn: async (input: OverrideInput) => {
       if (!user?.id) throw new Error('not_authenticated');
-      const { data, error } = await compliance().rpc('override_screening', {
-        p_screening_id: input.screening_id,
-        p_user_id: user.id,
-        p_reason: input.reason,
-        p_evidence_file_ids: input.evidence_file_ids ?? null,
-      });
-      if (error) throw error;
-      return data;
+      return overrideScreening(input);
     },
     onSuccess: (_data, vars) => {
       toast.success('Screening overridden');
@@ -197,13 +177,7 @@ export function useRevokeOverride() {
   return useMutation({
     mutationFn: async (input: RevokeInput) => {
       if (!user?.id) throw new Error('not_authenticated');
-      const { data, error } = await compliance().rpc('revoke_override', {
-        p_screening_id: input.screening_id,
-        p_user_id: user.id,
-        p_reason: input.reason,
-      });
-      if (error) throw error;
-      return data;
+      return revokeOverride(input);
     },
     onSuccess: (_data, vars) => {
       toast.success('Override revoked');

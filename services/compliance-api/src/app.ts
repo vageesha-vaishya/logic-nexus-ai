@@ -80,8 +80,13 @@ app.get('/compliance/v1/_status', (_req: Request, res: Response) => {
       'compliance.restricted_party_lists',
     ],
     routes: [
-      'GET /api/v1/compliance/screenings',
-      'GET /api/v1/compliance/records/:subject_type/:subject_id',
+      'GET  /api/v1/compliance/screenings',
+      'GET  /api/v1/compliance/screenings/:id',
+      'GET  /api/v1/compliance/screenings/:id/decisions',
+      'POST /api/v1/compliance/screenings/:id/override',
+      'POST /api/v1/compliance/screenings/:id/revoke-override',
+      'GET  /api/v1/compliance/records/:subject_type/:subject_id',
+      'GET  /api/v1/compliance/blocked-parties',
     ],
     consumers: [
       'gating-consumer (polls core.v_cross_module_pending_events for sales.lead.created, quotation.quote.send_requested, logistics.booking.created, finance.payment.created)',
