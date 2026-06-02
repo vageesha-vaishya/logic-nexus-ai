@@ -34,6 +34,8 @@ import { pickBodyForProvider, renderPrompt } from '../prompts/renderer.js';
 import { PromptError } from '../prompts/types.js';
 import { buildExperimentStore, type ExperimentStore } from '../prompts/experimentStore.js';
 import { pickVariant, experimentWarning } from '../prompts/experimentPicker.js';
+import { buildBudgetStore, type BudgetStore } from '../budgets/store.js';
+import { evaluateEnforcement } from '../budgets/enforcement.js';
 
 export const invokeRouter = Router();
 
@@ -117,6 +119,18 @@ function getExperimentStore(): ExperimentStore {
 /** Test helper: inject custom experiment store. */
 export function setExperimentStoreForTesting(store: ExperimentStore | null): void {
   invokeExperimentStore = store;
+}
+
+// Module-singleton budget store. P2.3.
+let invokeBudgetStore: BudgetStore | null = null;
+function getBudgetStore(): BudgetStore {
+  if (!invokeBudgetStore) invokeBudgetStore = buildBudgetStore();
+  return invokeBudgetStore;
+}
+
+/** Test helper: inject custom budget store. */
+export function setBudgetStoreForTesting(store: BudgetStore | null): void {
+  invokeBudgetStore = store;
 }
 
 function mapPiiError(err: PiiPolicyError): GatewayError {
@@ -228,6 +242,32 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
       throw err;
     }
 
+    // ── Budget + quota enforcement (P2.3) ──
+    // Load cap stack + current-period counters. Reject 429
+    // BUDGET_EXCEEDED / QUOTA_EXCEEDED on first hard-cap hit. Warnings
+    // (≥ warning_pct utilization) flow into the response.
+    const budgetSnapshot = await getBudgetStore().loadEnforcementSnapshot({
+      tenant_id: safeRequest.tenant_id,
+      feature: safeRequest.feature,
+      franchisee_id: callCtx.franchisee_id,
+    });
+    const enforcement = evaluateEnforcement({
+      caps: budgetSnapshot.caps,
+      quotas: budgetSnapshot.quotas,
+      counters: budgetSnapshot.counters,
+      billing_mode_tenant_paid: resolved.billing_mode === 'tenant_paid',
+    });
+    const budgetWarnings: string[] = [];
+    if (enforcement.kind === 'reject') {
+      throw new GatewayError(enforcement.code, enforcement.message, 429, {
+        scope_kind: enforcement.scope_kind,
+        scope_id: enforcement.scope_id,
+        period_kind: enforcement.period_kind,
+        ...enforcement.details,
+      });
+    }
+    budgetWarnings.push(...enforcement.warnings);
+
     const provider = resolveProvider(resolved.provider_kind);
 
     // ── Prompt resolution (P3.2) ──
@@ -327,6 +367,7 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
         ? [`pii_redacted:${piiResult.applied_kinds.join(',')}`]
         : []),
       ...promptWarnings,
+      ...budgetWarnings,
     ];
 
     const body: InvokeResponse = {
@@ -355,6 +396,24 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
     });
 
     res.json(body);
+
+    // Fire-and-forget budget counter increment (P2.3). Failures land
+    // in logs only; never crash the caller.
+    void getBudgetStore()
+      .incrementCounters({
+        tenant_id: safeRequest.tenant_id,
+        feature: safeRequest.feature,
+        franchisee_id: callCtx.franchisee_id,
+        spent_usd: result.cost_usd,
+        invocations: 1,
+        tokens: result.usage.total_tokens,
+      })
+      .catch((err: unknown) => {
+        logger.warn('budget counter increment failed', {
+          invocation_id,
+          err: err instanceof Error ? err.message : String(err),
+        });
+      });
 
     // Fire-and-forget audit log AFTER response — never blocks the client.
     // We pass the REDACTED request so any PII never lands in the audit
