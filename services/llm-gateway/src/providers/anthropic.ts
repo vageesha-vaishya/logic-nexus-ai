@@ -86,13 +86,17 @@ export function makeAnthropicProvider(config: AnthropicConfig = {}): ProviderAda
       const temperature = req.options?.temperature ?? DEFAULT_TEMPERATURE;
       const timeout_ms = req.options?.timeout_ms ?? 30_000;
 
+      // P3.2: prefer pre-rendered prompt body from the gateway prompt store;
+      // fall back to the JSON-stringify scaffold when no prompt is registered.
+      const userContent = ctx.rendered_body ?? renderPromptBody(req);
+
       const message = await client.messages.create(
         {
           model,
           max_tokens,
           temperature,
           system: config.system,
-          messages: [{ role: 'user', content: renderPromptBody(req) }],
+          messages: [{ role: 'user', content: userContent }],
         },
         { timeout: timeout_ms },
       );

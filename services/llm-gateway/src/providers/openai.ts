@@ -63,7 +63,8 @@ export function makeOpenAIProvider(config: OpenAIConfig = {}): ProviderAdapter {
 
       const messages: { role: 'system' | 'user'; content: string }[] = [];
       if (config.system) messages.push({ role: 'system', content: config.system });
-      messages.push({ role: 'user', content: renderPromptBody(req) });
+      // P3.2: prefer pre-rendered prompt body from the gateway prompt store.
+      messages.push({ role: 'user', content: ctx.rendered_body ?? renderPromptBody(req) });
 
       const completion = await client.chat.completions.create(
         {

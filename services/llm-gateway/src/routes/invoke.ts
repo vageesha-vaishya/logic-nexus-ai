@@ -29,6 +29,9 @@ import { requireScope } from '../middleware/auth.js';
 import { buildPolicyLookup, type PolicyLookup } from '../pii/policyLoader.js';
 import { redactVariables, unredactText } from '../pii/redactor.js';
 import { PiiPolicyError } from '../pii/types.js';
+import { buildPromptStore, type PromptStore } from '../prompts/store.js';
+import { pickBodyForProvider, renderPrompt } from '../prompts/renderer.js';
+import { PromptError } from '../prompts/types.js';
 
 export const invokeRouter = Router();
 
@@ -87,6 +90,19 @@ function getPolicyLookup(): PolicyLookup {
 /** Test helper: inject custom policy lookup. Production code never calls this. */
 export function setPolicyLookupForTesting(lookup: PolicyLookup | null): void {
   piiPolicyLookup = lookup;
+}
+
+// Module-singleton prompt store. P3.2: invoke reads from this to pre-render
+// the prompt body. Same store instance is shared with /v1/prompts/* routes.
+let invokePromptStore: PromptStore | null = null;
+function getInvokePromptStore(): PromptStore {
+  if (!invokePromptStore) invokePromptStore = buildPromptStore();
+  return invokePromptStore;
+}
+
+/** Test helper: inject a custom prompt store into the invoke pipeline. */
+export function setInvokePromptStoreForTesting(store: PromptStore | null): void {
+  invokePromptStore = store;
 }
 
 function mapPiiError(err: PiiPolicyError): GatewayError {
@@ -200,11 +216,46 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
 
     const provider = resolveProvider(resolved.provider_kind);
 
+    // ── Prompt resolution (P3.2) ──
+    // Look up the registered prompt for this key. If found, render the
+    // body with the (redacted) variables and pass to the provider via
+    // ctx.rendered_body. If not registered (PROMPT_NOT_FOUND), fall back
+    // to the adapter's internal scaffold — preserves backwards compat
+    // with callers that haven't migrated their prompts yet.
+    let rendered_body: string | undefined;
+    let prompt_version_id: string | undefined;
+    let prompt_version_number: number | undefined;
+    const promptWarnings: string[] = [];
+    try {
+      const { active_version } = await getInvokePromptStore().getActive(safeRequest.prompt_key);
+      const body = pickBodyForProvider(
+        active_version.body,
+        active_version.body_variants,
+        resolved.provider_kind,
+      );
+      const renderResult = renderPrompt(body, safeRequest.variables);
+      rendered_body = renderResult.rendered;
+      prompt_version_id = active_version.id;
+      prompt_version_number = active_version.version_number;
+      if (renderResult.missing_paths.length > 0) {
+        promptWarnings.push(`prompt_missing_variables:${renderResult.missing_paths.join(',')}`);
+      }
+    } catch (err) {
+      if (err instanceof PromptError && (err.code === 'PROMPT_NOT_FOUND' || err.code === 'PROMPT_NO_ACTIVE_VERSION')) {
+        promptWarnings.push('prompt_not_registered_using_scaffold');
+      } else {
+        throw err;
+      }
+    }
+
     const ctx: ProviderContext = {
       invocation_id,
       model_id: resolved.model_id,
       started_at: startedAt,
       request_id: requestId,
+      rendered_body,
+      prompt_version_id,
+      prompt_version_number,
     };
 
     // Provider sees redacted variables ONLY — never the plaintext.
@@ -235,6 +286,7 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
       ...(piiResult.applied_kinds.length > 0
         ? [`pii_redacted:${piiResult.applied_kinds.join(',')}`]
         : []),
+      ...promptWarnings,
     ];
 
     const body: InvokeResponse = {

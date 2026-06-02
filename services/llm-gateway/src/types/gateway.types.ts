@@ -105,6 +105,17 @@ export interface ProviderContext {
   model_id: string;
   started_at: number;       // performance.now() at request entry
   request_id: string;
+  /**
+   * Pre-rendered prompt body from the prompt store (P3.2). When set,
+   * adapters should pass it directly to the provider as the user-message
+   * content instead of building their own scaffold from the variables.
+   * Undefined when no prompt is registered for the prompt_key — adapters
+   * then fall back to their internal renderPromptBody scaffold so
+   * callers that haven't registered prompts yet keep working.
+   */
+  rendered_body?: string;
+  prompt_version_id?: string;
+  prompt_version_number?: number;
 }
 
 export interface ProviderResult<TOutput = unknown> {

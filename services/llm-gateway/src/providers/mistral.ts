@@ -61,7 +61,8 @@ export function makeMistralProvider(config: MistralConfig = {}): ProviderAdapter
 
       const messages: { role: 'system' | 'user'; content: string }[] = [];
       if (config.system) messages.push({ role: 'system', content: config.system });
-      messages.push({ role: 'user', content: renderPromptBody(req) });
+      // P3.2: prefer pre-rendered prompt body from the gateway prompt store.
+      messages.push({ role: 'user', content: ctx.rendered_body ?? renderPromptBody(req) });
 
       const response = await client.chat.complete({
         model,

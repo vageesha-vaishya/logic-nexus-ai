@@ -71,7 +71,9 @@ export function makeGeminiProvider(config: GeminiConfig = {}): ProviderAdapter {
         systemInstruction: config.system,
       });
 
-      const result = await model.generateContent(renderPromptBody(req));
+      // P3.2: prefer pre-rendered prompt body from the gateway prompt store.
+      const userContent = ctx.rendered_body ?? renderPromptBody(req);
+      const result = await model.generateContent(userContent);
       const response = result.response;
 
       const text = response.text();

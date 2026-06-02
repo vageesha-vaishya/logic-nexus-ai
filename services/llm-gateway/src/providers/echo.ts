@@ -46,6 +46,11 @@ export const echoProvider: ProviderAdapter = {
       echo: {
         variables: req.variables,
         subject: req.subject ?? null,
+        // P3.2: when the route layer pre-rendered the prompt body,
+        // surface it here so integration tests can assert end-to-end.
+        rendered_body: ctx.rendered_body ?? null,
+        prompt_version_id: ctx.prompt_version_id ?? null,
+        prompt_version_number: ctx.prompt_version_number ?? null,
       },
       message: `echo: ${req.prompt_key}`,
     };
