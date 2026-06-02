@@ -6,7 +6,15 @@
 // InvokeResponse / Outcome contract is preserved 1:1 so any caller
 // that imported these types is unaffected.
 
-import type { InvokeRequest, InvokeResponse, Outcome } from "./types.js";
+import type {
+  EmbedRequest,
+  EmbedResponse,
+  FineTuneCreateInput,
+  FineTuneJob,
+  InvokeRequest,
+  InvokeResponse,
+  Outcome,
+} from "./types.js";
 
 // ── Public configuration surface ──────────────────────────────────────────
 
@@ -221,6 +229,39 @@ export class LlmClient {
       body: JSON.stringify({ variables, provider_kind }),
     });
   }
+
+  // ── Embeddings (gateway §9.2) ──
+  async embed(req: EmbedRequest): Promise<EmbedResponse> {
+    return this.request<EmbedResponse>("/v1/embed", {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(req),
+    });
+  }
+
+  // ── Fine-tuning (gateway §9.1) ──
+  async submitFineTune(req: FineTuneCreateInput): Promise<FineTuneJob> {
+    return this.request<FineTuneJob>("/v1/fine-tunes", {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(req),
+    });
+  }
+
+  async getFineTune(id: string): Promise<FineTuneJob> {
+    return this.request<FineTuneJob>(`/v1/fine-tunes/${encodeURIComponent(id)}`, {
+      method: "GET",
+      headers: this.headers(),
+    });
+  }
+
+  async cancelFineTune(id: string, reason?: string): Promise<FineTuneJob> {
+    return this.request<FineTuneJob>(`/v1/fine-tunes/${encodeURIComponent(id)}/cancel`, {
+      method: "POST",
+      headers: this.headers(),
+      body: JSON.stringify(reason ? { reason } : {}),
+    });
+  }
 }
 
 // ── Module-singleton convenience API ──────────────────────────────────────
@@ -258,6 +299,22 @@ export async function renderPrompt(
   provider_kind?: string,
 ): Promise<ReturnType<LlmClient["renderPrompt"]>> {
   return getSingleton().renderPrompt(key, variables, provider_kind);
+}
+
+export async function embed(req: EmbedRequest): Promise<EmbedResponse> {
+  return getSingleton().embed(req);
+}
+
+export async function submitFineTune(req: FineTuneCreateInput): Promise<FineTuneJob> {
+  return getSingleton().submitFineTune(req);
+}
+
+export async function getFineTune(id: string): Promise<FineTuneJob> {
+  return getSingleton().getFineTune(id);
+}
+
+export async function cancelFineTune(id: string, reason?: string): Promise<FineTuneJob> {
+  return getSingleton().cancelFineTune(id, reason);
 }
 
 /** Test helper — never call from production. */

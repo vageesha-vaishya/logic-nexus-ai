@@ -126,6 +126,123 @@ describe("LlmClient — invoke() over the gateway", () => {
   });
 });
 
+describe("SDK parity — embed / fine-tune / tools / attachments", () => {
+  beforeEach(() => { _resetSingletonForTesting(); });
+
+  it("embed() POSTs to /v1/embed with the request body", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const client = new LlmClient({
+      gatewayUrl: "http://gw.local",
+      fetch: buildFakeFetch((url, init) => {
+        calls.push({ url, init });
+        return {
+          status: 200,
+          body: {
+            invocation_id: "emb-1",
+            model_used: "text-embedding-3-small",
+            provider_kind: "openai",
+            embeddings: [[0.1, 0.2, 0.3]],
+            usage: { prompt_tokens: 3, total_tokens: 3 },
+            cost_usd: 0,
+            latency_ms: 4,
+          },
+        };
+      }),
+    });
+    const res = await client.embed({ tenant_id: "t1", inputs: ["hi"] });
+    expect(res.invocation_id).toBe("emb-1");
+    expect(res.embeddings).toEqual([[0.1, 0.2, 0.3]]);
+    expect(calls[0]!.url).toBe("http://gw.local/v1/embed");
+  });
+
+  it("submitFineTune() POSTs to /v1/fine-tunes and returns the job", async () => {
+    const client = new LlmClient({
+      gatewayUrl: "http://gw.local",
+      fetch: buildFakeFetch(() => ({
+        status: 201,
+        body: {
+          id: "ft-1", tenant_id: "t1", provider_kind: "openai",
+          base_model_id: "gpt-4o-mini", status: "queued",
+          hyperparameters: {}, result_metrics: {},
+          created_at: "2026-06-03T00:00:00Z", updated_at: "2026-06-03T00:00:00Z",
+        },
+      })),
+    });
+    const job = await client.submitFineTune({
+      tenant_id: "t1", provider_kind: "openai", base_model_id: "gpt-4o-mini",
+    });
+    expect(job.id).toBe("ft-1");
+    expect(job.status).toBe("queued");
+  });
+
+  it("getFineTune() GETs /v1/fine-tunes/:id", async () => {
+    const calls: string[] = [];
+    const client = new LlmClient({
+      gatewayUrl: "http://gw.local",
+      fetch: buildFakeFetch((url) => {
+        calls.push(url);
+        return {
+          status: 200,
+          body: {
+            id: "ft-1", tenant_id: "t1", provider_kind: "openai",
+            base_model_id: "gpt-4o-mini", status: "training",
+            hyperparameters: {}, result_metrics: {},
+            created_at: "2026-06-03T00:00:00Z", updated_at: "2026-06-03T00:00:00Z",
+          },
+        };
+      }),
+    });
+    const job = await client.getFineTune("ft-1");
+    expect(job.status).toBe("training");
+    expect(calls[0]).toBe("http://gw.local/v1/fine-tunes/ft-1");
+  });
+
+  it("cancelFineTune() POSTs to /v1/fine-tunes/:id/cancel with reason", async () => {
+    let capturedBody = "";
+    const client = new LlmClient({
+      gatewayUrl: "http://gw.local",
+      fetch: buildFakeFetch((_, init) => {
+        capturedBody = init.body as string;
+        return {
+          status: 200,
+          body: {
+            id: "ft-1", tenant_id: "t1", provider_kind: "openai",
+            base_model_id: "gpt-4o-mini", status: "cancelled",
+            hyperparameters: {}, result_metrics: {}, cancel_reason: "budget exceeded",
+            created_at: "2026-06-03T00:00:00Z", updated_at: "2026-06-03T00:00:00Z",
+          },
+        };
+      }),
+    });
+    const job = await client.cancelFineTune("ft-1", "budget exceeded");
+    expect(job.status).toBe("cancelled");
+    expect(JSON.parse(capturedBody)).toEqual({ reason: "budget exceeded" });
+  });
+
+  it("InvokeRequest accepts tools + tool_choice + attachments + tool_calls round-trip", async () => {
+    const client = new LlmClient({
+      gatewayUrl: "http://gw.local",
+      fetch: buildFakeFetch(() => ({
+        status: 200,
+        body: {
+          invocation_id: "inv-1", output: null, cache_hit: false, model_used: "m",
+          provider_kind: "echo", usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+          cost_usd: 0, latency_ms: 1,
+          tool_calls: [{ id: "tc1", name: "fetch_db", args: { q: "x" } }],
+        },
+      })),
+    });
+    const res = await client.invoke({
+      tenant_id: "t1", module: "compliance", feature: "f", prompt_key: "k", variables: {},
+      tools: [{ name: "fetch_db", parameters_schema: { type: "object" } }],
+      tool_choice: "auto",
+      attachments: [{ kind: "image", mime_type: "image/png", url: "https://x.png" }],
+    });
+    expect(res.tool_calls).toHaveLength(1);
+    expect(res.tool_calls?.[0]?.name).toBe("fetch_db");
+  });
+});
+
 describe("Module-singleton invoke() / configure()", () => {
   beforeEach(() => _resetSingletonForTesting());
 
