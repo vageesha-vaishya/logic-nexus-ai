@@ -21,7 +21,7 @@ import { ShipmentContainerManager } from '@/components/logistics/ShipmentContain
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
+import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
 import { logger } from '@/lib/logger';
 import { formatContainerSize } from '@/lib/container-utils';

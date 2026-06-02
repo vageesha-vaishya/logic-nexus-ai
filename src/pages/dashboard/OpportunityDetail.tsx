@@ -26,7 +26,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { OpportunityItemsEditor } from '@/components/crm/OpportunityItemsEditor';
-import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
+import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
 import { OpportunityHistoryTab } from '@/components/crm/OpportunityHistoryTab';
 import { Opportunity, OpportunityHistory, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 import type { Database } from '@/integrations/supabase/types';

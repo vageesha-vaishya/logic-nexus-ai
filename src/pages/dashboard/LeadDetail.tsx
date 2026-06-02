@@ -13,8 +13,8 @@ import { LeadWorkspaceSections } from '@/features/module-sales/components/LeadWo
 import type { Json } from '@/integrations/supabase/types';
 import { LeadConversionDialog } from '@/components/crm/conversion/LeadConversionDialog';
 import { LeadActivitiesTimeline } from '@/features/module-sales/components/LeadActivitiesTimeline';
-import { EmailClient } from "@/components/email/EmailClient";
-import { EmailComposeDialog } from "@/components/email/EmailComposeDialog";
+import { EmailClient } from "@/features/module-communications/components/email/EmailClient";
+import { EmailComposeDialog } from "@/features/module-communications/components/email/EmailComposeDialog";
 import { LeadScoringCard } from '@/features/module-sales/components/LeadScoringCard';
 import { ManualAssignment } from '@/features/module-sales/components/assignment/ManualAssignment';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';

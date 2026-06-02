@@ -22,7 +22,7 @@ vi.mock('@/features/module-sales/components/LeadForm', () => ({
   LeadForm: () => <div data-testid="lead-form" />,
 }));
 
-vi.mock('@/components/email/EmailHistoryPanel', () => ({
+vi.mock('@/features/module-communications/components/email/EmailHistoryPanel', () => ({
   EmailHistoryPanel: () => <div data-testid="email-history-panel" />,
 }));
 

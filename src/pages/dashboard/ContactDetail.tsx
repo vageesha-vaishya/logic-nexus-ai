@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
-import { EmailHistoryPanel } from '@/components/email/EmailHistoryPanel';
+import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
 import { Building2, Phone, Mail, User, Linkedin, Star, Clock, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
