@@ -26,6 +26,9 @@ import type { CallContext, ResolverStores } from '../resolver/types.js';
 import { buildAuditPayload, buildInvocationWriter, type InvocationWriter } from '../audit/invocationWriter.js';
 import { buildAuthLookup, type AuthLookup } from '../auth/serviceToken.js';
 import { requireScope } from '../middleware/auth.js';
+import { buildPolicyLookup, type PolicyLookup } from '../pii/policyLoader.js';
+import { redactVariables, unredactText } from '../pii/redactor.js';
+import { PiiPolicyError } from '../pii/types.js';
 
 export const invokeRouter = Router();
 
@@ -67,6 +70,27 @@ function getAuthLookup(): AuthLookup {
 /** Test helper: inject custom auth lookup. Production code never calls this. */
 export function setAuthLookupForTesting(lookup: AuthLookup | null): void {
   authLookup = lookup;
+}
+
+// Module-singleton PII policy lookup. Defaults to strict when no env.
+let piiPolicyLookup: PolicyLookup | null = null;
+function getPolicyLookup(): PolicyLookup {
+  if (!piiPolicyLookup) piiPolicyLookup = buildPolicyLookup();
+  return piiPolicyLookup;
+}
+
+/** Test helper: inject custom policy lookup. Production code never calls this. */
+export function setPolicyLookupForTesting(lookup: PolicyLookup | null): void {
+  piiPolicyLookup = lookup;
+}
+
+function mapPiiError(err: PiiPolicyError): GatewayError {
+  const status =
+    err.code === 'PII_PASS_THROUGH_NOT_CONSENTED' ? 422 :
+    err.code === 'PII_UNREDACTABLE' ? 422 :
+    err.code === 'PII_PATTERN_INVALID' ? 500 :
+    500;
+  return new GatewayError(err.code, err.message, status, err.details);
 }
 
 function asString(value: unknown): string | null {
@@ -147,10 +171,23 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
     const parsed = validateInvokeRequest(req.body);
     const callCtx = readCallContext(req);
 
+    // ── Per-tenant PII redaction (pre-egress) ──
+    const piiPolicy = await getPolicyLookup()(parsed.tenant_id);
+    let piiResult;
+    try {
+      piiResult = redactVariables(parsed.variables, piiPolicy);
+    } catch (err) {
+      if (err instanceof PiiPolicyError) throw mapPiiError(err);
+      throw err;
+    }
+    // Replace variables on the request with the redacted clone before
+    // it touches the provider.
+    const safeRequest = { ...parsed, variables: piiResult.redacted };
+
     // ── 6-layer cascade resolution ──
     let resolved;
     try {
-      resolved = await cascadeResolve(parsed, callCtx, getResolverStores());
+      resolved = await cascadeResolve(safeRequest, callCtx, getResolverStores());
     } catch (err) {
       if (err instanceof ResolverError) throw mapResolverError(err);
       throw err;
@@ -165,19 +202,46 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
       request_id: requestId,
     };
 
-    const result = await provider.invoke(parsed, ctx);
+    // Provider sees redacted variables ONLY — never the plaintext.
+    const result = await provider.invoke(safeRequest, ctx);
     const latency_ms = Math.round(performance.now() - startedAt);
+
+    // Optional un-redaction of provider text output. Applies only when
+    // preserve_mapping is on AND we actually redacted something AND the
+    // output has a `text` field we can rewrite.
+    let finalOutput = result.output;
+    if (
+      piiPolicy.preserve_mapping &&
+      piiResult.replacements.length > 0 &&
+      finalOutput &&
+      typeof finalOutput === 'object' &&
+      'text' in (finalOutput as Record<string, unknown>) &&
+      typeof (finalOutput as { text: unknown }).text === 'string'
+    ) {
+      finalOutput = {
+        ...(finalOutput as Record<string, unknown>),
+        text: unredactText((finalOutput as { text: string }).text, piiResult.replacements),
+      };
+    }
+
+    const combinedWarnings = [
+      ...(result.warnings ?? []),
+      ...piiResult.warnings,
+      ...(piiResult.applied_kinds.length > 0
+        ? [`pii_redacted:${piiResult.applied_kinds.join(',')}`]
+        : []),
+    ];
 
     const body: InvokeResponse = {
       invocation_id,
-      output: result.output,
+      output: finalOutput,
       cache_hit: false,
       model_used: result.model_used || resolved.model_id,
       provider_kind: resolved.provider_kind,
       usage: result.usage,
       cost_usd: result.cost_usd,
       latency_ms,
-      warnings: result.warnings,
+      warnings: combinedWarnings.length > 0 ? combinedWarnings : undefined,
       scaffold_phase: 'P0',
     };
 
@@ -196,16 +260,18 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
     res.json(body);
 
     // Fire-and-forget audit log AFTER response — never blocks the client.
+    // We pass the REDACTED request so any PII never lands in the audit
+    // table either. The redaction itself is captured as warnings.
     getInvocationWriter()(
       buildAuditPayload({
         invocation_id,
         request_id: requestId,
-        request: parsed,
+        request: safeRequest,
         resolved,
         usage: result.usage,
         cost_usd: result.cost_usd,
         latency_ms,
-        warnings: result.warnings,
+        warnings: combinedWarnings,
       }),
     );
   } catch (err) {
