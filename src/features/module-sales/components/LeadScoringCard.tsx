@@ -23,6 +23,31 @@ interface ScoreBreakdown {
   decay: number;
 }
 
+function AiScoreSummary({ output }: { output: ScoreLeadOutput }) {
+  const stageVariant =
+    output.stage_fit === 'closed_won_likely' ? 'default' :
+    output.stage_fit === 'closed_lost_likely' ? 'destructive' :
+    'secondary';
+  return (
+    <div className="space-y-2 text-sm bg-muted/30 rounded p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-baseline gap-2">
+          <span className="text-2xl font-bold">{output.ai_score}</span>
+          <span className="text-muted-foreground text-xs">/ 10</span>
+          <span className="text-muted-foreground text-xs ml-2">
+            confidence {(output.confidence * 100).toFixed(0)}%
+          </span>
+        </div>
+        <Badge variant={stageVariant} className="text-xs">{output.stage_fit.replace('_', ' ')}</Badge>
+      </div>
+      <p className="text-xs">{output.reasoning}</p>
+      <p className="text-xs font-medium text-blue-700 dark:text-blue-400">
+        → {output.next_action}
+      </p>
+    </div>
+  );
+}
+
 export function LeadScoringCard({ leadId, score, status, estimatedValue, lastActivityDate, source, title }: LeadScoringCardProps) {
   const { supabase } = useCRM();
   const [breakdown, setBreakdown] = useState<ScoreBreakdown>({
@@ -180,6 +205,41 @@ export function LeadScoringCard({ leadId, score, status, estimatedValue, lastAct
                 </div>
                 <div className="font-medium text-red-500">-{breakdown.decay} pts</div>
             </div>
+        </div>
+
+        {/* AI rescore — calls the gateway via the llm-score-lead edge fn */}
+        <div className="border-t pt-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium text-muted-foreground">AI assessment</span>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() =>
+                scoreLead.mutate({
+                  lead_id: leadId,
+                  lead: {
+                    company_name: title ?? 'Unknown',
+                    title: title ?? undefined,
+                    estimated_value: estimatedValue ?? undefined,
+                    source,
+                    rule_score: score,
+                  },
+                  activity_count: 0,
+                  activities: [],
+                })
+              }
+              disabled={scoreLead.isPending}
+            >
+              <Sparkles className="h-3 w-3 mr-1" />
+              {scoreLead.isPending ? 'Scoring…' : 'AI rescore'}
+            </Button>
+          </div>
+          {scoreLead.data?.parsed_output && <AiScoreSummary output={scoreLead.data.parsed_output} />}
+          {scoreLead.data && !scoreLead.data.parsed_output && (
+            <pre className="text-xs bg-muted/50 p-2 rounded overflow-x-auto">
+              {JSON.stringify(scoreLead.data.output, null, 2)}
+            </pre>
+          )}
         </div>
 
         <div className="space-y-2 text-sm border-t pt-4">
