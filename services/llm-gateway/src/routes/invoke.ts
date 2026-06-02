@@ -21,14 +21,19 @@ import type {
 import { resolveProvider as cascadeResolve } from '../resolver/cascade.js';
 import { ResolverError } from '../resolver/errors.js';
 import { buildInMemoryStores } from '../resolver/inMemoryStores.js';
+import { buildSupabaseStores } from '../resolver/supabaseStores.js';
 import type { CallContext, ResolverStores } from '../resolver/types.js';
 
 export const invokeRouter = Router();
 
-// Module-singleton resolver stores. P2 swaps this for DB-backed stores.
+// Module-singleton resolver stores. Prefer Supabase when env vars
+// are set; fall back to in-memory (file-or-embedded) otherwise. Tests
+// inject custom stores via setResolverStoresForTesting().
 let resolverStores: ResolverStores | null = null;
 function getResolverStores(): ResolverStores {
-  if (!resolverStores) resolverStores = buildInMemoryStores();
+  if (!resolverStores) {
+    resolverStores = buildSupabaseStores() ?? buildInMemoryStores();
+  }
   return resolverStores;
 }
 
