@@ -2,7 +2,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
-import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp, Maximize2, Minimize2, UserPlus, Shield, ShieldAlert, ShieldCheck, AlertTriangle, Lock, Unlock } from "lucide-react";
+import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp, Maximize2, Minimize2, UserPlus, Shield, ShieldAlert, ShieldCheck, AlertTriangle, Lock, Unlock, Sparkles, Loader2 } from "lucide-react";
+import { useClassifyInbound, type InboundIntent, type InboundUrgency } from "@/features/module-communications/hooks/useClassifyInbound";
 import { format } from "date-fns";
 import { useState, useCallback, useEffect } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
@@ -54,6 +55,22 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
   const [isLocked, setIsLocked] = useState(false);
   const [decryptedBody, setDecryptedBody] = useState<string | null>(null);
   const [isDecrypting, setIsDecrypting] = useState(false);
+
+  const classifyInbound = useClassifyInbound();
+  const aiResult = classifyInbound.data?.parsed_output ?? null;
+
+  const handleClassify = useCallback(() => {
+    if (isLocked) return;
+    const body = decryptedBody ?? email.body_text ?? email.body_html ?? email.snippet ?? "";
+    classifyInbound.mutate({
+      message_id: email.id,
+      message: {
+        from: email.from_name ? `${email.from_name} <${email.from_email}>` : email.from_email,
+        subject: email.subject,
+        body,
+      },
+    });
+  }, [classifyInbound, email.id, email.from_name, email.from_email, email.subject, email.body_text, email.body_html, email.snippet, decryptedBody, isLocked]);
 
   useEffect(() => {
     checkSecurityRequirements();
@@ -236,6 +253,20 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
                 <Button variant="ghost" size="sm">
                   <Star className={`w-4 h-4 ${email.is_starred ? "fill-warning text-warning" : ""}`} />
                 </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleClassify}
+                  disabled={classifyInbound.isPending || isLocked}
+                  title="Classify intent, urgency and language with AI"
+                >
+                  {classifyInbound.isPending ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Sparkles className="w-4 h-4 mr-2" />
+                  )}
+                  Classify with AI
+                </Button>
                 <Button variant="outline" size="sm" onClick={() => setShowConvertToLead(true)} title="Convert to Lead">
                   <UserPlus className="w-4 h-4 mr-2" />
                   Convert
@@ -341,6 +372,36 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
               </Button>
             )}
           </div>
+
+          {aiResult && (
+            <>
+              <Separator />
+              <div className="space-y-2 rounded-md border bg-muted/30 p-3">
+                <div className="flex items-center gap-2">
+                  <Sparkles className="w-4 h-4 text-primary" />
+                  <h4 className="text-sm font-semibold">AI classification</h4>
+                  <Badge variant="secondary" className="capitalize">{aiResult.intent.replace(/_/g, " ")}</Badge>
+                  <Badge
+                    variant="outline"
+                    className={
+                      aiResult.urgency === "urgent" || aiResult.urgency === "high"
+                        ? "border-red-400 text-red-700"
+                        : aiResult.urgency === "medium"
+                        ? "border-amber-400 text-amber-700"
+                        : "border-muted-foreground/40 text-muted-foreground"
+                    }
+                  >
+                    {aiResult.urgency} urgency
+                  </Badge>
+                  <Badge variant="outline" className="uppercase">{aiResult.language}</Badge>
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    confidence {(aiResult.confidence * 100).toFixed(0)}%
+                  </span>
+                </div>
+                <p className="text-sm text-muted-foreground">{aiResult.summary}</p>
+              </div>
+            </>
+          )}
 
           {email.has_attachments && email.attachments && email.attachments.length > 0 && (
             <>
