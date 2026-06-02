@@ -11,6 +11,7 @@ import { mountExperimentRoutes } from './routes/experiments.js';
 import { mountEmbedRoutes } from './routes/embed.js';
 import { mountRtbfRoutes } from './routes/rtbf.js';
 import { mountFineTuneRoutes } from './routes/finetune.js';
+import { mountAdminListRoutes } from './routes/adminLists.js';
 
 export function createApp(): Express {
   const app: Express = express();
@@ -48,6 +49,7 @@ export function createApp(): Express {
   app.use('/v1', mountEmbedRoutes(getAuthLookupForApp));
   app.use('/v1', mountRtbfRoutes(getAuthLookupForApp));
   app.use('/v1', mountFineTuneRoutes(getAuthLookupForApp));
+  app.use('/v1', mountAdminListRoutes(getAuthLookupForApp));
 
   app.use(errorMiddleware);
 

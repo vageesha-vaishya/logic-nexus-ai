@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator, Monitor, Lightbulb, Bot, Copy } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator, Monitor, Lightbulb, Bot, Copy, Sparkles } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -347,6 +347,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Quote Numbering', path: '/dashboard/settings/quote-numbers', icon: FileCheck, description: 'Prefixes and reset policy', roles: ['platform_admin'] },
       { name: 'Quotation Engine', path: '/dashboard/settings/quotations', icon: FileCheck, description: 'Configure default module & smart mode', roles: ['platform_admin'] },
       { name: 'Feature Flags', path: '/dashboard/settings/feature-flags', icon: Flag, description: 'Control feature availability across tenants', roles: ['platform_admin'] },
+      { name: 'LLM Gateway', path: '/dashboard/admin/llm-gateway', icon: Sparkles, description: 'Browse prompts, experiments, and recent LLM invocations', roles: ['platform_admin'] },
       { name: 'Audit Logs', path: '/dashboard/audit-logs', icon: FileText, description: 'View system audit logs', roles: ['platform_admin', 'tenant_admin'] },
       { name: 'UI Forms Demo', path: '/dashboard/ui-forms-demo', icon: FileText, description: 'Phase 1–2 form patterns', roles: ['platform_admin'] },
       { name: 'UI Advanced Demo', path: '/dashboard/ui-advanced-demo', icon: FileCheck, description: 'Phase 3–5 advanced fields', roles: ['platform_admin'] },
