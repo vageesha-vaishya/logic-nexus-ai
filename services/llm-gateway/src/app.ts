@@ -4,7 +4,8 @@ import cors from 'cors';
 import { correlationMiddleware } from './middleware/correlation.js';
 import { errorMiddleware } from './middleware/error.js';
 import { healthRouter } from './routes/health.js';
-import { invokeRouter } from './routes/invoke.js';
+import { invokeRouter, getAuthLookupForApp } from './routes/invoke.js';
+import { mountPromptRoutes } from './routes/prompts.js';
 
 export function createApp(): Express {
   const app: Express = express();
@@ -34,6 +35,7 @@ export function createApp(): Express {
 
   // Versioned API surface
   app.use('/v1', invokeRouter);
+  app.use('/v1', mountPromptRoutes(getAuthLookupForApp));
 
   app.use(errorMiddleware);
 

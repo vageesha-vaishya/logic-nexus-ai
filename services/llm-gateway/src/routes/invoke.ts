@@ -67,6 +67,11 @@ function getAuthLookup(): AuthLookup {
   return authLookup;
 }
 
+/** Cross-router accessor so other route modules can share the same lookup. */
+export function getAuthLookupForApp(): AuthLookup {
+  return getAuthLookup();
+}
+
 /** Test helper: inject custom auth lookup. Production code never calls this. */
 export function setAuthLookupForTesting(lookup: AuthLookup | null): void {
   authLookup = lookup;
