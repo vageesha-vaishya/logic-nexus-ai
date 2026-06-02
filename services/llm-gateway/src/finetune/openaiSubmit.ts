@@ -9,6 +9,11 @@
 
 import OpenAI from 'openai';
 import type { FineTuneJob } from './store.js';
+import {
+  translateDatasetToOpenAIFileId,
+  FineTuneUploadError,
+  OPENAI_FILE_ID_RE,
+} from './openaiUpload.js';
 
 export interface SubmitResult {
   provider_job_id: string;
@@ -75,17 +80,38 @@ export async function submitOpenAIFineTune(
     );
   }
 
-  // The dataset_url for OpenAI must be a file id (file-abc123…) the
-  // tenant has previously uploaded via openai.files.create. Bucket
-  // URLs (gs://, s3://, https://supabase-storage/...) are stored in
-  // dataset_url for tenant convenience but cannot be passed directly
-  // to fineTuning.jobs.create. A future slice will add a translation
-  // step that uploads the bucket file via openai.files.create first.
-  if (!/^file-[A-Za-z0-9]{8,}$/.test(job.dataset_url)) {
+  // Translate the dataset_url to an OpenAI file id. file-XXX inputs
+  // pass through untouched; https:// URLs are fetched + uploaded via
+  // openai.files.create; gs:///s3:// raw URIs are rejected up-front.
+  // Result is cached process-wide by source URL so retries are cheap.
+  let trainingFileId: string;
+  try {
+    const translated = await translateDatasetToOpenAIFileId(
+      job.dataset_url,
+      job.dataset_format ?? undefined,
+    );
+    trainingFileId = translated.file_id;
+  } catch (err) {
+    if (err instanceof FineTuneUploadError) {
+      // Map upload errors onto submitter codes so the route layer's
+      // existing error envelope handles them.
+      const code: FineTuneSubmitError['code'] =
+        err.code === 'PROVIDER_NOT_CONFIGURED' ? 'PROVIDER_NOT_CONFIGURED' :
+        err.code === 'UNSUPPORTED_SCHEME'      ? 'DATASET_REQUIRED' :
+        'PROVIDER_UNAVAILABLE';
+      throw new FineTuneSubmitError(code, err.message, {
+        upload_code: err.code,
+        ...err.details,
+      });
+    }
+    throw err;
+  }
+  // Defensive: translator promises file-XXX shape, but verify before
+  // sending so we never call fineTuning.jobs.create with a bad ref.
+  if (!OPENAI_FILE_ID_RE.test(trainingFileId)) {
     throw new FineTuneSubmitError(
       'DATASET_REQUIRED',
-      `dataset_url must be an openai file id (file-...) for now; got "${job.dataset_url}". Upload via openai.files.create first.`,
-      { dataset_url: job.dataset_url },
+      `dataset translation returned non-file-id "${trainingFileId}"`,
     );
   }
 
@@ -103,7 +129,7 @@ export async function submitOpenAIFineTune(
   try {
     const created = await client.fineTuning.jobs.create({
       model: job.base_model_id,
-      training_file: job.dataset_url,
+      training_file: trainingFileId,
       hyperparameters: Object.keys(allowedHp).length > 0 ? (allowedHp as OpenAI.FineTuning.Jobs.JobCreateParams['hyperparameters']) : undefined,
       ...(options.suffix ? { suffix: options.suffix.slice(0, 18) } : {}),
     });
