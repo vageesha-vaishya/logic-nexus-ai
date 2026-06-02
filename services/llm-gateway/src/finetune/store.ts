@@ -48,6 +48,17 @@ export interface FineTuneStore {
   create(input: FineTuneCreateInput): Promise<FineTuneJob>;
   get(id: string): Promise<FineTuneJob | null>;
   cancel(id: string, reason?: string): Promise<FineTuneJob | null>;
+  /**
+   * Flip a queued job into 'preparing' state once the provider has
+   * accepted the submission. Captures provider_job_id + the effective
+   * model id (provider may rewrite the base_model with date suffix).
+   * Atomic: only flips when status is currently 'queued'.
+   */
+  markPreparing(args: {
+    id: string;
+    provider_job_id: string;
+    effective_model_id?: string;
+  }): Promise<FineTuneJob | null>;
 }
 
 function readEnv(): { url: string; key: string } | null {
@@ -105,6 +116,22 @@ export function buildInMemoryFineTuneStore(): FineTuneStore & { clear(): void; l
         updated_at: now,
       };
       byId.set(id, updated);
+      return updated;
+    },
+    async markPreparing(args) {
+      const job = byId.get(args.id);
+      if (!job) return null;
+      if (job.status !== 'queued') return job; // idempotent — already past queued
+      const now = new Date().toISOString();
+      const updated: FineTuneJob = {
+        ...job,
+        status: 'preparing',
+        provider_job_id: args.provider_job_id,
+        base_model_id: args.effective_model_id ?? job.base_model_id,
+        started_at: now,
+        updated_at: now,
+      };
+      byId.set(args.id, updated);
       return updated;
     },
     clear() {
@@ -171,6 +198,25 @@ export function buildSupabaseFineTuneStore(): FineTuneStore | null {
       if (data) return data as FineTuneJob;
       // Row exists but was already terminal — return current state.
       return this.get(id);
+    },
+    async markPreparing(args) {
+      // Atomic: only flip when status is currently 'queued'.
+      const { data, error } = await client
+        .from('fine_tune_jobs')
+        .update({
+          status: 'preparing',
+          provider_job_id: args.provider_job_id,
+          ...(args.effective_model_id ? { base_model_id: args.effective_model_id } : {}),
+          started_at: new Date().toISOString(),
+        })
+        .eq('id', args.id)
+        .eq('status', 'queued')
+        .select('*')
+        .maybeSingle();
+      if (error) return null;
+      if (data) return data as FineTuneJob;
+      // Job exists but already past 'queued' — return current state.
+      return this.get(args.id);
     },
   };
 }

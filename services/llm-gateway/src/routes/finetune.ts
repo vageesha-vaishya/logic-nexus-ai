@@ -21,6 +21,7 @@ import {
   type FineTuneCreateInput,
   type DatasetFormat,
 } from '../finetune/store.js';
+import { submitOpenAIFineTune, FineTuneSubmitError } from '../finetune/openaiSubmit.js';
 import type { ProviderKind } from '../types/gateway.types.js';
 
 export const fineTuneRouter = Router();
@@ -109,6 +110,85 @@ export function mountFineTuneRoutes(authLookup: () => AuthLookup): Router {
         const job = await getStore().get(id);
         if (!job) throw new GatewayError('INVOCATION_NOT_FOUND', `fine-tune job ${id} not found`, 404);
         res.json(job);
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  // POST /v1/fine-tunes/:id/submit — submits a queued job to the provider's
+  // training API and flips status to 'preparing'. Admin-scoped because this
+  // initiates billable training quota usage.
+  fineTuneRouter.post(
+    '/fine-tunes/:id/submit',
+    requireScope('admin_configs', authLookup),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const id = req.params.id;
+        if (!id) throw new GatewayError('INVALID_REQUEST', 'id required in path', 400);
+        const job = await getStore().get(id);
+        if (!job) throw new GatewayError('INVOCATION_NOT_FOUND', `fine-tune job ${id} not found`, 404);
+        if (job.status !== 'queued') {
+          throw new GatewayError(
+            'INVALID_REQUEST',
+            `job is not queued (status=${job.status}); cannot submit`,
+            409,
+            { current_status: job.status },
+          );
+        }
+        if (job.provider_kind !== 'openai') {
+          throw new GatewayError(
+            'PROVIDER_NOT_CONFIGURED',
+            `submit only supported for provider_kind=openai (got ${job.provider_kind})`,
+            503,
+          );
+        }
+
+        const suffix = typeof (req.body as { suffix?: unknown })?.suffix === 'string'
+          ? (req.body as { suffix: string }).suffix
+          : undefined;
+
+        let submitted;
+        try {
+          submitted = await submitOpenAIFineTune(job, { suffix });
+        } catch (err) {
+          if (err instanceof FineTuneSubmitError) {
+            // Map submitter codes onto the gateway's standard envelope codes.
+            const status =
+              err.code === 'PROVIDER_NOT_CONFIGURED' ? 503 :
+              err.code === 'DATASET_REQUIRED' ? 400 :
+              err.code === 'INVALID_HYPERPARAMETERS' ? 400 :
+              502;
+            const gatewayCode =
+              err.code === 'PROVIDER_NOT_CONFIGURED' ? 'PROVIDER_NOT_CONFIGURED' :
+              err.code === 'PROVIDER_UNAVAILABLE'    ? 'PROVIDER_UNAVAILABLE' :
+              'INVALID_REQUEST';
+            throw new GatewayError(gatewayCode, err.message, status, {
+              submitter_code: err.code,
+              ...err.details,
+            });
+          }
+          throw err;
+        }
+
+        const updated = await getStore().markPreparing({
+          id: job.id,
+          provider_job_id: submitted.provider_job_id,
+          effective_model_id: submitted.effective_model_id,
+        });
+        if (!updated) {
+          throw new GatewayError(
+            'INTERNAL',
+            'submission accepted but DB state-flip failed',
+            500,
+            { provider_job_id: submitted.provider_job_id },
+          );
+        }
+        res.status(200).json({
+          job: updated,
+          provider_job_id: submitted.provider_job_id,
+          effective_model_id: submitted.effective_model_id,
+        });
       } catch (err) {
         next(err);
       }
