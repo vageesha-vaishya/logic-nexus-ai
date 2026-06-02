@@ -9,6 +9,7 @@ import { mountPromptRoutes } from './routes/prompts.js';
 import { mountOutcomeRoutes } from './routes/outcomes.js';
 import { mountExperimentRoutes } from './routes/experiments.js';
 import { mountEmbedRoutes } from './routes/embed.js';
+import { mountRtbfRoutes } from './routes/rtbf.js';
 
 export function createApp(): Express {
   const app: Express = express();
@@ -42,6 +43,7 @@ export function createApp(): Express {
   app.use('/v1', mountOutcomeRoutes(getAuthLookupForApp));
   app.use('/v1', mountExperimentRoutes(getAuthLookupForApp));
   app.use('/v1', mountEmbedRoutes(getAuthLookupForApp));
+  app.use('/v1', mountRtbfRoutes(getAuthLookupForApp));
 
   app.use(errorMiddleware);
 
