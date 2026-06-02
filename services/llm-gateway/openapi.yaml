@@ -226,6 +226,25 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
 
   /v1/admin/prompts:
+    get:
+      summary: List seeded prompts (operator view)
+      description: |
+        Returns one row per prompt key plus a count of all versions on that
+        key. Requires `admin_configs` scope. When the gateway has no
+        Supabase env configured, returns `{ items: [], note: ... }`.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: Prompt list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminPromptListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
     post:
       summary: Create or bump a prompt version
       description: |
@@ -252,6 +271,60 @@ paths:
                   version_id: { type: string }
                   version_number: { type: integer }
         '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/experiments:
+    get:
+      summary: List A/B prompt experiments (operator view)
+      description: |
+        Returns experiments oldest-active-first with verdict + sample_size
+        when available. Requires `admin_configs` scope.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: query
+          name: status
+          schema: { type: string, enum: [active, evaluated, promoted, cancelled] }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 100 }
+      responses:
+        '200':
+          description: Experiment list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminExperimentListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/admin/audit:
+    get:
+      summary: List recent invocation audit rows (operator view)
+      description: |
+        Returns the most recent invocation audit rows ordered by ts desc.
+        Filterable by prompt_key, status, tenant_id. Requires `admin_configs`
+        scope. PII columns the caller does not own are scrubbed at the
+        DB layer regardless of this endpoint.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: query
+          name: prompt_key
+          schema: { type: string }
+        - in: query
+          name: status
+          schema: { type: string, enum: [succeeded, failed, rejected_safety] }
+        - in: query
+          name: tenant_id
+          schema: { type: string, format: uuid }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+      responses:
+        '200':
+          description: Audit row list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAuditListResponse' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
   # ───── Experiments (A/B + auto-promote) ─────
@@ -371,6 +444,150 @@ paths:
                   scrubbed_outcomes: { type: integer }
                   rtbf_log_id: { type: string }
         '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  # ───── Fine-tuning ─────
+  /v1/fine-tunes:
+    post:
+      summary: Create a fine-tuning job
+      description: |
+        Persists a new gateway.fine_tune_jobs row in `queued` state. Does NOT
+        submit to the provider yet — call POST /v1/fine-tunes/{id}/submit
+        afterwards. Requires `submit_job` scope.
+
+        dataset_url accepts either an OpenAI file id (file-…) or an https://
+        signed URL the gateway can fetch (translated to a file id on submit).
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/FineTuneCreateInput' }
+      responses:
+        '201':
+          description: Job created in queued state
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FineTuneJob' }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+  /v1/fine-tunes/{id}:
+    get:
+      summary: Fetch a fine-tuning job by id
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Job row
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FineTuneJob' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/fine-tunes/{id}/submit:
+    post:
+      summary: Submit a queued job to the provider
+      description: |
+        Requires `admin_configs` scope (training quota usage). Flips status
+        queued → preparing, captures the provider_job_id, and overwrites
+        base_model_id with the provider's effective model id (date-suffixed).
+        Idempotent: re-submitting a job past `queued` returns the current row.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                suffix: { type: string, maxLength: 18, description: Provider model id suffix (max 18 chars). }
+      responses:
+        '200':
+          description: Submission accepted
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [job, provider_job_id, effective_model_id]
+                properties:
+                  job: { $ref: '#/components/schemas/FineTuneJob' }
+                  provider_job_id: { type: string }
+                  effective_model_id: { type: string }
+        '400': { $ref: '#/components/responses/InvalidRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/ProviderUnavailable' }
+
+  /v1/fine-tunes/{id}/cancel:
+    post:
+      summary: Cancel a fine-tuning job
+      description: |
+        Idempotent. Cancelling an already-terminal job returns the current
+        row unchanged. Requires `submit_job` scope.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: path
+          name: id
+          required: true
+          schema: { type: string, format: uuid }
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                reason: { type: string, maxLength: 240 }
+      responses:
+        '200':
+          description: Cancelled (or already terminal)
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FineTuneJob' }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/fine-tunes/poll:
+    post:
+      summary: Run one fine-tune status-polling tick
+      description: |
+        Drains non-terminal jobs that have a provider_job_id set and refreshes
+        their status from the provider. Requires `admin_configs` scope. Returns
+        observability counts; never throws on provider errors (captured per-job).
+        Also runs automatically every LLM_GATEWAY_FT_POLL_INTERVAL_SEC seconds
+        when that env var is set in the deployment.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                limit: { type: integer, minimum: 1, maximum: 200, default: 25 }
+      responses:
+        '200':
+          description: Tick result
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/FineTunePollTickResult' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
 # ─── Reusable components: parameters, security, responses, schemas ──
@@ -798,3 +1015,172 @@ components:
               type: object
               additionalProperties: true
             request_id: { type: string }
+
+    # ── Admin list responses ─────────────────────────────────────────
+    AdminPromptListItem:
+      type: object
+      required: [key, module, feature, total_versions, updated_at]
+      properties:
+        key: { type: string }
+        module: { type: string }
+        feature: { type: string }
+        description: { type: string, nullable: true }
+        active_version_id: { type: string, nullable: true }
+        total_versions: { type: integer, minimum: 0 }
+        updated_at: { type: string, format: date-time }
+        default_capability: { type: string, nullable: true }
+        safety_class: { type: string, nullable: true, enum: [standard, restricted, null] }
+    AdminPromptListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminPromptListItem' }
+        note:
+          type: string
+          description: Present when the gateway DB is not configured; items will be empty.
+
+    AdminExperimentListItem:
+      type: object
+      required: [id, prompt_key, status, traffic_split, variant_a_version_id, variant_b_version_id]
+      properties:
+        id: { type: string, format: uuid }
+        prompt_key: { type: string }
+        status:
+          type: string
+          enum: [active, evaluated, promoted, cancelled]
+        traffic_split: { type: number, minimum: 0, maximum: 1 }
+        variant_a_version_id: { type: string }
+        variant_b_version_id: { type: string }
+        started_at: { type: string, format: date-time, nullable: true }
+        evaluated_at: { type: string, format: date-time, nullable: true }
+        verdict: { type: string, nullable: true }
+        sample_size: { type: integer, nullable: true }
+        note: { type: string, nullable: true }
+    AdminExperimentListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminExperimentListItem' }
+        note: { type: string }
+
+    AdminAuditListItem:
+      type: object
+      required: [id, ts, status]
+      properties:
+        id: { type: string, format: uuid }
+        ts: { type: string, format: date-time }
+        prompt_key: { type: string, nullable: true }
+        version_id: { type: string, nullable: true }
+        provider_kind: { $ref: '#/components/schemas/ProviderKind' }
+        model_id: { type: string, nullable: true }
+        status:
+          type: string
+          enum: [succeeded, failed, rejected_safety]
+        error_code: { type: string, nullable: true }
+        latency_ms: { type: integer, nullable: true }
+        cost_usd: { type: number, nullable: true }
+        tenant_id: { type: string, format: uuid, nullable: true }
+        user_id: { type: string, format: uuid, nullable: true }
+        experiment_id: { type: string, nullable: true }
+        variant_label: { type: string, nullable: true }
+    AdminAuditListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminAuditListItem' }
+        note: { type: string }
+
+    # ── Fine-tuning ──────────────────────────────────────────────────
+    FineTuneStatus:
+      type: string
+      enum: [queued, preparing, training, succeeded, failed, cancelled]
+    FineTuneDatasetFormat:
+      type: string
+      enum: [jsonl, parquet, csv]
+
+    FineTuneCreateInput:
+      type: object
+      required: [tenant_id, provider_kind, base_model_id]
+      properties:
+        tenant_id: { type: string, format: uuid }
+        provider_kind:
+          type: string
+          enum: [anthropic, openai, google_gemini, mistral]
+        base_model_id: { type: string, maxLength: 256 }
+        dataset_url:
+          type: string
+          description: |
+            Either an OpenAI file id (file-…) or an https:// signed URL the
+            gateway can fetch. gs:// / s3:// are rejected — use a signed URL.
+        dataset_format: { $ref: '#/components/schemas/FineTuneDatasetFormat' }
+        hyperparameters:
+          type: object
+          description: |
+            Provider-specific. For OpenAI, only n_epochs / batch_size /
+            learning_rate_multiplier are forwarded; unknown keys are dropped.
+          additionalProperties: true
+        created_by_user_id: { type: string, format: uuid }
+
+    FineTuneJob:
+      type: object
+      required: [id, tenant_id, provider_kind, base_model_id, status, hyperparameters, result_metrics, created_at, updated_at]
+      properties:
+        id: { type: string, format: uuid }
+        tenant_id: { type: string, format: uuid }
+        provider_kind:
+          type: string
+          enum: [anthropic, openai, google_gemini, mistral]
+        base_model_id: { type: string }
+        fine_tuned_model_id: { type: string, nullable: true }
+        provider_job_id: { type: string, nullable: true }
+        dataset_url: { type: string, nullable: true }
+        dataset_format: { $ref: '#/components/schemas/FineTuneDatasetFormat', nullable: true }
+        hyperparameters:
+          type: object
+          additionalProperties: true
+        status: { $ref: '#/components/schemas/FineTuneStatus' }
+        status_message: { type: string, nullable: true }
+        result_metrics:
+          type: object
+          additionalProperties: true
+        created_by_user_id: { type: string, format: uuid, nullable: true }
+        created_at: { type: string, format: date-time }
+        updated_at: { type: string, format: date-time }
+        started_at: { type: string, format: date-time, nullable: true }
+        finished_at: { type: string, format: date-time, nullable: true }
+        cancelled_at: { type: string, format: date-time, nullable: true }
+        cancel_reason: { type: string, nullable: true }
+
+    FineTunePollTickResult:
+      type: object
+      required: [scanned, updated, unchanged, failed_lookup, skipped, errors]
+      properties:
+        scanned: { type: integer, minimum: 0 }
+        updated: { type: integer, minimum: 0 }
+        unchanged: { type: integer, minimum: 0 }
+        failed_lookup:
+          type: integer
+          minimum: 0
+          description: Jobs that were in-flight at list time but vanished before the patch landed.
+        skipped:
+          type: integer
+          minimum: 0
+          description: Jobs whose provider_kind has no fetcher registered (non-openai today).
+        errors:
+          type: array
+          items:
+            type: object
+            required: [job_id, provider_kind, code, message]
+            properties:
+              job_id: { type: string, format: uuid }
+              provider_kind: { type: string }
+              code:
+                type: string
+                enum: [PROVIDER_NOT_CONFIGURED, PROVIDER_UNAVAILABLE, JOB_NOT_FOUND, UNKNOWN]
+              message: { type: string }
