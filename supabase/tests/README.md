@@ -26,7 +26,7 @@ DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supab
 Harness exits 0 if every test passes, 1 if any fails. Pass it through CI
 to catch regressions on schema/trigger/RPC changes.
 
-## Suite manifest (21 tests)
+## Suite manifest (22 tests)
 
 | File | Slice | Verifies |
 |---|---|---|
@@ -51,6 +51,7 @@ to catch regressions on schema/trigger/RPC changes.
 | `markets_multibroker_rls.sql` | (pre-session) | markets multi-broker portfolio RLS routing |
 | `finance_missing_schema.sql` | Slice A (gap-fill) | 13 finance.* tables exist + RLS + policies + FK + updated_at triggers + CHECK constraints |
 | `gateway_phase_p1_schema.sql` | LLM Gateway P1.3 | 5 gateway.* tables + RLS + seeds (5 models, 9 residency, 1 platform_default) + pin_only_on_feature_pin CHECK + append-only trigger on llm_invocations |
+| `gateway_service_tokens.sql` | LLM Gateway P2.2 | service_tokens table + mint_service_token RPC stores hash (not plaintext) + scope CHECK rejects unknown values + revoke_service_token flips status + arg validation |
 
 ## Authoring conventions
 

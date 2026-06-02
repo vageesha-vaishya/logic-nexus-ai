@@ -24,6 +24,8 @@ import { buildInMemoryStores } from '../resolver/inMemoryStores.js';
 import { buildSupabaseStores } from '../resolver/supabaseStores.js';
 import type { CallContext, ResolverStores } from '../resolver/types.js';
 import { buildAuditPayload, buildInvocationWriter, type InvocationWriter } from '../audit/invocationWriter.js';
+import { buildAuthLookup, type AuthLookup } from '../auth/serviceToken.js';
+import { requireScope } from '../middleware/auth.js';
 
 export const invokeRouter = Router();
 
@@ -53,6 +55,18 @@ function getInvocationWriter(): InvocationWriter {
 /** Test helper: inject custom writer. Production code never calls this. */
 export function setInvocationWriterForTesting(writer: InvocationWriter | null): void {
   invocationWriter = writer;
+}
+
+// Module-singleton auth lookup. Open-mode when nothing configured.
+let authLookup: AuthLookup | null = null;
+function getAuthLookup(): AuthLookup {
+  if (!authLookup) authLookup = buildAuthLookup();
+  return authLookup;
+}
+
+/** Test helper: inject custom auth lookup. Production code never calls this. */
+export function setAuthLookupForTesting(lookup: AuthLookup | null): void {
+  authLookup = lookup;
 }
 
 function asString(value: unknown): string | null {
@@ -122,7 +136,7 @@ function mapResolverError(err: ResolverError): GatewayError {
   return new GatewayError(err.code, err.message, status, err.details);
 }
 
-invokeRouter.post('/invoke', async (req: Request, res: Response, next: NextFunction) => {
+invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: Request, res: Response, next: NextFunction) => {
   // Express 4 doesn't auto-forward async errors to the error middleware,
   // so we wrap the whole handler in try/catch + next(err).
   try {
