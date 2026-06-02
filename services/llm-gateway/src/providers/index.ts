@@ -7,10 +7,12 @@
 import type { ProviderAdapter, ProviderKind } from '../types/gateway.types.js';
 import { echoProvider } from './echo.js';
 import { replayProvider } from './replay.js';
+import { anthropicProvider } from './anthropic.js';
 
 const registry: Partial<Record<ProviderKind, ProviderAdapter>> = {
   echo: echoProvider,
   replay: replayProvider,
+  anthropic: anthropicProvider,
 };
 
 export function resolveProvider(kind: ProviderKind): ProviderAdapter {
