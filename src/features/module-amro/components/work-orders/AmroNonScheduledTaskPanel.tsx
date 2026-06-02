@@ -15,8 +15,9 @@
  * - Uses AmroModuleGridDetailPanel for split-view
  */
 
-import { useCallback, useMemo, useState } from 'react';
-import { CheckCircle2, Clock, ArrowRightLeft, Eye, Filter, Plus, RefreshCw, Wrench } from 'lucide-react';
+import { useCallback, useMemo, useRef, useState } from 'react';
+import { CheckCircle2, Clock, ArrowRightLeft, Eye, Filter, Plus, RefreshCw, Wrench, Camera, Sparkles, Loader2 } from 'lucide-react';
+import { useReadDefectPhoto, type DefectPhotoOutput } from '../../hooks/useReadDefectPhoto';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -87,6 +88,50 @@ export function AmroNonScheduledTaskPanel(): JSX.Element {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogLoading, setDialogLoading] = useState(false);
   const [formValue, setFormValue] = useState({ ...DEFAULT_FORM });
+
+  // AI defect-photo upload state
+  const photoInputRef = useRef<HTMLInputElement | null>(null);
+  const readDefectPhoto = useReadDefectPhoto();
+  const [photoOutput, setPhotoOutput] = useState<DefectPhotoOutput | null>(null);
+  const handlePhotoPicked = useCallback(async (file: File | null) => {
+    if (!file) return;
+    if (!formValue.aircraft_id.trim()) {
+      toast.error('Enter the aircraft ID before reading a defect photo');
+      return;
+    }
+    try {
+      const res = await readDefectPhoto.mutateAsync({
+        aircraft_id: formValue.aircraft_id.trim(),
+        task_source: formValue.task_source,
+        notes: formValue.task_description || undefined,
+        photo: file,
+      });
+      if (res.parsed_output) {
+        setPhotoOutput(res.parsed_output);
+        setFormValue((prev) => ({
+          ...prev,
+          // Don't clobber what the user has already typed; only fill empty fields.
+          defect_description: prev.defect_description || res.parsed_output!.defect_description,
+          initial_assessment: prev.initial_assessment || res.parsed_output!.initial_assessment,
+          fault_code: prev.fault_code || res.parsed_output!.fault_code || prev.fault_code,
+        }));
+        toast.success('AI read the photo — review the suggested fields');
+      } else {
+        toast.error('AI returned an unexpected response shape');
+      }
+    } catch {
+      /* hook's onError already surfaced a toast */
+    } finally {
+      if (photoInputRef.current) photoInputRef.current.value = '';
+    }
+  }, [formValue.aircraft_id, formValue.task_source, formValue.task_description, readDefectPhoto]);
+  const handleDialogOpenChange = useCallback((open: boolean) => {
+    setDialogOpen(open);
+    if (!open) {
+      setPhotoOutput(null);
+      readDefectPhoto.reset();
+    }
+  }, [readDefectPhoto]);
 
   // Convert to WP dialog
   const [convertCandidate, setConvertCandidate] = useState<NonScheduledTask | null>(null);
@@ -447,11 +492,55 @@ export function AmroNonScheduledTaskPanel(): JSX.Element {
       />
 
       {/* Create Task Dialog */}
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle>Create Non-Scheduled Task</DialogTitle>
           </DialogHeader>
+          <div className="flex items-center justify-between rounded-md border border-dashed bg-muted/30 px-3 py-2">
+            <div className="flex items-center gap-2 text-sm">
+              <Camera className="h-4 w-4 text-muted-foreground" />
+              <span>Have a photo of the defect?</span>
+              <span className="text-muted-foreground">AI will pre-fill the description, fault code, and assessment.</span>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => photoInputRef.current?.click()}
+              disabled={readDefectPhoto.isPending}
+            >
+              {readDefectPhoto.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <Sparkles className="mr-2 h-4 w-4" />
+              )}
+              Read defect from photo
+            </Button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { void handlePhotoPicked(e.target.files?.[0] ?? null); }}
+            />
+          </div>
+          {photoOutput && (
+            <div className="rounded-md border bg-muted/30 p-3 text-sm space-y-1">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-4 w-4 text-primary" />
+                <span className="font-semibold">AI-suggested classification</span>
+                <Badge variant="outline" className="capitalize">{photoOutput.severity}</Badge>
+                {photoOutput.ata_chapter && (
+                  <Badge variant="secondary">ATA {photoOutput.ata_chapter}</Badge>
+                )}
+                <span className="ml-auto text-xs text-muted-foreground">
+                  confidence {(photoOutput.confidence * 100).toFixed(0)}%
+                </span>
+              </div>
+              <p className="text-muted-foreground">{photoOutput.initial_assessment}</p>
+            </div>
+          )}
           <div className="space-y-4 py-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
