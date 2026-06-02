@@ -36,6 +36,8 @@ export interface PromptUpsertInput {
 export interface PromptStore {
   /** Fetch a prompt + its active version. Throws PROMPT_NOT_FOUND. */
   getActive(key: string): Promise<{ prompt: Prompt; active_version: PromptVersion }>;
+  /** Fetch a specific version by id. Used by experiment picker to load variant_b. */
+  getVersionById(version_id: string): Promise<PromptVersion>;
   /** Create/bump version. Returns the new version id + number. */
   upsert(input: PromptUpsertInput): Promise<{ version_id: string; version_number: number }>;
 }
@@ -66,6 +68,13 @@ export function buildInMemoryPromptStore(): PromptStore {
         throw new PromptError('PROMPT_NO_ACTIVE_VERSION', `prompt ${key} has no active version`, { key });
       }
       return { prompt: entry.prompt, active_version: active };
+    },
+    async getVersionById(version_id: string) {
+      for (const entry of store.values()) {
+        const v = entry.versions.find((vv) => vv.id === version_id);
+        if (v) return v;
+      }
+      throw new PromptError('PROMPT_VERSION_NOT_FOUND', `version ${version_id} not found`, { version_id });
     },
     async upsert(input: PromptUpsertInput) {
       const existing = store.get(input.key);
@@ -159,6 +168,17 @@ export function buildSupabasePromptStore(): PromptStore | null {
         prompt: prompt as Prompt,
         active_version: version as PromptVersion,
       };
+    },
+    async getVersionById(version_id: string) {
+      const { data, error } = await client
+        .from('prompt_versions')
+        .select('id, prompt_key, version_number, body, body_variants, frontmatter, input_schema, output_schema, default_capability, default_temperature, default_max_tokens, cache_ttl_seconds, safety_class, status, source, git_sha, created_by_user_id, created_at, promoted_at')
+        .eq('id', version_id)
+        .maybeSingle();
+      if (error || !data) {
+        throw new PromptError('PROMPT_VERSION_NOT_FOUND', `version ${version_id} not found`, { version_id, err: error?.message });
+      }
+      return data as PromptVersion;
     },
     async upsert(input: PromptUpsertInput) {
       const { data, error } = await client.rpc('upsert_prompt_version', {

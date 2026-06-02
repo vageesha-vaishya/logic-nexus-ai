@@ -32,6 +32,8 @@ import { PiiPolicyError } from '../pii/types.js';
 import { buildPromptStore, type PromptStore } from '../prompts/store.js';
 import { pickBodyForProvider, renderPrompt } from '../prompts/renderer.js';
 import { PromptError } from '../prompts/types.js';
+import { buildExperimentStore, type ExperimentStore } from '../prompts/experimentStore.js';
+import { pickVariant, experimentWarning } from '../prompts/experimentPicker.js';
 
 export const invokeRouter = Router();
 
@@ -103,6 +105,18 @@ function getInvokePromptStore(): PromptStore {
 /** Test helper: inject a custom prompt store into the invoke pipeline. */
 export function setInvokePromptStoreForTesting(store: PromptStore | null): void {
   invokePromptStore = store;
+}
+
+// Module-singleton experiment store. P3.3.
+let invokeExperimentStore: ExperimentStore | null = null;
+function getExperimentStore(): ExperimentStore {
+  if (!invokeExperimentStore) invokeExperimentStore = buildExperimentStore();
+  return invokeExperimentStore;
+}
+
+/** Test helper: inject custom experiment store. */
+export function setExperimentStoreForTesting(store: ExperimentStore | null): void {
+  invokeExperimentStore = store;
 }
 
 function mapPiiError(err: PiiPolicyError): GatewayError {
@@ -228,15 +242,37 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
     const promptWarnings: string[] = [];
     try {
       const { active_version } = await getInvokePromptStore().getActive(safeRequest.prompt_key);
+      let chosen_version = active_version;
+
+      // ── A/B experiment override (P3.3) ──
+      // If an active experiment exists for this prompt_key, deterministically
+      // pick a variant based on hash(invocation_id) and swap if it's variant_b.
+      const experiment = await getExperimentStore().getActiveFor(safeRequest.prompt_key);
+      if (experiment) {
+        const pick = pickVariant(experiment, invocation_id);
+        if (pick.variant_version_id !== active_version.id) {
+          try {
+            chosen_version = await getInvokePromptStore().getVersionById(pick.variant_version_id);
+          } catch (err) {
+            if (err instanceof PromptError) {
+              promptWarnings.push(`experiment_variant_missing:${pick.variant_version_id}`);
+            } else {
+              throw err;
+            }
+          }
+        }
+        promptWarnings.push(experimentWarning(pick));
+      }
+
       const body = pickBodyForProvider(
-        active_version.body,
-        active_version.body_variants,
+        chosen_version.body,
+        chosen_version.body_variants,
         resolved.provider_kind,
       );
       const renderResult = renderPrompt(body, safeRequest.variables);
       rendered_body = renderResult.rendered;
-      prompt_version_id = active_version.id;
-      prompt_version_number = active_version.version_number;
+      prompt_version_id = chosen_version.id;
+      prompt_version_number = chosen_version.version_number;
       if (renderResult.missing_paths.length > 0) {
         promptWarnings.push(`prompt_missing_variables:${renderResult.missing_paths.join(',')}`);
       }
