@@ -15,6 +15,52 @@ import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 import { useAmroWorkspaceState } from '../hooks/useAmroWorkspaceState';
 import type { AmroAuthorityLevel, AmroAssetType } from '../workspace/amroWorkspaceModel';
+import {
+  assetTypeLabel,
+  authorityLabel,
+  authorityOptions,
+  workOrderStatusFilters,
+  regulatorProfileOptions,
+  certificationAuthorityProfileOptions,
+  workspaceViewModes,
+  amroHeaderActionOrder,
+  workspaceThemeOptions,
+  workOrderPageSizes,
+  workspaceLocaleOptions,
+  amroWorkspaceViewStorageKey,
+  amroWorkspaceThemeStorageKey,
+  amroWorkOrderPageSizeStorageKey,
+  amroWorkspaceLocaleStorageKey,
+  amroManualWorkOrderOrderStorageKey,
+  amroGridPreferencesStorageKey,
+  amroDashboardLoadBenchmark,
+  amroWorkOrderFilterApplyBenchmark,
+  amroDetailTabSwitchBenchmark,
+  amroTaskStepSubmitBenchmark,
+  defaultGridVisibleColumns,
+  defaultGridColumnWidths,
+  workOrderGridColumnLabels,
+  workOrderGridSortableColumns,
+  amroRoleVariants,
+  createDefaultWorkOrderCreateFormState,
+  type AmroUxRole,
+  type AmroWorkspaceModuleKey,
+  type AmroOwnedWorkspaceProps,
+  type AmroModuleAction,
+  type AmroRoleVariant,
+  type WorkOrderCreateTab,
+  type WorkOrderCreateFormState,
+  type WorkOrderCreateFormErrors,
+  type WorkOrderCreateAircraftOption,
+  type WorkOrderCreateTaskOption,
+  type TaskConflictInfo,
+  type WorkOrderGridColumnKey,
+  type WorkOrderGridSortKey,
+  type WorkOrderGridPreferences,
+  type WorkOrderGridRuntimeRow,
+  type PartsFormSectionKey,
+} from './amroOwnedWorkspaceConstants';
+import { AircraftSearchSection } from './AircraftSearchSection';
 import { AmroPartsInventoryWorkbench } from './parts/AmroPartsInventoryWorkbench';
 import { AmroItemMasterCatalogPanel } from './parts/AmroItemMasterCatalogPanel';
 import { AmroStockLedgerPanel } from './parts/AmroStockLedgerPanel';
@@ -40,330 +86,6 @@ import {
   type PartsFormFieldSchema,
 } from './parts/partsDetailSchema';
 
-const assetTypeLabel: Record<AmroAssetType, string> = {
-  aircraft: 'Aircraft',
-  engine: 'Engine',
-  serialized_component: 'Serialized Component',
-  heavy_asset: 'Heavy Asset',
-};
-
-const authorityLabel: Record<AmroAuthorityLevel, string> = {
-  technician: 'Technician',
-  supervisor: 'Supervisor',
-  engineering: 'Engineering',
-  qa: 'QA',
-  compliance: 'Compliance',
-};
-
-const authorityOptions: AmroAuthorityLevel[] = ['technician', 'supervisor', 'engineering', 'qa', 'compliance'];
-const workOrderStatusFilters = ['all', 'planning', 'scheduled', 'in_progress', 'completed', 'blocked', 'cancelled'] as const;
-const regulatorProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
-const certificationAuthorityProfileOptions = ['FAA', 'EASA', 'CAAC'] as const;
-const workspaceViewModes = ['kanban', 'card', 'grid', 'list'] as const;
-const amroHeaderActionOrder = ['Search', 'Filter', 'View', 'Create', 'Refresh', 'Import/Export', 'Theme'] as const;
-const workspaceThemeOptions = ['Azure Sky', 'Hangar Dark', 'Maintenance Slate'] as const;
-const workOrderPageSizes = [10, 25, 50] as const;
-const workspaceLocaleOptions = ['en-US', 'en-GB', 'fr-FR', 'de-DE'] as const;
-const amroWorkspaceViewStorageKey = 'amro.workspace.view';
-const amroWorkspaceThemeStorageKey = 'amro.workspace.theme';
-const amroWorkOrderPageSizeStorageKey = 'amro.workspace.work-order-page-size';
-const amroWorkspaceLocaleStorageKey = 'amro.workspace.locale';
-const amroManualWorkOrderOrderStorageKey = 'amro.workspace.work-order-order';
-const amroGridPreferencesStorageKey = 'amro-grid-preferences';
-const amroDashboardLoadBenchmark = { targetMs: 1000, hardLimitMs: 1500 };
-const amroWorkOrderFilterApplyBenchmark = { targetMs: 500, hardLimitMs: 900 };
-const amroDetailTabSwitchBenchmark = { targetMs: 250, hardLimitMs: 500 };
-const amroTaskStepSubmitBenchmark = { targetMs: 400, hardLimitMs: 800 };
-type AmroUxRole = 'technician' | 'engineer' | 'inspector' | 'planner' | 'management';
-type AmroWorkspaceModuleKey =
-  | 'overview'
-  | 'primary-users'
-  | 'work-orders'
-  | 'task-execution'
-  | 'scheduling'
-  | 'parts'
-  | 'compliance'
-  | 'certification'
-  | 'audit'
-  | 'integration'
-  | 'intelligence';
-
-type AmroOwnedWorkspaceProps = {
-  moduleKey?: AmroWorkspaceModuleKey;
-  overviewPersona?: 'platform_admin' | 'tenant_admin' | 'franchise_admin' | 'user';
-  overviewControls?: {
-    dateRange: '7d' | '30d' | '90d';
-    regulatorProfile: 'FAA' | 'EASA' | 'CAAC';
-    fleetFilter: string;
-    stationFilter: string;
-    onCycleDateRange: () => void;
-    onCycleRegulatorProfile: () => void;
-    onFleetFilterChange: (value: string) => void;
-    onStationFilterChange: (value: string) => void;
-    onRefresh: () => void;
-    onExport: () => void;
-    exporting?: boolean;
-  };
-  overviewTelemetry?: {
-    openWorkOrders?: number;
-    aogCount?: number;
-    complianceRiskCount?: number;
-    deferredCount?: number;
-    fillRatePct?: number;
-    pipelineSnapshot?: string;
-    riskHeatmapSummary?: string;
-    forecastSummary?: string;
-    confidenceSegmentation?: string;
-    recommendedActions?: string;
-    slaTrendSummary?: string;
-    dataFreshness?: string;
-    syncHealth?: string;
-  };
-};
-
-type AmroModuleAction = {
-  id: string;
-  label: string;
-  onClick: () => void;
-  disabled: boolean;
-  disabledReason: string;
-};
-
-type AmroRoleVariant = {
-  primaryViews: string;
-  coreActions: string;
-  restrictedActions: string;
-};
-
-type WorkOrderCreateTab = 'wp' | 'besting_wp' | 'task_payload' | 'workflow';
-
-type WorkOrderCreateFormState = {
-  packageNumber: string;
-  topic: string;
-  locationStation: string;
-  planningDate: string;
-  remarks: string;
-  createdBy: string;
-  aircraftId: string;
-  selectedAircraftModel: string;
-  selectedAircraftSerialOrRegistration: string;
-  workOrderDetails: string;
-  revision: string;
-  selectedTaskIds: string[];
-  maintenanceType: 'line' | 'base' | 'hangar' | 'shop';
-  priority: 'low' | 'medium' | 'high' | 'critical';
-  plannedStartDate: string;
-  plannedEndDate: string;
-  assignedRole: 'planner' | 'engineer' | 'inspector' | 'technician';
-  workflowStatus: 'planning' | 'scheduled' | 'in_progress' | 'blocked';
-};
-
-type WorkOrderCreateFormErrors = Partial<Record<keyof WorkOrderCreateFormState, string>>;
-
-type WorkOrderCreateAircraftOption = {
-  id: string;
-  registration: string;
-  serialNumber: string;
-  aircraftModel: string;
-  aircraftType: string;
-  operatorCode: string;
-  ownerName: string;
-  stationCode: string;
-  status: string;
-  currentFlightHours: number;
-  currentCycles: number;
-};
-
-type WorkOrderCreateTaskOption = {
-  value: string;
-  taskNumber: string;
-  title: string;
-  dueBasis: string;
-  dueDate: string;
-  estimatedManHours: string;
-  status: string;
-  category: string;
-  modelTags: string[];
-};
-
-type TaskConflictInfo = {
-  taskId: string;
-  reason: string;
-};
-
-type WorkOrderGridColumnKey = 'packageNumber' | 'aircraft' | 'priority' | 'category' | 'station' | 'due' | 'status' | 'owner';
-
-type WorkOrderGridSortKey = WorkOrderGridColumnKey;
-
-type WorkOrderGridPreferences = {
-  visibleColumns: Record<WorkOrderGridColumnKey, boolean>;
-  columnWidths: Record<WorkOrderGridColumnKey, number>;
-};
-
-type WorkOrderGridRuntimeRow = {
-  id: string;
-  packageNumber: string;
-  aircraft: string;
-  priority: string;
-  category: string;
-  station: string;
-  due: string;
-  status: string;
-  owner: string;
-  dueEpoch: number;
-};
-
-type PartsFormSectionKey = 'basic' | 'stock' | 'location' | 'supplier';
-
-const defaultGridVisibleColumns: Record<WorkOrderGridColumnKey, boolean> = {
-  packageNumber: true,
-  aircraft: true,
-  priority: true,
-  category: true,
-  station: true,
-  due: true,
-  status: true,
-  owner: true,
-};
-
-const defaultGridColumnWidths: Record<WorkOrderGridColumnKey, number> = {
-  packageNumber: 140,
-  aircraft: 160,
-  priority: 110,
-  category: 120,
-  station: 120,
-  due: 170,
-  status: 130,
-  owner: 120,
-};
-
-const workOrderGridColumnLabels: Record<WorkOrderGridColumnKey, string> = {
-  packageNumber: 'Work Order #',
-  aircraft: 'Aircraft',
-  priority: 'Priority',
-  category: 'Maintenance Category',
-  station: 'Station',
-  due: 'Due / Slot End',
-  status: 'Lifecycle Status',
-  owner: 'Owner',
-};
-
-const workOrderGridSortableColumns: WorkOrderGridSortKey[] = ['packageNumber', 'aircraft', 'priority', 'category', 'station', 'due', 'status', 'owner'];
-
-const amroRoleVariants: Record<AmroUxRole, AmroRoleVariant> = {
-  technician: {
-    primaryViews: 'Task cards, assigned work package details',
-    coreActions: 'Execute steps, capture evidence, request support',
-    restrictedActions: 'Work package closure, compliance override',
-  },
-  engineer: {
-    primaryViews: 'Work package detail, materials, schedule board',
-    coreActions: 'Plan tasks, assign resources, adjust estimates',
-    restrictedActions: 'Regulatory final sign-off',
-  },
-  inspector: {
-    primaryViews: 'Compliance gate, audit timeline, evidence review',
-    coreActions: 'Validate evidence, approve/reject tasks',
-    restrictedActions: 'Parts allocation edits',
-  },
-  planner: {
-    primaryViews: 'Work package list, scheduler board, capacity views',
-    coreActions: 'Create/plan/schedule work packages',
-    restrictedActions: 'Certifying release',
-  },
-  management: {
-    primaryViews: 'Overview dashboards, SLA/compliance analytics',
-    coreActions: 'Monitor KPIs, approve exceptions',
-    restrictedActions: 'Direct task execution',
-  },
-};
-
-const createDefaultWorkOrderCreateFormState = (): WorkOrderCreateFormState => {
-  const start = new Date();
-  const end = new Date(start.getTime() + 24 * 60 * 60 * 1000);
-  const today = start.toISOString().slice(0, 10);
-  return {
-    packageNumber: '',
-    topic: '',
-    locationStation: '',
-    planningDate: today,
-    remarks: '',
-    createdBy: 'planner',
-    aircraftId: '',
-    selectedAircraftModel: '',
-    selectedAircraftSerialOrRegistration: '',
-    workOrderDetails: '',
-    revision: '1',
-    selectedTaskIds: [],
-    maintenanceType: 'line',
-    priority: 'medium',
-    plannedStartDate: start.toISOString().slice(0, 10),
-    plannedEndDate: end.toISOString().slice(0, 10),
-    assignedRole: 'planner',
-    workflowStatus: 'planning',
-  };
-};
-
-/**
- * Memoized Aircraft Search Component
- * Extracted to prevent flickering caused by parent component re-renders
- */
-const AircraftSearchSection = memo(function AircraftSearchSection({
-  aircraftSearchTerm,
-  onSearchChange,
-  filteredAircraftOptions,
-  selectedAircraftId,
-  onSelectAircraft,
-  isLoading,
-  selectedAircraft,
-}: {
-  aircraftSearchTerm: string;
-  onSearchChange: (value: string) => void;
-  filteredAircraftOptions: WorkOrderCreateAircraftOption[];
-  selectedAircraftId: string | undefined;
-  onSelectAircraft: (id: string) => void;
-  isLoading: boolean;
-  selectedAircraft: WorkOrderCreateAircraftOption | null;
-}) {
-  return (
-    <div className="space-y-1">
-      <Label htmlFor="wp-aircraft-search">Aircraft</Label>
-      <TextInput id="wp-aircraft-search" value={aircraftSearchTerm} onChange={(event) => onSearchChange(event.target.value)} placeholder="Search model, registration, serial" />
-      <div className="max-h-56 space-y-2 overflow-y-auto rounded-md border p-2">
-        {isLoading ? (
-          <p className="text-xs text-muted-foreground">Loading aircraft...</p>
-        ) : filteredAircraftOptions.length === 0 ? (
-          <p className="text-xs text-muted-foreground">No aircraft found in tenant scope.</p>
-        ) : (
-          filteredAircraftOptions.map((aircraft) => (
-            <Button
-              key={aircraft.id}
-              type="button"
-              variant="ghost"
-              size="sm"
-              onClick={() => onSelectAircraft(aircraft.id)}
-              className={`h-auto w-full justify-start rounded-md border px-3 py-2 text-left text-xs ${selectedAircraftId === aircraft.id ? 'border-primary bg-primary/10' : 'border-border'}`}
-              aria-pressed={selectedAircraftId === aircraft.id}
-            >
-              <p className="font-medium">{aircraft.aircraftModel || 'Unknown Model'} · {aircraft.registration || '-'}</p>
-              <p className="text-muted-foreground">SN {aircraft.serialNumber || '-'} · Station {aircraft.stationCode || '-'}</p>
-            </Button>
-          ))
-        )}
-      </div>
-      {selectedAircraft ? (
-        <div className="grid grid-cols-2 gap-2 rounded-md border p-3 text-xs">
-          <div>Model: {selectedAircraft.aircraftModel || '-'}</div>
-          <div>Serial: {selectedAircraft.serialNumber || '-'}</div>
-          <div>Registration: {selectedAircraft.registration || '-'}</div>
-          <div>Hours/Cycles: {selectedAircraft.currentFlightHours}/{selectedAircraft.currentCycles}</div>
-          <div>Status: {selectedAircraft.status || '-'}</div>
-          <div>Operator: {selectedAircraft.operatorCode || '-'}</div>
-        </div>
-      ) : null}
-    </div>
-  );
-});
 
 export function AmroOwnedWorkspace({
   moduleKey,
