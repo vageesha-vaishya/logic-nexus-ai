@@ -1,7 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   invoke,
   recordOutcome,
+  configure,
+  LlmClient,
+  LlmGatewayError,
+  _resetSingletonForTesting,
   NullProviderAdapter,
   NullPromptCache,
   MemoryPromptCache,
@@ -16,21 +20,155 @@ import {
   summariseInvocation,
 } from "./index.js";
 
-describe("invoke() / recordOutcome() — Phase 0 stubs", () => {
-  it("invoke() throws with a helpful message", async () => {
-    await expect(
-      invoke({
-        tenant_id: "t1",
-        module: "core",
-        feature: "test",
-        prompt_key: "core.test",
-        variables: {},
-      }),
-    ).rejects.toThrow(/not yet wired/);
+// ── Test helpers: build a fake fetch that returns canned responses ──
+function buildFakeFetch(
+  responder: (url: string, init: RequestInit) => { status: number; body: unknown; headers?: Record<string, string> },
+): typeof fetch {
+  const fn = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    const res = responder(url, init ?? {});
+    const headers = new Headers({ "Content-Type": "application/json", ...(res.headers ?? {}) });
+    return new Response(JSON.stringify(res.body), { status: res.status, headers });
+  });
+  return fn as unknown as typeof fetch;
+}
+
+describe("LlmClient — invoke() over the gateway", () => {
+  beforeEach(() => {
+    _resetSingletonForTesting();
   });
 
-  it("recordOutcome() throws with the same message", async () => {
-    await expect(recordOutcome("inv1", { kind: "ignored" })).rejects.toThrow(/not yet wired/);
+  it("posts to /v1/invoke with headers + body and returns the parsed response", async () => {
+    const calls: { url: string; init: RequestInit }[] = [];
+    const client = new LlmClient({
+      gatewayUrl: "http://gw.local",
+      serviceToken: "lngw_test",
+      platformId: "logic-nexus-ai",
+      fetch: buildFakeFetch((url, init) => {
+        calls.push({ url, init });
+        return {
+          status: 200,
+          body: {
+            invocation_id: "inv-1",
+            output: { text: "ok" },
+            cache_hit: false,
+            model_used: "echo-v1",
+            provider_kind: "echo",
+            usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+            cost_usd: 0,
+            latency_ms: 5,
+          },
+        };
+      }),
+    });
+
+    const res = await client.invoke({
+      tenant_id: "t1",
+      module: "core",
+      feature: "test",
+      prompt_key: "core.test",
+      variables: { x: 1 },
+    });
+
+    expect(res.invocation_id).toBe("inv-1");
+    expect(res.model_used).toBe("echo-v1");
+    expect(calls).toHaveLength(1);
+    expect(calls[0]!.url).toBe("http://gw.local/v1/invoke");
+    const headers = calls[0]!.init.headers as Headers;
+    expect(headers.get("Authorization")).toBe("Bearer lngw_test");
+    expect(headers.get("X-Platform-Id")).toBe("logic-nexus-ai");
+    expect(headers.get("Content-Type")).toBe("application/json");
+    const body = JSON.parse(calls[0]!.init.body as string);
+    expect(body.prompt_key).toBe("core.test");
+  });
+
+  it("throws LlmGatewayError carrying code + status + request_id on non-2xx", async () => {
+    const client = new LlmClient({
+      gatewayUrl: "http://gw.local",
+      fetch: buildFakeFetch(() => ({
+        status: 401,
+        body: {
+          error: { code: "UNAUTHORIZED", message: "missing token", request_id: "req-42" },
+        },
+      })),
+    });
+
+    let caught: unknown;
+    try {
+      await client.invoke({
+        tenant_id: "t1", module: "core", feature: "f", prompt_key: "core.f", variables: {},
+      });
+    } catch (err) {
+      caught = err;
+    }
+    expect(caught).toBeInstanceOf(LlmGatewayError);
+    const e = caught as LlmGatewayError;
+    expect(e.code).toBe("UNAUTHORIZED");
+    expect(e.status).toBe(401);
+    expect(e.request_id).toBe("req-42");
+  });
+
+  it("trims trailing slash from gatewayUrl", async () => {
+    const calls: string[] = [];
+    const client = new LlmClient({
+      gatewayUrl: "http://gw.local///",
+      fetch: buildFakeFetch((url) => {
+        calls.push(url);
+        return { status: 200, body: {
+          invocation_id: "i", output: null, cache_hit: false, model_used: "m",
+          provider_kind: "echo", usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+          cost_usd: 0, latency_ms: 1,
+        } };
+      }),
+    });
+    await client.invoke({ tenant_id: "t", module: "core", feature: "f", prompt_key: "k", variables: {} });
+    expect(calls[0]).toBe("http://gw.local/v1/invoke");
+  });
+});
+
+describe("Module-singleton invoke() / configure()", () => {
+  beforeEach(() => _resetSingletonForTesting());
+
+  it("invoke() goes through the configured singleton", async () => {
+    configure({
+      gatewayUrl: "http://gw.local",
+      serviceToken: "tok",
+      fetch: buildFakeFetch(() => ({
+        status: 200,
+        body: {
+          invocation_id: "singleton-inv", output: null, cache_hit: false, model_used: "m",
+          provider_kind: "echo", usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+          cost_usd: 0, latency_ms: 1,
+        },
+      })),
+    });
+    const res = await invoke({
+      tenant_id: "t", module: "core", feature: "f", prompt_key: "k", variables: {},
+    });
+    expect(res.invocation_id).toBe("singleton-inv");
+  });
+
+  it("recordOutcome() swallows 404 (endpoint not yet implemented gateway-side)", async () => {
+    configure({
+      gatewayUrl: "http://gw.local",
+      fetch: buildFakeFetch(() => ({
+        status: 404,
+        body: { error: { code: "INVALID_REQUEST", message: "no such route", request_id: "r" } },
+      })),
+    });
+    // Must not throw
+    await expect(recordOutcome("inv1", { kind: "ignored" })).resolves.toBeUndefined();
+  });
+
+  it("recordOutcome() rethrows non-404/503 errors", async () => {
+    configure({
+      gatewayUrl: "http://gw.local",
+      fetch: buildFakeFetch(() => ({
+        status: 500,
+        body: { error: { code: "INTERNAL", message: "boom" } },
+      })),
+    });
+    await expect(recordOutcome("inv1", { kind: "ignored" })).rejects.toBeInstanceOf(LlmGatewayError);
   });
 });
 
