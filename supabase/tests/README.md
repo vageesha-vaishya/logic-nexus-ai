@@ -26,7 +26,7 @@ DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supab
 Harness exits 0 if every test passes, 1 if any fails. Pass it through CI
 to catch regressions on schema/trigger/RPC changes.
 
-## Suite manifest (25 tests)
+## Suite manifest (27 tests)
 
 | File | Slice | Verifies |
 |---|---|---|
@@ -55,6 +55,8 @@ to catch regressions on schema/trigger/RPC changes.
 | `gateway_tenant_pii_policy.sql` | LLM Gateway P2.4 | tenant_pii_policy table + RLS + defaults (strict / 6 redact_kinds / preserve_mapping) + policy_kind CHECK + pass_through_requires_consent CHECK enforces consent timestamp |
 | `gateway_prompts.sql` | LLM Gateway P3.1 | prompts + prompt_versions tables + RLS + upsert_prompt_version RPC creates+bumps version+flips active; promote=false keeps prior active; safety_class CHECK rejects unknown |
 | `gateway_prompt_experiments.sql` | LLM Gateway P3.3 | prompt_experiments table + variants_differ CHECK + traffic_split [0,1] CHECK + partial-unique-active index (only one active per prompt_key; paused/completed can coexist) |
+| `gateway_outcomes.sql` | LLM Gateway P3.4 | outcomes table + llm_invocations new experiment columns + kind/variant_label/source CHECKs + append-only trigger on outcomes |
+| `gateway_experiment_evaluation.sql` | LLM Gateway P3.5 | evaluate_experiment RPC zero-counts on fresh experiment + latest-per-invocation aggregation + promote_experiment_winner flips active_version, supersedes prior, completes experiment + rejects unknown winner |
 
 ## Authoring conventions
 
