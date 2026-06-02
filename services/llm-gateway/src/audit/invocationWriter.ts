@@ -148,6 +148,7 @@ export function buildAuditPayload(args: {
   experiment_id?: string | null;
   variant_label?: 'a' | 'b' | null;
   prompt_version_id?: string | null;
+  trace_id?: string | null;
 }): InvocationAuditPayload {
   return {
     id: args.invocation_id,
@@ -173,7 +174,7 @@ export function buildAuditPayload(args: {
     latency_ms: args.latency_ms,
     warnings: args.warnings ?? null,
     parent_invocation_id: null,             // P3+ when agent chains land
-    trace_id: null,                          // P10 with OpenTelemetry
+    trace_id: args.trace_id ?? null,         // §10 W3C trace propagation
     experiment_id: args.experiment_id ?? null,
     variant_label: args.variant_label ?? null,
     prompt_version_id: args.prompt_version_id ?? null,

@@ -27,8 +27,10 @@ export function createApp(): Express {
         'X-Tenant-Id',
         'X-Correlation-Id',
         'Idempotency-Key',
+        'traceparent',
+        'tracestate',
       ],
-      exposedHeaders: ['x-correlation-id', 'x-request-id'],
+      exposedHeaders: ['x-correlation-id', 'x-request-id', 'x-trace-id'],
     }),
   );
 

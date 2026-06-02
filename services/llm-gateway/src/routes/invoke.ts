@@ -389,6 +389,7 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
 
     logger.info('invoke completed', {
       request_id: requestId,
+      trace_id: req.traceId,
       invocation_id,
       tenant_id: parsed.tenant_id,
       prompt_key: parsed.prompt_key,
@@ -435,6 +436,7 @@ invokeRouter.post('/invoke', requireScope('invoke', getAuthLookup), async (req: 
         experiment_id,
         variant_label,
         prompt_version_id,
+        trace_id: req.traceId,
       }),
     );
   } catch (err) {
