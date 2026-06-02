@@ -194,6 +194,8 @@ const DataManagement = lazy(() => import("./pages/dashboard/DataManagement"));
 const ServiceTypeMappings = lazy(() => import("./pages/dashboard/ServiceTypeMappings"));
 const ServiceTypes = lazy(() => import("./pages/dashboard/ServiceTypes"));
 const RestrictedPartyScreening = lazy(() => import("./features/module-compliance").then((module) => ({ default: module.RestrictedPartyScreeningVerticalPage })));
+const ComplianceOfficerInbox = lazy(() => import("./pages/dashboard/ComplianceOfficerInbox"));
+const ComplianceScreeningDetail = lazy(() => import("./pages/dashboard/ComplianceScreeningDetail"));
 const TransportModes = lazy(() => import("./pages/dashboard/TransportModes"));
 const Services = lazy(() => import("./pages/dashboard/Services"));
 const Currencies = lazy(() => import("./pages/dashboard/Currencies"));
@@ -1154,6 +1156,8 @@ const App = () => (
              <Route path="/dashboard/service-types" element={<ProtectedRoute><ServiceTypes /></ProtectedRoute>} />
              <Route path="/dashboard/transport-modes" element={<ProtectedRoute><TransportModes /></ProtectedRoute>} />
              <Route path="/dashboard/restricted-party-screening" element={<ProtectedRoute><RestrictedPartyScreening /></ProtectedRoute>} />
+             <Route path="/dashboard/compliance/officer" element={<ProtectedRoute requiredPermissions={["compliance.officer.view"]}><ComplianceOfficerInbox /></ProtectedRoute>} />
+             <Route path="/dashboard/compliance/screenings/:id" element={<ProtectedRoute requiredPermissions={["compliance.officer.view"]}><ComplianceScreeningDetail /></ProtectedRoute>} />
              <Route path="/dashboard/services" element={<ProtectedRoute><Services /></ProtectedRoute>} />
              <Route path="/dashboard/service-type-mappings" element={<ProtectedRoute><ServiceTypeMappings /></ProtectedRoute>} />
             {/* Subscription & Billing Routes */}
