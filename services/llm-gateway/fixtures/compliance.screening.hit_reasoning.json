@@ -1,0 +1,11 @@
+{
+  "output": {
+    "verdict": "false_positive",
+    "confidence": 0.92,
+    "reasoning": "Replay fixture: name match is a coincidence; party is incorporated in a different jurisdiction than the OFAC-listed entity with the same name."
+  },
+  "model_used": "claude-opus-4-7",
+  "usage": { "prompt_tokens": 412, "completion_tokens": 87, "total_tokens": 499 },
+  "cost_usd": 0.0073,
+  "warnings": []
+}

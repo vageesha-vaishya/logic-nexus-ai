@@ -1,0 +1,10 @@
+{
+  "output": {
+    "kind": "replay",
+    "message": "this is the default replay fixture; create per-prompt fixtures alongside it"
+  },
+  "model_used": "replay-v1",
+  "usage": { "prompt_tokens": 10, "completion_tokens": 20, "total_tokens": 30 },
+  "cost_usd": 0,
+  "warnings": ["default_fixture_used"]
+}

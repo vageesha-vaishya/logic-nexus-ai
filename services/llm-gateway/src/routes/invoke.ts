@@ -17,10 +17,25 @@ import type {
   InvokeRequest,
   InvokeResponse,
   ProviderContext,
-  ProviderKind,
 } from '../types/gateway.types.js';
+import { resolveProvider as cascadeResolve } from '../resolver/cascade.js';
+import { ResolverError } from '../resolver/errors.js';
+import { buildInMemoryStores } from '../resolver/inMemoryStores.js';
+import type { CallContext, ResolverStores } from '../resolver/types.js';
 
 export const invokeRouter = Router();
+
+// Module-singleton resolver stores. P2 swaps this for DB-backed stores.
+let resolverStores: ResolverStores | null = null;
+function getResolverStores(): ResolverStores {
+  if (!resolverStores) resolverStores = buildInMemoryStores();
+  return resolverStores;
+}
+
+/** Test helper: inject custom stores. Production code never calls this. */
+export function setResolverStoresForTesting(stores: ResolverStores | null): void {
+  resolverStores = stores;
+}
 
 function asString(value: unknown): string | null {
   return typeof value === 'string' && value.length > 0 ? value : null;
@@ -72,10 +87,21 @@ function validateInvokeRequest(raw: unknown): InvokeRequest {
   };
 }
 
-// P0 provider resolution: trivial. Hardcoded to echo unless options.provider_override
-// is set (and only echo is registered). P1 replaces this with the 6-layer cascade.
-function resolveProviderKind(req: InvokeRequest): ProviderKind {
-  return req.options?.provider_override ?? 'echo';
+function readCallContext(req: Request): CallContext {
+  return {
+    user_id: (req.header('x-user-id') ?? undefined) as string | undefined,
+    franchisee_id: (req.header('x-franchisee-id') ?? undefined) as string | undefined,
+    domain_id: (req.header('x-domain-id') ?? undefined) as string | undefined,
+    tenant_residency: (req.header('x-tenant-residency') ?? undefined) as string | undefined,
+  };
+}
+
+function mapResolverError(err: ResolverError): GatewayError {
+  const status =
+    err.code === 'EGRESS_FORBIDDEN' || err.code === 'MODEL_CAPABILITY_MISMATCH' ? 422 :
+    err.code === 'PROVIDER_NOT_CONFIGURED' ? 503 :
+    500;
+  return new GatewayError(err.code, err.message, status, err.details);
 }
 
 invokeRouter.post('/invoke', async (req: Request, res: Response, next: NextFunction) => {
@@ -87,12 +113,22 @@ invokeRouter.post('/invoke', async (req: Request, res: Response, next: NextFunct
     const requestId = req.requestId;
 
     const parsed = validateInvokeRequest(req.body);
-    const providerKind = resolveProviderKind(parsed);
-    const provider = resolveProvider(providerKind);
+    const callCtx = readCallContext(req);
+
+    // ── 6-layer cascade resolution ──
+    let resolved;
+    try {
+      resolved = await cascadeResolve(parsed, callCtx, getResolverStores());
+    } catch (err) {
+      if (err instanceof ResolverError) throw mapResolverError(err);
+      throw err;
+    }
+
+    const provider = resolveProvider(resolved.provider_kind);
 
     const ctx: ProviderContext = {
       invocation_id,
-      model_id: parsed.options?.model_override ?? '',
+      model_id: resolved.model_id,
       started_at: startedAt,
       request_id: requestId,
     };
@@ -104,8 +140,8 @@ invokeRouter.post('/invoke', async (req: Request, res: Response, next: NextFunct
       invocation_id,
       output: result.output,
       cache_hit: false,
-      model_used: result.model_used,
-      provider_kind: providerKind,
+      model_used: result.model_used || resolved.model_id,
+      provider_kind: resolved.provider_kind,
       usage: result.usage,
       cost_usd: result.cost_usd,
       latency_ms,
@@ -118,8 +154,10 @@ invokeRouter.post('/invoke', async (req: Request, res: Response, next: NextFunct
       invocation_id,
       tenant_id: parsed.tenant_id,
       prompt_key: parsed.prompt_key,
-      provider_kind: providerKind,
-      model_used: result.model_used,
+      provider_kind: resolved.provider_kind,
+      resolved_scope_kind: resolved.resolved_scope_kind,
+      resolved_scope_id: resolved.resolved_scope_id,
+      model_used: body.model_used,
       latency_ms,
     });
 
