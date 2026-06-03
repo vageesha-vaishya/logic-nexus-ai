@@ -17,6 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
 import integrationsRoutes from './routes/integrations.routes.js';
 import dlqRoutes from './routes/dlq.routes.js';
+import outboxRoutes from './routes/outbox.routes.js';
 import inventoryItemsRoutes from './routes/inventory-items.routes.js';
 import connectorManifestsRoutes from './routes/connector-manifests.routes.js';
 import projectionsRoutes from './routes/projections.routes.js';
@@ -119,6 +120,7 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'PATCH  /api/v1/uim/integrations/:id',
       'DELETE /api/v1/uim/integrations/:id',
       'POST   /api/v1/uim/dlq/process  (platform_admin)',
+      'POST   /api/v1/uim/outbox/dispatch  (platform_admin)',
       'GET    /api/v1/uim/inventory-items',
       'GET    /api/v1/uim/inventory-items/:id',
       'GET    /api/v1/uim/connectors/manifests',
@@ -195,6 +197,7 @@ function auditApiRequest(req: Request, res: Response, next: NextFunction): void 
 
 app.use('/api', authMiddleware, auditApiRequest, integrationsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, dlqRoutes);
+app.use('/api', authMiddleware, auditApiRequest, outboxRoutes);
 app.use('/api', authMiddleware, auditApiRequest, inventoryItemsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, connectorManifestsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, projectionsRoutes);

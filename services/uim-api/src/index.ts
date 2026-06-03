@@ -65,8 +65,58 @@ async function startDlqPoller(): Promise<void> {
   setInterval(() => { void tick(); }, intervalMs).unref();
 }
 
+async function startOutboxPoller(): Promise<void> {
+  const raw = process.env.UIM_OUTBOX_POLL_INTERVAL_SEC;
+  const intervalSec = raw ? Number(raw) : 0;
+  if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+    // eslint-disable-next-line no-console
+    console.log('[uim-api] outbox poller disabled (set UIM_OUTBOX_POLL_INTERVAL_SEC to enable)');
+    return;
+  }
+  const intervalMs = Math.max(5, intervalSec) * 1000;
+  const { createClient } = await import('@supabase/supabase-js');
+  const { runOutboxDispatchTick } = await import('./services/webhook-outbox.js');
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    // eslint-disable-next-line no-console
+    console.log('[uim-api] outbox poller wanted but SUPABASE_URL/SERVICE_ROLE_KEY missing — skipping');
+    return;
+  }
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  // eslint-disable-next-line no-console
+  console.log(`[uim-api] outbox poller enabled every ${intervalMs / 1000}s`);
+
+  let running = false;
+  const tick = async (): Promise<void> => {
+    if (running) return;
+    running = true;
+    try {
+      const result = await runOutboxDispatchTick({ supabase });
+      if (result.scanned > 0 || result.errors.length > 0) {
+        // eslint-disable-next-line no-console
+        console.log('[uim-api] outbox tick', {
+          scanned: result.scanned,
+          delivered: result.delivered,
+          retired_permanent: result.retired_permanent,
+          escalated_to_dlq: result.escalated_to_dlq,
+          retried_in_outbox: result.retried_in_outbox,
+          errors: result.errors.length,
+        });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[uim-api] outbox tick crashed', err instanceof Error ? err.message : String(err));
+    } finally {
+      running = false;
+    }
+  };
+  setInterval(() => { void tick(); }, intervalMs).unref();
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`[uim-api] listening on :${PORT}`);
   void startDlqPoller();
+  void startOutboxPoller();
 });

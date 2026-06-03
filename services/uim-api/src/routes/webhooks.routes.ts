@@ -20,6 +20,7 @@ import { AuthRequest } from '../middleware/auth.middleware.js';
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { logger } from '../utils/logger.js';
 import type { ErrorResponse } from '../types/uim.types.js';
+import { enqueueWebhookEvent, runOutboxDispatchTick } from '../services/webhook-outbox.js';
 
 const router = Router();
 
@@ -174,15 +175,27 @@ router.post(
       }
 
       if (action === 'dispatch-event' || action === 'dispatch') {
-        // Producing webhook deliveries requires an outbox surface
-        // (e.g. uim.webhook_outbox) that doesn't exist yet — the
-        // Step 6 DLQ processor only retries pre-existing failed rows.
-        // A follow-up slice adds the outbox + dispatcher.
-        return res.status(501).json({
-          error: 'dispatch-event not yet implemented — requires uim.webhook_outbox + dispatcher (follow-up slice)',
-          code: 'NOT_IMPLEMENTED',
-          statusCode: 501,
-        } as ErrorResponse);
+        const eventType = typeof body.event_type === 'string' ? body.event_type.trim() : '';
+        if (!eventType) return bad(res, 'event_type required');
+        const payload = body.payload && typeof body.payload === 'object'
+          ? (body.payload as Record<string, unknown>)
+          : {};
+        const subscriptionId = typeof body.subscription_id === 'string' ? body.subscription_id.trim() : undefined;
+        if (subscriptionId && !UUID_RE.test(subscriptionId)) {
+          return bad(res, 'subscription_id must be uuid');
+        }
+        const result = await enqueueWebhookEvent({
+          supabase,
+          tenantId: authReq.tenantId,
+          eventType,
+          payload,
+          subscriptionId,
+        });
+        return res.status(202).json({
+          action: 'dispatch-event',
+          event_type: eventType,
+          ...result,
+        });
       }
 
       return bad(res, 'unsupported action — try register / deactivate / set-status');
