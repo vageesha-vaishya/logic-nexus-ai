@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useDomain } from '@/contexts/DomainContext';
 import { useAmroApiAvailability } from './useAmroApiAvailability';
+import { useAmroHoldAuditTrail } from './useAmroHoldAuditTrail';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -104,17 +105,21 @@ export function useAmroWorkspaceState() {
   const [workOrderSearch, setWorkOrderSearch] = useState<string>('');
   const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id);
   const [savedWorkOrderViews, setSavedWorkOrderViews] = useState<V2SavedWorkOrderView[]>([DEFAULT_WORK_PACKAGE_SAVED_VIEW]);
-  const [holdReleaseStatusByWorkOrder, setHoldReleaseStatusByWorkOrder] = useState<Record<string, WorkOrderStatus>>({});
-  const [softDeletedWorkOrderStatusById, setSoftDeletedWorkOrderStatusById] = useState<Record<string, WorkOrderStatus>>({});
-  const [holdAuditTrail, setHoldAuditTrail] = useState<Array<{
-    workOrderId: string;
-    packageNumber: string;
-    action: 'hold' | 'release';
-    fromStatus: WorkOrderStatus;
-    toStatus: WorkOrderStatus;
-    actorRole: string;
-    occurredAt: string;
-  }>>([]);
+  // Phase 8f.2: hold + soft-delete tracking maps + audit trail extracted to
+  // useAmroHoldAuditTrail. The orchestrator's toggleWorkOrderHold,
+  // softDeleteWorkOrder, restoreSoftDeletedWorkOrder callbacks call the
+  // helpers below (the callbacks themselves stay here because they reach
+  // into work-orders state — extracted in slice 8f.next).
+  const {
+    holdReleaseStatusByWorkOrder,
+    softDeletedWorkOrderStatusById,
+    holdAuditTrail,
+    rememberPreHoldStatus,
+    forgetPreHoldStatus,
+    rememberPreSoftDeleteStatus,
+    forgetPreSoftDeleteStatus,
+    appendHoldAuditEntry,
+  } = useAmroHoldAuditTrail();
   const [realtimeConnected, setRealtimeConnected] = useState<boolean>(false);
   const [requiredAuthority, setRequiredAuthority] = useState<AmroAuthorityLevel>('supervisor');
   const [selectedQualificationId, setSelectedQualificationId] = useState<string>(initialQualifications[0]?.id ?? '');
@@ -1727,30 +1732,20 @@ export function useAmroWorkspaceState() {
       const ok = await updateWorkOrderStatusById(targetWorkOrder.id, nextStatus);
       if (!ok) return false;
       if (workOrderStatus === 'blocked') {
-        setHoldReleaseStatusByWorkOrder((current) => {
-          const next = { ...current };
-          delete next[targetWorkOrder.id];
-          return next;
-        });
+        forgetPreHoldStatus(targetWorkOrder.id);
       } else {
-        setHoldReleaseStatusByWorkOrder((current) => ({
-          ...current,
-          [targetWorkOrder.id]: workOrderStatus,
-        }));
+        rememberPreHoldStatus(targetWorkOrder.id, workOrderStatus);
       }
       const occurredAt = new Date().toISOString();
-      setHoldAuditTrail((current) => [
-        {
-          workOrderId: targetWorkOrder.id,
-          packageNumber: targetWorkOrder.packageNumber,
-          action: workOrderStatus === 'blocked' ? 'release' : 'hold',
-          fromStatus: workOrderStatus,
-          toStatus: nextStatus,
-          actorRole: activeRole,
-          occurredAt,
-        },
-        ...current,
-      ]);
+      appendHoldAuditEntry({
+        workOrderId: targetWorkOrder.id,
+        packageNumber: targetWorkOrder.packageNumber,
+        action: workOrderStatus === 'blocked' ? 'release' : 'hold',
+        fromStatus: workOrderStatus,
+        toStatus: nextStatus,
+        actorRole: activeRole,
+        occurredAt,
+      });
       if (typeof window !== 'undefined') {
         window.dispatchEvent(new CustomEvent('amro:work-order-hold-audit', {
           detail: {
@@ -1768,7 +1763,9 @@ export function useAmroWorkspaceState() {
     },
     [
       activeRole,
-      holdReleaseStatusByWorkOrder,
+      appendHoldAuditEntry,
+      forgetPreHoldStatus,
+      rememberPreHoldStatus,
       selectedWorkOrder,
       updateWorkOrderStatusById,
       workOrders,
@@ -1784,13 +1781,10 @@ export function useAmroWorkspaceState() {
       const previousStatus = mapLifecycleToStatus(targetWorkOrder.lifecycleStage) as WorkOrderStatus;
       const ok = await updateWorkOrderStatusById(targetWorkOrder.id, 'cancelled');
       if (!ok) return false;
-      setSoftDeletedWorkOrderStatusById((current) => ({
-        ...current,
-        [targetWorkOrder.id]: previousStatus,
-      }));
+      rememberPreSoftDeleteStatus(targetWorkOrder.id, previousStatus);
       return true;
     },
-    [selectedWorkOrder, updateWorkOrderStatusById, workOrders],
+    [rememberPreSoftDeleteStatus, selectedWorkOrder, updateWorkOrderStatusById, workOrders],
   );
 
   const restoreSoftDeletedWorkOrder = useCallback(
@@ -1798,14 +1792,10 @@ export function useAmroWorkspaceState() {
       const restoreStatus = softDeletedWorkOrderStatusById[workOrderId] || 'planning';
       const ok = await updateWorkOrderStatusById(workOrderId, restoreStatus);
       if (!ok) return false;
-      setSoftDeletedWorkOrderStatusById((current) => {
-        const next = { ...current };
-        delete next[workOrderId];
-        return next;
-      });
+      forgetPreSoftDeleteStatus(workOrderId);
       return true;
     },
-    [softDeletedWorkOrderStatusById, updateWorkOrderStatusById],
+    [forgetPreSoftDeleteStatus, softDeletedWorkOrderStatusById, updateWorkOrderStatusById],
   );
 
   const openWorkOrderDetails = useCallback(
