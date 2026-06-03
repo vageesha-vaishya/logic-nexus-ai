@@ -348,6 +348,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Quotation Engine', path: '/dashboard/settings/quotations', icon: FileCheck, description: 'Configure default module & smart mode', roles: ['platform_admin'] },
       { name: 'Feature Flags', path: '/dashboard/settings/feature-flags', icon: Flag, description: 'Control feature availability across tenants', roles: ['platform_admin'] },
       { name: 'LLM Gateway', path: '/dashboard/admin/llm-gateway', icon: Sparkles, description: 'Browse prompts, experiments, and recent LLM invocations', roles: ['platform_admin'] },
+      { name: 'WhatsApp opt-ins', path: '/dashboard/admin/whatsapp-phones', icon: MessageSquare, description: 'Toggle whatsapp_capable per phone or bulk-enable per tenant', roles: ['platform_admin'] },
       { name: 'Audit Logs', path: '/dashboard/audit-logs', icon: FileText, description: 'View system audit logs', roles: ['platform_admin', 'tenant_admin'] },
       { name: 'UI Forms Demo', path: '/dashboard/ui-forms-demo', icon: FileText, description: 'Phase 1–2 form patterns', roles: ['platform_admin'] },
       { name: 'UI Advanced Demo', path: '/dashboard/ui-advanced-demo', icon: FileCheck, description: 'Phase 3–5 advanced fields', roles: ['platform_admin'] },

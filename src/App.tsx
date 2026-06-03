@@ -192,6 +192,7 @@ const QuoteNumberSettings = lazy(() => import("./pages/dashboard/QuoteNumberSett
 const QuotationSettings = lazy(() => import("./pages/dashboard/QuotationSettings"));
 const DataManagement = lazy(() => import("./pages/dashboard/DataManagement"));
 const LlmGatewayAdminPage = lazy(() => import("./pages/dashboard/admin/LlmGatewayAdminPage"));
+const WhatsappPhonesPage = lazy(() => import("./pages/dashboard/admin/WhatsappPhonesPage"));
 const ServiceTypeMappings = lazy(() => import("./pages/dashboard/ServiceTypeMappings"));
 const ServiceTypes = lazy(() => import("./pages/dashboard/ServiceTypes"));
 const RestrictedPartyScreening = lazy(() => import("./features/module-compliance").then((module) => ({ default: module.RestrictedPartyScreeningVerticalPage })));
@@ -1022,6 +1023,10 @@ const App = () => (
             <Route
               path="/dashboard/admin/llm-gateway"
               element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><LlmGatewayAdminPage /></ProtectedRoute>}
+            />
+            <Route
+              path="/dashboard/admin/whatsapp-phones"
+              element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><WhatsappPhonesPage /></ProtectedRoute>}
             />
             <Route 
               path="/dashboard/settings/domains" 

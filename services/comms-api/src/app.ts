@@ -103,7 +103,9 @@ app.get('/comms/v1/_status', (_req: Request, res: Response) => {
       'GET  /api/v1/comms/deliveries',
       'GET  /api/v1/comms/notifications/:id/deliveries',
       'POST /api/comms/webhooks/resend  (Svix-signed, no auth)',
-      'POST /api/v1/admin/phones/whatsapp-bulk-enable  (platform_admin)',
+      'POST  /api/v1/admin/phones/whatsapp-bulk-enable  (platform_admin)',
+      'GET   /api/v1/admin/phones?tenant_id=&capable=    (platform_admin)',
+      'PATCH /api/v1/admin/phones/:id                    (platform_admin)',
     ],
     consumers: [
       'notification-dispatcher (polls core.notifications, fans out into comms.deliveries via UNIQUE intent dedup index)',
