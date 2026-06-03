@@ -248,6 +248,27 @@ Each slice is independently shippable + reversible. Estimated total wall-clock: 
 
 ---
 
-## 10. Next action
+## 10a. Post-design audit finding (2026-06-03)
+
+**The `amro.*` schema already contained 39 tables in production** when this design was written — the original audit only inspected `public.amro_*`. Relevant pre-existing tables:
+
+| Table | Cols | Rows | Overlaps with |
+|---|---|---|---|
+| `amro.part_profiles` | 18 | 0 | proposed `item_aviation_metadata` + parts of `item_life_limit_tracking` (has ata_chapter, life_limited, life_limit_hours/cycles/months, calibration_required, calibration_interval_hours/months, requires_airworthiness_release) |
+| `amro.inventory_extensions` | 21 | 0 | proposed `item_aviation_metadata` (hazmat_class, un_number, shelf_life_days + trade compliance: hs_code, ecn_eccn, country_of_origin, plus storage temp/humidity/ESD/light sensitive) |
+| `amro.calibration_logs` | 19 | 0 | proposed `item_calibration_intervals` — but `calibration_logs` is a per-event log; the schedule (`next_calibration_due`, `calibration_interval_days`) lives on `part_profiles` |
+| `amro.tool_maintenance_history` | 13 | 0 | adjacent to life-limit tracking for tools |
+
+**Decision**: use the existing tables. Slice 9a executed as:
+- DROP TABLE the 3 proposed new tables (all empty; no data loss).
+- ADD COLUMN `currency text` to `amro.part_profiles` per Q1.
+
+**Implication for slices 9b-9j**: every reference to the proposed extension tables in §4-§6 above should be re-targeted to the existing tables. Full column-by-column reconciliation is a follow-up audit; see commit history for the rollback.
+
+The §4 proposed schema is preserved as the conceptual model — it cleanly separates catalog-level vs inventory-level vs tool-specific extension data. The implementation just lives in the existing 4 tables rather than 3 new ones.
+
+---
+
+## 11. Next action
 
 **Schedule sync with AMRO domain owner.** Do not ship implementation slices (9a-9j) until §7 open questions are answered. This doc is the conversation starter, not the plan of record.
