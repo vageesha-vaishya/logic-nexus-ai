@@ -30,6 +30,8 @@ import { getEmailProvider } from '../providers/email-provider.js';
 import type { EmailProvider, OutboundEmail, SendResult } from '../providers/email-provider.js';
 import { getSmsProvider } from '../providers/sms-provider.js';
 import type { SmsProvider, OutboundSms, SmsSendResult } from '../providers/sms-provider.js';
+import { getWhatsappProvider } from '../providers/whatsapp-provider.js';
+import type { WhatsappProvider, OutboundWhatsapp, WhatsappSendResult } from '../providers/whatsapp-provider.js';
 import { isSuppressed } from './suppressions.js';
 import { TemplateRenderer } from './template-renderer.js';
 import { logger } from '../utils/logger.js';
@@ -39,11 +41,11 @@ const POLL_INTERVAL_MS = parseInt(process.env.COMMS_WORKER_POLL_INTERVAL_MS || '
 const BATCH_SIZE = parseInt(process.env.COMMS_WORKER_BATCH_SIZE || '20', 10);
 const FROM_ADDRESS = process.env.COMMS_DEFAULT_FROM || 'SOS Logistics <notifications@sosservices.online>';
 const SMS_FROM_NUMBER = process.env.COMMS_SMS_DEFAULT_FROM || '';
+const WHATSAPP_FROM_NUMBER = process.env.COMMS_WHATSAPP_DEFAULT_FROM || '';
 const PUBLIC_BASE_URL = (process.env.COMMS_PUBLIC_BASE_URL || 'https://sosservices.online').replace(/\/$/, '');
-// Channels the worker picks up on each tick. SMS rides alongside email
-// once channel routing is in. Other channels (whatsapp, push, in_app)
-// stay 'pending' until their providers + render paths ship.
-const ACTIVE_CHANNELS: ReadonlyArray<string> = ['email', 'sms'];
+// Channels the worker picks up on each tick. push + in_app stay
+// 'pending' until their providers + render paths ship.
+const ACTIVE_CHANNELS: ReadonlyArray<string> = ['email', 'sms', 'whatsapp'];
 
 interface DeliveryWithIntent extends DeliveryRow {
   intent?: NotificationIntent | null;
@@ -53,6 +55,7 @@ export class DeliveryWorker {
   private supabase: SupabaseClient | null = null;
   private emailProvider: EmailProvider | null = null;
   private smsProvider: SmsProvider | null = null;
+  private whatsappProvider: WhatsappProvider | null = null;
   private templateRenderer: TemplateRenderer | null = null;
   private running = false;
   private intervalHandle: NodeJS.Timeout | null = null;
@@ -67,12 +70,14 @@ export class DeliveryWorker {
     this.supabase = createClient(url, key);
     this.emailProvider = getEmailProvider();
     this.smsProvider = getSmsProvider();
+    this.whatsappProvider = getWhatsappProvider();
     this.templateRenderer = new TemplateRenderer(this.supabase);
     logger.info('comms delivery worker starting', {
       pollMs: POLL_INTERVAL_MS,
       batch: BATCH_SIZE,
       emailProvider: this.emailProvider.name,
       smsProvider: this.smsProvider.name,
+      whatsappProvider: this.whatsappProvider.name,
     });
     this.intervalHandle = setInterval(() => {
       void this.tick();
@@ -145,7 +150,7 @@ export class DeliveryWorker {
   }
 
   private async processDelivery(delivery: DeliveryWithIntent): Promise<void> {
-    if (!this.supabase || !this.emailProvider || !this.smsProvider) return;
+    if (!this.supabase || !this.emailProvider || !this.smsProvider || !this.whatsappProvider) return;
     const channel = delivery.channel_kind as ChannelKind;
     if (!ACTIVE_CHANNELS.includes(channel)) return;
 
@@ -185,7 +190,7 @@ export class DeliveryWorker {
     // 3. Send. Route per channel — each provider returns the same
     //    {ok, providerMessageId?, errorText?, providerName, permanent?}
     //    shape so the retry/failure handling below is channel-agnostic.
-    let result: SendResult | SmsSendResult;
+    let result: SendResult | SmsSendResult | WhatsappSendResult;
     if (channel === 'sms') {
       const sms: OutboundSms = {
         tenantId: delivery.tenant_id,
@@ -197,6 +202,18 @@ export class DeliveryWorker {
         text: rendered.text || rendered.subject + (rendered.html ? '\n' + stripHtml(rendered.html) : ''),
       };
       result = await this.smsProvider.send(sms);
+    } else if (channel === 'whatsapp') {
+      // Same body-derivation as SMS — WhatsApp session messages don't
+      // render HTML. Template-initiated messages will set
+      // templateName/templateVariables via the payload; today we
+      // only ship the session-text path.
+      const wa: OutboundWhatsapp = {
+        tenantId: delivery.tenant_id,
+        from: WHATSAPP_FROM_NUMBER,
+        to: address,
+        text: rendered.text || rendered.subject + (rendered.html ? '\n' + stripHtml(rendered.html) : ''),
+      };
+      result = await this.whatsappProvider.send(wa);
     } else {
       const email: OutboundEmail = {
         tenantId: delivery.tenant_id,
