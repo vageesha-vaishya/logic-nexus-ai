@@ -15,6 +15,20 @@ import type { ErrorResponse } from '../types/uim.types.js';
 
 const router = Router();
 
+const KIND_VALUES = new Set([
+  'broker','market_data','llm','payment','email','sms','push',
+  'webhook','sso','storage','analytics','other',
+]);
+const LIFECYCLE_VALUES = new Set(['draft','active','suspended','terminated']);
+const RISK_CLASS_VALUES = new Set(['critical','high','medium','low']);
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function badRequest(res: Response, message: string, code = 'INVALID_REQUEST'): void {
+  res.status(400).json({
+    error: message, code, statusCode: 400,
+  } as ErrorResponse);
+}
+
 function unauthorized(res: Response): void {
   res.status(401).json({
     error: 'Authentication required',
@@ -97,6 +111,219 @@ router.get(
       return res.status(500).json({
         error: err instanceof Error ? err.message : 'Failed to fetch integration',
         code: 'UIM_FETCH_ERROR',
+        statusCode: 500,
+      } as ErrorResponse);
+    }
+  }),
+);
+
+// POST /v1/uim/integrations — create
+// Writes go to platform.integrations (still authoritative). The
+// Step 2 dual-write trigger mirrors into uim.integrations
+// automatically. We return the freshly-created row from uim.* so
+// the caller can confirm the mirror landed in one round-trip.
+router.post(
+  '/v1/uim/integrations',
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    if (!authReq.userId || !authReq.tenantId) return unauthorized(res);
+    const body = (req.body ?? {}) as Record<string, unknown>;
+
+    const kind = typeof body.kind === 'string' ? body.kind.trim() : '';
+    const name = typeof body.name === 'string' ? body.name.trim() : '';
+    const vendor = typeof body.vendor === 'string' ? body.vendor.trim() : '';
+    if (!kind || !KIND_VALUES.has(kind)) {
+      return badRequest(res, `kind must be one of: ${Array.from(KIND_VALUES).join(', ')}`);
+    }
+    if (!name) return badRequest(res, 'name required');
+    if (!vendor) return badRequest(res, 'vendor required');
+
+    const lifecycleState = typeof body.lifecycle_state === 'string'
+      ? body.lifecycle_state.trim() : 'active';
+    if (!LIFECYCLE_VALUES.has(lifecycleState)) {
+      return badRequest(res, `lifecycle_state must be one of: ${Array.from(LIFECYCLE_VALUES).join(', ')}`);
+    }
+    const vendorRiskClass = typeof body.vendor_risk_class === 'string'
+      ? body.vendor_risk_class.trim() : 'low';
+    if (!RISK_CLASS_VALUES.has(vendorRiskClass)) {
+      return badRequest(res, `vendor_risk_class must be one of: ${Array.from(RISK_CLASS_VALUES).join(', ')}`);
+    }
+    const ownerUserId = body.owner_user_id;
+    if (ownerUserId !== undefined && ownerUserId !== null && typeof ownerUserId !== 'string') {
+      return badRequest(res, 'owner_user_id must be uuid or null');
+    }
+    if (typeof ownerUserId === 'string' && !UUID_RE.test(ownerUserId)) {
+      return badRequest(res, 'owner_user_id must be uuid');
+    }
+    const scopeJson = (body.scope_json && typeof body.scope_json === 'object')
+      ? body.scope_json as Record<string, unknown> : {};
+    const metadata = (body.metadata && typeof body.metadata === 'object')
+      ? body.metadata as Record<string, unknown> : {};
+
+    try {
+      const supabase = getServiceRoleClient();
+      const { data, error } = await (supabase as any)
+        .schema('platform')
+        .from('integrations')
+        .insert({
+          tenant_id: authReq.tenantId,
+          franchise_id: authReq.franchiseId ?? null,
+          kind, name, vendor,
+          lifecycle_state: lifecycleState,
+          vendor_risk_class: vendorRiskClass,
+          owner_user_id: ownerUserId ?? null,
+          scope_json: scopeJson,
+          metadata,
+        })
+        .select('*')
+        .single();
+      if (error) throw error;
+
+      // Read back from uim.integrations to confirm the dual-write
+      // trigger landed in the same response.
+      const { data: mirror } = await (supabase as any)
+        .schema('uim')
+        .from('integrations')
+        .select('*')
+        .eq('id', (data as { id: string }).id)
+        .maybeSingle();
+
+      return res.status(201).json({
+        data,
+        mirror_ok: Boolean(mirror),
+      });
+    } catch (err) {
+      logger.error('uim.integrations create error', err);
+      return res.status(500).json({
+        error: err instanceof Error ? err.message : 'Failed to create integration',
+        code: 'UIM_CREATE_ERROR',
+        statusCode: 500,
+      } as ErrorResponse);
+    }
+  }),
+);
+
+// PATCH /v1/uim/integrations/:id — partial update
+// Mutable fields: name, vendor, scope_json, vendor_risk_class,
+// owner_user_id, lifecycle_state, metadata. kind is immutable
+// (changing it would change the constraint surface); recreate the
+// row instead.
+router.patch(
+  '/v1/uim/integrations/:id',
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    if (!authReq.userId || !authReq.tenantId) return unauthorized(res);
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) return badRequest(res, 'id (uuid) required in path');
+    const body = (req.body ?? {}) as Record<string, unknown>;
+
+    const patch: Record<string, unknown> = {};
+    if (typeof body.name === 'string') {
+      const v = body.name.trim();
+      if (!v) return badRequest(res, 'name must be non-empty');
+      patch.name = v;
+    }
+    if (typeof body.vendor === 'string') {
+      const v = body.vendor.trim();
+      if (!v) return badRequest(res, 'vendor must be non-empty');
+      patch.vendor = v;
+    }
+    if (typeof body.lifecycle_state === 'string') {
+      const v = body.lifecycle_state.trim();
+      if (!LIFECYCLE_VALUES.has(v)) {
+        return badRequest(res, `lifecycle_state must be one of: ${Array.from(LIFECYCLE_VALUES).join(', ')}`);
+      }
+      patch.lifecycle_state = v;
+    }
+    if (typeof body.vendor_risk_class === 'string') {
+      const v = body.vendor_risk_class.trim();
+      if (!RISK_CLASS_VALUES.has(v)) {
+        return badRequest(res, `vendor_risk_class must be one of: ${Array.from(RISK_CLASS_VALUES).join(', ')}`);
+      }
+      patch.vendor_risk_class = v;
+    }
+    if ('owner_user_id' in body) {
+      if (body.owner_user_id === null) patch.owner_user_id = null;
+      else if (typeof body.owner_user_id === 'string' && UUID_RE.test(body.owner_user_id)) {
+        patch.owner_user_id = body.owner_user_id;
+      } else return badRequest(res, 'owner_user_id must be uuid or null');
+    }
+    if (body.scope_json && typeof body.scope_json === 'object') {
+      patch.scope_json = body.scope_json as Record<string, unknown>;
+    }
+    if (body.metadata && typeof body.metadata === 'object') {
+      patch.metadata = body.metadata as Record<string, unknown>;
+    }
+    if (Object.keys(patch).length === 0) {
+      return badRequest(res, 'no mutable fields provided');
+    }
+    patch.updated_at = new Date().toISOString();
+
+    try {
+      const supabase = getServiceRoleClient();
+      const { data, error } = await (supabase as any)
+        .schema('platform')
+        .from('integrations')
+        .update(patch)
+        .eq('id', id)
+        .eq('tenant_id', authReq.tenantId)
+        .select('*')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        return res.status(404).json({
+          error: 'integration not found in tenant scope',
+          code: 'NOT_FOUND',
+          statusCode: 404,
+        } as ErrorResponse);
+      }
+      return res.json({ data });
+    } catch (err) {
+      logger.error('uim.integrations update error', err);
+      return res.status(500).json({
+        error: err instanceof Error ? err.message : 'Failed to update integration',
+        code: 'UIM_UPDATE_ERROR',
+        statusCode: 500,
+      } as ErrorResponse);
+    }
+  }),
+);
+
+// DELETE /v1/uim/integrations/:id — hard delete within tenant scope.
+// The Step 2 dual-write trigger handles uim.integrations
+// automatically (DELETE branch).
+router.delete(
+  '/v1/uim/integrations/:id',
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    if (!authReq.userId || !authReq.tenantId) return unauthorized(res);
+    const { id } = req.params;
+    if (!UUID_RE.test(id)) return badRequest(res, 'id (uuid) required in path');
+
+    try {
+      const supabase = getServiceRoleClient();
+      const { data, error } = await (supabase as any)
+        .schema('platform')
+        .from('integrations')
+        .delete()
+        .eq('id', id)
+        .eq('tenant_id', authReq.tenantId)
+        .select('id')
+        .maybeSingle();
+      if (error) throw error;
+      if (!data) {
+        return res.status(404).json({
+          error: 'integration not found in tenant scope',
+          code: 'NOT_FOUND',
+          statusCode: 404,
+        } as ErrorResponse);
+      }
+      return res.status(204).end();
+    } catch (err) {
+      logger.error('uim.integrations delete error', err);
+      return res.status(500).json({
+        error: err instanceof Error ? err.message : 'Failed to delete integration',
+        code: 'UIM_DELETE_ERROR',
         statusCode: 500,
       } as ErrorResponse);
     }

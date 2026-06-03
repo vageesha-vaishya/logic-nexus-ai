@@ -97,8 +97,11 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'uim.inventory_scan_events',
     ],
     routes: [
-      'GET  /api/v1/uim/integrations',
-      'GET  /api/v1/uim/integrations/:id',
+      'GET    /api/v1/uim/integrations',
+      'GET    /api/v1/uim/integrations/:id',
+      'POST   /api/v1/uim/integrations',
+      'PATCH  /api/v1/uim/integrations/:id',
+      'DELETE /api/v1/uim/integrations/:id',
     ],
     dual_writes: [
       'platform.integrations            → uim.integrations',
