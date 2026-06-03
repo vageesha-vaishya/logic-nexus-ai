@@ -57,6 +57,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { AmroModuleSurface } from '@/features/module-amro/components/parts/AmroPartsUiStandards';
 import { AmroCrudMessageBanner } from '@/features/module-amro/components/parts/AmroCrudPrimitives';
+import { ComplianceDocOcrPanel } from '@/features/module-amro/components/mpd/ComplianceDocOcrPanel';
+import type { DocumentContext } from '@/features/module-amro/hooks/useComplianceDocOcr';
 import { AmroStandardFormTemplate, type AmroTemplateFieldDefinition, type AmroTemplateSection } from '@/features/module-amro/components/templates/AmroStandardFormTemplate';
 import {
   useWorkOrder,
@@ -442,6 +444,25 @@ function TimelineTab({ wp }: { wp: WorkOrderDetail }) {
       </CardContent>
     </Card>
   );
+}
+
+// ── Compliance Tab ───────────────────────────────────────────────────────────
+// Hosts the LLM compliance-doc OCR panel. Maps work-package fields into the
+// DocumentContext the panel needs. Persistence of the parsed output is a
+// future slice — no evidence/attachment table is wired here yet, so the
+// panel renders for review only (onAttach omitted hides the commit button).
+
+function ComplianceTab({ wp }: { wp: WorkOrderDetail }) {
+  const context: DocumentContext = useMemo(() => ({
+    work_order_id: wp.id ?? null,
+    work_order_package_number: wp.work_order_number ?? null,
+    directive_id: null,
+    aircraft_registration: wp.aircraft_registration ?? null,
+    issuing_authority_hint: null,
+    notes_from_uploader: null,
+  }), [wp.id, wp.work_order_number, wp.aircraft_registration]);
+
+  return <ComplianceDocOcrPanel context={context} />;
 }
 
 // ── Edit Dialog Component ──────────────────────────────────────────────────────────
@@ -860,6 +881,9 @@ export function AmroWorkOrderDetailPage() {
           <TabsTrigger value="timeline">
             Timeline ({wp.maintenance_events?.length || 0})
           </TabsTrigger>
+          <TabsTrigger value="compliance">
+            Compliance
+          </TabsTrigger>
         </TabsList>
         <TabsContent value="tasks" className="mt-4">
           <TasksTab wp={wp} />
@@ -869,6 +893,9 @@ export function AmroWorkOrderDetailPage() {
         </TabsContent>
         <TabsContent value="timeline" className="mt-4">
           <TimelineTab wp={wp} />
+        </TabsContent>
+        <TabsContent value="compliance" className="mt-4">
+          <ComplianceTab wp={wp} />
         </TabsContent>
       </Tabs>
 
