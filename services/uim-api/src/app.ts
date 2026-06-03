@@ -28,6 +28,7 @@ import reservationsRoutes from './routes/reservations.routes.js';
 import commandsRoutes from './routes/commands.routes.js';
 import formsRoutes from './routes/forms.routes.js';
 import graphqlRoutes from './routes/graphql.routes.js';
+import inboundRoutes from './routes/inbound.routes.js';
 import integrationsRestRoutes from './routes/integrations-rest.routes.js';
 import externalMroPipelineRoutes from './routes/external-mro-pipeline.routes.js';
 import analyticsKpisRoutes from './routes/analytics-kpis.routes.js';
@@ -139,6 +140,7 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'DELETE /api/v1/uim/forms/:node/:id',
       'POST   /api/v1/uim/graphql  (yoga + Pothos schema)',
       'GET    /api/v1/uim/graphql  (introspection + GraphiQL in dev)',
+      'POST   /api/v1/uim/inbound/:integrationId  (HMAC-auth, no JWT)',
       'POST   /api/v1/uim/integrations/rest',
       'GET    /api/v1/uim/integrations/external-mro-pipeline',
       'POST   /api/v1/uim/integrations/external-mro-pipeline',
@@ -209,6 +211,10 @@ app.use('/api', authMiddleware, auditApiRequest, reservationsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, commandsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, formsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, graphqlRoutes);
+
+// Inbound webhook receiver — auth is by HMAC verify + integration_id
+// binding, NOT by user JWT. Mounted outside the authMiddleware chain.
+app.use('/api', auditApiRequest, inboundRoutes);
 app.use('/api', authMiddleware, auditApiRequest, integrationsRestRoutes);
 app.use('/api', authMiddleware, auditApiRequest, externalMroPipelineRoutes);
 app.use('/api', authMiddleware, auditApiRequest, analyticsKpisRoutes);
