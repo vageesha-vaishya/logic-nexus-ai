@@ -209,15 +209,56 @@ Each slice is independently shippable + reversible. Estimated total wall-clock: 
 
 ---
 
-## 7. Open questions for AMRO domain owner
+## 7. Open questions — RESOLVED 2026-06-03
 
-1. **Currency per-item**: keep on `uim.catalog_items` (recommended) or push to `amro.item_aviation_metadata`? Affects whether non-AMRO modules carry currency at SKU level.
-2. **Manufacturer fields**: hoist to `uim.catalog_items` first-class columns (recommended) or leave in `attributes` JSONB? Hoisting is a separate prep slice (~9.0) but unblocks query simplification across modules.
-3. **Lifecycle reconciliation**: AMRO has 3 status columns (`status`, `lifecycle_status`, `is_active`); UIM has 1 (`lifecycle_state`). Need the canonical mapping table.
-4. **Work-order linkage**: keep `amro.work_order_inventory_links` AMRO-specific (recommended) or move to a generic `uim.inventory_work_order_links`? The latter requires extending UIM's domain model.
-5. **Transaction-type codes**: AMRO uses RECEIVE / ISSUE / SCRAP / RETURN / etc. UIM uses RECEIVE / MOVE / RESERVE / CONSUME. Need the translation table (probably extends UIM's enum rather than translates).
-6. **`uim_mro_item_profiles` rationalization**: the existing `uim_mro_item_profiles` table overlaps with the proposed `amro.item_aviation_metadata`. Recommend dropping `uim_mro_item_profiles` and folding its 7 fields into the new extension table during 9b.
-7. **Rollback policy for slice 9j**: 30-day window or longer? AMRO acceptance tests need to cover.
+All 7 questions answered by domain owner. Decisions recorded inline.
+
+### Q1 — Currency placement → **AMRO extension** ✅ (commit 3c916868)
+`currency` lives in `amro.part_profiles.currency` (existing catalog-level AMRO extension). Falls back to franchise/tenant currency when NULL. Currency is procurement metadata, not catalog metadata; keeps UIM core lean for non-AMRO modules.
+
+### Q2 — Manufacturer fields hoist → **YES, to UIM core** ✅ (commit TBD)
+Added `manufacturer_name`, `manufacturer_part_number`, `oem_part_number` as first-class text columns on `public.uim_catalog_items`, plus indexes on `(tenant_id, manufacturer_part_number)` and `(tenant_id, oem_part_number)` (partial WHERE NOT NULL). Cross-industry value; cheap; AMRO slice 9c backfill becomes a clean column copy instead of JSONB extraction.
+
+### Q3 — Lifecycle reconciliation → **UIM single column + AMRO mapping fn** ✅ (commit TBD)
+Real prod audit (75 AMRO items): `status` is only ever 'active', `is_active` is redundant, `lifecycle_status` (`serviceable`/`quarantined`/`inspection_due`/`ready_for_install`) is actually **per-physical-item airworthiness** not catalog state. Decision:
+- Added `lifecycle_state text NOT NULL DEFAULT 'active' CHECK IN ('active','draft','retired','archived')` to `uim.catalog_items`.
+- Created `amro.map_lifecycle_to_uim(status, lifecycle_status, is_active)` IMMUTABLE SQL fn used by slice 9c backfill.
+- `lifecycle_status` is INTENTIONALLY IGNORED at catalog level — it belongs on a per-item AMRO surface (existing `amro.part_profiles` doesn't carry it yet; per-item state goes on `uim.inventory_items.status` + AMRO extensions when needed).
+
+### Q4 — Work-order linkage → **stay AMRO-specific** ✅ (no code change)
+`amro.work_order_item_links` already exists in production (discovered in §10a audit). Keep it AMRO-specific. UIM's domain model does not extend to work-order semantics (work-orders are an MRO concept, not a generic inventory concept). If a 2nd module wires work-orders later (e.g., a maintenance feature in Logistics), revisit.
+
+### Q5 — Transaction-type codes → **mapping fn, no UIM enum change** ✅ (commit TBD)
+Real prod audit: AMRO `movement_type` uses only `receipt/issue/adjustment` (3 values, 92 rows). UIM's `transaction_type` CHECK already covers `RECEIVE/MOVE/RESERVE/RELEASE/CONSUME/ADJUST/SCRAP/RETURN` — every AMRO value has a UIM equivalent. Decision:
+- Created `amro.map_txn_type_to_uim(amro_movement)` IMMUTABLE SQL fn covering all 8 UIM values (8 mappings + ADJUST default for unknown).
+- Used by slice 9e backfill.
+- No UIM CHECK constraint changes.
+
+### Q6 — `uim_mro_item_profiles` rationalization → **fold into `amro.part_profiles`** ✅ (slice 9b)
+The existing `amro.part_profiles` (18 cols, catalog-keyed, prod-empty) is the canonical home for catalog-level MRO/aviation metadata. `public.uim_mro_item_profiles` becomes deprecated. The 7 fields on `uim_mro_item_profiles` (maintenance_category, ata_chapter_code, ata_sub_chapter_code, ata_section_code, condition_code, certification_status, aog_priority) merge into the existing `amro.part_profiles` schema (which already has `regulatory_class`, `ata_chapter`, etc.) during slice 9b. Frontend code that currently reads `uim_mro_item_profiles` via GraphQL DataLoader gets updated to join `amro.part_profiles` instead — but only after the data fold completes.
+
+### Q7 — Rollback policy → **30-day deprecation window** ✅ (no code change)
+Slice 9j (DROP the 15 absorbed `amro_*` tables) gates on:
+- All AMRO frontend hooks have read from the new location for 30+ days
+- Zero queries against the old tables in the last 30 days (verify via Supabase log analysis or PostgreSQL's `pg_stat_user_tables.seq_scan + idx_scan`)
+- AMRO acceptance tests still passing
+- Operator sign-off (this user)
+
+If any criterion fails, the deprecation window extends by another 30 days. Hard cap: 90 days from slice 9i completion. After 90 days, drop regardless (the tables are then provably abandoned).
+
+---
+
+## 7a. Original open questions (for history)
+
+These were the questions BEFORE the §7 resolution above. Keeping them inline so the diff is auditable.
+
+1. Currency per-item — keep on `uim.catalog_items` or push to `amro.item_aviation_metadata`? — answered Q1.
+2. Manufacturer fields — hoist to `uim.catalog_items` or leave in `attributes` JSONB? — answered Q2.
+3. Lifecycle reconciliation — AMRO has 3 status columns; UIM has 1. — answered Q3.
+4. Work-order linkage — keep `amro.work_order_inventory_links` AMRO-specific or generalize? — answered Q4.
+5. Transaction-type codes — translation or UIM enum extension? — answered Q5.
+6. `uim_mro_item_profiles` rationalization. — answered Q6.
+7. Rollback policy for slice 9j. — answered Q7.
 
 ---
 
