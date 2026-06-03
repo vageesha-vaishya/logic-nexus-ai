@@ -15,6 +15,7 @@ import { randomUUID } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
+import adminWhatsappRoutes from './routes/admin-whatsapp.routes.js';
 import deliveriesRoutes from './routes/deliveries.routes.js';
 import unsubscribeRoutes from './routes/unsubscribe.routes.js';
 import webhooksRoutes from './routes/webhooks.routes.js';
@@ -102,6 +103,7 @@ app.get('/comms/v1/_status', (_req: Request, res: Response) => {
       'GET  /api/v1/comms/deliveries',
       'GET  /api/v1/comms/notifications/:id/deliveries',
       'POST /api/comms/webhooks/resend  (Svix-signed, no auth)',
+      'POST /api/v1/admin/phones/whatsapp-bulk-enable  (platform_admin)',
     ],
     consumers: [
       'notification-dispatcher (polls core.notifications, fans out into comms.deliveries via UNIQUE intent dedup index)',
@@ -157,6 +159,7 @@ app.use('/api', webhooksRoutes);
 app.use('/api', unsubscribeRoutes);
 
 app.use('/api', authMiddleware, auditApiRequest, deliveriesRoutes);
+app.use('/api', authMiddleware, auditApiRequest, adminWhatsappRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
