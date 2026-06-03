@@ -179,7 +179,7 @@ router.get(
         .schema('compliance')
         .from('screenings')
         .select(
-          'id, tenant_id, subject_type, subject_id, subject_party_id, search_name, search_country, status, decision, match_score, hits, provider, provider_request_id, triggered_by_event, performed_at, decided_by_user_id, decided_at, decision_notes, evidence_file_ids, expires_at, metadata, notes',
+          'id, tenant_id, subject_type, subject_id, subject_party_id, search_name, search_country, status, decision, match_score, hits, provider, provider_request_id, triggered_by_event, performed_at, decided_by_user_id, decided_at, decision_notes, evidence_file_ids, expires_at, metadata, notes, requires_co_sign',
         )
         .eq('id', id)
         .eq('tenant_id', authReq.tenantId)

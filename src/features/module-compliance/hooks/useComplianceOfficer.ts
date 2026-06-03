@@ -23,7 +23,10 @@ import {
   overrideScreening,
   revokeOverride,
   gateCheck,
+  attestOverride,
   type GateCheckResult,
+  type AttestResult,
+  ComplianceApiError,
 } from '../lib/complianceApi';
 
 export type BlockedPartyStatus = 'all' | 'failed' | 'overridden' | 'expired';
@@ -68,6 +71,42 @@ export interface ScreeningDecisionRow {
   metadata: Record<string, unknown> | null;
 }
 
+export interface AttestInput {
+  screening_id: string;
+  reason: string;
+  evidence_file_ids?: string[];
+}
+
+export function useAttestOverride() {
+  const { user } = useAuth();
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (input: AttestInput): Promise<AttestResult> => {
+      if (!user?.id) throw new Error('not_authenticated');
+      return attestOverride(input);
+    },
+    onSuccess: (result: AttestResult, vars) => {
+      const message =
+        result.state === 'pending_attestation'
+          ? 'Override requested — awaiting a second officer'
+          : result.state === 'attested'
+          ? 'Override attested — screening cleared'
+          : 'Screening overridden';
+      toast.success(message);
+      qc.invalidateQueries({ queryKey: ['compliance'] });
+      qc.invalidateQueries({ queryKey: screeningKey(vars.screening_id) });
+      qc.invalidateQueries({ queryKey: decisionsKey(vars.screening_id) });
+    },
+    onError: (e: unknown) => {
+      const friendly =
+        e instanceof ComplianceApiError && e.code === 'SELF_ATTEST_FORBIDDEN'
+          ? 'You requested this override — a different officer must attest it.'
+          : `Override failed: ${(e as Error).message ?? 'unknown error'}`;
+      toast.error(friendly);
+    },
+  });
+}
+
 export interface ScreeningDetail {
   id: string;
   tenant_id: string;
@@ -91,6 +130,8 @@ export interface ScreeningDetail {
   expires_at: string | null;
   metadata: Record<string, unknown> | null;
   notes: string | null;
+  // Phase 6 Compliance — two-officer attestation toggle.
+  requires_co_sign?: boolean;
 }
 
 const blockedPartiesKey = (status: BlockedPartyStatus) => ['compliance', 'blocked_parties', status] as const;

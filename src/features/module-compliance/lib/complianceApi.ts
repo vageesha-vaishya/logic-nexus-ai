@@ -72,6 +72,36 @@ export async function getScreeningDecisions<T>(id: string): Promise<T[]> {
   return body.data ?? [];
 }
 
+export type AttestState =
+  | 'pending_attestation'
+  | 'attested'
+  | 'overridden_single_officer';
+
+export interface AttestResult {
+  screening_id: string;
+  state: AttestState;
+  audit_decision_id: string | null;
+  prior_decision_id: string | null;
+}
+
+export async function attestOverride(input: {
+  screening_id: string;
+  reason: string;
+  evidence_file_ids?: string[];
+}): Promise<AttestResult> {
+  const res = await fetch(`${BASE}/screenings/${encodeURIComponent(input.screening_id)}/attest`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: await authHeaders(),
+    body: JSON.stringify({
+      reason: input.reason,
+      evidence_file_ids: input.evidence_file_ids ?? null,
+    }),
+  });
+  const body = await parseOrThrow<{ data: AttestResult }>(res);
+  return body.data;
+}
+
 export async function overrideScreening(input: { screening_id: string; reason: string; evidence_file_ids?: string[] }): Promise<unknown> {
   const res = await fetch(`${BASE}/screenings/${encodeURIComponent(input.screening_id)}/override`, {
     method: 'POST',

@@ -289,7 +289,12 @@ export default function ComplianceScreeningDetail() {
         )}
       </div>
 
-      <OverrideDialog screeningId={screening.id} open={overrideOpen} onOpenChange={setOverrideOpen} />
+      <OverrideDialog
+        screeningId={screening.id}
+        open={overrideOpen}
+        onOpenChange={setOverrideOpen}
+        requiresCoSign={screening.requires_co_sign === true}
+      />
       <RevokeOverrideDialog screeningId={screening.id} open={revokeOpen} onOpenChange={setRevokeOpen} />
     </DashboardLayout>
   );
