@@ -31,6 +31,7 @@ import integrationsRestRoutes from './routes/integrations-rest.routes.js';
 import externalMroPipelineRoutes from './routes/external-mro-pipeline.routes.js';
 import analyticsKpisRoutes from './routes/analytics-kpis.routes.js';
 import analyticsEtlRoutes from './routes/analytics-etl.routes.js';
+import analyticsTailRoutes from './routes/analytics-tail.routes.js';
 import type { ErrorResponse } from './types/uim.types.js';
 import { logger } from './utils/logger.js';
 
@@ -141,6 +142,11 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'GET    /api/v1/uim/analytics/kpis',
       'GET    /api/v1/uim/analytics/etl',
       'POST   /api/v1/uim/analytics/etl',
+      'GET    /api/v1/uim/analytics/reconciliation',
+      'GET    /api/v1/uim/analytics/bi-cube',
+      'GET    /api/v1/uim/analytics/qa-signoff',
+      'POST   /api/v1/uim/analytics/qa-signoff',
+      'GET    /api/v1/uim/analytics/sla-evidence',
     ],
     dual_writes: [
       'platform.integrations            → uim.integrations',
@@ -203,6 +209,7 @@ app.use('/api', authMiddleware, auditApiRequest, integrationsRestRoutes);
 app.use('/api', authMiddleware, auditApiRequest, externalMroPipelineRoutes);
 app.use('/api', authMiddleware, auditApiRequest, analyticsKpisRoutes);
 app.use('/api', authMiddleware, auditApiRequest, analyticsEtlRoutes);
+app.use('/api', authMiddleware, auditApiRequest, analyticsTailRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
