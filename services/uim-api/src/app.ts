@@ -28,7 +28,6 @@ import reservationsRoutes from './routes/reservations.routes.js';
 import commandsRoutes from './routes/commands.routes.js';
 import formsRoutes from './routes/forms.routes.js';
 import graphqlRoutes from './routes/graphql.routes.js';
-import graphqlV2Routes from './routes/graphql-v2.routes.js';
 import integrationsRestRoutes from './routes/integrations-rest.routes.js';
 import externalMroPipelineRoutes from './routes/external-mro-pipeline.routes.js';
 import analyticsKpisRoutes from './routes/analytics-kpis.routes.js';
@@ -138,9 +137,8 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'GET    /api/v1/uim/forms/:node/:id',
       'PATCH  /api/v1/uim/forms/:node/:id',
       'DELETE /api/v1/uim/forms/:node/:id',
-      'POST   /api/v1/uim/graphql',
-      'POST   /api/v1/uim/graphql/v2  (yoga + Pothos schema)',
-      'GET    /api/v1/uim/graphql/v2  (introspection + GraphiQL in dev)',
+      'POST   /api/v1/uim/graphql  (yoga + Pothos schema)',
+      'GET    /api/v1/uim/graphql  (introspection + GraphiQL in dev)',
       'POST   /api/v1/uim/integrations/rest',
       'GET    /api/v1/uim/integrations/external-mro-pipeline',
       'POST   /api/v1/uim/integrations/external-mro-pipeline',
@@ -211,7 +209,6 @@ app.use('/api', authMiddleware, auditApiRequest, reservationsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, commandsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, formsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, graphqlRoutes);
-app.use('/api', authMiddleware, auditApiRequest, graphqlV2Routes);
 app.use('/api', authMiddleware, auditApiRequest, integrationsRestRoutes);
 app.use('/api', authMiddleware, auditApiRequest, externalMroPipelineRoutes);
 app.use('/api', authMiddleware, auditApiRequest, analyticsKpisRoutes);

@@ -1,9 +1,9 @@
 // Phase 7 UIM Step 8.1 — yoga server handler.
 //
 // Exports an Express-compatible request handler that the routes
-// layer mounts at POST /api/v1/uim/graphql/v2 during the Phase A
-// migration window (per design doc §9). After 8.6 cutover, the
-// shim deletes and this mount renames to /api/v1/uim/graphql.
+// layer mounts at POST /api/v1/uim/graphql. Slice 8.7 collapsed the
+// design doc's Phase A/B/C migration into a single shim-delete +
+// rename — the callsite audit (§14a) found zero production callers.
 
 import { createYoga } from 'graphql-yoga';
 import { createClient } from '@supabase/supabase-js';
@@ -23,7 +23,7 @@ function getServiceRoleClient() {
 
 export const yoga = createYoga<{ req: AuthRequest }, GraphQLContext>({
   schema,
-  graphqlEndpoint: '/api/v1/uim/graphql/v2',
+  graphqlEndpoint: '/api/v1/uim/graphql',
   // Express CORS middleware is already applied by app.ts. Yoga
   // would otherwise emit duplicate CORS headers.
   cors: false,
