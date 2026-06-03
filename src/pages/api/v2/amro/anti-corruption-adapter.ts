@@ -147,7 +147,8 @@ export const AMRO_DATA_OWNERSHIP = {
     'maintenance_events',
     'amro_work_order_materials',
   ],
-  immutableSchema: ['mro_audit.records', 'mro_audit.trails'],
+  // Phase 8b: mro_audit.* schema dropped; immutable audit moved to core.audit_log.
+  immutableSchema: ['core.audit_log'],
   mandatoryIsolationFields: ['tenant_id', 'franchise_id', 'domain_id', 'version'],
 } as const;
 

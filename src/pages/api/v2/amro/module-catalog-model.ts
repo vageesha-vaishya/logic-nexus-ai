@@ -251,7 +251,8 @@ export const AMRO_DATABASE_MAPPING_MATRIX: ReadonlyArray<AmroDatabaseMappingMatr
   },
   {
     moduleId: 'MOD-AMRO-10',
-    primaryTables: ['maintenance_events', 'mro_audit.records', 'mro_audit.trails'],
+    // Phase 8b: mro_audit.* dropped; audit lives in core.audit_log.
+    primaryTables: ['maintenance_events', 'core.audit_log'],
     keyFieldsUsedByModule: ['event_hash', 'previous_hash', 'actor_id', 'timestamp'],
     criticalConstraintsAndRules: ['Append-only semantics', 'Hash-chain integrity required'],
   },
@@ -580,7 +581,7 @@ export const AMRO_QUICK_LOOKUP_CROSS_REFERENCE: ReadonlyArray<AmroQuickLookupCro
     module: 'Audit and Evidence Ledger',
     subModules: 'Event Append, Hash Verify, Replay Export',
     uiUx: 'SCR-010',
-    dbTables: 'maintenance_events, mro_audit.records, mro_audit.trails',
+    dbTables: 'maintenance_events, core.audit_log',
     workflow: '18.3',
     apis: 'API-014',
     implementationSequence: 'S9',

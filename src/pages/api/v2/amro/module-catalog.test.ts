@@ -142,7 +142,7 @@ describe('/api/v2/amro/module-catalog', () => {
     });
     expect((res.jsonBody as any)?.data?.moduleCatalog?.databaseMappingMatrix?.[9]).toEqual({
       moduleId: 'MOD-AMRO-10',
-      primaryTables: ['maintenance_events', 'mro_audit.records', 'mro_audit.trails'],
+      primaryTables: ['maintenance_events', 'core.audit_log'],
       keyFieldsUsedByModule: ['event_hash', 'previous_hash', 'actor_id', 'timestamp'],
       criticalConstraintsAndRules: ['Append-only semantics', 'Hash-chain integrity required'],
     });
