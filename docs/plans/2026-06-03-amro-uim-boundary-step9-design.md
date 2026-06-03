@@ -310,6 +310,113 @@ The §4 proposed schema is preserved as the conceptual model — it cleanly sepa
 
 ---
 
+## 10b. Implementation summary (2026-06-03 close-out)
+
+All planned slices 9a-9i have shipped. Key finding: **most of the
+"backfill" work was already done by existing dual-write triggers
+from earlier Phase 7 mirror work.** The actual code shipped:
+
+| Slice | Effort | Outcome |
+|---|---|---|
+| 9a | DDL + rollback | `currency` added to `amro.part_profiles` (Q1). 3 redundant new tables dropped after audit found existing `amro.*` coverage. Commit 3c916868. |
+| 9b | Backfill | `amro.part_profiles` populated from `amro_item_master` (75 rows). Q6 revised: `uim_mro_item_profiles` stays put. Commit f41ef778. |
+| 9c | NO-OP | Dual-write trigger already keeps `uim.item_master` ↔ `amro_item_master` at perfect parity. Commit 0a2830a1. |
+| 9d | Code + view | `amro.v_item_master` + `public.amro_v_item_master` join view shipped. amro-api READ sites switched (2 of 5). Commit 17c71ab2. |
+| 9e | NO-OP | Dual-write trigger keeps `uim.stock_ledger_transactions` ↔ `amro_stock_ledger_transactions` synced (92/92). Commit 0ee94cd1. |
+| 9f+9g+9h | NO-OP | Audit found 100% parity across 5 mirror pairs (recon/valuation/period/audit/UoM/xref — 5,370 rows total, all already mirrored). Commit eafe7d41. |
+| 9i | DDL | 4 uim.v_* views + public.uim_v_* aliases shipped on uim.* mirror tables. Full row-count parity with public.amro_* originals. Commit 14875695. |
+| 9j | GATED | See §10c. Cannot ship for ≥ 30 days from 2026-06-03. |
+
+**Total real implementation work**: 4 small migration files + 1 routes edit. The rest was audit + documentation.
+
+## 10c. Slice 9j — DROP gate (POLICY-GATED, Q7)
+
+Slice 9j drops the 15 absorbed `public.amro_*` tables. Per Q7:
+
+**Gate criteria** (all must pass before slice 9j ships):
+- [ ] 30 days have elapsed since 2026-06-03 (earliest drop date: **2026-07-03**)
+- [ ] Zero queries against the 15 tables in the last 30 days (verify via `pg_stat_user_tables.seq_scan + idx_scan` deltas)
+- [ ] AMRO acceptance tests still passing
+- [ ] Operator sign-off (this user)
+- [ ] At least 1 production deploy has gone out with the slice-9d view-cutover (so frontend definitely uses the new path)
+
+**Hard cap**: 2026-09-01 (90 days). Drop regardless after that.
+
+**Tables to drop**:
+```
+public.amro_item_master                   (FK depended on by amro_item_cross_references,
+                                            amro_item_uom_conversions, dual-write trigger)
+public.amro_item_cross_references         (150 rows, mirrored to uim.item_cross_references)
+public.amro_item_uom_conversions          (75 rows,  mirrored to uim.item_uom_conversions)
+public.amro_stock_ledger_transactions     (92 rows,  mirrored to uim.stock_ledger_transactions)
+public.amro_stock_reconciliation_runs     (5 rows,   mirrored to uim.stock_reconciliation_runs)
+public.amro_stock_reconciliation_items    (5000,     mirrored to uim.stock_reconciliation_items)
+public.amro_stock_valuation_layers        (40,       mirrored to uim.stock_valuation_layers)
+public.amro_stock_period_closes           (1,        mirrored to uim.stock_period_closes)
+public.amro_stock_audit_timeline          (99,       mirrored to uim.stock_audit_timeline)
+public.amro_inventory_scan_events         (0 rows,   safe to drop)
+public.amro_inventory_reorder_queue       (0 rows,   safe to drop)
+public.amro_inventory_work_order_links    (0 rows,   safe to drop)
+public.amro_stock_approval_queue          (0 rows,   safe to drop)
+public.amro_stock_valuation_consumptions  (0 rows,   safe to drop)
+```
+Plus the 5 dependent views (rebuilt in 9i):
+```
+public.amro_inventory_health_overview      → uim.v_inventory_health_overview (TBD if needed)
+public.amro_stock_audit_export             → uim.v_stock_audit_export (DONE)
+public.amro_stock_balance_summary          → uim.v_stock_balance_summary (DONE)
+public.amro_stock_ledger_current_balance   → uim.v_stock_ledger_current_balance (DONE)
+public.amro_stock_valuation_summary        → uim.v_stock_valuation_summary (DONE)
+```
+
+**Pre-drop verification SQL** (run before slice 9j executes):
+```sql
+SELECT
+  schemaname || '.' || relname AS table_name,
+  seq_scan + idx_scan AS reads_since_30_days
+FROM pg_stat_user_tables
+WHERE schemaname = 'public'
+  AND relname LIKE 'amro_%'
+ORDER BY reads_since_30_days DESC;
+-- All amro_* tables should show low/zero reads. Any with > 100 reads
+-- in 30 days indicates a callsite still on the old path; investigate
+-- before drop.
+```
+
+**Drop migration** (do NOT ship until gate passes):
+```sql
+BEGIN;
+DROP TRIGGER trg_amro_item_master_dual_write_to_uim ON public.amro_item_master;
+DROP TRIGGER trg_amro_stock_ledger_transactions_dual_write_to_uim ON public.amro_stock_ledger_transactions;
+-- (plus other dual-write triggers as needed)
+
+DROP VIEW IF EXISTS public.amro_inventory_health_overview;
+DROP VIEW IF EXISTS public.amro_stock_audit_export;
+DROP VIEW IF EXISTS public.amro_stock_balance_summary;
+DROP VIEW IF EXISTS public.amro_stock_ledger_current_balance;
+DROP VIEW IF EXISTS public.amro_stock_valuation_summary;
+
+DROP TABLE IF EXISTS public.amro_item_cross_references;
+DROP TABLE IF EXISTS public.amro_item_uom_conversions;
+DROP TABLE IF EXISTS public.amro_inventory_scan_events;
+DROP TABLE IF EXISTS public.amro_inventory_reorder_queue;
+DROP TABLE IF EXISTS public.amro_inventory_work_order_links;
+DROP TABLE IF EXISTS public.amro_stock_ledger_transactions;
+DROP TABLE IF EXISTS public.amro_stock_reconciliation_items;
+DROP TABLE IF EXISTS public.amro_stock_reconciliation_runs;
+DROP TABLE IF EXISTS public.amro_stock_valuation_consumptions;
+DROP TABLE IF EXISTS public.amro_stock_valuation_layers;
+DROP TABLE IF EXISTS public.amro_stock_period_closes;
+DROP TABLE IF EXISTS public.amro_stock_audit_timeline;
+DROP TABLE IF EXISTS public.amro_stock_approval_queue;
+DROP TABLE IF EXISTS public.amro_item_master;
+COMMIT;
+```
+
+**Rollback if gate trips**: The migration is in a single BEGIN/COMMIT. If anything breaks, `ROLLBACK` before COMMIT recovers state. All data lives in `uim.*` mirrors so no row loss either way.
+
+---
+
 ## 11. Next action
 
 **Schedule sync with AMRO domain owner.** Do not ship implementation slices (9a-9j) until §7 open questions are answered. This doc is the conversation starter, not the plan of record.
