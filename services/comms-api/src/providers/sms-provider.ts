@@ -5,10 +5,8 @@
 // directory via the eslint COMMS_PROVIDER_SDK_BANS rule — every caller
 // goes through getSmsProvider() so suppression checks, delivery_events,
 // and template-versioning happen in one place (per comms.md §10).
-//
-// The Twilio implementation arrives in the next slice. This file ships
-// the interface + a NullSmsProvider stub so the rest of the chain can
-// be exercised end-to-end without real credentials.
+
+import { TwilioSmsProvider } from './twilio.js';
 
 export interface OutboundSms {
   tenantId: string;
@@ -63,12 +61,16 @@ export class NullSmsProvider implements SmsProvider {
 
 export function getSmsProvider(): SmsProvider {
   const kind = String(process.env.COMMS_SMS_PROVIDER || '').toLowerCase().trim();
-  // twilio implementation lands in the next slice. For now any value
-  // other than the empty string still falls through to NullSmsProvider
-  // so a half-configured env doesn't crash the worker.
   if (kind === 'twilio') {
-    // Lazy load avoided here — implementation file doesn't exist yet.
-    return new NullSmsProvider();
+    const sid = process.env.TWILIO_ACCOUNT_SID;
+    const token = process.env.TWILIO_AUTH_TOKEN;
+    if (!sid || !token) {
+      // Half-configured env — keep using the null provider so the
+      // worker still boots and the misconfig surfaces in the
+      // resulting comms.deliveries.error_text rather than crashing.
+      return new NullSmsProvider();
+    }
+    return new TwilioSmsProvider(sid, token);
   }
   return new NullSmsProvider();
 }
