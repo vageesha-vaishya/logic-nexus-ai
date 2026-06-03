@@ -6,13 +6,20 @@
 // — each slice that needs a new batch-read drops one in.
 
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { buildCatalogItemLoader } from './catalog-item.loader.js';
-
 import type DataLoader from 'dataloader';
+
+import { buildCatalogItemLoader } from './catalog-item.loader.js';
+import { buildActiveReservationsByInventoryLoader } from './reservations-by-inventory.loader.js';
+import { buildRecentLedgerByInventoryLoader } from './recent-ledger-by-inventory.loader.js';
+
 import type { CatalogItemRow } from '../types/catalog-item.js';
+import type { ReservationRow } from '../types/reservation.js';
+import type { LedgerEntryRow } from '../types/ledger-entry.js';
 
 export type Loaders = {
   catalogItem: DataLoader<string, CatalogItemRow | null>;
+  activeReservationsByInventory: DataLoader<string, ReservationRow[]>;
+  recentLedgerByInventory: DataLoader<string, LedgerEntryRow[]>;
 };
 
 export function buildLoaders(input: {
@@ -21,5 +28,7 @@ export function buildLoaders(input: {
 }): Loaders {
   return {
     catalogItem: buildCatalogItemLoader(input),
+    activeReservationsByInventory: buildActiveReservationsByInventoryLoader(input),
+    recentLedgerByInventory: buildRecentLedgerByInventoryLoader(input),
   };
 }

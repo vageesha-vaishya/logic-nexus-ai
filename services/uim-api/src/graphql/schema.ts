@@ -15,9 +15,14 @@ import './types/catalog-item.js';
 import './types/inventory-item.js';
 import './types/page-info.js';
 import './types/inventory-item-connection.js';
+import './types/reservation.js';
+import './types/reservation-connection.js';
+import './types/ledger-entry.js';
+import './types/ledger-entry-connection.js';
 
 // Queries
 import './queries/health.queries.js';
 import './queries/inventory.queries.js';
+import './queries/reservation.queries.js';
 
 export const schema = builder.toSchema();

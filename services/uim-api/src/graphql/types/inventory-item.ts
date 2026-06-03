@@ -8,6 +8,8 @@
 
 import { builder } from '../builder.js';
 import { CatalogItemRef } from './catalog-item.js';
+import { ReservationRef } from './reservation.js';
+import { LedgerEntryRef } from './ledger-entry.js';
 
 export type InventoryItemRow = {
   id: string;
@@ -50,6 +52,26 @@ builder.objectType(InventoryItemRef, {
       resolve: async (parent, _args, ctx) => {
         if (!parent.catalog_item_id) return null;
         return ctx.loaders.catalogItem.load(parent.catalog_item_id);
+      },
+    }),
+    activeReservations: t.field({
+      type: [ReservationRef],
+      description: 'Active reservations against this inventory item, batched via DataLoader.',
+      resolve: async (parent, _args, ctx) => {
+        return ctx.loaders.activeReservationsByInventory.load(parent.id);
+      },
+    }),
+    recentLedger: t.field({
+      type: [LedgerEntryRef],
+      description: 'Most recent ledger entries for this inventory item (newest first).',
+      args: {
+        limit: t.arg.int({ defaultValue: 10 }),
+      },
+      resolve: async (parent, args, ctx) => {
+        const limitRaw = Number(args.limit ?? 10);
+        const limit = Math.min(Math.max(Number.isFinite(limitRaw) ? limitRaw : 10, 1), 50);
+        const all = await ctx.loaders.recentLedgerByInventory.load(parent.id);
+        return all.slice(0, limit);
       },
     }),
   }),
