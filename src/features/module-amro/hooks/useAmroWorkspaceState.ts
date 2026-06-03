@@ -4,6 +4,7 @@ import { useDomain } from '@/contexts/DomainContext';
 import { useAmroApiAvailability } from './useAmroApiAvailability';
 import { useAmroHoldAuditTrail } from './useAmroHoldAuditTrail';
 import { useAmroWorkOrderFilters } from './useAmroWorkOrderFilters';
+import { useAmroWorkOrdersState } from './useAmroWorkOrdersState';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -95,11 +96,17 @@ export function useAmroWorkspaceState() {
   const apiBaseUrl = useMemo(() => getAmroApiBaseUrl(), []);
   const [assets, setAssets] = useState<AmroAssetRegistryRecord[]>(initialAssets);
   const [assetsLoadedFromApi, setAssetsLoadedFromApi] = useState<boolean>(false);
-  const [hasV1WorkOrderConnectivity, setHasV1WorkOrderConnectivity] = useState<boolean>(false);
-  const [workOrders, setWorkOrders] = useState<AmroWorkOrder[]>([]);
-  const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string>('');
-  const [loadingWorkOrders, setLoadingWorkOrders] = useState<boolean>(false);
-  const [workOrdersError, setWorkOrdersError] = useState<string | null>(null);
+  // Phase 8f.3b: work-orders core state (6 vars) lifted to
+  // useAmroWorkOrdersState. Pure state lift — all 136 orchestrator
+  // setter touchpoints continue to call the setters via the destructure.
+  const {
+    workOrders, setWorkOrders,
+    selectedWorkOrderId, setSelectedWorkOrderId,
+    loadingWorkOrders, setLoadingWorkOrders,
+    workOrdersError, setWorkOrdersError,
+    hasV1WorkOrderConnectivity, setHasV1WorkOrderConnectivity,
+    realtimeConnected, setRealtimeConnected,
+  } = useAmroWorkOrdersState();
   // Phase 8f.3a: filter + saved-view state extracted to useAmroWorkOrderFilters.
   // applySavedWorkOrderView moved into the hook. saveCurrentWorkOrderView
   // stays here because it also writes setWorkOrdersError (orchestrator-owned).
@@ -129,7 +136,7 @@ export function useAmroWorkspaceState() {
     forgetPreSoftDeleteStatus,
     appendHoldAuditEntry,
   } = useAmroHoldAuditTrail();
-  const [realtimeConnected, setRealtimeConnected] = useState<boolean>(false);
+  // (realtimeConnected lifted to useAmroWorkOrdersState above — Phase 8f.3b)
   const [requiredAuthority, setRequiredAuthority] = useState<AmroAuthorityLevel>('supervisor');
   const [selectedQualificationId, setSelectedQualificationId] = useState<string>(initialQualifications[0]?.id ?? '');
   const [qualifications, setQualifications] = useState<AmroQualification[]>(initialQualifications);
