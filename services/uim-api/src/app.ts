@@ -29,6 +29,7 @@ import formsRoutes from './routes/forms.routes.js';
 import graphqlRoutes from './routes/graphql.routes.js';
 import integrationsRestRoutes from './routes/integrations-rest.routes.js';
 import externalMroPipelineRoutes from './routes/external-mro-pipeline.routes.js';
+import analyticsKpisRoutes from './routes/analytics-kpis.routes.js';
 import type { ErrorResponse } from './types/uim.types.js';
 import { logger } from './utils/logger.js';
 
@@ -136,6 +137,7 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'POST   /api/v1/uim/integrations/rest',
       'GET    /api/v1/uim/integrations/external-mro-pipeline',
       'POST   /api/v1/uim/integrations/external-mro-pipeline',
+      'GET    /api/v1/uim/analytics/kpis',
     ],
     dual_writes: [
       'platform.integrations            → uim.integrations',
@@ -196,6 +198,7 @@ app.use('/api', authMiddleware, auditApiRequest, formsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, graphqlRoutes);
 app.use('/api', authMiddleware, auditApiRequest, integrationsRestRoutes);
 app.use('/api', authMiddleware, auditApiRequest, externalMroPipelineRoutes);
+app.use('/api', authMiddleware, auditApiRequest, analyticsKpisRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
