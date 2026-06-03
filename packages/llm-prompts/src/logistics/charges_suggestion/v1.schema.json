@@ -1,0 +1,131 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/llm-prompts/logistics.charges.suggestion.v1.json",
+  "title": "logistics.charges.suggestion output v1",
+  "type": "object",
+  "required": [
+    "currency",
+    "suggested_charges",
+    "total_estimate",
+    "incoterm_split",
+    "risk_flags",
+    "warnings",
+    "confidence"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "iso_currency": { "type": "string", "pattern": "^[A-Z]{3}$" },
+    "money": {
+      "type": "object",
+      "required": ["amount", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "amount": { "type": "number" },
+        "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+      }
+    }
+  },
+  "properties": {
+    "currency": { "$ref": "#/definitions/iso_currency" },
+    "suggested_charges": {
+      "type": "array",
+      "maxItems": 18,
+      "items": {
+        "type": "object",
+        "required": [
+          "charge_code",
+          "label",
+          "amount",
+          "currency",
+          "basis",
+          "basis_qty",
+          "rate",
+          "payable_by",
+          "rationale",
+          "confidence"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "charge_code": {
+            "type": "string",
+            "enum": [
+              "freight",
+              "fuel_surcharge",
+              "security_surcharge",
+              "handling_origin",
+              "handling_destination",
+              "thc_origin",
+              "thc_destination",
+              "documentation",
+              "customs_filing_origin",
+              "customs_filing_destination",
+              "ams_aci_ens",
+              "isps",
+              "war_risk",
+              "hazmat_surcharge",
+              "temperature_control",
+              "container_seal",
+              "vgm",
+              "wharfage",
+              "delivery_order",
+              "demurrage_risk_reserve",
+              "detention_risk_reserve",
+              "pickup",
+              "delivery",
+              "insurance",
+              "duties_taxes_pass_through",
+              "fumigation",
+              "inspection",
+              "other"
+            ]
+          },
+          "label": { "type": "string", "maxLength": 120 },
+          "amount": { "type": "number", "minimum": 0 },
+          "currency": { "$ref": "#/definitions/iso_currency" },
+          "basis": {
+            "type": "string",
+            "enum": [
+              "flat",
+              "per_kg",
+              "per_cbm",
+              "per_container",
+              "percent_of_value",
+              "per_shipment",
+              "per_document"
+            ]
+          },
+          "basis_qty": { "type": ["number", "null"] },
+          "rate": { "type": ["number", "null"] },
+          "payable_by": {
+            "type": "string",
+            "enum": ["shipper", "consignee", "third_party", "per_incoterm"]
+          },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 280 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "total_estimate": { "$ref": "#/definitions/money" },
+    "incoterm_split": {
+      "type": "object",
+      "required": ["shipper_pays", "consignee_pays", "rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "shipper_pays": { "type": "number", "minimum": 0 },
+        "consignee_pays": { "type": "number", "minimum": 0 },
+        "rationale": { "type": "string", "maxLength": 280 }
+      }
+    },
+    "risk_flags": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "maxLength": 180 }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "maxLength": 240 }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}
