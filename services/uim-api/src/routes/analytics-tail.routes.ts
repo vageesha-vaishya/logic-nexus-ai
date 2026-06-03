@@ -214,8 +214,10 @@ router.get(
     const authReq = req as AuthRequest;
     if (!authReq.userId || !authReq.tenantId) return unauthorized(res);
 
-    const records = listUimQaSignoffRecords(authReq.tenantId, authReq.franchiseId || null);
-    const latest = getLatestUimQaSignoffRecord(authReq.tenantId, authReq.franchiseId || null);
+    const [records, latest] = await Promise.all([
+      listUimQaSignoffRecords(authReq.tenantId, authReq.franchiseId || null),
+      getLatestUimQaSignoffRecord(authReq.tenantId, authReq.franchiseId || null),
+    ]);
 
     return res.status(200).json({
       version: 'v1',
@@ -243,7 +245,7 @@ router.post(
     const signedOffRole = String(body.signed_off_role || '').trim();
     if (!signedOffRole) return bad(res, 'signed_off_role is required');
 
-    const signoff = createUimQaSignoffRecord({
+    const signoff = await createUimQaSignoffRecord({
       tenant_id: authReq.tenantId,
       franchise_id: authReq.franchiseId || null,
       signoff_status:
@@ -291,7 +293,7 @@ router.get(
         tenantId: authReq.tenantId,
         franchiseId: authReq.franchiseId || undefined,
       });
-      const signoff = getLatestUimQaSignoffRecord(authReq.tenantId, authReq.franchiseId || null);
+      const signoff = await getLatestUimQaSignoffRecord(authReq.tenantId, authReq.franchiseId || null);
       const latencyTarget = Number(
         process.env.UIM_ANALYTICS_DASHBOARD_LATENCY_TARGET_MS || DEFAULT_DASHBOARD_LATENCY_TARGET_MS,
       );
