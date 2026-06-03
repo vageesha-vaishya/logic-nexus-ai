@@ -27,7 +27,9 @@
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 import { getEmailProvider } from '../providers/email-provider.js';
-import type { EmailProvider, OutboundEmail } from '../providers/email-provider.js';
+import type { EmailProvider, OutboundEmail, SendResult } from '../providers/email-provider.js';
+import { getSmsProvider } from '../providers/sms-provider.js';
+import type { SmsProvider, OutboundSms, SmsSendResult } from '../providers/sms-provider.js';
 import { isSuppressed } from './suppressions.js';
 import { TemplateRenderer } from './template-renderer.js';
 import { logger } from '../utils/logger.js';
@@ -36,7 +38,12 @@ import type { ChannelKind, DeliveryRow, NotificationIntent } from '../types/comm
 const POLL_INTERVAL_MS = parseInt(process.env.COMMS_WORKER_POLL_INTERVAL_MS || '5000', 10);
 const BATCH_SIZE = parseInt(process.env.COMMS_WORKER_BATCH_SIZE || '20', 10);
 const FROM_ADDRESS = process.env.COMMS_DEFAULT_FROM || 'SOS Logistics <notifications@sosservices.online>';
+const SMS_FROM_NUMBER = process.env.COMMS_SMS_DEFAULT_FROM || '';
 const PUBLIC_BASE_URL = (process.env.COMMS_PUBLIC_BASE_URL || 'https://sosservices.online').replace(/\/$/, '');
+// Channels the worker picks up on each tick. SMS rides alongside email
+// once channel routing is in. Other channels (whatsapp, push, in_app)
+// stay 'pending' until their providers + render paths ship.
+const ACTIVE_CHANNELS: ReadonlyArray<string> = ['email', 'sms'];
 
 interface DeliveryWithIntent extends DeliveryRow {
   intent?: NotificationIntent | null;
@@ -45,6 +52,7 @@ interface DeliveryWithIntent extends DeliveryRow {
 export class DeliveryWorker {
   private supabase: SupabaseClient | null = null;
   private emailProvider: EmailProvider | null = null;
+  private smsProvider: SmsProvider | null = null;
   private templateRenderer: TemplateRenderer | null = null;
   private running = false;
   private intervalHandle: NodeJS.Timeout | null = null;
@@ -58,11 +66,13 @@ export class DeliveryWorker {
     }
     this.supabase = createClient(url, key);
     this.emailProvider = getEmailProvider();
+    this.smsProvider = getSmsProvider();
     this.templateRenderer = new TemplateRenderer(this.supabase);
     logger.info('comms delivery worker starting', {
       pollMs: POLL_INTERVAL_MS,
       batch: BATCH_SIZE,
       emailProvider: this.emailProvider.name,
+      smsProvider: this.smsProvider.name,
     });
     this.intervalHandle = setInterval(() => {
       void this.tick();
@@ -106,7 +116,7 @@ export class DeliveryWorker {
       .from('deliveries')
       .select('*')
       .eq('status', 'pending')
-      .eq('channel_kind', 'email')
+      .in('channel_kind', ACTIVE_CHANNELS)
       .lte('next_retry_at', nowIso)
       .order('created_at', { ascending: true })
       .limit(BATCH_SIZE);
@@ -135,9 +145,9 @@ export class DeliveryWorker {
   }
 
   private async processDelivery(delivery: DeliveryWithIntent): Promise<void> {
-    if (!this.supabase || !this.emailProvider) return;
+    if (!this.supabase || !this.emailProvider || !this.smsProvider) return;
     const channel = delivery.channel_kind as ChannelKind;
-    if (channel !== 'email') return;
+    if (!ACTIVE_CHANNELS.includes(channel)) return;
 
     const address = (delivery.recipient_address || '').trim();
     if (!address) {
@@ -145,7 +155,9 @@ export class DeliveryWorker {
       return;
     }
 
-    // 1. Suppression check.
+    // 1. Suppression check. Suppressions are channel-scoped (a number
+    //    can be SMS-opted-out without being email-opted-out and vice
+    //    versa) so we pass the channel through.
     if (await isSuppressed(this.supabase, delivery.tenant_id, channel, address)) {
       await this.markStatus(delivery.id, 'suppressed', {
         error_text: 'recipient is on comms.suppressions',
@@ -170,17 +182,33 @@ export class DeliveryWorker {
     const rendered = renderResult.rendered ?? renderFromIntent(delivery.intent);
     const templateVersionId = renderResult.rendered?.templateVersionId ?? null;
 
-    // 3. Send.
-    const email: OutboundEmail = {
-      tenantId: delivery.tenant_id,
-      from: FROM_ADDRESS,
-      to: [address],
-      subject: rendered.subject,
-      html: rendered.html,
-      text: rendered.text,
-      listUnsubscribeUrl: `${PUBLIC_BASE_URL}/api/comms/unsubscribe?d=${delivery.id}`,
-    };
-    const result = await this.emailProvider.send(email);
+    // 3. Send. Route per channel — each provider returns the same
+    //    {ok, providerMessageId?, errorText?, providerName, permanent?}
+    //    shape so the retry/failure handling below is channel-agnostic.
+    let result: SendResult | SmsSendResult;
+    if (channel === 'sms') {
+      const sms: OutboundSms = {
+        tenantId: delivery.tenant_id,
+        from: SMS_FROM_NUMBER,
+        to: address,
+        // SMS body — prefer the plain-text variant since SMS doesn't
+        // render HTML. Strip HTML tags from the html field as a last
+        // resort so the recipient at least sees the message content.
+        text: rendered.text || rendered.subject + (rendered.html ? '\n' + stripHtml(rendered.html) : ''),
+      };
+      result = await this.smsProvider.send(sms);
+    } else {
+      const email: OutboundEmail = {
+        tenantId: delivery.tenant_id,
+        from: FROM_ADDRESS,
+        to: [address],
+        subject: rendered.subject,
+        html: rendered.html,
+        text: rendered.text,
+        listUnsubscribeUrl: `${PUBLIC_BASE_URL}/api/comms/unsubscribe?d=${delivery.id}`,
+      };
+      result = await this.emailProvider.send(email);
+    }
     if (result.ok) {
       await this.markStatus(delivery.id, 'sent', {
         provider: result.providerName,
@@ -285,6 +313,22 @@ function renderFromIntent(
       `<pre>${escapeHtml(JSON.stringify(payload, null, 2))}</pre>`;
   const text = (payload.text as string) || JSON.stringify(payload);
   return { subject, html, text };
+}
+
+// Last-resort body for SMS when the template doesn't set body_text.
+// Strips tags + collapses whitespace; SMS bodies above ~160 chars get
+// auto-segmented by the provider so we don't truncate here.
+function stripHtml(input: string): string {
+  return input
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
 }
 
 function escapeHtml(input: string): string {

@@ -105,9 +105,13 @@ app.get('/comms/v1/_status', (_req: Request, res: Response) => {
     ],
     consumers: [
       'notification-dispatcher (polls core.notifications, fans out into comms.deliveries via UNIQUE intent dedup index)',
-      'delivery-worker (picks up status=pending email deliveries, suppression-checks, sends via configured provider, writes status back)',
+      'delivery-worker (picks up status=pending deliveries on the active channels, suppression-checks, sends via the per-channel provider, writes status back)',
     ],
-    providers: [process.env.COMMS_EMAIL_PROVIDER || 'null'],
+    active_channels: ['email', 'sms'],
+    providers: {
+      email: process.env.COMMS_EMAIL_PROVIDER || 'null',
+      sms: process.env.COMMS_SMS_PROVIDER || 'null',
+    },
   });
 });
 
