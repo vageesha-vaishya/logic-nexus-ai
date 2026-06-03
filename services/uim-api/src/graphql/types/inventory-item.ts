@@ -1,0 +1,44 @@
+// Phase 7 UIM Step 8.1 — InventoryItem type.
+//
+// Backed by uim_inventory_items. The 4b.10 shim only returned 6
+// columns; this v1 type exposes the same 6 to preserve byte-
+// identical responses. Cross-entity fields (catalogItem,
+// activeReservations, recentLedger) ship in slices 8.2 / 8.3 once
+// the loaders land.
+
+import { builder } from '../builder.js';
+
+export type InventoryItemRow = {
+  id: string;
+  catalog_item_id: string | null;
+  quantity: number;
+  status: string;
+  location_id: string | null;
+  updated_at: string;
+};
+
+export const InventoryItemRef = builder.objectRef<InventoryItemRow>('InventoryItem');
+
+builder.objectType(InventoryItemRef, {
+  description:
+    'A single inventory item — physical (serialized) or fungible (batched). Quantity is current on-hand at the recorded location.',
+  fields: (t) => ({
+    id: t.exposeID('id'),
+    catalogItemId: t.id({
+      nullable: true,
+      resolve: (parent) => parent.catalog_item_id,
+    }),
+    quantity: t.float({
+      resolve: (parent) => Number(parent.quantity || 0),
+    }),
+    status: t.exposeString('status'),
+    locationId: t.id({
+      nullable: true,
+      resolve: (parent) => parent.location_id,
+    }),
+    updatedAt: t.field({
+      type: 'DateTime',
+      resolve: (parent) => parent.updated_at,
+    }),
+  }),
+});

@@ -1,0 +1,20 @@
+// Phase 7 UIM Step 8.1 — schema assembly.
+//
+// Importing the type + query modules has the side effect of
+// registering them on the shared SchemaBuilder. The toSchema()
+// call at the end is what yoga binds to.
+//
+// New modules add an import here as they ship.
+
+import { builder } from './builder.js';
+
+// Types
+import './types/health.js';
+import './types/projection-snapshot.js';
+import './types/inventory-item.js';
+
+// Queries
+import './queries/health.queries.js';
+import './queries/inventory.queries.js';
+
+export const schema = builder.toSchema();
