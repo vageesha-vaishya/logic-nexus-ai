@@ -199,5 +199,83 @@ export function mountAdminListRoutes(authLookup: () => AuthLookup): Router {
     },
   );
 
+  // ── GET /v1/admin/budget-status ──────────────────────────────────
+  // Joins budget_caps with budget_counters for the current period so
+  // operators can see who's near their hard cap. Sortable by
+  // utilization desc (the default) so the dashboard surfaces the
+  // most-at-risk scopes first. Counter rows that have no matching cap
+  // are dropped (spend without a cap is just FYI; it's not over).
+  adminListsRouter.get(
+    '/admin/budget-status',
+    requireScope('admin_configs', authLookup),
+    async (req: Request, res: Response, next: NextFunction) => {
+      try {
+        const periodKind = typeof req.query.period_kind === 'string' ? req.query.period_kind : undefined;
+        const limit = clampLimit(req.query.limit, 200, 500);
+        const client = getClient();
+        if (!client) {
+          res.json({ items: [], note: NOTE_NO_DB });
+          return;
+        }
+        const [capsRes, countersRes] = await Promise.all([
+          client.from('budget_caps').select('*'),
+          client.from('budget_counters').select('*'),
+        ]);
+        if (capsRes.error) throw capsRes.error;
+        if (countersRes.error) throw countersRes.error;
+
+        type CapRow = {
+          scope_kind: string; scope_id: string; period_kind: string;
+          limit_usd: number; warning_pct: number; hard_cap: boolean;
+          tenant_paid_uncapped: boolean;
+        };
+        type CounterRow = {
+          scope_kind: string; scope_id: string; period_kind: string;
+          period_started_at: string; spent_usd: number;
+          invocations: number; tokens: number; updated_at: string;
+        };
+        const counterKey = (k: string, id: string, p: string) => `${k}|${id}|${p}`;
+        const countersByKey = new Map<string, CounterRow>();
+        for (const c of (countersRes.data ?? []) as CounterRow[]) {
+          countersByKey.set(counterKey(c.scope_kind, c.scope_id, c.period_kind), c);
+        }
+
+        const items = ((capsRes.data ?? []) as CapRow[])
+          .filter((c) => !periodKind || c.period_kind === periodKind)
+          .map((c) => {
+            const counter = countersByKey.get(counterKey(c.scope_kind, c.scope_id, c.period_kind));
+            const spent = Number(counter?.spent_usd ?? 0);
+            const limit = Number(c.limit_usd ?? 0);
+            const utilization_pct = limit > 0 ? Math.min(100, (spent / limit) * 100) : 0;
+            const status =
+              spent >= limit && limit > 0 ? 'exceeded' :
+              utilization_pct >= (c.warning_pct ?? 80) ? 'warning' :
+              'ok';
+            return {
+              scope_kind: c.scope_kind,
+              scope_id: c.scope_id,
+              period_kind: c.period_kind,
+              period_started_at: counter?.period_started_at ?? null,
+              limit_usd: limit,
+              spent_usd: spent,
+              utilization_pct: Number(utilization_pct.toFixed(2)),
+              warning_pct: c.warning_pct ?? 80,
+              hard_cap: !!c.hard_cap,
+              tenant_paid_uncapped: !!c.tenant_paid_uncapped,
+              invocations: counter?.invocations ?? 0,
+              tokens: Number(counter?.tokens ?? 0),
+              counter_updated_at: counter?.updated_at ?? null,
+              status,
+            };
+          });
+
+        items.sort((a, b) => b.utilization_pct - a.utilization_pct);
+        res.json({ items: items.slice(0, limit) });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
   return adminListsRouter;
 }

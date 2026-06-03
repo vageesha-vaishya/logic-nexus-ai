@@ -72,6 +72,7 @@ describe('OpenAPI spec', () => {
       '/v1/invoke', '/v1/embed', '/v1/outcomes',
       '/v1/prompts/{key}', '/v1/prompts/{key}/render',
       '/v1/admin/prompts', '/v1/admin/experiments', '/v1/admin/audit',
+      '/v1/admin/budget-status',
       '/v1/admin/experiments/{id}/evaluate', '/v1/admin/experiments/{id}/auto-promote',
       '/v1/admin/right-to-be-forgotten',
       '/v1/fine-tunes', '/v1/fine-tunes/{id}',

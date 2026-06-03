@@ -296,6 +296,32 @@ paths:
               schema: { $ref: '#/components/schemas/AdminExperimentListResponse' }
         '403': { $ref: '#/components/responses/Forbidden' }
 
+  /v1/admin/budget-status:
+    get:
+      summary: List budget caps with live spend + utilization (operator view)
+      description: |
+        Joins gateway.budget_caps with the matching gateway.budget_counters
+        row for the current period and computes utilization_pct + status
+        ('ok' | 'warning' | 'exceeded'). Sorted by utilization desc so
+        scopes near or above their cap surface first. Requires
+        `admin_configs` scope.
+      security: [{ BearerServiceToken: [] }]
+      parameters:
+        - $ref: '#/components/parameters/Authorization'
+        - in: query
+          name: period_kind
+          schema: { type: string, enum: [daily, weekly, monthly] }
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 500, default: 200 }
+      responses:
+        '200':
+          description: Budget status list
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminBudgetStatusListResponse' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
   /v1/admin/audit:
     get:
       summary: List recent invocation audit rows (operator view)
@@ -1094,6 +1120,39 @@ components:
         items:
           type: array
           items: { $ref: '#/components/schemas/AdminAuditListItem' }
+        note: { type: string }
+
+    AdminBudgetStatusItem:
+      type: object
+      required: [scope_kind, scope_id, period_kind, limit_usd, spent_usd, utilization_pct, status]
+      properties:
+        scope_kind:
+          type: string
+          enum: [platform, tenant, tenant_feature, franchisee]
+        scope_id: { type: string }
+        period_kind:
+          type: string
+          enum: [daily, weekly, monthly]
+        period_started_at: { type: string, format: date-time, nullable: true }
+        limit_usd: { type: number, minimum: 0 }
+        spent_usd: { type: number, minimum: 0 }
+        utilization_pct: { type: number, minimum: 0, maximum: 100 }
+        warning_pct: { type: integer, minimum: 0, maximum: 100 }
+        hard_cap: { type: boolean }
+        tenant_paid_uncapped: { type: boolean }
+        invocations: { type: integer, minimum: 0 }
+        tokens: { type: integer, minimum: 0 }
+        counter_updated_at: { type: string, format: date-time, nullable: true }
+        status:
+          type: string
+          enum: [ok, warning, exceeded]
+    AdminBudgetStatusListResponse:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/AdminBudgetStatusItem' }
         note: { type: string }
 
     # ── Fine-tuning ──────────────────────────────────────────────────

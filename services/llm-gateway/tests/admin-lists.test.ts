@@ -43,6 +43,12 @@ describe('admin list endpoints (no DB configured)', () => {
     expect(res.status).toBe(200);
     expect(res.body.items).toEqual([]);
   });
+
+  it('GET /v1/admin/budget-status returns empty items + note', async () => {
+    const res = await request(app).get('/v1/admin/budget-status');
+    expect(res.status).toBe(200);
+    expect(res.body.items).toEqual([]);
+  });
 });
 
 describe('admin list endpoints (mocked client)', () => {
@@ -122,6 +128,36 @@ describe('admin list endpoints (mocked client)', () => {
     expect(res.status).toBe(200);
     expect(res.body.items).toHaveLength(2);
     expect(res.body.items[1].error_code).toBe('PROVIDER_UNAVAILABLE');
+  });
+
+  it('GET /v1/admin/budget-status joins caps + counters and computes utilization', async () => {
+    setAdminListClientForTesting(makeFakeClient({
+      budget_caps: [
+        // 80% spent, warning_pct 75 → status 'warning'
+        { scope_kind: 'tenant', scope_id: 'tenant-A', period_kind: 'daily',
+          limit_usd: 10, warning_pct: 75, hard_cap: true, tenant_paid_uncapped: false },
+        // 100% spent → status 'exceeded'
+        { scope_kind: 'tenant', scope_id: 'tenant-B', period_kind: 'daily',
+          limit_usd: 5, warning_pct: 80, hard_cap: true, tenant_paid_uncapped: false },
+        // 0% spent → status 'ok'
+        { scope_kind: 'tenant', scope_id: 'tenant-C', period_kind: 'monthly',
+          limit_usd: 200, warning_pct: 80, hard_cap: false, tenant_paid_uncapped: false },
+      ],
+      budget_counters: [
+        { scope_kind: 'tenant', scope_id: 'tenant-A', period_kind: 'daily',
+          period_started_at: '2026-06-03T00:00:00Z', spent_usd: 8,
+          invocations: 40, tokens: 12000, updated_at: '2026-06-03T03:00:00Z' },
+        { scope_kind: 'tenant', scope_id: 'tenant-B', period_kind: 'daily',
+          period_started_at: '2026-06-03T00:00:00Z', spent_usd: 5,
+          invocations: 25, tokens: 7000, updated_at: '2026-06-03T03:00:00Z' },
+      ],
+    }));
+    const res = await request(app).get('/v1/admin/budget-status');
+    expect(res.status).toBe(200);
+    expect(res.body.items).toHaveLength(3);
+    expect(res.body.items[0]).toMatchObject({ scope_id: 'tenant-B', utilization_pct: 100, status: 'exceeded' });
+    expect(res.body.items[1]).toMatchObject({ scope_id: 'tenant-A', utilization_pct: 80, status: 'warning' });
+    expect(res.body.items[2]).toMatchObject({ scope_id: 'tenant-C', utilization_pct: 0, status: 'ok' });
   });
 
   it('GET /v1/admin/experiments shapes rows including verdict when present', async () => {

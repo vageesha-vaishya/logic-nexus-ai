@@ -14,7 +14,7 @@ import { Logger } from "../_shared/logger.ts";
 // @ts-ignore
 declare const Deno: any;
 
-type ListKind = "prompts" | "experiments" | "audit";
+type ListKind = "prompts" | "experiments" | "audit" | "budget-status";
 
 interface ListRequest {
   kind: ListKind;
@@ -32,8 +32,8 @@ function parseInputs(raw: unknown): ListRequest | { error: string } {
   if (!raw || typeof raw !== "object") return { error: "body must be a JSON object" };
   const r = raw as Record<string, unknown>;
   const kind = r.kind as ListKind;
-  if (kind !== "prompts" && kind !== "experiments" && kind !== "audit") {
-    return { error: "kind must be one of: prompts, experiments, audit" };
+  if (kind !== "prompts" && kind !== "experiments" && kind !== "audit" && kind !== "budget-status") {
+    return { error: "kind must be one of: prompts, experiments, audit, budget-status" };
   }
   const filters = (r.filters && typeof r.filters === "object" && !Array.isArray(r.filters))
     ? (r.filters as Record<string, string | number | undefined>)

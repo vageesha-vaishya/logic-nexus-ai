@@ -24,6 +24,7 @@ import {
   useAdminPromptList,
   useAdminExperimentList,
   useAdminAuditList,
+  useAdminBudgetStatus,
 } from '@/features/admin/llm-gateway/useLlmGatewayLists';
 
 function ErrorBox({ err }: { err: unknown }) {
@@ -274,6 +275,101 @@ function AuditTab() {
   );
 }
 
+function BudgetsTab() {
+  const [periodFilter, setPeriodFilter] = useState<string>('all');
+  const q = useAdminBudgetStatus(periodFilter === 'all' ? undefined : (periodFilter as 'daily' | 'weekly' | 'monthly'));
+  return (
+    <Card className="p-4 space-y-3">
+      <div className="flex items-center justify-between gap-2">
+        <div>
+          <h2 className="text-sm font-semibold">Budget status</h2>
+          <p className="text-xs text-muted-foreground">Spend vs cap per scope. Sorted by utilization — scopes near or above their cap surface first.</p>
+        </div>
+        <div className="flex items-center gap-2">
+          <Select value={periodFilter} onValueChange={setPeriodFilter}>
+            <SelectTrigger className="w-[120px] h-8 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All periods</SelectItem>
+              <SelectItem value="daily">Daily</SelectItem>
+              <SelectItem value="weekly">Weekly</SelectItem>
+              <SelectItem value="monthly">Monthly</SelectItem>
+            </SelectContent>
+          </Select>
+          <Button variant="ghost" size="sm" onClick={() => q.refetch()} disabled={q.isFetching}>
+            {q.isFetching ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />}
+          </Button>
+        </div>
+      </div>
+      {q.isError && <ErrorBox err={q.error} />}
+      {q.data?.note && (
+        <p className="rounded-md border bg-muted/30 px-3 py-2 text-xs text-muted-foreground">{q.data.note}</p>
+      )}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Scope</TableHead>
+            <TableHead>Period</TableHead>
+            <TableHead className="text-right">Spend / cap</TableHead>
+            <TableHead className="w-[180px]">Utilization</TableHead>
+            <TableHead>Status</TableHead>
+            <TableHead className="text-right">Invocations</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {(q.data?.items ?? []).map((row) => {
+            const barColor =
+              row.status === 'exceeded' ? 'bg-red-500' :
+              row.status === 'warning' ? 'bg-amber-500' : 'bg-emerald-500';
+            return (
+              <TableRow key={`${row.scope_kind}-${row.scope_id}-${row.period_kind}`}>
+                <TableCell>
+                  <div className="text-xs">
+                    <span className="font-mono">{row.scope_kind}</span>
+                    <span className="text-muted-foreground"> · </span>
+                    <span className="font-mono">{row.scope_id}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="text-xs capitalize">{row.period_kind}</TableCell>
+                <TableCell className="text-right text-xs tabular-nums">
+                  ${row.spent_usd.toFixed(2)} / ${row.limit_usd.toFixed(2)}
+                </TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <div className="h-1.5 w-32 overflow-hidden rounded-full bg-muted">
+                      <div
+                        className={`h-full ${barColor} transition-[width]`}
+                        style={{ width: `${row.utilization_pct}%` }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-muted-foreground tabular-nums w-10 text-right">
+                      {row.utilization_pct.toFixed(0)}%
+                    </span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Badge variant={
+                    row.status === 'exceeded' ? 'destructive' :
+                    row.status === 'warning' ? 'outline' : 'secondary'
+                  }>
+                    {row.status}
+                    {row.hard_cap && row.status === 'exceeded' ? ' · hard' : ''}
+                  </Badge>
+                </TableCell>
+                <TableCell className="text-right text-xs tabular-nums">{row.invocations}</TableCell>
+              </TableRow>
+            );
+          })}
+          {q.isSuccess && (q.data?.items.length ?? 0) === 0 && (
+            <TableRow><TableCell colSpan={6} className="text-center text-sm text-muted-foreground">No budget caps configured.</TableCell></TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </Card>
+  );
+}
+
 export default function LlmGatewayAdminPage() {
   return (
     <div className="p-6 space-y-4">
@@ -288,10 +384,12 @@ export default function LlmGatewayAdminPage() {
           <TabsTrigger value="prompts">Prompts</TabsTrigger>
           <TabsTrigger value="experiments">Experiments</TabsTrigger>
           <TabsTrigger value="audit">Audit log</TabsTrigger>
+          <TabsTrigger value="budgets">Budgets</TabsTrigger>
         </TabsList>
         <TabsContent value="prompts" className="mt-3"><PromptsTab /></TabsContent>
         <TabsContent value="experiments" className="mt-3"><ExperimentsTab /></TabsContent>
         <TabsContent value="audit" className="mt-3"><AuditTab /></TabsContent>
+        <TabsContent value="budgets" className="mt-3"><BudgetsTab /></TabsContent>
       </Tabs>
     </div>
   );

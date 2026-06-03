@@ -48,9 +48,26 @@ export interface AdminAuditRow {
   variant_label?: string | null;
 }
 
+export interface AdminBudgetStatusRow {
+  scope_kind: string;
+  scope_id: string;
+  period_kind: 'daily' | 'weekly' | 'monthly';
+  period_started_at: string | null;
+  limit_usd: number;
+  spent_usd: number;
+  utilization_pct: number;
+  warning_pct: number;
+  hard_cap: boolean;
+  tenant_paid_uncapped: boolean;
+  invocations: number;
+  tokens: number;
+  counter_updated_at: string | null;
+  status: 'ok' | 'warning' | 'exceeded';
+}
+
 type AnyFilters = Record<string, string | number | undefined>;
 
-async function callList<T>(kind: 'prompts' | 'experiments' | 'audit', filters: AnyFilters = {}): Promise<{ items: T[]; note?: string }> {
+async function callList<T>(kind: 'prompts' | 'experiments' | 'audit' | 'budget-status', filters: AnyFilters = {}): Promise<{ items: T[]; note?: string }> {
   const { data, error } = await supabase.functions.invoke<{ items: T[]; note?: string }>(
     'llm-admin-list',
     { body: { kind, filters } },
@@ -82,6 +99,14 @@ export interface AuditFilters {
   tenant_id?: string;
   limit?: number;
 }
+export function useAdminBudgetStatus(periodKind?: 'daily' | 'weekly' | 'monthly') {
+  return useQuery({
+    queryKey: ['llm-admin', 'budget-status', periodKind ?? null],
+    queryFn: () => callList<AdminBudgetStatusRow>('budget-status', periodKind ? { period_kind: periodKind } : {}),
+    staleTime: 30_000,
+  });
+}
+
 export function useAdminAuditList(filters: AuditFilters = {}) {
   return useQuery({
     queryKey: ['llm-admin', 'audit', filters],
