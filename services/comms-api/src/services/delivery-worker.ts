@@ -32,6 +32,8 @@ import { getSmsProvider } from '../providers/sms-provider.js';
 import type { SmsProvider, OutboundSms, SmsSendResult } from '../providers/sms-provider.js';
 import { getWhatsappProvider } from '../providers/whatsapp-provider.js';
 import type { WhatsappProvider, OutboundWhatsapp, WhatsappSendResult } from '../providers/whatsapp-provider.js';
+import { getPushProvider } from '../providers/push-provider.js';
+import type { PushProvider, OutboundPush, PushSendResult } from '../providers/push-provider.js';
 import { isSuppressed } from './suppressions.js';
 import { TemplateRenderer } from './template-renderer.js';
 import { logger } from '../utils/logger.js';
@@ -43,9 +45,10 @@ const FROM_ADDRESS = process.env.COMMS_DEFAULT_FROM || 'SOS Logistics <notificat
 const SMS_FROM_NUMBER = process.env.COMMS_SMS_DEFAULT_FROM || '';
 const WHATSAPP_FROM_NUMBER = process.env.COMMS_WHATSAPP_DEFAULT_FROM || '';
 const PUBLIC_BASE_URL = (process.env.COMMS_PUBLIC_BASE_URL || 'https://sosservices.online').replace(/\/$/, '');
-// Channels the worker picks up on each tick. push + in_app stay
-// 'pending' until their providers + render paths ship.
-const ACTIVE_CHANNELS: ReadonlyArray<string> = ['email', 'sms', 'whatsapp'];
+// Channels the worker picks up on each tick. in_app stays 'pending' —
+// useNotifications.ts reads markets.notifications directly without
+// going through comms.deliveries.
+const ACTIVE_CHANNELS: ReadonlyArray<string> = ['email', 'sms', 'whatsapp', 'push'];
 
 interface DeliveryWithIntent extends DeliveryRow {
   intent?: NotificationIntent | null;
@@ -56,6 +59,7 @@ export class DeliveryWorker {
   private emailProvider: EmailProvider | null = null;
   private smsProvider: SmsProvider | null = null;
   private whatsappProvider: WhatsappProvider | null = null;
+  private pushProvider: PushProvider | null = null;
   private templateRenderer: TemplateRenderer | null = null;
   private running = false;
   private intervalHandle: NodeJS.Timeout | null = null;
@@ -71,6 +75,7 @@ export class DeliveryWorker {
     this.emailProvider = getEmailProvider();
     this.smsProvider = getSmsProvider();
     this.whatsappProvider = getWhatsappProvider();
+    this.pushProvider = getPushProvider();
     this.templateRenderer = new TemplateRenderer(this.supabase);
     logger.info('comms delivery worker starting', {
       pollMs: POLL_INTERVAL_MS,
@@ -78,6 +83,7 @@ export class DeliveryWorker {
       emailProvider: this.emailProvider.name,
       smsProvider: this.smsProvider.name,
       whatsappProvider: this.whatsappProvider.name,
+      pushProvider: this.pushProvider.name,
     });
     this.intervalHandle = setInterval(() => {
       void this.tick();
@@ -150,7 +156,7 @@ export class DeliveryWorker {
   }
 
   private async processDelivery(delivery: DeliveryWithIntent): Promise<void> {
-    if (!this.supabase || !this.emailProvider || !this.smsProvider || !this.whatsappProvider) return;
+    if (!this.supabase || !this.emailProvider || !this.smsProvider || !this.whatsappProvider || !this.pushProvider) return;
     const channel = delivery.channel_kind as ChannelKind;
     if (!ACTIVE_CHANNELS.includes(channel)) return;
 
@@ -190,8 +196,24 @@ export class DeliveryWorker {
     // 3. Send. Route per channel — each provider returns the same
     //    {ok, providerMessageId?, errorText?, providerName, permanent?}
     //    shape so the retry/failure handling below is channel-agnostic.
-    let result: SendResult | SmsSendResult | WhatsappSendResult;
-    if (channel === 'sms') {
+    let result: SendResult | SmsSendResult | WhatsappSendResult | PushSendResult;
+    if (channel === 'push') {
+      // recipient_address holds the device token. Title/body come from
+      // the rendered template — push templates use subject_template
+      // for the banner title and body_text_template for the body.
+      const push: OutboundPush = {
+        tenantId: delivery.tenant_id,
+        token: address,
+        title: rendered.subject || 'Notification',
+        body: rendered.text || stripHtml(rendered.html || ''),
+        data: {
+          intent_kind: delivery.intent?.intent_kind || '',
+          subject_type: delivery.intent?.subject_type || '',
+          subject_id: delivery.intent?.subject_id || '',
+        },
+      };
+      result = await this.pushProvider.send(push);
+    } else if (channel === 'sms') {
       const sms: OutboundSms = {
         tenantId: delivery.tenant_id,
         from: SMS_FROM_NUMBER,

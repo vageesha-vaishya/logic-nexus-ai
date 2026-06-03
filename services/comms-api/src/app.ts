@@ -109,11 +109,12 @@ app.get('/comms/v1/_status', (_req: Request, res: Response) => {
       'notification-dispatcher (polls core.notifications, fans out into comms.deliveries via UNIQUE intent dedup index)',
       'delivery-worker (picks up status=pending deliveries on the active channels, suppression-checks, sends via the per-channel provider, writes status back)',
     ],
-    active_channels: ['email', 'sms', 'whatsapp'],
+    active_channels: ['email', 'sms', 'whatsapp', 'push'],
     providers: {
       email: process.env.COMMS_EMAIL_PROVIDER || 'null',
       sms: process.env.COMMS_SMS_PROVIDER || 'null',
       whatsapp: process.env.COMMS_WHATSAPP_PROVIDER || 'null',
+      push: process.env.FCM_SERVICE_ACCOUNT_JSON ? 'fcm' : 'null',
     },
   });
 });

@@ -261,15 +261,50 @@ export class RecipientResolver {
         });
         return [];
       }
-      const channels: ChannelKind[] = ['email'];
-      // 'in_app' is always available — useNotifications.ts reads markets.notifications
-      // directly without a comms.deliveries delivery attempt. Skipped here.
-      return channels.map((channel) => ({
-        userId,
-        channel,
-        address: data.user.email as string,
-        displayName: (data.user.user_metadata?.full_name as string) || null,
-      }));
+      const displayName = (data.user.user_metadata?.full_name as string) || null;
+      const recipients: ResolvedRecipient[] = [
+        // 'in_app' is always available — useNotifications.ts reads
+        // markets.notifications directly without going through
+        // comms.deliveries. Skipped here.
+        {
+          userId,
+          channel: 'email',
+          address: data.user.email as string,
+          displayName,
+        },
+      ];
+
+      // Add a push recipient per active device token. One delivery
+      // row per token so a multi-device user gets the same intent on
+      // every device; the dedup unique index in comms.deliveries
+      // (tenant, notification, channel, address) tolerates this
+      // because the address is the unique token.
+      try {
+        const { data: tokens } = await (this.supabase as any)
+          .schema('markets')
+          .from('push_tokens')
+          .select('token, platform')
+          .eq('user_id', userId)
+          .eq('is_active', true)
+          .limit(20);
+        for (const t of ((tokens ?? []) as Array<{ token: string; platform: string | null }>)) {
+          if (!t.token) continue;
+          recipients.push({
+            userId,
+            channel: 'push',
+            address: t.token,
+            displayName,
+          });
+        }
+      } catch (err) {
+        // Don't let a push lookup failure starve the email delivery.
+        logger.warn('recipient resolver: push token lookup threw', {
+          userId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      return recipients;
     } catch (err) {
       logger.warn('recipient resolver: user lookup threw', {
         userId,
