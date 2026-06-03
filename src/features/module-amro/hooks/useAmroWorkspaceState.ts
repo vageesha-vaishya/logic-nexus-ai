@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useDomain } from '@/contexts/DomainContext';
+import { useAmroApiAvailability } from './useAmroApiAvailability';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -94,7 +95,6 @@ export function useAmroWorkspaceState() {
   const apiBaseUrl = useMemo(() => getAmroApiBaseUrl(), []);
   const [assets, setAssets] = useState<AmroAssetRegistryRecord[]>(initialAssets);
   const [assetsLoadedFromApi, setAssetsLoadedFromApi] = useState<boolean>(false);
-  const [apiUnavailableUntil, setApiUnavailableUntil] = useState<number>(0);
   const [hasV1WorkOrderConnectivity, setHasV1WorkOrderConnectivity] = useState<boolean>(false);
   const [workOrders, setWorkOrders] = useState<AmroWorkOrder[]>([]);
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string>('');
@@ -213,12 +213,13 @@ export function useAmroWorkspaceState() {
     token,
   ]);
 
-  const isApiTemporarilyUnavailable = useCallback(() => Date.now() < apiUnavailableUntil, [apiUnavailableUntil]);
-
-  const markApiTemporarilyUnavailable = useCallback(() => {
-    setApiUnavailableUntil(Date.now() + 30000);
-    setRealtimeConnected(false);
-  }, []);
+  // Phase 8f.1: API-availability cooldown extracted to useAmroApiAvailability.
+  // Orchestrator wires onUnavailable to also drop the realtime flag (the
+  // cross-slice side effect the original markApiTemporarilyUnavailable did).
+  const { isApiTemporarilyUnavailable, markApiTemporarilyUnavailable } =
+    useAmroApiAvailability({
+      onUnavailable: useCallback(() => setRealtimeConnected(false), []),
+    });
 
   useEffect(() => {
     if (!isAwaitingAmroDomainActivation) {
