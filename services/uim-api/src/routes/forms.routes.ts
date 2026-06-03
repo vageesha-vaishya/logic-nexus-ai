@@ -33,6 +33,11 @@ import {
   parsePositiveInt,
   tryHandleUimFormStorageError,
 } from '../services/forms-shared.js';
+import {
+  buildDerivedNodeRecords,
+  buildSchemaDrivenColumnCatalog,
+  mapItemMasterPayloadToCatalog,
+} from '../services/forms-canonical.js';
 
 const router = Router();
 
@@ -66,6 +71,12 @@ function getServiceRoleClient() {
 }
 
 // ── GET /v1/uim/forms/:node — list ──────────────────────────────────
+// Canonical-first: try buildDerivedNodeRecords for the 6 known
+// node_keys with a real backing table (item-master, stock-ledger,
+// issue-consume, restock, reservations, locations, analytics,
+// overview). On any error from canonical, fall back to the generic
+// uim_form_records form-storage path. This mirrors the legacy GET
+// handler's behavior exactly.
 router.get(
   '/v1/uim/forms/:node',
   asyncHandler(async (req, res) => {
@@ -77,8 +88,35 @@ router.get(
     const limit = Math.min(parsePositiveInt(req.query.limit, 25), 200);
     const offset = Math.max(Number(req.query.offset) || 0, 0);
 
+    const supabase = getServiceRoleClient();
+    const access = {
+      tenantId: authReq.tenantId,
+      franchiseId: authReq.franchiseId || null,
+    };
+
+    // Try canonical first.
     try {
-      const supabase = getServiceRoleClient();
+      const canonical = await buildDerivedNodeRecords(supabase, access, nodeKey, limit, offset);
+      const schemaDrivenCatalog = buildSchemaDrivenColumnCatalog(
+        canonical.columnCatalog,
+        canonical.records,
+      );
+      return res.json({
+        node_key: nodeKey,
+        source: canonical.source,
+        records: canonical.records,
+        column_catalog: schemaDrivenCatalog,
+        pagination: { limit, offset, total: canonical.total },
+      });
+    } catch (canonicalErr) {
+      logger.warn('uim.forms canonical read failed, falling back to form-storage', {
+        node: nodeKey,
+        error: String(canonicalErr),
+      });
+    }
+
+    // Fallback: form-storage.
+    try {
       let query = supabase
         .from('uim_form_records')
         .select('id, node_key, payload, metadata, created_at, updated_at', { count: 'exact' })
@@ -95,6 +133,7 @@ router.get(
       }
       return res.json({
         node_key: nodeKey,
+        source: 'form-storage',
         records: data ?? [],
         pagination: { limit, offset, total: count ?? 0 },
       });
@@ -110,6 +149,11 @@ router.get(
 );
 
 // ── POST /v1/uim/forms/:node — create ───────────────────────────────
+// item-master writes go to uim_catalog_items via
+// mapItemMasterPayloadToCatalog (matches legacy POST behavior — the
+// item-master form is the only node with a real backing write
+// target). All other nodes write to the generic uim_form_records
+// table.
 router.post(
   '/v1/uim/forms/:node',
   asyncHandler(async (req, res) => {
@@ -126,8 +170,47 @@ router.post(
       ? payload.metadata as Record<string, unknown>
       : { source: 'uim-api.forms' };
 
+    const supabase = getServiceRoleClient();
+
+    if (nodeKey === 'item-master') {
+      const catalogInsert = mapItemMasterPayloadToCatalog({
+        payload: recordPayload,
+        tenantId: authReq.tenantId,
+        franchiseId: authReq.franchiseId || null,
+        userId: authReq.userId,
+      });
+      if (!String(catalogInsert.sku || '').trim()) {
+        return res.status(400).json({
+          error: 'SKU is required for item-master',
+          code: 'UIM_ITEM_MASTER_SKU_REQUIRED',
+          statusCode: 400,
+        } as ErrorResponse);
+      }
+      try {
+        const { data, error } = await supabase
+          .from('uim_catalog_items')
+          .insert(catalogInsert)
+          .select('id, sku, part_number, title, category, unit_of_measure, attributes, updated_at')
+          .limit(1)
+          .maybeSingle();
+        if (error) throw new Error(`Failed to create UIM item-master record: ${error.message}`);
+        return res.status(201).json({
+          interface: 'uim-item-master-create',
+          id: String(data?.id || ''),
+          record: data || {},
+          message: 'UIM item-master record created successfully',
+        });
+      } catch (err) {
+        logger.error('uim.forms item-master create error', { error: String(err) });
+        return res.status(500).json({
+          error: err instanceof Error ? err.message : 'Failed to create item-master record',
+          code: 'UIM_ITEM_MASTER_CREATE_ERROR',
+          statusCode: 500,
+        } as ErrorResponse);
+      }
+    }
+
     try {
-      const supabase = getServiceRoleClient();
       const { data, error } = await supabase
         .from('uim_form_records')
         .insert({
