@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Package, MapPin, Calendar, Edit, Paperclip, Download, Upload, CheckCircle2, AlertCircle, Plus, Trash2, FileText } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -22,7 +22,9 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
-import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
+import { CustomsDocExtractPanel } from '@/features/module-logistics/components/CustomsDocExtractPanel';
+import type { CustomsDocExtractOutput, ShipmentContext } from '@/features/module-logistics/hooks/useCustomsDocExtract';
+import { Shipment, ShipmentStatus, statusConfig, formatShipmentType, ShipmentType } from './shipments-data';
 import { logger } from '@/lib/logger';
 import { formatContainerSize } from '@/lib/container-utils';
 
@@ -250,6 +252,90 @@ export default function ShipmentDetail() {
       setPodUploading(false);
     }
   };
+
+  // Map internal ShipmentType to the customs extractor's mode hint.
+  // courier is intentionally null — the document tells us the real mode.
+  const shipmentModeHint = (t: ShipmentType | undefined | null): ShipmentContext['mode'] => {
+    switch (t) {
+      case 'ocean': return 'ocean_fcl';
+      case 'air': return 'air';
+      case 'inland_trucking': return 'road';
+      case 'rail': return 'rail';
+      case 'movers_packers': return 'multimodal';
+      default: return null;
+    }
+  };
+
+  const shipmentContext = useMemo<ShipmentContext>(() => ({
+    shipment_id: id ?? null,
+    booking_reference: shipment?.reference_number ?? null,
+    origin_country: shipment?.origin_address?.country ?? null,
+    destination_country: shipment?.destination_address?.country ?? null,
+    mode: shipmentModeHint(shipment?.shipment_type),
+    incoterm_hint: shipment?.incoterms ?? null,
+    currency_hint: shipment?.currency ?? null,
+    notes_from_uploader: null,
+  }), [
+    id,
+    shipment?.reference_number,
+    shipment?.origin_address?.country,
+    shipment?.destination_address?.country,
+    shipment?.shipment_type,
+    shipment?.incoterms,
+    shipment?.currency,
+  ]);
+
+  // After the LLM finishes parsing the uploaded customs doc, persist the
+  // file to storage + insert a shipment_attachments row stamped with the
+  // extracted doc_type. The structured output (parties, totals, route) is
+  // toast-summarised; deeper persistence would need a JSONB column the
+  // table doesn't have today — keep the slice tight and toast for now.
+  const handleAttachExtractedDoc = useCallback(async (
+    output: CustomsDocExtractOutput,
+    file: File,
+  ) => {
+    try {
+      if (!id) return;
+      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `${id}/customs_${Date.now()}_${safeName}`;
+      const { error: uploadError } = await supabase.storage
+        .from('shipments')
+        .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('shipments')
+        .getPublicUrl(path);
+      const publicUrl = urlData?.publicUrl ?? null;
+
+      const targetTenantId = shipment?.tenant_id || context?.tenantId;
+      const targetFranchiseId = shipment?.franchise_id || context?.franchiseId;
+
+      const { error: metaErr } = await (scopedDb
+        .from('shipment_attachments' as any)
+        .insert([{
+          shipment_id: id,
+          tenant_id: targetTenantId,
+          franchise_id: targetFranchiseId,
+          created_by: context?.userId,
+          name: file.name,
+          path,
+          size: file.size,
+          content_type: file.type || null,
+          public_url: publicUrl,
+          document_type: output.doc_type,
+        }]) as any);
+      if (metaErr) throw metaErr;
+
+      const docNum = output.doc_number ? ` (${output.doc_number})` : '';
+      toast.success(`Attached ${output.doc_type}${docNum} to shipment`);
+      await fetchAttachments();
+    } catch (error) {
+      logger.error('Customs doc attach failed', error);
+      const msg = error instanceof Error ? error.message : 'Unknown error';
+      toast.error(`Failed to attach customs doc: ${msg}`);
+    }
+  }, [id, shipment?.tenant_id, shipment?.franchise_id, supabase, scopedDb, context, fetchAttachments]);
 
   const getStatusColor = (status: ShipmentStatus) => {
     return statusConfig[status]?.color || 'bg-gray-500/10 text-gray-500';
@@ -689,6 +775,14 @@ export default function ShipmentDetail() {
             </div>
           </CardHeader>
           <CardContent>
+            {/* AI customs doc extract — drop-in panel from module-logistics */}
+            <div className="mb-4">
+              <CustomsDocExtractPanel
+                context={shipmentContext}
+                onAttach={handleAttachExtractedDoc}
+              />
+            </div>
+
             {/* POD upload control */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4 p-3 border rounded-md">
               <div className="flex items-center gap-2">
