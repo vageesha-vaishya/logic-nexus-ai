@@ -317,6 +317,67 @@ router.get(
   }),
 );
 
+// POST /v1/compliance/screenings/:id/attest
+//   Canonical two-officer override entrypoint. Calls compliance.
+//   attest_override which picks single-officer fast-path (when
+//   screening.requires_co_sign=false) or the two-officer request →
+//   attest flow. The same officer cannot do both calls.
+//   Body: { reason: string, evidence_file_ids?: string[] }
+//   200 → { state: 'pending_attestation' | 'attested' |
+//                  'overridden_single_officer', ... }
+router.post(
+  '/v1/compliance/screenings/:id/attest',
+  asyncHandler(async (req, res) => {
+    const authReq = req as AuthRequest;
+    if (!authReq.userId || !authReq.tenantId) return unauthorized(res);
+    const { id } = req.params;
+    const body = (req.body ?? {}) as { reason?: unknown; evidence_file_ids?: unknown };
+    const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
+    if (!reason) {
+      return res.status(400).json({
+        error: 'reason required',
+        code: 'INVALID_REQUEST',
+        statusCode: 400,
+      } as ErrorResponse);
+    }
+    const evidenceIds = Array.isArray(body.evidence_file_ids)
+      ? (body.evidence_file_ids as unknown[]).filter((v): v is string => typeof v === 'string')
+      : null;
+
+    try {
+      const supabase = getServiceRoleClient();
+      const { data, error } = await (supabase as any)
+        .schema('compliance')
+        .rpc('attest_override', {
+          p_screening_id: id,
+          p_user_id: authReq.userId,
+          p_reason: reason,
+          p_evidence_file_ids: evidenceIds,
+        });
+      if (error) {
+        // Translate the SQL P0001 SELF_ATTEST_FORBIDDEN error into a
+        // 403 so the frontend can show "another officer must approve"
+        // without parsing the SQLSTATE.
+        if (/SELF_ATTEST_FORBIDDEN/i.test(error.message ?? '')) {
+          return res.status(403).json({
+            error: error.message,
+            code: 'SELF_ATTEST_FORBIDDEN',
+            statusCode: 403,
+          } as ErrorResponse);
+        }
+        throw error;
+      }
+      // attest_override RETURNS TABLE — supabase wraps single-row results
+      // as an array. Always return the first row.
+      const row = Array.isArray(data) ? data[0] : data;
+      return res.json({ data: row });
+    } catch (err) {
+      logger.error('compliance.attest_override rpc error', err);
+      return serverError(res, 'COMPLIANCE_ATTEST_ERROR', err);
+    }
+  }),
+);
+
 // POST /v1/compliance/screenings/:id/revoke-override
 //   Body: { reason: string }
 //   Wraps the compliance.revoke_override RPC.

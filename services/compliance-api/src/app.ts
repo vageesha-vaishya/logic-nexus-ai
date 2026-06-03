@@ -84,6 +84,7 @@ app.get('/compliance/v1/_status', (_req: Request, res: Response) => {
       'GET  /api/v1/compliance/screenings/:id',
       'GET  /api/v1/compliance/screenings/:id/decisions',
       'POST /api/v1/compliance/screenings/:id/override',
+      'POST /api/v1/compliance/screenings/:id/attest',
       'POST /api/v1/compliance/screenings/:id/revoke-override',
       'GET  /api/v1/compliance/records/:subject_type/:subject_id',
       'GET  /api/v1/compliance/blocked-parties',
