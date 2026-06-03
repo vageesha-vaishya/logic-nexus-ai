@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
 import integrationsRoutes from './routes/integrations.routes.js';
+import dlqRoutes from './routes/dlq.routes.js';
 import type { ErrorResponse } from './types/uim.types.js';
 import { logger } from './utils/logger.js';
 
@@ -102,6 +103,7 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'POST   /api/v1/uim/integrations',
       'PATCH  /api/v1/uim/integrations/:id',
       'DELETE /api/v1/uim/integrations/:id',
+      'POST   /api/v1/uim/dlq/process  (platform_admin)',
     ],
     dual_writes: [
       'platform.integrations            → uim.integrations',
@@ -149,6 +151,7 @@ function auditApiRequest(req: Request, res: Response, next: NextFunction): void 
 }
 
 app.use('/api', authMiddleware, auditApiRequest, integrationsRoutes);
+app.use('/api', authMiddleware, auditApiRequest, dlqRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
