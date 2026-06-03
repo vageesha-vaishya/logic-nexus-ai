@@ -19,10 +19,13 @@ import './types/reservation.js';
 import './types/reservation-connection.js';
 import './types/ledger-entry.js';
 import './types/ledger-entry-connection.js';
+import './types/part-availability.js';
+import './types/location-availability.js';
 
 // Queries
 import './queries/health.queries.js';
 import './queries/inventory.queries.js';
 import './queries/reservation.queries.js';
+import './queries/availability.queries.js';
 
 export const schema = builder.toSchema();
