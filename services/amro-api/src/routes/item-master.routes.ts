@@ -184,8 +184,12 @@ router.get(
     const to = from + pageSize - 1;
     const supabase = getSupabaseAdminClient();
 
+    // Step 9d read cutover: source is amro_v_item_master view
+    // (uim.item_master joined with amro.part_profiles). Writes still
+    // hit amro_item_master + dual-write trigger to uim.item_master.
+    // Column names are byte-compatible with amro_item_master.
     let query = supabase
-      .from('amro_item_master')
+      .from('amro_v_item_master')
       .select('id,part_number,description,item_type,category,subcategory,status,lifecycle_status,specification,manufacturer_name,manufacturer_part_number,oem_part_number,unit_of_measure,base_unit_of_measure,uom_conversion_factor,currency,is_active,metadata,created_at,updated_at', { count: 'exact' })
       .eq('tenant_id', tenantId)
       .order('updated_at', { ascending: false })
@@ -237,8 +241,9 @@ router.get(
     const supabase = getSupabaseAdminClient();
     const tenantId = String(req.tenantId);
 
+    // Step 9d read cutover: see list route above.
     const { data, error } = await supabase
-      .from('amro_item_master')
+      .from('amro_v_item_master')
       .select('id,part_number,description,item_type,category,subcategory,status,lifecycle_status,specification,manufacturer_name,manufacturer_part_number,oem_part_number,unit_of_measure,base_unit_of_measure,uom_conversion_factor,currency,is_active,metadata,created_at,updated_at')
       .eq('tenant_id', tenantId)
       .eq('id', id)
