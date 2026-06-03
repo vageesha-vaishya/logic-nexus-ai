@@ -1,0 +1,85 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/llm-prompts/amro.compliance.doc_ocr.v1.json",
+  "title": "amro.compliance.doc_ocr output v1",
+  "type": "object",
+  "required": [
+    "doc_type", "issuing_authority", "issuing_organisation",
+    "approval_number", "serial_or_lot", "part_number", "part_description",
+    "quantity", "work_performed_codes", "authorised_signature",
+    "applicable_to_aircraft", "expires_on", "extracted_text_excerpts",
+    "warnings", "confidence"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "doc_type": {
+      "type": "string",
+      "enum": [
+        "form_8130-3", "easa_form_1", "caac_aac_038", "sacaa_card",
+        "ad_signoff", "sb_completion", "ferry_permit",
+        "other_release_cert", "unknown"
+      ]
+    },
+    "issuing_authority": {
+      "type": ["string", "null"],
+      "enum": ["FAA", "EASA", "CAAC", "SACAA", "OTHER", null]
+    },
+    "issuing_organisation": { "type": ["string", "null"] },
+    "approval_number": { "type": ["string", "null"] },
+    "serial_or_lot": {
+      "type": "object",
+      "required": ["type", "value"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["serial", "lot", "batch", "none"] },
+        "value": { "type": ["string", "null"] }
+      }
+    },
+    "part_number": { "type": ["string", "null"] },
+    "part_description": { "type": ["string", "null"] },
+    "quantity": {
+      "type": "object",
+      "required": ["value", "unit"],
+      "additionalProperties": false,
+      "properties": {
+        "value": { "type": ["number", "null"] },
+        "unit": { "type": ["string", "null"], "enum": ["EA", "FT", "GAL", "KG", "L", "OTHER", null] }
+      }
+    },
+    "work_performed_codes": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "authorised_signature": {
+      "type": "object",
+      "required": ["present", "signatory_name", "signatory_role", "signature_date"],
+      "additionalProperties": false,
+      "properties": {
+        "present": { "type": "boolean" },
+        "signatory_name": { "type": ["string", "null"] },
+        "signatory_role": { "type": ["string", "null"] },
+        "signature_date": { "type": ["string", "null"] }
+      }
+    },
+    "applicable_to_aircraft": {
+      "type": "object",
+      "required": ["registration_extracted", "matches_context", "match_rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "registration_extracted": { "type": ["string", "null"] },
+        "matches_context": { "type": ["boolean", "null"] },
+        "match_rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "expires_on": { "type": ["string", "null"] },
+    "extracted_text_excerpts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}
