@@ -84,6 +84,11 @@ export type Permission =
   | 'finance.draft_invoices.view' | 'finance.draft_invoices.manage'
   | 'finance.outbox_retries.view' | 'finance.outbox_retries.manage'
   | 'compliance.officer.view' | 'compliance.officer.manage'
+  // Phase 7 UIM Step 5 — tighten module-level route guards.
+  // uim.read controls visibility of the Universal Integration Module
+  // (inventory + integrations + webhooks); uim.manage gates the write
+  // surfaces (CRUD on integrations, webhook subscriptions, etc.).
+  | 'uim.read' | 'uim.manage'
   | 'view_amro_dashboard'
   | 'create_maintenance_request'
   | 'edit_aircraft_records'
@@ -108,6 +113,7 @@ export const ROLE_PERMISSIONS: Record<
     'campaigns.view','campaigns.manage',
     'files.view','files.manage',
     'dashboards.view','dashboards.manage',
+    'uim.read','uim.manage',
     'reports.view','reports.manage',
     'chatter.view','chatter.post','chatter.moderate',
     'groups.view','groups.manage',
@@ -138,6 +144,7 @@ export const ROLE_PERMISSIONS: Record<
     'campaigns.view','campaigns.manage',
     'files.view','files.manage',
     'dashboards.view','dashboards.manage',
+    'uim.read','uim.manage',
     'reports.view','reports.manage',
     'chatter.view','chatter.post','chatter.moderate',
     'groups.view','groups.manage',
@@ -168,6 +175,7 @@ export const ROLE_PERMISSIONS: Record<
     'campaigns.view','campaigns.manage',
     'files.view','files.manage',
     'dashboards.view','dashboards.manage',
+    'uim.read','uim.manage',
     'reports.view','reports.manage',
     'chatter.view','chatter.post','chatter.moderate',
     'groups.view','groups.manage',
@@ -196,6 +204,7 @@ export const ROLE_PERMISSIONS: Record<
     'campaigns.view',
     'files.view',
     'dashboards.view',
+    'uim.read',
     'reports.view',
     'chatter.view','chatter.post',
     'groups.view',
@@ -218,6 +227,7 @@ export const ROLE_PERMISSIONS: Record<
     'campaigns.view',
     'files.view',
     'dashboards.view',
+    'uim.read',
     'reports.view',
     'chatter.view','chatter.post',
     'groups.view',

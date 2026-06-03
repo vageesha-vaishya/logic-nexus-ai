@@ -1280,14 +1280,14 @@ const App = () => (
             <Route path="/dashboard/reports/reps" element={<ProtectedRoute><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/settings/teams" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><SalesPlaceholder /></ProtectedRoute>} />
             <Route path="/dashboard/settings/activities" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><SalesPlaceholder /></ProtectedRoute>} />
-            <Route path="/dashboard/uim" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
-            <Route path="/dashboard/uim/item-master" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
-            <Route path="/dashboard/uim/stock-ledger" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
-            <Route path="/dashboard/uim/reservations" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
-            <Route path="/dashboard/uim/issue-consume" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
-            <Route path="/dashboard/uim/restock" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
-            <Route path="/dashboard/uim/locations" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
-            <Route path="/dashboard/uim/analytics" element={<ProtectedRoute requiredPermissions={["dashboards.view"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim" element={<ProtectedRoute requiredPermissions={["uim.read"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/item-master" element={<ProtectedRoute requiredPermissions={["uim.read"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/stock-ledger" element={<ProtectedRoute requiredPermissions={["uim.read"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/reservations" element={<ProtectedRoute requiredPermissions={["uim.read"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/issue-consume" element={<ProtectedRoute requiredPermissions={["uim.read"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/restock" element={<ProtectedRoute requiredPermissions={["uim.read"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/locations" element={<ProtectedRoute requiredPermissions={["uim.read"]}><UimShell /></ProtectedRoute>} />
+            <Route path="/dashboard/uim/analytics" element={<ProtectedRoute requiredPermissions={["uim.read"]}><UimShell /></ProtectedRoute>} />
             
             <Route path="*" element={<NotFound />} />
                         </Routes>
