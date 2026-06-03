@@ -1,7 +1,7 @@
 {
   "name": "uim-api",
   "version": "0.1.0",
-  "description": "Dev-only UIM CRUD mock API service",
+  "description": "UIM backend service — integrations + webhooks + DLQ + inventory ledger. Express conformance shape matching finance-api / sales-api / comms-api / compliance-api.",
   "main": "dist/index.js",
   "type": "module",
   "scripts": {
@@ -10,6 +10,7 @@
     "start": "node dist/index.js"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.107.0",
     "cors": "^2.8.5",
     "dotenv": "^16.3.1",
     "express": "^4.18.2"

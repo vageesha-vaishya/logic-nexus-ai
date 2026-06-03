@@ -56,7 +56,7 @@ export default defineConfig(({ mode }) => {
   const complianceApiProxyTarget = process.env.VITE_COMPLIANCE_API_PROXY_TARGET || env.VITE_COMPLIANCE_API_PROXY_TARGET || 'http://localhost:3501';
   const commsApiProxyTarget = process.env.VITE_COMMS_API_PROXY_TARGET || env.VITE_COMMS_API_PROXY_TARGET || 'http://localhost:3601';
   const amroApiProxyTarget = process.env.VITE_AMRO_API_PROXY_TARGET || env.VITE_AMRO_API_PROXY_TARGET || 'http://localhost:3001';
-  const uimApiProxyTarget = process.env.VITE_UIM_API_PROXY_TARGET || env.VITE_UIM_API_PROXY_TARGET || 'http://localhost:3000';
+  const uimApiProxyTarget = process.env.VITE_UIM_API_PROXY_TARGET || env.VITE_UIM_API_PROXY_TARGET || 'http://localhost:3701';
   const tenantBrandingProxyTarget =
     process.env.VITE_TENANT_BRANDING_PROXY_TARGET ||
     env.VITE_TENANT_BRANDING_PROXY_TARGET ||
