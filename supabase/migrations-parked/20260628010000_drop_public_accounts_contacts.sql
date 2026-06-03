@@ -49,6 +49,16 @@
 --       Step 6 triggers are still firing and racing the DROP — pause
 --       and investigate.
 --
+--       NOTE 2026-06-03: parties_drift_check was refined (migration
+--       20260603230000) to exclude carrier/vendor parties whose
+--       external_refs.source IN ('carriers','vendors'). Phase 5
+--       intentionally writes 202 such parties without an accounts
+--       shadow. Before the refinement the check returned
+--       accounts_minus_orgs=-202 even when CRM-side dual-write was
+--       perfectly in sync. Post-refinement {0,0,0} on prod.
+--       Carrier/vendor parties stay in core.parties; the DROP below
+--       does NOT touch them.
+--
 -- Once 1–6 are checked, `git mv` this file into supabase/migrations/,
 -- bumping the timestamp prefix only if needed to maintain ordering
 -- relative to anything that landed since. Apply on local first; verify
