@@ -213,6 +213,14 @@ export class DeliveryWorker {
         },
       };
       result = await this.pushProvider.send(push);
+      // If the provider tells us the recipient token is permanently
+      // unregistered or invalid (UNREGISTERED / INVALID_TOKEN), flip
+      // markets.push_tokens.is_active=false so the resolver stops
+      // creating new deliveries against this dead token.
+      const pushResult = result as PushSendResult;
+      if (pushResult.invalidToken) {
+        await this.deactivatePushToken(pushResult.invalidToken);
+      }
     } else if (channel === 'sms') {
       const sms: OutboundSms = {
         tenantId: delivery.tenant_id,
@@ -316,6 +324,39 @@ export class DeliveryWorker {
       .eq('id', id);
     if (error) {
       logger.warn('delivery status update failed', { id, status, error: error.message });
+    }
+  }
+
+  // Phase 6 push cleanup — flip is_active=false on the matching
+  // markets.push_tokens row when FCM tells us the token is dead.
+  // Best-effort: errors logged but don't fail the delivery write.
+  private async deactivatePushToken(token: string): Promise<void> {
+    if (!this.supabase) return;
+    try {
+      const { error, count } = await (this.supabase as any)
+        .schema('markets')
+        .from('push_tokens')
+        .update({ is_active: false }, { count: 'exact' })
+        .eq('token', token)
+        .eq('is_active', true);
+      if (error) {
+        logger.warn('push token deactivate failed', {
+          token_prefix: token.slice(0, 12),
+          error: error.message,
+        });
+        return;
+      }
+      if ((count ?? 0) > 0) {
+        logger.info('push token deactivated', {
+          token_prefix: token.slice(0, 12),
+          rows: count,
+        });
+      }
+    } catch (err) {
+      logger.warn('push token deactivate threw', {
+        token_prefix: token.slice(0, 12),
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
 
