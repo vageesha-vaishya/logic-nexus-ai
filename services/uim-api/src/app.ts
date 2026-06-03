@@ -25,6 +25,7 @@ import webhooksRoutes from './routes/webhooks.routes.js';
 import seedingRoutes from './routes/seeding.routes.js';
 import reservationsRoutes from './routes/reservations.routes.js';
 import commandsRoutes from './routes/commands.routes.js';
+import formsRoutes from './routes/forms.routes.js';
 import type { ErrorResponse } from './types/uim.types.js';
 import { logger } from './utils/logger.js';
 
@@ -123,6 +124,11 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'POST   /api/v1/uim/seeding/mro  (platform_admin)',
       'POST   /api/v1/uim/reservations/soft',
       'POST   /api/v1/uim/commands  (command_type=RECEIVE|MOVE|RESERVE|CONSUME, idempotency_key?)',
+      'GET    /api/v1/uim/forms/:node',
+      'POST   /api/v1/uim/forms/:node',
+      'GET    /api/v1/uim/forms/:node/:id',
+      'PATCH  /api/v1/uim/forms/:node/:id',
+      'DELETE /api/v1/uim/forms/:node/:id',
     ],
     dual_writes: [
       'platform.integrations            → uim.integrations',
@@ -179,6 +185,7 @@ app.use('/api', authMiddleware, auditApiRequest, webhooksRoutes);
 app.use('/api', authMiddleware, auditApiRequest, seedingRoutes);
 app.use('/api', authMiddleware, auditApiRequest, reservationsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, commandsRoutes);
+app.use('/api', authMiddleware, auditApiRequest, formsRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
