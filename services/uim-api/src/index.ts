@@ -114,9 +114,28 @@ async function startOutboxPoller(): Promise<void> {
   setInterval(() => { void tick(); }, intervalMs).unref();
 }
 
+async function wireEtlPersistence(): Promise<void> {
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    // eslint-disable-next-line no-console
+    console.log('[uim-api] ETL persistence: SUPABASE_URL/SERVICE_ROLE_KEY missing — using in-memory');
+    return;
+  }
+  const { createClient } = await import('@supabase/supabase-js');
+  const { setUimEtlPersistenceAdapter, restoreUimEtlRunsFromPersistence } = await import('./services/etl-scheduler.js');
+  const { createSupabaseEtlPersistenceAdapter } = await import('./services/etl-persistence.js');
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  setUimEtlPersistenceAdapter(createSupabaseEtlPersistenceAdapter(supabase));
+  await restoreUimEtlRunsFromPersistence();
+  // eslint-disable-next-line no-console
+  console.log('[uim-api] ETL persistence wired to uim.etl_runs');
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`[uim-api] listening on :${PORT}`);
+  void wireEtlPersistence();
   void startDlqPoller();
   void startOutboxPoller();
 });
