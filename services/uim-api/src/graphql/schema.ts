@@ -11,7 +11,10 @@ import { builder } from './builder.js';
 // Types
 import './types/health.js';
 import './types/projection-snapshot.js';
+import './types/catalog-item.js';
 import './types/inventory-item.js';
+import './types/page-info.js';
+import './types/inventory-item-connection.js';
 
 // Queries
 import './queries/health.queries.js';

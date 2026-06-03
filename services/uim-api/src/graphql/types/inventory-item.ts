@@ -7,6 +7,7 @@
 // the loaders land.
 
 import { builder } from '../builder.js';
+import { CatalogItemRef } from './catalog-item.js';
 
 export type InventoryItemRow = {
   id: string;
@@ -39,6 +40,17 @@ builder.objectType(InventoryItemRef, {
     updatedAt: t.field({
       type: 'DateTime',
       resolve: (parent) => parent.updated_at,
+    }),
+    // Cross-entity — DataLoader batches every catalogItem lookup in
+    // a request into one SELECT … IN (...).
+    catalogItem: t.field({
+      type: CatalogItemRef,
+      nullable: true,
+      description: 'The catalog item that defines this inventory row, batched via DataLoader.',
+      resolve: async (parent, _args, ctx) => {
+        if (!parent.catalog_item_id) return null;
+        return ctx.loaders.catalogItem.load(parent.catalog_item_id);
+      },
     }),
   }),
 });

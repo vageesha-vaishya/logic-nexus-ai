@@ -10,6 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { schema } from './schema.js';
 import type { GraphQLContext } from './builder.js';
+import { buildLoaders } from './loaders/index.js';
 import type { AuthRequest } from '../middleware/auth.middleware.js';
 import { GraphQLError } from 'graphql';
 
@@ -36,11 +37,13 @@ export const yoga = createYoga<{ req: AuthRequest }, GraphQLContext>({
         extensions: { code: 'UNAUTHORIZED', status: 401 },
       });
     }
+    const supabase = getServiceRoleClient();
     return {
       userId: auth.userId,
       tenantId: auth.tenantId,
       franchiseId: auth.franchiseId ?? null,
-      supabase: getServiceRoleClient(),
+      supabase,
+      loaders: buildLoaders({ supabase, tenantId: auth.tenantId }),
     };
   },
   // Loose introspection / playground default — auth middleware

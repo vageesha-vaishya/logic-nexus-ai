@@ -7,12 +7,14 @@
 
 import SchemaBuilder from '@pothos/core';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Loaders } from './loaders/index.js';
 
 export type GraphQLContext = {
   userId: string;
   tenantId: string;
   franchiseId: string | null;
   supabase: SupabaseClient;
+  loaders: Loaders;
 };
 
 export const builder = new SchemaBuilder<{

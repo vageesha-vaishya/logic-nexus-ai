@@ -12,7 +12,12 @@ import { GraphQLError } from 'graphql';
 
 import { builder } from '../builder.js';
 import { ProjectionSnapshotRef } from '../types/projection-snapshot.js';
-import { InventoryItemRef } from '../types/inventory-item.js';
+import { InventoryItemRef, type InventoryItemRow } from '../types/inventory-item.js';
+import {
+  InventoryItemConnectionRef,
+  type InventoryItemConnectionShape,
+} from '../types/inventory-item-connection.js';
+import { decodeCursor, encodeCursor } from '../lib/cursor.js';
 
 builder.queryFields((t) => ({
   uimProjectionItems: t.field({
@@ -54,6 +59,70 @@ builder.queryFields((t) => ({
         replay_version: number;
         updated_at: string;
       }>;
+    },
+  }),
+
+  inventoryItems: t.field({
+    type: InventoryItemConnectionRef,
+    description:
+      'Relay cursor-paginated list of inventory items, scoped to tenant + franchise. Ordered by updated_at DESC, id DESC.',
+    args: {
+      first: t.arg.int({ defaultValue: 25 }),
+      after: t.arg.string({ required: false }),
+      catalogItemId: t.arg.id({ required: false }),
+      status: t.arg.string({ required: false }),
+      locationId: t.arg.id({ required: false }),
+    },
+    resolve: async (_parent, args, ctx): Promise<InventoryItemConnectionShape> => {
+      const { tenantId, franchiseId, supabase } = ctx;
+      const firstRaw = Number(args.first ?? 25);
+      const first = Math.min(Math.max(Number.isFinite(firstRaw) ? firstRaw : 25, 1), 200);
+      const cursor = decodeCursor(args.after ?? null);
+
+      let query = supabase
+        .from('uim_inventory_items')
+        .select('id, catalog_item_id, quantity, status, location_id, updated_at', {
+          count: 'exact',
+        })
+        .eq('tenant_id', tenantId)
+        .is('deleted_at', null)
+        .order('updated_at', { ascending: false })
+        .order('id', { ascending: false })
+        .limit(first + 1);
+      if (franchiseId) query = query.eq('franchise_id', franchiseId);
+      if (args.catalogItemId) query = query.eq('catalog_item_id', String(args.catalogItemId));
+      if (args.status) query = query.eq('status', String(args.status));
+      if (args.locationId) query = query.eq('location_id', String(args.locationId));
+      if (cursor) {
+        // (updated_at, id) < (cursor.k, cursor.i) — Postgres supports
+        // row-value comparison via .or() with composite predicate.
+        query = query.or(
+          `updated_at.lt.${cursor.k},and(updated_at.eq.${cursor.k},id.lt.${cursor.i})`,
+        );
+      }
+      const { data, error, count } = await query;
+      if (error) {
+        throw new GraphQLError(`Failed to list inventory items: ${error.message}`, {
+          extensions: { code: 'UIM_INVENTORY_ITEMS_LIST_ERROR' },
+        });
+      }
+      const rowsAll = (data ?? []) as InventoryItemRow[];
+      const hasNextPage = rowsAll.length > first;
+      const rows = hasNextPage ? rowsAll.slice(0, first) : rowsAll;
+      const edges = rows.map((row) => ({
+        cursor: encodeCursor({ k: String(row.updated_at), i: String(row.id) }),
+        node: row,
+      }));
+      return {
+        edges,
+        pageInfo: {
+          hasNextPage,
+          hasPreviousPage: Boolean(cursor),
+          startCursor: edges[0]?.cursor ?? null,
+          endCursor: edges[edges.length - 1]?.cursor ?? null,
+        },
+        totalCount: Number(count || 0),
+      };
     },
   }),
 
