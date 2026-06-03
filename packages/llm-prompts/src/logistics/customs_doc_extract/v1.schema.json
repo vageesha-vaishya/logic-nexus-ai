@@ -1,0 +1,176 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/llm-prompts/logistics.customs.doc_extract.v1.json",
+  "title": "logistics.customs.doc_extract output v1",
+  "type": "object",
+  "required": [
+    "doc_type", "doc_number", "issuer", "parties", "route", "incoterm",
+    "currency", "totals", "line_items", "matches_shipment_context",
+    "extracted_text_excerpts", "warnings", "confidence"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "iso_country": { "type": ["string", "null"], "pattern": "^[A-Z]{2}$" },
+    "iso_currency": { "type": ["string", "null"], "pattern": "^[A-Z]{3}$" },
+    "money": {
+      "type": "object",
+      "required": ["amount", "currency"],
+      "additionalProperties": false,
+      "properties": {
+        "amount": { "type": ["number", "null"] },
+        "currency": { "type": ["string", "null"], "pattern": "^[A-Z]{3}$" }
+      }
+    },
+    "party": {
+      "type": "object",
+      "required": ["name", "address", "country"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "address": { "type": ["string", "null"] },
+        "country": { "type": ["string", "null"], "pattern": "^[A-Z]{2}$" },
+        "tax_id": { "type": ["string", "null"] }
+      }
+    }
+  },
+  "properties": {
+    "doc_type": {
+      "type": "string",
+      "enum": [
+        "bill_of_lading", "air_waybill", "commercial_invoice", "packing_list",
+        "certificate_of_origin", "customs_declaration", "phytosanitary_certificate",
+        "insurance_certificate", "other_freight_doc", "unknown"
+      ]
+    },
+    "doc_number": { "type": ["string", "null"] },
+    "issuer": {
+      "type": "object",
+      "required": ["name", "address_country"],
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": ["string", "null"] },
+        "address_country": { "$ref": "#/definitions/iso_country" }
+      }
+    },
+    "parties": {
+      "type": "object",
+      "required": ["shipper", "consignee", "notify_party"],
+      "additionalProperties": false,
+      "properties": {
+        "shipper": { "$ref": "#/definitions/party" },
+        "consignee": { "$ref": "#/definitions/party" },
+        "notify_party": { "$ref": "#/definitions/party" }
+      }
+    },
+    "route": {
+      "type": "object",
+      "required": ["port_of_loading", "port_of_discharge", "place_of_receipt", "place_of_delivery", "vessel_or_flight", "departure_date", "estimated_arrival_date"],
+      "additionalProperties": false,
+      "properties": {
+        "port_of_loading": { "type": ["string", "null"] },
+        "port_of_discharge": { "type": ["string", "null"] },
+        "place_of_receipt": { "type": ["string", "null"] },
+        "place_of_delivery": { "type": ["string", "null"] },
+        "vessel_or_flight": { "type": ["string", "null"] },
+        "departure_date": { "type": ["string", "null"] },
+        "estimated_arrival_date": { "type": ["string", "null"] }
+      }
+    },
+    "incoterm": {
+      "type": ["string", "null"],
+      "enum": ["EXW", "FCA", "CPT", "CIP", "DAP", "DPU", "DDP", "FAS", "FOB", "CFR", "CIF", null]
+    },
+    "currency": { "$ref": "#/definitions/iso_currency" },
+    "totals": {
+      "type": "object",
+      "required": ["invoice_value", "freight", "insurance", "total_packages", "gross_weight", "net_weight", "volume"],
+      "additionalProperties": false,
+      "properties": {
+        "invoice_value": { "$ref": "#/definitions/money" },
+        "freight": { "$ref": "#/definitions/money" },
+        "insurance": { "$ref": "#/definitions/money" },
+        "total_packages": {
+          "type": "object",
+          "required": ["value", "unit"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": ["number", "null"] },
+            "unit": { "type": ["string", "null"], "enum": ["PCS", "CTN", "PLT", "OTHER", null] }
+          }
+        },
+        "gross_weight": {
+          "type": "object",
+          "required": ["value", "unit"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": ["number", "null"] },
+            "unit": { "type": ["string", "null"], "enum": ["KG", "LB", null] }
+          }
+        },
+        "net_weight": {
+          "type": "object",
+          "required": ["value", "unit"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": ["number", "null"] },
+            "unit": { "type": ["string", "null"], "enum": ["KG", "LB", null] }
+          }
+        },
+        "volume": {
+          "type": "object",
+          "required": ["value", "unit"],
+          "additionalProperties": false,
+          "properties": {
+            "value": { "type": ["number", "null"] },
+            "unit": { "type": ["string", "null"], "enum": ["M3", "FT3", null] }
+          }
+        }
+      }
+    },
+    "line_items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["line_no", "description", "hs_code", "quantity", "unit_price", "total_price", "country_of_origin"],
+        "additionalProperties": false,
+        "properties": {
+          "line_no": { "type": ["number", "null"] },
+          "description": { "type": "string", "minLength": 1 },
+          "hs_code": { "type": ["string", "null"] },
+          "quantity": {
+            "type": "object",
+            "required": ["value", "unit"],
+            "additionalProperties": false,
+            "properties": {
+              "value": { "type": "number" },
+              "unit": { "type": "string", "enum": ["PCS", "CTN", "PLT", "KG", "LB", "OTHER"] }
+            }
+          },
+          "unit_price": { "$ref": "#/definitions/money" },
+          "total_price": { "$ref": "#/definitions/money" },
+          "country_of_origin": { "$ref": "#/definitions/iso_country" }
+        }
+      }
+    },
+    "matches_shipment_context": {
+      "type": "object",
+      "required": ["booking_ref_match", "country_pair_match", "incoterm_match", "match_rationale"],
+      "additionalProperties": false,
+      "properties": {
+        "booking_ref_match": { "type": ["boolean", "null"] },
+        "country_pair_match": { "type": ["boolean", "null"] },
+        "incoterm_match": { "type": ["boolean", "null"] },
+        "match_rationale": { "type": "string", "minLength": 1 }
+      }
+    },
+    "extracted_text_excerpts": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "warnings": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}
