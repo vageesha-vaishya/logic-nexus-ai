@@ -3,6 +3,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDomain } from '@/contexts/DomainContext';
 import { useAmroApiAvailability } from './useAmroApiAvailability';
 import { useAmroHoldAuditTrail } from './useAmroHoldAuditTrail';
+import { useAmroWorkOrderFilters } from './useAmroWorkOrderFilters';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -39,7 +40,6 @@ import type {
   ApiEnvelope,
   V2WorkOrderItem,
   V2TaskItem,
-  V2SavedWorkOrderView,
   V2SchedulesResponse,
   V2WorkOrdersResponse,
   V2ScheduleOptimizationResponse,
@@ -56,7 +56,6 @@ import type {
   CertificationTemplateState,
   CreateWorkOrderOptions,
 } from './amroWorkspaceTypes';
-import { DEFAULT_WORK_PACKAGE_SAVED_VIEW } from './amroWorkspaceTypes';
 import {
   parseJsonSafe,
   isNetworkConnectivityError,
@@ -101,10 +100,20 @@ export function useAmroWorkspaceState() {
   const [selectedWorkOrderId, setSelectedWorkOrderId] = useState<string>('');
   const [loadingWorkOrders, setLoadingWorkOrders] = useState<boolean>(false);
   const [workOrdersError, setWorkOrdersError] = useState<string | null>(null);
-  const [workOrderStatusFilter, setWorkOrderStatusFilter] = useState<string>('all');
-  const [workOrderSearch, setWorkOrderSearch] = useState<string>('');
-  const [selectedSavedViewId, setSelectedSavedViewId] = useState<string>(DEFAULT_WORK_PACKAGE_SAVED_VIEW.id);
-  const [savedWorkOrderViews, setSavedWorkOrderViews] = useState<V2SavedWorkOrderView[]>([DEFAULT_WORK_PACKAGE_SAVED_VIEW]);
+  // Phase 8f.3a: filter + saved-view state extracted to useAmroWorkOrderFilters.
+  // applySavedWorkOrderView moved into the hook. saveCurrentWorkOrderView
+  // stays here because it also writes setWorkOrdersError (orchestrator-owned).
+  const {
+    workOrderStatusFilter,
+    setWorkOrderStatusFilter,
+    workOrderSearch,
+    setWorkOrderSearch,
+    selectedSavedViewId,
+    setSelectedSavedViewId,
+    savedWorkOrderViews,
+    setSavedWorkOrderViews,
+    applySavedWorkOrderView,
+  } = useAmroWorkOrderFilters();
   // Phase 8f.2: hold + soft-delete tracking maps + audit trail extracted to
   // useAmroHoldAuditTrail. The orchestrator's toggleWorkOrderHold,
   // softDeleteWorkOrder, restoreSoftDeletedWorkOrder callbacks call the
@@ -2301,15 +2310,9 @@ export function useAmroWorkspaceState() {
     }
   }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials, selectedWorkOrderId]);
 
-  const applySavedWorkOrderView = useCallback((viewId: string) => {
-    const selectedView = savedWorkOrderViews.find((item) => item.id === viewId)
-      || savedWorkOrderViews.find((item) => item.id === DEFAULT_WORK_PACKAGE_SAVED_VIEW.id)
-      || savedWorkOrderViews[0]
-      || DEFAULT_WORK_PACKAGE_SAVED_VIEW;
-    setSelectedSavedViewId(selectedView.id);
-    setWorkOrderStatusFilter(selectedView.filters.status || 'all');
-    setWorkOrderSearch(selectedView.filters.search || '');
-  }, [savedWorkOrderViews]);
+  // Phase 8f.3a: applySavedWorkOrderView now lives in useAmroWorkOrderFilters
+  // (destructured above). saveCurrentWorkOrderView stays here because it
+  // writes setWorkOrdersError on transient failures.
 
   const saveCurrentWorkOrderView = useCallback(
     async (name: string) => {
