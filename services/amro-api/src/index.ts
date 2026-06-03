@@ -68,6 +68,9 @@ async function startServer() {
       logger.info(`http://localhost:${PORT}`);
     });
 
+    // Phase 8d: env-gated core.outbox → Kafka transactional poller.
+    void startAmroOutboxPoller();
+
     // Handle graceful shutdown
     process.on('SIGTERM', () => {
       logger.warn('SIGTERM received, shutting down gracefully...');
@@ -90,6 +93,53 @@ async function startServer() {
     console.error('Failed to start server:', error);
     process.exit(1);
   }
+}
+
+async function startAmroOutboxPoller(): Promise<void> {
+  const raw = process.env.AMRO_OUTBOX_POLL_INTERVAL_SEC;
+  const intervalSec = raw ? Number(raw) : 0;
+  if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+    // eslint-disable-next-line no-console
+    console.log('[amro-api] outbox poller disabled (set AMRO_OUTBOX_POLL_INTERVAL_SEC to enable)');
+    return;
+  }
+  const intervalMs = Math.max(5, intervalSec) * 1000;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    // eslint-disable-next-line no-console
+    console.log('[amro-api] outbox poller wanted but SUPABASE_URL/SERVICE_ROLE_KEY missing — skipping');
+    return;
+  }
+  const { createClient } = await import('@supabase/supabase-js');
+  const { runAmroOutboxTick } = await import('./services/outbox-poller.js');
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  // eslint-disable-next-line no-console
+  console.log(`[amro-api] outbox poller enabled every ${intervalMs / 1000}s`);
+
+  let running = false;
+  const tick = async (): Promise<void> => {
+    if (running) return;
+    running = true;
+    try {
+      const result = await runAmroOutboxTick({ supabase });
+      if (result.scanned > 0 || result.errors.length > 0) {
+        // eslint-disable-next-line no-console
+        console.log('[amro-api] outbox tick', {
+          scanned: result.scanned,
+          published: result.published,
+          failed: result.failed,
+          errors: result.errors.length,
+        });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[amro-api] outbox tick crashed', err instanceof Error ? err.message : String(err));
+    } finally {
+      running = false;
+    }
+  };
+  setInterval(() => { void tick(); }, intervalMs).unref();
 }
 
 const server = startServer();
