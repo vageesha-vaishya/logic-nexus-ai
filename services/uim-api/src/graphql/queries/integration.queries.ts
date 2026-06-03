@@ -7,13 +7,13 @@ import { IntegrationRef, type IntegrationRow } from '../types/integration.js';
 import { DlqRetryableRowRef, type DlqRetryableRowShape } from '../types/dlq-row.js';
 
 const INTEGRATION_SELECT =
-  'id, tenant_id, vendor_name, vendor_code, kind, lifecycle_state, vendor_risk_class, config, created_at, updated_at';
+  'id, tenant_id, name, vendor, kind, lifecycle_state, direction, vendor_risk_class, scope_json, metadata, owner_user_id, created_at, updated_at';
 
 builder.queryFields((t) => ({
   integrations: t.field({
     type: [IntegrationRef],
     description:
-      'List integrations for the caller tenant. Ordered by vendor_name ASC.',
+      'List integrations for the caller tenant. Ordered by name ASC.',
     args: {
       limit: t.arg.int({ defaultValue: 100 }),
       lifecycleState: t.arg.string({ required: false }),
@@ -29,7 +29,7 @@ builder.queryFields((t) => ({
         .from('integrations')
         .select(INTEGRATION_SELECT)
         .eq('tenant_id', tenantId)
-        .order('vendor_name', { ascending: true })
+        .order('name', { ascending: true })
         .limit(limit);
       if (args.lifecycleState) {
         query = query.eq('lifecycle_state', String(args.lifecycleState));

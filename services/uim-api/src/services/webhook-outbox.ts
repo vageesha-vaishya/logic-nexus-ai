@@ -33,6 +33,7 @@ import crypto from 'crypto';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 import { logger } from '../utils/logger.js';
+import { getConnector } from '../connectors/registry.js';
 
 const DEFAULT_TICK_LIMIT = 25;
 const DEFAULT_MAX_ATTEMPTS = 1;
@@ -58,6 +59,10 @@ export interface OutboxPendingRow {
   signing_secret_id: string | null;
   event_filter: unknown;
   subscription_status: string | null;
+  integration_id: string | null;
+  vendor: string | null;
+  integration_name: string | null;
+  integration_direction: string | null;
 }
 
 export interface OutboxDeliveryResult {
@@ -182,6 +187,33 @@ async function defaultDelivery(
   row: OutboxPendingRow,
   signature: string,
 ): Promise<OutboxDeliveryResult> {
+  // Connector registry takes precedence over raw HTTP POST.
+  // When uim.integrations.vendor matches a registered adapter, the
+  // adapter's dispatch() handles transport (which can include
+  // anything from SDK calls to multi-step orchestration). HTTP
+  // POST stays as the default for connectors with no registered
+  // adapter — useful for one-off webhook URLs.
+  const adapter = getConnector(row.vendor);
+  if (adapter && row.integration_id) {
+    try {
+      return await adapter.dispatch(
+        { type: row.event_type, payload: row.payload },
+        {
+          tenantId: row.tenant_id,
+          integrationId: row.integration_id,
+          vendorName: row.integration_name,
+          vendorCode: row.vendor,
+          config: null,
+        },
+      );
+    } catch (err) {
+      return {
+        ok: false,
+        errorText: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
+
   if (!row.target_url) {
     return { ok: false, errorText: 'target_url missing', permanent: true };
   }
@@ -255,8 +287,13 @@ export async function runOutboxDispatchTick(
   result.scanned = rows.length;
 
   for (const row of rows) {
-    if (!row.target_url) {
-      result.errors.push({ outbox_id: row.id, reason: 'target_url missing on subscription' });
+    // Skip only if BOTH the adapter registry and target_url are
+    // empty — adapter-only connectors don't need a target_url.
+    if (!row.target_url && !getConnector(row.vendor)) {
+      result.errors.push({
+        outbox_id: row.id,
+        reason: 'no delivery path: target_url missing and no registered adapter',
+      });
       continue;
     }
     if (!secret) {

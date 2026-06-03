@@ -103,7 +103,7 @@ router.post(
     const { data: integration, error: intErr } = await (supabase as any)
       .schema('uim')
       .from('integrations')
-      .select('id, tenant_id, vendor_name, vendor_code, kind, direction, lifecycle_state')
+      .select('id, tenant_id, name, vendor, kind, direction, lifecycle_state')
       .eq('id', integrationId)
       .maybeSingle();
     if (intErr) {
@@ -160,7 +160,8 @@ router.post(
     if (authReq.userId) {
       logger.info('inbound: received', {
         integrationId: integration.id,
-        vendor: integration.vendor_name,
+        vendor: integration.vendor,
+        name: integration.name,
         eventType,
         logId: String(logRow?.id || ''),
       });
