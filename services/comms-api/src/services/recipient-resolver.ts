@@ -205,7 +205,7 @@ export class RecipientResolver {
           const { data: phoneRow } = await (this.supabase as any)
             .schema('core')
             .from('phone_numbers')
-            .select('e164')
+            .select('e164, whatsapp_capable')
             .eq('id', phoneId)
             .maybeSingle();
           const e164 = (phoneRow as { e164?: string } | null)?.e164;
@@ -216,6 +216,21 @@ export class RecipientResolver {
               address: e164,
               displayName: party.display_name || null,
             });
+            // Add a WhatsApp recipient too when the phone is flagged
+            // capable. Operators flip this column per-phone (default
+            // false) so the chain only runs for confirmed-opted-in
+            // numbers. The Twilio WhatsApp provider returns
+            // permanent=true on 63017 (number not on WhatsApp) so a
+            // mis-flagged number costs at most one failed delivery,
+            // not a retry loop.
+            if ((phoneRow as { whatsapp_capable?: boolean } | null)?.whatsapp_capable === true) {
+              recipients.push({
+                userId: partyId,
+                channel: 'whatsapp',
+                address: e164,
+                displayName: party.display_name || null,
+              });
+            }
           }
         }
       } catch (err) {
