@@ -19,6 +19,7 @@ import integrationsRoutes from './routes/integrations.routes.js';
 import dlqRoutes from './routes/dlq.routes.js';
 import inventoryItemsRoutes from './routes/inventory-items.routes.js';
 import connectorManifestsRoutes from './routes/connector-manifests.routes.js';
+import projectionsRoutes from './routes/projections.routes.js';
 import type { ErrorResponse } from './types/uim.types.js';
 import { logger } from './utils/logger.js';
 
@@ -109,6 +110,7 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'GET    /api/v1/uim/inventory-items',
       'GET    /api/v1/uim/inventory-items/:id',
       'GET    /api/v1/uim/connectors/manifests',
+      'GET    /api/v1/uim/projections/items',
     ],
     dual_writes: [
       'platform.integrations            → uim.integrations',
@@ -159,6 +161,7 @@ app.use('/api', authMiddleware, auditApiRequest, integrationsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, dlqRoutes);
 app.use('/api', authMiddleware, auditApiRequest, inventoryItemsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, connectorManifestsRoutes);
+app.use('/api', authMiddleware, auditApiRequest, projectionsRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
