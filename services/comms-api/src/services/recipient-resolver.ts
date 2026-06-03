@@ -175,7 +175,7 @@ export class RecipientResolver {
         return [];
       }
 
-      return [
+      const recipients: ResolvedRecipient[] = [
         {
           userId: partyId,
           channel: 'email',
@@ -183,6 +183,50 @@ export class RecipientResolver {
           displayName: party.display_name || null,
         },
       ];
+
+      // Phase 6 SMS slice — fan out to SMS too when the party has a
+      // phone linked. Mirrors the email path: prefer is_primary, then
+      // most-recently-linked. Missing phone is a silent skip (lots of
+      // parties won't have one). E.164 column on core.phone_numbers
+      // is what Twilio's API expects, so no normalisation needed.
+      try {
+        const { data: phoneLink } = await (this.supabase as any)
+          .schema('core')
+          .from('phone_links')
+          .select('phone_id, is_primary')
+          .eq('subject_type', 'core.party')
+          .eq('subject_id', partyId)
+          .order('is_primary', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+        const phoneId = (phoneLink as { phone_id?: string } | null)?.phone_id;
+        if (phoneId) {
+          const { data: phoneRow } = await (this.supabase as any)
+            .schema('core')
+            .from('phone_numbers')
+            .select('e164')
+            .eq('id', phoneId)
+            .maybeSingle();
+          const e164 = (phoneRow as { e164?: string } | null)?.e164;
+          if (e164 && /^\+[1-9][0-9]{6,14}$/.test(e164)) {
+            recipients.push({
+              userId: partyId,
+              channel: 'sms',
+              address: e164,
+              displayName: party.display_name || null,
+            });
+          }
+        }
+      } catch (err) {
+        // Don't let an SMS lookup failure starve the email delivery.
+        logger.warn('recipient resolver: party phone lookup threw', {
+          partyId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+
+      return recipients;
     } catch (err) {
       logger.warn('recipient resolver: party lookup threw', {
         partyId,
