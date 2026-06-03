@@ -21,11 +21,14 @@ import './types/ledger-entry.js';
 import './types/ledger-entry-connection.js';
 import './types/part-availability.js';
 import './types/location-availability.js';
+import './types/integration.js';
+import './types/dlq-row.js';
 
 // Queries
 import './queries/health.queries.js';
 import './queries/inventory.queries.js';
 import './queries/reservation.queries.js';
 import './queries/availability.queries.js';
+import './queries/integration.queries.js';
 
 export const schema = builder.toSchema();
