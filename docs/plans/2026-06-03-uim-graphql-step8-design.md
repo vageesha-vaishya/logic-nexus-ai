@@ -552,6 +552,27 @@ development.
 
 ---
 
+## 14a. Callsite audit (2026-06-03)
+
+Ran `grep -rn '/api/v1/uim/graphql\|/api/v2/uim/graphql\|uimProjectionItems\|uimInventoryItem\|uimHealth\|UIM_GRAPHQL_PATH'` across the repo excluding `node_modules`, `dist`, and the worktrees.
+
+**Result: zero production callers.** Every match is server-side:
+
+- `services/uim-api/src/routes/graphql.routes.ts` — the 4b.10 shim itself.
+- `services/uim-api/src/routes/graphql-v2.routes.ts` — the new yoga mount.
+- `services/uim-api/src/routes/contracts.routes.ts` — advertises the path in the integration-contracts registry.
+- `src/pages/api/v2/uim/graphql.ts` + `.test.ts` — legacy Next-API-style route, part of the documented shadow tree, removal scheduled separately.
+
+**Implications for Phase B (cutover):**
+
+- There are no frontend hooks, no admin dashboards, no external connector code currently calling the GraphQL endpoint.
+- The per-caller PR sequence in §9 (Phase B) is effectively a no-op.
+- We can collapse Phase B into Phase C and ship the shim removal as one slice (8.7).
+
+This is good news — the only cost of the migration is updating one path constant in `contracts.routes.ts` from `/api/v1/uim/graphql` to the new path. No client-side rollout coordination needed.
+
+---
+
 ## 15. References
 
 - Pothos docs: https://pothos-graphql.dev/docs
