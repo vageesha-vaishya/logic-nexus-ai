@@ -23,6 +23,7 @@ import projectionsRoutes from './routes/projections.routes.js';
 import contractsRoutes from './routes/contracts.routes.js';
 import webhooksRoutes from './routes/webhooks.routes.js';
 import seedingRoutes from './routes/seeding.routes.js';
+import reservationsRoutes from './routes/reservations.routes.js';
 import type { ErrorResponse } from './types/uim.types.js';
 import { logger } from './utils/logger.js';
 
@@ -119,6 +120,7 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'POST   /api/v1/uim/webhooks  (action=register|deactivate|set-status|dispatch-event)',
       'GET    /api/v1/uim/seeding/mro',
       'POST   /api/v1/uim/seeding/mro  (platform_admin)',
+      'POST   /api/v1/uim/reservations/soft',
     ],
     dual_writes: [
       'platform.integrations            → uim.integrations',
@@ -173,6 +175,7 @@ app.use('/api', authMiddleware, auditApiRequest, projectionsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, contractsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, webhooksRoutes);
 app.use('/api', authMiddleware, auditApiRequest, seedingRoutes);
+app.use('/api', authMiddleware, auditApiRequest, reservationsRoutes);
 
 app.use((_req: Request, res: Response) => {
   const req = _req as RequestWithCorrelation;
