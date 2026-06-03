@@ -29,6 +29,7 @@ import commandsRoutes from './routes/commands.routes.js';
 import formsRoutes from './routes/forms.routes.js';
 import graphqlRoutes from './routes/graphql.routes.js';
 import inboundRoutes from './routes/inbound.routes.js';
+import syncConflictsRoutes from './routes/sync-conflicts.routes.js';
 import integrationsRestRoutes from './routes/integrations-rest.routes.js';
 import externalMroPipelineRoutes from './routes/external-mro-pipeline.routes.js';
 import analyticsKpisRoutes from './routes/analytics-kpis.routes.js';
@@ -141,6 +142,8 @@ app.get('/uim/v1/_status', (_req: Request, res: Response) => {
       'POST   /api/v1/uim/graphql  (yoga + Pothos schema)',
       'GET    /api/v1/uim/graphql  (introspection + GraphiQL in dev)',
       'POST   /api/v1/uim/inbound/:integrationId  (HMAC-auth, no JWT)',
+      'GET    /api/v1/uim/sync-conflicts',
+      'POST   /api/v1/uim/sync-conflicts/:id/resolve',
       'POST   /api/v1/uim/integrations/rest',
       'GET    /api/v1/uim/integrations/external-mro-pipeline',
       'POST   /api/v1/uim/integrations/external-mro-pipeline',
@@ -215,6 +218,8 @@ app.use('/api', authMiddleware, auditApiRequest, graphqlRoutes);
 // Inbound webhook receiver — auth is by HMAC verify + integration_id
 // binding, NOT by user JWT. Mounted outside the authMiddleware chain.
 app.use('/api', auditApiRequest, inboundRoutes);
+
+app.use('/api', authMiddleware, auditApiRequest, syncConflictsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, integrationsRestRoutes);
 app.use('/api', authMiddleware, auditApiRequest, externalMroPipelineRoutes);
 app.use('/api', authMiddleware, auditApiRequest, analyticsKpisRoutes);
