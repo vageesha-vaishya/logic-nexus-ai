@@ -215,29 +215,21 @@ export default async function handler(req: ApiRequest, res: ApiResponse): Promis
         syncedStock += 1;
       }
 
-      const { error: syncEventError } = await supabase
-        .from('amro_uim_inventory_sync_events')
-        .insert({
-          tenant_id: tenantId,
-          franchise_id: franchiseId || null,
-          sync_direction: 'amro_to_uim',
-          sync_operation: 'catalog_and_stock',
-          records_processed: rows.length,
-          records_succeeded: syncedStock,
-          records_failed: rows.length - syncedStock,
-          status: syncErrors.length > 0 ? 'partial' : 'success',
-          error_summary: syncErrors.slice(0, 10),
-          metadata: {
-            correlation_id: ctx.correlationId,
-          },
-          triggered_by: auth.userId,
-        });
-      if (syncEventError) {
-        logger.warn('amro-uim-sync-event-insert-failed', {
-          correlationId: ctx.correlationId,
-          message: syncEventError.message,
-        });
-      }
+      // ADR-0013 Step 66: amro_uim_inventory_sync_events was dropped
+      // once the parts_consumed outbox emitter (Step 64) + UIM consumer
+      // (Step 65) replaced the polling pipeline. The audit summary now
+      // lives in correlation logs + core.outbox.audit. We keep the
+      // info-level log so ops can still trace bulk-sync calls.
+      logger.info('amro-uim-bulk-sync-completed', {
+        correlationId: ctx.correlationId,
+        tenantId,
+        franchiseId,
+        recordsProcessed: rows.length,
+        recordsSucceeded: syncedStock,
+        recordsFailed: rows.length - syncedStock,
+        status: syncErrors.length > 0 ? 'partial' : 'success',
+        sampleErrors: syncErrors.slice(0, 10),
+      });
 
       res.status(200).json({
         version: 'v2',

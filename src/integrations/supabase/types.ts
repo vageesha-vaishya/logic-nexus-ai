@@ -5285,69 +5285,6 @@ export type Database = {
           },
         ]
       }
-      amro_uim_inventory_sync_events: {
-        Row: {
-          created_at: string
-          error_summary: Json
-          franchise_id: string | null
-          id: string
-          metadata: Json
-          records_failed: number
-          records_processed: number
-          records_succeeded: number
-          status: string
-          sync_direction: string
-          sync_operation: string
-          tenant_id: string
-          triggered_by: string | null
-        }
-        Insert: {
-          created_at?: string
-          error_summary?: Json
-          franchise_id?: string | null
-          id?: string
-          metadata?: Json
-          records_failed?: number
-          records_processed?: number
-          records_succeeded?: number
-          status: string
-          sync_direction: string
-          sync_operation: string
-          tenant_id: string
-          triggered_by?: string | null
-        }
-        Update: {
-          created_at?: string
-          error_summary?: Json
-          franchise_id?: string | null
-          id?: string
-          metadata?: Json
-          records_failed?: number
-          records_processed?: number
-          records_succeeded?: number
-          status?: string
-          sync_direction?: string
-          sync_operation?: string
-          tenant_id?: string
-          triggered_by?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "amro_uim_inventory_sync_events_franchise_id_fkey"
-            columns: ["franchise_id"]
-            isOneToOne: false
-            referencedRelation: "franchises"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "amro_uim_inventory_sync_events_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       amro_work_order_audit_log: {
         Row: {
           action: string
@@ -31272,20 +31209,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      amro_uim_seed_validation: {
-        Row: {
-          catalog_items_count: number | null
-          categories_count: number | null
-          inventory_items_count: number | null
-          ledger_count: number | null
-          locations_count: number | null
-          reservations_count: number | null
-          suppliers_count: number | null
-          tenant_id: string | null
-          valuation_methods_count: number | null
-        }
-        Relationships: []
       }
       quotation_version_options_compat: {
         Row: {

@@ -114,7 +114,8 @@ describe('/api/v2/amro/inventory/sync', () => {
         }
         if (table === 'uim_catalog_items') return { upsert };
         if (table === 'uim_inventory_items') return { upsert: vi.fn().mockResolvedValue({ error: null }) };
-        if (table === 'amro_uim_inventory_sync_events') return { insert: vi.fn().mockResolvedValue({ error: null }) };
+        // amro_uim_inventory_sync_events dropped by ADR-0013 Step 66.
+        // The route no longer inserts here — audit is via correlation logs.
         throw new Error(`Unexpected table: ${table}`);
       }),
     };
