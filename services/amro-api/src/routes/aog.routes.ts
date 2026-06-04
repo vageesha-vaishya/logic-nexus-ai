@@ -570,7 +570,7 @@ router.post(
     const { data: wo, error: woErr } = await publicClient
       .from('work_orders')
       .insert([woInsert])
-      .select('id')
+      .select('id, work_order_number')
       .single();
     if (woErr || !wo) {
       res.status(500).json({
@@ -580,10 +580,53 @@ router.post(
       });
       return;
     }
+    const woRow = wo as JsonRecord;
+
+    // S7: pre-fill task rows from triage.recommended_actions if present.
+    // Operators land on the WO with the AI's plan already actionable —
+    // no re-typing the steps. Failures here are non-fatal: the WO is
+    // already created; we surface a warning if tasks couldn't be
+    // inserted but the conversion still succeeds.
+    const triage = alertRow.last_triage_output as JsonRecord | null;
+    const recommended = triage && Array.isArray(triage.recommended_actions)
+      ? triage.recommended_actions
+      : [];
+    let tasksInserted = 0;
+    let tasksWarning: string | null = null;
+    if (recommended.length > 0) {
+      const taskRows = (recommended as JsonRecord[]).map((a, i) => ({
+        tenant_id: tenantId,
+        work_order_id: woRow.id,
+        task_number: `AOG-${i + 1}`,
+        title: String(a.action ?? `Recovery action ${i + 1}`).slice(0, 200),
+        description: [
+          `Owner: ${a.owner_role ?? 'unspecified'}`,
+          `Deadline: ${typeof a.deadline_hours_from_now === 'number' ? `${a.deadline_hours_from_now}h from declaration` : 'unspecified'}`,
+          a.blocking ? 'BLOCKING — must complete before next step' : null,
+          '',
+          'Auto-generated from AOG triage.',
+        ].filter(Boolean).join('\n'),
+        status: 'planned',
+        task_category: 'aog_response',
+        task_type: 'recovery_action',
+        sequence_order: i + 1,
+        aircraft_id: alertRow.aircraft_id ?? null,
+        is_latest_task: true,
+        version_number: 1,
+      }));
+      const { error: tasksErr, count } = await publicClient
+        .from('tasks')
+        .insert(taskRows, { count: 'exact' });
+      if (tasksErr) {
+        tasksWarning = `Pre-filled tasks failed: ${tasksErr.message}`;
+      } else {
+        tasksInserted = count ?? taskRows.length;
+      }
+    }
 
     const { error: linkErr } = await supabase
       .from('aog_alerts')
-      .update({ work_order_id: (wo as JsonRecord).id, status: 'in_progress' })
+      .update({ work_order_id: woRow.id, status: 'in_progress' })
       .eq('tenant_id', tenantId)
       .eq('id', id);
     if (linkErr) {
@@ -597,7 +640,10 @@ router.post(
 
     res.json({
       alert_id: id,
-      work_order_id: (wo as JsonRecord).id,
+      work_order_id: woRow.id,
+      work_order_number: woRow.work_order_number ?? null,
+      tasks_inserted: tasksInserted,
+      tasks_warning: tasksWarning,
       status: 'in_progress',
     });
   }),

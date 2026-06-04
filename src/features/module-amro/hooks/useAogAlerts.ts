@@ -232,6 +232,9 @@ export function useTriageAogAlert() {
 export interface AogConvertResponse {
   alert_id: string;
   work_order_id: string;
+  work_order_number: string | null;
+  tasks_inserted: number;
+  tasks_warning: string | null;
   status: 'in_progress';
 }
 
@@ -248,7 +251,14 @@ export function useConvertAogToWorkOrder() {
     onSuccess: (resp) => {
       void qc.invalidateQueries({ queryKey: ALERTS_KEY });
       void qc.invalidateQueries({ queryKey: [...ALERTS_KEY, resp.alert_id] });
-      toast.success(`Converted to work order ${resp.work_order_id}`);
+      const label = resp.work_order_number ?? resp.work_order_id.slice(0, 8);
+      const tasksNote = resp.tasks_inserted > 0
+        ? ` (${resp.tasks_inserted} task${resp.tasks_inserted === 1 ? '' : 's'} pre-filled from AI plan)`
+        : '';
+      toast.success(`Converted to work order ${label}${tasksNote}`);
+      if (resp.tasks_warning) {
+        toast.warning(resp.tasks_warning);
+      }
     },
     onError: (e: unknown) => {
       toast.error(`Convert to WO failed: ${(e as Error).message}`);
