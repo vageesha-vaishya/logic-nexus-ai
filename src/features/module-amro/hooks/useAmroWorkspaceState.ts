@@ -14,6 +14,7 @@ import { useAmroOpenWorkOrderDetails } from './useAmroOpenWorkOrderDetails';
 import { useAmroScheduleMutations } from './useAmroScheduleMutations';
 import { useAmroWorkOrderMutations } from './useAmroWorkOrderMutations';
 import { useAmroAdvanceLifecycle } from './useAmroAdvanceLifecycle';
+import { useAmroMaterialsMutations } from './useAmroMaterialsMutations';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -1130,258 +1131,28 @@ export function useAmroWorkspaceState() {
     fetchWorkOrders,
   });
 
-  const reservePartsAllocationForSelectedWorkOrder = useCallback(async () => {
-    if (!authHeaders || !selectedWorkOrderId || materials.length === 0) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const demandLines = materials.slice(0, 2).map((material, index) => ({
-        part_number: material.partNumber,
-        quantity: index === 0 ? 1 : 2,
-        serial: index === 0 ? `${material.id}-serial` : undefined,
-      }));
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=reserve-parts`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          work_order_id: selectedWorkOrderId,
-          demand_lines: demandLines,
-        }),
-      });
-      const payload = await parseJsonSafe<{ error?: string }>(response);
-      if (!response.ok) {
-        throw new Error(payload?.error || `Failed to reserve parts (${response.status})`);
-      }
-      await fetchModuleSurfaces();
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to reserve parts');
-      return false;
-    }
-  }, [
+  // Phase 8f.4f — 6 materials/supplier/inventory mutators carved into useAmroMaterialsMutations.
+  const {
+    reservePartsAllocationForSelectedWorkOrder,
+    processCriticalShortageResponse,
+    applyRotableLlpTraceability,
+    runInventoryOptimizationModel,
+    syncSupplierEtaForSelectedWorkOrder,
+    syncSupplierAsnAndErpProcurement,
+  } = useAmroMaterialsMutations({
     apiBaseUrl,
     authHeaders,
-    fetchModuleSurfaces,
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
+    setWorkOrdersError,
     materials,
-    selectedWorkOrderId,
-  ]);
-
-  const processCriticalShortageResponse = useCallback(async () => {
-    if (!authHeaders) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const shortageMaterial = materials.find((item) => item.reservationStatus === 'shortage') || materials[0];
-      if (!shortageMaterial) return false;
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=process-shortage-response`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          shortage_id: shortageMaterial.id,
-          action: 'escalate',
-          supplier_ref: shortageMaterial.partNumber,
-        }),
-      });
-      const payload = await parseJsonSafe<{ error?: string }>(response);
-      if (!response.ok) {
-        throw new Error(payload?.error || `Failed to process shortage response (${response.status})`);
-      }
-      await fetchModuleSurfaces();
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to process shortage response');
-      return false;
-    }
-  }, [apiBaseUrl, authHeaders, fetchModuleSurfaces, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials]);
-
-  const applyRotableLlpTraceability = useCallback(async (materialId: string) => {
-    if (!authHeaders) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const targetMaterial = materials.find((item) => item.id === materialId);
-      if (!targetMaterial) return false;
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=trace-rotable-llp`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          component_id: targetMaterial.id,
-          part_number: targetMaterial.partNumber,
-          serial_number: `${targetMaterial.id}-serial`,
-          rotable_status: targetMaterial.rotableStatus,
-          llp_remaining_cycles: targetMaterial.llpRemainingCycles,
-          traceability_action: targetMaterial.rotableStatus === 'quarantined' ? 'release' : 'verify',
-        }),
-      });
-      const payload = await parseJsonSafe<{ output?: { traceability_status?: 'verified' | 'quarantined' | 'released' }; error?: string }>(response);
-      if (!response.ok) {
-        throw new Error(payload?.error || `Failed to apply traceability controls (${response.status})`);
-      }
-      const nextStatus = payload?.output?.traceability_status || 'verified';
-      setMaterials((previous) =>
-        previous.map((material) =>
-          material.id === materialId
-            ? {
-                ...material,
-                traceabilityStatus: nextStatus,
-                rotableStatus: nextStatus === 'quarantined' ? 'quarantined' : 'serviceable',
-              }
-            : material,
-        ),
-      );
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to apply rotable/LLP traceability');
-      return false;
-    }
-  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials]);
-
-  const runInventoryOptimizationModel = useCallback(async () => {
-    if (!authHeaders || !selectedWorkOrderId) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=run-inventory-optimization`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          work_order_id: selectedWorkOrderId,
-          forecast_signal_ids: predictiveRecommendations.slice(0, 3).map((item) => item.id),
-          optimization_window: 'P14D',
-        }),
-      });
-      const payload = await parseJsonSafe<{ output?: { optimization_run_id?: string }; error?: string }>(response);
-      if (!response.ok) {
-        throw new Error(payload?.error || `Failed to run inventory optimization (${response.status})`);
-      }
-      setLastInventoryOptimizationRunId(String(payload?.output?.optimization_run_id || ''));
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to run inventory optimization');
-      return false;
-    }
-  }, [
-    apiBaseUrl,
-    authHeaders,
-    isApiTemporarilyUnavailable,
-    markApiTemporarilyUnavailable,
+    setMaterials,
     predictiveRecommendations,
     selectedWorkOrderId,
-  ]);
-
-  const syncSupplierEtaForSelectedWorkOrder = useCallback(async () => {
-    if (!authHeaders || !selectedWorkOrderId) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const targetMaterial = materials.find((item) => item.reservationStatus === 'shortage') || materials[0];
-      if (!targetMaterial) return false;
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=sync-supplier-eta`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          supplier_event_id: `supplier-eta-${Date.now()}`,
-          part_number: targetMaterial.partNumber,
-          eta: new Date(Date.now() + 86400000).toISOString(),
-          quantity_confirmed: targetMaterial.reservationStatus === 'shortage' ? 0 : 1,
-          supplier_source: 'vendor_portal',
-          impacted_work_orders: [selectedWorkOrderId],
-        }),
-      });
-      const payload = await parseJsonSafe<{ error?: string }>(response);
-      if (!response.ok) {
-        throw new Error(payload?.error || `Failed to sync supplier ETA (${response.status})`);
-      }
-      await fetchModuleSurfaces();
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to sync supplier ETA');
-      return false;
-    }
-  }, [
-    apiBaseUrl,
-    authHeaders,
+    setLastInventoryOptimizationRunId,
+    setLastProcurementSyncId,
     fetchModuleSurfaces,
-    isApiTemporarilyUnavailable,
-    markApiTemporarilyUnavailable,
-    materials,
-    selectedWorkOrderId,
-  ]);
-
-  const syncSupplierAsnAndErpProcurement = useCallback(async () => {
-    if (!authHeaders) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=sync-supplier-asn-erp`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          asn_event_id: `asn-${Date.now()}`,
-          procurement_source: 'sap-pm',
-          po_number: `PO-${Date.now()}`,
-          line_items: materials.slice(0, 2).map((material) => ({
-            part_number: material.partNumber,
-            qty: material.reservationStatus === 'shortage' ? 2 : 1,
-          })),
-          impacted_work_orders: selectedWorkOrderId ? [selectedWorkOrderId] : [],
-        }),
-      });
-      const payload = await parseJsonSafe<{ output?: { procurement_sync_id?: string }; error?: string }>(response);
-      if (!response.ok) {
-        throw new Error(payload?.error || `Failed to sync supplier ASN and ERP procurement (${response.status})`);
-      }
-      setLastProcurementSyncId(String(payload?.output?.procurement_sync_id || ''));
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to sync supplier ASN and ERP procurement');
-      return false;
-    }
-  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, materials, selectedWorkOrderId]);
+  });
 
   // Phase 8f.3a: applySavedWorkOrderView now lives in useAmroWorkOrderFilters
   // (destructured above). saveCurrentWorkOrderView stays here because it
