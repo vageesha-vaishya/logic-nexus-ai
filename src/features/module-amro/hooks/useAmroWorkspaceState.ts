@@ -5,6 +5,7 @@ import { useAmroApiAvailability } from './useAmroApiAvailability';
 import { useAmroHoldAuditTrail } from './useAmroHoldAuditTrail';
 import { useAmroWorkOrderFilters } from './useAmroWorkOrderFilters';
 import { useAmroWorkOrdersState } from './useAmroWorkOrdersState';
+import { useAmroWorkOrdersFetch } from './useAmroWorkOrdersFetch';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -259,113 +260,28 @@ export function useAmroWorkspaceState() {
     tasks: [],
   }), []);
 
-  const fetchWorkOrders = useCallback(async () => {
-    if (!authHeaders) {
-      setWorkOrders([]);
-      setSelectedWorkOrderId('');
-      return;
-    }
-    if (!hasAmroAccess) {
-      setWorkOrdersError(
-        isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
-      );
-      return;
-    }
-    if (isApiTemporarilyUnavailable()) {
-      return;
-    }
-    setLoadingWorkOrders(true);
-    setWorkOrdersError(null);
-    try {
-      let next: AmroWorkOrder[] = [];
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/v1/work-orders`, { headers: authHeaders });
-        const payload = await parseJsonSafe<ApiEnvelope<ApiWorkOrder[]> & { error?: string }>(response);
-        if (!response.ok || !Array.isArray(payload?.data)) {
-          throw new Error(payload?.error || `Failed to load work packages (${response.status})`);
-        }
-        setHasV1WorkOrderConnectivity(true);
-        next = payload.data.map((item) => mapWorkOrderRecord({
-          id: item.id,
-          packageNumber: item.work_order_number || item.work_order_number || item.id,
-          status: item.status,
-          assetId: item.aircraft_id,
-        })) as AmroWorkOrder[];
-      } catch (error) {
-        setHasV1WorkOrderConnectivity(false);
-        const query = new URLSearchParams();
-        if (workOrderStatusFilter !== 'all') {
-          query.set('status', workOrderStatusFilter);
-        }
-        if (workOrderSearch.trim()) {
-          query.set('search', workOrderSearch.trim());
-        }
-        if (selectedSavedViewId && selectedSavedViewId !== 'default-all') {
-          query.set('saved_view', selectedSavedViewId);
-        }
-        const endpoint = query.size
-          ? `${apiBaseUrl}/api/v2/amro/work-orders?${query.toString()}`
-          : `${apiBaseUrl}/api/v2/amro/work-orders`;
-        const v2Response = await fetch(endpoint, { headers: authHeaders });
-        const v2Payload = await parseJsonSafe<V2WorkOrdersResponse>(v2Response);
-        const v2Items = v2Payload?.data?.workOrders;
-        if (!v2Response.ok || !Array.isArray(v2Items)) {
-          throw new Error(v2Payload?.error || `Failed to load work packages (${v2Response.status})`);
-        }
-        if (Array.isArray(v2Payload?.savedViews) && v2Payload.savedViews.length > 0) {
-          setSavedWorkOrderViews(sanitizeSavedWorkOrderViews(v2Payload.savedViews));
-        }
-        next = v2Items.map((item) =>
-          mapWorkOrderRecord({
-            id: item.id,
-            packageNumber: item.code || item.id,
-            status: mapV2StatusToV1Status(item.status),
-            assetId: '',
-          }),
-        ) as AmroWorkOrder[];
-      }
-      if (hasV1WorkOrderConnectivity) {
-        const normalizedSearch = workOrderSearch.trim().toLowerCase();
-        next = next.filter((item) => {
-          const status = mapLifecycleToStatus(item.lifecycleStage);
-          const statusMatch = workOrderStatusFilter === 'all' ? true : status === workOrderStatusFilter;
-          const searchMatch = !normalizedSearch
-            ? true
-            : item.packageNumber.toLowerCase().includes(normalizedSearch) || item.id.toLowerCase().includes(normalizedSearch);
-          return statusMatch && searchMatch;
-        });
-      }
-      setWorkOrders(next);
-      setSelectedWorkOrderId((previous) => {
-        if (previous && next.some((item) => item.id === previous)) {
-          return previous;
-        }
-        return next[0]?.id || '';
-      });
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load work packages');
-    } finally {
-      setLoadingWorkOrders(false);
-    }
-  }, [
+  // Phase 8f.3c — fetchWorkOrders carved into useAmroWorkOrdersFetch.
+  // Orchestrator passes deps as a typed input; behavior identical.
+  const fetchWorkOrders = useAmroWorkOrdersFetch({
     apiBaseUrl,
     authHeaders,
-    hasV1WorkOrderConnectivity,
-    isApiTemporarilyUnavailable,
-    mapWorkOrderRecord,
-    markApiTemporarilyUnavailable,
-    selectedSavedViewId,
     hasAmroAccess,
-    amroAccessErrorMessage,
-    workOrderSearch,
-    workOrderStatusFilter,
     isAwaitingAmroDomainActivation,
-  ]);
+    amroAccessErrorMessage,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    hasV1WorkOrderConnectivity,
+    setHasV1WorkOrderConnectivity,
+    setWorkOrders,
+    setSelectedWorkOrderId,
+    setLoadingWorkOrders,
+    setWorkOrdersError,
+    workOrderStatusFilter,
+    workOrderSearch,
+    selectedSavedViewId,
+    setSavedWorkOrderViews,
+    mapWorkOrderRecord,
+  });
 
   const fetchModuleSurfaces = useCallback(async () => {
     if (!authHeaders) {
