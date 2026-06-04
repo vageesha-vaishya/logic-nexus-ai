@@ -29,6 +29,11 @@ import type {
   ChargesSuggestionInput,
   ShipmentMode as ChargesShipmentMode,
 } from '@/features/module-logistics/hooks/useChargesSuggestion';
+import { ShipmentDelayPredictionPanel } from '@/features/module-logistics/components/ShipmentDelayPredictionPanel';
+import type {
+  DelayPredictionInput,
+  ShipmentStatus as DelayShipmentStatus,
+} from '@/features/module-logistics/hooks/useShipmentDelayPrediction';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType, ShipmentType } from './shipments-data';
 import { logger } from '@/lib/logger';
 import { formatContainerSize } from '@/lib/container-utils';
@@ -348,6 +353,78 @@ export default function ShipmentDetail() {
         service_level: 'standard',
       },
       tariff_hints: null,
+    };
+  }, [id, shipment]);
+
+  // Map internal ShipmentStatus to the delay-prediction status enum.
+  // Internal: draft / confirmed / in_transit / out_for_delivery / delivered / customs / cancelled / on_hold / returned
+  // LLM:      booked / picked_up / in_transit_origin / departed_origin / in_transit / arrived_destination_port / customs / out_for_delivery / delivered / exception
+  const delayStatus = (s: ShipmentStatus | undefined | null): DelayShipmentStatus => {
+    switch (s) {
+      case 'draft': return 'booked';
+      case 'confirmed': return 'booked';
+      case 'in_transit': return 'in_transit';
+      case 'out_for_delivery': return 'out_for_delivery';
+      case 'delivered': return 'delivered';
+      case 'customs': return 'customs';
+      case 'on_hold': return 'exception';
+      case 'cancelled': return 'exception';
+      case 'returned': return 'exception';
+      default: return 'in_transit';
+    }
+  };
+
+  const delayPredictionInput = useMemo<DelayPredictionInput | null>(() => {
+    if (!shipment || !id) return null;
+    if (!shipment.origin_address?.country || !shipment.destination_address?.country) return null;
+    if (!shipment.estimated_delivery_date) return null;
+    const daysInTransit = shipment.pickup_date
+      ? Math.max(0, Math.floor((Date.now() - new Date(shipment.pickup_date).getTime()) / 86400000))
+      : 0;
+    return {
+      shipment: {
+        shipment_id: id,
+        mode: chargesShipmentMode(shipment.shipment_type),
+        origin: {
+          country: shipment.origin_address.country,
+          port_or_airport: shipment.port_of_loading ?? null,
+        },
+        destination: {
+          country: shipment.destination_address.country,
+          port_or_airport: shipment.port_of_discharge ?? null,
+        },
+        committed_delivery_iso: shipment.estimated_delivery_date,
+        current_status: delayStatus(shipment.status as ShipmentStatus),
+        last_known_location: shipment.current_location
+          ? [shipment.current_location.city, shipment.current_location.country]
+              .filter(Boolean)
+              .join(' ')
+          : null,
+        last_update_iso: shipment.created_at,
+        days_in_transit_so_far: daysInTransit,
+        declared_value: { amount: shipment.total_charges ?? 0, currency: shipment.currency ?? 'USD' },
+        hazmat: { is_hazmat: false, un_numbers: [] },
+      },
+      // No carrier history aggregation yet — stub with 'unknown' tier.
+      // The prompt is designed to lower confidence + flag warnings when
+      // these come back as unknown/null, so the panel renders honestly.
+      carrier_history: {
+        carrier_name: shipment.carriers?.carrier_name ?? null,
+        on_time_rate_pct_lane_90d: null,
+        on_time_rate_pct_global_90d: null,
+        avg_transit_days_lane: null,
+        shipments_observed_lane_90d: null,
+        recent_disruption_count_30d: 0,
+        reliability_tier: 'unknown',
+      },
+      // No lane-conditions data source yet — same honest-unknown pattern.
+      lane_conditions: {
+        port_congestion_signal: 'unknown',
+        weather_disruption: 'unknown',
+        customs_processing_delay_days: null,
+        holiday_or_strike_flag: false,
+        alternative_routes_available: 1,
+      },
     };
   }, [id, shipment]);
 
@@ -834,6 +911,11 @@ export default function ShipmentDetail() {
         {/* AI charges suggestion — invoice draft helper */}
         {chargesSuggestionInput && (
           <ChargesSuggestionPanel input={chargesSuggestionInput} />
+        )}
+
+        {/* AI delay prediction — operator escalation helper */}
+        {delayPredictionInput && shipment.status !== 'delivered' && shipment.status !== 'cancelled' && (
+          <ShipmentDelayPredictionPanel input={delayPredictionInput} />
         )}
 
         {/* Attachments */}
