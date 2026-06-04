@@ -1,6 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
+import { ActivitySummarisePanel } from '@/features/module-crm/components/ActivitySummarisePanel';
+import type {
+  ActivitySummariseInput,
+  ActivityType as SummariseActivityType,
+} from '@/features/module-crm/hooks/useActivitySummarise';
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
 import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
@@ -62,6 +67,52 @@ export default function ContactDetail() {
       setActivities(data || []);
     } catch (err) { logger.error(err); }
   };
+
+  // Best-effort mapping from the legacy activity_type vocabulary used in
+  // public.activities to the panel's typed enum. Anything unmapped becomes
+  // "other" so the panel still renders.
+  const mapActivityType = (raw: string | null | undefined): SummariseActivityType => {
+    const t = (raw || '').toLowerCase();
+    if (t.includes('call')) return 'call';
+    if (t.includes('email')) return 'email';
+    if (t.includes('meeting') || t.includes('mtg')) return 'meeting';
+    if (t.includes('demo')) return 'demo';
+    if (t.includes('proposal')) return 'proposal_sent';
+    if (t.includes('quote')) return 'quote_sent';
+    if (t.includes('note')) return 'note';
+    if (t === 'task' || t.includes('task_completed')) return 'task_completed';
+    if (t.includes('stage')) return 'stage_change';
+    return 'other';
+  };
+
+  const summariseInput = useMemo<ActivitySummariseInput | null>(() => {
+    if (!contact || activities.length === 0) return null;
+    return {
+      subject: {
+        type: 'contact',
+        id: contact.id,
+        name: `${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Contact',
+        stage: contact.lifecycle_stage ?? null,
+        owner: null,
+      },
+      activities: activities.map((a) => ({
+        activity_id: String(a.id),
+        type: mapActivityType(a.activity_type),
+        direction: null,
+        actor_role: null,
+        occurred_at: a.created_at || a.completed_at || new Date().toISOString(),
+        duration_minutes: null,
+        summary: a.subject ?? null,
+        body: String(a.description || a.subject || ''),
+        outcome: a.status ?? null,
+      })),
+      summary_window: {
+        max_activities_considered: 20,
+        earliest_iso: null,
+        audience: 'sdr_handoff',
+      },
+    };
+  }, [contact, activities]);
 
   const fetchSegments = async (contactId: string) => {
     try {
@@ -262,12 +313,24 @@ export default function ContactDetail() {
                         </EnterpriseTab>
 
                         <EnterpriseTab label="Emails" value="emails">
-                            <EmailHistoryPanel 
-                                emailAddress={contact.email} 
-                                entityType="contact" 
-                                entityId={contact.id} 
+                            <EmailHistoryPanel
+                                emailAddress={contact.email}
+                                entityType="contact"
+                                entityId={contact.id}
                                 tenantId={contact.tenant_id}
                             />
+                        </EnterpriseTab>
+
+                        <EnterpriseTab label="AI Summary" value="ai-summary">
+                            {summariseInput ? (
+                                <ActivitySummarisePanel input={summariseInput} />
+                            ) : (
+                                <p className="text-sm text-muted-foreground italic">
+                                    {activities.length === 0
+                                        ? 'No activities yet — log a call, meeting, or note to enable AI summary.'
+                                        : 'Loading contact context…'}
+                                </p>
+                            )}
                         </EnterpriseTab>
                     </EnterpriseNotebook>
                 )}
