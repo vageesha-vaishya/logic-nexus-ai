@@ -24,6 +24,11 @@ import { format } from 'date-fns';
 import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
 import { CustomsDocExtractPanel } from '@/features/module-logistics/components/CustomsDocExtractPanel';
 import type { CustomsDocExtractOutput, ShipmentContext } from '@/features/module-logistics/hooks/useCustomsDocExtract';
+import { ChargesSuggestionPanel } from '@/features/module-logistics/components/ChargesSuggestionPanel';
+import type {
+  ChargesSuggestionInput,
+  ShipmentMode as ChargesShipmentMode,
+} from '@/features/module-logistics/hooks/useChargesSuggestion';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType, ShipmentType } from './shipments-data';
 import { logger } from '@/lib/logger';
 import { formatContainerSize } from '@/lib/container-utils';
@@ -284,6 +289,67 @@ export default function ShipmentDetail() {
     shipment?.incoterms,
     shipment?.currency,
   ]);
+
+  // Map the internal ShipmentType to the narrower charges-suggestion mode.
+  // courier maps to courier (unlike the customs panel where we sent null);
+  // here we want a usable spine even for courier shipments.
+  const chargesShipmentMode = (t: ShipmentType | undefined | null): ChargesShipmentMode => {
+    switch (t) {
+      case 'ocean': return 'ocean_fcl';
+      case 'air': return 'air';
+      case 'inland_trucking': return 'road';
+      case 'rail': return 'rail';
+      case 'courier': return 'courier';
+      case 'movers_packers': return 'multimodal';
+      default: return 'multimodal';
+    }
+  };
+
+  const chargesSuggestionInput = useMemo<ChargesSuggestionInput | null>(() => {
+    if (!shipment || !id) return null;
+    if (!shipment.origin_address?.country || !shipment.destination_address?.country) return null;
+    if (!shipment.currency) return null;
+    return {
+      shipment: {
+        shipment_id: id,
+        mode: chargesShipmentMode(shipment.shipment_type),
+        origin: {
+          country: shipment.origin_address.country,
+          port_or_airport: shipment.port_of_loading ?? null,
+          city: shipment.origin_address.city ?? null,
+        },
+        destination: {
+          country: shipment.destination_address.country,
+          port_or_airport: shipment.port_of_discharge ?? null,
+          city: shipment.destination_address.city ?? null,
+        },
+        packages: {
+          total_pieces: shipment.total_packages ?? null,
+          total_weight_kg: shipment.total_weight_kg ?? null,
+          total_volume_m3: null,
+          chargeable_weight_kg: shipment.total_weight_kg ?? null,
+        },
+        containers: null,
+        hazmat: { is_hazmat: false, un_numbers: [], imdg_class: null },
+        temp_controlled: { required: false, range_celsius: null },
+        incoterm: shipment.incoterms ?? null,
+        currency: shipment.currency,
+        declared_value: { amount: shipment.total_charges ?? null, currency: shipment.currency },
+        line_items: [],
+        service_terms: {
+          door_pickup: false,
+          door_delivery: false,
+          customs_clearance: 'destination',
+        },
+      },
+      carrier: {
+        name: shipment.carriers?.carrier_name ?? null,
+        type: null,
+        service_level: 'standard',
+      },
+      tariff_hints: null,
+    };
+  }, [id, shipment]);
 
   // After the LLM finishes parsing the uploaded customs doc, persist the
   // file to storage + insert a shipment_attachments row stamped with the
@@ -764,6 +830,11 @@ export default function ShipmentDetail() {
           entityType="shipment" 
           entityId={shipment.id} 
         />
+
+        {/* AI charges suggestion — invoice draft helper */}
+        {chargesSuggestionInput && (
+          <ChargesSuggestionPanel input={chargesSuggestionInput} />
+        )}
 
         {/* Attachments */}
         <Card>
