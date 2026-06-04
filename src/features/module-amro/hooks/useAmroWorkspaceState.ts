@@ -8,6 +8,7 @@ import { useAmroWorkOrdersState } from './useAmroWorkOrdersState';
 import { useAmroWorkOrdersFetch } from './useAmroWorkOrdersFetch';
 import { useAmroModuleSurfacesFetch } from './useAmroModuleSurfacesFetch';
 import { useAmroTasksFetch } from './useAmroTasksFetch';
+import { useAmroScheduleBoardFetch } from './useAmroScheduleBoardFetch';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -319,38 +320,18 @@ export function useAmroWorkspaceState() {
     setWorkOrdersError,
   });
 
-  const fetchScheduleBoard = useCallback(async () => {
-    if (!authHeaders) {
-      setScheduleBoardRows([]);
-      return;
-    }
-    if (!hasAmroAccess) {
-      setWorkOrdersError(
-        isAwaitingAmroDomainActivation ? 'Switching to AMRO domain context...' : amroAccessErrorMessage,
-      );
-      return;
-    }
-    if (isApiTemporarilyUnavailable()) {
-      return;
-    }
-    try {
-      const todayIso = new Date().toISOString();
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/schedules?date=${encodeURIComponent(todayIso)}`, { headers: authHeaders });
-      const payload = await parseJsonSafe<V2SchedulesResponse>(response);
-      const rows = payload?.output?.schedules;
-      if (!response.ok || !Array.isArray(rows)) {
-        throw new Error(payload?.error || `Failed to load schedules (${response.status})`);
-      }
-      setScheduleBoardRows(rows);
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load scheduling board');
-    }
-  }, [apiBaseUrl, amroAccessErrorMessage, authHeaders, hasAmroAccess, isApiTemporarilyUnavailable, isAwaitingAmroDomainActivation, markApiTemporarilyUnavailable]);
+  // Phase 8f.3f — fetchScheduleBoard carved into useAmroScheduleBoardFetch.
+  const fetchScheduleBoard = useAmroScheduleBoardFetch({
+    apiBaseUrl,
+    authHeaders,
+    hasAmroAccess,
+    isAwaitingAmroDomainActivation,
+    amroAccessErrorMessage,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    setScheduleBoardRows,
+    setWorkOrdersError,
+  });
 
   useEffect(() => {
     void fetchWorkOrders();
