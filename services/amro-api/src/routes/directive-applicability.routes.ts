@@ -456,6 +456,118 @@ router.post(
   }),
 );
 
+// ── POST /amro/directives/:directiveId/applicability/queue-fleet ───
+// Enqueue a job to evaluate this directive against EVERY active
+// aircraft for the tenant. Asynchronous — drained by the
+// applicability-worker (per design slice S3).
+router.post(
+  '/amro/directives/:directiveId/applicability/queue-fleet',
+  asyncHandler(async (req: AuthRequest, res) => {
+    if (!req.tenantId) { unauthorized(res); return; }
+    const tenantId = String(req.tenantId);
+    const directiveId = String(req.params.directiveId);
+
+    const supabase = getAmroClient();
+    const { data, error } = await supabase
+      .from('applicability_eval_jobs')
+      .insert([{
+        tenant_id: tenantId,
+        directive_id: directiveId,
+        trigger_kind: 'manual_batch',
+        requested_by: req.userId ?? null,
+      }])
+      .select('id, status')
+      .single();
+    if (error) {
+      res.status(500).json({
+        error: `Failed to enqueue job: ${error.message}`,
+        code: 'APPLICABILITY_ENQUEUE_FAILED',
+        statusCode: 500,
+      });
+      return;
+    }
+    res.status(202).json({
+      job_id: (data as JsonRecord).id,
+      status: (data as JsonRecord).status,
+      scope: 'fleet',
+      directive_id: directiveId,
+    });
+  }),
+);
+
+// ── POST /amro/aircraft/:aircraftId/applicability/queue-all ─────────
+// Enqueue a job to evaluate every active directive against this
+// aircraft. Asynchronous — drained by the worker.
+router.post(
+  '/amro/aircraft/:aircraftId/applicability/queue-all',
+  asyncHandler(async (req: AuthRequest, res) => {
+    if (!req.tenantId) { unauthorized(res); return; }
+    const tenantId = String(req.tenantId);
+    const aircraftId = String(req.params.aircraftId);
+
+    const supabase = getAmroClient();
+    const { data, error } = await supabase
+      .from('applicability_eval_jobs')
+      .insert([{
+        tenant_id: tenantId,
+        aircraft_id: aircraftId,
+        trigger_kind: 'aircraft_entered_service',
+        requested_by: req.userId ?? null,
+      }])
+      .select('id, status')
+      .single();
+    if (error) {
+      res.status(500).json({
+        error: `Failed to enqueue job: ${error.message}`,
+        code: 'APPLICABILITY_ENQUEUE_FAILED',
+        statusCode: 500,
+      });
+      return;
+    }
+    res.status(202).json({
+      job_id: (data as JsonRecord).id,
+      status: (data as JsonRecord).status,
+      scope: 'all_directives',
+      aircraft_id: aircraftId,
+    });
+  }),
+);
+
+// ── GET /amro/directives/applicability/jobs ─────────────────────────
+// Operator view of pending + recently-completed eval jobs for this tenant.
+router.get(
+  '/amro/directives/applicability/jobs',
+  asyncHandler(async (req: AuthRequest, res) => {
+    if (!req.tenantId) { unauthorized(res); return; }
+    const supabase = getAmroClient();
+    const tenantId = String(req.tenantId);
+    const status = String(req.query.status || '').trim();
+    const limit = Math.min(Number(req.query.limit) || 50, 200);
+
+    let query = supabase
+      .from('applicability_eval_jobs')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .order('requested_at', { ascending: false })
+      .limit(limit);
+
+    if (status && ['pending','in_progress','completed','failed','cancelled'].includes(status)) {
+      query = query.eq('status', status);
+    }
+
+    const { data, error } = await query;
+    if (error) {
+      res.status(500).json({
+        error: `Failed to list jobs: ${error.message}`,
+        code: 'APPLICABILITY_JOBS_LIST_FAILED',
+        statusCode: 500,
+      });
+      return;
+    }
+    res.json({ records: data ?? [], total: (data ?? []).length });
+  }),
+);
+
 // ── PATCH /amro/directives/applicability/:verdictId ─────────────────
 // Accept / override / snooze. Override REQUIRES human_override_reason.
 router.patch(

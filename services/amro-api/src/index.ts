@@ -71,6 +71,10 @@ async function startServer() {
     // Phase 8d: env-gated core.outbox → Kafka transactional poller.
     void startAmroOutboxPoller();
 
+    // Directive Applicability S3: env-gated amro.applicability_eval_jobs
+    // batch processor. Drains pending evaluation jobs via the LLM gateway.
+    void startApplicabilityWorker();
+
     // Handle graceful shutdown
     process.on('SIGTERM', () => {
       logger.warn('SIGTERM received, shutting down gracefully...');
@@ -135,6 +139,72 @@ async function startAmroOutboxPoller(): Promise<void> {
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('[amro-api] outbox tick crashed', err instanceof Error ? err.message : String(err));
+    } finally {
+      running = false;
+    }
+  };
+  setInterval(() => { void tick(); }, intervalMs).unref();
+}
+
+async function startApplicabilityWorker(): Promise<void> {
+  const raw = process.env.AMRO_APPLICABILITY_WORKER_INTERVAL_SEC;
+  const intervalSec = raw ? Number(raw) : 0;
+  if (!Number.isFinite(intervalSec) || intervalSec <= 0) {
+    // eslint-disable-next-line no-console
+    console.log('[amro-api] applicability worker disabled (set AMRO_APPLICABILITY_WORKER_INTERVAL_SEC to enable)');
+    return;
+  }
+  const intervalMs = Math.max(15, intervalSec) * 1000;
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  const gatewayUrl = process.env.LLM_GATEWAY_URL;
+  if (!supabaseUrl || !supabaseKey || !gatewayUrl) {
+    // eslint-disable-next-line no-console
+    console.log('[amro-api] applicability worker wanted but SUPABASE_URL/SERVICE_ROLE_KEY/LLM_GATEWAY_URL missing — skipping');
+    return;
+  }
+  const serviceToken = process.env.LLM_GATEWAY_SERVICE_TOKEN ?? null;
+  const platformId = process.env.LLM_GATEWAY_PLATFORM_ID ?? 'logic-nexus-ai';
+  const workerId = `${process.env.HOSTNAME ?? 'amro-api'}-${process.pid}`;
+  const jobLimitRaw = Number(process.env.AMRO_APPLICABILITY_WORKER_JOB_LIMIT ?? 5);
+  const jobLimit = Number.isFinite(jobLimitRaw) && jobLimitRaw > 0 ? jobLimitRaw : 5;
+
+  const { createClient } = await import('@supabase/supabase-js');
+  const { runApplicabilityWorkerTick } = await import('./workers/applicability-worker.js');
+  const supabase = createClient(supabaseUrl, supabaseKey);
+  // eslint-disable-next-line no-console
+  console.log(`[amro-api] applicability worker enabled every ${intervalMs / 1000}s (jobLimit=${jobLimit}, workerId=${workerId})`);
+
+  let running = false;
+  let tickCount = 0;
+  const tick = async (): Promise<void> => {
+    if (running) return;
+    running = true;
+    tickCount += 1;
+    try {
+      const result = await runApplicabilityWorkerTick({
+        supabase,
+        gatewayUrl,
+        serviceToken,
+        platformId,
+        workerId,
+        jobLimit,
+        runRecovery: tickCount % 20 === 0,
+      });
+      if (result.claimed > 0 || result.errors.length > 0 || result.recoveryReset > 0) {
+        // eslint-disable-next-line no-console
+        console.log('[amro-api] applicability tick', {
+          claimed: result.claimed,
+          pairs: result.pairsProcessed,
+          verdicts: result.verdictsPersisted,
+          failed: result.jobsFailed,
+          recovered: result.recoveryReset,
+          errors: result.errors.length,
+        });
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('[amro-api] applicability tick crashed', err instanceof Error ? err.message : String(err));
     } finally {
       running = false;
     }
