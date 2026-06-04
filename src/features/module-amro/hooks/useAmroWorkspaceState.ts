@@ -9,6 +9,7 @@ import { useAmroWorkOrdersFetch } from './useAmroWorkOrdersFetch';
 import { useAmroModuleSurfacesFetch } from './useAmroModuleSurfacesFetch';
 import { useAmroTasksFetch } from './useAmroTasksFetch';
 import { useAmroScheduleBoardFetch } from './useAmroScheduleBoardFetch';
+import { useAmroWorkOrderHoldMutations } from './useAmroWorkOrderHoldMutations';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -1428,83 +1429,25 @@ export function useAmroWorkspaceState() {
     [assignSelectedWorkOrderToNextSlot, fetchScheduleBoard, selectedWorkOrderId, updateWorkOrderStatusById, workOrders],
   );
 
-  const toggleWorkOrderHold = useCallback(
-    async (workOrderId?: string) => {
-      const targetWorkOrder = workOrderId
-        ? workOrders.find((item) => item.id === workOrderId) ?? null
-        : selectedWorkOrder;
-      if (!targetWorkOrder) return false;
-      const workOrderStatus = mapLifecycleToStatus(targetWorkOrder.lifecycleStage) as WorkOrderStatus;
-      const releaseStatus = holdReleaseStatusByWorkOrder[targetWorkOrder.id] || 'scheduled';
-      const nextStatus = workOrderStatus === 'blocked' ? releaseStatus : 'blocked';
-      const ok = await updateWorkOrderStatusById(targetWorkOrder.id, nextStatus);
-      if (!ok) return false;
-      if (workOrderStatus === 'blocked') {
-        forgetPreHoldStatus(targetWorkOrder.id);
-      } else {
-        rememberPreHoldStatus(targetWorkOrder.id, workOrderStatus);
-      }
-      const occurredAt = new Date().toISOString();
-      appendHoldAuditEntry({
-        workOrderId: targetWorkOrder.id,
-        packageNumber: targetWorkOrder.packageNumber,
-        action: workOrderStatus === 'blocked' ? 'release' : 'hold',
-        fromStatus: workOrderStatus,
-        toStatus: nextStatus,
-        actorRole: activeRole,
-        occurredAt,
-      });
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('amro:work-order-hold-audit', {
-          detail: {
-            workOrderId: targetWorkOrder.id,
-            packageNumber: targetWorkOrder.packageNumber,
-            action: workOrderStatus === 'blocked' ? 'release' : 'hold',
-            fromStatus: workOrderStatus,
-            toStatus: nextStatus,
-            actorRole: activeRole,
-            occurredAt,
-          },
-        }));
-      }
-      return true;
-    },
-    [
-      activeRole,
-      appendHoldAuditEntry,
-      forgetPreHoldStatus,
-      rememberPreHoldStatus,
-      selectedWorkOrder,
-      updateWorkOrderStatusById,
-      workOrders,
-    ],
-  );
-
-  const softDeleteWorkOrder = useCallback(
-    async (workOrderId?: string) => {
-      const targetWorkOrder = workOrderId
-        ? workOrders.find((item) => item.id === workOrderId) ?? null
-        : selectedWorkOrder;
-      if (!targetWorkOrder) return false;
-      const previousStatus = mapLifecycleToStatus(targetWorkOrder.lifecycleStage) as WorkOrderStatus;
-      const ok = await updateWorkOrderStatusById(targetWorkOrder.id, 'cancelled');
-      if (!ok) return false;
-      rememberPreSoftDeleteStatus(targetWorkOrder.id, previousStatus);
-      return true;
-    },
-    [rememberPreSoftDeleteStatus, selectedWorkOrder, updateWorkOrderStatusById, workOrders],
-  );
-
-  const restoreSoftDeletedWorkOrder = useCallback(
-    async (workOrderId: string) => {
-      const restoreStatus = softDeletedWorkOrderStatusById[workOrderId] || 'planning';
-      const ok = await updateWorkOrderStatusById(workOrderId, restoreStatus);
-      if (!ok) return false;
-      forgetPreSoftDeleteStatus(workOrderId);
-      return true;
-    },
-    [forgetPreSoftDeleteStatus, softDeletedWorkOrderStatusById, updateWorkOrderStatusById],
-  );
+  // Phase 8f.4a — toggleWorkOrderHold + softDeleteWorkOrder +
+  // restoreSoftDeletedWorkOrder carved into useAmroWorkOrderHoldMutations.
+  const {
+    toggleWorkOrderHold,
+    softDeleteWorkOrder,
+    restoreSoftDeletedWorkOrder,
+  } = useAmroWorkOrderHoldMutations({
+    workOrders,
+    selectedWorkOrder,
+    activeRole,
+    updateWorkOrderStatusById,
+    holdReleaseStatusByWorkOrder,
+    softDeletedWorkOrderStatusById,
+    rememberPreHoldStatus,
+    forgetPreHoldStatus,
+    rememberPreSoftDeleteStatus,
+    forgetPreSoftDeleteStatus,
+    appendHoldAuditEntry,
+  });
 
   const openWorkOrderDetails = useCallback(
     async (workOrderId: string) => {
