@@ -31,8 +31,10 @@ import type {
 } from '@/features/module-logistics/hooks/useChargesSuggestion';
 import { ShipmentDelayPredictionPanel } from '@/features/module-logistics/components/ShipmentDelayPredictionPanel';
 import type {
+  CarrierHistoryInput,
   DelayPredictionInput,
   ShipmentStatus as DelayShipmentStatus,
+  ReliabilityTier,
 } from '@/features/module-logistics/hooks/useShipmentDelayPrediction';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType, ShipmentType } from './shipments-data';
 import { logger } from '@/lib/logger';
@@ -61,6 +63,7 @@ export default function ShipmentDetail() {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   
   // Cargo state
+  const [carrierHistory, setCarrierHistory] = useState<CarrierHistoryInput | null>(null);
   const [cargoItems, setCargoItems] = useState<any[]>([]);
   const [cargoConfigs, setCargoConfigs] = useState<any[]>([]);
   const [isCargoOpen, setIsCargoOpen] = useState(false);
@@ -186,6 +189,59 @@ export default function ShipmentDetail() {
       fetchCargoConfigs();
     }
   }, [id, fetchShipment, fetchAttachments, fetchCargo, fetchCargoConfigs]);
+
+  // Follow-up #6: load carrier_lane_history aggregation once we know
+  // tenant + carrier + lane. Replaces the prior 'unknown' tier stub
+  // in delayPredictionInput. The RPC is fast (single round trip,
+  // index-backed) so this is fire-and-forget on shipment load.
+  useEffect(() => {
+    if (!shipment?.tenant_id || !shipment?.carrier_id) {
+      setCarrierHistory(null);
+      return;
+    }
+    if (!shipment.origin_country || !shipment.destination_country) {
+      setCarrierHistory(null);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const { data, error } = await supabase.rpc('carrier_lane_history' as never, {
+          p_tenant_id: shipment.tenant_id,
+          p_carrier_id: shipment.carrier_id,
+          p_origin_country: shipment.origin_country,
+          p_destination_country: shipment.destination_country,
+        } as never);
+        if (error) throw error;
+        if (cancelled || !data) return;
+        const row = data as Record<string, unknown>;
+        const tier = (row.reliability_tier as ReliabilityTier) ?? 'unknown';
+        setCarrierHistory({
+          carrier_name: (row.carrier_name as string | null) ?? null,
+          on_time_rate_pct_lane_90d: (row.on_time_rate_pct_lane_90d as number | null) ?? null,
+          on_time_rate_pct_global_90d: (row.on_time_rate_pct_global_90d as number | null) ?? null,
+          avg_transit_days_lane: (row.avg_transit_days_lane as number | null) ?? null,
+          shipments_observed_lane_90d: (row.shipments_observed_lane_90d as number | null) ?? null,
+          recent_disruption_count_30d: (row.recent_disruption_count_30d as number | null) ?? 0,
+          reliability_tier: tier,
+        });
+      } catch (e) {
+        logger.warn('Failed to load carrier lane history', {
+          shipmentId: id,
+          error: e instanceof Error ? e.message : String(e),
+        });
+        if (!cancelled) setCarrierHistory(null);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [
+    id,
+    shipment?.tenant_id,
+    shipment?.carrier_id,
+    shipment?.origin_country,
+    shipment?.destination_country,
+    supabase,
+  ]);
 
   const handleDeleteCargo = async (cargoId: string) => {
     if (!confirm('Are you sure you want to delete this cargo item?')) return;
@@ -405,10 +461,11 @@ export default function ShipmentDetail() {
         declared_value: { amount: shipment.total_charges ?? 0, currency: shipment.currency ?? 'USD' },
         hazmat: { is_hazmat: false, un_numbers: [] },
       },
-      // No carrier history aggregation yet — stub with 'unknown' tier.
-      // The prompt is designed to lower confidence + flag warnings when
-      // these come back as unknown/null, so the panel renders honestly.
-      carrier_history: {
+      // Real carrier history from carrier_lane_history RPC when loaded
+      // (Follow-up #6). Falls back to an 'unknown' stub during the brief
+      // window before the RPC resolves OR when carrier_id / lane is
+      // unset — the LLM prompt handles the unknown tier gracefully.
+      carrier_history: carrierHistory ?? {
         carrier_name: shipment.carriers?.carrier_name ?? null,
         on_time_rate_pct_lane_90d: null,
         on_time_rate_pct_global_90d: null,
@@ -426,7 +483,7 @@ export default function ShipmentDetail() {
         alternative_routes_available: 1,
       },
     };
-  }, [id, shipment]);
+  }, [id, shipment, carrierHistory]);
 
   // After the LLM finishes parsing the uploaded customs doc, persist the
   // file to storage + insert a shipment_attachments row stamped with the
