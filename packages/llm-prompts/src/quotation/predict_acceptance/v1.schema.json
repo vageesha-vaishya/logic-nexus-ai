@@ -1,0 +1,91 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/llm-prompts/quotation.predict.acceptance.v1.json",
+  "title": "quotation.predict.acceptance output v1",
+  "type": "object",
+  "required": [
+    "p_accept",
+    "p_accept_band",
+    "confidence",
+    "positive_drivers",
+    "negative_drivers",
+    "risk_factors",
+    "suggested_adjustments",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "driver": {
+      "type": "object",
+      "required": ["factor", "weight", "evidence"],
+      "additionalProperties": false,
+      "properties": {
+        "factor": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "weight": { "type": "string", "enum": ["high", "medium", "low"] },
+        "evidence": { "type": "string", "minLength": 1, "maxLength": 240 }
+      }
+    }
+  },
+  "properties": {
+    "p_accept": { "type": "number", "minimum": 0, "maximum": 1 },
+    "p_accept_band": {
+      "type": "string",
+      "enum": ["very_low", "low", "moderate", "high", "very_high"]
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "positive_drivers": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "$ref": "#/definitions/driver" }
+    },
+    "negative_drivers": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "$ref": "#/definitions/driver" }
+    },
+    "risk_factors": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "maxLength": 240 }
+    },
+    "suggested_adjustments": {
+      "type": "array",
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "adjustment_type",
+          "specific_change",
+          "expected_p_accept_delta",
+          "revenue_impact_pct",
+          "rationale",
+          "confidence"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "adjustment_type": {
+            "type": "string",
+            "enum": [
+              "price_concession",
+              "term_concession",
+              "scope_change",
+              "validity_extension",
+              "add_concession_line",
+              "no_change_recommended"
+            ]
+          },
+          "specific_change": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "expected_p_accept_delta": { "type": "number", "minimum": -1, "maximum": 1 },
+          "revenue_impact_pct": { "type": "number", "minimum": -100, "maximum": 100 },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "maxLength": 240 }
+    }
+  }
+}
