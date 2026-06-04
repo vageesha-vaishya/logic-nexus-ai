@@ -398,7 +398,33 @@ router.post(
       return;
     }
 
-    // 3. Build LLM input
+    // 3. Fetch fleet_context from the aggregation RPC. Replaces the
+    //    stub fleet_context shipped in S2. Falls back to a stub on
+    //    error so triage doesn't hard-fail if the RPC is unavailable.
+    let fleetContext: JsonRecord = {
+      same_type_aircraft_nearby: [],
+      tools_at_airport: [],
+      parts_at_airport: [],
+      station_capability: 'vendor_required',
+      sla_recovery_hours: 24,
+    };
+    try {
+      const { data: fcData, error: fcErr } = await publicClient.rpc(
+        'fleet_context_at_airport' as never,
+        {
+          p_airport_iata: String(alertRow.airport_iata),
+          p_aircraft_model: String(aircraft.model ?? ''),
+          p_tenant_id: tenantId,
+        } as never,
+      );
+      if (!fcErr && fcData && typeof fcData === 'object') {
+        fleetContext = fcData as JsonRecord;
+      }
+    } catch {
+      // Swallow — stub fleet_context will be sent instead.
+    }
+
+    // 4. Build LLM input
     const llmInput = {
       alert: {
         alert_id: String(alertRow.id),
@@ -421,16 +447,10 @@ router.post(
         cycles_since_new: null,
         current_mel_deferrals: [],
       },
-      fleet_context: {
-        same_type_aircraft_nearby: [],
-        tools_at_airport: [],
-        parts_at_airport: [],
-        station_capability: 'vendor_required' as const,
-        sla_recovery_hours: 24,
-      },
+      fleet_context: fleetContext,
     };
 
-    // 4. Invoke the Edge Function
+    // 5. Invoke the Edge Function
     const fnUrl = `${String(process.env.AMRO_SUPABASE_URL || process.env.SUPABASE_URL || '').replace(/\/$/, '')}/functions/v1/llm-aog-triage`;
     const authHeader = (req.headers.authorization || '').replace(/^Bearer\s+/i, '');
     const callRes = await fetch(fnUrl, {
@@ -457,7 +477,7 @@ router.post(
       output?: JsonRecord;
     };
 
-    // 5. Persist the verdict on the alert row + flip status to 'triaged' if still 'declared'
+    // 6. Persist the verdict on the alert row + flip status to 'triaged' if still 'declared'
     const triageUpdate: JsonRecord = {
       last_triage_output: result.output ?? {},
       last_triage_invocation_id: result.invocation_id ?? null,
