@@ -26,6 +26,12 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { QuoteActionIcon } from '@/components/quotation/QuoteActionIcon';
+import { PredictAcceptancePanel } from '@/features/module-quotation/components/PredictAcceptancePanel';
+import type {
+  PredictAcceptanceInput,
+  CustomerHistoryInput,
+  Mode as PredictMode,
+} from '@/features/module-quotation/hooks/usePredictQuoteAcceptance';
 
 const RETRY_DELAYS_MS = [0, 500, 1200];
 const DEFAULT_RANKING_CRITERIA = { cost: 0.4, transit_time: 0.3, reliability: 0.3 };
@@ -134,6 +140,28 @@ export default function QuoteDetail() {
   const [versionId, setVersionId] = useState<string | null>(urlVersionId || null);
   const [tenantId, setTenantId] = useState<string | null>(null);
   const [quoteNumber, setQuoteNumber] = useState<string | null>(null);
+
+  // Quote header lifted for the predict-acceptance panel — minimal subset
+  // of public.quotes carrying the fields the LLM input needs.
+  type QuoteHeader = {
+    account_id: string | null;
+    transport_mode: string | null;
+    origin_code: string | null;
+    destination_code: string | null;
+    origin_location: unknown;
+    destination_location: unknown;
+    incoterms: string | null;
+    total_amount: number | null;
+    currency: string | null;
+    valid_until: string | null;
+    pickup_date: string | null;
+    payment_terms: string | null;
+    created_at: string | null;
+    is_hazmat: boolean | null;
+    status: string | null;
+  };
+  const [quoteHeader, setQuoteHeader] = useState<QuoteHeader | null>(null);
+  const [customerHistory, setCustomerHistory] = useState<CustomerHistoryInput | null>(null);
   const [showSaveVersion, setShowSaveVersion] = useState(false);
   const [config, setConfig] = useState<any>(null);
   const [comparisonOptions, setComparisonOptions] = useState<any[]>([]);
@@ -626,6 +654,50 @@ export default function QuoteDetail() {
     checkQuote();
   }, [id, reloadToken, scopedDb, debug]);
 
+  // Lift quote header + customer history once we have resolvedId.
+  // Used by the predict-acceptance panel only — if either query fails
+  // we leave state null and the panel renders a "missing context" hint
+  // instead of running with broken input.
+  useEffect(() => {
+    if (!resolvedId) return;
+    let cancelled = false;
+    const loadPredictionContext = async () => {
+      try {
+        const { data: header, error: headerErr } = await supabase
+          .from('quotes')
+          .select(
+            'account_id, transport_mode, origin_code, destination_code, ' +
+            'origin_location, destination_location, incoterms, total_amount, ' +
+            'currency, valid_until, pickup_date, payment_terms, created_at, ' +
+            'is_hazmat, status'
+          )
+          .eq('id', resolvedId)
+          .maybeSingle();
+        if (headerErr) throw headerErr;
+        if (cancelled || !header) return;
+        setQuoteHeader(header as QuoteHeader);
+
+        if (header.account_id) {
+          const { data: hist, error: histErr } = await supabase.rpc(
+            'customer_quote_history',
+            { p_account_id: header.account_id },
+          );
+          if (histErr) throw histErr;
+          if (!cancelled && hist) {
+            setCustomerHistory(hist as CustomerHistoryInput);
+          }
+        }
+      } catch (err) {
+        logger.warn('Failed to load prediction context', {
+          quoteId: resolvedId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    };
+    void loadPredictionContext();
+    return () => { cancelled = true; };
+  }, [resolvedId, supabase]);
+
   useEffect(() => {
     const loadLatestVersion = async () => {
       if (!resolvedId) return;
@@ -984,6 +1056,95 @@ export default function QuoteDetail() {
     );
   }
 
+  // ── Predict-acceptance input assembly ────────────────────────────────
+  // Map quotes.transport_mode (free-text) onto the LLM's narrower mode enum.
+  // Returns null when we can't map confidently — the panel won't render.
+  const mapTransportMode = (raw: string | null | undefined): PredictMode | null => {
+    const t = (raw || '').toLowerCase();
+    if (!t) return null;
+    if (t.includes('ocean') && (t.includes('lcl') || t.includes('groupage'))) return 'ocean_lcl';
+    if (t.includes('ocean') || t.includes('sea')) return 'ocean_fcl';
+    if (t.includes('air')) return 'air';
+    if (t.includes('road') || t.includes('truck')) return 'road';
+    if (t.includes('rail')) return 'rail';
+    if (t.includes('courier') || t.includes('parcel')) return 'courier';
+    if (t.includes('multi') || t.includes('combined')) return 'multimodal';
+    return null;
+  };
+
+  // Pull a 2-letter ISO country from origin_code/destination_code or
+  // origin_location.country / destination_location.country JSON.
+  const extractCountry = (code: string | null | undefined, loc: unknown): string | null => {
+    const fromCode = (code || '').toUpperCase();
+    if (/^[A-Z]{2}$/.test(fromCode)) return fromCode;
+    if (fromCode.length >= 2 && /^[A-Z]{2}/.test(fromCode)) return fromCode.slice(0, 2);
+    if (loc && typeof loc === 'object') {
+      const c = (loc as Record<string, unknown>).country;
+      if (typeof c === 'string' && /^[A-Z]{2}$/.test(c.toUpperCase())) return c.toUpperCase();
+    }
+    return null;
+  };
+
+  const predictionInput: PredictAcceptanceInput | null = (() => {
+    if (!resolvedId || !quoteHeader || !customerHistory) return null;
+    const mode = mapTransportMode(quoteHeader.transport_mode);
+    const origin = extractCountry(quoteHeader.origin_code, quoteHeader.origin_location);
+    const destination = extractCountry(quoteHeader.destination_code, quoteHeader.destination_location);
+    if (!mode || !origin || !destination) return null;
+    if (!quoteHeader.account_id) return null;
+    if (typeof quoteHeader.total_amount !== 'number') return null;
+    if (!quoteHeader.currency) return null;
+
+    const paymentTermsDays = (() => {
+      const raw = quoteHeader.payment_terms || '';
+      const m = raw.match(/(\d+)/);
+      return m ? Math.max(0, parseInt(m[1], 10)) : 30;
+    })();
+    const validityDays = (() => {
+      if (!quoteHeader.valid_until || !quoteHeader.created_at) return 14;
+      const v = new Date(quoteHeader.valid_until).getTime();
+      const c = new Date(quoteHeader.created_at).getTime();
+      const diff = Math.round((v - c) / (1000 * 60 * 60 * 24));
+      return diff > 0 ? diff : 14;
+    })();
+    const daysUntilPickup = (() => {
+      if (!quoteHeader.pickup_date) return null;
+      const p = new Date(quoteHeader.pickup_date).getTime();
+      return Math.round((p - Date.now()) / (1000 * 60 * 60 * 24));
+    })();
+
+    return {
+      quotation: {
+        quote_id: resolvedId,
+        customer_account_id: quoteHeader.account_id,
+        mode,
+        lane: {
+          origin_country: origin,
+          destination_country: destination,
+          origin_port_or_airport: quoteHeader.origin_code ?? null,
+          destination_port_or_airport: quoteHeader.destination_code ?? null,
+        },
+        service_level: 'standard',
+        total_amount: { amount: quoteHeader.total_amount, currency: quoteHeader.currency },
+        line_count: 0,
+        top_lines: [],
+        terms: {
+          incoterm: quoteHeader.incoterms ?? null,
+          payment_terms_days: paymentTermsDays,
+          validity_days: validityDays,
+          credit_check_passed: true,
+        },
+        urgency_context: {
+          requested_pickup_iso: quoteHeader.pickup_date ?? null,
+          days_until_pickup: daysUntilPickup,
+          spot_or_contract: 'spot',
+        },
+      },
+      customer_history: customerHistory,
+      competitive_context: null,
+    };
+  })();
+
   return (
     <DashboardLayout>
       <DetailScreenTemplate
@@ -1133,6 +1294,12 @@ export default function QuoteDetail() {
                     )}
                   </TabsTrigger>
                 )}
+                <TabsTrigger
+                  value="ai-prediction"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:shadow-none py-3"
+                >
+                  AI Prediction
+                </TabsTrigger>
               </TabsList>
               <TabsContent value="composer" className="pt-6">
                 <UnifiedQuoteComposer
@@ -1168,6 +1335,17 @@ export default function QuoteDetail() {
                   )}
                 </TabsContent>
               )}
+              <TabsContent value="ai-prediction" className="pt-6">
+                {predictionInput ? (
+                  <PredictAcceptancePanel input={predictionInput} />
+                ) : (
+                  <div className="rounded-lg border p-6 text-sm text-muted-foreground">
+                    {!quoteHeader || !customerHistory
+                      ? 'Loading quote context…'
+                      : 'AI prediction requires the quote to have an account, transportation mode, origin + destination country codes, total amount, and currency. Fill those in on the Quote Form tab and re-open this tab.'}
+                  </div>
+                )}
+              </TabsContent>
             </Tabs>
           )}
         </div>
