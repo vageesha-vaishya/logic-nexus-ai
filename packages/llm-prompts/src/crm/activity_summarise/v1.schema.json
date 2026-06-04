@@ -1,0 +1,96 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/llm-prompts/crm.activity.summarise.v1.json",
+  "title": "crm.activity.summarise output v1",
+  "type": "object",
+  "required": [
+    "headline",
+    "narrative",
+    "topics_covered",
+    "commitments",
+    "decisions_made",
+    "blockers",
+    "key_stakeholders_named",
+    "sentiment_overall",
+    "sentiment_rationale",
+    "next_step_suggestion",
+    "redactions_made",
+    "confidence"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "headline": { "type": "string", "minLength": 1, "maxLength": 200 },
+    "narrative": { "type": "string", "minLength": 1, "maxLength": 1200 },
+    "topics_covered": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "maxLength": 60 }
+    },
+    "commitments": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["party", "what", "deadline_iso", "status", "supporting_activity_id"],
+        "additionalProperties": false,
+        "properties": {
+          "party": { "type": "string", "enum": ["us", "prospect"] },
+          "what": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "deadline_iso": { "type": ["string", "null"] },
+          "status": { "type": "string", "enum": ["open", "done", "overdue", "missed"] },
+          "supporting_activity_id": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "decisions_made": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "maxLength": 240 }
+    },
+    "blockers": {
+      "type": "array",
+      "maxItems": 12,
+      "items": { "type": "string", "maxLength": 240 }
+    },
+    "key_stakeholders_named": {
+      "type": "array",
+      "maxItems": 12,
+      "items": {
+        "type": "object",
+        "required": ["name", "role_or_title", "side", "sentiment"],
+        "additionalProperties": false,
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "role_or_title": { "type": ["string", "null"], "maxLength": 120 },
+          "side": { "type": "string", "enum": ["us", "prospect", "third_party"] },
+          "sentiment": {
+            "type": "string",
+            "enum": ["champion", "neutral", "skeptical", "blocker", "unknown"]
+          }
+        }
+      }
+    },
+    "sentiment_overall": {
+      "type": "string",
+      "enum": ["champion", "interested", "neutral", "cooling", "lost", "unknown"]
+    },
+    "sentiment_rationale": { "type": "string", "minLength": 1, "maxLength": 240 },
+    "next_step_suggestion": {
+      "type": "object",
+      "required": ["action", "owner", "rationale", "urgency"],
+      "additionalProperties": false,
+      "properties": {
+        "action": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "owner": { "type": "string", "enum": ["us", "prospect"] },
+        "rationale": { "type": "string", "minLength": 1, "maxLength": 240 },
+        "urgency": { "type": "string", "enum": ["today", "this_week", "this_month", "watch"] }
+      }
+    },
+    "redactions_made": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "maxLength": 120 }
+    },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+  }
+}
