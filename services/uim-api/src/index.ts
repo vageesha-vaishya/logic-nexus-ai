@@ -132,10 +132,33 @@ async function wireEtlPersistence(): Promise<void> {
   console.log('[uim-api] ETL persistence wired to uim.etl_runs');
 }
 
+// ADR-0013 Step 65: env-gated cross-module consumer for
+// amro.work_order.parts_consumed → uim_inventory_ledger.
+async function startCrossModuleConsumer(): Promise<void> {
+  const enabled = String(process.env.UIM_CROSS_MODULE_CONSUMER_ENABLED ?? 'false').toLowerCase();
+  if (!['1', 'true', 'yes', 'on'].includes(enabled)) {
+    // eslint-disable-next-line no-console
+    console.log('[uim-api] cross-module consumer disabled (set UIM_CROSS_MODULE_CONSUMER_ENABLED=true to enable)');
+    return;
+  }
+  const supabaseUrl = process.env.SUPABASE_URL;
+  const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY;
+  if (!supabaseUrl || !supabaseKey) {
+    // eslint-disable-next-line no-console
+    console.log('[uim-api] cross-module consumer wanted but SUPABASE_URL/SERVICE_ROLE_KEY missing — skipping');
+    return;
+  }
+  const { uimCrossModuleConsumer } = await import('./services/cross-module-consumer.js');
+  uimCrossModuleConsumer.start();
+  // eslint-disable-next-line no-console
+  console.log('[uim-api] cross-module consumer enabled');
+}
+
 app.listen(PORT, '0.0.0.0', () => {
   // eslint-disable-next-line no-console
   console.log(`[uim-api] listening on :${PORT}`);
   void wireEtlPersistence();
   void startDlqPoller();
   void startOutboxPoller();
+  void startCrossModuleConsumer();
 });
