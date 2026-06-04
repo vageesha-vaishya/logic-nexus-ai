@@ -16,6 +16,7 @@ import { useAmroWorkOrderMutations } from './useAmroWorkOrderMutations';
 import { useAmroAdvanceLifecycle } from './useAmroAdvanceLifecycle';
 import { useAmroMaterialsMutations } from './useAmroMaterialsMutations';
 import { useAmroComplianceMutations } from './useAmroComplianceMutations';
+import { useAmroTaskEvidenceMutations } from './useAmroTaskEvidenceMutations';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -805,135 +806,22 @@ export function useAmroWorkspaceState() {
     ],
   );
 
-  const updateTaskExecutionStatus = useCallback(
-    async (taskId: string, action: 'start' | 'complete' | 'block' | 'reopen') => {
-      if (!authHeaders || !selectedWorkOrderId) return false;
-      if (isApiTemporarilyUnavailable()) {
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/v2/amro/tasks?interface=update-task-step`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            task_id: taskId,
-            step_id: `step-${taskId}`,
-            action,
-            performed_at: new Date().toISOString(),
-            device_id: 'amro-ui-workspace',
-          }),
-        });
-        const payload = await parseJsonSafe<{ error?: string }>(response);
-        if (!response.ok) {
-          throw new Error(payload?.error || `Failed to update task step (${response.status})`);
-        }
-        await fetchTasksForWorkOrder(selectedWorkOrderId);
-        return true;
-      } catch (error) {
-        if (isNetworkConnectivityError(error)) {
-          markApiTemporarilyUnavailable();
-          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-          return false;
-        }
-        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to update task step');
-        return false;
-      }
-    },
-    [
-      apiBaseUrl,
-      authHeaders,
-      fetchTasksForWorkOrder,
-      isApiTemporarilyUnavailable,
-      markApiTemporarilyUnavailable,
-      selectedWorkOrderId,
-    ],
-  );
-
-  const uploadTaskEvidence = useCallback(
-    async (taskId: string) => {
-      if (!authHeaders) return false;
-      if (isApiTemporarilyUnavailable()) {
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      try {
-        const now = Date.now();
-        const response = await fetch(`${apiBaseUrl}/api/v2/amro/tasks?interface=upload-evidence`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            task_id: taskId,
-            evidence_type: 'photo',
-            media_ref: `amro://evidence/${taskId}/${now}`,
-            checksum: `sha256-${now}`,
-          }),
-        });
-        const payload = await parseJsonSafe<{ output?: { evidence_id?: string }; error?: string }>(response);
-        if (!response.ok) {
-          throw new Error(payload?.error || `Failed to upload evidence (${response.status})`);
-        }
-        const evidenceId = String(payload?.output?.evidence_id || `${taskId}-${now}`);
-        setEvidenceChain((previous) => [
-          ...previous,
-          {
-            id: evidenceId,
-            entityType: 'task',
-            entityId: taskId,
-            hash: `sha256-${now}`,
-            immutable: true,
-            createdAt: new Date(now).toISOString(),
-          },
-        ]);
-        return true;
-      } catch (error) {
-        if (isNetworkConnectivityError(error)) {
-          markApiTemporarilyUnavailable();
-          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-          return false;
-        }
-        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to upload task evidence');
-        return false;
-      }
-    },
-    [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable],
-  );
-
-  const submitTaskSignature = useCallback(
-    async (taskId: string) => {
-      if (!authHeaders || !selectedQualification) return false;
-      if (isApiTemporarilyUnavailable()) {
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/v2/amro/tasks?interface=submit-signature`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            task_id: taskId,
-            signer_id: selectedQualification.id,
-            signature_payload: `sig-${selectedQualification.id}-${Date.now()}`,
-            method: 'digital_certificate',
-          }),
-        });
-        const payload = await parseJsonSafe<{ error?: string }>(response);
-        if (!response.ok) {
-          throw new Error(payload?.error || `Failed to submit signature (${response.status})`);
-        }
-        return true;
-      } catch (error) {
-        if (isNetworkConnectivityError(error)) {
-          markApiTemporarilyUnavailable();
-          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-          return false;
-        }
-        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to submit signature');
-        return false;
-      }
-    },
-    [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable, selectedQualification],
-  );
+  // Phase 8f.4h — task evidence trio carved into useAmroTaskEvidenceMutations.
+  const {
+    updateTaskExecutionStatus,
+    uploadTaskEvidence,
+    submitTaskSignature,
+  } = useAmroTaskEvidenceMutations({
+    apiBaseUrl,
+    authHeaders,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    setWorkOrdersError,
+    selectedWorkOrderId,
+    selectedQualification,
+    setEvidenceChain,
+    fetchTasksForWorkOrder,
+  });
 
   const deleteSelectedWorkOrder = useCallback(async () => {
     if (!authHeaders || !selectedWorkOrderId) return false;
