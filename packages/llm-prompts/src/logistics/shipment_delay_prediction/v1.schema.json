@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://platform.local/llm-prompts/logistics.shipment.delay_prediction.v1.json",
+  "title": "logistics.shipment.delay_prediction output v1",
+  "type": "object",
+  "required": [
+    "p_breach",
+    "p_breach_band",
+    "predicted_delay_hours",
+    "predicted_delivery_iso",
+    "confidence",
+    "risk_factors",
+    "positive_signals",
+    "mitigation_options",
+    "warnings"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "factor": {
+      "type": "object",
+      "required": ["factor", "weight", "evidence"],
+      "additionalProperties": false,
+      "properties": {
+        "factor": { "type": "string", "minLength": 1, "maxLength": 180 },
+        "weight": { "type": "string", "enum": ["high", "medium", "low"] },
+        "evidence": { "type": "string", "minLength": 1, "maxLength": 240 }
+      }
+    }
+  },
+  "properties": {
+    "p_breach": { "type": "number", "minimum": 0, "maximum": 1 },
+    "p_breach_band": {
+      "type": "string",
+      "enum": ["very_low", "low", "moderate", "high", "very_high"]
+    },
+    "predicted_delay_hours": { "type": "number", "minimum": 0 },
+    "predicted_delivery_iso": { "type": "string", "minLength": 1 },
+    "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+    "risk_factors": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "$ref": "#/definitions/factor" }
+    },
+    "positive_signals": {
+      "type": "array",
+      "maxItems": 6,
+      "items": { "$ref": "#/definitions/factor" }
+    },
+    "mitigation_options": {
+      "type": "array",
+      "maxItems": 4,
+      "items": {
+        "type": "object",
+        "required": [
+          "action_type",
+          "specific_action",
+          "expected_delay_reduction_hours",
+          "cost_impact",
+          "deadline_to_act",
+          "rationale",
+          "confidence"
+        ],
+        "additionalProperties": false,
+        "properties": {
+          "action_type": {
+            "type": "string",
+            "enum": [
+              "carrier_escalation",
+              "route_change",
+              "expedite_customs",
+              "alternate_carrier",
+              "customer_notify_early",
+              "buffer_inventory",
+              "no_action_recommended"
+            ]
+          },
+          "specific_action": { "type": "string", "minLength": 1, "maxLength": 280 },
+          "expected_delay_reduction_hours": { "type": "number", "minimum": 0 },
+          "cost_impact": {
+            "type": "string",
+            "enum": ["low", "medium", "high"]
+          },
+          "deadline_to_act": { "type": ["string", "null"] },
+          "rationale": { "type": "string", "minLength": 1, "maxLength": 240 },
+          "confidence": { "type": "number", "minimum": 0, "maximum": 1 }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "maxItems": 8,
+      "items": { "type": "string", "maxLength": 240 }
+    }
+  }
+}
