@@ -212,6 +212,7 @@ const MarginRules = lazy(() => import("./pages/dashboard/finance/MarginRules"));
 const InvoiceDetail = lazy(() => import("./pages/dashboard/finance/InvoiceDetail"));
 const TaxJurisdictions = lazy(() => import("./pages/dashboard/finance/TaxJurisdictions"));
 const TaxJurisdictionDetail = lazy(() => import("./pages/dashboard/finance/TaxJurisdictionDetail"));
+const FinanceAccountingSetup = lazy(() => import("./features/module-finance/pages/FinanceAccountingSetupPage"));
 const RateManagement = lazy(() => import("./pages/dashboard/RateManagement"));
 const VesselTypes = lazy(() => import("./pages/dashboard/VesselTypes"));
 const VesselClasses = lazy(() => import("./pages/dashboard/VesselClasses"));
@@ -1124,6 +1125,7 @@ const App = () => (
             <Route path="/dashboard/finance/invoices/:id" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><InvoiceDetail /></ProtectedRoute>} />
             <Route path="/dashboard/finance/tax-jurisdictions" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TaxJurisdictions /></ProtectedRoute>} />
             <Route path="/dashboard/finance/tax-jurisdictions/:id" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><TaxJurisdictionDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/finance/accounting-setup" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><FinanceAccountingSetup /></ProtectedRoute>} />
             <Route path="/dashboard/container-types" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ContainerTypes /></ProtectedRoute>} />
             <Route path="/dashboard/container-sizes" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ContainerSizes /></ProtectedRoute>} />
             <Route path="/dashboard/container-tracking" element={<ProtectedRoute><ContainerTracking /></ProtectedRoute>} />

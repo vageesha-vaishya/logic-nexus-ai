@@ -24,6 +24,12 @@ import {
 import { Input } from '@/components/ui/input';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { format } from 'date-fns';
+import { InvoiceLineClassifyPanel } from '@/features/module-finance/components/InvoiceLineClassifyPanel';
+import { useGlAccounts } from '@/features/module-finance/hooks/useGlAccounts';
+import { useTenantTaxRules } from '@/features/module-finance/hooks/useTenantTaxRules';
+import type { InvoiceLineClassifyInput } from '@/features/module-finance/hooks/useInvoiceLineClassify';
+import { useMemo } from 'react';
+import { Link } from 'react-router-dom';
 
 const itemSchema = z.object({
   description: z.string().min(1, 'Description is required'),
@@ -126,6 +132,44 @@ export default function InvoiceDetail() {
         toast({ title: 'Error', description: error.message, variant: 'destructive' });
     }
   };
+
+  // Chart of accounts + tenant tax rules feed the LLM line-classify panel.
+  const accountsQuery = useGlAccounts(false);
+  const taxQuery = useTenantTaxRules();
+
+  const classifyInput: InvoiceLineClassifyInput | null = useMemo(() => {
+    if (isNew) return null;
+    if (!invoice?.invoice_line_items || invoice.invoice_line_items.length === 0) return null;
+    if (!accountsQuery.data || accountsQuery.data.length === 0) return null;
+    if (!taxQuery.data) return null;
+    return {
+      invoice_id: invoice.id,
+      invoice_lines: invoice.invoice_line_items.map((li: any) => ({
+        line_id: String(li.id),
+        charge_code: String(li.metadata?.charge_code ?? li.type ?? 'other'),
+        description: String(li.description ?? ''),
+        amount: Number(li.amount ?? li.unit_price ?? 0) * Number(li.quantity ?? 1),
+        currency: String(invoice.currency ?? 'USD'),
+        is_pass_through: li.metadata?.is_pass_through ?? null,
+        vendor_ref: li.metadata?.vendor_ref ?? null,
+        service_country_origin: li.metadata?.service_country_origin ?? null,
+        service_country_destination: li.metadata?.service_country_destination ?? null,
+      })),
+      chart_of_accounts: accountsQuery.data.map((a) => ({
+        code: a.code,
+        name: a.name,
+        type: a.type,
+        tags: a.tags,
+      })),
+      tax_rules: {
+        jurisdiction: taxQuery.data.jurisdiction,
+        tax_label: taxQuery.data.tax_label,
+        default_rate_pct: taxQuery.data.default_rate_pct,
+        reverse_charge_applicable_codes: taxQuery.data.reverse_charge_applicable_codes,
+        zero_rated_charges: taxQuery.data.zero_rated_charges,
+      },
+    };
+  }, [isNew, invoice, accountsQuery.data, taxQuery.data]);
 
   const onSubmit = async (values: FormValues) => {
     if (!isNew) {
@@ -462,6 +506,36 @@ export default function InvoiceDetail() {
                 </div>
               </CardContent>
             </Card>
+            {/* AI line classification panel — needs chart of accounts + tax rules configured */}
+            {!isNew && invoice?.invoice_line_items && invoice.invoice_line_items.length > 0 && (
+              classifyInput ? (
+                <InvoiceLineClassifyPanel input={classifyInput} />
+              ) : (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">AI line classification</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-muted-foreground">
+                      {accountsQuery.isLoading || taxQuery.isLoading
+                        ? 'Loading chart of accounts + tax rules…'
+                        : (
+                          <>
+                            Configure the chart of accounts + tax rules first.{' '}
+                            <Link
+                              to="/dashboard/finance/accounting-setup"
+                              className="text-primary underline"
+                            >
+                              Open Accounting Setup
+                            </Link>.
+                          </>
+                        )}
+                    </p>
+                  </CardContent>
+                </Card>
+              )
+            )}
+
             {!isNew && invoice?.invoice_line_items && invoice.invoice_line_items.length > 0 && (
               <Card>
                 <CardHeader>
