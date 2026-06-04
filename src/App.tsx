@@ -217,6 +217,7 @@ const AogAlertsList = lazy(() => import("./features/module-amro/pages/AogAlertsL
 const AogAlertDetail = lazy(() => import("./features/module-amro/pages/AogAlertDetailPage"));
 const DirectiveApplicabilityQueue = lazy(() => import("./features/module-amro/pages/DirectiveApplicabilityQueuePage"));
 const AmroDirectiveDetail = lazy(() => import("./features/module-amro/pages/AmroDirectiveDetailPage"));
+const AmroAircraftApplicability = lazy(() => import("./features/module-amro/pages/AmroAircraftApplicabilityPage"));
 const RateManagement = lazy(() => import("./pages/dashboard/RateManagement"));
 const VesselTypes = lazy(() => import("./pages/dashboard/VesselTypes"));
 const VesselClasses = lazy(() => import("./pages/dashboard/VesselClasses"));
@@ -1134,6 +1135,7 @@ const App = () => (
             <Route path="/dashboard/amro/aog/:id" element={<ProtectedRoute requiredPermissions={["amro.read"]}><AogAlertDetail /></ProtectedRoute>} />
             <Route path="/dashboard/amro/directives/applicability/queue" element={<ProtectedRoute requiredPermissions={["amro.read"]}><DirectiveApplicabilityQueue /></ProtectedRoute>} />
             <Route path="/dashboard/amro/directives/:id" element={<ProtectedRoute requiredPermissions={["amro.read"]}><AmroDirectiveDetail /></ProtectedRoute>} />
+            <Route path="/dashboard/amro/aircraft/:id/applicability" element={<ProtectedRoute requiredPermissions={["amro.read"]}><AmroAircraftApplicability /></ProtectedRoute>} />
             <Route path="/dashboard/container-types" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ContainerTypes /></ProtectedRoute>} />
             <Route path="/dashboard/container-sizes" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ContainerSizes /></ProtectedRoute>} />
             <Route path="/dashboard/container-tracking" element={<ProtectedRoute><ContainerTracking /></ProtectedRoute>} />
