@@ -20,6 +20,7 @@ import configureMpdRoutes from './routes/configure-mpd.routes.js';
 import configureDirectivesRoutes from './routes/configure-directives.routes.js';
 import stockLedgerRoutes from './routes/stock-ledger.routes.js';
 import aogRoutes from './routes/aog.routes.js';
+import directiveApplicabilityRoutes from './routes/directive-applicability.routes.js';
 import enterpriseRoutes from './routes/enterprise.routes.js';
 import { ErrorResponse } from './types/amro.types.js';
 import { logger } from './utils/logger.js';
@@ -2070,6 +2071,7 @@ app.use('/api/v2', configureMpdRoutes);
 app.use('/api/v2', configureDirectivesRoutes);
 app.use('/api/v2', stockLedgerRoutes);
 app.use('/api/v1', aogRoutes);
+app.use('/api/v1', directiveApplicabilityRoutes);
 
 // Mount enterprise routes
 app.use('/api/v2/amro/enterprise', enterpriseRoutes);
