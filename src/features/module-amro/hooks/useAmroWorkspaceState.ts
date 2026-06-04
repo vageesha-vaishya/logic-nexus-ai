@@ -10,6 +10,7 @@ import { useAmroModuleSurfacesFetch } from './useAmroModuleSurfacesFetch';
 import { useAmroTasksFetch } from './useAmroTasksFetch';
 import { useAmroScheduleBoardFetch } from './useAmroScheduleBoardFetch';
 import { useAmroWorkOrderHoldMutations } from './useAmroWorkOrderHoldMutations';
+import { useAmroOpenWorkOrderDetails } from './useAmroOpenWorkOrderDetails';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -1449,65 +1450,17 @@ export function useAmroWorkspaceState() {
     appendHoldAuditEntry,
   });
 
-  const openWorkOrderDetails = useCallback(
-    async (workOrderId: string) => {
-      setSelectedWorkOrderId(workOrderId);
-      if (!authHeaders) return true;
-      if (isApiTemporarilyUnavailable()) {
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders/${workOrderId}`, {
-          method: 'GET',
-          headers: authHeaders,
-        });
-        const payload = await parseJsonSafe<{
-          data?: {
-            work_order?: {
-              id?: string;
-              status?: string;
-              aircraft_id?: string;
-              code?: string;
-            };
-          };
-          error?: string;
-        }>(response);
-        if (!response.ok) {
-          throw new Error(payload?.error || `Failed to load work package detail (${response.status})`);
-        }
-        const detail = payload?.data?.work_order;
-        if (detail?.id) {
-          setWorkOrders((current) => current.map((item) => (
-            item.id === detail.id
-              ? {
-                  ...item,
-                  packageNumber: String(detail.code || item.packageNumber),
-                  lifecycleStage: mapStatusToLifecycle(String(detail.status || mapLifecycleToStatus(item.lifecycleStage))),
-                  assetId: String(detail.aircraft_id || item.assetId),
-                }
-              : item
-          )));
-        }
-        await fetchTasksForWorkOrder(workOrderId);
-        setWorkOrdersError(null);
-        return true;
-      } catch (error) {
-        if (isNetworkConnectivityError(error)) {
-          markApiTemporarilyUnavailable();
-        }
-        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to open work package');
-        return false;
-      }
-    },
-    [
-      apiBaseUrl,
-      authHeaders,
-      fetchTasksForWorkOrder,
-      isApiTemporarilyUnavailable,
-      markApiTemporarilyUnavailable,
-    ],
-  );
+  // Phase 8f.4b — openWorkOrderDetails carved into useAmroOpenWorkOrderDetails.
+  const openWorkOrderDetails = useAmroOpenWorkOrderDetails({
+    apiBaseUrl,
+    authHeaders,
+    isApiTemporarilyUnavailable,
+    markApiTemporarilyUnavailable,
+    setSelectedWorkOrderId,
+    setWorkOrders,
+    setWorkOrdersError,
+    fetchTasksForWorkOrder,
+  });
 
   const acknowledgeScheduleUpdate = useCallback(
     async (scheduleId: string, workOrderId: string) => {
