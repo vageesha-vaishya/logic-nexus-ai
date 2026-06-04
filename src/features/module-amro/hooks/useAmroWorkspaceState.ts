@@ -13,6 +13,7 @@ import { useAmroWorkOrderHoldMutations } from './useAmroWorkOrderHoldMutations';
 import { useAmroOpenWorkOrderDetails } from './useAmroOpenWorkOrderDetails';
 import { useAmroScheduleMutations } from './useAmroScheduleMutations';
 import { useAmroWorkOrderMutations } from './useAmroWorkOrderMutations';
+import { useAmroAdvanceLifecycle } from './useAmroAdvanceLifecycle';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -1027,95 +1028,21 @@ export function useAmroWorkspaceState() {
     return true;
   }, []);
 
-  const advanceWorkOrderLifecycle = async (workOrderId?: string) => {
-    const targetWorkOrder = workOrderId
-      ? workOrders.find((item) => item.id === workOrderId) ?? null
-      : selectedWorkOrder;
-    if (!targetWorkOrder) return false;
-    const nextStage = getNextWorkOrderLifecycleStage(targetWorkOrder.lifecycleStage);
-    if (!canTransitionWorkOrderLifecycle(targetWorkOrder.lifecycleStage, nextStage)) return false;
-    if (!authHeaders) {
-      return applyLocalLifecycleTransition(targetWorkOrder.id, nextStage);
-    }
-    try {
-      if (nextStage === 'close') {
-        const selectedTasks = targetWorkOrder.tasks || [];
-        const completedTasks = selectedTasks.filter((task) => task.completed).length;
-        const evidenceForPackage = evidenceChain.filter(
-          (record) =>
-            (record.entityType === 'work_order' && record.entityId === targetWorkOrder.id)
-            || (record.entityType === 'task' && selectedTasks.some((task) => task.id === record.entityId)),
-        ).length;
-        const signaturePending = canSignOff ? 0 : 1;
-        const qualityGateResponse = await fetch(
-          `${apiBaseUrl}/api/v2/amro/compliance-gates?interface=evaluate-closure-quality-gate`,
-          {
-            method: 'POST',
-            headers: authHeaders,
-            body: JSON.stringify({
-              work_order_id: targetWorkOrder.id,
-              open_findings: selectedTasks.length - completedTasks,
-              unresolved_deferrals: 0,
-              pending_signatures: signaturePending,
-              evidence_coverage_pct: selectedTasks.length > 0 ? Math.min(100, (evidenceForPackage / selectedTasks.length) * 100) : 0,
-            }),
-          },
-        );
-        const qualityGatePayload = await parseJsonSafe<{ output?: { release_ready?: boolean }; error?: string }>(qualityGateResponse);
-        if (!qualityGateResponse.ok || !qualityGatePayload?.output?.release_ready) {
-          throw new Error(qualityGatePayload?.error || 'Closure quality gate is not satisfied');
-        }
-      }
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/v1/work-orders/${targetWorkOrder.id}`, {
-          method: 'PATCH',
-          headers: authHeaders,
-          body: JSON.stringify({
-            status: mapLifecycleToStatus(nextStage),
-          }),
-        });
-        if (!response.ok) {
-          const payload = await parseJsonSafe<{ error?: string }>(response);
-          throw new Error(payload?.error || `Failed to update work package (${response.status})`);
-        }
-      } catch (error) {
-        const v2Response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=transition-work-order`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            work_order_id: targetWorkOrder.id,
-            current_status: mapLifecycleToStatus(targetWorkOrder.lifecycleStage),
-            target_status: mapLifecycleToStatus(nextStage),
-            reason_code: 'ui-transition',
-            actor_signature: `ui-${Date.now()}`,
-            idempotency_key: `wp-transition-${targetWorkOrder.id}-${Date.now()}`,
-            decision_trace_id: `wp-transition-${targetWorkOrder.id}`,
-            scope_context: {
-              domain_id: 'amro',
-            },
-          }),
-        });
-        const v2Payload = await parseJsonSafe<{ error?: string }>(v2Response);
-        if (!v2Response.ok) {
-          throw new Error(v2Payload?.error || `Failed to update work package (${v2Response.status})`);
-        }
-      }
-      await fetchWorkOrders();
-      await fetchTasksForWorkOrder(targetWorkOrder.id);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to advance lifecycle';
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-      }
-      if (shouldUseLocalWorkOrderFallback(message)) {
-        setWorkOrdersError('Running in local fallback mode for lifecycle transition.');
-        return applyLocalLifecycleTransition(targetWorkOrder.id, nextStage);
-      }
-      setWorkOrdersError(message);
-      return false;
-    }
-    return true;
-  };
+  // Phase 8f.4e — advanceWorkOrderLifecycle carved into useAmroAdvanceLifecycle.
+  const advanceWorkOrderLifecycle = useAmroAdvanceLifecycle({
+    apiBaseUrl,
+    authHeaders,
+    markApiTemporarilyUnavailable,
+    setWorkOrdersError,
+    workOrders,
+    selectedWorkOrder,
+    evidenceChain,
+    canSignOff,
+    fetchWorkOrders,
+    fetchTasksForWorkOrder,
+    applyLocalLifecycleTransition,
+    shouldUseLocalWorkOrderFallback,
+  });
 
   // Phase 8f.4d — 5 work-order CRUD mutators carved into useAmroWorkOrderMutations.
   const {
