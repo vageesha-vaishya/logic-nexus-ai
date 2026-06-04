@@ -11,6 +11,7 @@ import { useAmroTasksFetch } from './useAmroTasksFetch';
 import { useAmroScheduleBoardFetch } from './useAmroScheduleBoardFetch';
 import { useAmroWorkOrderHoldMutations } from './useAmroWorkOrderHoldMutations';
 import { useAmroOpenWorkOrderDetails } from './useAmroOpenWorkOrderDetails';
+import { useAmroScheduleMutations } from './useAmroScheduleMutations';
 import type {
   AmroAssetRegistryRecord,
   AmroAuthorityLevel,
@@ -1462,195 +1463,30 @@ export function useAmroWorkspaceState() {
     fetchTasksForWorkOrder,
   });
 
-  const acknowledgeScheduleUpdate = useCallback(
-    async (scheduleId: string, workOrderId: string) => {
-      if (!authHeaders) return false;
-      if (isApiTemporarilyUnavailable()) {
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      try {
-        const response = await fetch(`${apiBaseUrl}/api/v2/amro/schedules?interface=acknowledge-schedule-update`, {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            schedule_id: scheduleId,
-            work_order_id: workOrderId,
-            acknowledged_at: new Date().toISOString(),
-            device_id: 'mobile-ui-emulator',
-          }),
-        });
-        const payload = await parseJsonSafe<{ error?: string }>(response);
-        if (!response.ok) {
-          throw new Error(payload?.error || `Failed to acknowledge schedule (${response.status})`);
-        }
-        return true;
-      } catch (error) {
-        if (isNetworkConnectivityError(error)) {
-          markApiTemporarilyUnavailable();
-          setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-          return false;
-        }
-        setWorkOrdersError(error instanceof Error ? error.message : 'Failed to acknowledge schedule');
-        return false;
-      }
-    },
-    [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable],
-  );
-
-  const fetchScheduleOptimizationRecommendations = useCallback(async () => {
-    if (!authHeaders) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const response = await fetch(
-        `${apiBaseUrl}/api/v2/amro/schedules/replan?interface=generate-schedule-optimization-recommendations`,
-        {
-          method: 'POST',
-          headers: authHeaders,
-          body: JSON.stringify({
-            schedule_date: new Date().toISOString().slice(0, 10),
-            station_code: 'station-a',
-            demand_pressure: 0.74,
-            disruption_risk: 0.58,
-            recommendation_count: 3,
-          }),
-        },
-      );
-      const payload = await parseJsonSafe<V2ScheduleOptimizationResponse>(response);
-      const recommendations = payload?.output?.recommendations;
-      if (!response.ok || !Array.isArray(recommendations)) {
-        throw new Error(payload?.error || `Failed to load schedule optimization recommendations (${response.status})`);
-      }
-      setScheduleOptimizationRecommendations(recommendations);
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to load schedule optimization recommendations');
-      return false;
-    }
-  }, [apiBaseUrl, authHeaders, isApiTemporarilyUnavailable, markApiTemporarilyUnavailable]);
-
-  const runWorkOrderReplanSimulation = useCallback(async () => {
-    if (!authHeaders || !selectedWorkOrderId) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const tenantScope = String(assets[0]?.tenantId || 'tenant-ops-01').trim() || 'tenant-ops-01';
-      const disruptionStart = scheduleBoardRows[0]?.slot_start || new Date().toISOString();
-      const disruptionEnd = scheduleBoardRows[0]?.slot_end || new Date(Date.now() + 3600000).toISOString();
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=run-replan-simulation`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          disrupted_slots: [
-            {
-              slot_id: scheduleBoardRows[0]?.schedule_id || `${selectedWorkOrderId}-slot`,
-              work_order_id: selectedWorkOrderId,
-              slot_start: disruptionStart,
-              slot_end: disruptionEnd,
-            },
-          ],
-          priority_rules: {
-            preserve_critical: true,
-            minimize_total_delay: true,
-          },
-          planning_horizon: 'P7D',
-          active_constraints: [
-            { id: 'station-capacity', enabled: true },
-            { id: 'qualified-team', enabled: true },
-          ],
-          tenant_calendar_id: `${tenantScope}:maintenance-calendar`,
-        }),
-      });
-      const payload = await parseJsonSafe<{ output?: { replan_options?: ApiWorkOrderReplanOption[] }; error?: string }>(response);
-      const options = payload?.output?.replan_options;
-      if (!response.ok || !Array.isArray(options)) {
-        throw new Error(payload?.error || `Failed to run replan simulation (${response.status})`);
-      }
-      setWorkOrderReplanOptions(options);
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to run replan simulation');
-      return false;
-    }
-  }, [
+  // Phase 8f.4c — 4 schedule mutators carved into useAmroScheduleMutations.
+  const {
+    acknowledgeScheduleUpdate,
+    fetchScheduleOptimizationRecommendations,
+    runWorkOrderReplanSimulation,
+    confirmWorkOrderReplan,
+  } = useAmroScheduleMutations({
     apiBaseUrl,
-    assets,
     authHeaders,
     isApiTemporarilyUnavailable,
     markApiTemporarilyUnavailable,
+    setWorkOrdersError,
     scheduleBoardRows,
+    assets,
     selectedWorkOrderId,
-  ]);
-
-  const confirmWorkOrderReplan = useCallback(async () => {
-    if (!authHeaders || !selectedWorkOrderId || workOrderReplanOptions.length === 0) return false;
-    if (isApiTemporarilyUnavailable()) {
-      setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-      return false;
-    }
-    try {
-      const selectedOption = workOrderReplanOptions[0];
-      const response = await fetch(`${apiBaseUrl}/api/v2/amro/work-orders?interface=confirm-replan`, {
-        method: 'POST',
-        headers: authHeaders,
-        body: JSON.stringify({
-          selected_option_id: selectedOption.option_id,
-          approver_id: activeRole,
-          reason: 'ui-replan-approval',
-          affected_work_orders: [
-            {
-              work_order_id: selectedWorkOrderId,
-              current_state: mapLifecycleToStatus(selectedWorkOrder?.lifecycleStage || 'create'),
-            },
-          ],
-        }),
-      });
-      const payload = await parseJsonSafe<{ output?: { updated_schedule?: { schedule_id?: string } }; error?: string }>(response);
-      if (!response.ok) {
-        throw new Error(payload?.error || `Failed to confirm replan (${response.status})`);
-      }
-      const confirmedScheduleId = String(payload?.output?.updated_schedule?.schedule_id || '').trim();
-      setLastConfirmedReplanScheduleId(confirmedScheduleId);
-      setWorkOrderReplanOptions([]);
-      await fetchScheduleBoard();
-      await fetchWorkOrders();
-      return true;
-    } catch (error) {
-      if (isNetworkConnectivityError(error)) {
-        markApiTemporarilyUnavailable();
-        setWorkOrdersError('AMRO API is temporarily unavailable. Retrying shortly.');
-        return false;
-      }
-      setWorkOrdersError(error instanceof Error ? error.message : 'Failed to confirm replan');
-      return false;
-    }
-  }, [
+    selectedWorkOrder,
     activeRole,
-    apiBaseUrl,
-    authHeaders,
+    workOrderReplanOptions,
+    setWorkOrderReplanOptions,
+    setScheduleOptimizationRecommendations,
+    setLastConfirmedReplanScheduleId,
     fetchScheduleBoard,
     fetchWorkOrders,
-    isApiTemporarilyUnavailable,
-    markApiTemporarilyUnavailable,
-    selectedWorkOrder,
-    selectedWorkOrderId,
-    workOrderReplanOptions,
-  ]);
+  });
 
   const reservePartsAllocationForSelectedWorkOrder = useCallback(async () => {
     if (!authHeaders || !selectedWorkOrderId || materials.length === 0) return false;
