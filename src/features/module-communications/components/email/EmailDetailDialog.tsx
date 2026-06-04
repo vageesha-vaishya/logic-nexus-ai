@@ -4,6 +4,9 @@ import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { Reply, Forward, Archive, Trash2, Star, Paperclip, MoreHorizontal, ChevronUp, Maximize2, Minimize2, UserPlus, Shield, ShieldAlert, ShieldCheck, AlertTriangle, Lock, Unlock, Sparkles, Loader2 } from "lucide-react";
 import { useClassifyInbound, type InboundIntent, type InboundUrgency } from "@/features/module-communications/hooks/useClassifyInbound";
+import { DraftReplyPanel } from "./DraftReplyPanel";
+import type { DraftReplyInput } from "@/features/module-communications/hooks/useDraftReply";
+import { useAuth } from "@/hooks/useAuth";
 import { format } from "date-fns";
 import { useState, useCallback, useEffect } from "react";
 import { EmailComposeDialog } from "./EmailComposeDialog";
@@ -58,6 +61,8 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
 
   const classifyInbound = useClassifyInbound();
   const aiResult = classifyInbound.data?.parsed_output ?? null;
+  const { user } = useAuth();
+  const [aiDraft, setAiDraft] = useState<{ subject: string; body: string } | null>(null);
 
   const handleClassify = useCallback(() => {
     if (isLocked) return;
@@ -403,6 +408,40 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
             </>
           )}
 
+          {aiResult && (() => {
+            const body = decryptedBody ?? email.body_text ?? email.body_html ?? email.snippet ?? "";
+            const draftInput: DraftReplyInput = {
+              message_id: email.id,
+              inbound: {
+                from_name: email.from_name ?? "",
+                from_email: email.from_email,
+                subject: email.subject,
+                body,
+                received_iso: email.received_at,
+                language: aiResult.language ?? "en",
+              },
+              classification: {
+                intent: aiResult.intent,
+                urgency: aiResult.urgency,
+                summary: aiResult.summary,
+              },
+              context: {
+                operator_name: user?.user_metadata?.full_name ?? user?.email?.split("@")[0] ?? "",
+                company_name: "Logic Nexus",
+              },
+              language: aiResult.language ?? "en",
+            };
+            return (
+              <DraftReplyPanel
+                input={draftInput}
+                onUseDraft={(draft) => {
+                  setAiDraft(draft);
+                  setShowReply(true);
+                }}
+              />
+            );
+          })()}
+
           {email.has_attachments && email.attachments && email.attachments.length > 0 && (
             <>
               <Separator />
@@ -464,11 +503,14 @@ export function EmailDetailDialog({ open, onOpenChange, email, onRefresh }: Emai
 
       <EmailComposeDialog
         open={showReply}
-        onOpenChange={setShowReply}
+        onOpenChange={(o) => {
+          setShowReply(o);
+          if (!o) setAiDraft(null);
+        }}
         replyTo={{
           to: email.from_email,
-          subject: email.subject,
-          body: email.body_text,
+          subject: aiDraft?.subject ?? email.subject,
+          body: aiDraft?.body ?? email.body_text,
         }}
       />
 
