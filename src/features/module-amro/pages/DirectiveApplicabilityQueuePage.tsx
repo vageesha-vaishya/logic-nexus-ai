@@ -7,6 +7,7 @@
 // human attention). Optional max-confidence ceiling slider.
 
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import {
   ShieldCheck,
   Loader2,
@@ -15,6 +16,7 @@ import {
   XCircle,
   AlertTriangle,
   Pause,
+  Bell,
 } from 'lucide-react';
 
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
@@ -246,18 +248,26 @@ export default function DirectiveApplicabilityQueuePage() {
               LLM verdicts on directive × aircraft applicability. Director of Maintenance signs off.
             </p>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => void queueQuery.refetch()}
-            disabled={queueQuery.isFetching}
-          >
-            {queueQuery.isFetching ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <RefreshCw className="h-4 w-4" />
-            )}
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" asChild>
+              <Link to="/dashboard/amro/directives/applicability/alerts-config">
+                <Bell className="mr-2 h-4 w-4" />
+                Alerts
+              </Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void queueQuery.refetch()}
+              disabled={queueQuery.isFetching}
+            >
+              {queueQuery.isFetching ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
         <Card>
