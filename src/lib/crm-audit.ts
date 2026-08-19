@@ -108,6 +108,180 @@ export class CRMAuditService {
     return changed;
   }
 
+  /**
+   * Like computeDiff, but also returns old/new value maps narrowed to only
+   * the fields that actually changed (used by the generic entity_type/
+   * entity_id logging methods below, e.g. logContactUpdated).
+   */
+  private computeChangeSet(
+    oldValues: Record<string, any>,
+    newValues: Record<string, any>
+  ): {
+    changed_fields: string[];
+    old_values: Record<string, any>;
+    new_values: Record<string, any>;
+  } {
+    const changed_fields = this.computeDiff(oldValues, newValues);
+    const old_values: Record<string, any> = {};
+    const new_values: Record<string, any> = {};
+    changed_fields.forEach((key) => {
+      old_values[key] = oldValues[key];
+      new_values[key] = newValues[key];
+    });
+    return { changed_fields, old_values, new_values };
+  }
+
+  /**
+   * Generic single-record logger for the entity_type/entity_id-shaped rows
+   * (contact/opportunity/quote/interaction). Adds user context the same way
+   * the lead-specific methods do, then delegates to the array-based log().
+   */
+  private async logEntry(entry: Record<string, any>): Promise<void> {
+    const userContext = await this.addUserContext();
+    await this.log([
+      {
+        user_id: userContext.userId,
+        user_email: userContext.userEmail,
+        ...entry,
+      },
+    ]);
+  }
+
+  async logContactCreated(
+    contactId: string,
+    leadId: string,
+    values: Record<string, any>,
+    tenantId: string,
+    franchiseId?: string
+  ): Promise<void> {
+    await this.logEntry({
+      action: 'create',
+      entity_type: 'contact',
+      entity_id: contactId,
+      related_entity_id: leadId,
+      related_entity_type: 'lead',
+      new_values: values,
+      changed_fields: Object.keys(values),
+      tenant_id: tenantId,
+      franchise_id: franchiseId ?? null,
+    });
+  }
+
+  async logContactUpdated(
+    contactId: string,
+    oldValues: Record<string, any>,
+    newValues: Record<string, any>,
+    tenantId: string,
+    franchiseId?: string
+  ): Promise<void> {
+    const { changed_fields, old_values, new_values } = this.computeChangeSet(
+      oldValues,
+      newValues
+    );
+    if (changed_fields.length === 0) return;
+    await this.logEntry({
+      action: 'update',
+      entity_type: 'contact',
+      entity_id: contactId,
+      old_values,
+      new_values,
+      changed_fields,
+      tenant_id: tenantId,
+      franchise_id: franchiseId ?? null,
+    });
+  }
+
+  async logContactInteraction(
+    contactId: string,
+    type: 'call' | 'email' | 'meeting',
+    details: Record<string, any>,
+    tenantId: string,
+    franchiseId?: string
+  ): Promise<void> {
+    await this.logEntry({
+      action: 'interaction',
+      entity_type: 'interaction',
+      entity_id: `${contactId}-${Date.now()}`,
+      related_entity_id: contactId,
+      related_entity_type: 'contact',
+      new_values: details,
+      metadata: { interaction_type: type },
+      tenant_id: tenantId,
+      franchise_id: franchiseId ?? null,
+    });
+  }
+
+  async logOpportunityCreated(
+    opportunityId: string,
+    leadId: string,
+    values: Record<string, any>,
+    tenantId: string,
+    franchiseId?: string
+  ): Promise<void> {
+    await this.logEntry({
+      action: 'create',
+      entity_type: 'opportunity',
+      entity_id: opportunityId,
+      related_entity_id: leadId,
+      related_entity_type: 'lead',
+      new_values: values,
+      changed_fields: Object.keys(values),
+      tenant_id: tenantId,
+      franchise_id: franchiseId ?? null,
+    });
+  }
+
+  async logPipelineMove(
+    opportunityId: string,
+    fromStage: string,
+    toStage: string,
+    tenantId: string,
+    franchiseId?: string
+  ): Promise<void> {
+    await this.logEntry({
+      action: 'move',
+      entity_type: 'opportunity',
+      entity_id: opportunityId,
+      metadata: { stage_from: fromStage, stage_to: toStage },
+      tenant_id: tenantId,
+      franchise_id: franchiseId ?? null,
+    });
+  }
+
+  async logQuoteCreated(
+    quoteId: string,
+    opportunityId: string,
+    values: Record<string, any>,
+    tenantId: string,
+    franchiseId?: string
+  ): Promise<void> {
+    await this.logEntry({
+      action: 'create',
+      entity_type: 'quote',
+      entity_id: quoteId,
+      related_entity_id: opportunityId,
+      related_entity_type: 'opportunity',
+      new_values: values,
+      changed_fields: Object.keys(values),
+      tenant_id: tenantId,
+      franchise_id: franchiseId ?? null,
+    });
+  }
+
+  async logQuoteApproved(
+    quoteId: string,
+    tenantId: string,
+    franchiseId?: string
+  ): Promise<void> {
+    await this.logEntry({
+      action: 'approve',
+      entity_type: 'quote',
+      entity_id: quoteId,
+      tenant_id: tenantId,
+      franchise_id: franchiseId ?? null,
+    });
+  }
+
   private async addUserContext(): Promise<{
     userId: string;
     userEmail: string;
