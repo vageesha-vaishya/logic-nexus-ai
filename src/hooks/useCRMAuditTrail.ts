@@ -38,16 +38,19 @@ export function useCRMAuditTrail(options: CRMAuditTrailOptions) {
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['crm-audit-trail', entityType, entityId, limit],
     queryFn: async () => {
-      if (!entityType || !entityId) return [];
-
       try {
-        const query = auditLogsClient
+        let query = auditLogsClient
           .from('crm_audit_logs')
           .select('*')
-          .eq('entity_type', entityType)
-          .eq('entity_id', entityId)
           .order('created_at', { ascending: false })
           .limit(limit);
+
+        // If entity filters provided, filter to that specific entity
+        if (entityType && entityId) {
+          query = query
+            .eq('entity_type', entityType)
+            .eq('entity_id', entityId);
+        }
 
         const { data, error } = await query;
 
@@ -62,7 +65,7 @@ export function useCRMAuditTrail(options: CRMAuditTrailOptions) {
         return [];
       }
     },
-    enabled: !!entityType && !!entityId,
+    enabled: true,
   });
 
   // Subscribe to real-time updates
