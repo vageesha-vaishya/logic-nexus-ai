@@ -36,6 +36,7 @@ import { initGlobalErrorHandlers } from "./lib/global-error-handler";
 import { initNetworkLogger } from "./lib/network-logger";
 import { initPerformanceMonitoring } from "./lib/performance-logger";
 import { supabase } from "./integrations/supabase/client";
+import { auditLogger } from "./lib/audit";
 import { v4 as uuidv4 } from "uuid";
 
 // Initialize core services
@@ -55,6 +56,11 @@ logger.enableConsoleInterception();
 initGlobalErrorHandlers();
 initNetworkLogger();
 initPerformanceMonitoring();
+
+// Initialize audit service after Supabase
+auditLogger.initialize(supabase);
+// eslint-disable-next-line no-console
+console.log('CRMAuditService initialized');
 
 logger.info("Platform Startup: During-loading", { component: "Main", step: "Rendering App" });
 
