@@ -1,8 +1,17 @@
 import { SupabaseClient } from '@supabase/supabase-js';
+import { logger } from '@/lib/logger';
+
+interface RetryEntry {
+  entry: Record<string, any>;
+  attempts: number;
+  nextRetry: number;
+}
 
 export class CRMAuditService {
   private static instance: CRMAuditService | null = null;
   private supabase: SupabaseClient | null = null;
+  private retryQueue: RetryEntry[] = [];
+  private isRetrying = false;
 
   private constructor() {}
 
@@ -131,8 +140,68 @@ export class CRMAuditService {
       .insert(records);
 
     if (error) {
-      // Silently fail to avoid disrupting main app flow
+      logger.warn('Failed to log audit entry, queuing for retry:', error);
+      // Queue each record for retry
+      records.forEach((entry) => {
+        this.retryQueue.push({
+          entry,
+          attempts: 0,
+          nextRetry: Date.now() + 5000 // Retry in 5 seconds
+        });
+      });
+      this.scheduleRetry();
+    }
+  }
+
+  private scheduleRetry(): void {
+    if (this.isRetrying) return;
+
+    const now = Date.now();
+    const nextEntry = this.retryQueue.find((e) => e.nextRetry <= now);
+
+    if (!nextEntry) {
+      // Schedule next check
+      setTimeout(() => this.scheduleRetry(), 5000);
       return;
+    }
+
+    this.isRetrying = true;
+    this.retryEntry(nextEntry)
+      .then(() => {
+        this.isRetrying = false;
+        this.scheduleRetry();
+      })
+      .catch(() => {
+        this.isRetrying = false;
+        setTimeout(() => this.scheduleRetry(), 5000);
+      });
+  }
+
+  private async retryEntry(retryEntry: RetryEntry): Promise<void> {
+    if (retryEntry.attempts >= 3) {
+      logger.error(
+        'Audit log retry failed after 3 attempts, dropping:',
+        retryEntry.entry
+      );
+      this.retryQueue = this.retryQueue.filter((e) => e !== retryEntry);
+      return;
+    }
+
+    try {
+      const { error } = await this.supabase!
+        .from('crm_audit_logs')
+        .insert([retryEntry.entry]);
+
+      if (!error) {
+        this.retryQueue = this.retryQueue.filter((e) => e !== retryEntry);
+        logger.info('Audit log retry succeeded');
+      } else {
+        retryEntry.attempts++;
+        retryEntry.nextRetry = Date.now() + (5000 * Math.pow(2, retryEntry.attempts));
+      }
+    } catch (err) {
+      retryEntry.attempts++;
+      retryEntry.nextRetry = Date.now() + (5000 * Math.pow(2, retryEntry.attempts));
     }
   }
 }
