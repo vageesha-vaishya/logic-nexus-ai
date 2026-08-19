@@ -12,6 +12,7 @@ import type { LeadFormData } from '@/features/module-sales/components/LeadForm';
 import { LeadWorkspaceSections } from '@/features/module-sales/components/LeadWorkspaceSections';
 import type { Json } from '@/integrations/supabase/types';
 import { LeadConversionDialog } from '@/components/crm/conversion/LeadConversionDialog';
+import { CRMAuditHistoryPanel } from '@/components/crm/audit/CRMAuditHistoryPanel';
 import { LeadActivitiesTimeline } from '@/features/module-sales/components/LeadActivitiesTimeline';
 import { EmailClient } from "@/features/module-communications/components/email/EmailClient";
 import { EmailComposeDialog } from "@/features/module-communications/components/email/EmailComposeDialog";
@@ -1230,6 +1231,14 @@ export default function LeadDetail() {
                     {lead.qualification_status && <div>Qualification: {lead.qualification_status}</div>}
                   </CardContent>
                 </Card>
+
+                {context.tenantId && (
+                  <CRMAuditHistoryPanel
+                    entityType="lead"
+                    entityId={lead.id}
+                    tenantId={context.tenantId}
+                  />
+                )}
               </div>
             )}
 
