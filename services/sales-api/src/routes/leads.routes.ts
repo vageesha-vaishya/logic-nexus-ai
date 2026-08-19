@@ -13,11 +13,13 @@ import { CreateLeadRequest, DeleteLeadsRequest, ErrorResponse, UpdateLeadRequest
 import { asyncHandler } from '../utils/asyncHandler.js';
 import { SalesEventType } from '../events/sales-events.types.js';
 import { salesEventsProducer } from '../events/sales-events.producer.js';
+import { auditLeadCreated, auditLeadDeleted, auditLeadUpdated } from '../services/audit/leads.js';
 
 interface AuthRequest extends Request {
   tenantId?: string;
   franchiseId?: string | null;
   userId?: string;
+  user?: { email?: string | null } | null;
 }
 
 const router = Router();
@@ -76,6 +78,10 @@ router.post(
       return;
     }
     const lead = await leadsService.createLead(req.tenantId, req.userId, payload, req.franchiseId);
+    await auditLeadCreated(lead.id, { ...lead }, req.tenantId, req.franchiseId, {
+      userId: req.userId,
+      userEmail: req.user?.email ?? null,
+    });
     salesEventsProducer.publishLeadEvent(
       req.tenantId,
       req.franchiseId ?? null,
@@ -108,7 +114,17 @@ router.patch(
       return;
     }
     const payload: UpdateLeadRequest = req.body;
+    let oldLead: Record<string, any> | null = null;
+    try {
+      oldLead = { ...(await leadsService.getLead(req.tenantId, req.params.id, req.franchiseId)) };
+    } catch {
+      oldLead = null;
+    }
     const lead = await leadsService.updateLead(req.tenantId, req.params.id, payload, req.franchiseId);
+    await auditLeadUpdated(lead.id, oldLead ?? {}, { ...lead }, req.tenantId, req.franchiseId, {
+      userId: req.userId,
+      userEmail: req.user?.email ?? null,
+    });
     salesEventsProducer.publishLeadEvent(
       req.tenantId,
       req.franchiseId ?? null,
@@ -140,6 +156,12 @@ router.delete(
       } as ErrorResponse);
       return;
     }
+    let leadBeforeDelete: Record<string, any> | null = null;
+    try {
+      leadBeforeDelete = { ...(await leadsService.getLead(req.tenantId, req.params.id, req.franchiseId)) };
+    } catch {
+      leadBeforeDelete = null;
+    }
     const deleted = await leadsService.deleteLead(req.tenantId, req.params.id, req.franchiseId);
     if (!deleted) {
       res.status(404).json({
@@ -149,6 +171,13 @@ router.delete(
       } as ErrorResponse);
       return;
     }
+    await auditLeadDeleted(
+      req.params.id,
+      leadBeforeDelete ?? { id: req.params.id },
+      req.tenantId,
+      req.franchiseId,
+      { userId: req.userId, userEmail: req.user?.email ?? null },
+    );
     salesEventsProducer.publishLeadEvent(
       req.tenantId,
       req.franchiseId ?? null,
