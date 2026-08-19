@@ -143,6 +143,8 @@ const CRMWorkspace = lazy(() => import("./features/module-crm").then((module) =>
 const More = lazy(() => import("./pages/dashboard/More"));
 const PermissionsMatrix = lazy(() => import("./pages/dashboard/PermissionsMatrix"));
 const AuditLogs = lazy(() => import("./pages/dashboard/AuditLogs"));
+const AuditDashboard = lazy(() => import("./pages/dashboard/AuditDashboard"));
+const CRMAuditDashboard = lazy(() => import("./pages/crm/CRMAuditDashboard"));
 const SecurityIncidents = lazy(() => import("./pages/dashboard/SecurityIncidents"));
 const CustomRoles = lazy(() => import("./pages/dashboard/CustomRoles"));
 const Bookings = lazy(() => import("./pages/dashboard/Bookings"));
@@ -1121,6 +1123,8 @@ const App = () => (
             <Route path="/dashboard/more" element={<ProtectedRoute><More /></ProtectedRoute>} />
             <Route path="/dashboard/settings/permissions" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><PermissionsMatrix /></ProtectedRoute>} />
             <Route path="/dashboard/audit-logs" element={<ProtectedRoute><AuditLogs /></ProtectedRoute>} />
+            <Route path="/dashboard/audit" element={<ProtectedRoute><AuditDashboard /></ProtectedRoute>} />
+            <Route path="/crm/audit-dashboard" element={<ProtectedRoute><CRMAuditDashboard /></ProtectedRoute>} />
             <Route path="/dashboard/security-incidents" element={<ProtectedRoute><SecurityIncidents /></ProtectedRoute>} />
             <Route path="/dashboard/settings/custom-roles" element={<ProtectedRoute requiredRole={PLATFORM_ADMIN_ROLE} accessDeniedMessage="Access denied - Platform admin privileges required"><CustomRoles /></ProtectedRoute>} />
             <Route path="/dashboard/charge-categories" element={<ProtectedRoute requiredPermissions={["admin.settings.manage"]}><ChargeCategories /></ProtectedRoute>} />
