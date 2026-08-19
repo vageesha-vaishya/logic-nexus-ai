@@ -132,7 +132,7 @@ function UnifiedQuoteComposerContent({
   const [selectedOption, setSelectedOption] = useState<RateOption | null>(null);
   const [quoteTenantId, setQuoteTenantId] = useState<string | null>(null);
   const [visibleRateIds, setVisibleRateIds] = useState<string[]>([]);
-  const [isSmartMode, setIsSmartMode] = useState(false);
+  const [isSmartMode, setIsSmartMode] = useState(true);
   const [saving, setSaving] = useState(false);
   const [complianceCheck, setComplianceCheck] = useState<{ compliant: boolean; issues: any[] } | null>(null);
   const [lastFormData, setLastFormData] = useState<{ values: FormZoneValues; extended: ExtendedFormData } | null>(null);
