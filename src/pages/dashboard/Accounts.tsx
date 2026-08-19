@@ -13,8 +13,8 @@ import { toast } from 'sonner';
 import { FirstScreenTemplate } from '@/components/system/FirstScreenTemplate';
 import { EntityCard } from '@/components/system/EntityCard';
 import { EmptyState } from '@/components/system/EmptyState';
-import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
@@ -42,11 +42,9 @@ export default function Accounts() {
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const { context, scopedDb } = useCRM();
-  const { setActive } = useTheme();
   const {
     viewMode: moduleViewMode,
     theme,
-    hydrated,
     setViewMode,
     setTheme,
   } = useCRMModuleNavigationState('accounts', { viewMode: 'pipeline', theme: 'Azure Sky' });
@@ -95,11 +93,6 @@ export default function Accounts() {
   useEffect(() => {
     fetchAccounts();
   }, [fetchAccounts]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    setActive(theme);
-  }, [hydrated, setActive, theme]);
 
   const filteredAccounts = accounts.filter(account =>
     account.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -194,6 +187,7 @@ export default function Accounts() {
 
   return (
     <DashboardLayout>
+      <div style={themeStyleFromPreset(theme)} className="min-h-full transition-colors duration-300">
       <FirstScreenTemplate
         title="Accounts"
         description="Manage your company accounts"
@@ -342,6 +336,7 @@ export default function Accounts() {
           </div>
         )}
       </FirstScreenTemplate>
+      </div>
     </DashboardLayout>
   );
 }

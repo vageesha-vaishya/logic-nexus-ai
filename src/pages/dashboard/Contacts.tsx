@@ -12,9 +12,9 @@ import { useCRM } from '@/hooks/useCRM';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Link, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -41,11 +41,9 @@ export default function Contacts() {
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
   const { context, scopedDb } = useCRM();
-  const { setActive } = useTheme();
   const {
     viewMode,
     theme,
-    hydrated,
     setViewMode,
     setTheme,
   } = useCRMModuleNavigationState('contacts', { viewMode: 'pipeline', theme: 'Azure Sky' });
@@ -96,11 +94,6 @@ export default function Contacts() {
     refreshContacts();
   }, [refreshContacts]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    setActive(theme);
-  }, [hydrated, setActive, theme]);
-
   const filteredContacts = contacts.filter(contact =>
     `${contact.first_name} ${contact.last_name}`.toLowerCase().includes(searchQuery.toLowerCase()) ||
     contact.email?.toLowerCase().includes(searchQuery.toLowerCase())
@@ -118,7 +111,7 @@ export default function Contacts() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
       <div className="flex justify-between items-center">
         <div>
           <H1>Contacts</H1>

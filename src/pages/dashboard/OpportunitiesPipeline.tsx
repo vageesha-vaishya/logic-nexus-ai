@@ -24,9 +24,9 @@ import { Opportunity, OpportunityStage as Stage, stageColors, stageLabels, stage
 import { PipelineService } from "@/services/pipeline-service";
 import { useTranslation } from "react-i18next";
 import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
-import { useTheme } from "@/hooks/useTheme";
 import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
+import { themeStyleFromPreset } from "@/lib/theme-utils";
 import { logger } from "@/lib/logger";
 type OpportunityStage = Stage;
 
@@ -35,8 +35,7 @@ export default function OpportunitiesPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { scopedDb } = useCRM();
-  const { setActive } = useTheme();
-  const { theme, setTheme, setViewMode, hydrated } = useCRMModuleNavigationState("opportunities", {
+  const { theme, setTheme, setViewMode } = useCRMModuleNavigationState("opportunities", {
     viewMode: "pipeline",
     theme: "Azure Sky",
   });
@@ -142,11 +141,6 @@ export default function OpportunitiesPipeline() {
     refreshOpportunities();
     fetchAccounts();
   }, [fetchAccounts, refreshOpportunities]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    setActive(theme);
-  }, [hydrated, setActive, theme]);
 
   const handleStageChange = async (opportunityId: string, newStage: Stage) => {
     const previousOpportunity = opportunities.find((opportunity) => opportunity.id === opportunityId);
@@ -453,7 +447,7 @@ export default function OpportunitiesPipeline() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-center justify-between">
           <div>
             <H1>Opportunities Pipeline</H1>

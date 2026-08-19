@@ -104,16 +104,14 @@ export default function ThemeManagement() {
         setStripWidth((found as any).stripWidth || stripWidth);
         setStripAngle((found as any).stripAngle || stripAngle);
         setHeaderBannerVisible(
-          found.name === 'Default Simple'
-            ? true
-            : typeof (found as any).headerBannerVisible === 'boolean'
-              ? (found as any).headerBannerVisible
-              : domBannerVisible
+          typeof (found as any).headerBannerVisible === 'boolean'
+            ? (found as any).headerBannerVisible
+            : domBannerVisible
         );
         setHeaderBannerContent(
           typeof (found as any).headerBannerContent === 'string'
             ? (found as any).headerBannerContent
-            : (found.name === 'Default Simple' ? '' : domBannerContent)
+            : domBannerContent
         );
         if (typeof (found as any).headerBannerColor === 'string') {
           setHeaderBannerColor((found as any).headerBannerColor);
@@ -611,7 +609,7 @@ export default function ThemeManagement() {
                           stripAngle: (p as any).stripAngle ?? stripAngle,
                           headerBannerVisible: typeof (p as any).headerBannerVisible === 'boolean'
                             ? (p as any).headerBannerVisible
-                            : p.name === 'Default Simple',
+                            : false,
                           headerBannerContent: (p as any).headerBannerContent ?? '',
                           headerBannerColor: (p as any).headerBannerColor ?? p.accent ?? p.primary ?? '217 91% 60%',
                           headerBannerTextColor: (p as any).headerBannerTextColor ?? '0 0% 100%',
@@ -657,11 +655,9 @@ export default function ThemeManagement() {
                               stripOpacity: typeof (p as any).stripOpacity === 'number' ? (p as any).stripOpacity : 0.2,
                               stripWidth: (p as any).stripWidth ?? stripWidth,
                               stripAngle: (p as any).stripAngle ?? stripAngle,
-                              headerBannerVisible: p.name === 'Default Simple'
-                                ? true
-                                : typeof (p as any).headerBannerVisible === 'boolean'
-                                  ? (p as any).headerBannerVisible
-                                  : false,
+                              headerBannerVisible: typeof (p as any).headerBannerVisible === 'boolean'
+                                ? (p as any).headerBannerVisible
+                                : false,
                               headerBannerContent: (p as any).headerBannerContent ?? '',
                               headerBannerColor: (p as any).headerBannerColor ?? p.accent ?? p.primary ?? '217 91% 60%',
                               headerBannerTextColor: (p as any).headerBannerTextColor ?? '0 0% 100%',
@@ -700,11 +696,9 @@ export default function ThemeManagement() {
                         setStripOpacity(typeof (p as any).stripOpacity === 'number' ? (p as any).stripOpacity : 0.2);
                         setStripWidth((p as any).stripWidth || stripWidth);
                         setStripAngle((p as any).stripAngle || stripAngle);
-                        setHeaderBannerVisible(p.name === 'Default Simple'
-                          ? true
-                          : typeof (p as any).headerBannerVisible === 'boolean'
-                            ? (p as any).headerBannerVisible
-                            : false);
+                        setHeaderBannerVisible(typeof (p as any).headerBannerVisible === 'boolean'
+                          ? (p as any).headerBannerVisible
+                          : false);
                         setHeaderBannerContent((p as any).headerBannerContent || '');
                         setHeaderBannerColor((p as any).headerBannerColor || p.accent || p.primary || '217 91% 60%');
                         setHeaderBannerTextColor((p as any).headerBannerTextColor || '0 0% 100%');

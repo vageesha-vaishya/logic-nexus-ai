@@ -593,7 +593,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           Skip to main content
         </a>
         <AppSidebar />
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-w-0">
           <header
             ref={headerRef}
             className="h-12 border-b flex items-center px-3 gap-3 bg-background sticky top-0 z-10 overflow-visible relative"
@@ -700,7 +700,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                 </span>
               </div>
             )}
-            <div className="relative z-[3] flex items-center gap-3 w-full">
+            <div className="relative z-[3] flex items-center gap-3 w-full overflow-x-auto">
               {isMobileSidebar && (
                 <Button
                   variant="ghost"

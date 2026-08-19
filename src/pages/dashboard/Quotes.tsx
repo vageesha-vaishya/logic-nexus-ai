@@ -23,9 +23,9 @@ import Papa from 'papaparse';
 import { AdvancedSearchFilter, FilterCriterion } from '@/components/quotation/AdvancedSearchFilter';
 import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { QuotationDeleteService } from '@/services/quotation/QuotationDeleteService';
-import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { QuoteCard } from '@/components/quotation/QuoteCard';
 import { useTranslation } from 'react-i18next';
 import { CrmFallbackReason, resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -85,11 +85,9 @@ export default function Quotes() {
   const [quotes, setQuotes] = useState<QuoteWithRelations[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
-  const { setActive } = useTheme();
   const {
     viewMode,
     theme,
-    hydrated,
     setViewMode,
     setTheme,
   } = useCRMModuleNavigationState('quotes', { viewMode: 'pipeline', theme: 'Azure Sky' });
@@ -124,11 +122,6 @@ export default function Quotes() {
     const copy = resolveCrmFallbackBannerCopy('quotes', dbFallbackReason);
     return t(copy.key);
   }, [dbFallbackReason, t]);
-
-  useEffect(() => {
-    if (!hydrated) return;
-    setActive(theme);
-  }, [hydrated, setActive, theme]);
 
   const fetchQuotes = useCallback(async () => {
     if (quotes.length === 0) setLoading(true);
@@ -749,6 +742,7 @@ export default function Quotes() {
 
   return (
     <DashboardLayout>
+      <div style={themeStyleFromPreset(theme)} className="min-h-full transition-colors duration-300">
       <FirstScreenTemplate
         title="Quotes"
         description="Manage sales quotes and opportunities. Shortcuts: ⌘/Ctrl+B (New), ⌘/Ctrl+R (Refresh)"
@@ -971,6 +965,7 @@ export default function Quotes() {
           )}
         </div>
       </FirstScreenTemplate>
+      </div>
     </DashboardLayout>
   );
 }

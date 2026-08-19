@@ -19,9 +19,9 @@ import { Separator } from "@/components/ui/separator";
 import { PipelineService } from "@/services/pipeline-service";
 import { useTranslation } from "react-i18next";
 import { resolveCrmFallbackBannerCopy } from "./leadsListUtils";
-import { useTheme } from "@/hooks/useTheme";
 import { useCRMModuleNavigationState } from "@/hooks/useCRMModuleNavigationState";
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from "@/components/crm/CRMModuleHeaderNavigation";
+import { themeStyleFromPreset } from "@/lib/theme-utils";
 import { logger } from "@/lib/logger";
 
 type ContactStage = 'new_contact' | 'verified' | 'key_decision_maker' | 'active' | 'inactive' | 'bounced_invalid';
@@ -69,8 +69,7 @@ export default function ContactsPipeline() {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { context, scopedDb } = useCRM();
-  const { setActive } = useTheme();
-  const { theme, setTheme, setViewMode, hydrated } = useCRMModuleNavigationState("contacts", {
+  const { theme, setTheme, setViewMode } = useCRMModuleNavigationState("contacts", {
     viewMode: "pipeline",
     theme: "Azure Sky",
   });
@@ -134,11 +133,6 @@ export default function ContactsPipeline() {
     refreshContacts();
   }, [refreshContacts]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    setActive(theme);
-  }, [hydrated, setActive, theme]);
-
   const latestActivityByContact = useMemo(() => {
     const m: Record<string, number> = {};
     for (const act of activities) {
@@ -195,7 +189,7 @@ export default function ContactsPipeline() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold">Contacts Pipeline</h1>

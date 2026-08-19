@@ -13,6 +13,7 @@
     },
     "actions": {
       "newLead": "New Lead",
+      "addLead": "New Lead",
       "refresh": "Refresh",
       "listView": "List View",
       "pipelineView": "Pipeline View",
@@ -72,7 +73,10 @@
       "apiNetworkFallback": "CRM API unreachable, showing DB fallback",
       "apiServerFallback": "CRM API error, showing DB fallback",
       "apiMissingTokenFallback": "Authentication missing, showing DB fallback",
-      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback"
+      "apiMissingScopeFallback": "Tenant scope missing, showing DB fallback",
+      "noLeads": "No leads found",
+      "noLeadsDescSearch": "No leads match your search. Try adjusting your filters.",
+      "noLeadsDescNew": "Get started by creating your first lead."
     }
   },
   "accounts": {

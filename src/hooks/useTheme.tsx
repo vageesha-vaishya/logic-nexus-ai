@@ -123,7 +123,7 @@ const buildPresetTheme = (preset: (typeof THEME_PRESETS)[number]): SavedTheme =>
   stripOpacity: typeof (preset as any).stripOpacity === 'number' ? (preset as any).stripOpacity : 0.2,
   stripWidth: (preset as any).stripWidth ?? '22px',
   stripAngle: (preset as any).stripAngle ?? '14deg',
-  headerBannerVisible: typeof (preset as any).headerBannerVisible === 'boolean' ? (preset as any).headerBannerVisible : preset.name === 'Default Simple',
+  headerBannerVisible: typeof (preset as any).headerBannerVisible === 'boolean' ? (preset as any).headerBannerVisible : false,
   headerBannerContent: (preset as any).headerBannerContent ?? '',
   headerBannerColor: normalizeHslToken((preset as any).headerBannerColor ?? preset.accent ?? preset.primary, '217 91% 60%'),
   headerBannerTextColor: normalizeHslToken((preset as any).headerBannerTextColor, '0 0% 100%'),
@@ -132,18 +132,13 @@ const buildPresetTheme = (preset: (typeof THEME_PRESETS)[number]): SavedTheme =>
 });
 
 const normalizeSavedThemeForStartup = (theme: SavedTheme): SavedTheme => {
-  const isDefaultSimpleTheme = theme.name === 'Default Simple';
   return {
     ...theme,
     stripColor: normalizeHslToken(theme.stripColor || theme.accent || theme.primary, '267 78% 44%'),
-    headerBannerVisible: isDefaultSimpleTheme
-      ? true
-      : typeof theme.headerBannerVisible === 'boolean'
-        ? theme.headerBannerVisible
-        : false,
-    headerBannerContent: isDefaultSimpleTheme
-      ? (typeof theme.headerBannerContent === 'string' ? theme.headerBannerContent : '')
-      : theme.headerBannerContent,
+    headerBannerVisible: typeof theme.headerBannerVisible === 'boolean'
+      ? theme.headerBannerVisible
+      : false,
+    headerBannerContent: typeof theme.headerBannerContent === 'string' ? theme.headerBannerContent : '',
     headerBannerColor: normalizeHslToken(theme.headerBannerColor || theme.stripColor || theme.accent || theme.primary, '217 91% 60%'),
     headerBannerTextColor: normalizeHslToken(theme.headerBannerTextColor, '0 0% 100%'),
     headerBannerHeight: theme.headerBannerHeight || '48px',
@@ -283,20 +278,15 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     root.style.setProperty('--menu-strip-amro', menuStripAmro);
     root.style.setProperty('--menu-strip-administration', menuStripAdministration);
     root.style.setProperty('--menu-strip-other', menuStripOther);
-    const isDefaultSimpleTheme = t.name === 'Default Simple';
     const existingBannerVisible = root.getAttribute('data-header-banner-visible') === '1'
       || getComputedStyle(root).getPropertyValue('--header-banner-visible').trim() === '1';
-    const headerBannerVisible = isDefaultSimpleTheme
-      ? true
-      : typeof t.headerBannerVisible === 'boolean'
-        ? t.headerBannerVisible
-        : existingBannerVisible;
+    const headerBannerVisible = typeof t.headerBannerVisible === 'boolean'
+      ? t.headerBannerVisible
+      : existingBannerVisible;
     const existingBannerContent = root.getAttribute('data-header-banner-content') || '';
-    const headerBannerContent = isDefaultSimpleTheme
-      ? (typeof t.headerBannerContent === 'string' ? t.headerBannerContent : '')
-      : typeof t.headerBannerContent === 'string'
-        ? t.headerBannerContent
-        : existingBannerContent;
+    const headerBannerContent = typeof t.headerBannerContent === 'string'
+      ? t.headerBannerContent
+      : existingBannerContent;
     const headerBannerColor = normalizeHslToken(t.headerBannerColor || t.accent || t.primary, '217 91% 60%');
     const headerBannerTextColor = normalizeHslToken(t.headerBannerTextColor, '0 0% 100%');
     const headerBannerHeight = t.headerBannerHeight || '48px';
@@ -467,16 +457,12 @@ export const ThemeProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             stripOpacity: row.tokens.stripOpacity,
             stripWidth: row.tokens.stripWidth,
             stripAngle: row.tokens.stripAngle,
-            headerBannerVisible: row.name === 'Default Simple'
-              ? true
-              : typeof row.tokens.headerBannerVisible === 'boolean'
-                ? row.tokens.headerBannerVisible
-                : undefined,
-            headerBannerContent: row.name === 'Default Simple'
-              ? (typeof row.tokens.headerBannerContent === 'string' ? row.tokens.headerBannerContent : '')
-              : typeof row.tokens.headerBannerContent === 'string'
-                ? row.tokens.headerBannerContent
-                : undefined,
+            headerBannerVisible: typeof row.tokens.headerBannerVisible === 'boolean'
+              ? row.tokens.headerBannerVisible
+              : undefined,
+            headerBannerContent: typeof row.tokens.headerBannerContent === 'string'
+              ? row.tokens.headerBannerContent
+              : undefined,
             headerBannerColor: normalizeHslToken(row.tokens.headerBannerColor, row.tokens.accent || row.tokens.primary || '217 91% 60%'),
             headerBannerTextColor: normalizeHslToken(row.tokens.headerBannerTextColor, '0 0% 100%'),
             headerBannerHeight: row.tokens.headerBannerHeight,

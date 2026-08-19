@@ -14,9 +14,9 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { matchText, TextOp, formatCurrency } from '@/lib/utils';
 import { Opportunity, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
-import { useTheme } from '@/hooks/useTheme';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { PipelineService } from '@/services/pipeline-service';
 import { useTranslation } from 'react-i18next';
 import { resolveCrmFallbackBannerCopy } from './leadsListUtils';
@@ -29,11 +29,9 @@ export default function Opportunities() {
   const [loading, setLoading] = useState(true);
   const [isDbFallbackActive, setIsDbFallbackActive] = useState(false);
   const [dbFallbackReason, setDbFallbackReason] = useState<'relations_query_failed' | null>(null);
-  const { setActive } = useTheme();
   const {
     viewMode,
     theme,
-    hydrated,
     setViewMode,
     setTheme,
   } = useCRMModuleNavigationState('opportunities', { viewMode: 'pipeline', theme: 'Azure Sky' });
@@ -83,11 +81,6 @@ export default function Opportunities() {
     refreshOpportunities();
   }, [refreshOpportunities]);
 
-  useEffect(() => {
-    if (!hydrated) return;
-    setActive(theme);
-  }, [hydrated, setActive, theme]);
-
   const formatDate = (date: string | null) => {
     if (!date) return '-';
     return new Date(date).toLocaleDateString();
@@ -132,7 +125,7 @@ export default function Opportunities() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6">
+      <div style={themeStyleFromPreset(theme)} className="space-y-6 transition-colors duration-300">
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold">Opportunities</h1>

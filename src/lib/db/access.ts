@@ -437,12 +437,13 @@ export class ScopedDataAccess {
         newValue.tenant_id = this.context.tenantId;
       }
       if (this.context.franchiseId) {
-        // Special-case: franchises table does not have franchise_id
+        // Special-case: these tables do not have a franchise_id column
         if (
           table !== 'franchises' &&
           table !== ('master_commodities' as TableName) &&
           table !== ('contacts' as TableName) &&
-          table !== ('accounts' as TableName)
+          table !== ('accounts' as TableName) &&
+          table !== ('system_settings' as TableName)
         ) {
           newValue.franchise_id = this.context.franchiseId;
         }
@@ -550,10 +551,10 @@ export class ScopedDataAccess {
       setting_value: value,
     };
     
-    const injectedPayload = this.injectScope(payload);
+    const injectedPayload = this.injectScope(payload, 'system_settings' as TableName);
     
     const result = await this.supabase.from('system_settings' as any).upsert(injectedPayload, {
-      onConflict: 'tenant_id, setting_key'
+      onConflict: 'tenant_id,setting_key'
     });
     
     this.logAudit('UPSERT', 'system_settings', { key, value });
