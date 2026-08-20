@@ -158,6 +158,8 @@ export default function SmartQuoteWorkspace() {
       );
     },
     (errors) => {
+      // Without this callback a failed validation is completely silent — the Generate button just
+      // does nothing. Surface the first message(s) so the user knows what to fix.
       const messages = Object.values(errors)
         .map((err: any) => err?.message)
         .filter((message): message is string => typeof message === 'string' && message.length > 0);
@@ -179,6 +181,9 @@ export default function SmartQuoteWorkspace() {
     const shared = deriveSharedPayload(values, cargoItem, originDetails, destinationDetails);
     const transferPayload = {
       ...shared,
+      // deriveSharedPayload defaults these to `null` (from useState<any>(null)) when the user
+      // never picked a location-autocomplete suggestion. QuoteTransferSchema's LocationDetailsSchema
+      // is `.optional()` but not `.nullable()`, so normalize null -> undefined before validating.
       originDetails: shared.originDetails ?? undefined,
       destinationDetails: shared.destinationDetails ?? undefined,
       selectedRates: selectedOptions,
@@ -200,6 +205,11 @@ export default function SmartQuoteWorkspace() {
         mode: validatedData.mode,
         optionsCount: validatedData.selectedRates.length,
       });
+      // IMPORTANT: navigate with the RAW selectedOptions, not validatedData.selectedRates.
+      // QuoteTransferSchema is used purely as a validation gate here — Zod strips unknown keys, and
+      // RateLegSchema has no `charges` key, so the parsed output silently loses every leg-level charge
+      // array. The composer's flattenOptionCharges reads option.legs[].charges to build the charge grid
+      // that gets persisted, so handing it the parsed copy would save degraded financials.
       navigate('/dashboard/quotes/new', {
         state: { ...validatedData, selectedRates: selectedOptions, selectedRate: selectedOptions[0] },
       });
@@ -268,6 +278,9 @@ export default function SmartQuoteWorkspace() {
             className="w-[400px] shrink-0 p-6 border rounded-lg overflow-y-auto"
             style={{ background: 'var(--sq-bg)', borderColor: 'var(--sq-border)' }}
           >
+            {/* onSubmit is required: without it, pressing Enter in any input triggers a native form
+                submission and a full page reload. handleGenerate is form.handleSubmit(...), which
+                calls preventDefault() internally. */}
             <form className="space-y-6" onSubmit={handleGenerate}>
               <div
                 className="flex items-center justify-between p-3 rounded-md border"
