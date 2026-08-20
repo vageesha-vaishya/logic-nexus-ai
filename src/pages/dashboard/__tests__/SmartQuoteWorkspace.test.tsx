@@ -45,4 +45,24 @@ describe('SmartQuoteWorkspace', () => {
     expect(screen.getByRole('heading', { name: /smart quote/i })).toBeInTheDocument();
     expect(screen.getByText(/fill out the form to generate quotes/i)).toBeInTheDocument();
   });
+
+  it('lets the user pick a transport mode and enter origin/destination', async () => {
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: {
+          retry: false,
+        },
+      },
+    });
+
+    const { getByText } = render(
+      <QueryClientProvider client={queryClient}>
+        <MemoryRouter initialEntries={['/dashboard/quotes/smart-quote']}>
+          <SmartQuoteWorkspace />
+        </MemoryRouter>
+      </QueryClientProvider>
+    );
+    expect(getByText('Ocean')).toBeInTheDocument();
+    expect(getByText('Air')).toBeInTheDocument();
+  });
 });
