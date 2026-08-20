@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "npm run rules:consult && npm run rules:enforce && node scripts/dev-orchestrator.mjs",
     "dev:vite": "vite",
+    "dev:vps": "vite --mode production --port 8082",
     "services:start": "node scripts/service-orchestrator.mjs --start-only",
     "services:check": "node scripts/service-orchestrator.mjs --check-only",
     "build": "vite build",

@@ -36,6 +36,8 @@ supabase/migration-package/new-supabase-config.env
 supabase/migration-package/new-supabase-config*.env
 supabase/migration-package/direct-migration/migration.env*
 migration.env
+/env
+/env local docker
 
 # Git worktrees (isolated development workspaces)
 .worktrees
