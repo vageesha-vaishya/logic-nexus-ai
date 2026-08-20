@@ -1,6 +1,5 @@
 import '@testing-library/jest-dom';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -30,7 +29,7 @@ vi.mock('@/components/layout/DashboardLayout', () => ({
 const defaultRateFetchingResult = {
   results: null as any,
   loading: false,
-  error: null,
+  error: null as string | null,
   marketAnalysis: null,
   confidenceScore: null,
   anomalies: [] as string[],
@@ -52,27 +51,8 @@ vi.mock('@/components/common/LocationAutocomplete', () => ({
   ),
 }));
 
-vi.mock('@/components/quotation/shared/QuoteResultsList', () => ({
-  QuoteResultsList: ({ results }: any) => (
-    <div data-testid="quote-results-list">List view: {results.length} options</div>
-  ),
-}));
-
-vi.mock('@/components/quotation/shared/QuoteComparisonView', () => ({
-  QuoteComparisonView: ({ options }: any) => (
-    <div data-testid="quote-comparison-view">Compare view: {options.length} options</div>
-  ),
-}));
-
 function renderPage() {
-  const queryClient = new QueryClient({
-    defaultOptions: {
-      queries: {
-        retry: false,
-      },
-    },
-  });
-
+  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   return render(
     <QueryClientProvider client={queryClient}>
       <MemoryRouter initialEntries={['/dashboard/quotes/smart-quote']}>
@@ -84,69 +64,29 @@ function renderPage() {
 
 describe('SmartQuoteWorkspace', () => {
   beforeEach(() => {
-    vi.mocked(useRateFetching).mockReturnValue({
-      ...defaultRateFetchingResult,
-      fetchRates: vi.fn().mockResolvedValue([]),
-      clearResults: vi.fn(),
-    });
+    vi.mocked(useRateFetching).mockReturnValue({ ...defaultRateFetchingResult });
   });
 
   it('renders the Smart Quote form and an empty results placeholder', () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-
-    render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/dashboard/quotes/smart-quote']}>
-          <SmartQuoteWorkspace />
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
+    renderPage();
     expect(screen.getByRole('heading', { name: /smart quote/i })).toBeInTheDocument();
     expect(screen.getByText(/fill out the form to generate quotes/i)).toBeInTheDocument();
   });
 
   it('lets the user pick a transport mode and enter origin/destination', async () => {
-    const queryClient = new QueryClient({
-      defaultOptions: {
-        queries: {
-          retry: false,
-        },
-      },
-    });
-
-    const { getByText } = render(
-      <QueryClientProvider client={queryClient}>
-        <MemoryRouter initialEntries={['/dashboard/quotes/smart-quote']}>
-          <SmartQuoteWorkspace />
-        </MemoryRouter>
-      </QueryClientProvider>
-    );
-    expect(getByText('Ocean')).toBeInTheDocument();
-    expect(getByText('Air')).toBeInTheDocument();
+    renderPage();
+    expect(screen.getByText('Ocean')).toBeInTheDocument();
+    expect(screen.getByText('Air')).toBeInTheDocument();
   });
 
   it('calls fetchRates with the derived shared payload when Generate is clicked', async () => {
     const fetchRates = vi.fn().mockResolvedValue([]);
-    vi.mocked(useRateFetching).mockReturnValue({
-      ...defaultRateFetchingResult,
-      fetchRates,
-    });
+    vi.mocked(useRateFetching).mockReturnValue({ ...defaultRateFetchingResult, fetchRates });
 
     renderPage();
 
-    fireEvent.change(screen.getByLabelText('Origin port, airport, or city'), {
-      target: { value: 'Los Angeles' },
-    });
-    fireEvent.change(screen.getByLabelText('Destination port, airport, or city'), {
-      target: { value: 'Shanghai' },
-    });
-
+    fireEvent.change(screen.getByLabelText('Origin port, airport, or city'), { target: { value: 'Los Angeles' } });
+    fireEvent.change(screen.getByLabelText('Destination port, airport, or city'), { target: { value: 'Shanghai' } });
     fireEvent.click(screen.getByRole('button', { name: /generate smart quotes/i }));
 
     await waitFor(() => expect(fetchRates).toHaveBeenCalledTimes(1));
@@ -165,23 +105,45 @@ describe('SmartQuoteWorkspace', () => {
     expect(containerResolver).toHaveProperty('resolveContainerInfo');
   });
 
-  it('renders the results panel with a List/Compare toggle once rate options are available', async () => {
+  it('shows the shipment recap strip once origin and destination are both filled', () => {
+    renderPage();
+    expect(screen.queryByTestId('shipment-recap-strip')).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Origin port, airport, or city'), { target: { value: 'CNSHA' } });
+    fireEvent.change(screen.getByLabelText('Destination port, airport, or city'), { target: { value: 'USLAX' } });
+
+    expect(screen.getByTestId('shipment-recap-strip')).toBeInTheDocument();
+  });
+
+  it('shows a loading state in the results panel while a request is in flight', () => {
+    // Regex is scoped to "ranking carriers" (the results-panel copy), not a broader
+    // /generating|ranking/ pattern — the Generate button also reads "Generating..." while
+    // loading, and a broader pattern would match both elements and make getByText throw.
+    vi.mocked(useRateFetching).mockReturnValue({ ...defaultRateFetchingResult, loading: true });
+    renderPage();
+    expect(screen.getByText(/ranking carriers/i)).toBeInTheDocument();
+  });
+
+  it('shows an inline error state in the results panel when the fetch fails', () => {
+    vi.mocked(useRateFetching).mockReturnValue({ ...defaultRateFetchingResult, error: 'No quotes available.' });
+    renderPage();
+    expect(screen.getByText('No quotes available.')).toBeInTheDocument();
+  });
+
+  it('renders a SmartQuoteRateCard per result once options are available, with no Browse/Compare tabs', async () => {
     vi.mocked(useRateFetching).mockReturnValue({
       ...defaultRateFetchingResult,
-      results: [{ id: 'opt-1' }, { id: 'opt-2' }] as any,
+      results: [
+        { id: 'opt-1', carrier: 'Carrier One', price: 100, currency: 'USD', transitTime: '10 days', tier: 'cheapest' },
+        { id: 'opt-2', carrier: 'Carrier Two', price: 200, currency: 'USD', transitTime: '5 days', tier: 'fastest' },
+      ] as any,
     });
 
     renderPage();
 
-    expect(screen.getByText(/^2 options$/i)).toBeInTheDocument();
-    expect(screen.getByTestId('quote-results-list')).toHaveTextContent('List view: 2 options');
-    expect(screen.queryByTestId('quote-comparison-view')).not.toBeInTheDocument();
-
-    const user = userEvent.setup();
-    await user.click(screen.getByRole('tab', { name: /compare/i }));
-
-    await waitFor(() => {
-      expect(screen.getByTestId('quote-comparison-view')).toHaveTextContent('Compare view: 2 options');
-    });
+    expect(screen.getByTestId('smart-quote-rate-card-opt-1')).toBeInTheDocument();
+    expect(screen.getByTestId('smart-quote-rate-card-opt-2')).toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /compare/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('tab', { name: /browse/i })).not.toBeInTheDocument();
   });
 });

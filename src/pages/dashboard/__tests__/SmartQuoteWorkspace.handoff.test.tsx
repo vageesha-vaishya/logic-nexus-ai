@@ -1,5 +1,5 @@
 import '@testing-library/jest-dom';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -45,26 +45,6 @@ vi.mock('@/hooks/useRateFetching', () => ({
 vi.mock('@/components/common/LocationAutocomplete', () => ({
   LocationAutocomplete: ({ value, onChange, placeholder }: any) => (
     <input aria-label={placeholder} value={value || ''} onChange={(e) => onChange(e.target.value)} />
-  ),
-}));
-
-// Unlike the smoke-test suite's mock, this one wires the REAL onSelect handler through so the
-// hand-off path (handleConvertToQuote -> navigate) is genuinely exercised.
-vi.mock('@/components/quotation/shared/QuoteResultsList', () => ({
-  QuoteResultsList: ({ results, onSelect }: any) => (
-    <div data-testid="quote-results-list">
-      {results.map((result: any) => (
-        <button key={result.id} type="button" onClick={() => onSelect(result)}>
-          Select {result.id}
-        </button>
-      ))}
-    </div>
-  ),
-}));
-
-vi.mock('@/components/quotation/shared/QuoteComparisonView', () => ({
-  QuoteComparisonView: ({ options }: any) => (
-    <div data-testid="quote-comparison-view">Compare view: {options.length} options</div>
   ),
 }));
 
@@ -163,7 +143,7 @@ describe('SmartQuoteWorkspace navigation state (Critical #2 regression)', () => 
     renderPage();
     await fillRoute();
 
-    fireEvent.click(screen.getByRole('button', { name: /select opt-1/i }));
+    fireEvent.click(within(screen.getByTestId('smart-quote-rate-card-opt-1')).getByRole('button', { name: /^select$/i }));
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledTimes(1));
 
@@ -195,7 +175,7 @@ describe('SmartQuoteWorkspace navigation state (Critical #2 regression)', () => 
     renderPage();
     await fillRoute();
 
-    fireEvent.click(screen.getByRole('button', { name: /select opt-1/i }));
+    fireEvent.click(within(screen.getByTestId('smart-quote-rate-card-opt-1')).getByRole('button', { name: /^select$/i }));
 
     await waitFor(() => expect(navigateMock).toHaveBeenCalledTimes(1));
     const state = navigateMock.mock.calls[0][1].state;
