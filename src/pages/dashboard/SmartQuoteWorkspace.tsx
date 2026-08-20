@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -9,8 +9,18 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import {
+  Breadcrumb,
+  BreadcrumbItem,
+  BreadcrumbLink,
+  BreadcrumbList,
+  BreadcrumbPage,
+  BreadcrumbSeparator,
+} from '@/components/ui/breadcrumb';
 import { ArrowLeft, ArrowRight, Package, Sparkles, Plane, Ship, Truck, Train } from 'lucide-react';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
+import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
+import { themeStyleFromPreset } from '@/lib/theme-utils';
 import { useRateFetching } from '@/hooks/useRateFetching';
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 import { SharedCargoInput } from '@/components/quotation/shared/SharedCargoInput';
@@ -86,6 +96,11 @@ function deriveSharedPayload(
 export default function SmartQuoteWorkspace() {
   const navigate = useNavigate();
   const { toast } = useToast();
+  // Sibling quote pages (Quotes.tsx / QuotationManager.tsx / QuoteNew.tsx) all read the persisted
+  // CRM module theme for the 'quotes' module and apply it via themeStyleFromPreset. This page has no
+  // theme switcher of its own, but it must honour the same preset so navigating here from those pages
+  // doesn't produce a jarring visual break.
+  const { theme } = useCRMModuleNavigationState('quotes', { viewMode: 'pipeline', theme: 'Azure Sky' });
   const { containerTypes, containerSizes } = useContainerRefs();
   const [smartMode, setSmartMode] = useState(true);
   const [cargoItem, setCargoItem] = useState<CargoItem>(INITIAL_CARGO_ITEM);
@@ -114,14 +129,28 @@ export default function SmartQuoteWorkspace() {
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
 
-  const handleGenerate = form.handleSubmit(async (values) => {
-    setSelectedIds([]);
-    const shared = deriveSharedPayload(values, cargoItem, originDetails, destinationDetails);
-    await rateFetching.fetchRates(
-      { ...shared, smartMode, account_id: undefined } as any,
-      containerResolver
-    );
-  });
+  const handleGenerate = form.handleSubmit(
+    async (values) => {
+      setSelectedIds([]);
+      const shared = deriveSharedPayload(values, cargoItem, originDetails, destinationDetails);
+      await rateFetching.fetchRates(
+        { ...shared, smartMode, account_id: undefined } as any,
+        containerResolver
+      );
+    },
+    (errors) => {
+      // Without this callback a failed validation is completely silent — the Generate button just
+      // does nothing. Surface the first message(s) so the user knows what to fix.
+      const messages = Object.values(errors)
+        .map((err: any) => err?.message)
+        .filter((message): message is string => typeof message === 'string' && message.length > 0);
+      toast({
+        title: 'Missing shipment details',
+        description: messages.length > 0 ? messages.join('\n') : 'Please complete the required fields before generating quotes.',
+        variant: 'destructive',
+      });
+    }
+  );
 
   const toggleSelection = (id: string) => {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
@@ -139,9 +168,17 @@ export default function SmartQuoteWorkspace() {
       originDetails: shared.originDetails ?? undefined,
       destinationDetails: shared.destinationDetails ?? undefined,
       selectedRates: selectedOptions,
-      marketAnalysis: rateFetching.marketAnalysis,
-      confidenceScore: rateFetching.confidenceScore,
-      anomalies: rateFetching.anomalies,
+      // These three come straight off the edge-function response with no runtime guarantees. They are
+      // cosmetic metadata, so coerce them to schema-safe fallbacks rather than let a malformed AI
+      // response make QuoteTransferSchema.parse() throw and block the entire hand-off.
+      marketAnalysis: typeof rateFetching.marketAnalysis === 'string' ? rateFetching.marketAnalysis : null,
+      confidenceScore:
+        typeof rateFetching.confidenceScore === 'number' && Number.isFinite(rateFetching.confidenceScore)
+          ? rateFetching.confidenceScore
+          : null,
+      anomalies: Array.isArray(rateFetching.anomalies)
+        ? rateFetching.anomalies.filter((anomaly): anomaly is string => typeof anomaly === 'string')
+        : [],
     };
 
     try {
@@ -152,8 +189,13 @@ export default function SmartQuoteWorkspace() {
         mode: validatedData.mode,
         optionsCount: validatedData.selectedRates.length,
       });
+      // IMPORTANT: navigate with the RAW selectedOptions, not validatedData.selectedRates.
+      // QuoteTransferSchema is used purely as a validation gate here — Zod strips unknown keys, and
+      // RateLegSchema has no `charges` key, so the parsed output silently loses every leg-level charge
+      // array. The composer's flattenOptionCharges reads option.legs[].charges to build the charge grid
+      // that gets persisted, so handing it the parsed copy would save degraded financials.
       navigate('/dashboard/quotes/new', {
-        state: { ...validatedData, selectedRate: selectedOptions[0] },
+        state: { ...validatedData, selectedRates: selectedOptions, selectedRate: selectedOptions[0] },
       });
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -173,7 +215,30 @@ export default function SmartQuoteWorkspace() {
 
   return (
     <DashboardLayout>
-      <div className="flex flex-col h-[calc(100vh-140px)] gap-6">
+      <div
+        style={themeStyleFromPreset(theme)}
+        className="flex flex-col h-[calc(100vh-140px)] gap-4 transition-colors duration-300"
+      >
+        <Breadcrumb className="flex-none">
+          <BreadcrumbList>
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/dashboard">Dashboard</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbLink asChild>
+                <Link to="/dashboard/quotes">Quotes</Link>
+              </BreadcrumbLink>
+            </BreadcrumbItem>
+            <BreadcrumbSeparator />
+            <BreadcrumbItem>
+              <BreadcrumbPage>Smart Quote</BreadcrumbPage>
+            </BreadcrumbItem>
+          </BreadcrumbList>
+        </Breadcrumb>
+
         <div className="flex-none flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="icon" onClick={() => navigate('/dashboard/quotes/pipeline')} aria-label="Back to Quotes">
@@ -198,7 +263,10 @@ export default function SmartQuoteWorkspace() {
 
         <div className="flex flex-1 overflow-hidden gap-6">
           <div className="w-[400px] shrink-0 bg-muted/30 p-6 border rounded-lg overflow-y-auto">
-            <form className="space-y-6">
+            {/* onSubmit is required: without it, pressing Enter in any input triggers a native form
+                submission and a full page reload. handleGenerate is form.handleSubmit(...), which
+                calls preventDefault() internally. */}
+            <form className="space-y-6" onSubmit={handleGenerate}>
               <div className="flex items-center justify-between bg-purple-50 dark:bg-purple-950/30 p-3 rounded-md border border-purple-100 dark:border-purple-900">
                 <div className="flex items-center gap-2">
                   <Sparkles className="w-4 h-4 text-purple-600" />
