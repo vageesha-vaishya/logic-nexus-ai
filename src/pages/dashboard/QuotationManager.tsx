@@ -6,7 +6,7 @@ import { DashboardLayout } from "@/components/layout/DashboardLayout";
 import { QuotesKanbanBoard } from "@/components/quotation/kanban/QuotesKanbanBoard";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { AlertCircle, CalendarDays, CheckSquare, ChevronLeft, ChevronRight, Download, RefreshCcw, Trash2 } from "lucide-react";
+import { AlertCircle, CalendarDays, CheckSquare, ChevronLeft, ChevronRight, Download, RefreshCcw, Sparkles, Trash2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Quote, QuoteStatus, stages, statusConfig } from "./quotes-data";
@@ -444,46 +444,58 @@ export default function QuotationManager() {
             <div>
               <h1 className="text-3xl font-bold tracking-tight">Quotations Workspace</h1>
             </div>
-            <CRMModuleHeaderNavigation
-              moduleLabel="Quotes"
-              viewMode="pipeline"
-              theme={theme}
-              onViewModeChange={(mode) => {
-                if (mode === "pipeline") {
-                  setViewMode("pipeline");
-                  navigate("/dashboard/quotes/pipeline");
-                  return;
-                }
-                if (mode === "list") {
-                  setViewMode("list");
-                  navigate("/dashboard/quotes");
-                  return;
-                }
-                setViewMode(mode);
-                navigate(`/dashboard/quotes?view=${mode}`);
-              }}
-              analyticsLabel="Analytics"
-              analyticsActive={currentView === "analytics"}
-              onAnalyticsClick={() => {
-                if (!canViewAnalytics) {
-                  toast({
-                    title: "Access denied",
-                    description: "You do not have permission to view analytics.",
-                    variant: "destructive",
-                  });
-                  return;
-                }
-                navigate("/dashboard/quotes/analytics");
-              }}
-              controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
-              onThemeChange={setTheme}
-              onCreate={() => navigate("/dashboard/quotes/new")}
-              createLabel="New Quote"
-              iconOnly
-              layout="compact"
-              onRefresh={fetchQuotes}
-              onImportExport={() => navigate("/dashboard/quotes/import-export")}
-            />
+            <div className="flex items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800 dark:border-purple-900 dark:text-purple-300 dark:hover:bg-purple-950/30"
+                onClick={() => navigate("/dashboard/quotes/new")}
+                title="Smart Quote"
+              >
+                <Sparkles className="h-4 w-4 mr-2" />
+                Smart Quote
+              </Button>
+              <CRMModuleHeaderNavigation
+                moduleLabel="Quotes"
+                viewMode="pipeline"
+                theme={theme}
+                onViewModeChange={(mode) => {
+                  if (mode === "pipeline") {
+                    setViewMode("pipeline");
+                    navigate("/dashboard/quotes/pipeline");
+                    return;
+                  }
+                  if (mode === "list") {
+                    setViewMode("list");
+                    navigate("/dashboard/quotes");
+                    return;
+                  }
+                  setViewMode(mode);
+                  navigate(`/dashboard/quotes?view=${mode}`);
+                }}
+                analyticsLabel="Analytics"
+                analyticsActive={currentView === "analytics"}
+                onAnalyticsClick={() => {
+                  if (!canViewAnalytics) {
+                    toast({
+                      title: "Access denied",
+                      description: "You do not have permission to view analytics.",
+                      variant: "destructive",
+                    });
+                    return;
+                  }
+                  navigate("/dashboard/quotes/analytics");
+                }}
+                controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+                onThemeChange={setTheme}
+                onCreate={() => navigate("/dashboard/quotes/new")}
+                createLabel="New Quote"
+                iconOnly
+                layout="compact"
+                onRefresh={fetchQuotes}
+                onImportExport={() => navigate("/dashboard/quotes/import-export")}
+              />
+            </div>
           </div>
         </div>
 

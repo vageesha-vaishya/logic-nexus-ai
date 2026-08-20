@@ -3994,6 +3994,22 @@ function UnifiedQuoteComposerContent({
               </TabsTrigger>
             </TabsList>
             <TabsContent value="form" className="pt-6">
+              <div className="mb-6 rounded-md border border-purple-100 bg-purple-50 p-4 dark:border-purple-900 dark:bg-purple-950/30">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="h-4 w-4 text-purple-600" />
+                    <div className="flex flex-col">
+                      <span className="text-sm font-medium text-purple-900 dark:text-purple-200">Smart Quote Mode</span>
+                      <span className="text-[10px] text-purple-600 dark:text-purple-400">AI-optimized routes & pricing</span>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={isSmartMode}
+                    onCheckedChange={setIsSmartMode}
+                    data-testid="smart-mode-switch-form"
+                  />
+                </div>
+              </div>
               <FormZone
                 onGetRates={handleGetRates}
                 onSaveDraft={handleSaveDraft}
