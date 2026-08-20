@@ -2322,11 +2322,20 @@ function UnifiedQuoteComposerContent({
       });
     }
 
-    if (initialData.containerType || initialData.incoterms || initialData.htsCode) {
+    if (
+      initialData.containerType ||
+      initialData.incoterms ||
+      initialData.htsCode ||
+      (Array.isArray(initialData.containerCombos) && initialData.containerCombos.length > 0)
+    ) {
       setInitialExtended({
         containerType: initialData.containerType || '',
         containerSize: initialData.containerSize || '',
         containerQty: initialData.containerQty || '1',
+        // FormZone seeds cargoItem.containerCombos from initialExtended.containerCombos; without this
+        // its cargo-sync effect sees an empty combos array and resets containerType/containerSize back
+        // to '', silently dropping the multi-container selections Smart Quote sends for ocean/rail.
+        containerCombos: initialData.containerCombos || [],
         incoterms: initialData.incoterms || '',
         htsCode: initialData.htsCode || '',
         dangerousGoods: !!initialData.dangerousGoods,
