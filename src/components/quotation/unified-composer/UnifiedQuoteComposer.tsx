@@ -2275,6 +2275,18 @@ function UnifiedQuoteComposerContent({
 
   useEffect(() => {
     if (!quoteId) return;
+    // QuoteNew.tsx creates an empty quote "shell" row asynchronously and only then
+    // passes `quoteId` down, so this effect fires *after* the Smart Quote /
+    // QuickQuoteHistory hand-off has already prefilled the composer from
+    // `initialData`. Reloading that freshly-created shell here would call
+    // form.reset()/setInitialExtended() with its still-empty columns and wipe the
+    // prefilled cargo details (containerCombos, commodity, weight, volume,
+    // htsCode, incoterms, dangerousGoods) — they live only in local state at this
+    // point and were never persisted. A fresh shell has no saved options either,
+    // so skipping the reload loses nothing. A hard refresh drops router
+    // location.state, so `initialData` is undefined and this ref is false on that
+    // mount, letting the reload run normally.
+    if (smartQuotePrefillDoneRef.current) return;
     loadExistingQuote();
   }, [loadExistingQuote, quoteId]);
 
