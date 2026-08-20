@@ -1,4 +1,4 @@
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useMemo, useState, useRef } from 'react';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { useCRM } from '@/hooks/useCRM';
 import { useAuth } from '@/hooks/useAuth';
@@ -29,11 +29,22 @@ function QuoteNewInner() {
   const [versionId, setVersionId] = useState<string | null>(null);
   const [, setTenantId] = useState<string | null>(null);
   const [initializing, setInitializing] = useState(true);
+  // Snapshot the arrival navigation state ONCE, on mount.
+  //
+  // createQuoteShell() below calls setSearchParams() to put ?id=<quoteId> in the URL. React Router
+  // v6's setSearchParams navigates with `state: null` when no second argument is given, which wipes
+  // location.state — and it does so before setInitializing(false), i.e. before UnifiedQuoteComposer
+  // ever mounts. Reading location.state directly for initialData therefore always yielded null/
+  // undefined by the time the composer could consume it, silently killing the Smart Quote and
+  // QuickQuoteHistory hand-offs.
+  //
+  // The lazy useState initializer captures the state at first render and never recomputes, so the
+  // hand-off payload survives the setSearchParams navigation.
+  const [arrivalState] = useState<any>(() => location.state as any);
   const [domainFormValues, setDomainFormValues] = useState<Record<string, unknown>>({});
   const initializedRef = useRef(false);
   const { viewMode, theme, setTheme } = useCRMModuleNavigationState('quotes', { viewMode: 'pipeline' });
-  const domainCode =
-    String((location.state as { domainCode?: string } | null)?.domainCode || 'LOGISTICS').toUpperCase();
+  const domainCode = String(arrivalState?.domainCode || 'LOGISTICS').toUpperCase();
   const domainFormConfig = PluginRegistry.getFormConfigByDomain(domainCode);
 
   // Check default module configuration
@@ -106,8 +117,8 @@ function QuoteNewInner() {
         return;
       }
 
-      // Check location state for pre-populated data
-      const state = location.state as any;
+      // Check the mount-time navigation-state snapshot for pre-populated data
+      const state = arrivalState;
       const originLabel = state?.origin || '';
       const destLabel = state?.destination || '';
       const mode = state?.mode || 'ocean';
@@ -177,14 +188,21 @@ function QuoteNewInner() {
     window.location.reload();
   };
 
-  // Build initialData from location.state (QuickQuoteHistory pre-population)
-  const initialData = location.state
-    ? {
-        ...(location.state as any),
-        accountId: (location.state as any)?.accountId,
-        contactId: (location.state as any)?.contactId,
-      }
-    : undefined;
+  // Build initialData from the mount-time snapshot of location.state (Smart Quote hand-off /
+  // QuickQuoteHistory pre-population). useMemo keeps the object referentially stable across
+  // re-renders so UnifiedQuoteComposer's pre-population effect (deps: [initialData, form]) doesn't
+  // re-fire — re-firing would call form.reset() and revert the user's in-progress edits.
+  const initialData = useMemo(
+    () =>
+      arrivalState
+        ? {
+            ...arrivalState,
+            accountId: arrivalState.accountId,
+            contactId: arrivalState.contactId,
+          }
+        : undefined,
+    [arrivalState]
+  );
 
   return (
     <DashboardLayout>
