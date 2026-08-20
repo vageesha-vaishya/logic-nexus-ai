@@ -753,7 +753,7 @@ export default function Quotes() {
               type="button"
               variant="outline"
               className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800 dark:border-purple-900 dark:text-purple-300 dark:hover:bg-purple-950/30"
-              onClick={() => navigate('/dashboard/quotes/new')}
+              onClick={() => navigate('/dashboard/quotes/smart-quote')}
               title="Smart Quote"
             >
               <Sparkles className="h-4 w-4 mr-2" />
