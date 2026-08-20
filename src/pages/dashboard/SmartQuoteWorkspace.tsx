@@ -34,6 +34,9 @@ import { useToast } from '@/hooks/use-toast';
 import { logger } from '@/lib/logger';
 import type { RateOption } from '@/types/quote-breakdown';
 
+// No .css suffix on these three (unlike the ibm-plex-* imports below): this package's
+// installed exports map lacks a "./*.css" identity mapping, so "/600.css" fails to resolve —
+// only the extension-less form works. See @fontsource/big-shoulders-display/package.json.
 import '@fontsource/big-shoulders-display/600';
 import '@fontsource/big-shoulders-display/700';
 import '@fontsource/big-shoulders-display/800';
@@ -187,6 +190,9 @@ export default function SmartQuoteWorkspace() {
       originDetails: shared.originDetails ?? undefined,
       destinationDetails: shared.destinationDetails ?? undefined,
       selectedRates: selectedOptions,
+      // These three come straight off the edge-function response with no runtime guarantees. They are
+      // cosmetic metadata, so coerce them to schema-safe fallbacks rather than let a malformed AI
+      // response make QuoteTransferSchema.parse() throw and block the entire hand-off.
       marketAnalysis: typeof rateFetching.marketAnalysis === 'string' ? rateFetching.marketAnalysis : null,
       confidenceScore:
         typeof rateFetching.confidenceScore === 'number' && Number.isFinite(rateFetching.confidenceScore)
@@ -276,7 +282,7 @@ export default function SmartQuoteWorkspace() {
         <div className="flex flex-1 overflow-hidden gap-6">
           <div
             className="w-[400px] shrink-0 p-6 border rounded-lg overflow-y-auto"
-            style={{ background: 'var(--sq-bg)', borderColor: 'var(--sq-border)' }}
+            style={{ background: 'var(--sq-surface)', borderColor: 'var(--sq-border)' }}
           >
             {/* onSubmit is required: without it, pressing Enter in any input triggers a native form
                 submission and a full page reload. handleGenerate is form.handleSubmit(...), which
@@ -367,7 +373,12 @@ export default function SmartQuoteWorkspace() {
             style={{ background: 'var(--sq-surface)', borderColor: 'var(--sq-border)' }}
           >
             {rateFetching.loading ? (
-              <div className="h-full flex flex-col items-center justify-center gap-3" style={{ color: 'var(--sq-tide)' }}>
+              <div
+                className="h-full flex flex-col items-center justify-center gap-3"
+                style={{ color: 'var(--sq-tide)' }}
+                role="status"
+                aria-live="polite"
+              >
                 <span
                   className="h-2.5 w-2.5 rounded-full motion-safe:animate-pulse"
                   style={{ background: 'var(--sq-tide)' }}
@@ -376,7 +387,7 @@ export default function SmartQuoteWorkspace() {
                 <p>Ranking carriers on cost, transit time, and reliability&hellip;</p>
               </div>
             ) : rateFetching.error ? (
-              <div className="h-full flex flex-col items-center justify-center gap-2" style={{ color: 'var(--sq-rust)' }}>
+              <div className="h-full flex flex-col items-center justify-center gap-2" style={{ color: 'var(--sq-rust)' }} role="alert">
                 <p className="font-medium">{rateFetching.error}</p>
                 <p className="text-sm" style={{ opacity: 0.8 }}>Adjust the shipment details and try again.</p>
               </div>
@@ -445,7 +456,7 @@ export default function SmartQuoteWorkspace() {
         </div>
       </div>
 
-      <Dialog open={!!viewDetailsId} onOpenChange={(open) => !open && setViewDetailsId(null)}>
+      <Dialog open={!!viewDetailsOption} onOpenChange={(open) => !open && setViewDetailsId(null)}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{viewDetailsOption?.carrier || manualQuoteLabel}{viewDetailsOption?.name ? ` - ${viewDetailsOption.name}` : ''}</DialogTitle>

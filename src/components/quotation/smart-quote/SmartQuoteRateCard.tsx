@@ -2,7 +2,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { getModeIcon } from '@/components/quotation/shared/quote-badges';
 import { mapLegsForVisualizer } from '@/lib/quote-legs';
-import { formatCurrency, cn } from '@/lib/utils';
+import { formatCurrency } from '@/lib/utils';
 import { formatContainerSize } from '@/lib/container-utils';
 import { RateOption } from '@/types/quote-breakdown';
 
@@ -55,10 +55,10 @@ export function SmartQuoteRateCard({ option, isSelected, onToggleSelection, onSe
     <div
       data-testid={`smart-quote-rate-card-${option.id}`}
       data-selected={isSelected}
-      className={cn('flex flex-col gap-3 rounded-lg border p-4 transition-colors')}
+      className="flex flex-col gap-3 rounded-lg border p-4 transition-colors"
       style={{
         borderColor: isSelected ? 'var(--sq-accent)' : 'var(--sq-border)',
-        background: 'var(--sq-surface)',
+        background: 'var(--sq-bg)',
       }}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -105,13 +105,13 @@ export function SmartQuoteRateCard({ option, isSelected, onToggleSelection, onSe
       </div>
 
       {legs.length > 0 && (
-        <div aria-label="Route" className="flex items-center gap-1">
+        <div aria-label="Route" role="img" className="flex items-center gap-1">
           {legs.map((leg, i) => (
             <span
               key={i}
               title={`${leg.from} → ${leg.to}`}
               className="h-2 w-2 rounded-full"
-              style={{ background: 'var(--sq-border)' }}
+              style={{ background: 'var(--sq-tide)' }}
             />
           ))}
         </div>

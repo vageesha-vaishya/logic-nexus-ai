@@ -70,7 +70,7 @@ import {
     getReliabilityColor
 } from '../shared/quote-badges';
 import { formatCurrency } from '@/lib/utils';
-import { RateOption, TransportLeg } from '@/types/quote-breakdown';
+import { RateOption } from '@/types/quote-breakdown';
 
 interface QuoteResultsListProps {
     results: RateOption[];
