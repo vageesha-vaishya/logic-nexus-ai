@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Package, Sparkles, Plane, Ship, Truck, Train } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Package, Sparkles, Plane, Ship, Truck, Train } from 'lucide-react';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
 import { useRateFetching } from '@/hooks/useRateFetching';
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
@@ -17,6 +17,10 @@ import { SharedCargoInput } from '@/components/quotation/shared/SharedCargoInput
 import { QuoteResultsList } from '@/components/quotation/shared/QuoteResultsList';
 import { QuoteComparisonView } from '@/components/quotation/shared/QuoteComparisonView';
 import { CargoItem } from '@/types/cargo';
+import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
+import { useToast } from '@/hooks/use-toast';
+import { logger } from '@/lib/logger';
+import type { RateOption } from '@/types/quote-breakdown';
 
 const smartQuoteFormSchema = z.object({
   mode: z.enum(['air', 'ocean', 'road', 'rail']),
@@ -80,6 +84,7 @@ function deriveSharedPayload(
 
 export default function SmartQuoteWorkspace() {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const { containerTypes, containerSizes } = useContainerRefs();
   const [smartMode, setSmartMode] = useState(true);
   const [cargoItem, setCargoItem] = useState<CargoItem>(INITIAL_CARGO_ITEM);
@@ -121,8 +126,49 @@ export default function SmartQuoteWorkspace() {
     setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
   };
 
-  // TODO(Task 4): replace with real hand-off logic using deriveSharedPayload.
-  const handleConvertToQuote = (option: any) => { console.log('select', option); };
+  const handleConvertToQuote = (option: RateOption | RateOption[]) => {
+    const selectedOptions = Array.isArray(option) ? option : [option];
+    const values = form.getValues();
+    const shared = deriveSharedPayload(values, cargoItem, originDetails, destinationDetails);
+    const transferPayload = {
+      ...shared,
+      // deriveSharedPayload defaults these to `null` (from useState<any>(null)) when the user
+      // never picked a location-autocomplete suggestion. QuoteTransferSchema's LocationDetailsSchema
+      // is `.optional()` but not `.nullable()`, so normalize null -> undefined before validating.
+      originDetails: shared.originDetails ?? undefined,
+      destinationDetails: shared.destinationDetails ?? undefined,
+      selectedRates: selectedOptions,
+      marketAnalysis: rateFetching.marketAnalysis,
+      confidenceScore: rateFetching.confidenceScore,
+      anomalies: rateFetching.anomalies,
+    };
+
+    try {
+      const validatedData = QuoteTransferSchema.parse(transferPayload);
+      logger.info('Smart Quote hand-off to New Quote', {
+        origin: validatedData.origin,
+        destination: validatedData.destination,
+        mode: validatedData.mode,
+        optionsCount: validatedData.selectedRates.length,
+      });
+      navigate('/dashboard/quotes/new', {
+        state: { ...validatedData, selectedRate: selectedOptions[0] },
+      });
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        const errorMessages = error.errors.map((err) => `${err.path.join('.')}: ${err.message}`).join('\n');
+        toast({ title: 'Data Validation Error', description: `Cannot proceed. Missing or invalid fields:\n${errorMessages}`, variant: 'destructive' });
+      } else {
+        toast({ title: 'Transfer Error', description: 'An unexpected error occurred preparing the quote.', variant: 'destructive' });
+      }
+    }
+  };
+
+  const handleConvertSelected = () => {
+    if (!rateFetching.results) return;
+    const selectedOptions = rateFetching.results.filter((r) => selectedIds.includes(r.id));
+    if (selectedOptions.length > 0) handleConvertToQuote(selectedOptions);
+  };
 
   return (
     <DashboardLayout>
@@ -257,6 +303,17 @@ export default function SmartQuoteWorkspace() {
                     onToggleSelection={toggleSelection}
                     onGenerateSmartOptions={smartMode ? handleGenerate : undefined}
                   />
+                )}
+                {selectedIds.length > 0 && (
+                  <div className="sticky bottom-0 left-0 right-0 p-4 bg-background border-t shadow-lg flex justify-between items-center">
+                    <div className="text-sm font-medium">
+                      <Badge variant="secondary" className="mr-2">{selectedIds.length}</Badge>
+                      options selected
+                    </div>
+                    <Button onClick={handleConvertSelected} className="gap-2">
+                      Create Quote with Selected <ArrowRight className="w-4 h-4" />
+                    </Button>
+                  </div>
                 )}
               </div>
             )}
