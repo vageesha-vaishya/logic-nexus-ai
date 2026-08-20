@@ -16,6 +16,7 @@ import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 import { SharedCargoInput } from '@/components/quotation/shared/SharedCargoInput';
 import { QuoteResultsList } from '@/components/quotation/shared/QuoteResultsList';
 import { QuoteComparisonView } from '@/components/quotation/shared/QuoteComparisonView';
+import { QuickQuoteHistory } from '@/components/quotation/shared/QuickQuoteHistory';
 import { CargoItem } from '@/types/cargo';
 import { QuoteTransferSchema } from '@/lib/schemas/quote-transfer';
 import { useToast } from '@/hooks/use-toast';
@@ -188,6 +189,11 @@ export default function SmartQuoteWorkspace() {
               </p>
             </div>
           </div>
+          <QuickQuoteHistory
+            onSelect={(payload) => {
+              navigate('/dashboard/quotes/new', { state: payload });
+            }}
+          />
         </div>
 
         <div className="flex flex-1 overflow-hidden gap-6">
