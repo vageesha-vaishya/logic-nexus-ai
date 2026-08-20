@@ -2331,6 +2331,12 @@ function UnifiedQuoteComposerContent({
         destinationDetails: initialData.destinationDetails || null,
       });
     }
+
+    if (Array.isArray(initialData.selectedRates) && initialData.selectedRates.length > 0) {
+      setManualOptions(initialData.selectedRates);
+      setSelectedOption(initialData.selectedRates[0]);
+      setActiveComposerSection('results');
+    }
   }, [initialData, form]);
 
   // ---------------------------------------------------------------------------
