@@ -41,6 +41,7 @@ import { QuoteLegsVisualizer } from './QuoteLegsVisualizer';
 import { QuoteMapVisualizer } from './QuoteMapVisualizer';
 import { QuoteDetailView } from './QuoteDetailView';
 import { mapOptionToQuote } from '@/lib/quote-mapper';
+import { mapLegsForVisualizer } from '@/lib/quote-legs';
 import { Input } from '@/components/ui/input';
 import { 
     Sparkles, 
@@ -203,57 +204,6 @@ const OptionSourceBadge = ({ option }: { option: RateOption }) => {
             </Tooltip>
         </TooltipProvider>
     );
-};
-
-const normalizePoint = (value: unknown) => {
-    const normalized = String(value || '').trim();
-    if (!normalized) return '';
-    if (normalized.toLowerCase() === 'origin') return '';
-    if (normalized.toLowerCase() === 'destination') return '';
-    return normalized;
-};
-
-const mapLegsForVisualizer = (
-    legs: TransportLeg[] | undefined,
-    route?: { origin?: string; destination?: string }
-) => {
-    if (!legs) return [];
-    const normalized = legs.map((leg) => ({
-        ...leg,
-        origin: normalizePoint((leg as any).origin || (leg as any).from),
-        destination: normalizePoint((leg as any).destination || (leg as any).to),
-    }));
-    if (normalized.length > 0) {
-        if (!normalized[0].origin) normalized[0].origin = normalizePoint(route?.origin);
-        if (!normalized[normalized.length - 1].destination) {
-            normalized[normalized.length - 1].destination = normalizePoint(route?.destination);
-        }
-    }
-    for (let i = 1; i < normalized.length; i += 1) {
-        if (!normalized[i].origin && normalized[i - 1].destination) {
-            normalized[i].origin = normalized[i - 1].destination;
-        }
-    }
-    for (let i = normalized.length - 2; i >= 0; i -= 1) {
-        if (!normalized[i].destination && normalized[i + 1].origin) {
-            normalized[i].destination = normalized[i + 1].origin;
-        }
-    }
-    for (let i = 0; i < normalized.length; i += 1) {
-        const previousDestination = i > 0 ? normalized[i - 1].destination : normalizePoint(route?.origin);
-        const nextOrigin = i < normalized.length - 1 ? normalized[i + 1].origin : normalizePoint(route?.destination);
-        if (!normalized[i].origin) normalized[i].origin = previousDestination || normalizePoint(route?.origin) || 'Origin';
-        if (!normalized[i].destination) normalized[i].destination = nextOrigin || normalizePoint(route?.destination) || 'Destination';
-    }
-    return normalized.map((leg) => ({
-        from: leg.origin,
-        to: leg.destination,
-        mode: leg.mode,
-        carrier: leg.carrier || 'Unknown Carrier',
-        transit_time: leg.transit_time,
-        origin: leg.origin,
-        destination: leg.destination
-    }));
 };
 
 const DeleteOptionButton = ({ optionId, onRemoveOption }: { optionId: string, onRemoveOption?: (id: string) => void }) => {
