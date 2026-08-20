@@ -9,7 +9,7 @@ import { DataTable } from '@/components/system/DataTable';
 import { ColumnDef } from '@/components/system/DataTable';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Copy, Trash2, FileText, Download, AlertCircle, RefreshCcw } from 'lucide-react';
+import { Copy, Trash2, FileText, Download, AlertCircle, RefreshCcw, Sparkles } from 'lucide-react';
 import { format } from 'date-fns';
 import { statusConfig } from '@/config/statusConfig';
 import { QuoteMetrics } from '@/components/quotation/QuoteMetrics';
@@ -748,26 +748,38 @@ export default function Quotes() {
         description="Manage sales quotes and opportunities. Shortcuts: ⌘/Ctrl+B (New), ⌘/Ctrl+R (Refresh)"
         breadcrumbs={[{ label: 'Dashboard', to: '/dashboard' }, { label: 'Quotes' }]}
         actionsRight={
-          <CRMModuleHeaderNavigation
-            moduleLabel="Quotes"
-            viewMode={viewMode}
-            theme={theme}
-            onViewModeChange={(mode) => {
-              if (mode === 'pipeline') {
-                navigate('/dashboard/quotes/pipeline');
-                return;
-              }
-              setViewMode(mode);
-            }}
-            onThemeChange={setTheme}
-            onCreate={() => navigate('/dashboard/quotes/new')}
-            createLabel="New Quote"
-            iconOnly
-            layout="compact"
-            onRefresh={refreshQuotes}
-            onImportExport={() => navigate('/dashboard/quotes/import-export')}
-            controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
-          />
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              className="h-11 border-purple-200 text-purple-700 hover:bg-purple-50 hover:text-purple-800 dark:border-purple-900 dark:text-purple-300 dark:hover:bg-purple-950/30"
+              onClick={() => navigate('/dashboard/quotes/new')}
+              title="Smart Quote"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Smart Quote
+            </Button>
+            <CRMModuleHeaderNavigation
+              moduleLabel="Quotes"
+              viewMode={viewMode}
+              theme={theme}
+              onViewModeChange={(mode) => {
+                if (mode === 'pipeline') {
+                  navigate('/dashboard/quotes/pipeline');
+                  return;
+                }
+                setViewMode(mode);
+              }}
+              onThemeChange={setTheme}
+              onCreate={() => navigate('/dashboard/quotes/new')}
+              createLabel="New Quote"
+              iconOnly
+              layout="compact"
+              onRefresh={refreshQuotes}
+              onImportExport={() => navigate('/dashboard/quotes/import-export')}
+              controlSequence={CRM_HEADER_PRIMARY_CONTROL_SEQUENCE}
+            />
+          </>
         }
       >
         <div className="flex justify-end mb-4">
