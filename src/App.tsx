@@ -167,6 +167,7 @@ const BillingInvoiceDetail = lazy(() => import("./pages/dashboard/billing/Billin
 const Quotes = lazy(() => import("./pages/dashboard/Quotes"));
 const QuoteTemplates = lazy(() => import("./pages/dashboard/QuoteTemplates"));
 const QuoteNew = lazy(() => import("./pages/dashboard/QuoteNew"));
+const SmartQuoteWorkspace = lazy(() => import("./pages/dashboard/SmartQuoteWorkspace"));
 const QuoteDetail = lazy(() => import("./pages/dashboard/QuoteDetail"));
 const QuotesImportExport = lazy(() => import("./pages/dashboard/QuotesImportExport"));
 const QuotesPipeline = lazy(() => 
@@ -876,13 +877,21 @@ const App = () => (
                 </ProtectedRoute>
               } 
             />
-            <Route 
-              path="/dashboard/quotes/pipeline" 
+            <Route
+              path="/dashboard/quotes/pipeline"
               element={
                 <ProtectedRoute requiredPermissions={["quotes.view"]}>
                   <QuotesPipeline />
                 </ProtectedRoute>
-              } 
+              }
+            />
+            <Route
+              path="/dashboard/quotes/smart-quote"
+              element={
+                <ProtectedRoute requiredPermissions={["quotes.view"]}>
+                  <SmartQuoteWorkspace />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="/dashboard/quotes/analytics"
