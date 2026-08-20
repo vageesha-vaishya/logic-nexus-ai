@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -8,10 +8,14 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 import { ArrowLeft, Package, Sparkles, Plane, Ship, Truck, Train } from 'lucide-react';
 import { useContainerRefs } from '@/hooks/useContainerRefs';
+import { useRateFetching } from '@/hooks/useRateFetching';
 import { LocationAutocomplete } from '@/components/common/LocationAutocomplete';
 import { SharedCargoInput } from '@/components/quotation/shared/SharedCargoInput';
+import { QuoteResultsList } from '@/components/quotation/shared/QuoteResultsList';
+import { QuoteComparisonView } from '@/components/quotation/shared/QuoteComparisonView';
 import { CargoItem } from '@/types/cargo';
 
 const smartQuoteFormSchema = z.object({
@@ -32,6 +36,48 @@ const INITIAL_CARGO_ITEM: CargoItem = {
   containerDetails: { typeId: '', sizeId: '' },
 };
 
+function formatCommodityDisplay(commodity?: { description?: string; hts_code?: string }): string {
+  if (!commodity) return '';
+  const description = (commodity.description || '').trim();
+  const htsCode = (commodity.hts_code || '').trim();
+  if (description && htsCode) return `${description} - ${htsCode}`;
+  return description || htsCode;
+}
+
+function deriveSharedPayload(
+  values: SmartQuoteFormValues,
+  cargoItem: CargoItem,
+  originDetails: any,
+  destinationDetails: any
+) {
+  const containerCombos =
+    cargoItem.type === 'container'
+      ? (cargoItem.containerCombos && cargoItem.containerCombos.length > 0
+          ? cargoItem.containerCombos.map((c) => ({ type: c.typeId, size: c.sizeId, qty: c.quantity }))
+          : cargoItem.containerDetails?.typeId && cargoItem.containerDetails?.sizeId
+            ? [{ type: cargoItem.containerDetails.typeId, size: cargoItem.containerDetails.sizeId, qty: cargoItem.quantity }]
+            : [])
+      : [];
+
+  return {
+    mode: values.mode,
+    origin: values.origin,
+    destination: values.destination,
+    commodity: formatCommodityDisplay(cargoItem.commodity),
+    commodity_description: cargoItem.commodity?.description || '',
+    htsCode: cargoItem.commodity?.hts_code || '',
+    weight: String(cargoItem.weight.value || 0),
+    volume: String(cargoItem.volume || 0),
+    containerType: containerCombos[0]?.type || '',
+    containerSize: containerCombos[0]?.size || '',
+    containerQty: String(containerCombos[0]?.qty || cargoItem.quantity || 1),
+    containerCombos,
+    dangerousGoods: !!cargoItem.hazmat,
+    originDetails,
+    destinationDetails,
+  };
+}
+
 export default function SmartQuoteWorkspace() {
   const navigate = useNavigate();
   const { containerTypes, containerSizes } = useContainerRefs();
@@ -45,6 +91,38 @@ export default function SmartQuoteWorkspace() {
     defaultValues: { mode: 'ocean' },
   });
   const mode = form.watch('mode');
+
+  const containerResolver = useMemo(() => ({
+    resolveContainerInfo: (typeId: string, sizeId: string) => {
+      const typeObj = containerTypes.find((t: any) => t.id === typeId);
+      const sizeObj = containerSizes.find((s: any) => s.id === sizeId);
+      return {
+        type: typeObj?.code || typeObj?.name || typeId,
+        size: sizeObj?.name || sizeId,
+        iso_code: sizeObj?.iso_code,
+      };
+    },
+  }), [containerTypes, containerSizes]);
+
+  const rateFetching = useRateFetching();
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [viewMode, setViewMode] = useState<'list' | 'compare'>('list');
+
+  const handleGenerate = form.handleSubmit(async (values) => {
+    setSelectedIds([]);
+    const shared = deriveSharedPayload(values, cargoItem, originDetails, destinationDetails);
+    await rateFetching.fetchRates(
+      { ...shared, smartMode, account_id: undefined } as any,
+      containerResolver
+    );
+  });
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  // TODO(Task 4): replace with real hand-off logic using deriveSharedPayload.
+  const handleConvertToQuote = (option: any) => { console.log('select', option); };
 
   return (
     <DashboardLayout>
@@ -134,13 +212,54 @@ export default function SmartQuoteWorkspace() {
                 value={cargoItem}
                 onChange={setCargoItem}
               />
+
+              <Button type="button" onClick={handleGenerate} disabled={rateFetching.loading} className="w-full">
+                {rateFetching.loading ? 'Generating...' : 'Generate Smart Quotes'}
+              </Button>
             </form>
           </div>
           <div className="flex-1 p-6 bg-background border rounded-lg overflow-y-auto">
-            <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
-              <Package className="w-12 h-12 mb-4 opacity-20" />
-              <p>Fill out the form to generate quotes</p>
-            </div>
+            {!rateFetching.results ? (
+              <div className="h-full flex flex-col items-center justify-center text-muted-foreground">
+                <Package className="w-12 h-12 mb-4 opacity-20" />
+                <p>Fill out the form to generate quotes</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <div className="flex items-center gap-2">
+                    <h3 className="font-semibold text-lg">Rate Options</h3>
+                    <Badge variant="outline" className="text-xs">{rateFetching.results.length} Options</Badge>
+                  </div>
+                  <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'list' | 'compare')} className="w-auto">
+                    <TabsList className="h-8">
+                      <TabsTrigger value="list" className="text-xs h-7 px-2">Browse</TabsTrigger>
+                      <TabsTrigger value="compare" className="text-xs h-7 px-2">Compare</TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+                </div>
+                {viewMode === 'list' ? (
+                  <QuoteResultsList
+                    results={rateFetching.results}
+                    onSelect={handleConvertToQuote}
+                    selectedIds={selectedIds}
+                    onToggleSelection={toggleSelection}
+                    onGenerateSmartOptions={smartMode ? handleGenerate : undefined}
+                    marketAnalysis={rateFetching.marketAnalysis}
+                    confidenceScore={rateFetching.confidenceScore}
+                    anomalies={rateFetching.anomalies}
+                  />
+                ) : (
+                  <QuoteComparisonView
+                    options={rateFetching.results}
+                    onSelect={handleConvertToQuote}
+                    selectedIds={selectedIds}
+                    onToggleSelection={toggleSelection}
+                    onGenerateSmartOptions={smartMode ? handleGenerate : undefined}
+                  />
+                )}
+              </div>
+            )}
           </div>
         </div>
       </div>
