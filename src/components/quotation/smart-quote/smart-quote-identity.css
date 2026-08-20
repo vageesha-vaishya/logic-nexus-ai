@@ -1,0 +1,36 @@
+.smart-quote-identity {
+  --sq-ink: #0E2430;
+  --sq-bg: #EEF2F1;
+  --sq-surface: #FFFFFF;
+  --sq-border: #D3DCDA;
+  --sq-accent: #C97F1C;
+  --sq-accent-ink: #1A1103;
+  --sq-tide: #1B8F86;
+  --sq-good: #2F8F5B;
+  --sq-rust: #B23A24;
+
+  --sq-font-display: 'Big Shoulders Display', 'Arial Narrow', sans-serif;
+  --sq-font-body: 'IBM Plex Sans', 'Segoe UI', system-ui, sans-serif;
+  --sq-font-mono: 'IBM Plex Mono', 'SFMono-Regular', Consolas, monospace;
+
+  background: var(--sq-bg);
+  color: var(--sq-ink);
+  font-family: var(--sq-font-body);
+}
+
+.dark .smart-quote-identity {
+  --sq-ink: #EAF1EF;
+  --sq-bg: #0E2430;
+  --sq-surface: #15303D;
+  --sq-border: #2B4652;
+  --sq-accent: #E3A64A;
+  --sq-accent-ink: #1A1103;
+  --sq-tide: #4FC9BE;
+  --sq-good: #5CC48D;
+  --sq-rust: #E4826A;
+}
+
+.smart-quote-identity :focus-visible {
+  outline: 2px solid var(--sq-tide);
+  outline-offset: 2px;
+}
