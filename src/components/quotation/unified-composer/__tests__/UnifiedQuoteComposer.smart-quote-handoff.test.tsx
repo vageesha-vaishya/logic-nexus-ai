@@ -330,20 +330,31 @@ describe('UnifiedQuoteComposer Smart Quote hand-off', () => {
   });
 
   // -------------------------------------------------------------------------
-  // Regression: the late-arriving quoteId must not wipe the hand-off prefill.
+  // Regression: the shell-quote reload must not wipe the hand-off prefill.
   //
-  // Real-app sequence QuoteNew.tsx produces:
-  //   1. composer mounts with initialData but NO quoteId (the shell INSERT is
-  //      still in flight) -> the hand-off effect prefills cargo details and
-  //      selected rates;
-  //   2. the INSERT resolves and QuoteNew re-renders, passing quoteId for the
-  //      first time (with a freshly-built initialData object literal);
-  //   3. the quoteId effect fires and loadExistingQuote() reloads the shell row,
-  //      whose cargo columns are all still empty, and unconditionally calls
-  //      form.reset()/setInitialExtended() with them.
+  // Real-app sequence QuoteNew.tsx produces (verified by reading QuoteNew.tsx):
+  //   1. QuoteNew renders an "Initializing..." spinner while `initializing` is
+  //      true; UnifiedQuoteComposer is NOT mounted yet.
+  //   2. createQuoteShell() inserts the shell row and calls
+  //      setCreatedQuoteId(quoteId); only afterwards does its `finally` block
+  //      call setInitializing(false).
+  //   3. QuoteNew re-renders with initializing === false and mounts the
+  //      composer for the FIRST time with BOTH `quoteId` (the shell id) and
+  //      `initialData` (the mount-time snapshot of location.state) present
+  //      together on that single first render.
+  //   4. On that mount the quoteId effect (declared *before* the hand-off
+  //      prefill effect) would fire loadExistingQuote(), which reloads the
+  //      shell row — whose cargo columns are all still empty — and
+  //      unconditionally calls form.reset()/setInitialExtended() with them.
   // Origin/destination/mode survived because QuoteNew persists them in the
   // shell INSERT; the cargo details did not, because they only ever existed in
   // local state.
+  //
+  // There is NO "mount without quoteId, then quoteId arrives later" phase: the
+  // composer is never rendered while `initializing` is true. Any test that
+  // simulates that two-phase sequence lets the prefill effect run in an earlier
+  // render pass and therefore cannot detect a guard that reads state the prefill
+  // effect has not written yet.
   // -------------------------------------------------------------------------
 
   const buildHandOffInitialData = () => ({
@@ -363,40 +374,28 @@ describe('UnifiedQuoteComposer Smart Quote hand-off', () => {
     selectedRates: [{ id: 'opt-1', carrier: 'Maersk', price: 1200, currency: 'USD', name: 'Best Value' }],
   });
 
-  it('does not reload (and therefore does not wipe) the prefill when quoteId arrives after the Smart Quote hand-off', async () => {
-    // Step 1: mount before QuoteNew's shell INSERT resolves — no quoteId yet.
-    const { rerender } = render(
-      <MemoryRouter>
-        <UnifiedQuoteComposer initialData={buildHandOffInitialData()} />
-      </MemoryRouter>
-    );
-    await flushAsyncEffects();
-
-    openGeneralInformationTab();
-    expect(readInitialExtended()).toMatchObject({
-      containerCombos: [{ type: 'dry', size: '40HC', qty: 2 }],
-      containerType: 'dry',
-      containerSize: '40HC',
-      containerQty: '2',
-      incoterms: 'FOB',
-      htsCode: '8507.60',
-      dangerousGoods: true,
-    });
-
-    // Step 2: the shell row lands and quoteId is passed down for the first time.
-    // `initialData` is rebuilt as a fresh literal, exactly as QuoteNew does.
-    scopedDbFromCalls.length = 0;
-    rerender(
+  it('does not reload (and therefore does not wipe) the prefill when quoteId and the Smart Quote hand-off arrive together on the first mount', async () => {
+    // The REAL QuoteNew.tsx sequence: a single mount carrying both props. No
+    // prior render exists in which the hand-off effect could have already run.
+    render(
       <MemoryRouter>
         <UnifiedQuoteComposer quoteId="shell-quote-1" initialData={buildHandOffInitialData()} />
       </MemoryRouter>
     );
     await flushAsyncEffects();
 
-    // The guard must skip the reload entirely — no `quotes` fetch at all.
-    expect(scopedDbFromCalls).not.toContain('quotes');
+    // (c) The composer must not be stuck on its `editLoading` early return.
+    // `editLoading` initialises to !!quoteId and is only ever cleared inside
+    // loadExistingQuote, so a guard that skips the reload without clearing it
+    // would leave this spinner up forever.
+    expect(screen.queryByText('Loading quote...')).not.toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Quotation Composer' })).toBeInTheDocument();
 
-    // ...and the prefilled cargo details must survive untouched.
+    // (a) The reload must be skipped entirely — no `quotes` fetch at all.
+    expect(scopedDbFromCalls).not.toContain('quotes');
+    expect(scopedDbMock.from).not.toHaveBeenCalledWith('quotes');
+
+    // (b) The prefilled cargo details must survive untouched.
     openGeneralInformationTab();
     expect(readInitialExtended()).toMatchObject({
       containerCombos: [{ type: 'dry', size: '40HC', qty: 2 }],
@@ -413,6 +412,40 @@ describe('UnifiedQuoteComposer Smart Quote hand-off', () => {
     fireEvent.mouseDown(screen.getByRole('tab', { name: 'Quotation Composer' }), { button: 0 });
     expect(screen.getByTestId('results-zone')).toHaveAttribute('data-selected-option-id', 'opt-1');
     expect(screen.getByTestId('finalize-section')).toHaveAttribute('data-selected-option-id', 'opt-1');
+  });
+
+  it('keeps the hand-off prefill after the parent re-renders with a fresh initialData literal and the same quoteId', async () => {
+    // QuoteNew re-renders for unrelated reasons (e.g. setVersionId resolving
+    // after the shell INSERT). loadExistingQuote is a useCallback whose identity
+    // can change, so the quoteId effect can re-fire — the guard must still hold.
+    const { rerender } = render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer quoteId="shell-quote-1" initialData={buildHandOffInitialData()} />
+      </MemoryRouter>
+    );
+    await flushAsyncEffects();
+
+    rerender(
+      <MemoryRouter>
+        <UnifiedQuoteComposer
+          quoteId="shell-quote-1"
+          versionId="shell-version-1"
+          initialData={buildHandOffInitialData()}
+        />
+      </MemoryRouter>
+    );
+    await flushAsyncEffects();
+
+    expect(screen.queryByText('Loading quote...')).not.toBeInTheDocument();
+    expect(scopedDbFromCalls).not.toContain('quotes');
+
+    openGeneralInformationTab();
+    expect(readInitialExtended()).toMatchObject({
+      containerCombos: [{ type: 'dry', size: '40HC', qty: 2 }],
+      incoterms: 'FOB',
+      htsCode: '8507.60',
+      dangerousGoods: true,
+    });
   });
 
   it('still reloads the quote for the normal edit path (quoteId with no Smart Quote hand-off)', async () => {
