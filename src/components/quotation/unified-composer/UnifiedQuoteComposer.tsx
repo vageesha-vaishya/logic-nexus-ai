@@ -151,6 +151,10 @@ function UnifiedQuoteComposerContent({
     results: false,
     finalize: false,
   });
+  // Guards the one-time Smart Quote hand-off pre-population below so it doesn't
+  // re-run (and clobber user edits) on every parent re-render — `initialData`
+  // is a fresh object literal on each render for callers like QuoteNew.
+  const smartQuotePrefillDoneRef = useRef(false);
 
   // PDF Generation State
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -2332,8 +2336,13 @@ function UnifiedQuoteComposerContent({
       });
     }
 
-    if (Array.isArray(initialData.selectedRates) && initialData.selectedRates.length > 0) {
-      setManualOptions(initialData.selectedRates);
+    if (
+      !smartQuotePrefillDoneRef.current &&
+      Array.isArray(initialData.selectedRates) &&
+      initialData.selectedRates.length > 0
+    ) {
+      smartQuotePrefillDoneRef.current = true;
+      setManualOptions([...initialData.selectedRates]);
       setSelectedOption(initialData.selectedRates[0]);
       setActiveComposerSection('results');
     }

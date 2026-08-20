@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import { UnifiedQuoteComposer } from '../UnifiedQuoteComposer';
 
@@ -88,12 +88,13 @@ vi.mock('@/components/quotation/unified-composer/FormZone', () => ({
 }));
 
 // Unlike the base test file's trivial mock, this one renders the `results`
-// prop so we can assert that the Smart Quote hand-off actually populated
-// manualOptions (and therefore combinedResults/displayResults) with the
-// selected rate.
+// and `selectedOptionId` props so we can assert that the Smart Quote hand-off
+// actually populated manualOptions (and therefore combinedResults/displayResults)
+// with the selected rate, AND that the rate is actually selected (not merely
+// visible) — selectedOptionId is a real prop passed at UnifiedQuoteComposer.tsx:4088.
 vi.mock('@/components/quotation/unified-composer/ResultsZone', () => ({
   ResultsZone: (props: any) => (
-    <div data-testid="results-zone">
+    <div data-testid="results-zone" data-selected-option-id={props.selectedOptionId || ''}>
       {(props.results || []).map((opt: any) => (
         <div key={opt.id}>{opt.carrier}</div>
       ))}
@@ -101,8 +102,15 @@ vi.mock('@/components/quotation/unified-composer/ResultsZone', () => ({
   ),
 }));
 
+// FinalizeSection only renders when selectedOption is truthy
+// (UnifiedQuoteComposer.tsx:4091-4108), so asserting its presence is part of
+// verifying the hand-off actually selects the option, not just lists it.
 vi.mock('@/components/quotation/unified-composer/FinalizeSection', () => ({
-  FinalizeSection: () => <div data-testid="finalize-section">FinalizeSection</div>,
+  FinalizeSection: (props: any) => (
+    <div data-testid="finalize-section" data-selected-option-id={props.selectedOption?.id || ''}>
+      FinalizeSection
+    </div>
+  ),
 }));
 
 // ---------------------------------------------------------------------------
@@ -114,7 +122,7 @@ describe('UnifiedQuoteComposer Smart Quote hand-off', () => {
     vi.clearAllMocks();
   });
 
-  it('pre-populates the selected rate and switches to the results tab when initialData.selectedRates is present', () => {
+  it('pre-populates and SELECTS the rate (not merely lists it) and switches to the results tab when initialData.selectedRates is present', () => {
     const initialData = {
       mode: 'ocean',
       origin: 'CNSHA',
@@ -129,8 +137,18 @@ describe('UnifiedQuoteComposer Smart Quote hand-off', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Quotation Composer')).toHaveAttribute('data-state', 'active');
+    // Using getByRole('tab', ...) rather than getByText because the literal
+    // "Quotation Composer" also renders as a button label elsewhere while
+    // isSmartMode defaults true.
+    expect(screen.getByRole('tab', { name: 'Quotation Composer' })).toHaveAttribute('data-state', 'active');
     expect(screen.getByText('Maersk')).toBeInTheDocument();
+
+    // The rate must be actually SELECTED, not just visible in the results
+    // list — that's what separates "the rate is visible" from "the rate is
+    // selected and finalizable", which is the point of the hand-off.
+    expect(screen.getByTestId('results-zone')).toHaveAttribute('data-selected-option-id', 'opt-1');
+    expect(screen.getByTestId('finalize-section')).toBeInTheDocument();
+    expect(screen.getByTestId('finalize-section')).toHaveAttribute('data-selected-option-id', 'opt-1');
   });
 
   it('does not switch tabs or populate options when initialData has no selectedRates', () => {
@@ -147,7 +165,51 @@ describe('UnifiedQuoteComposer Smart Quote hand-off', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('General Information')).toHaveAttribute('data-state', 'active');
+    expect(screen.getByRole('tab', { name: 'General Information' })).toHaveAttribute('data-state', 'active');
     expect(screen.queryByText('Maersk')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('finalize-section')).not.toBeInTheDocument();
+  });
+
+  it('does not re-clobber user edits when the parent re-renders with a new (but equivalent) initialData object reference', () => {
+    // QuoteNew.tsx rebuilds `initialData` as a fresh object literal on every
+    // render. The pre-population effect's deps are [initialData, form], so it
+    // re-runs on every such re-render. This test guards against the
+    // destructive statements (setManualOptions/setSelectedOption/
+    // setActiveComposerSection) re-firing and undoing user navigation.
+    const buildInitialData = () => ({
+      mode: 'ocean',
+      origin: 'CNSHA',
+      destination: 'USLAX',
+      commodity: 'General Cargo',
+      selectedRates: [{ id: 'opt-1', carrier: 'Maersk', price: 1200, currency: 'USD', name: 'Best Value' }],
+    });
+
+    const { rerender } = render(
+      <MemoryRouter>
+        <UnifiedQuoteComposer initialData={buildInitialData()} />
+      </MemoryRouter>
+    );
+
+    // Starts on the results tab per the hand-off pre-population.
+    expect(screen.getByRole('tab', { name: 'Quotation Composer' })).toHaveAttribute('data-state', 'active');
+
+    // User navigates back to General Information. Radix Tabs activates on
+    // mousedown (see @radix-ui/react-tabs TriggerImpl), not click, so we fire
+    // that event directly rather than pulling in userEvent for a single
+    // interaction.
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'General Information' }), { button: 0 });
+    expect(screen.getByRole('tab', { name: 'General Information' })).toHaveAttribute('data-state', 'active');
+
+    // Parent re-renders with a brand-new `initialData` object (same shape and
+    // content, different reference) — e.g. QuoteNew re-rendering because the
+    // user typed into an unrelated field.
+    rerender(
+      <MemoryRouter>
+        <UnifiedQuoteComposer initialData={buildInitialData()} />
+      </MemoryRouter>
+    );
+
+    // The re-run of the effect must NOT snap the tab back to results.
+    expect(screen.getByRole('tab', { name: 'General Information' })).toHaveAttribute('data-state', 'active');
   });
 });
