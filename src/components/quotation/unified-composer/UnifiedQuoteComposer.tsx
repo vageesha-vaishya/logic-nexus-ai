@@ -151,6 +151,26 @@ function UnifiedQuoteComposerContent({
     results: false,
     finalize: false,
   });
+  // Guards the one-time Smart Quote hand-off pre-population below so it doesn't
+  // re-run (and clobber user edits) on every parent re-render — `initialData`
+  // is a fresh object literal on each render for callers like QuoteNew.
+  const smartQuotePrefillDoneRef = useRef(false);
+  // Whether THIS mount arrived via a Smart Quote / QuickQuoteHistory hand-off.
+  //
+  // Deliberately computed here, during the first render, rather than inside an
+  // effect: QuoteNew.tsx mounts this component with `quoteId` and `initialData`
+  // present together on the very first render (it renders an "Initializing..."
+  // spinner until createQuoteShell has both set createdQuoteId and cleared
+  // `initializing`), so there is no earlier render pass in which an effect could
+  // have recorded the hand-off. React flushes effects in declaration order, and
+  // the quoteId reload effect below is declared *before* the hand-off prefill
+  // effect — so it cannot read anything the prefill effect writes.
+  // useRef's argument is evaluated on every render but only the first render's
+  // value is retained, which is exactly the "decide once, synchronously, at
+  // mount" semantics needed here.
+  const isSmartQuoteHandoffMountRef = useRef(
+    Array.isArray(initialData?.selectedRates) && initialData.selectedRates.length > 0
+  );
 
   // PDF Generation State
   const [showPdfModal, setShowPdfModal] = useState(false);
@@ -2271,6 +2291,31 @@ function UnifiedQuoteComposerContent({
 
   useEffect(() => {
     if (!quoteId) return;
+    // QuoteNew.tsx always creates an empty quote "shell" row before it renders
+    // this composer, so on a Smart Quote / QuickQuoteHistory hand-off the very
+    // first mount carries BOTH `quoteId` (the fresh shell) and `initialData`
+    // (the hand-off payload). Reloading that freshly-created shell here would
+    // call form.reset()/setInitialExtended() with its still-empty columns and
+    // wipe the hand-off's cargo details (containerCombos, commodity, weight,
+    // volume, htsCode, incoterms, dangerousGoods) — they live only in local
+    // state at this point and were never persisted. A fresh shell has no saved
+    // options either, so skipping the reload loses nothing.
+    //
+    // The guard reads `isSmartQuoteHandoffMountRef`, seeded during the initial
+    // render, and NOT `smartQuotePrefillDoneRef`: this effect is declared before
+    // the hand-off prefill effect, so React flushes it first and that ref is
+    // still false here on the mount that matters.
+    //
+    // A hard refresh drops router location.state, so `initialData` is undefined,
+    // the ref is false, and the reload runs normally — as it does for the
+    // ordinary "open an existing quote to edit" path.
+    if (isSmartQuoteHandoffMountRef.current) {
+      // Nothing else ever clears `editLoading` (it initialises to !!quoteId and
+      // is only reset inside loadExistingQuote), so skipping the reload without
+      // this would leave the composer stuck on its "Loading quote..." spinner.
+      setEditLoading(false);
+      return;
+    }
     loadExistingQuote();
   }, [loadExistingQuote, quoteId]);
 
@@ -2318,11 +2363,20 @@ function UnifiedQuoteComposerContent({
       });
     }
 
-    if (initialData.containerType || initialData.incoterms || initialData.htsCode) {
+    if (
+      initialData.containerType ||
+      initialData.incoterms ||
+      initialData.htsCode ||
+      (Array.isArray(initialData.containerCombos) && initialData.containerCombos.length > 0)
+    ) {
       setInitialExtended({
         containerType: initialData.containerType || '',
         containerSize: initialData.containerSize || '',
         containerQty: initialData.containerQty || '1',
+        // FormZone seeds cargoItem.containerCombos from initialExtended.containerCombos; without this
+        // its cargo-sync effect sees an empty combos array and resets containerType/containerSize back
+        // to '', silently dropping the multi-container selections Smart Quote sends for ocean/rail.
+        containerCombos: initialData.containerCombos || [],
         incoterms: initialData.incoterms || '',
         htsCode: initialData.htsCode || '',
         dangerousGoods: !!initialData.dangerousGoods,
@@ -2330,6 +2384,17 @@ function UnifiedQuoteComposerContent({
         originDetails: initialData.originDetails || null,
         destinationDetails: initialData.destinationDetails || null,
       });
+    }
+
+    if (
+      !smartQuotePrefillDoneRef.current &&
+      Array.isArray(initialData.selectedRates) &&
+      initialData.selectedRates.length > 0
+    ) {
+      smartQuotePrefillDoneRef.current = true;
+      setManualOptions([...initialData.selectedRates]);
+      setSelectedOption(initialData.selectedRates[0]);
+      setActiveComposerSection('results');
     }
   }, [initialData, form]);
 
