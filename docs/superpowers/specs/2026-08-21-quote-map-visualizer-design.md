@@ -28,7 +28,7 @@ Investigation (verified directly against the codebase, not assumed) confirmed:
 
 **Goals:**
 - Render a real, interactive geographic map (pan/zoom, real basemap) showing a quote option's route, for every existing consumer of `QuoteMapVisualizer`.
-- Resolve real coordinates for the locations already known to the app: user-picked origin/destination (via `LocationAutocomplete`) and per-leg waypoints (via a new best-effort resolver against the four location tables above).
+- Resolve real coordinates for every leg endpoint via a new best-effort resolver against the four location tables above — this alone covers the overall route origin/destination too, since every render site derives those from the first/last leg (see Background).
 - Preserve today's schematic view as an automatic fallback whenever an option's coordinates can't be fully resolved — never a broken or empty map.
 - Keep `QuoteMapVisualizer` visually theme-neutral: it is rendered both inside `SmartQuoteWorkspace` (which has its own fixed `--sq-*` identity, per the prior visual-refresh work) and inside `UnifiedQuoteComposer` (which does not) — it must not adopt either page's specific styling.
 
@@ -63,10 +63,10 @@ Rendering:
   QuoteMapVisualizer(origin, destination, legs)
         ↓
   every leg has both originCoordinates and destinationCoordinates resolved?
-        ├─ yes → real Leaflet map: markers (custom divIcon, mode-colored, reusing the
-        │         existing Ship/Plane/Truck/Train icon language) at legs[0].originCoordinates,
-        │         each intermediate stop, and legs[last].destinationCoordinates, + polylines
-        │         between consecutive stops, OpenStreetMap tile basemap, pan/zoom enabled
+        ├─ yes → real Leaflet map: CircleMarker stops (SVG-drawn, no image asset — see §5) at
+        │         legs[0].originCoordinates, each intermediate stop, and legs[last].destinationCoordinates,
+        │         + mode-colored polylines between consecutive stops, OpenStreetMap tile basemap,
+        │         pan/zoom enabled
         └─ no  → today's exact schematic view (code kept as-is, not deleted)
 ```
 
@@ -101,7 +101,7 @@ No new user-facing error states. A coordinate-resolution miss is not an error �
 
 - Unit tests for `location-coordinates.ts`: table-priority order (a `ports_locations` hit wins over an `airports` hit for the same name), each table's shape-normalization (`Json` object vs. direct columns), cache behavior (second call for the same name does not re-query), and the `null`-on-miss contract.
 - `QuoteMapVisualizer` tests for both render paths: real map when every leg resolves, schematic fallback when any leg doesn't (including the exact current schematic tests, if any exist in `ui-consistency.test.tsx`, continuing to pass).
-- Before writing `react-leaflet`-based tests, verify Leaflet actually mounts cleanly under this repo's Vitest/jsdom setup (a known trouble spot for map libraries under test runners that lack real browser layout APIs) — resolve this as a concrete finding during plan-writing/Task 1, not assumed here.
+- Before writing `react-leaflet`-based tests, verify Leaflet actually mounts cleanly under this repo's Vitest/jsdom setup (a known trouble spot for map libraries under test runners that lack real browser layout APIs) — resolved during plan-writing (in the `QuoteMapVisualizer` rewrite task): `react-leaflet` is mocked entirely at the module boundary rather than relying on real Leaflet DOM/layout code executing under jsdom, since the component's own branching logic doesn't require exercising Leaflet's internals to verify.
 - No new tests required for `QuoteResultsList`/`QuoteDetailView`/`QuoteOptionsOverview` — none of them are modified. Their existing suites should be run once as a regression check, since they render `QuoteMapVisualizer` and `TransportLeg` gains new optional fields, but no code change is expected in any of them.
 
 ## 8. Rollout
