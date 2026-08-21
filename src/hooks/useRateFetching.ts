@@ -13,6 +13,7 @@ import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 import { HybridRouteMetricsService, type QuoteGenerationStage } from '@/services/quotation/HybridRouteMetricsService';
 
 import { QuotationRankingService } from '@/services/quotation/QuotationRankingService';
+import { resolveCoordinates } from '@/lib/location-coordinates';
 
 // --- Sorting / Selection helpers ---
 
@@ -305,7 +306,7 @@ const fillLegContinuity = (
   return normalizedLegs;
 };
 
-const enrichOptionRouteData = (option: any, fallbackRoute: { origin: string; destination: string }) => {
+const enrichOptionRouteData = async (option: any, fallbackRoute: { origin: string; destination: string }) => {
   const optionOrigin = resolveOptionLocation(option, ORIGIN_LOCATION_KEYS) || fallbackRoute.origin;
   const optionDestination = resolveOptionLocation(option, DESTINATION_LOCATION_KEYS) || fallbackRoute.destination;
 
@@ -352,11 +353,26 @@ const enrichOptionRouteData = (option: any, fallbackRoute: { origin: string; des
           },
         ];
 
+  // NEW: resolve real-world coordinates for each leg's endpoints, after continuity-filling has
+  // settled the final origin/destination names — resolving before continuity-filling would
+  // look up the wrong (empty or pre-fill) name for legs that had sparse endpoints.
+  const legsWithCoordinates = await Promise.all(
+    legs.map(async (leg: any) => {
+      const originCoordinates = await resolveCoordinates(leg.origin);
+      const destinationCoordinates = await resolveCoordinates(leg.destination);
+      return {
+        ...leg,
+        originCoordinates: originCoordinates ?? undefined,
+        destinationCoordinates: destinationCoordinates ?? undefined,
+      };
+    })
+  );
+
   return {
     ...option,
-    origin: optionOrigin || legs[0]?.origin || '',
-    destination: optionDestination || legs[legs.length - 1]?.destination || '',
-    legs,
+    origin: optionOrigin || legsWithCoordinates[0]?.origin || '',
+    destination: optionDestination || legsWithCoordinates[legsWithCoordinates.length - 1]?.destination || '',
+    legs: legsWithCoordinates,
   };
 };
 
@@ -538,7 +554,7 @@ export function useRateFetching(): RateFetchingResult {
           const { size: sizeName } = containerResolver.resolveContainerInfo(combo.type, combo.size);
           let legacyOptions = await Promise.all(
             rawOptions.map(async (opt: any) => {
-              const mapped = enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
+              const mapped = await enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
               const qty = combo.qty || 1;
               const sell = (mapped.total_amount || 0) * qty;
               const calc = await pricingService.calculateFinancials(sell, 15, false);
@@ -588,7 +604,7 @@ export function useRateFetching(): RateFetchingResult {
           if (aiData.options) {
             const aiOptionsRaw = await Promise.all(
               aiData.options.map(async (opt: any) => {
-                const mapped = enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
+                const mapped = await enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
                 const calc = await pricingService.calculateFinancials(mapped.total_amount, 15, false);
                 let markupPercent = 0;
                 if (calc.buyPrice > 0) {
@@ -648,7 +664,7 @@ export function useRateFetching(): RateFetchingResult {
         if (simulated.length > 0) {
           let simOptions = await Promise.all(
             simulated.map(async (opt: any) => {
-                const mapped = enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
+                const mapped = await enrichOptionRouteData(mapOptionToQuote(opt), routeContext);
               const sell = mapped.total_amount || 0;
               const calc = await pricingService.calculateFinancials(sell, 15, false);
               let markupPercent = 0;
@@ -724,7 +740,9 @@ export function useRateFetching(): RateFetchingResult {
             auditTrail: [],
           };
 
-      const normalizedCombinedOptions = hybridConfig.options.map((opt) => enrichOptionRouteData(opt, routeContext));
+      const normalizedCombinedOptions = await Promise.all(
+        hybridConfig.options.map((opt) => enrichOptionRouteData(opt, routeContext))
+      );
       const hybridAnomalies = hybridConfig.validationIssues.map((issue) => `${issue.option_id}: ${issue.message}`);
       const optionsWithRouteFallback = normalizedCombinedOptions.filter((opt) => {
         const firstLeg = Array.isArray(opt.legs) ? opt.legs[0] : null;

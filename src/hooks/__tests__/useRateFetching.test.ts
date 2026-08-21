@@ -108,6 +108,11 @@ vi.mock('@/lib/logger', () => ({
   },
 }));
 
+const mockResolveCoordinates = vi.fn();
+vi.mock('@/lib/location-coordinates', () => ({
+  resolveCoordinates: (name: string) => mockResolveCoordinates(name),
+}));
+
 // ---------------------------------------------------------------------------
 // Import the hook under test AFTER mocks are registered
 // ---------------------------------------------------------------------------
@@ -142,6 +147,7 @@ describe('useRateFetching', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockInvokeAiAdvisor.mockResolvedValue({ data: null, error: null });
+    mockResolveCoordinates.mockResolvedValue(null);
     vi.mocked(generateSimulatedRates).mockReturnValue([]);
     mockUseAppFeatureFlag.mockImplementation((flagKey: string) => ({
       enabled: flagKey === 'hybrid_route_configuration_v1',
@@ -512,5 +518,54 @@ describe('useRateFetching', () => {
     expect(option!.legs?.[1]?.destination).toBe('DC Z');
     expect(option!.legs?.[2]?.origin).toBe('DC Z');
     expect(option!.legs?.[2]?.destination).toBe('DC Z');
+  });
+
+  it('attaches resolved coordinates to each leg when the resolver finds a match', async () => {
+    mockResolveCoordinates.mockImplementation(async (name: string) => {
+      if (name === 'Shanghai') return { lat: 31.2, lng: 121.5 };
+      if (name === 'Rotterdam') return { lat: 51.9, lng: 4.5 };
+      return null;
+    });
+    mockInvokeFn.mockResolvedValueOnce({
+      data: {
+        options: [
+          { id: 'r1', carrier: 'Test', price: 1000, total_amount: 1000, currency: 'USD', transit_days: 14 },
+        ],
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useRateFetching());
+
+    await act(async () => {
+      await result.current.fetchRates(mockParams, mockResolver);
+    });
+
+    const option = result.current.results![0];
+    expect(option.legs?.[0]?.originCoordinates).toEqual({ lat: 31.2, lng: 121.5 });
+    expect(option.legs?.[0]?.destinationCoordinates).toEqual({ lat: 51.9, lng: 4.5 });
+  });
+
+  it('leaves coordinates undefined when the resolver finds no match (existing behavior unaffected)', async () => {
+    mockInvokeFn.mockResolvedValueOnce({
+      data: {
+        options: [
+          { id: 'r1', carrier: 'Test', price: 1000, total_amount: 1000, currency: 'USD', transit_days: 14 },
+        ],
+      },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useRateFetching());
+
+    await act(async () => {
+      await result.current.fetchRates(mockParams, mockResolver);
+    });
+
+    const option = result.current.results![0];
+    expect(option.legs?.[0]?.originCoordinates).toBeUndefined();
+    expect(option.legs?.[0]?.destinationCoordinates).toBeUndefined();
+    // Confirms the existing test suite's behavior (this file's other assertions) is unaffected.
+    expect(option.carrier).toBe('Test');
   });
 });

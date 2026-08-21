@@ -34,6 +34,8 @@ export interface TransportLeg {
     service_type?: string; // Standard, Express, Saver
     sequence?: number; // Order in route
     charges?: Charge[];
+    originCoordinates?: { lat: number; lng: number };
+    destinationCoordinates?: { lat: number; lng: number };
 }
 
 export interface RateBreakdown {
