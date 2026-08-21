@@ -1,10 +1,17 @@
 import React, { useMemo } from 'react';
+import { MapContainer, TileLayer, CircleMarker, Polyline, Tooltip as LeafletTooltip } from 'react-leaflet';
+import 'leaflet/dist/leaflet.css';
 import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Info, MapPin, Plane, Ship, Train, Truck } from 'lucide-react';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 type QuoteMapLegMode = 'ocean' | 'air' | 'road' | 'rail' | 'other';
+
+interface QuoteMapCoordinates {
+  lat: number;
+  lng: number;
+}
 
 interface QuoteMapLegInput {
   from?: string | null;
@@ -15,6 +22,8 @@ interface QuoteMapLegInput {
   transit_time?: string | number | null;
   border_crossing?: boolean | null;
   carrier?: string | null;
+  originCoordinates?: QuoteMapCoordinates | null;
+  destinationCoordinates?: QuoteMapCoordinates | null;
 }
 
 interface QuoteMapVisualizerProps {
@@ -22,6 +31,14 @@ interface QuoteMapVisualizerProps {
   destination: string;
   legs: QuoteMapLegInput[];
 }
+
+const MODE_COLORS: Record<QuoteMapLegMode, string> = {
+  ocean: '#2563eb',
+  air: '#0284c7',
+  road: '#d97706',
+  rail: '#ea580c',
+  other: '#6b7280',
+};
 
 export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisualizerProps) {
   const normalizedLegs = useMemo(() => {
@@ -41,6 +58,8 @@ export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisual
       transitTime: leg.transit_time ? String(leg.transit_time) : 'N/A',
       borderCrossing: Boolean(leg.border_crossing),
       carrier: leg.carrier ? String(leg.carrier) : 'N/A',
+      originCoordinates: leg.originCoordinates ?? null,
+      destinationCoordinates: leg.destinationCoordinates ?? null,
     }));
   }, [legs]);
 
@@ -64,25 +83,97 @@ export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisual
     return <Truck className="h-4 w-4 text-primary" />;
   };
 
+  const stops = useMemo(() => {
+    if (normalizedLegs.length === 0) return null;
+    const hasAllCoordinates = normalizedLegs.every(
+      (leg) => leg.originCoordinates && leg.destinationCoordinates
+    );
+    if (!hasAllCoordinates) return null;
+
+    const result: { lat: number; lng: number; label: string }[] = [];
+    const seen = new Set<string>();
+    const addStop = (coords: QuoteMapCoordinates, label: string) => {
+      const key = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push({ ...coords, label });
+    };
+    normalizedLegs.forEach((leg) => {
+      addStop(leg.originCoordinates as QuoteMapCoordinates, leg.from);
+      addStop(leg.destinationCoordinates as QuoteMapCoordinates, leg.to);
+    });
+    return result;
+  }, [normalizedLegs]);
+
+  const header = (
+    <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
+      <div className="space-y-1">
+        <h4 className="flex items-center gap-2 text-xs font-semibold">
+          <MapPin className="h-3 w-3 text-primary" />
+          Route Visualization
+        </h4>
+        <p className="text-[10px] text-muted-foreground">
+          {origin} → {destination}
+        </p>
+      </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.ocean} Ocean</Badge>
+        <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.air} Air</Badge>
+        <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.road} Road</Badge>
+        <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.rail} Rail</Badge>
+      </div>
+    </div>
+  );
+
+  if (stops && stops.length > 0) {
+    const bounds = stops.map((stop) => [stop.lat, stop.lng] as [number, number]);
+    return (
+      <Card className="w-full min-h-[300px] border-border bg-card overflow-hidden">
+        {header}
+        <div className="h-[320px] w-full">
+          <MapContainer
+            bounds={bounds}
+            boundsOptions={{ padding: [24, 24] }}
+            style={{ height: '100%', width: '100%' }}
+            scrollWheelZoom={false}
+          >
+            <TileLayer
+              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+              url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+            />
+            {normalizedLegs.map((leg, index) => {
+              const from = leg.originCoordinates as QuoteMapCoordinates;
+              const to = leg.destinationCoordinates as QuoteMapCoordinates;
+              return (
+                <Polyline
+                  key={`leg-${index}`}
+                  positions={[
+                    [from.lat, from.lng],
+                    [to.lat, to.lng],
+                  ]}
+                  pathOptions={{ color: MODE_COLORS[leg.mode], weight: 3 }}
+                />
+              );
+            })}
+            {stops.map((stop, index) => (
+              <CircleMarker
+                key={`stop-${index}`}
+                center={[stop.lat, stop.lng]}
+                radius={7}
+                pathOptions={{ color: '#0f172a', fillColor: '#ffffff', fillOpacity: 1, weight: 2 }}
+              >
+                <LeafletTooltip>{stop.label}</LeafletTooltip>
+              </CircleMarker>
+            ))}
+          </MapContainer>
+        </div>
+      </Card>
+    );
+  }
+
   return (
     <Card className="w-full min-h-[300px] border-border bg-card">
-      <div className="flex items-center justify-between gap-3 border-b border-border px-4 py-3">
-        <div className="space-y-1">
-          <h4 className="flex items-center gap-2 text-xs font-semibold">
-            <MapPin className="h-3 w-3 text-primary" />
-            Route Visualization
-          </h4>
-          <p className="text-[10px] text-muted-foreground">
-            {origin} → {destination}
-          </p>
-        </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.ocean} Ocean</Badge>
-          <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.air} Air</Badge>
-          <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.road} Road</Badge>
-          <Badge variant="outline" className="h-5 text-[10px]">{modeCounts.rail} Rail</Badge>
-        </div>
-      </div>
+      {header}
 
       <div className="p-4">
         <div className="flex items-center overflow-x-auto rounded-md border border-border bg-muted/20 px-3 py-6">
