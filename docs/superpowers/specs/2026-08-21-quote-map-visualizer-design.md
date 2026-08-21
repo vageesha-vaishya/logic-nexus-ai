@@ -91,7 +91,7 @@ Rendering:
 
 ## 5. Marker rendering (a known Leaflet gotcha, addressed by design)
 
-Leaflet's default marker icons are well known to break under bundlers (broken image paths under Vite/webpack). This design avoids the issue entirely by never using Leaflet's default `L.Icon` — all markers are custom `L.divIcon`s rendering the same mode icons (Ship/Plane/Truck/Train) already used by `QuoteLegsVisualizer` and `quote-badges.tsx`'s `getModeIcon`, keeping the visual language consistent with the rest of the app and sidestepping the bug rather than working around it.
+Leaflet's default marker icons are well known to break under bundlers (broken image paths under Vite/webpack). This design avoids the issue entirely by never using Leaflet's default `L.Icon` (image-based) at all — stops render as `react-leaflet`'s `CircleMarker` (SVG-drawn, mode-colored via `pathOptions`, no image asset involved whatsoever) with a `Tooltip` showing carrier/transit-time detail on hover, mirroring the information the current schematic's `TooltipProvider`/`Tooltip` already surfaces. This sidesteps the bundler-icon-path bug more completely than a custom `divIcon` would (no HTML-string marker content to build or escape either).
 
 ## 6. Data Flow / Error Handling
 
