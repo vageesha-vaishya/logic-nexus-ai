@@ -535,7 +535,7 @@ The 4th call site (the final normalization pass, currently a plain `.map()`) mus
 - [ ] **Step 6: Run the test file to verify all tests pass**
 
 Run: `npx vitest run src/hooks/__tests__/useRateFetching.test.ts`
-Expected: PASS — all pre-existing tests plus the 2 new ones (this file has 9 pre-existing `it(...)` blocks + 2 new = 11 tests total).
+Expected: PASS — all pre-existing tests plus the 2 new ones (baseline is 10 pre-existing `it(...)` blocks + 2 new = 12 tests total).
 
 - [ ] **Step 7: Broad regression check — confirm the global test-mock fix actually prevents the breakage it was added for**
 
