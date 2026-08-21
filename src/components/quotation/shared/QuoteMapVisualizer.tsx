@@ -90,11 +90,17 @@ export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisual
     );
     if (!hasAllCoordinates) return null;
 
-    const result: { lat: number; lng: number; label: string }[] = [
-      { ...(normalizedLegs[0].originCoordinates as QuoteMapCoordinates), label: normalizedLegs[0].from },
-    ];
+    const result: { lat: number; lng: number; label: string }[] = [];
+    const seen = new Set<string>();
+    const addStop = (coords: QuoteMapCoordinates, label: string) => {
+      const key = `${coords.lat.toFixed(4)},${coords.lng.toFixed(4)}`;
+      if (seen.has(key)) return;
+      seen.add(key);
+      result.push({ ...coords, label });
+    };
     normalizedLegs.forEach((leg) => {
-      result.push({ ...(leg.destinationCoordinates as QuoteMapCoordinates), label: leg.to });
+      addStop(leg.originCoordinates as QuoteMapCoordinates, leg.from);
+      addStop(leg.destinationCoordinates as QuoteMapCoordinates, leg.to);
     });
     return result;
   }, [normalizedLegs]);
@@ -135,16 +141,20 @@ export function QuoteMapVisualizer({ origin, destination, legs }: QuoteMapVisual
               attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
-            {normalizedLegs.map((leg, index) => (
-              <Polyline
-                key={`leg-${index}`}
-                positions={[
-                  [stops[index].lat, stops[index].lng],
-                  [stops[index + 1].lat, stops[index + 1].lng],
-                ]}
-                pathOptions={{ color: MODE_COLORS[leg.mode], weight: 3 }}
-              />
-            ))}
+            {normalizedLegs.map((leg, index) => {
+              const from = leg.originCoordinates as QuoteMapCoordinates;
+              const to = leg.destinationCoordinates as QuoteMapCoordinates;
+              return (
+                <Polyline
+                  key={`leg-${index}`}
+                  positions={[
+                    [from.lat, from.lng],
+                    [to.lat, to.lng],
+                  ]}
+                  pathOptions={{ color: MODE_COLORS[leg.mode], weight: 3 }}
+                />
+              );
+            })}
             {stops.map((stop, index) => (
               <CircleMarker
                 key={`stop-${index}`}

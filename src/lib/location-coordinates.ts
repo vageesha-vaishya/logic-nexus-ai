@@ -11,20 +11,21 @@ function normalizeKey(name: string): string {
   return name.trim().toLowerCase();
 }
 
-function parsePortCoordinates(value: unknown): Coordinates | null {
-  if (!value || typeof value !== 'object') return null;
-  const record = value as Record<string, unknown>;
-  const lat = Number(record.latitude);
-  const lng = Number(record.longitude);
-  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null;
-  return { lat, lng };
-}
-
 function toCoordinates(lat: unknown, lng: unknown): Coordinates | null {
+  if (lat === null || lat === undefined || lat === '') return null;
+  if (lng === null || lng === undefined || lng === '') return null;
   const latNum = Number(lat);
   const lngNum = Number(lng);
   if (!Number.isFinite(latNum) || !Number.isFinite(lngNum)) return null;
+  if (latNum < -90 || latNum > 90) return null;
+  if (lngNum < -180 || lngNum > 180) return null;
   return { lat: latNum, lng: lngNum };
+}
+
+function parsePortCoordinates(value: unknown): Coordinates | null {
+  if (!value || typeof value !== 'object') return null;
+  const record = value as Record<string, unknown>;
+  return toCoordinates(record.latitude, record.longitude);
 }
 
 async function findPortCoordinates(name: string): Promise<Coordinates | null> {
@@ -101,18 +102,16 @@ export async function resolveCoordinates(name: string | null | undefined): Promi
   const key = normalizeKey(trimmed);
   if (cache.has(key)) return cache.get(key) as Coordinates | null;
 
-  let resolved: Coordinates | null = null;
   try {
-    resolved = await findPortCoordinates(trimmed);
+    let resolved: Coordinates | null = await findPortCoordinates(trimmed);
     if (!resolved) resolved = await findAirportCoordinates(trimmed);
     if (!resolved) resolved = await findCityCoordinates(trimmed);
     if (!resolved) resolved = await findTransferPointCoordinates(trimmed);
+    cache.set(key, resolved);
+    return resolved;
   } catch {
-    resolved = null;
+    return null; // do not cache — a transient error shouldn't permanently poison this name
   }
-
-  cache.set(key, resolved);
-  return resolved;
 }
 
 export function __clearCoordinatesCacheForTests(): void {

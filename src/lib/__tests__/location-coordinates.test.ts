@@ -91,6 +91,24 @@ describe('resolveCoordinates', () => {
     expect(result).toBeNull();
   });
 
+  it('discards a row with NULL latitude/longitude instead of resolving to {lat:0,lng:0}', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'cities') return chain({ data: { latitude: null, longitude: null } });
+      return chain({ data: null });
+    });
+    const result = await resolveCoordinates('NullIslandCity');
+    expect(result).toBeNull();
+  });
+
+  it('discards out-of-range coordinate values', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'cities') return chain({ data: { latitude: 999, longitude: 5000 } });
+      return chain({ data: null });
+    });
+    const result = await resolveCoordinates('OutOfRangeCity');
+    expect(result).toBeNull();
+  });
+
   it('caches results — a second call for the same (normalized) name does not re-query', async () => {
     let portCallCount = 0;
     mockFrom.mockImplementation((table: string) => {
