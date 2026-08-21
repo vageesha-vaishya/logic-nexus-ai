@@ -39,7 +39,16 @@ describe('resolveCoordinates', () => {
     expect(await resolveCoordinates(undefined)).toBeNull();
   });
 
-  it('resolves from ports_locations, parsing the {latitude,longitude} JSON shape', async () => {
+  it('resolves from ports_locations, parsing the real {lat,lng} JSON shape (verified against production data)', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'ports_locations') return chain({ data: { coordinates: { lat: 31.2, lng: 121.5 } } });
+      return chain({ data: null });
+    });
+    const result = await resolveCoordinates('CNSHA');
+    expect(result).toEqual({ lat: 31.2, lng: 121.5 });
+  });
+
+  it('falls back to the {latitude,longitude} shape for ports_locations rows that use it', async () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === 'ports_locations') return chain({ data: { coordinates: { latitude: 31.2, longitude: 121.5 } } });
       return chain({ data: null });
@@ -84,10 +93,19 @@ describe('resolveCoordinates', () => {
 
   it('discards malformed coordinate data (non-numeric lat/lng)', async () => {
     mockFrom.mockImplementation((table: string) => {
-      if (table === 'ports_locations') return chain({ data: { coordinates: { latitude: 'not-a-number', longitude: null } } });
+      if (table === 'ports_locations') return chain({ data: { coordinates: { lat: 'not-a-number', lng: null } } });
       return chain({ data: null });
     });
     const result = await resolveCoordinates('BadData');
+    expect(result).toBeNull();
+  });
+
+  it('discards an empty coordinates object ({}) rather than treating it as valid', async () => {
+    mockFrom.mockImplementation((table: string) => {
+      if (table === 'ports_locations') return chain({ data: { coordinates: {} } });
+      return chain({ data: null });
+    });
+    const result = await resolveCoordinates('EmptyCoordsPort');
     expect(result).toBeNull();
   });
 
@@ -114,7 +132,7 @@ describe('resolveCoordinates', () => {
     mockFrom.mockImplementation((table: string) => {
       if (table === 'ports_locations') {
         portCallCount += 1;
-        return chain({ data: { coordinates: { latitude: 1, longitude: 2 } } });
+        return chain({ data: { coordinates: { lat: 1, lng: 2 } } });
       }
       return chain({ data: null });
     });

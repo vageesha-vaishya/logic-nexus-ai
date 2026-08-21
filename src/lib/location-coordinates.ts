@@ -25,7 +25,11 @@ function toCoordinates(lat: unknown, lng: unknown): Coordinates | null {
 function parsePortCoordinates(value: unknown): Coordinates | null {
   if (!value || typeof value !== 'object') return null;
   const record = value as Record<string, unknown>;
-  return toCoordinates(record.latitude, record.longitude);
+  // Real ports_locations.coordinates rows are shaped { lat, lng } (verified against production
+  // data — 194/194 non-empty rows use this shape, 0 use { latitude, longitude }). The
+  // latitude/longitude fallback is kept only as defensive support for any differently-shaped
+  // seed/import data, not because it's the primary convention.
+  return toCoordinates(record.lat, record.lng) ?? toCoordinates(record.latitude, record.longitude);
 }
 
 async function findPortCoordinates(name: string): Promise<Coordinates | null> {
