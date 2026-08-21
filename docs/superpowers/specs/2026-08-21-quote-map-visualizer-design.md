@@ -12,7 +12,9 @@ The user asked for six improvements to the Smart Quote module. Given the size (s
 
 Investigation (verified directly against the codebase, not assumed) confirmed:
 - `src/components/quotation/shared/QuoteMapVisualizer.tsx` is **not a geographic map** — it's a schematic node-and-line strip, literally labeled `"Schematic View • Not to scale"` in its own markup. No real map component exists anywhere in this codebase.
-- It is a **shared component**, rendered from `QuoteResultsList.tsx`, `QuoteDetailView.tsx` (used by Smart Quote's "Details" dialog), and `QuoteOptionsOverview.tsx` (used inside `UnifiedQuoteComposer`) — plus referenced by `src/lib/__tests__/ui-consistency.test.tsx`. Fixing it once fixes it everywhere it's used.
+- It is a **shared component**, actually rendered in 2 files: once in `QuoteDetailView.tsx` (used by Smart Quote's "Details" dialog) and twice in `QuoteOptionsOverview.tsx` (used inside `UnifiedQuoteComposer`) — verified by finding every JSX usage, not just every import. `QuoteResultsList.tsx` imports it but never renders it (a pre-existing unused import, out of scope — nothing to change there). Fixing the component once fixes it everywhere it's actually used.
+- **Every one of these 3 render sites derives its `origin`/`destination` props purely from `legs[0]` and `legs[legs.length - 1]`** (`opt.legs?.[0]?.from`/`.origin` and `opt.legs?.[legs.length-1]?.to`/`.destination`) — never from an independent source. This is a load-bearing finding: it means resolving coordinates at the **leg level only** is sufficient to cover the whole route, including the overall origin/destination markers — no separate resolution path is needed for `LocationAutocomplete`-picked locations.
+- Both `SmartQuoteWorkspace` (via `useRateFetching`) and `UnifiedQuoteComposer` (also via `useRateFetching` — confirmed by import) funnel every rate option through the same `enrichOptionRouteData` normalization pass. Resolving coordinates once, there, covers every option reaching every render site.
 - Coordinate data already exists in the database, in four different shapes that need normalizing:
   - `ports_locations.coordinates: Json | null` — a JSON object shaped `{ latitude, longitude }` (confirmed via `PortLocationForm.tsx`'s existing parsing code).
   - `airports.latitude: number`, `airports.longitude: number` — direct, required columns.
@@ -32,38 +34,39 @@ Investigation (verified directly against the codebase, not assumed) confirmed:
 
 **Non-Goals:**
 - Not building a geocoding pipeline for arbitrary freeform text — only locations resolvable against `ports_locations`/`airports`/`cities`/`transfer_points` get real coordinates. AI-inferred waypoint names with no match in those tables fall back to the schematic view for that option, by design.
-- Not changing `QuoteResultsList.tsx`, `QuoteDetailView.tsx`, or `QuoteOptionsOverview.tsx`'s own logic — they only gain trivial prop-plumbing to pass new coordinate fields through to `QuoteMapVisualizer`.
+- Not changing `QuoteResultsList.tsx`, `QuoteDetailView.tsx`, or `QuoteOptionsOverview.tsx` at all — each already passes its full `legs` array straight through to `QuoteMapVisualizer`, so they need no code change once `TransportLeg` carries coordinates (see §4).
 - Not touching the other five items from the user's original six-item list (charges-per-leg breakdown, the audit's concrete bug fixes, UX enhancements, the two-phase compliance work, source-attribution-in-Details) — each is its own sub-project, to be brainstormed and planned separately.
 - Not adding a map/geocoding API key or any paid service — the chosen approach (Leaflet + OpenStreetMap tiles) needs neither.
 
 ## 3. Architecture
 
 ```
-Coordinate resolution (new, runs once per relevant event — never inside the map component's render):
-
-  User picks origin/destination via LocationAutocomplete
-        ↓ (existing select queries gain `coordinates`/`latitude`/`longitude` columns)
-  originDetails / destinationDetails gain lat/lng
-        ↓ (already flows through SmartQuoteWorkspace.tsx and the general composer today)
+Coordinate resolution (new, runs once per rate-fetch — never inside the map component's render,
+never a second, separate path for user-picked locations, per the finding above):
 
   Rate option legs arrive from rate-engine / AI advisor (plain from/to name strings)
         ↓
-  useRateFetching.ts's existing enrichOptionRouteData pass
-        ↓ (NEW: for each leg endpoint, call the new resolver)
+  useRateFetching.ts's existing enrichOptionRouteData pass, AFTER fillLegContinuity has
+  settled each leg's final origin/destination name (continuity-filling must run first —
+  resolving coordinates on a not-yet-continuity-filled leg would resolve the wrong, or an
+  empty, name)
+        ↓ (NEW: for each leg's final origin name and destination name, call the resolver)
   src/lib/location-coordinates.ts: resolveCoordinates(name) → {lat,lng} | null
         (priority-ordered lookup: ports_locations → airports → cities → transfer_points,
          in-memory cache keyed by normalized name, never re-queries within a session)
         ↓
-  TransportLeg gains optional lat/lng on origin and destination
+  TransportLeg gains optional originCoordinates/destinationCoordinates (see §4 — a leg has
+  two distinct endpoints, so this is two coordinate pairs, not one)
 
 Rendering:
 
   QuoteMapVisualizer(origin, destination, legs)
         ↓
-  every leg endpoint has resolved coordinates?
+  every leg has both originCoordinates and destinationCoordinates resolved?
         ├─ yes → real Leaflet map: markers (custom divIcon, mode-colored, reusing the
-        │         existing Ship/Plane/Truck/Train icon language) + polylines between
-        │         consecutive stops, OpenStreetMap tile basemap, pan/zoom enabled
+        │         existing Ship/Plane/Truck/Train icon language) at legs[0].originCoordinates,
+        │         each intermediate stop, and legs[last].destinationCoordinates, + polylines
+        │         between consecutive stops, OpenStreetMap tile basemap, pan/zoom enabled
         └─ no  → today's exact schematic view (code kept as-is, not deleted)
 ```
 
@@ -73,12 +76,14 @@ Rendering:
 - `src/lib/location-coordinates.ts` — `resolveCoordinates(name: string): Promise<{ lat: number; lng: number } | null>`. Queries `ports_locations`, `airports`, `cities`, `transfer_points` in that priority order (first non-null match wins), normalizing each table's different coordinate shape into `{lat, lng}`. In-memory `Map<string, {lat,lng}|null>` cache keyed by a normalized (trimmed, lowercased) name — a session lives as long as the page, so this is a plain module-level cache, not a persistent store.
 
 ### Modified
-- `src/components/common/LocationAutocomplete.tsx` — add the relevant coordinate column(s) to all 5 `.select(...)` calls; extend the `location` object passed to `onChange` with resolved `{lat, lng}` (parsed the same way `PortLocationForm.tsx` already parses `ports_locations.coordinates`, for consistency with existing code, not a new parsing convention).
-- `src/types/quote-breakdown.ts` — add optional `lat?: number; lng?: number` to `TransportLeg`.
-- `src/hooks/useRateFetching.ts` — inside the existing `enrichOptionRouteData` normalization pass, call `resolveCoordinates` for each leg's origin/destination name and attach the result.
-- `src/components/quotation/shared/QuoteMapVisualizer.tsx` — rewritten. Accepts the same `origin`/`destination`/`legs` props as today, now optionally carrying coordinates; internally decides real-map vs. schematic per the architecture above. Imports `leaflet/dist/leaflet.css` directly in this file (component-scoped, not global — this component is not on every page).
-- `src/components/quotation/shared/QuoteResultsList.tsx`, `src/components/quotation/shared/QuoteDetailView.tsx`, `src/components/quotation/composer/QuoteOptionsOverview.tsx` — pass the now-available coordinate fields through to `QuoteMapVisualizer`; no other change.
+- `src/types/quote-breakdown.ts` — add to `TransportLeg`: `originCoordinates?: { lat: number; lng: number }` and `destinationCoordinates?: { lat: number; lng: number }`. Two fields, not one — a leg connects two distinct points.
+- `src/hooks/useRateFetching.ts` — inside the existing `enrichOptionRouteData` normalization pass, after `fillLegContinuity` settles each leg's final `origin`/`destination` names, call `resolveCoordinates` for each and attach the results as `originCoordinates`/`destinationCoordinates`. `enrichOptionRouteData` becomes `async`; its one call site that isn't already inside an async `.map()` callback (`hybridConfig.options.map((opt) => enrichOptionRouteData(opt, routeContext))`, the final normalization pass) must become `await Promise.all(hybridConfig.options.map((opt) => enrichOptionRouteData(opt, routeContext)))` — verified this is the only site needing that conversion; the other three call sites are already inside `Promise.all(array.map(async (opt) => ...))` callbacks and only need an `await` added.
+- `src/components/quotation/shared/QuoteMapVisualizer.tsx` — rewritten. Accepts the same `origin`/`destination`/`legs` props as today (no prop-shape change needed at the call sites — `legs` already carries whatever `TransportLeg` carries); internally decides real-map vs. schematic based on whether every leg's `originCoordinates`/`destinationCoordinates` are present. Imports `leaflet/dist/leaflet.css` directly in this file (component-scoped, not global — this component is not on every page).
 - `package.json` — add `leaflet@^1.9.4`, `react-leaflet@^4.2.1` (dependencies), `@types/leaflet@^1.9.22` (devDependency). These specific versions are required, not the latest majors — `react-leaflet@5.x` needs React 19, which this app does not have.
+
+### Explicitly not modified (a scope reduction from the original proposal, found during verification)
+- `LocationAutocomplete.tsx` — no changes needed. Since every `QuoteMapVisualizer` render site derives `origin`/`destination` purely from the first/last leg (never from an independent user-picked-location field), and every leg's coordinates are resolved once in `enrichOptionRouteData` regardless of whether that leg's name came from user selection or AI inference, a second resolution path through the autocomplete component would be redundant.
+- `QuoteResultsList.tsx`, `QuoteDetailView.tsx`, `QuoteOptionsOverview.tsx` — no changes. They already pass `legs={...}` straight through; once `TransportLeg` carries coordinates, these components automatically forward them with no code change on their part.
 
 ### Untouched
 - Everything about the schematic rendering path in `QuoteMapVisualizer.tsx` — kept verbatim as the fallback, not rewritten or deleted.
@@ -97,7 +102,7 @@ No new user-facing error states. A coordinate-resolution miss is not an error �
 - Unit tests for `location-coordinates.ts`: table-priority order (a `ports_locations` hit wins over an `airports` hit for the same name), each table's shape-normalization (`Json` object vs. direct columns), cache behavior (second call for the same name does not re-query), and the `null`-on-miss contract.
 - `QuoteMapVisualizer` tests for both render paths: real map when every leg resolves, schematic fallback when any leg doesn't (including the exact current schematic tests, if any exist in `ui-consistency.test.tsx`, continuing to pass).
 - Before writing `react-leaflet`-based tests, verify Leaflet actually mounts cleanly under this repo's Vitest/jsdom setup (a known trouble spot for map libraries under test runners that lack real browser layout APIs) — resolve this as a concrete finding during plan-writing/Task 1, not assumed here.
-- No new tests required for `QuoteResultsList`/`QuoteDetailView`/`QuoteOptionsOverview` beyond confirming their existing suites still pass with the new props threaded through.
+- No new tests required for `QuoteResultsList`/`QuoteDetailView`/`QuoteOptionsOverview` — none of them are modified. Their existing suites should be run once as a regression check, since they render `QuoteMapVisualizer` and `TransportLeg` gains new optional fields, but no code change is expected in any of them.
 
 ## 8. Rollout
 
