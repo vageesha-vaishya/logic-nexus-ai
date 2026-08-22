@@ -4,9 +4,11 @@
 
 **Goal:** Stand up a memory-capped, self-hosted Supabase-equivalent stack (Postgres 17 + Kong + GoTrue + PostgREST + Storage API + Realtime + Edge Runtime) on the existing shared Hostinger/Coolify VPS, deployed through Coolify, serving zero production traffic, with every container hard-capped so it cannot starve the other 24 apps already on that box.
 
-**Architecture:** Postgres is a Coolify-native "Database" resource (matching the aviation-ai-pro precedent, `avaipro-pg`) rather than a raw docker-compose Postgres. The other six services are a single Coolify "Service" deployed from a docker-compose file tracked in this repo (`deploy/selfhosted-supabase/`), on the shared `coolify` Docker network (same as every other Coolify-managed resource on this VPS, including Postgres itself — required for container-name DNS reachability, not a special case), fronted by Kong on a new subdomain. Protection against resource contention with the other 24 apps comes from per-container memory limits, not network isolation. No repo application code changes — this is infrastructure-only.
+**Architecture:** All 7 services (Postgres/`db` + Kong + Auth + REST + Storage + Realtime + Edge Runtime) are ONE Coolify "Service" deployed from a single docker-compose file tracked in this repo (`deploy/selfhosted-supabase/`), on the shared `coolify` Docker network (same as every other Coolify-managed resource on this VPS — required for container-name DNS reachability, not a special case), fronted by Kong on a new subdomain. Protection against resource contention with the other 24 apps comes from per-container memory limits, not network isolation. No repo application code changes — this is infrastructure-only.
 
-**Tech Stack:** Coolify v4 (REST API + Traefik), Docker/docker-compose, `supabase/postgres:17`, `kong`, `supabase/gotrue`, `postgrest/postgrest`, `supabase/storage-api`, `supabase/realtime`, `supabase/edge-runtime`.
+**Revised 2026-08-22 during Task 2 execution:** the original plan had Postgres as a separate Coolify-native "Database" resource (matching the `avaipro-pg` precedent), with a distinct Task 2 (provision it) before Task 4 (deploy the other six services). This doesn't work: `supabase/postgres`'s own entrypoint unconditionally requires a bind-mounted `99-roles.sql` on every startup, which a bare Coolify Database resource cannot supply (confirmed directly against the image and against `avaipro-pg`, which uses a different, simpler image that doesn't need this file). Postgres is now a `db` service inside the same compose file as the other six — Tasks 2-6 below reflect this; the old Task 2 (Coolify-native resource) is dropped entirely, not deferred.
+
+**Tech Stack:** Coolify v4 (REST API + Traefik), Docker/docker-compose, `supabase/postgres:17.4.1.037`, `kong/kong:3.9.3`, `supabase/gotrue:v2.189.0`, `postgrest/postgrest:v14.12`, `supabase/storage-api:v1.60.4`, `supabase/realtime:v2.102.3`, `supabase/edge-runtime:v1.74.0` (all image tags confirmed during Task 1/2 execution, not guessed).
 
 ## Global Constraints
 
@@ -104,144 +106,98 @@ this compose file."
 
 ---
 
-### Task 2: Provision the Coolify-native Postgres Database resource
+### Task 2: Add Postgres (`db`) to the compose stack, bind-mounting the required upstream init files
 
-**Files:** none (Coolify-managed resource, no repo files) — this task's output is a live Coolify resource whose UUID subsequent tasks depend on.
-
-**Interfaces:**
-- Consumes: nothing from Task 1.
-- Produces: a running Postgres reachable at an internal host:port that Task 4 will inject into the compose stack's `.env` as `POSTGRES_HOST`/`POSTGRES_PORT`.
-
-- [ ] **Step 1: Create the database via the Coolify API**
-
-```bash
-export COOLIFY_API_TOKEN=$(grep '^COOLIFY_API_TOKEN=' env | cut -d'"' -f2)
-curl -sS -X POST "http://72.61.249.111:8000/api/v1/databases/postgresql" \
-  -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "project_uuid": "gkwk84gocoo44wkkcsscs0k8",
-    "environment_uuid": "ko4o00k400ccgo44kk40s8gw",
-    "server_uuid": "ewwc8w4oc4cs0w08g4goc0go",
-    "name": "logicnexus-selfhost-pg",
-    "description": "Phase 1 self-hosted Supabase Postgres for logic-nexus-ai (see docs/superpowers/specs/2026-08-22-supabase-selfhost-phase1-design.md). No production traffic.",
-    "image": "supabase/postgres:17.4.1.037",
-    "postgres_db": "postgres",
-    "postgres_user": "postgres",
-    "is_public": false,
-    "limits_memory": "3g",
-    "limits_memory_swap": "3g"
-  }'
-```
-
-Expected: HTTP 200/201 with a JSON body containing a `uuid` field. **Save this UUID** — every later step references it as `$PG_DB_UUID`.
-
-- [ ] **Step 2: If the exact image tag in Step 1 doesn't exist, find the current one and retry**
-
-```bash
-curl -s -m 10 "https://hub.docker.com/v2/repositories/supabase/postgres/tags?page_size=5&ordering=last_updated" | node -e '
-let data=""; process.stdin.on("data",d=>data+=d); process.stdin.on("end",()=>{
-  JSON.parse(data).results.forEach(t=>console.log(t.name));
-});'
-```
-
-Expected: a list of current tags. Pick the most recent `17.x.x.xxx`-style tag, redo Step 1 with that value if the first attempt 404'd.
-
-- [ ] **Step 3: Start the database**
-
-```bash
-export PG_DB_UUID="<uuid from Step 1>"
-curl -sS -X GET "http://72.61.249.111:8000/api/v1/databases/$PG_DB_UUID/start" \
-  -H "Authorization: Bearer $COOLIFY_API_TOKEN"
-```
-
-Expected: HTTP 200.
-
-- [ ] **Step 4: Verify it's running and capture the internal connection details**
-
-```bash
-curl -sS "http://72.61.249.111:8000/api/v1/databases/$PG_DB_UUID" \
-  -H "Authorization: Bearer $COOLIFY_API_TOKEN" | node -e '
-let data=""; process.stdin.on("data",d=>data+=d); process.stdin.on("end",()=>{
-  const d = JSON.parse(data);
-  console.log("status:", d.status);
-  console.log("limits_memory:", d.limits_memory);
-  console.log("internal name (use as POSTGRES_HOST):", d.uuid);
-});'
-```
-
-Expected: `status` is `running:healthy` (may need to re-run after ~15s if still `running:unhealthy` right after start), `limits_memory` is `3g` (confirms the cap actually took — if it shows `0`, Step 1's payload field name was wrong and must be fixed before proceeding). The database's internal Docker network hostname is its container name — confirm the actual container name via `ssh hostinger-vps "docker ps --filter name=$PG_DB_UUID --format '{{.Names}}'"` and use that as `POSTGRES_HOST` in Task 4.
-
-- [ ] **Step 5: Re-verify the other 24 apps are unaffected (Global Constraints check)**
-
-Run the four health-check curls from Global Constraints. All must return `200`.
-
----
-
-### Task 3: Verify and enable the required Postgres extensions
-
-**Files:** none.
-
-**Interfaces:**
-- Consumes: `$PG_DB_UUID` and its container name from Task 2.
-- Produces: confirmation that `vector`, `postgis`, `pgroonga`, `pg_cron`, `pgjwt`, `pgsodium`, `pg_net`, `pg_graphql` are installed — Task 4's services assume these exist (GoTrue/Storage don't need them directly, but this is the same Postgres later phases will replicate real production data into, and production uses all of these).
-
-- [ ] **Step 1: Check which extensions are already available in the image**
-
-```bash
-ssh hostinger-vps "docker exec <pg-container-name-from-task2-step4> psql -U postgres -c \"SELECT name, default_version, installed_version FROM pg_available_extensions WHERE name IN ('vector','postgis','pgroonga','pg_cron','pgjwt','pgsodium','pg_net','pg_graphql') ORDER BY name;\""
-```
-
-Expected: all 8 rows present with a non-null `default_version`. If any are missing, `supabase/postgres` doesn't bundle it — stop and report back rather than guessing a fix (this would mean the spec's image choice needs revisiting).
-
-- [ ] **Step 2: Enable each extension that isn't already installed**
-
-```bash
-ssh hostinger-vps "docker exec <pg-container-name> psql -U postgres -c \"
-CREATE EXTENSION IF NOT EXISTS vector;
-CREATE EXTENSION IF NOT EXISTS postgis;
-CREATE EXTENSION IF NOT EXISTS pgroonga;
-CREATE EXTENSION IF NOT EXISTS pg_cron;
-CREATE EXTENSION IF NOT EXISTS pgjwt;
-CREATE EXTENSION IF NOT EXISTS pgsodium;
-CREATE EXTENSION IF NOT EXISTS pg_net;
-CREATE EXTENSION IF NOT EXISTS pg_graphql;
-\""
-```
-
-Expected: no errors. `pg_cron` may require `shared_preload_libraries=pg_cron` in `postgresql.conf` to actually activate (the `CREATE EXTENSION` can succeed but the background worker won't start without it) — the `supabase/postgres` image sets this by default; if `pg_cron` jobs don't run later, check `SHOW shared_preload_libraries;` first before assuming a config problem elsewhere.
-
-- [ ] **Step 3: Verify all 8 are now installed**
-
-```bash
-ssh hostinger-vps "docker exec <pg-container-name> psql -U postgres -c \"SELECT extname FROM pg_extension WHERE extname IN ('vector','postgis','pgroonga','pg_cron','pgjwt','pgsodium','pg_net','pg_graphql') ORDER BY extname;\""
-```
-
-Expected: exactly 8 rows returned.
-
-- [ ] **Step 4: Re-verify the other 24 apps are unaffected**
-
-Run the four health-check curls from Global Constraints. All must return `200`.
-
----
-
-### Task 4: Deploy the app-layer stack (Kong, Auth, REST, Storage, Realtime, Edge Runtime) via Coolify
+**Why this replaces the old Task 2:** `supabase/postgres`'s own entrypoint unconditionally runs `psql -f /docker-entrypoint-initdb.d/init-scripts/99-roles.sql` (and other init SQL) on every startup — files that must be bind-mounted in from the same upstream reference Task 1 already used. A bare Coolify "Database" resource has no way to supply them (confirmed directly against the image and against the `avaipro-pg` precedent, which uses a different image that doesn't need this). Deploying Postgres as a `db` service in the same compose file Task 1 built is the fix.
 
 **Files:**
-- Modify: none in the repo (Coolify pulls `deploy/selfhosted-supabase/docker-compose.yml` from Task 1 directly from the `main` branch when deploying a Git-based compose service).
+- Modify: `deploy/selfhosted-supabase/docker-compose.yml` (add `db` service; change the other six services' Postgres connection env vars from `${POSTGRES_HOST}:${POSTGRES_PORT}` to the internal service name `db:5432`)
+- Modify: `deploy/selfhosted-supabase/env.example` (replace `POSTGRES_HOST`/`POSTGRES_PORT` placeholders with whatever the `db` service actually needs — `POSTGRES_PASSWORD`, `POSTGRES_DB`, etc.)
+- Create: `deploy/selfhosted-supabase/volumes/db/` — the bind-mounted init SQL files, copied verbatim from upstream (exact filenames depend on what Step 2 finds; do not invent contents)
 
 **Interfaces:**
-- Consumes: `deploy/selfhosted-supabase/docker-compose.yml` and `.env.example` from Task 1; `POSTGRES_HOST`/`POSTGRES_PORT`/`POSTGRES_PASSWORD` from Task 2.
-- Produces: a running Coolify service (`logicnexus-selfhost-supabase`) with Kong reachable at the domain chosen in the spec's Open Items (`supabase.sosservices.online`, unless changed) — Task 5's checks hit this domain.
+- Consumes: Task 1's `docker-compose.yml`, `env.example`.
+- Produces: a `db` service named exactly `db` (matches what the other six services will reference as their Postgres host) with `mem_limit: 3g`, on the `coolify` network — Task 3 deploys this, Task 4 runs against it.
 
-- [ ] **Step 1: Generate real secrets for `.env` (not the placeholders from `.env.example`)**
+- [ ] **Step 1: Re-clone the upstream reference (same approach as Task 1 Step 1 — temporary, read-only)**
+
+```bash
+git clone --depth 1 --filter=blob:none --sparse https://github.com/supabase/supabase.git /tmp/supabase-upstream-ref
+cd /tmp/supabase-upstream-ref
+git sparse-checkout set docker
+```
+
+- [ ] **Step 2: Read the upstream `db` service definition and its volume mounts**
+
+Read `/tmp/supabase-upstream-ref/docker/docker-compose.yml`'s `db` service block: note the exact image tag (compare against `supabase/postgres:17.4.1.037`, already confirmed to exist — use the same tag for consistency with Task 1/2's already-confirmed version unless the upstream file pins something meaningfully different, in which case flag it rather than silently picking one), every volume it bind-mounts under `docker/volumes/db/` (typically includes files like `realtime.sql`, `webhooks.sql`, `roles.sql`, `jwt.sql`, `_supabase.sql`, `logs.sql`, `pooler.sql`, and a `init/` directory — read the actual current list, don't assume this exact set), and its required environment variables (`POSTGRES_PASSWORD`, `POSTGRES_DB`, `POSTGRES_PORT`, `JWT_SECRET`, `JWT_EXP`, etc.).
+
+- [ ] **Step 3: Copy the required volume files into this repo**
+
+Copy every file the `db` service bind-mounts (from Step 2) into `deploy/selfhosted-supabase/volumes/db/`, preserving the same relative filenames upstream uses (so the compose file's mount paths need minimal adaptation). Do not paraphrase or hand-author SQL — copy verbatim.
+
+- [ ] **Step 4: Add the `db` service to `deploy/selfhosted-supabase/docker-compose.yml`**
+
+- Service name: exactly `db`.
+- Image: `supabase/postgres:17.4.1.037` (or the upstream-confirmed equivalent from Step 2).
+- `mem_limit: 3g`, `mem_limit_swap` equivalent set so swap adds zero extra headroom (mirror Task 1's pattern of capping swap equal to the memory limit, for the same reasoning: a clean OOM-kill is better than swap-thrashing a database).
+- `networks: [coolify]` — same as the other six services, not an isolated network (this is required for the other services to reach `db` by name at all, and matches every Coolify-managed resource on this box).
+- Bind-mount every file copied in Step 3 to the exact container paths upstream uses.
+- Environment: `POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}`, `POSTGRES_DB: ${POSTGRES_DB:-postgres}`, `POSTGRES_PORT: 5432`, `JWT_SECRET: ${JWT_SECRET}`, `JWT_EXP: ${JWT_EXP:-3600}`, plus anything else Step 2 found required.
+- Healthcheck: use upstream's own healthcheck definition for `db` if present (typically a `pg_isready` check), not a hand-invented one.
+
+- [ ] **Step 5: Update the other six services' Postgres connection strings**
+
+In `docker-compose.yml`, change every reference from `${POSTGRES_HOST}:${POSTGRES_PORT}` to the literal internal service name `db:5432` (e.g. `GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-postgres}` — adjust exact role names per what Task 1's original extraction already found in each service's env block; do not invent role names not already present in the file). Remove `POSTGRES_HOST`/`POSTGRES_PORT` from `env.example` since they're no longer externally injected — replace with `POSTGRES_PASSWORD` and `POSTGRES_DB` if not already present.
+
+- [ ] **Step 6: Validate the compose file syntax on the real VPS Docker (not a substitute check)**
+
+```bash
+scp deploy/selfhosted-supabase/docker-compose.yml deploy/selfhosted-supabase/kong.yml deploy/selfhosted-supabase/kong-entrypoint.sh deploy/selfhosted-supabase/env.example hostinger-vps:/tmp/compose-validate-task2/
+ssh hostinger-vps "cd /tmp/compose-validate-task2 && docker compose --env-file env.example -f docker-compose.yml config --quiet; echo \"EXIT: \$?\""
+```
+
+(Copy `deploy/selfhosted-supabase/volumes/` too if the compose file's bind-mount paths are relative to it.) Expected: `EXIT: 0`, no error output. This mirrors how Task 1's validation gap was closed by the controller — do it directly this time since Docker is confirmed reachable via `ssh hostinger-vps`.
+
+- [ ] **Step 7: Clean up**
+
+```bash
+rm -rf /tmp/supabase-upstream-ref
+ssh hostinger-vps "rm -rf /tmp/compose-validate-task2"
+```
+
+- [ ] **Step 8: Commit**
+
+```bash
+git add deploy/selfhosted-supabase/
+git commit -m "feat(selfhost-supabase): add db service to compose stack
+
+Postgres deploys as a db service in the same compose file as the other
+six services, not a separate Coolify-native Database resource — that
+approach doesn't work because supabase/postgres's entrypoint requires
+bind-mounted init SQL files a bare Database resource can't supply.
+See docs/superpowers/specs/2026-08-22-supabase-selfhost-phase1-design.md
+revision note (2026-08-22)."
+```
+
+---
+
+### Task 3: Deploy the full stack (all 7 services) via Coolify
+
+**Files:**
+- Modify: none in the repo (Coolify pulls `deploy/selfhosted-supabase/docker-compose.yml` from the `main` branch when deploying a Git-based compose service).
+
+**Interfaces:**
+- Consumes: `deploy/selfhosted-supabase/docker-compose.yml`, `env.example`, and `volumes/db/` from Tasks 1-2.
+- Produces: a running Coolify service (`logicnexus-selfhost-supabase`) with all 7 containers, Kong reachable at the domain chosen in the spec's Open Items (`supabase.sosservices.online`, unless changed) — Task 4 and Task 5's checks depend on this.
+
+- [ ] **Step 1: Generate real secrets**
 
 ```bash
 export JWT_SECRET=$(openssl rand -base64 48 | tr -d '\n')
 export POSTGRES_PASSWORD=$(openssl rand -base64 32 | tr -d '\n' | tr '/+' '_-')
 ```
 
-Note: per the spec (§2 Non-Goals), these are freshly generated, **not** aligned with Supabase Cloud's actual JWT secret — that alignment is Phase 5's job, out of scope here. Save both values somewhere durable (e.g. a local password manager entry) — they're needed again in Task 5 to mint a test JWT, and by Phase 5 later.
+Note: per the spec (§2 Non-Goals), these are freshly generated, **not** aligned with Supabase Cloud's actual JWT secret — that alignment is Phase 5's job, out of scope here. Save both values somewhere durable — needed again in Task 4/5.
 
 - [ ] **Step 2: Generate the ANON_KEY and SERVICE_ROLE_KEY JWTs signed with `$JWT_SECRET`**
 
@@ -264,15 +220,10 @@ console.log("SERVICE_ROLE_KEY=" + sign({ role: "service_role", iss: "supabase", 
 
 Expected: two `KEY=eyJ...` lines. Save both.
 
-- [ ] **Step 3: Update the Postgres database's password to match Step 1's generated value**
+- [ ] **Step 3: Create the Coolify service from the repo's compose file**
 
 ```bash
-ssh hostinger-vps "docker exec <pg-container-name> psql -U postgres -c \"ALTER USER postgres WITH PASSWORD '$POSTGRES_PASSWORD';\""
-```
-
-- [ ] **Step 4: Create the Coolify service from the repo's compose file**
-
-```bash
+export COOLIFY_API_TOKEN=$(grep '^COOLIFY_API_TOKEN=' env | cut -d'"' -f2)
 curl -sS -X POST "http://72.61.249.111:8000/api/v1/services" \
   -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
   -H "Content-Type: application/json" \
@@ -282,19 +233,19 @@ curl -sS -X POST "http://72.61.249.111:8000/api/v1/services" \
     "server_uuid": "ewwc8w4oc4cs0w08g4goc0go",
     "type": "docker-compose",
     "name": "logicnexus-selfhost-supabase",
-    "description": "Phase 1 self-hosted Supabase app layer (Kong/Auth/REST/Storage/Realtime/Edge Runtime). See docs/superpowers/specs/2026-08-22-supabase-selfhost-phase1-design.md.",
+    "description": "Phase 1 self-hosted Supabase stack for logic-nexus-ai (db+Kong/Auth/REST/Storage/Realtime/Edge Runtime). See docs/superpowers/specs/2026-08-22-supabase-selfhost-phase1-design.md.",
     "git_repository": "https://github.com/vageesha-vaishya/logic-nexus-ai.git",
     "git_branch": "main",
     "docker_compose_location": "/deploy/selfhosted-supabase/docker-compose.yml"
   }'
 ```
 
-Expected: HTTP 200/201 with a `uuid` field — save as `$SVC_UUID`. If this specific request shape 404s or errors (Coolify's exact endpoint/payload for a Git-sourced compose service has shifted between versions before), fall back to creating the service through the Coolify UI at `http://72.61.249.111:8000` instead (New Resource → Docker Compose → point at this repo/branch/path) and note in this file which method actually worked, for future reference.
+Expected: HTTP 200/201 with a `uuid` field — save as `$SVC_UUID`. If this specific request shape 404s or errors, fall back to creating the service through the Coolify UI at `http://72.61.249.111:8000` (New Resource → Docker Compose → point at this repo/branch/path) and note which method worked, for future reference. (Task 2's execution confirmed the Coolify API generally works well once the right HTTP verb/fields are found via its own error messages — apply that same trial pattern here if needed, rather than treating a first-attempt error as a hard blocker.)
 
-- [ ] **Step 5: Set the service's environment variables**
+- [ ] **Step 4: Set the service's environment variables**
 
 ```bash
-for kv in "POSTGRES_HOST=<pg-container-name-from-task2>" "POSTGRES_PORT=5432" "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" "JWT_SECRET=$JWT_SECRET" "ANON_KEY=<from step 2>" "SERVICE_ROLE_KEY=<from step 2>" "SITE_URL=https://supabase.sosservices.online"; do
+for kv in "POSTGRES_PASSWORD=$POSTGRES_PASSWORD" "POSTGRES_DB=postgres" "JWT_SECRET=$JWT_SECRET" "ANON_KEY=<from step 2>" "SERVICE_ROLE_KEY=<from step 2>" "SITE_URL=https://supabase.sosservices.online"; do
   key="${kv%%=*}"; value="${kv#*=}"
   curl -sS -X POST "http://72.61.249.111:8000/api/v1/services/$SVC_UUID/envs" \
     -H "Authorization: Bearer $COOLIFY_API_TOKEN" \
@@ -303,26 +254,77 @@ for kv in "POSTGRES_HOST=<pg-container-name-from-task2>" "POSTGRES_PORT=5432" "P
 done
 ```
 
-Expected: HTTP 200/201 for each call.
+Add any further env vars Task 2 Step 2 found required that aren't listed here — check `env.example` for the authoritative full list before running this.
 
-- [ ] **Step 6: Set the domain on the `kong` sub-resource within this service and deploy**
+- [ ] **Step 5: Set the domain on the `kong` sub-resource within this service and deploy**
 
-Via the Coolify UI (this is the most reliable path for setting a per-container domain within a compose service — the API shape for this varies more than top-level resource creation): open the service, find the `kong` container's settings, set its domain to `supabase.sosservices.online` (or whatever was confirmed for the spec's Open Item), enable HTTPS. Then trigger deploy:
+Via the Coolify UI: open the service, find the `kong` container's settings, set its domain to `supabase.sosservices.online` (or whatever was confirmed for the spec's Open Item), enable HTTPS. Then trigger deploy:
 
 ```bash
-curl -sS -X GET "http://72.61.249.111:8000/api/v1/services/$SVC_UUID/start" \
+curl -sS -X POST "http://72.61.249.111:8000/api/v1/services/$SVC_UUID/start" \
   -H "Authorization: Bearer $COOLIFY_API_TOKEN"
 ```
 
-- [ ] **Step 7: Confirm all 6 containers are running**
+(Note: Task 2's execution found the analogous database `/start` endpoint requires `POST`, not `GET`, despite older docs — try `POST` first here too.)
+
+- [ ] **Step 6: Confirm all 7 containers are running**
 
 ```bash
-ssh hostinger-vps "docker ps --filter 'label=com.docker.compose.project' --format '{{.Names}}\t{{.Status}}' | grep -i 'kong\|auth\|rest\|storage\|realtime\|functions'"
+ssh hostinger-vps "docker ps --filter 'label=com.docker.compose.project' --format '{{.Names}}\t{{.Status}}' | grep -i 'kong\|auth\|rest\|storage\|realtime\|functions\|^db\b\|_db_'"
 ```
 
-Expected: 6 lines, all `Up ...`.
+Expected: 7 lines, all `Up ...`. If `db` doesn't reach a healthy state, check its logs immediately (`ssh hostinger-vps "docker logs <db-container-name> --tail 50"`) before assuming anything else is wrong — Task 2's diagnosis pattern (read the entrypoint, compare against the working precedent) is the right approach if it crash-loops again.
 
-- [ ] **Step 8: Re-verify the other 24 apps are unaffected**
+- [ ] **Step 7: Re-verify the other 24 apps are unaffected**
+
+Run the four health-check curls from Global Constraints. All must return `200`.
+
+---
+
+### Task 4: Verify and enable the required Postgres extensions
+
+**Files:** none.
+
+**Interfaces:**
+- Consumes: the running `db` container from Task 3.
+- Produces: confirmation that `vector`, `postgis`, `pgroonga`, `pg_cron`, `pgjwt`, `pgsodium`, `pg_net`, `pg_graphql` are installed.
+
+- [ ] **Step 1: Check which extensions are already available in the image**
+
+```bash
+ssh hostinger-vps "docker exec <db-container-name-from-task3-step6> psql -U supabase_admin -c \"SELECT name, default_version, installed_version FROM pg_available_extensions WHERE name IN ('vector','postgis','pgroonga','pg_cron','pgjwt','pgsodium','pg_net','pg_graphql') ORDER BY name;\""
+```
+
+Note: the bootstrap superuser is `supabase_admin` (confirmed during Task 2's diagnosis — `supabase/postgres`'s own migration scripts assume this role, not `postgres`), not the plain `postgres` user the original plan assumed.
+
+Expected: all 8 rows present with a non-null `default_version`. If any are missing, `supabase/postgres` doesn't bundle it — stop and report back rather than guessing a fix.
+
+- [ ] **Step 2: Enable each extension that isn't already installed**
+
+```bash
+ssh hostinger-vps "docker exec <db-container-name> psql -U supabase_admin -c \"
+CREATE EXTENSION IF NOT EXISTS vector;
+CREATE EXTENSION IF NOT EXISTS postgis;
+CREATE EXTENSION IF NOT EXISTS pgroonga;
+CREATE EXTENSION IF NOT EXISTS pg_cron;
+CREATE EXTENSION IF NOT EXISTS pgjwt;
+CREATE EXTENSION IF NOT EXISTS pgsodium;
+CREATE EXTENSION IF NOT EXISTS pg_net;
+CREATE EXTENSION IF NOT EXISTS pg_graphql;
+\""
+```
+
+Expected: no errors. `pg_cron` may require `shared_preload_libraries=pg_cron` in `postgresql.conf` to actually activate — the `supabase/postgres` image sets this by default; if `pg_cron` jobs don't run later, check `SHOW shared_preload_libraries;` first.
+
+- [ ] **Step 3: Verify all 8 are now installed**
+
+```bash
+ssh hostinger-vps "docker exec <db-container-name> psql -U supabase_admin -c \"SELECT extname FROM pg_extension WHERE extname IN ('vector','postgis','pgroonga','pg_cron','pgjwt','pgsodium','pg_net','pg_graphql') ORDER BY extname;\""
+```
+
+Expected: exactly 8 rows returned.
+
+- [ ] **Step 4: Re-verify the other 24 apps are unaffected**
 
 Run the four health-check curls from Global Constraints. All must return `200`.
 
@@ -333,7 +335,7 @@ Run the four health-check curls from Global Constraints. All must return `200`.
 **Files:** none.
 
 **Interfaces:**
-- Consumes: `$ANON_KEY` from Task 4 Step 2, the domain from Task 4 Step 6.
+- Consumes: `$ANON_KEY` from Task 3 Step 2, the domain from Task 3 Step 5.
 
 - [ ] **Step 1: GoTrue health through Kong**
 
@@ -365,7 +367,7 @@ Expected: `200`.
 curl -s -o /dev/null -w "%{http_code}\n" -H "Connection: Upgrade" -H "Upgrade: websocket" -H "apikey: $ANON_KEY" https://supabase.sosservices.online/realtime/v1/
 ```
 
-Expected: `101` (or `426` if the upgrade headers aren't perfectly formed by curl — either indicates the Realtime container itself responded, which is what this step is checking; a `502`/`503`/`000` means it's not reachable and needs investigation).
+Expected: `101` (or `426` if the upgrade headers aren't perfectly formed by curl — either indicates the Realtime container itself responded; a `502`/`503`/`000` means it's not reachable and needs investigation).
 
 - [ ] **Step 5: Edge Runtime through Kong**
 
@@ -373,15 +375,23 @@ Expected: `101` (or `426` if the upgrade headers aren't perfectly formed by curl
 curl -s -o /dev/null -w "%{http_code}\n" https://supabase.sosservices.online/functions/v1/ -H "apikey: $ANON_KEY"
 ```
 
-Expected: `404` is acceptable here (no functions deployed yet — that's Phase 4) as long as it's not `502`/`503`/`000`, which would mean the Edge Runtime container itself isn't reachable through Kong.
+Expected: `404` is acceptable here (no functions deployed yet — that's Phase 4) as long as it's not `502`/`503`/`000`.
 
-- [ ] **Step 6: Confirm each container's actual memory usage is within its cap under this light smoke-test load**
+- [ ] **Step 6: Direct Postgres connectivity check (new — wasn't needed under the old split-resource design)**
 
 ```bash
-ssh hostinger-vps "docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' | grep -i 'kong\|auth\|rest\|storage\|realtime\|functions'"
+ssh hostinger-vps "docker exec <db-container-name> psql -U supabase_admin -c 'SELECT 1;'"
 ```
 
-Expected: every value well under its configured cap (512m/256m/256m/512m/768m/768m).
+Expected: returns `1`. This directly confirms `db` itself is healthy and accepting connections, independent of whatever Kong/PostgREST report — cheap and worth doing given Task 2/3's history with this specific image.
+
+- [ ] **Step 7: Confirm each container's actual memory usage is within its cap under this light smoke-test load**
+
+```bash
+ssh hostinger-vps "docker stats --no-stream --format '{{.Name}}\t{{.MemUsage}}' | grep -i 'kong\|auth\|rest\|storage\|realtime\|functions\|^db\b\|_db_'"
+```
+
+Expected: every value well under its configured cap (3g for `db`, 512m/256m/256m/512m/768m/768m for the rest).
 
 ---
 
@@ -398,7 +408,7 @@ Expected: every value well under its configured cap (512m/256m/256m/512m/768m/76
 ssh hostinger-vps "free -h; echo '---'; dmesg | grep -i 'out of memory' | tail -5; echo '---'; docker ps --format '{{.Names}}' | wc -l"
 ```
 
-Expected: no new OOM entries beyond the known 2026-08-15 incident, free/available memory not meaningfully worse than the pre-deployment baseline (966MB free / 6.15GB available), container count now 7 higher than the actual pre-deployment baseline of **71** (confirmed via `docker ps -a --format '{{.Names}}' | wc -l` during this plan's audit, i.e. *after* the `logicprodev` + `supabase-gateway` cleanup — not the original 88 from before that cleanup) — so expect **78** total: 71 + 1 database + 6 app-layer.
+Expected: no new OOM entries beyond the known 2026-08-15 incident, free/available memory not meaningfully worse than the pre-deployment baseline (966MB free / 6.15GB available), container count now 7 higher than the actual pre-deployment baseline of **71** (confirmed via `docker ps -a --format '{{.Names}}' | wc -l` — after the `logicprodev`/`supabase-gateway` cleanup, and after Task 2's original blocked attempt was fully cleaned up) — so expect **78** total: 71 + 7 (all one Coolify Compose service now, not split across a database resource + a separate service).
 
 - [ ] **Step 2: Re-run all four production health-check curls one final time**
 
@@ -420,8 +430,8 @@ Append to `deploy/selfhosted-supabase/README.md`:
 
 If this stack needs to be torn down (resource pressure, or Phase 1 is abandoned):
 
-1. Stop the app-layer service: `curl -X GET "http://72.61.249.111:8000/api/v1/services/$SVC_UUID/stop" -H "Authorization: Bearer $COOLIFY_API_TOKEN"`, then delete it: `curl -X DELETE "http://72.61.249.111:8000/api/v1/services/$SVC_UUID" -H "Authorization: Bearer $COOLIFY_API_TOKEN"`.
-2. Stop and delete the database: `curl -X DELETE "http://72.61.249.111:8000/api/v1/databases/$PG_DB_UUID" -H "Authorization: Bearer $COOLIFY_API_TOKEN"`.
+1. Stop the service: `curl -X POST "http://72.61.249.111:8000/api/v1/services/$SVC_UUID/stop" -H "Authorization: Bearer $COOLIFY_API_TOKEN"`, then delete it: `curl -X DELETE "http://72.61.249.111:8000/api/v1/services/$SVC_UUID" -H "Authorization: Bearer $COOLIFY_API_TOKEN"`.
+2. This removes all 7 containers (including `db`) in one action, since they're all one Coolify Compose service — simpler than the original two-resource design.
 3. Re-run the four production health-check curls to confirm zero impact (same as every other step in this plan).
 
 Nothing in this stack is referenced by any production app's env vars, so this teardown is safe at any time during Phase 1.
@@ -438,11 +448,11 @@ git commit -m "docs(selfhost-supabase): document Phase 1 rollback path"
 
 ## Plan Self-Review
 
-**Spec coverage:** §3 Architecture (all 7 components) → Tasks 1, 2, 4. §4 Memory limits → Global Constraints + every task's mem_limit/limits_memory values. §5 Domain/networking → Task 1 Step 4 (isolated network), Task 4 Step 6 (domain). §6 Verification plan → Tasks 3, 5, 6 map 1:1 to the spec's 5 verification items. §7 Open items → Task 2 Step 1/2 handles the image tag by checking live rather than guessing; the domain name is used as given (`supabase.sosservices.online`) per the spec's stated default — flag to the user if they wanted a different one before Task 4 Step 6.
+**Spec coverage (post-revision numbering):** §3 Architecture (all 7 components, all one compose service) → Tasks 1, 2, 3. §4 Memory limits → Global Constraints + every task's `mem_limit` values, including `db`'s 3g in Task 2. §5 Domain/networking → all 7 services on `coolify` network (Task 1 for the six, Task 2 for `db`), domain in Task 3 Step 5. §6 Verification plan → Tasks 4, 5, 6 map to the spec's 5 verification items, plus Task 5's new direct-Postgres check. §7 Open items → Postgres image tag resolved (confirmed `17.4.1.037` during the original Task 2 attempt); domain name used as given (`supabase.sosservices.online`) per the spec's stated default.
 
-**Placeholder scan:** Task 2 Step 1's `image` tag is a best-guess string with an explicit fallback verification+retry step (Step 2) rather than a bare TBD — acceptable per the "No Placeholders" rule since it's a concrete, verifiable, self-correcting action. Task 4 Step 4's Coolify API shape has an explicit UI fallback if the guessed endpoint is wrong, for the same reason — Coolify's service-creation API is the least-verified endpoint in this plan (I confirmed `/api/v1/databases/postgresql` create-shape indirectly via the existing `avaipro-pg` resource's GET schema, but did not find and test the exact `/api/v1/services` POST payload before writing this plan).
+**Placeholder scan:** Task 3 Step 3's Coolify API shape has an explicit UI fallback if the guessed endpoint is wrong — Coolify's service-creation API is the least-verified endpoint in this plan; the analogous database-creation endpoint needed a live fix (POST not GET for `/start`) during the original Task 2 attempt, so the same trial-and-adapt approach is called out explicitly here rather than assumed to work first-try.
 
-**Type/name consistency:** compose service names (`kong`, `auth`, `rest`, `storage`, `realtime`, `functions`) are defined in Task 1 and referenced identically in Task 4 (env var injection, domain routing) and Task 5 (health-check paths) — verified consistent.
+**Type/name consistency:** compose service names (`kong`, `auth`, `rest`, `storage`, `realtime`, `functions`, and now `db`) are defined in Tasks 1-2 and referenced identically in Task 3 (env var injection, domain routing) and Tasks 4-5 (extension checks, health-check paths) — verified consistent.
 
 **Second audit pass (2026-08-22, requested by user):** re-checked this plan against live evidence rather than re-reading it for tone. Found and fixed three real issues:
 1. **Network architecture bug:** the original Task 1 (and spec §5) put the app-layer services on an isolated network separate from `coolify`. Re-verified directly (`docker inspect y85hpjdrs9wlotcgqcbw8gdg`) that Coolify-native Database resources live on the shared `coolify` network — as originally written, `auth`/`rest`/`storage`/`realtime`/`functions` would never have been able to reach Postgres by container name. Fixed in both the spec and Task 1: all 7 containers now join `coolify`; the actual protection against the other 24 apps is the memory limits, not network topology.
@@ -450,6 +460,8 @@ git commit -m "docs(selfhost-supabase): document Phase 1 rollback path"
 3. **Stale container-count baseline in Task 6:** used the pre-cleanup figure (88) instead of the actual current baseline. Re-verified live (`docker ps -a | wc -l` = 71) and corrected the expected post-deployment count to 78.
 
 Also flagged (not a bug, a known limitation): Realtime needs tenant registration for full functionality beyond a bare WebSocket handshake — Task 5's check only validates the handshake, noted explicitly in Task 1 so this isn't mistaken for "fully working" later.
+
+**Third revision (2026-08-22, discovered during Task 2 execution, not an audit pass — a real BLOCKED report):** Task 1 completed and passed review cleanly. Task 2 (original: provision Postgres as a Coolify-native Database resource) came back BLOCKED: `supabase/postgres`'s entrypoint unconditionally requires a bind-mounted `99-roles.sql` on every startup, which Coolify's generic Database resource type cannot supply — confirmed by the implementer reading the image's own `docker-entrypoint.sh` and by contrast with the working `avaipro-pg` precedent (plain `postgres:17`, a different image that doesn't need this). This is a genuine plan defect, not a retry-able mistake — escalated to the user per this skill's BLOCKED-handling guidance rather than guessed through. User chose: fold Postgres into the compose stack as a `db` service. Both the spec and this plan were revised accordingly (old Task 2 dropped entirely; Tasks 3-6 renumbered/adjusted — see the "Revised" notes at the top of this document and in the spec). The dead-end Coolify Database resource from the blocked attempt was deleted and confirmed gone before continuing.
 
 ---
 
