@@ -10,7 +10,15 @@ _transform: true
 # were dropped for the same reason. Everything else — including the $SUPABASE_ANON_KEY
 # / $SUPABASE_SERVICE_KEY / $LUA_AUTH_EXPR / $LUA_RT_WS_EXPR placeholders, which only
 # resolve into real values via kong-entrypoint.sh's substitution step at container
-# start — is unchanged from upstream.
+# start — is unchanged from upstream, EXCEPT the four Realtime service URLs below:
+# upstream points them at `realtime-dev.supabase-realtime` (a hostname upstream's own
+# docker-compose.yml manufactures via `container_name:` on the realtime service, purely
+# so Kong has something to resolve). Coolify does not honor `container_name` as a
+# network alias, so that hostname never resolves here — Kong only ever sees the plain
+# `realtime` alias. Rewritten to `http://realtime:4000/...` accordingly (Task 5 fix,
+# 2026-08-22). Realtime's own container_name in docker-compose.yml is untouched — that
+# setting is for Realtime's internal Erlang/Phoenix node identity, unrelated to how
+# Kong reaches it over HTTP.
 
 ###
 ### Consumers / Users
@@ -218,7 +226,7 @@ services:
   ## Secure Realtime routes
   - name: realtime-v1-ws
     _comment: 'Realtime: /realtime/v1/* -> ws://realtime:4000/socket/*'
-    url: http://realtime-dev.supabase-realtime:4000/socket
+    url: http://realtime:4000/socket
     protocol: ws
     routes:
       - name: realtime-v1-ws
@@ -248,7 +256,7 @@ services:
   # Block access to /realtime/v1/api/openapi
   - name: realtime-v1-rest-openapi
     _comment: 'Realtime: /realtime/v1/api/openapi/* -> http://realtime:4000/api/openapi/* (blocked)'
-    url: http://realtime-dev.supabase-realtime:4000/api/openapi
+    url: http://realtime:4000/api/openapi
     protocol: http
     routes:
       - name: realtime-v1-rest-openapi
@@ -264,7 +272,7 @@ services:
   # Block access to /realtime/v1/api/tenants
   - name: realtime-v1-rest-tenants
     _comment: 'Realtime: /realtime/v1/api/tenants/* -> http://realtime:4000/api/tenants/* (blocked)'
-    url: http://realtime-dev.supabase-realtime:4000/api/tenants
+    url: http://realtime:4000/api/tenants
     protocol: http
     routes:
       - name: realtime-v1-rest-tenants
@@ -279,7 +287,7 @@ services:
 
   - name: realtime-v1-rest
     _comment: 'Realtime: /realtime/v1/api/* -> http://realtime:4000/api/*'
-    url: http://realtime-dev.supabase-realtime:4000/api
+    url: http://realtime:4000/api
     protocol: http
     routes:
       - name: realtime-v1-rest
