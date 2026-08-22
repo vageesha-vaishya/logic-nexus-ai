@@ -115,7 +115,7 @@ Also found and cleaned up during this investigation (see git history / conversat
 
 | Component | Image | Memory cap | Rationale |
 |---|---|---|---|
-| Postgres (`db` service) | `supabase/postgres:17.4.1.037` (confirmed exists on Docker Hub, accepted without a 404 during Task 2) | 3GB | Modest `shared_buffers` (~768MB, tunable), room for per-connection work_mem given ~300 tables but currently modest real row counts |
+| Postgres (`db` service) | `supabase/postgres:17.6.1.136` (corrected 2026-08-22: this is what upstream's `docker-compose.yml` actually pins as of the Task 2 re-clone; the earlier `17.4.1.037` also exists on Docker Hub but is a stale snapshot — every other image tag in this table was confirmed against the same upstream fetch as this one, so the discrepancy was isolated to Postgres specifically, not a stale fetch overall) | 3GB | Modest `shared_buffers` (~768MB, tunable), room for per-connection work_mem given ~300 tables but currently modest real row counts |
 | Kong | `kong/kong:3.9.3` (confirmed, pulled directly from upstream's current reference during Task 1) | 512MB | Gateway/routing only, no heavy state |
 | GoTrue | `supabase/gotrue:v2.189.0` | 256MB | Auth is lightweight per-request |
 | PostgREST | `postgrest/postgrest:v14.12` | 256MB | Stateless REST layer |
@@ -153,6 +153,6 @@ Before Phase 1 is considered done:
 
 ## 7. Open Items (explicit, to resolve before/during implementation)
 
-- ~~**Postgres image tag**~~ — resolved: `supabase/postgres:17.4.1.037`, confirmed to exist on Docker Hub during Task 2 execution.
+- ~~**Postgres image tag**~~ — resolved: `supabase/postgres:17.6.1.136` (corrected 2026-08-22 — the compose-stack Task 2 re-clone found upstream actually pins this, not the `17.4.1.037` first noted during the original, now-superseded Coolify-native-Database-resource attempt).
 - **Domain name for the gateway**: proposed default `supabase.sosservices.online`, matching the "one clear subdomain per concern" pattern already used across the other 24 apps (`api.`, `amro.`, `uim.`, `db.aviation.`, etc.). Adjustable — confirm with the user before provisioning DNS/Traefik routing.
 - **Storage backend**: local disk (proposed default, matches "lean" goal) vs. adding MinIO later if S3-compatible access becomes necessary for a later phase — deferred, not blocking Phase 1.

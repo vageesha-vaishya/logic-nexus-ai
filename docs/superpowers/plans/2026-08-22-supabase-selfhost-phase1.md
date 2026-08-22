@@ -8,7 +8,7 @@
 
 **Revised 2026-08-22 during Task 2 execution:** the original plan had Postgres as a separate Coolify-native "Database" resource (matching the `avaipro-pg` precedent), with a distinct Task 2 (provision it) before Task 4 (deploy the other six services). This doesn't work: `supabase/postgres`'s own entrypoint unconditionally requires a bind-mounted `99-roles.sql` on every startup, which a bare Coolify Database resource cannot supply (confirmed directly against the image and against `avaipro-pg`, which uses a different, simpler image that doesn't need this file). Postgres is now a `db` service inside the same compose file as the other six — Tasks 2-6 below reflect this; the old Task 2 (Coolify-native resource) is dropped entirely, not deferred.
 
-**Tech Stack:** Coolify v4 (REST API + Traefik), Docker/docker-compose, `supabase/postgres:17.4.1.037`, `kong/kong:3.9.3`, `supabase/gotrue:v2.189.0`, `postgrest/postgrest:v14.12`, `supabase/storage-api:v1.60.4`, `supabase/realtime:v2.102.3`, `supabase/edge-runtime:v1.74.0` (all image tags confirmed during Task 1/2 execution, not guessed).
+**Tech Stack:** Coolify v4 (REST API + Traefik), Docker/docker-compose, `supabase/postgres:17.6.1.136` (corrected from the plan's earlier `17.4.1.037` assumption during Task 2's actual execution — see its report), `kong/kong:3.9.3`, `supabase/gotrue:v2.189.0`, `postgrest/postgrest:v14.12`, `supabase/storage-api:v1.60.4`, `supabase/realtime:v2.102.3`, `supabase/edge-runtime:v1.74.0` (all image tags confirmed against the same live upstream fetch, not guessed).
 
 ## Global Constraints
 
