@@ -65,9 +65,9 @@ Also found and cleaned up during this investigation (see git history / conversat
    "Database"         │  extensions: vector, postgis, pgroonga,                          │
    resource            │  pg_cron, pgjwt, pgsodium, pg_net, pg_graphql                    │
                       │                     ▲                                            │
-                      │                     │ internal Docker network (isolated,          │
-                      │                     │ same pattern as the network we verified     │
-                      │                     │ for the removed logicprodev stack)          │
+                      │                     │ shared `coolify` Docker network (same one   │
+                      │                     │ every Coolify resource on this box uses —   │
+                      │                     │ see §5, corrected during plan audit)        │
                       │        ┌────────────┼─────────────┬──────────────┬──────────┐    │
                       │        │            │             │              │          │    │
                       │     GoTrue      PostgREST      Storage API    Realtime   Edge Rtm │
@@ -125,9 +125,12 @@ This does not make the risk zero: if literal system-wide available memory (not j
 
 ## 5. Domain / Networking
 
-- New stack's containers sit on their own isolated Docker network (not the shared `coolify` bridge network that 51+ other containers share) — verified as the right pattern from auditing both the stack we removed (isolated, zero risk) and confirming isolation before touching anything.
+**Corrected during plan audit (2026-08-22):** the first draft of this section said the new stack would sit on its own isolated Docker network, separate from the shared `coolify` network — modeled on the isolation we confirmed for the abandoned `logicprodev` stack before removing it. That's wrong for this design: **Coolify-native Database resources live on the shared `coolify` network** (confirmed directly on `avaipro-pg`, `y85hpjdrs9wlotcgqcbw8gdg`, via `docker inspect`), and Coolify's Traefik-based domain routing also expects the exposed container to be reachable on that same network (confirmed via the working `avaipro-gotrue`/`avaipro-postgrest`/`avaipro-gateway` precedent, all on `coolify`). Building this stack on a separate isolated network as originally written would have left `auth`/`rest`/`storage`/`realtime`/`functions` unable to reach Postgres by container name at all — the stack would report "running" but be non-functional.
+
+- All 7 containers (Postgres + Kong + GoTrue + PostgREST + Storage + Realtime + Edge Runtime) join the shared `coolify` Docker network — this is simply how every Coolify-managed resource on this box works, not a special exception for this stack.
+- The actual safety property against the other 24 apps is **not** network isolation — it's the per-container memory limits (§4). Network topology was never the right lever for that concern; being on a shared bridge network doesn't cost CPU/memory or affect other containers' resource cgroups.
 - Kong is the only component exposed via Coolify's Traefik, on a new subdomain (see Open Items §7 for the exact name).
-- Postgres, GoTrue, PostgREST, Storage, Realtime, Edge Runtime are internal-only — reachable from Kong via the internal network, not exposed to the host or the internet directly (matches the pattern of the stack that was removed, and unlike the currently-unusual `logicprodev` finding where the DB had no exposed port either — that part of the old design was actually fine).
+- Postgres, GoTrue, PostgREST, Storage, Realtime, Edge Runtime don't need host port exposure — reachable from Kong (and from each other, and from Postgres) via the shared `coolify` network's internal container-name DNS, same as every other Coolify app already does.
 
 ## 6. Verification Plan for Phase 1
 
