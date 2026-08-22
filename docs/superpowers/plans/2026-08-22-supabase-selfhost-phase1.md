@@ -351,7 +351,19 @@ Expected: `200`.
 curl -s -o /dev/null -w "%{http_code}\n" https://supabase.sosservices.online/rest/v1/ -H "apikey: $ANON_KEY"
 ```
 
-Expected: `200`.
+**Corrected post-execution (2026-08-22, final whole-plan review):** actual
+live result is `403`, not `200` — Kong's ACL config makes this route
+admin-only, so the anon key alone is rejected. The check that actually
+proves Kong→PostgREST connectivity works is the same request with the
+`service_role` key instead:
+
+```bash
+curl -s -o /dev/null -w "%{http_code}\n" https://supabase.sosservices.online/rest/v1/ -H "apikey: $SERVICE_ROLE_KEY"
+```
+
+Expected (revised): `403` with the anon key (proves Kong's ACL is enforcing,
+not that something is broken); `200` with the real PostgREST OpenAPI root
+body when using `service_role`.
 
 - [ ] **Step 3: Storage API status through Kong**
 
@@ -369,6 +381,14 @@ curl -s -o /dev/null -w "%{http_code}\n" -H "Connection: Upgrade" -H "Upgrade: w
 
 Expected: `101` (or `426` if the upgrade headers aren't perfectly formed by curl — either indicates the Realtime container itself responded; a `502`/`503`/`000` means it's not reachable and needs investigation).
 
+**Corrected post-execution (2026-08-22, final whole-plan review):** actual
+live result is `403`, not `101`/`426`. This is Realtime's own Cowboy server
+responding (confirming the request reached the container through Kong), but
+rejecting it for lack of a registered tenant — a tenant-auth gap, not a
+routing failure. A `403` here should be read the same way the original
+`101`/`426` expectation was: proof the container is reachable. Only
+`502`/`503`/`000` indicates an actual reachability problem.
+
 - [ ] **Step 5: Edge Runtime through Kong**
 
 ```bash
@@ -376,6 +396,13 @@ curl -s -o /dev/null -w "%{http_code}\n" https://supabase.sosservices.online/fun
 ```
 
 Expected: `404` is acceptable here (no functions deployed yet — that's Phase 4) as long as it's not `502`/`503`/`000`.
+
+**Corrected post-execution (2026-08-22, final whole-plan review):** actual
+live result is `503`, because the `functions` container itself is down (a
+known, permanent, isolated crash-loop — real Edge Function content doesn't
+exist yet, deliberately deferred to a later phase, not a Task 5 defect). A
+future re-run of this plan should expect `503` here until `functions` has
+real content to serve, not the `404` originally predicted.
 
 - [ ] **Step 6: Direct Postgres connectivity check (new — wasn't needed under the old split-resource design)**
 
@@ -409,6 +436,14 @@ ssh hostinger-vps "free -h; echo '---'; dmesg | grep -i 'out of memory' | tail -
 ```
 
 Expected: no new OOM entries beyond the known 2026-08-15 incident, free/available memory not meaningfully worse than the pre-deployment baseline (966MB free / 6.15GB available), container count now 7 higher than the actual pre-deployment baseline of **71** (confirmed via `docker ps -a --format '{{.Names}}' | wc -l` — after the `logicprodev`/`supabase-gateway` cleanup, and after Task 2's original blocked attempt was fully cleaned up) — so expect **78** total: 71 + 7 (all one Coolify Compose service now, not split across a database resource + a separate service).
+
+**Corrected post-execution (2026-08-22, final whole-plan review):** the
+verified stable actual count is **77 total / 76 running**, not 78. The
+71-baseline used above had itself already been corrected once during an
+earlier audit pass (from an original 88); it reconciles as 70 non-stack
+containers (not 71) + this stack's 7 = 77 total, with one of the 7
+(`functions`) perpetually restarting rather than running, hence 76 running.
+Treat 77/76 as the figure to check against on any future re-run, not 78.
 
 - [ ] **Step 2: Re-run all four production health-check curls one final time**
 

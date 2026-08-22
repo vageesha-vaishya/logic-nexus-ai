@@ -1,8 +1,9 @@
 # Self-hosted Supabase — Phase 1 lean stack
 
 Docker-compose config for a resource-capped, self-hosted Supabase-equivalent
-stack (Kong + Auth + REST + Storage + Realtime + Edge Runtime), deployed
-through Coolify on the existing shared Hostinger VPS (`72.61.249.111`).
+stack (Postgres + Kong + Auth + REST + Storage + Realtime + Edge Runtime),
+deployed through Coolify on the existing shared Hostinger VPS
+(`72.61.249.111`).
 
 This is **Phase 1** of the "Logic Nexus AI" migration off Supabase Cloud
 (project `gzhxgoigflftharcmdqj`) to self-hosted infrastructure. Phase 1 only
@@ -18,14 +19,24 @@ This directory follows the same documentation convention as the existing
 deployment path for the frontend + markets-worker) — a compose/config
 bundle plus a README, not a script-driven install like that one.
 
+> **Revised 2026-08-22 (final whole-plan review):** the sections below
+> originally described a pre-revision architecture (Postgres as a separate
+> Coolify-native "Database" resource, no `db` service in this compose file,
+> "not a live deployment yet"). That was never true of the final, executed
+> plan and directly contradicted the Rollback section below it. Corrected to
+> describe the actual, current architecture: 7 services (including `db`) in
+> one compose file, live and deployed as Coolify application
+> `i64jlyerora7ao9vkw5sweh3`.
+
 ## What's in this directory
 
 | File | Purpose |
 |---|---|
-| `docker-compose.yml` | The 6-service stack: `kong`, `auth`, `rest`, `storage`, `realtime`, `functions`. No `db` service — Postgres is a separate Coolify-native "Database" resource (see below). |
+| `docker-compose.yml` | The 7-service stack: `db`, `kong`, `auth`, `rest`, `storage`, `realtime`, `functions` — Postgres runs as the `db` service in this same compose file, not a separate Coolify-native "Database" resource (that approach was tried and doesn't work; see the plan's Task 2 history). |
 | `kong.yml` | Kong's DB-less declarative config — routes `/auth/v1`, `/rest/v1`, `/graphql/v1`, `/storage/v1`, `/realtime/v1`, `/functions/v1` to their backends. Adapted from upstream `supabase/supabase`, with Studio/postgres-meta/Analytics routes removed (out of scope). |
 | `kong-entrypoint.sh` | Kong's custom entrypoint — substitutes `$SUPABASE_ANON_KEY`/`$SUPABASE_SERVICE_KEY` and builds the request-transformer Lua expressions into `kong.yml` before Kong starts. Copied verbatim from upstream; do not hand-edit the substitution logic. |
 | `env.example` | Every env var the compose file references, with placeholders and comments. Copy to `.env` (not committed) and fill in real values. Named without a leading dot, like `deploy/env.example`, so the repo's pre-commit hook (which blocks any staged `.env*` file as a secrets-safety guard) doesn't reject it. |
+| `volumes/db/*.sql` | Postgres init scripts, bind-mounted into `db`'s `/docker-entrypoint-initdb.d/` — required unconditionally by `supabase/postgres`'s own entrypoint (see "Operational gotcha" below for why these can't just be edited and redeployed). |
 
 ## Where this deploys
 
@@ -33,33 +44,45 @@ bundle plus a README, not a script-driven install like that one.
   `72.61.249.111`, alongside the platform's other resources (frontend,
   8 microservices, and ~24 unrelated apps). This stack is *additive* — it
   does not touch, replace, or reconfigure any existing Coolify resource.
-- **Postgres**: a Coolify-native "Database" resource (Task 2 of the Phase 1
-  plan), matching the precedent already proven by the `aviation-ai-pro` app
-  on this same box — not a container in this compose file. `POSTGRES_HOST`/
-  `POSTGRES_PORT` in `.env` point at that resource once it exists.
-- **Network**: all 6 services join the shared, pre-existing `coolify` Docker
+- **Postgres**: the `db` service in this same `docker-compose.yml` — not a
+  separate Coolify-native "Database" resource. That approach (matching the
+  precedent proven by the `aviation-ai-pro` app on this same box) was the
+  original plan but was abandoned during Task 2's execution: `supabase/postgres`'s
+  own entrypoint unconditionally requires bind-mounted init SQL under
+  `/docker-entrypoint-initdb.d/` (see `volumes/db/`), which a bare Coolify
+  Database resource has no way to supply. `POSTGRES_HOST`/`POSTGRES_PORT` in
+  `.env` are unused by `db` itself; every other service instead points its
+  DB connection URL at the literal internal hostname `db:5432`.
+- **Network**: all 7 services join the shared, pre-existing `coolify` Docker
   network (`external: true` in `docker-compose.yml`) — the same network every
-  other Coolify-managed resource on this VPS uses, including the Postgres
-  resource above. This is required for container-name DNS resolution to work
-  (confirmed via `docker inspect` against existing resources on this VPS);
-  it is not an isolation boundary. Memory limits (below) are.
-- **Gateway domain**: Kong is the only service meant to be exposed via
-  Coolify's Traefik, proposed at `supabase.sosservices.online` (adjustable —
-  confirm before DNS/Traefik provisioning). The other 5 services are reachable
-  only from Kong and each other, over the internal `coolify` network.
+  other Coolify-managed resource on this VPS uses. This is required for
+  container-name DNS resolution to work (confirmed via `docker inspect`
+  against existing resources on this VPS); it is not an isolation boundary.
+  Memory limits (below) are.
+- **Gateway domain**: Kong is the only service exposed via Coolify's Traefik,
+  live at `https://supabase.sosservices.online`. The other 6 services are
+  reachable only from Kong and each other, over the internal `coolify`
+  network — Kong's `docker-compose.yml` port binding is loopback-only (see
+  below), so Traefik reaches it purely by container name over `coolify`, the
+  same as every other service-to-service hop in this stack.
 
-Actually wiring this compose file up as a Coolify resource, provisioning the
-Postgres "Database" resource, and Traefik/DNS routing are later tasks in the
-Phase 1 plan (Task 2 and Task 4) — this directory only contains the
-repo-tracked config, not a live deployment.
+This compose file is deployed and live as Coolify application
+`i64jlyerora7ao9vkw5sweh3` (see Rollback below for full detail) — this
+directory is not merely repo-tracked config awaiting deployment.
 
 ## Memory limits
 
 Every service has an explicit `mem_limit`, matching the design spec's Global
-Constraints table:
+Constraints table, and a `memswap_limit` equal to its own `mem_limit` (fixed
+2026-08-22 — the six non-`db` services previously had no `memswap_limit` at
+all, which meant each could swap up to 2x its memory cap; only `db` had this
+set from the start). Setting `memswap_limit` equal to `mem_limit` means zero
+extra swap headroom for any service — a clean OOM-kill inside this stack's
+own cgroup beats swap-thrashing that could degrade the whole VPS.
 
-| Service | Cap | Image |
+| Service | Cap (`mem_limit` = `memswap_limit`) | Image |
 |---|---|---|
+| `db` | 3g | `supabase/postgres:17.6.1.136` |
 | `kong` | 512m | `kong/kong:3.9.3` |
 | `auth` | 256m | `supabase/gotrue:v2.189.0` |
 | `rest` | 256m | `postgrest/postgrest:v14.12` |
@@ -67,11 +90,11 @@ Constraints table:
 | `realtime` | 768m | `supabase/realtime:v2.102.3` |
 | `functions` | 768m | `supabase/edge-runtime:v1.74.0` |
 
-Total: ~3.1GB for this compose file, plus Postgres's separate 3GB cap
-(Task 2) — ~6.1GB combined, matching the design spec. This is the concrete
-mechanism protecting the other 24 apps on the shared VPS from this stack: if
-this stack's usage exceeds its own ceiling, the kernel OOM-kills a process
-*inside this stack's cgroup*, not an unrelated app's process.
+Total: ~6.1GB across all 7 containers in this one compose file, matching the
+design spec. This is the concrete mechanism protecting the other 24 apps on
+the shared VPS from this stack: if this stack's usage exceeds its own
+ceiling, the kernel OOM-kills a process *inside this stack's cgroup*, not an
+unrelated app's process.
 
 ## Known Phase 1 limitations (not blockers)
 
@@ -86,6 +109,14 @@ this stack's usage exceeds its own ceiling, the kernel OOM-kills a process
 - **Storage**: local-disk backend only (`STORAGE_BACKEND=file`), no
   MinIO/S3 — matches the spec's "skip MinIO" decision. Revisit only if a
   later phase actually needs S3-compatible access.
+- **Coolify application status**: shows permanently as `restarting:unknown`
+  in the Coolify UI/API, not `running`/`healthy` — this is `functions`'s
+  known, permanent, isolated crash-loop (real Edge Function content doesn't
+  exist yet, a later phase) dragging down the whole Compose application's
+  aggregate status, even though the other 6 containers are individually
+  healthy. Don't waste time chasing this as a regression; check each
+  container's own health status instead (`docker ps`), not the application's
+  rolled-up status.
 
 ## Validating this compose file
 
@@ -149,13 +180,18 @@ this same VPS (`frontend`, `crm-api`, `amro-api`, `comms-api`,
 `compliance-api`, `finance-api`, `logistics-api`, `markets-worker`,
 `uim-api`) track `main` directly; pushing straight to `origin/main` risked
 triggering their redeploys via whatever webhook/polling Coolify has
-configured for that branch. Local `main` has since been fast-forwarded to
-include all of this stack's fixes (including Task 5's Kong/Realtime fix), so
-`main` and the deploy branch currently point at the same commit content-wise
-— but Coolify's application is still configured to track
-`deploy/supabase-selfhost-phase1` specifically, not `main`. Repoint it via
-`PATCH /api/v1/applications/i64jlyerora7ao9vkw5sweh3` with a `git_branch`
-change if that's ever deliberately decided instead.
+configured for that branch. Local `main` is kept significantly ahead of
+`origin/main` throughout this project — check
+`git rev-list --count origin/main..main` for the current count rather than
+trusting any specific figure written here, since it drifts with every commit
+and would otherwise go stale (an earlier draft of this section cited a fixed
+"67 commits ahead," which was already wrong within days). `main` is
+periodically synced onto `deploy/supabase-selfhost-phase1` (most recently as
+part of this fix wave, via `git push origin main:deploy/supabase-selfhost-phase1`)
+so the two point at the same commit content-wise — but Coolify's application
+is still configured to track `deploy/supabase-selfhost-phase1` specifically,
+not `main`. Repoint it via `PATCH /api/v1/applications/i64jlyerora7ao9vkw5sweh3`
+with a `git_branch` change if that's ever deliberately decided instead.
 
 If this stack needs to be torn down (resource pressure, or Phase 1 is
 abandoned):

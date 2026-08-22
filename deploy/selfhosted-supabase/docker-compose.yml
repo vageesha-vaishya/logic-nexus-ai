@@ -27,9 +27,11 @@
 #   - No Studio, postgres-meta, Analytics/Logflare, imgproxy, or MinIO/S3 —
 #     all explicitly out of scope for Phase 1 (see design spec §2, §4).
 #   - Storage uses the local-disk backend (STORAGE_BACKEND=file), not S3.
-#   - Every service has an explicit mem_limit (see design spec §4 for the
-#     rationale — this is the safety mechanism protecting the other 24 apps
-#     on the shared VPS from this stack, not network isolation).
+#   - Every service has an explicit mem_limit, and a matching memswap_limit
+#     equal to its own mem_limit (fixed 2026-08-22 for the six non-`db`
+#     services — no extra swap headroom anywhere in this stack; see design
+#     spec §4 for the rationale — this is the safety mechanism protecting the
+#     other 24 apps on the shared VPS from this stack, not network isolation).
 #   - All services join the shared external `coolify` Docker network (see
 #     design spec §5) — Coolify-native Database resources (incl. the one
 #     Task 2 creates) and Coolify's Traefik routing both require it.
@@ -45,14 +47,21 @@ services:
     networks:
       - coolify
     mem_limit: 512m
+    memswap_limit: 512m
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 5s
       timeout: 5s
       retries: 5
     ports:
-      # Coolify's Traefik fronts this port on the shared network (Task 4).
-      - "${KONG_HTTP_PORT:-8000}:8000/tcp"
+      # NOT needed for Coolify's Traefik — Traefik reaches this container over
+      # the shared `coolify` network by container name, not via a published
+      # host port (fixed 2026-08-22; the prior comment claiming otherwise was
+      # wrong and this port was reachable over plaintext HTTP from the public
+      # internet, undocumented). Bound to loopback only, kept solely for local
+      # debugging convenience (`ssh hostinger-vps` + `curl 127.0.0.1:8010`);
+      # safe to delete this whole `ports:` block if that convenience isn't needed.
+      - "127.0.0.1:${KONG_HTTP_PORT:-8000}:8000/tcp"
     volumes:
       - ./kong.yml:/home/kong/temp.yml:ro
       - ./kong-entrypoint.sh:/home/kong/kong-entrypoint.sh:ro
@@ -85,6 +94,7 @@ services:
     networks:
       - coolify
     mem_limit: 256m
+    memswap_limit: 256m
     healthcheck:
       test:
         [
@@ -144,6 +154,7 @@ services:
     networks:
       - coolify
     mem_limit: 256m
+    memswap_limit: 256m
     healthcheck:
       test: [ "CMD", "postgrest", "--ready" ]
       interval: 5s
@@ -177,6 +188,7 @@ services:
     networks:
       - coolify
     mem_limit: 512m
+    memswap_limit: 512m
     depends_on:
       rest:
         condition: service_started
@@ -230,6 +242,7 @@ services:
     networks:
       - coolify
     mem_limit: 768m
+    memswap_limit: 768m
     healthcheck:
       test:
         [
@@ -270,6 +283,7 @@ services:
     networks:
       - coolify
     mem_limit: 768m
+    memswap_limit: 768m
     volumes:
       - ./volumes/functions:/home/deno/functions:ro
       - deno-cache:/root/.cache/deno
@@ -314,8 +328,9 @@ services:
     # Caps swap at zero extra headroom beyond mem_limit (memswap_limit is the
     # combined memory+swap ceiling; setting it equal to mem_limit means no
     # swap is available at all) — a clean OOM-kill beats swap-thrashing a
-    # database. Task 1's other six services don't set this (no equivalent
-    # pattern existed there to mirror); added here per this task's brief.
+    # database. The other six services now mirror this same pattern (fixed
+    # 2026-08-22 — they originally had no memswap_limit at all, which let
+    # each swap up to 2x its mem_limit).
     memswap_limit: 3g
     volumes:
       - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
