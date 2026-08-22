@@ -6,10 +6,18 @@
 # Adapted from upstream supabase/supabase:docker/docker-compose.yml +
 # docker/docker-compose.kong.yml (fetched 2026-08-22). Deliberate differences
 # from upstream:
-#   - No `db` service. Postgres is a separate Coolify-native "Database"
-#     resource (Task 2 of the Phase 1 plan), not a container in this file.
-#     Every DB connection URL below points at ${POSTGRES_HOST}:${POSTGRES_PORT}
-#     (filled in .env once that resource exists) instead of upstream's `db`.
+#   - Postgres runs as a `db` service in THIS compose file (revised Task 2,
+#     2026-08-22), not a separate Coolify-native "Database" resource — that
+#     approach doesn't work because supabase/postgres's own entrypoint
+#     unconditionally requires bind-mounted init SQL under
+#     /docker-entrypoint-initdb.d/ (see volumes/db/), which a bare Coolify
+#     Database resource has no way to supply. Every other service's DB
+#     connection URL below points at the literal internal hostname `db:5432`.
+#   - `db`'s image tag is supabase/postgres:17.6.1.136 — the tag upstream's
+#     docker-compose.yml actually pins as of this fetch (2026-08-22), not the
+#     supabase/postgres:17.4.1.037 the plan assumed; both exist on Docker Hub,
+#     but 17.6.1.136 is what upstream currently ships and every other image
+#     tag in this file already matches this same upstream snapshot exactly.
 #   - Upstream's default gateway is Envoy (`api-gw` service), with Kong as an
 #     opt-in override (docker-compose.kong.yml) that replaces `api-gw` in
 #     place. This file skips Envoy entirely and defines `kong` directly,
@@ -96,7 +104,7 @@ services:
       API_EXTERNAL_URL: ${API_EXTERNAL_URL}
 
       GOTRUE_DB_DRIVER: postgres
-      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      GOTRUE_DB_DATABASE_URL: postgres://supabase_auth_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
 
       GOTRUE_SITE_URL: ${SITE_URL}
       GOTRUE_URI_ALLOW_LIST: ${ADDITIONAL_REDIRECT_URLS}
@@ -142,7 +150,7 @@ services:
       timeout: 5s
       retries: 3
     environment:
-      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      PGRST_DB_URI: postgres://authenticator:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       PGRST_DB_SCHEMAS: ${PGRST_DB_SCHEMAS}
       PGRST_DB_MAX_ROWS: ${PGRST_DB_MAX_ROWS:-1000}
       PGRST_DB_EXTRA_SEARCH_PATH: ${PGRST_DB_EXTRA_SEARCH_PATH:-public}
@@ -194,7 +202,7 @@ services:
       # Legacy symmetric HS256 key
       AUTH_JWT_SECRET: ${JWT_SECRET}
 
-      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      DATABASE_URL: postgres://supabase_storage_admin:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       STORAGE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       REQUEST_ALLOW_X_FORWARDED_PATH: "true"
       FILE_SIZE_LIMIT: 52428800
@@ -234,8 +242,8 @@ services:
       start_period: 10s
     environment:
       PORT: 4000
-      DB_HOST: ${POSTGRES_HOST}
-      DB_PORT: ${POSTGRES_PORT}
+      DB_HOST: db
+      DB_PORT: 5432
       DB_USER: supabase_admin
       DB_PASSWORD: ${POSTGRES_PASSWORD}
       DB_NAME: ${POSTGRES_DB}
@@ -281,7 +289,7 @@ services:
       SUPABASE_PUBLIC_URL: ${SUPABASE_PUBLIC_URL}
       SUPABASE_ANON_KEY: ${ANON_KEY}
       SUPABASE_SERVICE_ROLE_KEY: ${SERVICE_ROLE_KEY}
-      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DB}
+      SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT}"
     command:
       [
@@ -293,6 +301,73 @@ services:
     # volumes/functions/ is not part of this task) — this only proves the container starts
     # and the healthcheck TCP port responds. Real function deployment is a later phase.
 
+  db:
+    container_name: logic-nexus-db
+    # Image tag verified against upstream docker/docker-compose.yml on this
+    # fetch (2026-08-22) — see note at top of file re: 17.6.1.136 vs the
+    # 17.4.1.037 the plan assumed.
+    image: supabase/postgres:17.6.1.136
+    restart: unless-stopped
+    networks:
+      - coolify
+    mem_limit: 3g
+    # Caps swap at zero extra headroom beyond mem_limit (memswap_limit is the
+    # combined memory+swap ceiling; setting it equal to mem_limit means no
+    # swap is available at all) — a clean OOM-kill beats swap-thrashing a
+    # database. Task 1's other six services don't set this (no equivalent
+    # pattern existed there to mirror); added here per this task's brief.
+    memswap_limit: 3g
+    volumes:
+      - ./volumes/db/realtime.sql:/docker-entrypoint-initdb.d/migrations/99-realtime.sql:Z
+      # Must be superuser to create event trigger
+      - ./volumes/db/webhooks.sql:/docker-entrypoint-initdb.d/init-scripts/98-webhooks.sql:Z
+      # Must be superuser to alter reserved role
+      - ./volumes/db/roles.sql:/docker-entrypoint-initdb.d/init-scripts/99-roles.sql:Z
+      # Initialize the database settings with JWT_SECRET and JWT_EXP
+      - ./volumes/db/jwt.sql:/docker-entrypoint-initdb.d/init-scripts/99-jwt.sql:Z
+      # PGDATA directory is persisted between restarts (host-created at
+      # runtime; gitignored, never committed — see .gitignore)
+      - ./volumes/db/data:/var/lib/postgresql/data:Z
+      # Changes required for internal supabase data such as _analytics
+      - ./volumes/db/_supabase.sql:/docker-entrypoint-initdb.d/migrations/97-_supabase.sql:Z
+      # Changes required for Analytics support
+      - ./volumes/db/logs.sql:/docker-entrypoint-initdb.d/migrations/99-logs.sql:Z
+      # Changes required for Pooler support
+      - ./volumes/db/pooler.sql:/docker-entrypoint-initdb.d/migrations/99-pooler.sql:Z
+      # Named volume persists the pgsodium decryption key between restarts
+      - db-config:/etc/postgresql-custom
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "pg_isready",
+          "-U",
+          "postgres",
+          "-h",
+          "localhost"
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    environment:
+      POSTGRES_HOST: /var/run/postgresql
+      PGPORT: 5432
+      POSTGRES_PORT: 5432
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      PGDATABASE: ${POSTGRES_DB}
+      POSTGRES_DB: ${POSTGRES_DB}
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_EXP: ${JWT_EXPIRY}
+    command:
+      [
+        "postgres",
+        "-c",
+        "config_file=/etc/postgresql/postgresql.conf",
+        "-c",
+        "log_min_messages=fatal" # prevents Realtime polling queries from appearing in logs
+      ]
+
 networks:
   coolify:
     external: true
@@ -300,3 +375,4 @@ networks:
 volumes:
   storage-data:
   deno-cache:
+  db-config:

@@ -84,3 +84,8 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
+
+# Self-hosted Supabase Postgres PGDATA bind mount — created at runtime on the
+# host, never committed (mirrors upstream supabase/supabase's own .gitignore
+# entry for docker/volumes/db/data).
+deploy/selfhosted-supabase/volumes/db/data/
