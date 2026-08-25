@@ -21,6 +21,33 @@ Production (Supabase Cloud project `gzhxgoigflftharcmdqj`, "SG-Logistics-Pro-Ent
 - **All 21 application schemas, but not `auth`** (corrected 2026-08-26, see §1a). Self-hosted GoTrue manages its own `auth` schema via its own internal migration versioning (already bootstrapped in Phase 1). Logical-replicating Supabase Cloud's live `auth` tables directly risks colliding with that if the two GoTrue versions' schema expectations ever diverge. Real user/session data migration is deferred to Phase 5 (already scoped for JWT/auth continuity), which is the more appropriate place to reconcile this carefully rather than bolt it onto Phase 2. The same reasoning excludes the other Supabase-managed schemas (`storage`, `realtime`, `vault`, `cron`, `net`, `extensions`, `graphql`, `graphql_public`, `supabase_migrations`) — these are infrastructure the self-hosted stack manages itself, not application data.
 - **Schema DDL comes from `pg_dump --schema-only` against live production, not from replaying the repo's 1,111 migration files.** This guarantees the self-hosted schema exactly matches what's actually running now, including any manual/dashboard changes that may not be captured in migration files — a common source of drift in Supabase projects, and a real risk if replication depends on the two schemas actually matching column-for-column.
 
+## 0. ⚠ HANDOFF TO PHASE 5 — do not lose this
+
+Found during Phase 2 Task 2b's re-review (2026-08-26) and deliberately **not** fixed here, because `auth` is out of Phase 2's scope and Phase 5 owns auth-schema reconciliation:
+
+**Production has a trigger `on_auth_user_created` on `auth.users` that self-hosted does not.** Verified directly on both sides — production `auth.users` has 1 non-internal trigger, self-hosted has 0.
+
+```sql
+-- production: AFTER INSERT ON auth.users FOR EACH ROW EXECUTE FUNCTION public.handle_new_user()
+-- public.handle_new_user() is SECURITY DEFINER and does:
+--   INSERT INTO public.profiles (id, email, first_name, last_name)
+--   VALUES (NEW.id, NEW.email,
+--           COALESCE(NEW.raw_user_meta_data->>'first_name',''),
+--           COALESCE(NEW.raw_user_meta_data->>'last_name',''));
+```
+
+**The function `public.handle_new_user()` DOES exist on self-hosted** (it lives in `public`, so Task 2 restored it correctly). Only the trigger that fires it is missing.
+
+**Consequence if not fixed before cutover:** every new user signup against the self-hosted stack would create an `auth.users` row but **no matching `public.profiles` row** — silently. The app depends on `profiles` (104 rows in production today). This would not surface as an error at signup; it would surface later as users with missing profile data.
+
+**Why it's missing:** the `auth` schema on self-hosted is bootstrapped by GoTrue itself, not restored from production, so anything the application added to `auth` (like this trigger) was never carried over. There may be other application-added objects in `auth` — **Phase 5 should diff the whole `auth` schema between production and self-hosted, not just recreate this one trigger.**
+
+**Fix is one statement**, but must be applied as part of Phase 5's auth work (after GoTrue's own schema expectations are reconciled), not bolted on earlier:
+```sql
+CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users
+  FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
+```
+
 ## 1a. The Application Schema Landscape (discovered 2026-08-26, source of the scope correction)
 
 Production's data model is **not** confined to `public`. Queried directly against production:
