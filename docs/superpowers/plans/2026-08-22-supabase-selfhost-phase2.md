@@ -574,13 +574,23 @@ Expected: no new OOM entries beyond the known 2026-08-15 incident; `db`'s memory
 
 - [ ] **Step 2: Production-wide replication health, final check**
 
+**⚠ Corrected 2026-08-26 — do not expect the two Realtime slots to exist.** This step originally listed three slot names and expected `active = true` for all three. That was wrong: Supabase's Realtime slots are **ephemeral**, created when Realtime has active subscribers and dropped when idle. Verified during Task 3 via both MCP and a direct `psql` connection — production had **zero** slots and zero WAL senders at that moment, with both publications still intact. Checking for those two slot names by name will fail spuriously and tell you nothing.
+
 ```sql
--- On production (MCP):
-SELECT slot_name, active, pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
-FROM pg_replication_slots
-WHERE slot_name IN ('phase2_public_migration_slot', 'supabase_realtime_replication_slot_2_129_6_893679d', 'supabase_realtime_messages_replication_slot_2_129_6_893679d');
+-- On production. List ALL slots rather than asserting specific names:
+SELECT slot_name, plugin, active,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots ORDER BY slot_name;
 ```
-Expected: all three slots `active = true` with bounded retained WAL — confirms both our new slot and the pre-existing Realtime slots are healthy (i.e., this phase's work didn't inadvertently degrade the existing Realtime replication either).
+Expected: **our** slot `phase2_public_migration_slot` present, `active = true`, with bounded (not unboundedly growing) retained WAL. Any `supabase_realtime*` slots may or may not be present depending on live Realtime usage — their absence is normal and is **not** evidence this phase degraded anything.
+
+The durable check that this phase didn't harm Realtime is that its **publications** are intact, not its slots:
+```sql
+SELECT pubname, count(*) AS tables FROM pg_publication_tables
+WHERE pubname IN ('supabase_realtime','supabase_realtime_messages_publication')
+GROUP BY 1 ORDER BY 1;
+```
+Expected: unchanged membership (`supabase_realtime` = 1 table, as of 2026-08-26).
 
 - [ ] **Step 3: Final production health-check curls, one last time**
 
