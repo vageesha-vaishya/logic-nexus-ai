@@ -50,6 +50,26 @@ CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 ```
 
+## 0b. Data-sensitivity note — credential-bearing tables ARE in replication scope
+
+Recorded during Task 3's review (2026-08-26), closing the §6 open item that asked for a confirm that nothing in scope holds data that shouldn't leave production.
+
+A scan across all 21 scoped schemas found these credential/secret-bearing tables, all of which **will** replicate to the self-hosted VPS:
+
+| Table | Schema |
+|---|---|
+| `secrets` | `core` |
+| `service_tokens`, `tenant_provider_credentials` | `gateway` |
+| `integration_credentials` | `platform` |
+| `integration_credentials` | `uim` |
+| `oauth_configurations`, `portal_tokens` | `public` |
+
+**Assessment: correct to include.** This is a self-host migration of the same organization's own infrastructure, not an export to a third party — the self-hosted stack cannot function without these. Excluding them would produce a replica that can't actually serve traffic at cutover.
+
+**But it changes the VPS's security posture, and that is worth conscious acknowledgement rather than a silent pass:** the shared Coolify VPS (`72.61.249.111`) now holds a live, continuously-updated copy of production's integration credentials, OAuth configs, and portal tokens. That box also runs 24 other applications. Anyone with host-level access to it, or to the self-hosted Postgres, effectively has production credentials. Prior to Phase 2 the VPS held no production secrets at all.
+
+Not a blocker for Phase 2, and no action taken here. Flagged for the plan owner, and worth revisiting before cutover — reasonable hardening options include restricting Postgres access on the VPS, ensuring `vault`/`pgsodium` column encryption carries over for the tables that use it, and confirming the VPS's own access controls are appropriate for holding production secrets.
+
 ## 1a. The Application Schema Landscape (discovered 2026-08-26, source of the scope correction)
 
 Production's data model is **not** confined to `public`. Queried directly against production:
