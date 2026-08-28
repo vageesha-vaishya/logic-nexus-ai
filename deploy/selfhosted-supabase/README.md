@@ -170,6 +170,97 @@ normal Coolify redeploy is not sufficient by itself.** You must also:
    A full Coolify redeploy alone will **not** pick up the new file content;
    only restarting the container against the re-seeded host path does.
 
+## Phase 2: Logical Replication
+
+Phase 2 adds ongoing data replication from Supabase Cloud (production) into
+this stack's `db`, across all 795 tables spanning the 21 application schemas
+(`public` plus 20 others — see the Phase 2 design spec's §1a for the full
+include/exclude list). Full history, defects found, and how they were fixed
+is in the Phase 2 SDD progress ledger
+(`.superpowers/sdd/2026-08-22-supabase-selfhost-phase2/progress.md`); this
+section is the operational summary for running/tearing this down later.
+
+**Objects:**
+- `phase2_public_migration` — the publication on **production**, covering all
+  21 schemas via `FOR TABLES IN SCHEMA` (dynamic — future tables in those
+  schemas auto-join without needing to alter the publication).
+- `phase2_replicator` — the dedicated role on production the subscription
+  connects as (SELECT-only + `REPLICATION` + `BYPASSRLS`, no superuser).
+- `phase2_public_migration_sub` / `phase2_public_migration_slot` — the
+  subscription and its replication slot, both on self-hosted `db`.
+
+**⚠ WAL retention: do not leave this subscription disabled for extended
+periods.** Production's `max_slot_wal_keep_size` is 4GB, and this database's
+write volume is enough to exceed that within roughly a day of normal
+traffic if the slot sits idle while disabled (a disabled subscription still
+pins its slot's `restart_lsn` in place while production keeps generating
+WAL). This happened **twice** during Phase 2 development, each requiring a
+full subscription rebuild (drop + recreate with a fresh slot, plus a full
+data re-sync). If you must disable it to debug something, keep the window
+to a few hours at most, or explicitly plan for a rebuild afterward rather
+than a resume. Check slot health any time you're unsure:
+```sql
+-- On production:
+SELECT slot_name, active, wal_status,
+       pg_size_pretty(pg_wal_lsn_diff(pg_current_wal_lsn(), restart_lsn)) AS retained_wal
+FROM pg_replication_slots;
+```
+`wal_status = 'lost'` means the slot is permanently dead — see "Rebuilding
+after slot invalidation" below.
+
+**Checking replication lag/health:**
+```sql
+-- On self-hosted:
+SELECT subname, pid, received_lsn, latest_end_time FROM pg_stat_subscription;
+SELECT srsubstate, count(*) FROM pg_subscription_rel GROUP BY 1;  -- all 795 should show 'r'
+```
+```sql
+-- On production, confirm the two pre-existing Realtime publications are
+-- unaffected (the durable evidence this phase hasn't degraded Realtime —
+-- its replication slots are ephemeral and expected to come and go):
+SELECT pubname, count(*) AS tables FROM pg_publication_tables
+WHERE pubname IN ('supabase_realtime','supabase_realtime_messages_publication')
+GROUP BY 1 ORDER BY 1;
+```
+
+**Rebuilding after slot invalidation** (or after any defect that leaves the
+subscription's initial-copy mechanism unreliable — see the ledger's account
+of a connection-churn defect in Postgres's native tablesync process that
+made this necessary once): rather than trying to resume, do a full,
+manually-driven rebuild:
+1. `ALTER SUBSCRIPTION phase2_public_migration_sub SET (slot_name = NONE); DROP SUBSCRIPTION phase2_public_migration_sub;` on self-hosted (the slot is already dead/gone on the publisher, so it must be disassociated first or `DROP SUBSCRIPTION` will try and fail to drop it there). Drop the dead slot on production separately if it still shows up in `pg_replication_slots`.
+2. Re-sync every table's data directly (a plain `\copy`-based dump/load per table, using `SET LOCAL session_replication_role = replica;` during the load to bypass FK/trigger ordering issues, and an explicit non-generated column list on both the dump `SELECT` and the load `COPY` target to avoid column-mismatch errors) — this sidesteps Postgres's native tablesync mechanism entirely if that's what caused the problem.
+3. `CREATE SUBSCRIPTION phase2_public_migration_sub ... WITH (copy_data = false, create_slot = true, slot_name = 'phase2_public_migration_slot');` — `copy_data = false` marks all 795 tables `'r'` immediately with no per-table tablesync workers involved, and streaming (CDC only) starts fresh from the new slot's creation point.
+4. Verify: all tables `'r'`, apply worker running with no errors, slot `active = true`, and a full row-count reconciliation against production (a single `UNION ALL` query summing counts across all 795 tables run on both sides and diffed) shows no mismatches beyond ordinary lag on high-write-frequency tables.
+
+**Teardown — clean path (publisher reachable), verified 2026-08-27/28
+against disposable test objects (`phase2_teardown_test_sub`/`_slot`/`_pub`),
+never against the real subscription:**
+```sql
+-- On self-hosted:
+DROP SUBSCRIPTION phase2_public_migration_sub;
+```
+This alone drops the slot on the publisher too — confirmed via
+`SELECT slot_name FROM pg_replication_slots WHERE slot_name = 'phase2_public_migration_slot';`
+returning zero rows immediately after.
+
+**Teardown — manual-detach path (publisher unreachable, or you don't want
+`DROP SUBSCRIPTION` to depend on network connectivity to production at
+all):**
+```sql
+-- On self-hosted — this sequence never needs to reach the publisher:
+ALTER SUBSCRIPTION phase2_public_migration_sub DISABLE;
+ALTER SUBSCRIPTION phase2_public_migration_sub SET (slot_name = NONE);
+DROP SUBSCRIPTION phase2_public_migration_sub;
+```
+This leaves the slot **orphaned** on production (confirmed via testing —
+the slot still exists after this sequence completes). Clean it up manually
+once the publisher is reachable again:
+```sql
+-- On production:
+SELECT pg_drop_replication_slot('phase2_public_migration_slot');
+```
+
 ## Rollback
 
 This stack is live, deployed as Coolify application `i64jlyerora7ao9vkw5sweh3`
