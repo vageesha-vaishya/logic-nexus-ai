@@ -8,8 +8,21 @@
 #   PHASE3_PROD_SERVICE_ROLE_KEY  - production's service_role JWT (Storage API auth)
 #   PHASE3_SELFHOSTED_SERVICE_ROLE_KEY - self-hosted's service_role JWT (Storage API auth)
 #   PHASE3_PROD_PG_CONN           - production's direct (non-pooled) postgres-role
-#                                   connection string, e.g. env's DIRECT_URL
-#                                   (used only to list storage.objects rows)
+#                                   connection string (used only to list
+#                                   storage.objects rows). DO NOT use env's
+#                                   DIRECT_URL / DATABASE_URL / SUPABASE_DB_URL
+#                                   verbatim - despite their names, all three
+#                                   are actually a POOLED pgbouncer connection
+#                                   (aws-1-ap-south-1.pooler.supabase.com:6543,
+#                                   pgbouncer=true), which `psql` rejects and
+#                                   which this script's `docker exec psql`
+#                                   invocation can't use anyway. Use the true
+#                                   direct host instead, e.g.:
+#                                     postgresql://postgres:<password from
+#                                     env's DIRECT_URL>@db.gzhxgoigflftharcmdqj
+#                                     .supabase.co:5432/postgres?sslmode=require
+#                                   (same host Phase 2 verified - see
+#                                   PHASE2_PROD_CONN in README.md)
 #   PHASE3_SSH_HOST               - SSH alias for the VPS
 #   PHASE3_DB_CONTAINER           - self-hosted Postgres container name (only
 #                                   used to run the listing query through the
@@ -25,6 +38,8 @@ set -uo pipefail
 
 PROD_URL="https://gzhxgoigflftharcmdqj.supabase.co"
 SELFHOSTED_URL="https://supabase.sosservices.online"
+# Relative to whatever directory this script is invoked from (e.g. the repo
+# root if run as `bash deploy/selfhosted-supabase/scripts/phase3-storage-sync.sh`).
 LOG="./phase3-storage-sync.log"
 : > "$LOG"
 
@@ -36,7 +51,12 @@ OBJECTS=$(ssh -n -o BatchMode=yes -o ConnectTimeout=8 "$PHASE3_SSH_HOST" \
   \"SELECT bucket_id || '|' || name || '|' || coalesce(metadata->>'mimetype','application/octet-stream') FROM storage.objects ORDER BY bucket_id, name;\"")
 
 TOTAL=$(echo "$OBJECTS" | grep -c . || true)
-DONE=0; OK=0; FAIL=0
+# DONE is used below purely for the [$DONE/$TOTAL] progress label in each log
+# line - it survives fine across iterations since the whole while-loop runs
+# in one persistent subshell. There's no OK/FAIL running-total counter here
+# because those would NOT survive past the loop (the subshell exits when the
+# pipe closes) - the real OK/FAIL tallies are grep'd out of the log below.
+DONE=0
 echo "$(date -u) START total=$TOTAL" >> "$LOG"
 
 echo "$OBJECTS" | while IFS='|' read -r BUCKET NAME MIMETYPE; do
@@ -50,7 +70,7 @@ echo "$OBJECTS" | while IFS='|' read -r BUCKET NAME MIMETYPE; do
     "$PROD_URL/storage/v1/object/$BUCKET/$NAME")
   if [ "$HTTP_CODE" != "200" ]; then
     echo "$(date -u) [$DONE/$TOTAL] FAIL(download:$HTTP_CODE) $BUCKET/$NAME" >> "$LOG"
-    FAIL=$((FAIL+1)); rm -f "$TMPFILE"; continue
+    rm -f "$TMPFILE"; continue
   fi
 
   UPLOAD_CODE=$(curl -s -o /dev/null -w '%{http_code}' -X POST \
@@ -62,15 +82,13 @@ echo "$OBJECTS" | while IFS='|' read -r BUCKET NAME MIMETYPE; do
     "$SELFHOSTED_URL/storage/v1/object/$BUCKET/$NAME")
   if [ "$UPLOAD_CODE" == "200" ]; then
     echo "$(date -u) [$DONE/$TOTAL] OK $BUCKET/$NAME" >> "$LOG"
-    OK=$((OK+1))
   else
     echo "$(date -u) [$DONE/$TOTAL] FAIL(upload:$UPLOAD_CODE) $BUCKET/$NAME" >> "$LOG"
-    FAIL=$((FAIL+1))
   fi
   rm -f "$TMPFILE"
 done
 
 echo "$(date -u) DONE total=$TOTAL" >> "$LOG"
-echo "See $LOG for per-object results (the while-loop's OK/FAIL counters don't survive the pipe subshell - grep the log for the real tally)."
+echo "See $LOG for per-object results (grep the log for the real OK/FAIL tally, below)."
 grep -c ' OK ' "$LOG" || true
 grep -c 'FAIL' "$LOG" || true
