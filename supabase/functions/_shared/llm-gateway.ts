@@ -5,8 +5,10 @@
 // Provider resolution order:
 //   1. Look up platform.get_tenant_llm_config(tenant_id) for the tenant's
 //      active default. If present → use that provider + model + decrypted key.
-//   2. Else fall back to env (legacy: ANTHROPIC_API_KEY) using the static
-//      ROUTING map.
+//   2. Else fall back to env ANTHROPIC_API_KEY using the static ROUTING map.
+//   3. Else fall back further to a self-hosted vLLM rig (OpenAI-compatible),
+//      if VLLM_BASE_URL/VLLM_API_KEY/VLLM_MODEL_NAME are set — lets a
+//      self-hosted deployment run without any cloud LLM subscription.
 //
 // Supported providers:
 //   • anthropic    — native Messages API
@@ -14,7 +16,10 @@
 //                    (key https://openrouter.ai/keys)
 //   • openai       — chat completions (drop-in; same shape as openrouter)
 //   • gemini       — TODO (not wired)
-//   • local-qwen   — TODO (D-11)
+//   • local-qwen   — OpenAI-compatible chat completions against a self-hosted
+//                    vLLM (or similar) endpoint. Per §9.6 (D-11): tenant
+//                    configs may also set this provider directly with their
+//                    own base_url/api_key.
 // =====================================================================
 
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -275,24 +280,42 @@ async function resolveConfig(
     }
   }
 
-  // Fall back to env-based legacy routing (Anthropic only for now).
+  // Fall back to env-based legacy routing (Anthropic).
   const routing = FALLBACK_ROUTING[taskId];
   const envKey = Deno.env.get("ANTHROPIC_API_KEY");
-  if (!envKey) {
-    throw new LlmGatewayError(
-      "no_llm_config",
-      "No tenant LLM config and no env ANTHROPIC_API_KEY. Configure a provider via the Settings UI or set the env secret.",
-      503,
-    );
+  if (envKey) {
+    return {
+      provider: routing.provider,
+      model: routing.model,
+      apiKey: envKey,
+      baseUrl: null,
+      maxOutputTokens: routing.maxOutputTokens,
+      source: "env_fallback",
+    };
   }
-  return {
-    provider: routing.provider,
-    model: routing.model,
-    apiKey: envKey,
-    baseUrl: null,
-    maxOutputTokens: routing.maxOutputTokens,
-    source: "env_fallback",
-  };
+
+  // No Anthropic key — fall back further to a self-hosted vLLM rig, if
+  // configured. Used by the self-hosted deployment, which has no cloud
+  // Anthropic subscription.
+  const vllmBaseUrl = Deno.env.get("VLLM_BASE_URL");
+  const vllmApiKey = Deno.env.get("VLLM_API_KEY");
+  const vllmModel = Deno.env.get("VLLM_MODEL_NAME");
+  if (vllmBaseUrl && vllmApiKey && vllmModel) {
+    return {
+      provider: "local-qwen",
+      model: vllmModel,
+      apiKey: vllmApiKey,
+      baseUrl: vllmBaseUrl,
+      maxOutputTokens: routing.maxOutputTokens,
+      source: "env_fallback",
+    };
+  }
+
+  throw new LlmGatewayError(
+    "no_llm_config",
+    "No tenant LLM config and no env ANTHROPIC_API_KEY or VLLM_BASE_URL/VLLM_API_KEY/VLLM_MODEL_NAME fallback. Configure a provider via the Settings UI or set an env secret.",
+    503,
+  );
 }
 
 // ─── Public API ────────────────────────────────────────────────────────
@@ -325,6 +348,8 @@ export async function callLLM(
         result = await callGemini(config, prompt.system, userMsg);
         break;
       case "local-qwen":
+        result = await callOpenAiCompatible(config, prompt.system, userMsg, "local-qwen");
+        break;
       case "custom":
         throw new LlmGatewayError(
           "provider_not_implemented",
@@ -450,10 +475,12 @@ async function callOpenAiCompatible(
   cfg: ResolvedConfig,
   system: string,
   user: string,
-  provider: "openrouter" | "openai",
+  provider: "openrouter" | "openai" | "local-qwen",
 ): Promise<LlmCallResult> {
   const defaultBase =
-    provider === "openrouter" ? "https://openrouter.ai/api/v1" : "https://api.openai.com/v1";
+    provider === "openrouter" ? "https://openrouter.ai/api/v1"
+    : provider === "openai" ? "https://api.openai.com/v1"
+    : "https://api.openai.com/v1"; // local-qwen always supplies cfg.baseUrl (required by resolveConfig)
   const url = (cfg.baseUrl ?? defaultBase) + "/chat/completions";
 
   const headers: Record<string, string> = {
@@ -739,8 +766,13 @@ export async function callLLMConversation(
         break;
       }
       case "openrouter":
-      case "openai": {
-        const baseUrl = config.baseUrl ?? (config.provider === "openrouter" ? "https://openrouter.ai/api" : "https://api.openai.com");
+      case "openai":
+      case "local-qwen": {
+        // Strip a trailing "/v1" so a configured base_url may include it or
+        // not (VLLM_BASE_URL is set with a trailing /v1, matching the
+        // single-turn callOpenAiCompatible convention) without doubling up.
+        const rawBase = config.baseUrl ?? (config.provider === "openrouter" ? "https://openrouter.ai/api" : "https://api.openai.com");
+        const baseUrl = rawBase.replace(/\/v1\/?$/, "");
         const url = baseUrl + "/v1/chat/completions";
         const oaiMessages = [{ role: "system", content: system }, ...validMessages];
         const resp = await fetch(url, {
