@@ -512,8 +512,74 @@ own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
   [`scripts/phase4-batch1-functions.txt`](scripts/phase4-batch1-functions.txt).
   All 88 confirmed reachable through the router (no function returned the
   router's 404 "not found or failed to load" body).
+- **Deployed — Batch 2:** 21 LLM-provider-dependent functions, listed in
+  [`scripts/phase4-batch2-functions.txt`](scripts/phase4-batch2-functions.txt)
+  (`ai-advisor`, `ai-agent`, `ai-message-assistant`, `analyze-cargo-damage`,
+  `analyze-email-threat`, `categorize-document`, `classify-email`,
+  `ensemble-demand`, `extract-bol-fields`, `extract-invoice-items`,
+  `generate-embedding`, `ingest-email`, `markets-enrich-news`,
+  `markets-portfolio-brief`, `markets-portfolio-diagnostic`,
+  `markets-research`, `nexus-copilot`, `portal-chatbot`,
+  `process-franchise-import`, `smart-reply`, `suggest-transport-mode`). All
+  21 confirmed dispatching through the router (none returned the router's
+  404). `forecast-demand` and `route-optimization` remain deliberately
+  excluded from every batch so far, pending their backing services.
+  **Secrets:** 6 new env vars were added to `docker-compose.yml`'s
+  `functions` service and `env.example`
+  (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`,
+  `UPSTASH_REDIS_REST_TOKEN`, `UPSTASH_REDIS_REST_URL`), each defaulted to
+  empty (`${VAR:-}`) so an unset one doesn't break compose validation. Only
+  two were actually provisioned with real values on the VPS (repo-root
+  gitignored `env` file → live Coolify `.env`):
+  - `OPENAI_API_KEY` — provisioned.
+  - `GOOGLE_API_KEY` — provisioned.
+  - `GEMINI_API_KEY` — deliberately deferred; `suggest-transport-mode` (the
+    only function using it) falls back to `GOOGLE_API_KEY` when it's absent,
+    so this is safe to defer.
+  - `UPSTASH_REDIS_REST_TOKEN` / `UPSTASH_REDIS_REST_URL` — deliberately
+    deferred; `_shared/rate-limit.ts` fails open when Upstash isn't
+    configured, so rate limiting is simply inactive for this batch until
+    supplied, not broken.
+  - `ANTHROPIC_API_KEY` — deliberately deferred, and has **no fallback**:
+    `_shared/llm-gateway.ts` throws `"No tenant LLM config and no env
+    ANTHROPIC_API_KEY..."` without it. `markets-enrich-news`,
+    `markets-portfolio-brief`, `markets-portfolio-diagnostic`, and
+    `markets-research` are deployed and reachable through the router but
+    will error internally on any real invocation until this key is
+    supplied in a later follow-up.
+  **Known limitation as of this deployment — env vars are not yet live in
+  the running container:** a plain `docker restart` (used to pick up the
+  new function files on the read-only bind mount, which — unlike env
+  vars — *are* re-read on every container start) does **not** cause the
+  Edge Runtime process to see newly-added environment variables. Env vars
+  are fixed into a container at creation time; only recreating the
+  container (a real Coolify redeploy of application `i64jlyerora7ao9vkw5sweh3`,
+  via its dashboard or `POST $COOLIFY_API_URL/api/v1/deploy?uuid=i64jlyerora7ao9vkw5sweh3`
+  with `COOLIFY_API_TOKEN` from the repo-root `env` file as the bearer
+  token) picks up compose/`.env` changes. **Do not** attempt this by running
+  `docker compose up`/`--force-recreate` directly against
+  `/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/docker-compose.yaml`
+  on the host — Coolify's real deployed container carries an extra private
+  per-application network and `coolify.*` management labels that this
+  on-disk compose file doesn't declare (they're injected by Coolify's own
+  deploy pipeline from a separate `/artifacts/<uuid>/` checkout); a bare
+  `docker compose up` from the host path only attaches to the *shared*
+  `coolify` network and registers a **second, duplicate `functions` network
+  alias on it** — risking DNS round-robin against the other ~24 unrelated
+  apps on this VPS. This was hit and immediately reverted (stray container
+  and its orphan volume removed, four standard health checks re-confirmed
+  clean) during Batch 2's rollout — see
+  `.superpowers/sdd/2026-08-28-supabase-selfhost-phase4-batch2/task-2-report.md`
+  for the full account. **Follow-up required:** trigger a real Coolify
+  redeploy for `i64jlyerora7ao9vkw5sweh3`, then re-run the four standard
+  health checks plus a spot check of an `OPENAI_API_KEY`/`GOOGLE_API_KEY`-
+  dependent function (e.g. `classify-email`, `generate-embedding`) with a
+  real payload to confirm the key is actually live — until then, all 21
+  Batch 2 functions dispatch correctly but none can complete an LLM call
+  (this is broader than just the 4 `ANTHROPIC_API_KEY`-dependent functions
+  noted above, which will remain non-functional even after that redeploy).
 - **Pending — later batches:** every function needing a third-party secret
-  not yet provisioned on the self-hosted VPS (email/SMS/LLM/payment provider
+  not yet provisioned on the self-hosted VPS (email/SMS/payment provider
   keys, etc.), to be grouped and deployed once each secret is available.
 - **Permanently excluded** (not deployable under any batch — no reliable
   local source match): `feature-flags` (no local source exists in the
