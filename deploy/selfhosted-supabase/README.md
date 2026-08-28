@@ -290,9 +290,10 @@ the plan/spec above instead.)
   `file_size_limit`, `allowed_mime_types`, `avif_autodetection`), via
   `phase3-storage-buckets.sql`.
 - All 31 RLS policies on `storage.objects` (not 26 — a plan-authoring
-  snapshot had gone stale by execution time; see Task 1's report), captured
-  point-in-time in `phase3-captured-storage-policies.sql` via the generator
-  query in `phase3-generate-storage-policies.sql`.
+  snapshot had gone stale by execution time on this actively-written
+  production database), captured point-in-time in
+  `phase3-captured-storage-policies.sql` via the generator query in
+  `phase3-generate-storage-policies.sql`.
 - Actual file bytes for every real object in `storage.objects`, via
   [`scripts/phase3-storage-sync.sh`](scripts/phase3-storage-sync.sh).
 
@@ -354,9 +355,11 @@ values) rather than production's original uploader, and `created_at` set to
 the upload time rather than production's original creation time. The two
 alternatives that would preserve these — direct disk manipulation of the
 storage backend, or manually rewriting `storage.objects` metadata rows
-after upload — were both considered and deliberately rejected in the design
-spec in favor of the simpler, more reliable API approach; this is an
-accepted, inherent trade-off of that choice, not an oversight.
+after upload — both carry worse trade-offs (reverse-engineering the
+storage backend's undocumented on-disk layout, or a second write pass with
+its own consistency risk) than the API approach's small, well-understood
+gap; this is an accepted, inherent trade-off of that choice, not an
+oversight.
 
 As of 2026-08-28, production's `storage.objects` has 8 rows with a non-null
 `owner` and 6 with a non-null `owner_id` (out of all 11 rows, including the
