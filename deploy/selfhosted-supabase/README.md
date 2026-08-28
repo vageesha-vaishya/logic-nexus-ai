@@ -382,6 +382,169 @@ ownership gap, manually patch the affected `storage.objects` rows on
 self-hosted, or otherwise remediate — don't assume the zero-impact status
 from 2026-08-28 still holds.
 
+## Phase 4: Edge Functions
+
+Phase 4 deploys the project's Supabase Edge Functions to self-hosted, in
+secret-availability-ordered batches (functions needing a third-party API key
+are deferred to a later batch until that secret is provisioned on the VPS).
+Full history is in the Phase 4 Batch 1 implementation plan
+(`docs/superpowers/plans/2026-08-28-supabase-selfhost-phase4-batch1.md`).
+(The SDD task reports this work was tracked under,
+`.superpowers/sdd/2026-08-28-supabase-selfhost-phase4-batch1/task-1-report.md`
+and `task-2-report.md`, are gitignored and not available on a fresh clone —
+use the plan above instead.)
+
+**Architecture — one shared router, not one function per isolate:**
+self-hosted's Edge Runtime (`supabase/edge-runtime`) is configured with
+`--main-service` pointing at `supabase/functions/main/index.ts`. Every
+request to `/functions/v1/<name>` arrives at this one router first, which:
+1. Looks up `<name>` in `main/verify_jwt_map.ts`'s `VERIFY_JWT_MAP` and, if
+   the map doesn't say `false`, calls `_shared/auth.ts`'s `requireAuth()`
+   itself — reconstructing production's actual per-function JWT-enforcement
+   matrix (from `supabase/config.toml`'s `verify_jwt = false` entries), since
+   self-hosted's Edge Runtime only exposes one global toggle, not a
+   per-function one.
+2. Dispatches to the target function's own module by temporarily shimming
+   the global `Deno.serve` to capture the handler each function's own
+   top-level `Deno.serve(...)` call (via `_shared/logger.ts`'s
+   `serveWithLogger`, or directly) registers, then invokes that captured
+   handler directly. This reuses every function's existing code completely
+   unmodified. Captured handlers are cached by name after first use; a
+   promise-chained lock serializes the shim-install/import/shim-restore
+   critical section globally, so concurrent cold-start requests for
+   different functions can't race each other's shim state.
+
+**Static import map requirement (`function_importers.ts`) — read this
+before adding a function to any future batch:** the router does NOT use a
+computed-string dynamic import like `import(\`../${name}/index.ts\`)`. This
+was tried and empirically fails against the real, self-hosted Rust Edge
+Runtime: `--main-service` mode builds its executable module graph via
+**static analysis** of the entrypoint's imports at boot time, materializing
+only the files it can discover into an internal sandboxed compile directory.
+A computed-string import is invisible to that analyzer, so the target file
+is never materialized and the import throws `Module not found` at request
+time for every function, regardless of whether it uses `serveWithLogger` or
+raw `Deno.serve` (confirmed against all of Batch 1 during this phase's
+implementation). A plain string-literal argument to `import()` **is**
+discovered by the analyzer even when nested inside an object-literal value —
+that's the mechanism `supabase/functions/main/function_importers.ts` relies
+on: a generated `Record<string, () => Promise<any>>` with one literal
+`() => import("../<name>/index.ts")` entry per deployed function, which the
+router's `getHandler()` looks up instead of computing the path itself.
+**This map is intentionally scoped to the currently-deployed batch only**
+(Batch 1's 88 functions), unlike `verify_jwt_map.ts` (pure data, safe to
+cover all 132 functions up front). Each entry here references a real file
+path — an entry for a function not yet physically present on the bind-mount
+risks a boot-time failure if the runtime's static analysis can't resolve it,
+not just a request-time 404 like the old dynamic-import design. **To add
+functions in a future batch:** append new literal entries (name and matching
+`../<name>/index.ts` path) to `FUNCTION_IMPORTERS` in
+`function_importers.ts` for every function that batch deploys, matching the
+existing entries' exact form, before reseeding the bind-mount with those
+functions' directories — do not deploy a function's directory without also
+adding its importer entry, and don't add an importer entry for a function
+whose directory isn't actually being deployed in that same reseed.
+
+**Regenerating/extending `verify_jwt_map.ts`:** re-derive from
+`supabase/config.toml`'s `verify_jwt = false` entries with:
+```bash
+python3 -c "
+import re
+with open('supabase/config.toml', encoding='utf-8') as f:
+    content = f.read()
+false_funcs = sorted(set(re.findall(r'\[functions\.([^\]]+)\]\s*\nverify_jwt = false', content)))
+print(len(false_funcs))
+for f in false_funcs: print(f.rstrip())
+"
+```
+`config.toml` has Windows CRLF line endings — `f.rstrip()` above strips the
+trailing `\r` that otherwise silently breaks name comparisons. Cross-check
+the result against production's actual active function list before trusting
+it wholesale; not everything in `config.toml` is production-active (e.g.
+`comms-unsubscribe`/`comms-webhook-resend` are configured and exist locally
+but aren't currently deployed anywhere).
+
+**Bind-mount reseed procedure (this specific volume):** the live path,
+confirmed empirically (this bind-mount was empty before Phase 4 and had
+never been populated by an earlier phase), is
+`/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/volumes/functions/` —
+mounted read-only into the `functions` container
+(`functions-i64jlyerora7ao9vkw5sweh3-103525190194`, Coolify's generated name
+— NOT the literal `logic-nexus-functions` name an earlier plan draft
+assumed) at `/home/deno/functions`. Reseed by staging locally-checked-out
+files to a scratch dir on the VPS, then atomically swapping them in:
+```bash
+ssh hostinger-vps "mkdir -p /tmp/phase4-functions-staging"
+scp -r supabase/functions/main supabase/functions/_shared supabase/functions/_types \
+  supabase/functions/deno.json supabase/functions/import_map.json supabase/functions/types.d.ts \
+  hostinger-vps:/tmp/phase4-functions-staging/
+while read -r fn; do
+  scp -r "supabase/functions/$fn" "hostinger-vps:/tmp/phase4-functions-staging/"
+done < deploy/selfhosted-supabase/scripts/phase4-batch1-functions.txt   # or the current batch's list
+ssh hostinger-vps "rm -rf /data/coolify/applications/i64jlyerora7ao9vkw5sweh3/volumes/functions/* && \
+  cp -r /tmp/phase4-functions-staging/* /data/coolify/applications/i64jlyerora7ao9vkw5sweh3/volumes/functions/ && \
+  rm -rf /tmp/phase4-functions-staging"
+ssh hostinger-vps "docker restart functions-i64jlyerora7ao9vkw5sweh3-103525190194"
+```
+The container's healthcheck is a bare TCP port check (see
+`docker-compose.yaml`), so `docker ps` reporting `healthy` only proves the
+process is listening — it does **not** prove function dispatch works. Always
+follow a restart with the four standard health-check curls below, plus a
+router-correctness spot check (an unauthenticated request to a
+`verify_jwt=false` function should return something other than the router's
+own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
+
+**Batch status:**
+- **Deployed — Batch 1** (this phase): 88 functions, listed in
+  [`scripts/phase4-batch1-functions.txt`](scripts/phase4-batch1-functions.txt).
+  All 88 confirmed reachable through the router (no function returned the
+  router's 404 "not found or failed to load" body).
+- **Pending — later batches:** every function needing a third-party secret
+  not yet provisioned on the self-hosted VPS (email/SMS/LLM/payment provider
+  keys, etc.), to be grouped and deployed once each secret is available.
+- **Permanently excluded** (not deployable under any batch — no reliable
+  local source match): `feature-flags` (no local source exists in the
+  repo), `migrate-flypal-directives` (superseded locally by
+  `migrate-flypal-directives-v2`/`-v3`), and
+  `flypal_configured_directives_id_match_with_code_form` (lowercase `code` —
+  a legacy duplicate deployment; the correctly-cased
+  `flypal_configured_directives_id_match_with_Code_form` has local source
+  and is deployed in Batch 1).
+
+**Known gap — self-hosted `service_role` JWTs don't satisfy `requireAuth()`:**
+a `service_role` JWT (from self-hosted's own `.env`) is rejected by
+`_shared/auth.ts`'s `requireAuth()` with `"invalid claim: missing sub
+claim"`, because `service_role` tokens carry no `sub` claim while
+`requireAuth()`'s underlying `getUser`/`getClaims` check expects one (this
+differs from what an earlier plan draft assumed). To exercise a
+`verify_jwt=true` function's positive path, obtain a real user session JWT
+instead — self-hosted's GoTrue supports this via its own Auth API, e.g.
+creating a throwaway user with the admin API and signing in:
+```bash
+curl -s -X POST "https://supabase.sosservices.online/auth/v1/admin/users" \
+  -H "apikey: $SERVICE_ROLE_KEY" -H "Authorization: Bearer $SERVICE_ROLE_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"email":"<throwaway>@example.com","password":"<temp password>","email_confirm":true}'
+curl -s -X POST "https://supabase.sosservices.online/auth/v1/token?grant_type=password" \
+  -H "apikey: $ANON_KEY" -H "Content-Type: application/json" \
+  -d '{"email":"<throwaway>@example.com","password":"<temp password>"}'
+# use the response's access_token as the Authorization: Bearer value
+```
+(Self-hosted's anonymous sign-in provider is disabled, so `signInAnonymously`-
+style flows return `anonymous_provider_disabled` — use the admin-create +
+password-sign-in flow above instead.) Note also: this project's self-hosted
+GoTrue admin `DELETE /auth/v1/admin/users/<id>` intermittently returns `504
+request_timeout` even when the delete eventually succeeds — don't assume a
+504 here means the delete failed; verify with a follow-up `GET` before
+retrying.
+
+**The four standard health-check curls** (run after every `functions`
+container restart, or any other state-changing step on this shared VPS):
+```bash
+ssh hostinger-vps "curl -s -o /dev/null -w 'app: %{http_code}\n' https://app.sosservices.online/; curl -s -o /dev/null -w 'api: %{http_code}\n' https://api.sosservices.online/health; curl -s -o /dev/null -w 'amro: %{http_code}\n' https://amro.sosservices.online/health; curl -s -o /dev/null -w 'aviation: %{http_code}\n' https://app.aviation.sosservices.online/"
+```
+Expected: all four `200`.
+
 ## Rollback
 
 This stack is live, deployed as Coolify application `i64jlyerora7ao9vkw5sweh3`
