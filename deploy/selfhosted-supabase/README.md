@@ -229,7 +229,16 @@ of a connection-churn defect in Postgres's native tablesync process that
 made this necessary once): rather than trying to resume, do a full,
 manually-driven rebuild:
 1. `ALTER SUBSCRIPTION phase2_public_migration_sub SET (slot_name = NONE); DROP SUBSCRIPTION phase2_public_migration_sub;` on self-hosted (the slot is already dead/gone on the publisher, so it must be disassociated first or `DROP SUBSCRIPTION` will try and fail to drop it there). Drop the dead slot on production separately if it still shows up in `pg_replication_slots`.
-2. Re-sync every table's data directly (a plain `\copy`-based dump/load per table, using `SET LOCAL session_replication_role = replica;` during the load to bypass FK/trigger ordering issues, and an explicit non-generated column list on both the dump `SELECT` and the load `COPY` target to avoid column-mismatch errors) — this sidesteps Postgres's native tablesync mechanism entirely if that's what caused the problem.
+2. Re-sync every table's data directly using [`scripts/phase2-manual-resync.sh`](scripts/phase2-manual-resync.sh) — this sidesteps Postgres's native tablesync mechanism entirely if that's what caused the problem. It dumps and reloads one table at a time (explicit non-generated column list on both sides to avoid column-mismatch errors, `SET LOCAL session_replication_role = replica` during the load to bypass FK/trigger ordering without needing topological table ordering, `DELETE FROM` rather than `TRUNCATE` since `TRUNCATE` fails on any table referenced by an FK even from an empty table). Generate the table list and run it:
+   ```bash
+   ssh hostinger-vps "docker exec db-i64jlyerora7ao9vkw5sweh3-103525206238 psql -U supabase_admin -d postgres -tAc \"SELECT schemaname||'.'||tablename FROM pg_publication_tables WHERE pubname='phase2_public_migration' ORDER BY 1;\"" > tables.txt
+   PHASE2_PROD_CONN="host=db.gzhxgoigflftharcmdqj.supabase.co port=5432 dbname=postgres user=phase2_replicator password=<PHASE2_REPLICATOR_PASSWORD from env> sslmode=require" \
+   PHASE2_SSH_HOST=hostinger-vps \
+   PHASE2_DB_CONTAINER=db-i64jlyerora7ao9vkw5sweh3-103525206238 \
+   PHASE2_TABLE_LIST=tables.txt \
+   bash deploy/selfhosted-supabase/scripts/phase2-manual-resync.sh
+   ```
+   The script exits non-zero if any table failed — check its log (`./phase2-manual-resync.log` by default) for `FAIL` lines and re-run with just the failed tables in a new list file. The two `NOT VALID` CHECK constraints below are the known failure modes this hit during Phase 2 development; there may be others for tables not yet exercised this way.
 3. `CREATE SUBSCRIPTION phase2_public_migration_sub ... WITH (copy_data = false, create_slot = true, slot_name = 'phase2_public_migration_slot');` — `copy_data = false` marks all 795 tables `'r'` immediately with no per-table tablesync workers involved, and streaming (CDC only) starts fresh from the new slot's creation point.
 4. Verify: all tables `'r'`, apply worker running with no errors, slot `active = true`, and a full row-count reconciliation against production (a single `UNION ALL` query summing counts across all 795 tables run on both sides and diffed) shows no mismatches beyond ordinary lag on high-write-frequency tables.
 
