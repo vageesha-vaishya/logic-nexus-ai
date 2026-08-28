@@ -277,9 +277,13 @@ actual file bytes — from production to self-hosted. Unlike Phase 2, this is
 not ongoing replication: it's a point-in-time copy, re-run manually
 whenever needed (most importantly, once just before Phase 6's cutover to
 pick up anything uploaded to production in the interim). Full history is in
-the Phase 3 SDD task reports
-(`.superpowers/sdd/2026-08-28-supabase-selfhost-phase3/task-1-report.md`
-and `task-2-report.md`).
+the Phase 3 implementation plan
+(`docs/superpowers/plans/2026-08-28-supabase-selfhost-phase3.md`) and design
+spec (`docs/superpowers/specs/2026-08-28-supabase-selfhost-phase3-design.md`).
+(The SDD task reports this work was originally tracked under,
+`.superpowers/sdd/2026-08-28-supabase-selfhost-phase3/task-1-report.md` and
+`task-2-report.md`, are gitignored and not available on a fresh clone — use
+the plan/spec above instead.)
 
 **What got replicated:**
 - All 9 `storage.buckets` rows (config only — id, name, `public`,
@@ -340,6 +344,40 @@ shows 11; both sides' total byte size (155 kB) and per-object checksums
 match exactly for everything that actually has content. Don't be alarmed by
 this specific 11-vs-9 count gap on future re-runs; do investigate if the
 gap changes shape (different objects failing, or a size mismatch).
+
+**Known limitations of the API-based sync — `owner`/`owner_id`/`created_at`
+are not preserved:** `phase3-storage-sync.sh` uploads through the Storage
+HTTP API, so every synced object lands on self-hosted with `owner` and
+`owner_id` set to whichever credential performed the upload (here,
+`service_role`, so both come out null/different from production's original
+values) rather than production's original uploader, and `created_at` set to
+the upload time rather than production's original creation time. The two
+alternatives that would preserve these — direct disk manipulation of the
+storage backend, or manually rewriting `storage.objects` metadata rows
+after upload — were both considered and deliberately rejected in the design
+spec in favor of the simpler, more reliable API approach; this is an
+accepted, inherent trade-off of that choice, not an oversight.
+
+As of 2026-08-28, production's `storage.objects` has 8 rows with a non-null
+`owner` and 6 with a non-null `owner_id` (out of all 11 rows, including the
+2 orphaned ones above — not just the 9 successfully-transferred real
+objects), while self-hosted has 0 of either. Concretely, this means the RLS
+policy `"Users can delete their own email attachments"` on
+`storage.objects`, which depends on `auth.uid() = owner`, would misbehave
+on self-hosted for any object relying on its original owner: today this is
+zero-impact because the `email-attachments` bucket is empty in production,
+but if an owner-scoped object exists there (or in any other bucket with a
+similar owner-dependent policy) by the time of Phase 6's cutover, that
+object's original owner would silently lose their ability to act on it
+under self-hosted's RLS.
+
+**Action for Phase 6's cutover checklist:** re-run the owner/owner_id check
+above against production immediately before cutover to see whether any
+owner-scoped object now exists in an affected bucket. If one does, decide
+before relying on self-hosted for that bucket whether to accept the
+ownership gap, manually patch the affected `storage.objects` rows on
+self-hosted, or otherwise remediate — don't assume the zero-impact status
+from 2026-08-28 still holds.
 
 ## Rollback
 

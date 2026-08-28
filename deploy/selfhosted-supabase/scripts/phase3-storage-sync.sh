@@ -49,8 +49,24 @@ LOG="./phase3-storage-sync.log"
 OBJECTS=$(ssh -n -o BatchMode=yes -o ConnectTimeout=8 "$PHASE3_SSH_HOST" \
   "docker exec $PHASE3_DB_CONTAINER psql \"$PHASE3_PROD_PG_CONN\" -tAc \
   \"SELECT bucket_id || '|' || name || '|' || coalesce(metadata->>'mimetype','application/octet-stream') FROM storage.objects ORDER BY bucket_id, name;\"")
+LIST_EXIT=$?
+# This is a command substitution assignment, not a pipeline - `set -o
+# pipefail` does NOT catch a failure here, so it must be checked explicitly.
+# Without this, a bad SSH_HOST/DB_CONTAINER/PROD_PG_CONN just yields an empty
+# $OBJECTS, which silently looks identical to "production genuinely has zero
+# objects" further down.
+if [ "$LIST_EXIT" -ne 0 ]; then
+  echo "ERROR: failed to list production storage.objects (ssh/docker exec/psql exited $LIST_EXIT)." >&2
+  echo "Check PHASE3_SSH_HOST, PHASE3_DB_CONTAINER, and PHASE3_PROD_PG_CONN - see this script's header comment." >&2
+  exit 1
+fi
 
 TOTAL=$(echo "$OBJECTS" | grep -c . || true)
+if [ "$TOTAL" -eq 0 ]; then
+  echo "ERROR: listing query succeeded but returned 0 rows from production storage.objects." >&2
+  echo "Refusing to report success - this almost certainly means the query/connection is misconfigured, not that production genuinely has zero objects. Check PHASE3_PROD_PG_CONN, PHASE3_SSH_HOST, and PHASE3_DB_CONTAINER." >&2
+  exit 1
+fi
 # DONE is used below purely for the [$DONE/$TOTAL] progress label in each log
 # line - it survives fine across iterations since the whole while-loop runs
 # in one persistent subshell. There's no OK/FAIL running-total counter here
@@ -89,6 +105,12 @@ echo "$OBJECTS" | while IFS='|' read -r BUCKET NAME MIMETYPE; do
 done
 
 echo "$(date -u) DONE total=$TOTAL" >> "$LOG"
-echo "See $LOG for per-object results (grep the log for the real OK/FAIL tally, below)."
-grep -c ' OK ' "$LOG" || true
-grep -c 'FAIL' "$LOG" || true
+echo "See $LOG for per-object results (tally below is grep'd from the log, not a live counter)."
+OK_COUNT=$(grep -c ' OK ' "$LOG" || true)
+FAIL_COUNT=$(grep -c ' FAIL' "$LOG" || true)
+echo "OK: $OK_COUNT"
+echo "FAIL: $FAIL_COUNT"
+if [ "$FAIL_COUNT" -gt 0 ]; then
+  echo "ERROR: $FAIL_COUNT object(s) failed to sync - see $LOG for details." >&2
+  exit 1
+fi
