@@ -399,11 +399,24 @@ self-hosted's Edge Runtime (`supabase/edge-runtime`) is configured with
 `--main-service` pointing at `supabase/functions/main/index.ts`. Every
 request to `/functions/v1/<name>` arrives at this one router first, which:
 1. Looks up `<name>` in `main/verify_jwt_map.ts`'s `VERIFY_JWT_MAP` and, if
-   the map doesn't say `false`, calls `_shared/auth.ts`'s `requireAuth()`
-   itself — reconstructing production's actual per-function JWT-enforcement
-   matrix (from `supabase/config.toml`'s `verify_jwt = false` entries), since
-   self-hosted's Edge Runtime only exposes one global toggle, not a
-   per-function one.
+   the map doesn't say `false`, verifies the request's bearer token's
+   **signature and expiry** against `JWT_SECRET` itself (HS256, via Web
+   Crypto's `crypto.subtle.verify` — no external dependency) — reconstructing
+   production's actual per-function JWT-enforcement matrix (from
+   `supabase/config.toml`'s `verify_jwt = false` entries), since self-hosted's
+   Edge Runtime only exposes one global toggle, not a per-function one. This
+   deliberately mirrors what production's own gateway (Kong) does for
+   `verify_jwt = true`: signature/expiry only, no identity/claim check — both
+   the anon key and the service_role key are validly-signed JWTs with no
+   `sub` claim, and both must pass (real callers depend on it: the
+   `markets_t1_ingest_crons` migrations call `verify_jwt=true`
+   `markets-ingest-*` functions with the service-role key, and
+   `invokeAnonymous()` in `src/lib/supabase-functions.ts` calls
+   `verify_jwt=true` functions like `discover-email-settings` with the anon
+   key). A function that needs a real authenticated end user (e.g.
+   `admin-reset-password`) calls `_shared/auth.ts`'s `requireAuth()` itself,
+   internally — the router's gate and a function's own `requireAuth()` call
+   are independent, exactly as on production.
 2. Dispatches to the target function's own module by temporarily shimming
    the global `Deno.serve` to capture the handler each function's own
    top-level `Deno.serve(...)` call (via `_shared/logger.ts`'s
@@ -511,13 +524,23 @@ own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
   `flypal_configured_directives_id_match_with_Code_form` has local source
   and is deployed in Batch 1).
 
+**Note — this no longer affects the router's own gate, only functions that
+call `requireAuth()` internally:** as of the Phase 4 Batch 1 final-review
+fix pass, the router's own JWT check (see the Architecture section above)
+verifies signature/expiry only, so both `ANON_KEY` and `SERVICE_ROLE_KEY`
+pass it for any `verify_jwt=true` function, same as production. The
+paragraph below is about `_shared/auth.ts`'s `requireAuth()` specifically —
+still relevant for the handful of functions (e.g. `admin-reset-password`)
+that call it themselves to require a real authenticated end user, on top of
+(not instead of) the router's gate.
+
 **Known gap — self-hosted `service_role` JWTs don't satisfy `requireAuth()`:**
 a `service_role` JWT (from self-hosted's own `.env`) is rejected by
 `_shared/auth.ts`'s `requireAuth()` with `"invalid claim: missing sub
 claim"`, because `service_role` tokens carry no `sub` claim while
 `requireAuth()`'s underlying `getUser`/`getClaims` check expects one (this
-differs from what an earlier plan draft assumed). To exercise a
-`verify_jwt=true` function's positive path, obtain a real user session JWT
+differs from what an earlier plan draft assumed). To exercise a function
+that calls `requireAuth()` itself, obtain a real user session JWT
 instead — self-hosted's GoTrue supports this via its own Auth API, e.g.
 creating a throwaway user with the admin API and signing in:
 ```bash
@@ -557,6 +580,24 @@ container restart, or any other state-changing step on this shared VPS):
 ssh hostinger-vps "curl -s -o /dev/null -w 'app: %{http_code}\n' https://app.sosservices.online/; curl -s -o /dev/null -w 'api: %{http_code}\n' https://api.sosservices.online/health; curl -s -o /dev/null -w 'amro: %{http_code}\n' https://amro.sosservices.online/health; curl -s -o /dev/null -w 'aviation: %{http_code}\n' https://app.aviation.sosservices.online/"
 ```
 Expected: all four `200`.
+
+**Phase 6 cutover checklist (started here, not yet a full section):**
+- **PostgREST schema exposure gap:** self-hosted's `rest` service only sets
+  `PGRST_DB_SCHEMAS=public,graphql_public`
+  (`deploy/selfhosted-supabase/env.example`), while production's PostgREST
+  exposes 6 schemas, including `markets`, `platform`, `core`, and `comms`.
+  This batch's 11 `markets-*` functions (see
+  `scripts/phase4-batch1-functions.txt`) dispatch correctly through the
+  router, but any of them that actually reads/writes the `markets` schema
+  via PostgREST (as opposed to a direct `postgres://` connection) will fail
+  once it does real work, since that schema isn't in `rest`'s exposed list.
+  This is a real gap but was explicitly left out of Phase 4 Batch 1's scope
+  (it's a Phase 1 `rest`-service config matter, not an edge-function code
+  issue) — do not change the live `PGRST_DB_SCHEMAS` env var casually; widen
+  it to match production's schema list (and restart the `rest` container)
+  as part of Phase 6 cutover prep, then re-run the four standard
+  health-check curls plus a spot check against one `markets-*` function that
+  actually touches PostgREST.
 
 ## Rollback
 

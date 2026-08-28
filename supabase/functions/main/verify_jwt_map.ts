@@ -72,6 +72,8 @@ export const VERIFY_JWT_MAP: Record<string, boolean> = {
   "analyze-email-threat": false,
   "categorize-document": false,
   "classify-email": false,
+  "comms-unsubscribe": false,
+  "comms-webhook-resend": false,
   "container-demand": false,
   "domains-register": false,
   "domains-verify": false,
