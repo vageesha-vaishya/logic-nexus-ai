@@ -17,15 +17,33 @@
 //
 // To reuse that unmodified code under a single shared isolate, this router
 // temporarily replaces the global `Deno.serve` with a capturing shim
-// immediately before dynamically importing a function's module. The
-// function's own top-level `Deno.serve(...)` call hands its handler to the
-// shim instead of starting a real server; the router then restores the real
-// `Deno.serve` and calls the captured handler directly with the actual
-// request. `Deno.serve` is resolved as a global at call time (not a
-// module-level binding captured at import time), so the shim intercepts the
-// call regardless of how many layers of function calls sit between module
+// immediately before importing a function's module. The function's own
+// top-level `Deno.serve(...)` call hands its handler to the shim instead of
+// starting a real server; the router then restores the real `Deno.serve`
+// and calls the captured handler directly with the actual request.
+// `Deno.serve` is resolved as a global at call time (not a module-level
+// binding captured at import time), so the shim intercepts the call
+// regardless of how many layers of function calls sit between module
 // evaluation and the `Deno.serve(...)` statement (e.g. `serveWithLogger`
 // calling it internally on behalf of its caller).
+//
+// Static import map requirement
+// ------------------------------
+// The module is imported via `FUNCTION_IMPORTERS[name]()` from
+// `function_importers.ts`, NOT a computed-string `import(`../${name}/index.ts`)`
+// call. This is load-bearing, not stylistic: the real Supabase Rust Edge
+// Runtime (`supabase/edge-runtime`), run with `--main-service`, builds its
+// executable module graph via STATIC analysis of this entrypoint's imports
+// at boot time, materializing only the files it can discover into an
+// internal sandboxed compile directory. A computed-string dynamic import is
+// invisible to that static analyzer, so the target file is never
+// materialized and the import throws `Module not found` at request time -
+// confirmed empirically against the live self-hosted runtime (see
+// `.superpowers/sdd/2026-08-28-supabase-selfhost-phase4-batch1/task-2-report.md`).
+// A plain string-literal argument to `import()`, even nested inside an
+// object-literal value, IS discovered by the analyzer - that is the
+// mechanism `function_importers.ts` relies on. See that file's own header
+// for the regeneration procedure when adding functions to a future batch.
 //
 // Because Deno's module cache means re-importing a module a second time
 // would NOT re-run its top-level `Deno.serve()` call, the captured handler
@@ -45,6 +63,7 @@
 // touch the lock or the shim at all.
 import { requireAuth } from "../_shared/auth.ts";
 import { VERIFY_JWT_MAP } from "./verify_jwt_map.ts";
+import { FUNCTION_IMPORTERS } from "./function_importers.ts";
 
 // @ts-ignore
 declare const Deno: any;
@@ -73,6 +92,15 @@ async function getHandler(name: string): Promise<Handler | null> {
     const alreadyCached = handlerCache.get(name);
     if (alreadyCached) return alreadyCached;
 
+    // Look up the static importer BEFORE touching Deno.serve at all - a name
+    // with no registered importer (not in this batch, or simply unknown)
+    // should fail the same way it would have failed at import time, without
+    // installing/restoring the shim for nothing.
+    const importer = FUNCTION_IMPORTERS[name];
+    if (!importer) {
+      throw new Error(`No static importer registered for function '${name}'`);
+    }
+
     const realServe = Deno.serve;
     let captured: Handler | null = null;
 
@@ -98,7 +126,7 @@ async function getHandler(name: string): Promise<Handler | null> {
     };
 
     try {
-      await import(`../${name}/index.ts`);
+      await importer();
     } finally {
       // Always restore the real Deno.serve before releasing the lock, even
       // if the import threw - otherwise a failed import for one function

@@ -1,0 +1,115 @@
+// supabase/functions/main/function_importers.ts
+//
+// Static, exhaustive import map consumed by main/index.ts's getHandler().
+//
+// Why this exists (do not replace with a computed-string dynamic import):
+// The real Supabase Rust Edge Runtime (supabase/edge-runtime), when booted
+// with --main-service, builds its executable module graph via STATIC
+// analysis of this entrypoint's imports at boot time, materializing only
+// the files it can discover into an internal sandboxed compile directory
+// (/var/tmp/sb-compile-edge-runtime/...). A computed-string dynamic import
+// like `import(`../${name}/index.ts`)` is invisible to that static
+// analyzer, so the target file is never materialized and the import throws
+// `Module not found` at request time - this was confirmed empirically
+// against the live self-hosted runtime (see task-2-report.md). A plain
+// string-literal argument to import(), even nested inside an object-
+// literal value (an arrow function stored as a property, as below), IS
+// discovered by the analyzer - that is the mechanism this file relies on.
+//
+// Scope: this map is intentionally scoped to Batch 1 only (the 88
+// functions in deploy/selfhosted-supabase/scripts/phase4-batch1-functions.txt),
+// NOT all 132 functions like verify_jwt_map.ts. Unlike that map (pure data,
+// no dependency on file existence), each entry below references a real file
+// path. Every batch must regenerate/extend this file to add its own
+// functions before deployment - see deploy/selfhosted-supabase/README.md's
+// "Phase 4: Edge Functions" section for the regeneration procedure.
+export const FUNCTION_IMPORTERS: Record<string, () => Promise<any>> = {
+  "accept-invite": () => import("../accept-invite/index.ts"),
+  "admin-reset-password": () => import("../admin-reset-password/index.ts"),
+  "anomaly-detection": () => import("../anomaly-detection/index.ts"),
+  "anomaly-detector": () => import("../anomaly-detector/index.ts"),
+  "autonomous-email": () => import("../autonomous-email/index.ts"),
+  "calculate-lead-score": () => import("../calculate-lead-score/index.ts"),
+  "calculate-quote-financials": () => import("../calculate-quote-financials/index.ts"),
+  "carrier-scoring": () => import("../carrier-scoring/index.ts"),
+  "check-expiring-documents": () => import("../check-expiring-documents/index.ts"),
+  "cleanup-logs": () => import("../cleanup-logs/index.ts"),
+  "clone-user-from-example": () => import("../clone-user-from-example/index.ts"),
+  "create-franchise": () => import("../create-franchise/index.ts"),
+  "create-user": () => import("../create-user/index.ts"),
+  "delete-user": () => import("../delete-user/index.ts"),
+  "discover-email-settings": () => import("../discover-email-settings/index.ts"),
+  "email-scan": () => import("../email-scan/index.ts"),
+  "email-stats": () => import("../email-stats/index.ts"),
+  "emit-event": () => import("../emit-event/index.ts"),
+  "escalate-message": () => import("../escalate-message/index.ts"),
+  "execute-sql-external": () => import("../execute-sql-external/index.ts"),
+  "export-data": () => import("../export-data/index.ts"),
+  "fleet-utilization": () => import("../fleet-utilization/index.ts"),
+  "flypal_configured_directives_create_tasks": () => import("../flypal_configured_directives_create_tasks/index.ts"),
+  "flypal_configured_directives_id_match": () => import("../flypal_configured_directives_id_match/index.ts"),
+  "flypal_configured_directives_id_match_with_Code_form": () => import("../flypal_configured_directives_id_match_with_Code_form/index.ts"),
+  "flypal_configured_directives_parse_frequency": () => import("../flypal_configured_directives_parse_frequency/index.ts"),
+  "generate-aircraft-tasks": () => import("../generate-aircraft-tasks/index.ts"),
+  "get-account-label": () => import("../get-account-label/index.ts"),
+  "get-contact-label": () => import("../get-contact-label/index.ts"),
+  "get-opportunity-full": () => import("../get-opportunity-full/index.ts"),
+  "get-opportunity-label": () => import("../get-opportunity-label/index.ts"),
+  "get-service-label": () => import("../get-service-label/index.ts"),
+  "ingest-linkedin": () => import("../ingest-linkedin/index.ts"),
+  "ingest-web": () => import("../ingest-web/index.ts"),
+  "ingest-x": () => import("../ingest-x/index.ts"),
+  "lead-event-webhook": () => import("../lead-event-webhook/index.ts"),
+  "lead-scoring": () => import("../lead-scoring/index.ts"),
+  "list-edge-functions": () => import("../list-edge-functions/index.ts"),
+  "margin-optimizer": () => import("../margin-optimizer/index.ts"),
+  "markets-compute-nav": () => import("../markets-compute-nav/index.ts"),
+  "markets-ingest-commodity-prices": () => import("../markets-ingest-commodity-prices/index.ts"),
+  "markets-ingest-corporate-actions": () => import("../markets-ingest-corporate-actions/index.ts"),
+  "markets-ingest-fo-prices": () => import("../markets-ingest-fo-prices/index.ts"),
+  "markets-ingest-fx-rates": () => import("../markets-ingest-fx-rates/index.ts"),
+  "markets-ingest-mf-nav": () => import("../markets-ingest-mf-nav/index.ts"),
+  "markets-ingest-news": () => import("../markets-ingest-news/index.ts"),
+  "markets-ingest-prices": () => import("../markets-ingest-prices/index.ts"),
+  "markets-llm-config": () => import("../markets-llm-config/index.ts"),
+  "markets-push-notify": () => import("../markets-push-notify/index.ts"),
+  "markets-watchlists": () => import("../markets-watchlists/index.ts"),
+  "metrics-quotation": () => import("../metrics-quotation/index.ts"),
+  "mgl-quotation-api": () => import("../mgl-quotation-api/index.ts"),
+  "migrate-flypal-directives-v2": () => import("../migrate-flypal-directives-v2/index.ts"),
+  "migrate-flypal-directives-v3": () => import("../migrate-flypal-directives-v3/index.ts"),
+  "moderate-message": () => import("../moderate-message/index.ts"),
+  "parse-directive-frequency-temp": () => import("../parse-directive-frequency-temp/index.ts"),
+  "payment-webhook-handler": () => import("../payment-webhook-handler/index.ts"),
+  "plan-event-webhook": () => import("../plan-event-webhook/index.ts"),
+  "portfolio-pnl": () => import("../portfolio-pnl/index.ts"),
+  "predict-eta": () => import("../predict-eta/index.ts"),
+  "process-email-retention": () => import("../process-email-retention/index.ts"),
+  "process-lead-assignments": () => import("../process-lead-assignments/index.ts"),
+  "process-scheduled-emails": () => import("../process-scheduled-emails/index.ts"),
+  "process-sequences": () => import("../process-sequences/index.ts"),
+  "provision-retail-user": () => import("../provision-retail-user/index.ts"),
+  "quote-event-webhook": () => import("../quote-event-webhook/index.ts"),
+  "rate-engine": () => import("../rate-engine/index.ts"),
+  "reconcile-quote": () => import("../reconcile-quote/index.ts"),
+  "remote-import": () => import("../remote-import/index.ts"),
+  "restore-quotation-version": () => import("../restore-quotation-version/index.ts"),
+  "retail-risk-score": () => import("../retail-risk-score/index.ts"),
+  "revenue-forecasting": () => import("../revenue-forecasting/index.ts"),
+  "route-email": () => import("../route-email/index.ts"),
+  "save-quotation-version": () => import("../save-quotation-version/index.ts"),
+  "scheduled-reconcile": () => import("../scheduled-reconcile/index.ts"),
+  "search-emails": () => import("../search-emails/index.ts"),
+  "send-web": () => import("../send-web/index.ts"),
+  "send-whatsapp": () => import("../send-whatsapp/index.ts"),
+  "subscription-plans": () => import("../subscription-plans/index.ts"),
+  "sync-all-mailboxes": () => import("../sync-all-mailboxes/index.ts"),
+  "sync-cn-hs-data": () => import("../sync-cn-hs-data/index.ts"),
+  "sync-emails": () => import("../sync-emails/index.ts"),
+  "sync-emails-v2": () => import("../sync-emails-v2/index.ts"),
+  "sync-hts-data": () => import("../sync-hts-data/index.ts"),
+  "track-email": () => import("../track-email/index.ts"),
+  "update-aircraft-template-model-json": () => import("../update-aircraft-template-model-json/index.ts"),
+  "verify-email-credentials": () => import("../verify-email-credentials/index.ts"),
+  "win-probability": () => import("../win-probability/index.ts"),
+};
