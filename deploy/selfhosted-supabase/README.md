@@ -270,6 +270,77 @@ once the publisher is reachable again:
 SELECT pg_drop_replication_slot('phase2_public_migration_slot');
 ```
 
+## Phase 3: Storage Sync
+
+Phase 3 replicates Supabase Storage — bucket configs, RLS policies, and
+actual file bytes — from production to self-hosted. Unlike Phase 2, this is
+not ongoing replication: it's a point-in-time copy, re-run manually
+whenever needed (most importantly, once just before Phase 6's cutover to
+pick up anything uploaded to production in the interim). Full history is in
+the Phase 3 SDD task reports
+(`.superpowers/sdd/2026-08-28-supabase-selfhost-phase3/task-1-report.md`
+and `task-2-report.md`).
+
+**What got replicated:**
+- All 9 `storage.buckets` rows (config only — id, name, `public`,
+  `file_size_limit`, `allowed_mime_types`, `avif_autodetection`), via
+  `phase3-storage-buckets.sql`.
+- All 31 RLS policies on `storage.objects` (not 26 — a plan-authoring
+  snapshot had gone stale by execution time; see Task 1's report), captured
+  point-in-time in `phase3-captured-storage-policies.sql` via the generator
+  query in `phase3-generate-storage-policies.sql`.
+- Actual file bytes for every real object in `storage.objects`, via
+  [`scripts/phase3-storage-sync.sh`](scripts/phase3-storage-sync.sh).
+
+**⚠ `service_role` JWTs are full-access on both sides.** Unlike Phase 2's
+`phase2_replicator` (a purpose-built, least-privilege role), Phase 3's
+sync script authenticates to both production's and self-hosted's Storage
+APIs using each side's `service_role` JWT — which bypasses RLS entirely and
+can read/write any bucket. There is no scoped-down credential option here;
+the Storage HTTP API doesn't support one. Treat both keys with the same
+care as any other full-access production secret.
+
+**Re-running `phase3-storage-sync.sh` before cutover:**
+```bash
+PROD_KEY="<value from env's SUPABASE_SERVICE_ROLE_KEY>"
+SELFHOSTED_KEY="$(ssh hostinger-vps "grep -E '^SERVICE_ROLE_KEY=' /data/coolify/applications/i64jlyerora7ao9vkw5sweh3/.env | cut -d= -f2-")"
+PHASE3_PROD_SERVICE_ROLE_KEY="$PROD_KEY" \
+PHASE3_SELFHOSTED_SERVICE_ROLE_KEY="$SELFHOSTED_KEY" \
+PHASE3_PROD_PG_CONN="postgresql://postgres:<postgres role password, same one in env's DIRECT_URL>@db.gzhxgoigflftharcmdqj.supabase.co:5432/postgres?sslmode=require" \
+PHASE3_SSH_HOST=hostinger-vps \
+PHASE3_DB_CONTAINER=db-i64jlyerora7ao9vkw5sweh3-103525206238 \
+bash deploy/selfhosted-supabase/scripts/phase3-storage-sync.sh
+```
+It's safe to re-run repeatedly — uploads use `x-upsert: true`, so an
+already-synced object is simply overwritten, not duplicated or errored on.
+
+**Note on `PHASE3_PROD_PG_CONN`:** despite its name, env's `DIRECT_URL` (and
+`DATABASE_URL` / `SUPABASE_DB_URL`, which are identical) is actually a
+**pooled** connection (`aws-1-ap-south-1.pooler.supabase.com:6543`,
+`pgbouncer=true`) — `psql` rejects the `pgbouncer` query parameter outright,
+and even stripped of it a pooled connection isn't what this script's
+`docker exec psql` invocation needs. Use the true direct host instead
+(`db.gzhxgoigflftharcmdqj.supabase.co:5432`, `user=postgres`, same password
+as `DIRECT_URL`), the same host Phase 2 verified extensively — see
+`PHASE2_PROD_CONN` in the "Rebuilding after slot invalidation" section
+above for the equivalent libpq-keyword form.
+
+**Known pre-existing production data issue — 2 orphaned objects:** as of
+the last sync (2026-08-28), production's `storage.objects` has 11 rows in
+`organization-assets` but only 9 have real backing files. The other 2
+(`11111111-1111-1111-1111-111111111111/logo.png` and
+`22222222-2222-2222-2222-222222222222/admin_upload.png`, both org-id
+placeholders from March 2026 seed data) return `404 NoSuchKey` from
+**production's own** Storage API — confirmed directly, not a sync-side
+issue — meaning their `storage.objects` metadata rows were created without
+ever going through a real upload. `phase3-storage-sync.sh` correctly skips
+these (logged as `FAIL(download:400)`) since there's nothing to copy. This
+is why self-hosted legitimately has 9 objects where production's `count(*)`
+shows 11; both sides' total byte size (155 kB) and per-object checksums
+match exactly for everything that actually has content. Don't be alarmed by
+this specific 11-vs-9 count gap on future re-runs; do investigate if the
+gap changes shape (different objects failing, or a size mismatch).
+
 ## Rollback
 
 This stack is live, deployed as Coolify application `i64jlyerora7ao9vkw5sweh3`
