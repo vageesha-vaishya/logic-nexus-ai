@@ -50,6 +50,31 @@ CREATE TRIGGER on_auth_user_created AFTER INSERT ON auth.users
   FOR EACH ROW EXECUTE FUNCTION public.handle_new_user();
 ```
 
+### 0a. The full `auth` diff this handoff asked for — COMPLETED 2026-08-28
+
+The handoff above says "Phase 5 should diff the whole `auth` schema, not just recreate this one trigger." That diff has now been run against both live databases. Results, so Phase 5 starts from evidence rather than repeating the work:
+
+| | Production | Self-hosted |
+|---|---|---|
+| `auth` tables | 23 | 23 ✅ |
+| `auth` functions | `email, jwt, role, uid` | identical ✅ |
+| `auth` non-internal triggers | 1 | **0** ❌ |
+| `auth` columns (all tables) | 240 | **239** ❌ |
+| `auth.users` rows | 103 | **1** (a test user) ❌ |
+| `auth.identities` rows | 101 | **1** ❌ |
+| `public.profiles` rows | 104 | 104 ✅ (Phase 2 replicated it) |
+| GoTrue schema migration | `20260625000000` | **`20260302000000`** ❌ |
+
+**Exactly ONE real structural column gap** (240 vs 239): `auth.custom_oauth_providers.custom_claims_allowlist` (`text[]`, NOT NULL) exists in production, absent self-hosted. Every other column matches name-for-name, type-for-type, in the same ordinal positions.
+
+⚠ **Methodology warning for whoever re-runs this:** a naive `format_type()`-based column diff reports **11** differences, not 1. The other 10 (`mfa_factors.factor_type`, `sessions.aal`, `one_time_tokens.token_type`, `oauth_clients.client_type`/`registration_type`, `oauth_authorizations.status`/`response_type`/`code_challenge_method`, `flow_state.code_challenge_method`) are **false positives** — `format_type()` renders the same enum as `auth.factor_type` or bare `factor_type` depending on the connecting role's `search_path` (production was queried as `postgres`, self-hosted as `supabase_admin`). Verified directly: all those enum types live in the `auth` schema on **both** sides. Don't "fix" them.
+
+**Root cause of the real gap:** self-hosted GoTrue is ~3.5 months behind production's (March vs June 2026 migration stamp). The column is one GoTrue added in that window.
+
+**Implication for Phase 5's approach:** do **not** hand-add the missing column. That would desynchronise self-hosted's `auth.schema_migrations` from its actual schema and fight GoTrue's own migration versioning — precisely the collision §2 warned about when it excluded `auth` from Phase 2. The correct fix is to upgrade the self-hosted GoTrue image and let it run its own migrations, then re-run this diff to confirm convergence.
+
+**Phase 5's actual scope, therefore:** (1) upgrade GoTrue to close the version skew, (2) migrate 103 users + 101 identities, (3) create the `on_auth_user_created` trigger, (4) align the JWT secret so existing sessions survive cutover.
+
 ## 0b. Data-sensitivity note — credential-bearing tables ARE in replication scope
 
 Recorded during Task 3's review (2026-08-26), closing the §6 open item that asked for a confirm that nothing in scope holds data that shouldn't leave production.
