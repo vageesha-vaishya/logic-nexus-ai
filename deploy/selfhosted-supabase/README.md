@@ -538,6 +538,19 @@ request_timeout` even when the delete eventually succeeds — don't assume a
 504 here means the delete failed; verify with a follow-up `GET` before
 retrying.
 
+**Leftover test user still on self-hosted `auth.users` (needs opportunistic
+cleanup):** a throwaway user created while verifying this behavior during
+Phase 4 batch 1 —
+`phase4-batch1-verify-test@sosservices.online`
+(id `02424458-e64b-4584-87ca-dd1d33f414c7`) — was never successfully deleted
+(hit the `DELETE` 504 above) and, as of this task, is still present on
+self-hosted's live `auth.users` table. It's inert (no associated app data)
+but whoever next touches self-hosted auth should delete it opportunistically,
+e.g.:
+```bash
+ssh hostinger-vps "docker exec db-i64jlyerora7ao9vkw5sweh3-103525206238 psql -U supabase_admin -d postgres -c \"DELETE FROM auth.users WHERE id = '02424458-e64b-4584-87ca-dd1d33f414c7';\""
+```
+
 **The four standard health-check curls** (run after every `functions`
 container restart, or any other state-changing step on this shared VPS):
 ```bash
