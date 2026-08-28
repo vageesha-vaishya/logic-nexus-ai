@@ -121,12 +121,23 @@ async function getHandler(name: string): Promise<Handler | null> {
 
 Deno.serve(async (req: Request) => {
   const url = new URL(req.url);
-  // Path arrives as /functions/v1/<name>[/...] from Kong; extract <name>.
+  // `deploy/selfhosted-supabase/kong.yml`'s `functions-v1` route has
+  // `strip_path: true` for its `/functions/v1/` path prefix, so by the time a
+  // request reaches this router, Kong has already removed that prefix - a
+  // request to `.../functions/v1/admin-reset-password` arrives here as just
+  // `/admin-reset-password`, with no literal "functions" segment present at
+  // all. The function name is therefore the FIRST path segment; this matches
+  // Supabase's own documented self-hosted main-service router pattern, which
+  // this project's Kong config was adapted from.
+  //
+  // A fallback for the unstripped `/functions/v1/<name>` shape is kept too
+  // (defensive, e.g. local/manual testing against the function directly
+  // without going through Kong), but it is not the shape Kong actually sends.
   const segments = url.pathname.split("/").filter(Boolean);
   const functionsIdx = segments.indexOf("functions");
   const name = functionsIdx >= 0 && segments.length > functionsIdx + 2
     ? segments[functionsIdx + 2]
-    : null;
+    : (segments.length > 0 ? segments[0] : null);
 
   if (!name) {
     return new Response(
