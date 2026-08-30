@@ -170,6 +170,34 @@ normal Coolify redeploy is not sufficient by itself.** You must also:
    A full Coolify redeploy alone will **not** pick up the new file content;
    only restarting the container against the re-seeded host path does.
 
+## Operational gotcha: environment variables — the flat `.env` on disk is a decoy
+
+**Read this before adding or changing any env var for this app.** There is a
+flat file at `/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/.env` on
+the VPS that looks like the obvious place to add a new secret — it already
+holds `JWT_SECRET`, `POSTGRES_PASSWORD`, etc. **It is not what Coolify
+actually deploys from.** Confirmed via an A/B test during Phase 4 Batch 2:
+editing that file and triggering a redeploy did **not** change the running
+container's environment at all; the new vars simply never appeared. The
+real mechanism is Coolify's own database-backed env-var store, managed via
+its API (or the dashboard's Environment Variables tab) — `docker-compose.yml`'s
+`${VAR:-}` interpolations are resolved from *that* store at deploy time, not
+from the flat file.
+
+**To add or change an env var this app's compose file references:**
+```bash
+curl -X POST "http://72.61.249.111:8000/api/v1/applications/i64jlyerora7ao9vkw5sweh3/envs" \
+  -H "Authorization: Bearer $COOLIFY_API_TOKEN" -H "Content-Type: application/json" \
+  -d '{"key": "YOUR_VAR", "value": "the value"}'
+```
+(payload must be exactly `{key, value}` — Coolify's API rejects an
+`is_build_time` field with a 422). Then trigger a redeploy (`POST
+.../applications/i64jlyerora7ao9vkw5sweh3/start`) for the new container to
+pick it up. The flat `.env` file is left in place (now with a warning
+comment prepended) purely because something already relies on the file
+existing at that path — do not treat its contents as authoritative for
+anything live.
+
 ## Phase 2: Logical Replication
 
 Phase 2 adds ongoing data replication from Supabase Cloud (production) into
@@ -524,60 +552,84 @@ own `{"error":"Function '<name>' not found or failed to load"}` 404 body).
   21 confirmed dispatching through the router (none returned the router's
   404). `forecast-demand` and `route-optimization` remain deliberately
   excluded from every batch so far, pending their backing services.
-  **Secrets:** 6 new env vars were added to `docker-compose.yml`'s
-  `functions` service and `env.example`
-  (`OPENAI_API_KEY`, `GOOGLE_API_KEY`, `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`,
-  `UPSTASH_REDIS_REST_TOKEN`, `UPSTASH_REDIS_REST_URL`), each defaulted to
-  empty (`${VAR:-}`) so an unset one doesn't break compose validation. Only
-  two were actually provisioned with real values on the VPS (repo-root
-  gitignored `env` file → live Coolify `.env`):
-  - `OPENAI_API_KEY` — provisioned.
-  - `GOOGLE_API_KEY` — provisioned.
-  - `GEMINI_API_KEY` — deliberately deferred; `suggest-transport-mode` (the
-    only function using it) falls back to `GOOGLE_API_KEY` when it's absent,
-    so this is safe to defer.
-  - `UPSTASH_REDIS_REST_TOKEN` / `UPSTASH_REDIS_REST_URL` — deliberately
-    deferred; `_shared/rate-limit.ts` fails open when Upstash isn't
-    configured, so rate limiting is simply inactive for this batch until
-    supplied, not broken.
-  - `ANTHROPIC_API_KEY` — deliberately deferred, and has **no fallback**:
-    `_shared/llm-gateway.ts` throws `"No tenant LLM config and no env
-    ANTHROPIC_API_KEY..."` without it. `markets-enrich-news`,
+  **Secrets (corrected 2026-08-28 — see below):** the `functions` service
+  wires 5 env vars, not the 6 originally planned:
+  `OPENAI_API_KEY`, `GOOGLE_API_KEY`, `VLLM_BASE_URL`, `VLLM_API_KEY`,
+  `VLLM_MODEL_NAME`, each defaulted to empty (`${VAR:-}`) so an unset one
+  doesn't break compose validation. `GEMINI_API_KEY`, `ANTHROPIC_API_KEY`,
+  `UPSTASH_REDIS_REST_TOKEN`, and `UPSTASH_REDIS_REST_URL` are **deliberately
+  not wired at all** (an earlier pass of this task added all 6 of the
+  originally-planned vars including these 4; that was superseded on
+  same-day review once each was checked against actual function source):
+  - `OPENAI_API_KEY` — provisioned with a real value.
+  - `GOOGLE_API_KEY` — provisioned with a real value.
+  - `VLLM_BASE_URL` / `VLLM_API_KEY` / `VLLM_MODEL_NAME` — provisioned with
+    real values pointing at this project's self-hosted vLLM rig. This is
+    `_shared/llm-gateway.ts`'s `local-qwen` provider, used as the fallback
+    when no tenant LLM config and no `ANTHROPIC_API_KEY` are set — verified
+    live independently of this deployment (key authenticates against
+    `/v1/models`, model id matches what's served, a real chat-completion
+    round-trip succeeded).
+  - `GEMINI_API_KEY` — not provisioned; `suggest-transport-mode` (its only
+    caller) falls back to `GOOGLE_API_KEY` when this is absent (see that
+    function's own source, `Deno.env.get('GEMINI_API_KEY') ||
+    Deno.env.get('GOOGLE_API_KEY')`), which is provisioned above.
+  - `ANTHROPIC_API_KEY` — not provisioned; superseded by the `VLLM_*`
+    self-hosted fallback above per this project's direction to run LLM
+    workloads against the self-hosted rig instead of a cloud Anthropic
+    subscription. `_shared/llm-gateway.ts` falls back to `local-qwen` when
+    `ANTHROPIC_API_KEY` is absent but `VLLM_BASE_URL`/`VLLM_API_KEY`/
+    `VLLM_MODEL_NAME` are set, so `markets-enrich-news`,
     `markets-portfolio-brief`, `markets-portfolio-diagnostic`, and
-    `markets-research` are deployed and reachable through the router but
-    will error internally on any real invocation until this key is
-    supplied in a later follow-up.
-  **Known limitation as of this deployment — env vars are not yet live in
-  the running container:** a plain `docker restart` (used to pick up the
-  new function files on the read-only bind mount, which — unlike env
-  vars — *are* re-read on every container start) does **not** cause the
-  Edge Runtime process to see newly-added environment variables. Env vars
-  are fixed into a container at creation time; only recreating the
-  container (a real Coolify redeploy of application `i64jlyerora7ao9vkw5sweh3`,
-  via its dashboard or `POST $COOLIFY_API_URL/api/v1/deploy?uuid=i64jlyerora7ao9vkw5sweh3`
-  with `COOLIFY_API_TOKEN` from the repo-root `env` file as the bearer
-  token) picks up compose/`.env` changes. **Do not** attempt this by running
-  `docker compose up`/`--force-recreate` directly against
-  `/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/docker-compose.yaml`
-  on the host — Coolify's real deployed container carries an extra private
-  per-application network and `coolify.*` management labels that this
-  on-disk compose file doesn't declare (they're injected by Coolify's own
-  deploy pipeline from a separate `/artifacts/<uuid>/` checkout); a bare
-  `docker compose up` from the host path only attaches to the *shared*
-  `coolify` network and registers a **second, duplicate `functions` network
-  alias on it** — risking DNS round-robin against the other ~24 unrelated
-  apps on this VPS. This was hit and immediately reverted (stray container
-  and its orphan volume removed, four standard health checks re-confirmed
-  clean) during Batch 2's rollout — see
-  `.superpowers/sdd/2026-08-28-supabase-selfhost-phase4-batch2/task-2-report.md`
-  for the full account. **Follow-up required:** trigger a real Coolify
-  redeploy for `i64jlyerora7ao9vkw5sweh3`, then re-run the four standard
-  health checks plus a spot check of an `OPENAI_API_KEY`/`GOOGLE_API_KEY`-
-  dependent function (e.g. `classify-email`, `generate-embedding`) with a
-  real payload to confirm the key is actually live — until then, all 21
-  Batch 2 functions dispatch correctly but none can complete an LLM call
-  (this is broader than just the 4 `ANTHROPIC_API_KEY`-dependent functions
-  noted above, which will remain non-functional even after that redeploy).
+    `markets-research` route to the vLLM rig instead of erroring.
+  - `UPSTASH_REDIS_REST_TOKEN` / `UPSTASH_REDIS_REST_URL` — not provisioned;
+    `_shared/rate-limit.ts` fails open by explicit design when these are
+    unset (its own module header states this must never be changed to
+    fail-closed), so rate limiting is simply inactive for this batch, not
+    broken.
+
+  **Critical operational finding (2026-08-28) — Coolify does not durably
+  apply either env-var or `docker-compose.yml` changes made by hand,
+  even though a normal redeploy *does* pick up compose-file changes:**
+  a follow-up redeploy of `i64jlyerora7ao9vkw5sweh3` (triggered outside this
+  task, most likely via the Coolify dashboard) silently reset **both**
+  files this task edits at the paths this README's own bind-mount workflow
+  above uses:
+  - `/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/.env` was
+    regenerated from Coolify's own database-managed env-var list for this
+    application (`GET /api/v1/applications/{uuid}/envs`) — any secret
+    appended by hand via `ssh ... >> .env` (as an earlier pass of this task
+    did for `OPENAI_API_KEY`/`GOOGLE_API_KEY`) is **wiped** the next time
+    Coolify redeploys, because Coolify doesn't read from the file at all;
+    it writes it, from vars it doesn't know about at all if they were only
+    ever hand-appended.
+  - `/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/docker-compose.yaml`
+    was reset to the exact HEAD of the `deploy/supabase-selfhost-phase1`
+    git branch this application deploys from (confirmed via
+    `GET /api/v1/applications/{uuid}` → `git_branch` +
+    `git_commit_sha: "HEAD"` + `docker_compose_location`). A `scp`'d
+    compose file (as an earlier pass of this task did) only lasts until
+    the next real redeploy — it is **not** durable unless the same change
+    also lands on that git branch, not just `main` (where all of this
+    project's Phase 2–4 development happens, per this repo's established
+    convention; the two branches otherwise agree on this file byte-for-byte
+    except for exactly this task's own pending env-var lines).
+
+  Batch 1 never hit this because it added no env vars and made no compose
+  changes — only bind-mounted function files, which **do** persist across a
+  real redeploy (confirmed still present after the surprise redeploy above:
+  all 115 expected files, all 21 Batch 2 directories intact). Batch 2 is the
+  first to need durable env vars, so this is the first time the gap surfaced.
+
+  **Correct way to make secrets durably live, going forward:** provision
+  each secret via Coolify's own env-var API/dashboard for this application
+  (not by hand-editing the live `.env`), and land any `docker-compose.yml`
+  change on the `deploy/supabase-selfhost-phase1` branch specifically (not
+  only `main`) before relying on a redeploy to pick it up. Both of these are
+  mutating actions against the live Coolify control plane and require
+  explicit human sign-off in this project's operating model — see this
+  batch's task-2-report.md for the exact commands attempted and where they
+  were blocked.
 - **Pending — later batches:** every function needing a third-party secret
   not yet provisioned on the self-hosted VPS (email/SMS/payment provider
   keys, etc.), to be grouped and deployed once each secret is available.
