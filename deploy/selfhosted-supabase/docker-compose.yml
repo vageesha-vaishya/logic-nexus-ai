@@ -306,10 +306,13 @@ services:
       SUPABASE_DB_URL: postgresql://postgres:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      UPSTASH_REDIS_REST_TOKEN: ${UPSTASH_REDIS_REST_TOKEN:-}
-      UPSTASH_REDIS_REST_URL: ${UPSTASH_REDIS_REST_URL:-}
+      # Self-hosted vLLM fallback (see _shared/llm-gateway.ts) — used when no
+      # tenant LLM config and no ANTHROPIC_API_KEY are set. GEMINI_API_KEY,
+      # ANTHROPIC_API_KEY, and the UPSTASH_REDIS_REST_* pair are deliberately
+      # NOT set here; see README's Phase 4 Batch 2 section for why.
+      VLLM_BASE_URL: ${VLLM_BASE_URL:-}
+      VLLM_API_KEY: ${VLLM_API_KEY:-}
+      VLLM_MODEL_NAME: ${VLLM_MODEL_NAME:-}
       VERIFY_JWT: "${FUNCTIONS_VERIFY_JWT}"
     command:
       [
