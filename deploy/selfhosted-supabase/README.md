@@ -136,15 +136,34 @@ unrelated app's process.
   supplied for this migration is really production's, or merely a
   wrong-but-internally-consistent 88-character string typed in error; none
   of those checks compare against a known-good production-signed artifact.
-  The correct, cheap fix is to verify HS256 signature validity of *any* real
-  production-issued access token (expired is fine — signature validity is
-  independent of expiry) against self-hosted's secret, e.g. via the
-  self-hosted `db` container's `pgjwt` `verify()` function, or an offline
-  check. This has not been done because no such token has been supplied yet.
-  Still open — needs a real production access token from the plan owner
-  before cutover.
+  **Practical importance of this item dropped after Phase 5b established that
+  production now issues ES256-signed access tokens, not HS256** — so no
+  currently-issued production token can serve as the HS256-signature artifact
+  this bullet originally called for; any production access token obtainable
+  today is signed with an algorithm this HS256 secret was never meant to
+  verify. If this still needs closing, the artifact has to be an **old**
+  production-issued token that predates production's move to ES256 (if one
+  still exists and hasn't aged out of any retention window), or some other
+  production-side record of the actual HS256 secret value — not a freshly
+  requested token. The check itself is unchanged: verify HS256 signature
+  validity of whichever artifact is actually available (expired is fine for a
+  token — signature validity is independent of expiry) against self-hosted's
+  secret, e.g. via the self-hosted `db` container's `pgjwt` `verify()`
+  function, or an offline check. Still open, but now lower-priority than the
+  JWKS-staleness risk called out in the next bullet and the Phase 6 cutover
+  checklist below.
 - **Closed by Phase 5b: production ES256 access tokens are now accepted by
   `auth`/`rest`.** See the Phase 5b section below for the full mechanism.
+  **"Closed" here means the ES256 signature-verification mechanism is
+  implemented and empirically confirmed — not that this item needs no further
+  attention before cutover.** The key material is a static snapshot of
+  production's JWKS taken at Phase 5b's implementation time; if production
+  rotates its ES256 signing keys before the real cutover, verification breaks
+  silently — no error, no log, no failing health check. This is why the
+  Phase 6 cutover checklist below includes a mandatory JWKS re-check plus a
+  post-redeploy assertion that `GOTRUE_JWT_KEYS` is actually present in the
+  running `auth` container; do not treat this bullet as done without also
+  completing those two checklist items immediately before cutover.
   Still open, unchanged by Phase 5b: `storage` and `realtime`'s own
   independent JWT verification (`AUTH_JWT_SECRET`/`API_JWT_SECRET`, both
   still the legacy HS256 secret) was not investigated by Phase 5b and very
@@ -248,6 +267,27 @@ pick it up. The flat `.env` file is left in place (now with a warning
 comment prepended) purely because something already relies on the file
 existing at that path — do not treat its contents as authoritative for
 anything live.
+
+**Reconciling this with vars that also get hand-edited via the flat `.env`
+elsewhere in this README (e.g. Phase 5b's `GOTRUE_JWT_KEYS`/`JWT_JWKS`).**
+Both statements in this section are true in their own context: a normal
+Coolify redeploy reads only Coolify's DB-backed store (above), while the
+manual single-service recreate pattern used elsewhere in this README (e.g.
+Phase 5a's `docker compose --env-file .env up -d <service>`) reads the flat
+`.env` file directly, instead. Any var maintained via that manual pattern —
+`GOTRUE_JWT_KEYS`/`JWT_JWKS` included — therefore has **two** sources of
+truth that must be kept in sync by hand: update Coolify's store via the API
+above, **and** apply the identical value to the on-disk `.env`, then verify
+the two actually agree (e.g. compare byte lengths of the value in both
+places) before recreating anything. Patching Coolify's store alone and
+skipping `.env` leaves a future manual recreate silently reverting that
+service to the stale value — with no error signaling it happened. **Before
+appending anything to `.env`, always confirm the file currently ends in a
+newline** (e.g. `tail -c1 .env | xxd` on the VPS copy) — appending onto a
+file whose last line lacks a trailing `\n` concatenates the new `KEY=value`
+directly onto the previous line, corrupting both. This exact failure
+recurred live during Phase 5b (see that section below for the incident);
+check it every time this file is edited, don't assume it still ends cleanly.
 
 ## Phase 5a: GoTrue upgraded to v2.195.0
 
@@ -542,6 +582,30 @@ closes that gap for `auth` and `rest` by teaching both services about
 production's public verification keys, **without changing anything about
 how self-hosted itself signs tokens.**
 
+**What "closes that gap" means for `auth` specifically — signature
+verification, not full authentication success.** GoTrue's
+`requireAuthentication` → `maybeLoadUserOrSession` path looks up the token's
+`session_id` claim against `auth.sessions` and returns `session_not_found` if
+that row isn't there. Migrating `auth.sessions` is an explicit non-goal of
+both Phase 5 and Phase 5b (only `auth.users`/`auth.identities` were migrated
+— see the Phase 5 section above), so a *fresh, unexpired* production access
+token would very likely still be rejected at `/auth/v1/user` — with
+`session_not_found`, not `bad_jwt`. The useful asymmetry this surfaces:
+PostgREST does **no** session lookup at all, so `/rest/v1` — the data plane
+the app actually uses — is where a fresh production token genuinely works
+end-to-end today. This is consistent with, and further evidenced by, the
+expired-token check already run against `rest`: presenting production's
+expired token to `/rest/v1/profiles?limit=1` returned `{"code":"PGRST303",
+"message":"JWT expired"}` / HTTP 401 — PostgREST's **claims**-stage
+rejection, reachable only after it already resolved production's ES256 key
+and verified the signature (a signature failure would instead surface as
+`PGRST301`/`JWSInvalidSignature`). None of this diminishes what this phase
+closed — the ES256 signature/algorithm gate genuinely now passes for both
+services — it just means "accepted by `auth`/`rest`" should not be read as
+"a valid production token gets you a 200 from `/auth/v1/user`"; that
+specific endpoint has its own, unrelated reason to still fail, unaffected by
+anything Phase 5b did.
+
 **Mechanism — one signing key, several verify-only keys:**
 - `GOTRUE_JWT_KEYS` (a bare JSON array, on both the VPS `.env` and Coolify's
   env-var store) holds 3 entries: self-hosted's existing HS256 secret,
@@ -576,13 +640,33 @@ Coolify entries, plus `sed -i '/^GOTRUE_JWT_KEYS=/d'` on the VPS `.env` —
 followed by re-running the `docker compose up -d auth rest` recreate and
 confirming `auth` returns healthy.
 
-**No compose-file change was needed.** Every service in this stack declares
-`env_file: .env`, and Coolify injects its *entire* env-var store into every
-container regardless of that service's own `environment:` block (the same
-finding Phase 5a made for scalar env vars — confirmed here to also hold for
-this multi-line JSON blob). Registering `GOTRUE_JWT_KEYS`/`JWT_JWKS` in
-Coolify's store and the on-disk `.env`, then recreating just `auth` and
-`rest`, was sufficient; `docker-compose.yaml` itself was untouched.
+**No compose-file change was needed.** Every service declares `env_file:
+.env` — but, exactly as the Phase 5 section above already found for
+`JWT_SECRET`, only in Coolify's own **generated** compose file on the VPS,
+`/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/docker-compose.yaml`
+(note the `.yaml` extension). This repo's own
+`deploy/selfhosted-supabase/docker-compose.yml` has zero `env_file:` lines
+(`grep -c env_file deploy/selfhosted-supabase/docker-compose.yml` returns
+`0`, on both `main` and `deploy/supabase-selfhost-phase1`) — there is no
+`.yaml` file anywhere in this repo. Coolify injects its *entire* env-var
+store into every container regardless of that service's own `environment:`
+block (the same finding Phase 5a made for scalar env vars — confirmed here
+to also hold for this multi-line JSON blob). Registering
+`GOTRUE_JWT_KEYS`/`JWT_JWKS` in Coolify's store and the on-disk `.env`, then
+recreating just `auth` and `rest`, was sufficient; `docker-compose.yaml`
+itself was untouched.
+
+**This is a behavior, not a guaranteed contract.** The `env_file: .env`
+declaration that gets `GOTRUE_JWT_KEYS` into the `auth` container at all
+lives only in a file under no version control, generated by Coolify's own
+(undocumented, to this project) compose-generation logic — not in anything
+this repo tracks or this project controls. If Coolify's generation ever
+changes, `GOTRUE_JWT_KEYS` silently stops reaching the `auth` container:
+GoTrue falls back to `GOTRUE_JWT_SECRET`, production ES256 tokens stop
+verifying, and there is no crash, no log, and no failing health check to
+signal it. This is exactly why the Phase 6 cutover checklist below includes
+a post-redeploy assertion that the var is actually present in the running
+container's resolved environment.
 
 **Operational gotcha, confirmed to actually recur:** appending a new
 `KEY=value` line to the VPS `.env` with a bare `>>` is only safe if the
@@ -615,7 +699,24 @@ stale silently — there is no mechanism here that re-fetches
 `https://gzhxgoigflftharcmdqj.supabase.co/auth/v1/.well-known/jwks.json`
 automatically. **Re-check production's JWKS kids against this stack's
 `GOTRUE_JWT_KEYS`/`JWT_JWKS` manually, immediately before the real cutover**,
-and redo this phase's registration steps if they've diverged.
+and redo this phase's registration steps if they've diverged. This re-check
+is now also a standing item on the Phase 6 cutover checklist below — see
+that section rather than relying on this narrative alone being remembered.
+
+**Undocumented side effect: self-hosted's own public JWKS endpoint now
+advertises production's public keys.**
+`https://supabase.sosservices.online/auth/v1/.well-known/jwks.json` is
+reachable without authentication (`kong.yml` routes it through the `cors`
+plugin only, no `key-auth`) and previously returned `{"keys":[]}`; it now
+returns production's two ES256 **public** keys under self-hosted's own
+domain and issuer. Nothing secret leaks — GoTrue's `internal/api/jwks.go`
+explicitly skips symmetric keys before serving this endpoint (`if
+key.PublicKey == nil || key.PublicKey.KeyType() == jwa.OctetSeq { continue
+}`, commented "don't expose hmac jwk in endpoint"), so the `oct` signing key
+is correctly omitted — confirmed to hold here. But a client doing standard
+JWKS discovery against self-hosted is now told this issuer signs with ES256
+keys it never actually uses for signing, and has no way to discover the key
+it does sign with from this endpoint alone.
 
 **What this phase did not touch (see "Open items before cutover" above):**
 `storage` and `realtime`'s own independent JWT verification, and the
@@ -1141,6 +1242,37 @@ Expected: all four `200`.
   as part of Phase 6 cutover prep, then re-run the four standard
   health-check curls plus a spot check against one `markets-*` function that
   actually touches PostgREST.
+- **Re-fetch production's JWKS and confirm the `kid`s still match (Phase
+  5b):** re-fetch
+  `https://gzhxgoigflftharcmdqj.supabase.co/auth/v1/.well-known/jwks.json`
+  and confirm the `kid`s it returns still match what `GOTRUE_JWT_KEYS`/
+  `JWT_JWKS` hold on this stack. Production rotating its ES256 signing keys
+  before cutover silently breaks ES256 verification here — no error, no log,
+  no health-check failure — so this needs a manual, deliberate re-check
+  right before cutover, not an assumption that Phase 5b's one-time snapshot
+  (see that section above) still holds.
+- **Assert `GOTRUE_JWT_KEYS` is actually present in the running `auth`
+  container after any redeploy (Phase 5b):**
+  ```bash
+  docker inspect <auth-container> --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -c '^GOTRUE_JWT_KEYS='
+  ```
+  should return `1`. This matters because the `env_file: .env` declaration
+  that gets this var into the container at all lives only in Coolify's
+  generated, non-version-controlled compose file on the VPS, not in anything
+  this repo tracks (see the Phase 5b section above) — if Coolify's
+  compose-generation logic ever changes, this var can silently stop reaching
+  the container with no other symptom: GoTrue falls back to
+  `GOTRUE_JWT_SECRET` and production ES256 tokens quietly stop verifying.
+- **Confirm `storage`, `realtime`, and `functions` still do not verify
+  production ES256 tokens, and that this is still a deliberate deferral, not
+  a forgotten gap (Phase 5b):** `storage`'s `AUTH_JWT_SECRET` and
+  `realtime`'s `API_JWT_SECRET` both still resolve to the legacy HS256
+  `JWT_SECRET` only (`docker-compose.yml` lines 215 and 267 respectively —
+  neither reads `JWT_JWKS`/`GOTRUE_JWT_KEYS`), and the `functions` router
+  (`supabase/functions/main/index.ts`) verifies with hardcoded HMAC against
+  `JWT_SECRET` across all 109 deployed edge functions, with no ES256
+  algorithm branching. All three were explicitly out of scope for Phase 5b
+  (see that section above) and remain open going into cutover.
 
 ## Rollback
 
