@@ -198,6 +198,51 @@ comment prepended) purely because something already relies on the file
 existing at that path — do not treat its contents as authoritative for
 anything live.
 
+## Phase 5a: GoTrue upgraded to v2.195.0
+
+Self-hosted `auth` (GoTrue) is now `supabase/gotrue:v2.195.0`, matching
+production. This closed the schema gap identified during the Phase 2
+handoff: `auth.custom_oauth_providers.custom_claims_allowlist` did not exist
+self-hosted (`auth.schema_migrations` was at `20260302000000`, 239 `auth`
+columns) but did exist in production. After this upgrade both sides converge
+exactly: migration `20260625000000`, 240 `auth` columns,
+`custom_claims_allowlist` present on both. See
+[docs/superpowers/plans/2026-08-30-supabase-selfhost-phase5a-gotrue-upgrade.md](../../docs/superpowers/plans/2026-08-30-supabase-selfhost-phase5a-gotrue-upgrade.md)
+and its design spec's §3 for the full background.
+
+**New operational finding from this upgrade:** the persistent
+`/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/docker-compose.yaml` on
+the VPS is **not** the file a real Coolify redeploy actually creates
+containers from. A redeploy checks the compose file out fresh into an
+ephemeral `/artifacts/<uuid>` directory each time, uses that to (re)create
+the **entire 7-container stack together**, and the ephemeral directory is
+confirmed deleted from disk afterward. The persistent on-disk copy above is
+only authoritative when you run `docker compose` directly against it
+yourself — which is exactly what this task did to avoid a full-stack
+recreate for a single-service change:
+
+```bash
+# Edit the one image line on the persistent on-disk file, then:
+cd /data/coolify/applications/i64jlyerora7ao9vkw5sweh3
+docker compose -p i64jlyerora7ao9vkw5sweh3 --env-file .env -f docker-compose.yaml pull <service>
+docker compose -p i64jlyerora7ao9vkw5sweh3 --env-file .env -f docker-compose.yaml up -d <service>
+```
+
+Matching the existing `-p i64jlyerora7ao9vkw5sweh3` project name is what lets
+Compose recognize the other 6 running containers as already part of the
+project with unchanged config, so only the named service(s) get recreated.
+For any single-service image bump like this one, prefer this pattern
+directly on the VPS over triggering Coolify's `/start` redeploy endpoint,
+which would recreate all 7 containers together.
+
+Also note: `deploy/supabase-selfhost-phase1` — the branch Coolify's
+`git_branch` API field actually points to — needed this same
+`supabase/gotrue:v2.189.0` → `v2.195.0` image-tag change applied as a
+separate commit from `main`'s. The two branches had already diverged (see
+the design spec's §3 and the Phase 1 branch-sync note further down this
+README) so a change made only on `main` would not have reached what Coolify
+deploys.
+
 ## Phase 2: Logical Replication
 
 Phase 2 adds ongoing data replication from Supabase Cloud (production) into
