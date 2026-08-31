@@ -118,6 +118,44 @@ unrelated app's process.
   container's own health status instead (`docker ps`), not the application's
   rolled-up status.
 
+## Open items before cutover
+
+- **Self-hosted's own signup/email path is broken — a real cutover
+  blocker, not a nice-to-have.** `SMTP_HOST` is still the unfilled
+  placeholder `REPLACE_WITH_SMTP_HOST` (see the Phase 5 section above).
+  Self-hosted now holds 103 real migrated users. Without working SMTP there
+  is no password-reset, magic-link, email-change, or invite path, and no way
+  to onboard a brand-new user through the normal public signup flow at all —
+  every verification so far has had to route around this via GoTrue's Admin
+  API. This needs real SMTP credentials before this stack can take over from
+  production.
+- **The JWT secret's actual equality with production has never been
+  independently verified.** Every check run so far — the `db` GUC's
+  length (88 chars), token issuance/validation working end-to-end, the
+  standard health-check curls — would look identical whether the secret
+  supplied for this migration is really production's, or merely a
+  wrong-but-internally-consistent 88-character string typed in error; none
+  of those checks compare against a known-good production-signed artifact.
+  The correct, cheap fix is to verify HS256 signature validity of *any* real
+  production-issued access token (expired is fine — signature validity is
+  independent of expiry) against self-hosted's secret, e.g. via the
+  self-hosted `db` container's `pgjwt` `verify()` function, or an offline
+  check. This has not been done because no such token has been supplied yet.
+  Still open — needs a real production access token from the plan owner
+  before cutover.
+- **Deploy-branch structural compose drift beyond scalar env vars is still
+  unaddressed.** `deploy/supabase-selfhost-phase1` (the branch Coolify
+  actually deploys from) and `main` had already diverged structurally by the
+  time this was investigated. The Phase 5a section above found that scalar
+  env-var drift between the two branches is *not* a live risk (Coolify
+  injects its full env-var store into every container regardless of a
+  service's `environment:` block), but structural drift — different image
+  tags, added/removed services, changed volumes, ports, or healthchecks —
+  only takes effect from whichever branch is actually checked out at
+  redeploy time, and was flagged there as still worth keeping in sync
+  deliberately. See the "Branch drift, corrected" paragraph under Phase 5a
+  for the full analysis; it is cross-referenced here rather than repeated.
+
 ## Validating this compose file
 
 ```bash
@@ -371,9 +409,19 @@ takes actual user signups** — tracked as a follow-up, not fixed here.
    immediately, no recreate needed.
 
 **Caveat: the named-services list above is not the actual blast radius.**
-Every service in `docker-compose.yaml` declares `env_file: .env`
-(`grep -n env_file deploy/selfhosted-supabase/docker-compose.yaml` returns
-one hit per service, all 7). Compose computes each service's config-hash
+Every service declares `env_file: .env` — but **not** in this repo's own
+`deploy/selfhosted-supabase/docker-compose.yml`, which has zero `env_file:`
+lines (`grep -c env_file deploy/selfhosted-supabase/docker-compose.yml`
+returns `0`). The `env_file: .env` declarations exist only in **Coolify's
+own generated compose file on the VPS**,
+`/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/docker-compose.yaml`
+(note the `.yaml` extension, and the on-VPS-only path — there is no `.yaml`
+file anywhere in this repo). Confirm live:
+`ssh hostinger-vps "grep -c env_file /data/coolify/applications/i64jlyerora7ao9vkw5sweh3/docker-compose.yaml"`
+returns one hit per service, all 7. Running the equivalent `grep` against
+this repo's checked-out file will correctly find nothing — that does **not**
+mean the caveat below doesn't apply; it means you're looking at the wrong
+compose file. Compose computes each service's config-hash
 from the *entire* `.env` file's contents merged with that service's own
 `environment:` block — not just the variables that service's own
 `environment:` block happens to reference. This means ANY edit to `.env`
@@ -381,8 +429,12 @@ can make Compose decide to recreate ANY service, not only the ones named in
 your `up -d` command. This is exactly what happened during this phase's
 `JWT_SECRET`-only rotation: `docker compose up -d auth rest realtime
 functions` also recreated `kong`, even though `kong`'s own `environment:`
-block never references `${JWT_SECRET}` at all (it only interpolates
-`${ANON_KEY}`, `${SERVICE_ROLE_KEY}`, `${KONG_HTTP_PORT}`). It was confirmed
+block never references `${JWT_SECRET}` at all (per
+`deploy/selfhosted-supabase/docker-compose.yml`, it interpolates `${ANON_KEY}`,
+`${SERVICE_ROLE_KEY}`, `${SUPABASE_PUBLISHABLE_KEY:-}`, `${SUPABASE_SECRET_KEY:-}`,
+`${ANON_KEY_ASYMMETRIC:-}`, and `${SERVICE_ROLE_KEY_ASYMMETRIC:-}` — `KONG_HTTP_PORT`
+is actually referenced in kong's `ports:` block, not its `environment:` block).
+It was confirmed
 harmless here — `kong` is stateless, reloads its declarative config fresh
 from a bind-mounted `kong.yml` on every start, and came back healthy within
 seconds — but that is not something to assume will always be true. **Always
@@ -405,6 +457,19 @@ self-hosted `db` container's `pgjwt` extension:
 ```sql
 SELECT sign('{"role":"anon","iss":"supabase","iat":...,"exp":...}'::json, '<new-secret>', 'HS256');
 ```
+**Caution for any future rotation:** this statement embeds the signing
+secret directly in the SQL text, which risks the secret landing in Postgres
+statement logs (`log_statement`) or an audit-logging extension's captured
+statement text if either is active on the `db` container at the time. This
+phase's fix-wave verified `log_statement = none`, `log_min_duration_statement
+= -1`, and `pgaudit.log = none` on self-hosted `db` at check time (so no
+statement-text capture was configured), and confirmed zero occurrences of
+`sign(` in the container's own logs — but don't assume that configuration
+holds for a future rotation without re-checking it first. Prefer passing the
+secret as a bound parameter (e.g. `psql -v` or a driver-level parameterized
+query) rather than interpolating it into literal SQL text, to remove the
+risk entirely regardless of logging configuration.
+
 **Known wrinkle:** this stack's `pgjwt` was installed with its bundled
 `sign()`/`algorithm_sign()` functions hardcoded to call `public.hmac(...)`,
 but `pgcrypto` (which provides `hmac()`) is installed into the `extensions`
@@ -435,6 +500,21 @@ disposable probe key during Phase 5's design pass — no duplicate created);
 add `"is_preview": true` to the same body to reach the preview copy
 instead. Using `POST` on a key that already exists was not tested and
 should not be assumed safe.
+
+**Production-security consequence of this phase (intended, not a defect —
+but must be treated accordingly):** aligning self-hosted's `JWT_SECRET` with
+production's real one means production's actual signing secret, plus the
+two regenerated keys — `ANON_KEY` and `SERVICE_ROLE_KEY` (the latter an
+RLS-bypassing credential, valid until ~2036 per its `exp` claim) — are now
+production-valid credentials that live on this VPS: in Coolify's env-var
+store, the on-disk `.env`, and the `db` container's
+`app.settings.jwt_secret` GUC. This VPS is shared with 24 unrelated
+production apps. From this phase forward, treat the VPS's env store, `.env`,
+and `db` GUC as holding **production-secret-grade material**, not merely
+self-hosted's own throwaway secrets — the operational caution that implies
+(who can read `.env`/the Coolify store, what gets pasted into logs/tickets,
+etc.) is materially higher than before this phase. See also the Rollback
+section's note on what this means for tearing this stack down.
 
 ## Phase 2: Logical Replication
 
@@ -1016,3 +1096,19 @@ down and later re-deploying this same stack from scratch will hit the
 bind-mount-seeding gotcha documented above all over again (Coolify will
 recreate the file-based mount paths from empty on a fresh deploy) — budget
 time for the manual `scp` reseed step if that happens.
+
+**This "safe at any time" framing is stale once Phase 5 has run.** The
+paragraph above describes Phase 1's teardown risk (no production app reads
+this stack's env vars) — it says nothing about the data or secrets *inside*
+the stack. After Phase 5, this stack holds 103 real migrated users' emails
+and password hashes, and its `JWT_SECRET`/`ANON_KEY`/`SERVICE_ROLE_KEY` are
+now identical to production's real ones (see the production-security note
+in the Phase 5 section above). A rollback/teardown decided *after* Phase 5
+is a materially different, higher-stakes operation than one decided before
+it: abandoning this migration would imply also rotating production's actual
+JWT secret (since self-hosted now shares it, leaving it in place on a
+to-be-deleted stack is itself a residual-exposure question), which would
+invalidate every currently-issued production access/refresh token and both
+production API keys. Treat a post-Phase-5 rollback as its own decision
+requiring the plan owner's sign-off, not a mechanical repeat of the steps
+above.
