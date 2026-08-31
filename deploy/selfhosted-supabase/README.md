@@ -210,16 +210,40 @@ exactly: migration `20260625000000`, 240 `auth` columns,
 [docs/superpowers/plans/2026-08-30-supabase-selfhost-phase5a-gotrue-upgrade.md](../../docs/superpowers/plans/2026-08-30-supabase-selfhost-phase5a-gotrue-upgrade.md)
 and its design spec's §3 for the full background.
 
-**New operational finding from this upgrade:** the persistent
+**Kong gotcha when verifying GoTrue's version — don't use the public
+health route:** a public `curl https://supabase.sosservices.online/auth/v1/health`
+does **not** return GoTrue's version JSON; it returns Kong's
+`{"message":"No API key found in request"}`, because Kong's `key-auth`
+plugin applies to that route (per `kong.yml`) and rejects the request before
+it ever reaches `auth`. Don't misdiagnose that response as GoTrue being
+down or misconfigured. To actually check GoTrue's version, bypass Kong
+entirely and hit it in-container: `docker exec <auth-container> curl -s
+http://localhost:9999/health`.
+
+**Operational finding, from this sub-project's design-time audit (not this
+upgrade's execution):** the design spec's fourth audit pass established, before
+any implementation task ran, that the persistent
 `/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/docker-compose.yaml` on
 the VPS is **not** the file a real Coolify redeploy actually creates
 containers from. A redeploy checks the compose file out fresh into an
 ephemeral `/artifacts/<uuid>` directory each time, uses that to (re)create
-the **entire 7-container stack together**, and the ephemeral directory is
-confirmed deleted from disk afterward. The persistent on-disk copy above is
+the **entire 7-container stack together**. This is an inference from two
+pieces of evidence gathered at design time — `docker inspect` creation-time
+labels plus all 7 containers sharing identical uptime — not from directly
+observing a redeploy happen live; no redeploy was executed during this
+sub-project. Task 2's execution relied on this design-time finding rather
+than re-deriving it. The persistent on-disk copy above is
 only authoritative when you run `docker compose` directly against it
 yourself — which is exactly what this task did to avoid a full-stack
-recreate for a single-service change:
+recreate for a single-service change.
+
+**This hand-edit is only durable if the same change also lands on
+`deploy/supabase-selfhost-phase1`** (as Task 1 of this sub-project did for
+this image-tag bump — see the paragraph below the code block). Editing only
+the persistent on-disk file gets the running container upgraded now, but the
+next real Coolify redeploy re-checks-out the compose file fresh from that
+branch and would silently revert the hand-edit if the branch itself hadn't
+also been updated.
 
 ```bash
 # Edit the one image line on the persistent on-disk file, then:
@@ -231,9 +255,39 @@ docker compose -p i64jlyerora7ao9vkw5sweh3 --env-file .env -f docker-compose.yam
 Matching the existing `-p i64jlyerora7ao9vkw5sweh3` project name is what lets
 Compose recognize the other 6 running containers as already part of the
 project with unchanged config, so only the named service(s) get recreated.
-For any single-service image bump like this one, prefer this pattern
-directly on the VPS over triggering Coolify's `/start` redeploy endpoint,
-which would recreate all 7 containers together.
+
+**This contradicts the "decoy" gotcha immediately above it — read both
+together.** `--env-file .env` resolves this compose file's `${VAR}`/`${VAR:-}`
+placeholders directly from the same flat, non-authoritative `.env` file the
+section above says not to trust for anything live (Coolify's own deploy
+mechanism resolves those placeholders from its DB-backed store instead, not
+from this file). Using this manual pattern is only safe when `.env`'s current
+values for whatever vars the target service's `environment:` block references
+are actually known to be current — don't assume that; pair it with a live
+equivalence check against Coolify's authoritative store (see below) rather
+than trusting the file blindly. With that precondition made explicit: for a
+single-service image bump like this one, this pattern is preferable to
+triggering Coolify's `/start` redeploy endpoint, which would recreate all 7
+containers together — it is not a context-free best practice for any future
+single-service change.
+
+**Live equivalence check, done as part of this fix wave (2026-08-31):** every
+var the `auth` service's `environment:` block references
+(`POSTGRES_PASSWORD`, `JWT_SECRET`, `API_EXTERNAL_URL`, `SITE_URL`, `SMTP_*`,
+`MAILER_URLPATHS_*`, `DISABLE_SIGNUP`, `ADDITIONAL_REDIRECT_URLS`,
+`ENABLE_*` flags, `JWT_EXPIRY`) was compared across the flat `.env` file used
+by the `up -d auth` command above, the recreated container's actual resolved
+environment (`docker inspect`), and the literal values Coolify itself had
+already baked into the persisted on-disk `docker-compose.yaml` as of its last
+deploy. All three agreed for every var checked — no drift from a stale
+`.env` was found. (Coolify's `GET .../envs` API endpoint on this instance
+returns only metadata — key names and flags, no `value` field — under the
+token available for this check, so the comparison used the persisted
+compose file's baked-in values as the proxy for Coolify's authoritative
+state rather than a direct API value read; see the fix-wave report for
+detail.) One pre-existing, unrelated anomaly was noticed while checking
+(not introduced by this upgrade, not a drift/mismatch — see the fix-wave
+report) and is flagged there for separate triage, not fixed here.
 
 Also note: `deploy/supabase-selfhost-phase1` — the branch Coolify's
 `git_branch` API field actually points to — needed this same
@@ -242,6 +296,33 @@ separate commit from `main`'s. The two branches had already diverged (see
 the design spec's §3 and the Phase 1 branch-sync note further down this
 README) so a change made only on `main` would not have reached what Coolify
 deploys.
+
+**Branch drift, corrected:** `deploy/supabase-selfhost-phase1` is still
+significantly behind `main` (check
+`git rev-list --count origin/deploy/supabase-selfhost-phase1..origin/main`
+for the current count rather than trusting a specific figure here, per the
+same caveat as the Rollback section below). This was flagged during final
+review as a live risk to the `functions` service specifically — the theory
+being that a future Coolify redeploy would leave `functions` unable to reach
+`OPENAI_API_KEY`/`GOOGLE_API_KEY`/`VLLM_BASE_URL`/`VLLM_API_KEY`/
+`VLLM_MODEL_NAME` because the phase1 branch's compose file doesn't declare
+them in that service's `environment:` block. That specific mechanism does
+**not** hold: `docker inspect` on the live `functions` container (created
+from the phase1 branch's compose file, unchanged/untouched by this
+sub-project) shows all five vars present with real values despite the
+phase1 branch's `environment:` block never referencing them — direct,
+live evidence that Coolify injects its full registered env-var store into
+every container's runtime environment regardless of whether that service's
+`environment:` block references a given key by name. A compose file's
+explicit `environment:` entries matter for `${VAR:-default}` fallback
+documentation, not for whether a Coolify-known scalar var reaches the
+container. So scalar env-var drift between the two branches is not actually
+a live risk. What genuinely would only take effect from whichever branch is
+checked out at redeploy time — and so is still worth keeping in sync
+deliberately rather than assuming it propagates — is *structural* compose
+drift: different image tags, added/removed services, changed volumes,
+ports, or healthchecks. Those come from the git-checked-out compose file
+itself, unlike scalar env vars.
 
 ## Phase 2: Logical Replication
 
