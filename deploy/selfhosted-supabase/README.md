@@ -324,6 +324,97 @@ drift: different image tags, added/removed services, changed volumes,
 ports, or healthchecks. Those come from the git-checked-out compose file
 itself, unlike scalar env vars.
 
+## Phase 5: Auth Data Migration & JWT Alignment
+
+Phase 5 closed out the remaining Phase 2→5 handoff (see Phase 5a above for
+the GoTrue version/schema half): migrated production's real 103
+`auth.users` + 101 `auth.identities` rows into self-hosted, created the
+`on_auth_user_created` trigger, and aligned self-hosted's JWT secret with
+production's real one so a still-valid production access token keeps
+validating against self-hosted immediately after a future cutover. Full
+design rationale: `docs/superpowers/specs/2026-08-31-supabase-selfhost-phase5-auth-migration-design.md`;
+implementation plan: `docs/superpowers/plans/2026-08-31-supabase-selfhost-phase5-auth-migration.md`.
+
+**Data migration:** done via `pg_dump --data-only --inserts --rows-per-insert=1`
+against production's true-direct host (`db.gzhxgoigflftharcmdqj.supabase.co:5432`
+— **not** this repo's `DATABASE_URL`/`DIRECT_URL`, both pgbouncer-pooled
+despite `DIRECT_URL`'s name and rejected outright by `pg_dump`), text-transformed
+to add `ON CONFLICT (id) DO NOTHING`, applied via `psql` inside the
+self-hosted `db` container. The trigger was created only *after* the bulk
+migration completed — creating it first would have fired
+`handle_new_user()` for every migrated row and collided with the
+`public.profiles` rows Phase 2's replication had already brought over for
+those same users (same primary key).
+
+**Discovered along the way: self-hosted's own signup path is broken.**
+`/auth/v1/signup` fails end-to-end — `SMTP_HOST` is an unfilled placeholder
+(`REPLACE_WITH_SMTP_HOST`), a pre-existing gap unrelated to this migration.
+Trigger and token-issuance verification during this phase used GoTrue's
+Admin API (`POST /auth/v1/admin/users` with `email_confirm: true`, using
+`SERVICE_ROLE_KEY`) instead of the public signup endpoint — a sound
+substitute, since `on_auth_user_created` is a DB-level `AFTER INSERT`
+trigger that fires regardless of which GoTrue code path produced the
+`INSERT`. **This needs a real fix (real SMTP credentials) before self-hosted
+takes actual user signups** — tracked as a follow-up, not fixed here.
+
+**JWT secret alignment is two separate mechanisms, both required:**
+1. Update `JWT_SECRET` in Coolify's env-var store and the on-disk `.env`,
+   then recreate the containers that read it at runtime (`auth`, `rest`,
+   `realtime`, `functions`). **Never recreate `db` for this** — its own copy
+   of `JWT_SECRET` is consumed only by a one-time init script
+   (`volumes/db/jwt.sql`) that doesn't rerun once `PGDATA` already exists;
+   recreating `db` achieves nothing for this and needlessly restarts
+   Postgres for all 6 dependent services.
+2. Separately, run `ALTER DATABASE postgres SET "app.settings.jwt_secret"
+   TO '<new-secret>';` directly against the live `db` container — this is
+   what actually changes the GUC, takes effect for new sessions
+   immediately, no recreate needed.
+
+**A third mechanism this phase's execution surfaced that the original plan
+missed entirely:** `ANON_KEY` and `SERVICE_ROLE_KEY` are themselves
+pre-generated JWTs, signed with self-hosted's *old* `JWT_SECRET` at Phase 1
+bootstrap. Changing `JWT_SECRET` alone — without also regenerating these
+two keys under the new secret — broke self-hosted's own REST API for
+anon/service-role access immediately: `GET /rest/v1/...` with the old
+`ANON_KEY` started returning `401 PGRST301 "No suitable key or wrong key
+type"` the moment `auth`/`rest`/`realtime`/`functions` were recreated with
+the new secret, confirmed live. The fix: regenerate both keys with the same
+claims (`role`, `iss`, `iat`, `exp`) signed under the new secret, via the
+self-hosted `db` container's `pgjwt` extension:
+```sql
+SELECT sign('{"role":"anon","iss":"supabase","iat":...,"exp":...}'::json, '<new-secret>', 'HS256');
+```
+**Known wrinkle:** this stack's `pgjwt` was installed with its bundled
+`sign()`/`algorithm_sign()` functions hardcoded to call `public.hmac(...)`,
+but `pgcrypto` (which provides `hmac()`) is installed into the `extensions`
+schema here, not `public` — so `pgjwt`'s `sign()` fails with `function
+public.hmac(text, text, text) does not exist` out of the box. Worked around
+with a temporary bridge function
+(`CREATE FUNCTION public.hmac(text,text,text) ... AS $$ SELECT
+extensions.hmac($1,$2,$3) $$;`), dropped again immediately after generating
+the two keys — not a permanent fixture, but worth knowing if this needs
+doing again (e.g. Phase 5's next real cutover, or any future key rotation).
+Once regenerated, both keys need the same treatment as `JWT_SECRET` above:
+Coolify's env-var store, the on-disk `.env`, and a recreate — but this time
+of `kong` and `storage` too (Kong's own `key-auth` plugin credential store
+is these exact string values, compared literally against whatever `apikey`
+header a client presents, not JWT-verified — it needs the new strings to
+accept future requests using them).
+
+**Coolify env-var API confirmed behavior (relevant beyond just this
+phase):** every key gets two entries when first created — one
+`is_preview: false` (what this app's live containers actually use) and one
+`is_preview: true` (a preview-deployment shadow copy this app doesn't
+otherwise use, since it runs no preview deployments). `POST
+.../applications/{uuid}/envs` is for genuinely *new* keys (this project's
+established pattern from Phase 4 Batch 2). For an *existing* key,
+`PATCH .../applications/{uuid}/envs` with `{"key": ..., "value": ...}`
+updates the production copy in place (same `uuid`, confirmed via a
+disposable probe key during Phase 5's design pass — no duplicate created);
+add `"is_preview": true` to the same body to reach the preview copy
+instead. Using `POST` on a key that already exists was not tested and
+should not be assumed safe.
+
 ## Phase 2: Logical Replication
 
 Phase 2 adds ongoing data replication from Supabase Cloud (production) into
