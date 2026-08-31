@@ -143,6 +143,19 @@ unrelated app's process.
   check. This has not been done because no such token has been supplied yet.
   Still open — needs a real production access token from the plan owner
   before cutover.
+- **Closed by Phase 5b: production ES256 access tokens are now accepted by
+  `auth`/`rest`.** See the Phase 5b section below for the full mechanism.
+  Still open, unchanged by Phase 5b: `storage` and `realtime`'s own
+  independent JWT verification (`AUTH_JWT_SECRET`/`API_JWT_SECRET`, both
+  still the legacy HS256 secret) was not investigated by Phase 5b and very
+  likely still rejects production-issued tokens the same way `rest` did
+  before this phase. And the `functions` router's own JWT verification
+  (`supabase/functions/main/index.ts`, hardcoded HMAC against `JWT_SECRET`,
+  no algorithm branching, gating all 109 deployed edge functions) is
+  **also unaddressed and is the largest of the three gaps** — it is this
+  project's own code, not a third-party service's config, so closing it is a
+  genuine code change, not an env-var change, and needs its own scoped piece
+  of work.
 - **Deploy-branch structural compose drift beyond scalar env vars is still
   unaddressed.** `deploy/supabase-selfhost-phase1` (the branch Coolify
   actually deploys from) and `main` had already diverged structurally by the
@@ -515,6 +528,100 @@ self-hosted's own throwaway secrets — the operational caution that implies
 (who can read `.env`/the Coolify store, what gets pasted into logs/tickets,
 etc.) is materially higher than before this phase. See also the Rollback
 section's note on what this means for tearing this stack down.
+
+## Phase 5b: JWKS-based verification of production tokens
+
+Phase 5 (above) aligned self-hosted's `JWT_SECRET` with production's real
+HS256 secret, so self-hosted-issued tokens and production tokens signed with
+that legacy secret both verify. But production had already moved on to
+signing new access tokens with **ES256** (an asymmetric keypair, verified
+via production's public JWKS endpoint), which GoTrue/PostgREST reject
+outright at the algorithm gate — `403 bad_jwt: signing method ES256 is
+invalid`, rejected before signature verification is even attempted. Phase 5b
+closes that gap for `auth` and `rest` by teaching both services about
+production's public verification keys, **without changing anything about
+how self-hosted itself signs tokens.**
+
+**Mechanism — one signing key, several verify-only keys:**
+- `GOTRUE_JWT_KEYS` (a bare JSON array, on both the VPS `.env` and Coolify's
+  env-var store) holds 3 entries: self-hosted's existing HS256 secret,
+  re-expressed as an `oct` JWK with `kid: selfhosted-legacy-hs256` and
+  `key_ops: ["sign"]` — the only entry with `sign` — followed by production's
+  two ES256 public keys, copied verbatim from its JWKS endpoint, each with
+  `key_ops: ["verify"]`.
+- `JWT_JWKS` (a `{"keys": [...]}` object, same two locations) holds the same
+  3 logical keys, but the `oct` entry there carries `key_ops: ["verify"]`
+  instead of `["sign"]` — PostgREST has no separate signing role, so its copy
+  of the legacy secret only ever needs to verify.
+- **The signing key deliberately stayed HS256.** This is the whole reason
+  `ANON_KEY`/`SERVICE_ROLE_KEY` needed no regeneration: both are themselves
+  HS256-signed JWTs, and GoTrue/PostgREST's `ValidMethods` still includes
+  HS256 precisely because the one designated *signing* key in
+  `GOTRUE_JWT_KEYS` is still the `oct` secret. Anything that changed the
+  signing key to ES256 would have forced regenerating both keys — a much
+  larger, riskier change this design explicitly avoided (see Phase 5's own
+  section above on why those keys are now production-secret-grade material).
+
+**Never-blank hazard.** GoTrue's config decoder `json.Unmarshal`s
+`GOTRUE_JWT_KEYS` with no guard for an empty string, and envconfig invokes
+that decoder whenever the var is *set at all* — so a **present-but-empty**
+value crash-loops `auth` (103 real users) identically to a malformed one.
+Because of this, the variable was designed to go straight from **absent**
+to its correct, fully-validated final value (validated offline in a separate
+task before ever touching the live container) — never through an
+intermediate blank state. The same asymmetry governs rollback: **delete the
+variable, never blank it** — `DELETE
+.../applications/{uuid}/envs/{uuid}` for both the production and preview
+Coolify entries, plus `sed -i '/^GOTRUE_JWT_KEYS=/d'` on the VPS `.env` —
+followed by re-running the `docker compose up -d auth rest` recreate and
+confirming `auth` returns healthy.
+
+**No compose-file change was needed.** Every service in this stack declares
+`env_file: .env`, and Coolify injects its *entire* env-var store into every
+container regardless of that service's own `environment:` block (the same
+finding Phase 5a made for scalar env vars — confirmed here to also hold for
+this multi-line JSON blob). Registering `GOTRUE_JWT_KEYS`/`JWT_JWKS` in
+Coolify's store and the on-disk `.env`, then recreating just `auth` and
+`rest`, was sufficient; `docker-compose.yaml` itself was untouched.
+
+**Operational gotcha, confirmed to actually recur:** appending a new
+`KEY=value` line to the VPS `.env` with a bare `>>` is only safe if the
+file's existing last line already ends in a newline. It did not, the first
+time this was attempted live: `HOST=0.0.0.0` (the file's prior last line)
+had no trailing `\n`, so appending `GOTRUE_JWT_KEYS=...` concatenated
+directly onto it — corrupting `HOST`'s value and leaving `GOTRUE_JWT_KEYS`
+unparseable as its own variable (this is the identical failure mode Phase 4
+Batch 2 hit, which is why the delete-then-append `sed` pattern exists at
+all; the delete guarded the *re-run*, but the concatenation still happened
+on the line before it). Caught by checking `tail -3 .env` after the append
+rather than trusting the write silently succeeded; fixed by restoring
+`HOST=0.0.0.0`, deleting both new lines, confirming the file ends with `\n`,
+and re-appending. **Always verify the file's last line ends in a newline
+before appending to it, or re-verify with `tail`/`wc -c` immediately after
+any append to this file.**
+
+**Verifying a running container's actual resolved value, when the image has
+no shell.** `postgrest/postgrest:v14.12` ships no `sh`, `env`, `printenv`, or
+`cat` — `docker exec ... printenv VAR` simply fails with "executable file
+not found." `docker inspect <container> --format '{{json .Config.Env}}'`
+(run from the host, no exec into the container needed) returns the full
+resolved environment as a JSON array and works regardless of what binaries
+the image ships.
+
+**The JWKS is a static snapshot, not a live refresh.** This phase copied
+production's public keys once, at implementation time. If production
+rotates its signing keys before the real cutover, self-hosted's copy goes
+stale silently — there is no mechanism here that re-fetches
+`https://gzhxgoigflftharcmdqj.supabase.co/auth/v1/.well-known/jwks.json`
+automatically. **Re-check production's JWKS kids against this stack's
+`GOTRUE_JWT_KEYS`/`JWT_JWKS` manually, immediately before the real cutover**,
+and redo this phase's registration steps if they've diverged.
+
+**What this phase did not touch (see "Open items before cutover" above):**
+`storage` and `realtime`'s own independent JWT verification, and the
+`functions` router's hardcoded-HMAC verification for all 109 deployed edge
+functions. A production-issued token presented directly to those endpoints
+will very likely still be rejected after this phase.
 
 ## Phase 2: Logical Replication
 
