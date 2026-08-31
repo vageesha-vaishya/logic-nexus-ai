@@ -10,6 +10,11 @@ Phase 2's auth-schema diff (completed 2026-08-28) found self-hosted GoTrue (`v2.
 
 `v2.195.0` is confirmed pullable on Docker Hub. GitHub release notes for all 7 intermediate releases (`v2.190.0` through `v2.195.0`) were checked directly and contain no "BREAKING" callouts.
 
+**Corrected/strengthened during a second audit pass (2026-08-31):** the first pass only grepped release bodies for the literal word "BREAKING" — a real gap, since conventional-changelog release notes don't reliably label every self-host-relevant config change that way. Re-checked more thoroughly:
+
+- **Full release bodies re-scanned for config/env-var-relevant lines** (`GOTRUE_`, "env var", "config", "required", "deprecated", "removed", "renamed"), not just the word "BREAKING". Found: `v2.190.0` changed WebAuthn config to *warn instead of erroring* on invalid config (a leniency improvement, not a new requirement) and added optional JSON-file config support (doesn't affect our env-var-based setup); `v2.195.0` only removed two unused audit-log *event types* (cosmetic, not a config/env-var change). No new required env var, no renamed/removed one, across any of the 7 releases. We don't configure WebAuthn at all in this stack, so that change is moot either way.
+- **Upstream's own reference `docker-compose.yml` (`supabase/supabase:docker/docker-compose.yml`) still pins `v2.189.0`** — re-checked live, unchanged since Phase 1. This means `v2.195.0` is genuinely ahead of what Supabase's official self-host reference config currently ships and tests against; this upgrade can't lean on "upstream already validated this exact config," unlike every other version pin in this project so far, which matched upstream's own current reference exactly. It's still a reasonable upgrade — Supabase Cloud runs `v2.195.0` at real production scale, so the *binary* is proven, just not in this exact self-host compose shape. This raises (without blocking) the importance of the Verification Plan's health/diff checks actually being run carefully rather than treated as a formality.
+
 **Why now, not bundled into the rest of Phase 5:** self-hosted `auth.users` currently holds exactly 1 test user (confirmed via the same Phase 2 diff) — no real production user data is at stake yet. Doing the version bump before Phase 5 migrates the real 103 users/101 identities means any migration problem is cheap to discover and retry, rather than something to debug under the pressure of live user data.
 
 ## 2. Goals / Non-Goals
@@ -36,9 +41,10 @@ Phase 2's auth-schema diff (completed 2026-08-28) found self-hosted GoTrue (`v2.
 
 1. `auth` container reaches `Up ... (healthy)` after redeploy, not crash-looping.
 2. `GET /auth/v1/health` (through Kong) reports `"version":"v2.195.0"`.
-3. Re-run the Phase 2 diff: column count (should now be 240/240, not 239/240), the specific `custom_oauth_providers.custom_claims_allowlist` column exists self-hosted, and `auth.schema_migrations` latest version matches production's `20260625000000` (or whatever the actual current production stamp is by the time this runs — re-check live, don't assume it hasn't moved).
-4. The other 6 stack containers remain healthy throughout (unaffected by an `auth` container change).
-5. All four production health-check curls remain 200 throughout (this only touches the self-hosted stack, but verify anyway — same discipline as every other phase).
+3. **`docker logs` on the new `auth` container is read directly, not inferred from health status alone** (added during spec audit — since upstream hasn't validated this exact config at this version, per §1, a Docker healthcheck passing doesn't rule out a startup warning worth knowing about, e.g. the WebAuthn leniency change surfacing a warning rather than an error). Confirm the migration run completed without error and note anything unexpected even if non-fatal.
+4. Re-run the Phase 2 diff: column count (should now be 240/240, not 239/240), the specific `custom_oauth_providers.custom_claims_allowlist` column exists self-hosted, and `auth.schema_migrations` latest version matches production's `20260625000000` (or whatever the actual current production stamp is by the time this runs — re-check live, don't assume it hasn't moved).
+5. The other 6 stack containers remain healthy throughout (unaffected by an `auth` container change).
+6. All four production health-check curls remain 200 throughout (this only touches the self-hosted stack, but verify anyway — same discipline as every other phase).
 
 ## 5. Rollback
 
