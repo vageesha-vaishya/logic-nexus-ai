@@ -370,6 +370,27 @@ takes actual user signups** — tracked as a follow-up, not fixed here.
    what actually changes the GUC, takes effect for new sessions
    immediately, no recreate needed.
 
+**Caveat: the named-services list above is not the actual blast radius.**
+Every service in `docker-compose.yaml` declares `env_file: .env`
+(`grep -n env_file deploy/selfhosted-supabase/docker-compose.yaml` returns
+one hit per service, all 7). Compose computes each service's config-hash
+from the *entire* `.env` file's contents merged with that service's own
+`environment:` block — not just the variables that service's own
+`environment:` block happens to reference. This means ANY edit to `.env`
+can make Compose decide to recreate ANY service, not only the ones named in
+your `up -d` command. This is exactly what happened during this phase's
+`JWT_SECRET`-only rotation: `docker compose up -d auth rest realtime
+functions` also recreated `kong`, even though `kong`'s own `environment:`
+block never references `${JWT_SECRET}` at all (it only interpolates
+`${ANON_KEY}`, `${SERVICE_ROLE_KEY}`, `${KONG_HTTP_PORT}`). It was confirmed
+harmless here — `kong` is stateless, reloads its declarative config fresh
+from a bind-mounted `kong.yml` on every start, and came back healthy within
+seconds — but that is not something to assume will always be true. **Always
+verify actual post-recreate container timestamps
+(`docker ps --format '{{.Names}}\t{{.CreatedAt}}'`) against your intended
+scope after any `.env` edit + `up -d`, rather than trusting the
+named-services list you passed on the command line.**
+
 **A third mechanism this phase's execution surfaced that the original plan
 missed entirely:** `ANON_KEY` and `SERVICE_ROLE_KEY` are themselves
 pre-generated JWTs, signed with self-hosted's *old* `JWT_SECRET` at Phase 1
