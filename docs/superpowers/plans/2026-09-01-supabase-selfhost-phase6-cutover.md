@@ -85,11 +85,20 @@ SELECT schemaname||'.'||sequencename AS seq, last_value FROM pg_sequences WHERE 
 ```
 **Paste all of it into the task report.** A baseline that lives only in a temp file is not a baseline.
 
-- [ ] **Step 6: Measure the frontend build time — the number that sizes the window**
+- [ ] **Step 6: Measure the frontend build time — WITHOUT deploying anything**
 
-Trigger a Coolify rebuild of `b2lt2if6x6ovekc4tj7vg8tx` **with its current (production) settings unchanged**, purely to time it. This is a no-op deploy: same inputs, same output, no user-visible change. Record wall-clock from deploy start to healthy.
+⚠ **Do not trigger a Coolify rebuild of `frontend` to time it.** Per spec §1c, the running container was built from `7d5d04db` while Coolify deploys `main` at `HEAD`, which is now 138 commits ahead including 52 application files. A rebuild would ship that entire pending release to production. An earlier draft of this step wrongly called it a no-op; it is not.
 
-This answers whether the window is ~10 minutes or ~40, and directly informs Task 2's decision on pre-staging. If a no-op rebuild is considered too risky to run against the live frontend, say so and instead time `docker build` on the VPS against the same Dockerfile without deploying.
+Instead, time a build **on the VPS that produces no deployment**, from the pinned commit:
+```bash
+ssh hostinger-vps "cd /tmp && rm -rf _p6build && git clone --quiet --no-checkout https://github.com/vageesha-vaishya/logic-nexus-ai.git _p6build 2>/dev/null || echo 'CLONE FAILED - use an existing checkout or skip'; cd _p6build 2>/dev/null && git checkout --quiet 7d5d04db 2>&1 | tail -2"
+```
+If the clone needs credentials the VPS lacks, say so and fall back to timing the build inside an existing source directory on the VPS, or report that the measurement could not be taken rather than inventing a number. Then:
+```bash
+ssh hostinger-vps "cd /tmp/_p6build && time docker build --build-arg VITE_SUPABASE_URL=https://supabase.sosservices.online -t phase6-timing-probe:local . 2>&1 | tail -5"
+ssh hostinger-vps "docker rmi phase6-timing-probe:local 2>/dev/null; rm -rf /tmp/_p6build"
+```
+Record the wall-clock. This sizes the window and feeds Task 2 Step 4's pre-build decision. **Clean up the image and the checkout** — leaving a stray image on a VPS with 24 other production apps is not acceptable.
 
 - [ ] **Step 7: Run the four health curls and write the report**
 
@@ -122,7 +131,9 @@ Create a throwaway sequence on self-hosted, run the sync logic against it with a
 
 - [ ] **Step 4: Decide and, if chosen, pre-build the frontend image**
 
-Using Task 1 Step 6's measured build time, decide whether to pre-build the frontend image with the self-hosted `VITE_SUPABASE_URL`/keys **before** the window, so Task 3 contains a redeploy rather than a build.
+Using Task 1 Step 6's measured build time, decide whether to pre-build the frontend image before the window so Task 3 contains a redeploy rather than a build.
+
+**Regardless of that decision, the build must be pinned to `7d5d04db`** (spec §1c) so the cutover changes only the Supabase build args and does not ship the 138 pending commits. Verify the pinning mechanism now, not in the window: check whether setting Coolify's `git_commit_sha` on app `b2lt2if6x6ovekc4tj7vg8tx` from `HEAD` to `7d5d04db` actually pins the build, and record how to restore it to `HEAD` afterwards. If Coolify cannot pin reliably, report that — building the image manually and deploying it is the fallback, and it changes Task 3 Step 7.
 
 Recommended if the build exceeds a few minutes. The tradeoff to state explicitly in the report: pre-building shortens the commitment period, but the pre-built image points at self-hosted and **must not be deployed early** — guard against an accidental deploy between staging and the window.
 
@@ -172,7 +183,7 @@ Run Task 2's script for real. Confirm every sequence on self-hosted is now `>=` 
 
 - [ ] **Step 7: Repoint the services and bring them back**
 
-Update each service's `SUPABASE_URL`, `DATABASE_URL`/`SUPABASE_DB_URL`, and keys to the self-hosted targets in Global Constraints (Coolify env store **and**, for anything using the flat file, the on-disk `.env`), then start them. Deploy the frontend — a redeploy of the pre-built image if Task 2 Step 4 chose that, otherwise a rebuild.
+Update each service's `SUPABASE_URL`, `DATABASE_URL`/`SUPABASE_DB_URL`, and keys to the self-hosted targets in Global Constraints (Coolify env store **and**, for anything using the flat file, the on-disk `.env`), then start them. Deploy the frontend — a redeploy of the pre-built image if Task 2 Step 4 chose that, otherwise a rebuild **pinned to `7d5d04db`** using the mechanism Task 2 verified. Confirm before deploying that the build is pinned; an unpinned rebuild ships 138 commits of application code alongside the cutover and destroys the ability to attribute any failure (spec §1c).
 
 - [ ] **Step 8: Verify — do not reopen until these pass**
 
