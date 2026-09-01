@@ -14,7 +14,7 @@ Phases 1–5b stood up a self-hosted Supabase-equivalent stack on the Coolify VP
 
 Every item here was verified live, not inferred. Several materially change the shape of the cutover.
 
-**1. The cutover surface is 10 containers, not one — and naming is a trap.** Enumerating Coolify's 25 applications by env-var *keys* suggests 15 apps carry Supabase configuration. That list is wrong to act on. Grouping the **running containers by the value they actually resolve** gives the real picture:
+**1. The cutover surface is many containers, not one — and naming is a trap.** *(Count corrected by §1b Finding A: the true figure is eleven running containers, not the ten Coolify applications stated below. The reasoning here stands; the enumeration method does not.)* Enumerating Coolify's 25 applications by env-var *keys* suggests 15 apps carry Supabase configuration. That list is wrong to act on. Grouping the **running containers by the value they actually resolve** gives the real picture:
 
 | Points at | Containers | Action |
 |---|---|---|
@@ -49,6 +49,25 @@ Without a sync step, the first insert into `maintenance_tasks` after cutover cla
 
 **5. Several previously-tracked "blockers" resolve themselves at cutover and should not hold it up.** The open items list carries `storage`, `realtime`, and the `functions` router as unable to verify production's ES256 tokens. That gap exists only while clients hold *production-issued* tokens. After cutover, users authenticate against self-hosted's GoTrue, which signs with the shared HS256 secret — exactly what those three already verify. Since sessions were deliberately not migrated (Phase 5 non-goal), every user re-authenticates at cutover anyway, so the window in which the gap could bite is the interval between the switch and each user's next sign-in, during which they are being sent to a login screen regardless. This reframes three standing items from blockers to non-issues for this phase.
 
+## 1b. Audit pass (2026-09-01) — three corrections, one of which invalidates the §1a.1 inventory
+
+**Finding A — the container inventory is wrong, and the method that produced it is also wrong.** §1a.1 says "10 containers" and derives them from Coolify's application list. Enumerating **running containers** by resolved value returns **eleven**, and two of them are not part of any current Coolify deployment:
+
+- `amro-api` — image `logic-nexus-ai-amro-api` (a locally-built image, not a Coolify artefact), started 2026-07-08, `restart=unless-stopped`.
+- `amro-api-container` — image `c7dfnatpn9gaq4g0hjweubeu:7d5d04db…` (an *older* Coolify build of amro-api, under a hand-chosen container name), started 2026-07-23.
+
+Both carry `com.docker.compose.*` labels but neither is the live Coolify container for that app, which is `c7dfnatpn9gaq4g0hjweubeu-071742077856`. So **three** amro-api containers are running concurrently, all configured against production. Repointing through Coolify's API — the mechanism §3 step 8 assumes — would update exactly one of the three and leave two still pointed at Supabase Cloud with `restart=unless-stopped`.
+
+This is precisely the split-brain §2 exists to prevent, and it would not have been caught by any check in the spec as drafted. Two corrections follow: the inventory must be derived from **running containers**, never from the Coolify application list; and the two orphans must be explicitly resolved before cutover — established as genuinely unused and stopped, or repointed alongside the rest. Deciding which is a task for the plan, but it must not be left implicit.
+
+**Finding B — storage sync is a point-in-time copy, and §3 has no re-sync step.** The Phase 3 README states plainly that it is *"not ongoing replication: it's a point-in-time copy, re-run manually."* Any object uploaded to production after the last run would therefore be absent from self-hosted at cutover. §3 must gain a re-sync step immediately before the commitment point.
+
+Severity is low in practice but the step is still required: production's newest object dates to **2026-03-18** (~5½ months old), so the corpus is effectively static, and current parity is verified — self-hosted's 9 objects versus production's 11 is fully explained (two production objects are contentless, so there is nothing to copy), with both sides' total byte size (155 kB) and per-object checksums matching. The README's existing "re-run the `owner`/`owner_id` check" cutover action should be folded into the same step rather than tracked separately.
+
+**Finding C — connection-level checks cannot verify the cutover, which raises the stakes on the write test.** An obvious way to confirm nothing still talks to production is to inspect `pg_stat_activity` there. That does not work here: sampled during this pass, production shows only Supabase's own internal clients (`postgrest`/`authenticator`, `realtime_*`, `mgmt-api`, `postgres_exporter`), because the VPS services reach the database through the pooler and PostgREST rather than as direct clients. A stale container would therefore be invisible to that check while still issuing writes.
+
+Consequence: §4's requirement 4 — perform a real application write and confirm it appears on self-hosted and **not** on production — is not merely the best check, it is the **only** reliable one, and it must be run per-service rather than once globally if the orphans from Finding A are kept alive. §4 should say so explicitly rather than leaving requirement 4 as one item among seven.
+
 ## 2. Goals / Non-Goals
 
 **Goals:**
@@ -72,16 +91,18 @@ Two stages: **rehearsal** (steps 1–3, abandonable at any point, no user impact
 
 **Rehearsal — before the window, and again at its start:**
 1. **Re-derive the container inventory from resolved values**, exactly as §1a.1 describes — never from this document's table, and never from an env-key search. Confirm the count and that no `avaipro-*` or `sos` container is in it.
-2. **Verify parity and health:** all seven self-hosted containers healthy; the four standard production health curls returning 200; replication lag at zero; auth row counts matching (103/101/104); a sample of application tables comparing row counts across both databases.
-3. **Capture the full rollback baseline:** every one of the 10 containers' current Supabase-related env values, the frontend's current image tag/build args, and production's complete sequence inventory. Paste it into the execution record — a rollback plan that lives only in a temp file is not a rollback plan.
+2. **Resolve the orphaned containers** (§1b Finding A): establish whether `amro-api` and `amro-api-container` serve live traffic or are dead weight, then either stop them or add them to the repoint set. Do this in rehearsal, not in the window — it needs investigation, not a decision under time pressure.
+3. **Verify parity and health:** all seven self-hosted containers healthy; the four standard production health curls returning 200; replication lag at zero; auth row counts matching (103/101/104); a sample of application tables comparing row counts across both databases.
+4. **Capture the full rollback baseline:** every one of the 10 containers' current Supabase-related env values, the frontend's current image tag/build args, and production's complete sequence inventory. Paste it into the execution record — a rollback plan that lives only in a temp file is not a rollback plan.
 
 **Commitment — inside the window:**
 4. **Quiesce writes.** Stop the nine backend services so production stops receiving application writes. The frontend may remain up serving a maintenance state, or be stopped; either way users are not transacting.
 5. **Drain and confirm.** Wait for replication lag to reach zero and stay there, proving every accepted write has landed on self-hosted.
 6. **Drop the subscription** (`phase2_public_migration_sub`) on self-hosted, and drop the corresponding publication/slot on production so no slot is left retaining WAL. **This is the point of no return** — record the wall-clock time, as it bounds any later reconciliation.
-7. **Sync all sequences.** For every sequence in the 21 application schemas, set self-hosted's value to production's current value (with a safety margin). Read production's values *now*, not from §1a's table.
-8. **Repoint the nine runtime services** (env update + restart), then **rebuild and redeploy `frontend`** with the new `VITE_SUPABASE_URL`/keys.
-9. **Verify** (see §4) before declaring the window closed.
+7. **Re-run the storage sync** (§1b Finding B) so any object uploaded to production since the last run is copied across, and fold in the README's existing `owner`/`owner_id` check rather than tracking it separately.
+8. **Sync all sequences.** For every sequence in the 21 application schemas, set self-hosted's value to production's current value (with a safety margin). Read production's values *now*, not from §1a's table.
+9. **Repoint the runtime services** (env update + restart), then **rebuild and redeploy `frontend`** with the new `VITE_SUPABASE_URL`/keys.
+10. **Verify** (see §4) before declaring the window closed.
 
 **After the window:** monitor, and leave production untouched and running as the rollback substrate.
 
@@ -92,7 +113,7 @@ Verification must exercise the application, not just assert configuration. Cutov
 1. **Configuration, from resolved values:** each of the 10 containers reports the self-hosted URL in its actual running environment. Separately confirm the 5 `avaipro-*` containers and `sos` are unchanged, by comparing their resolved values against the step-3 baseline.
 2. **Replication genuinely stopped:** no subscription on self-hosted, and **no replication slot left on production** — a forgotten slot silently retains WAL and has already caused two incidents in this project's history.
 3. **Sequences correct:** for every sequence in all 21 schemas, self-hosted's value is `>=` production's captured value. This is the check that prevents the primary-key collision described in §1a.3.
-4. **A real write succeeds and lands in the right place:** perform an application-level write through the running app, then confirm the row exists in **self-hosted** and does **not** appear in production. This is the definitive proof of cutover, and the only check that catches a service silently still pointed at Cloud.
+4. **A real write succeeds and lands in the right place — the single indispensable check (§1b Finding C).** Connection-level inspection of production cannot detect a service still pointed at Cloud, because the VPS reaches it through the pooler and PostgREST rather than as a direct client. Run this **per repointed service**, not once globally: perform an application-level write through the running app, then confirm the row exists in **self-hosted** and does **not** appear in production. This is the definitive proof of cutover, and the only check that catches a service silently still pointed at Cloud.
 5. **A real login succeeds** against self-hosted, using a genuine migrated user account, confirming end-to-end auth against the new stack.
 6. **Storage and edge functions respond** for an authenticated user, exercising the two subsystems whose JWT handling §1a.5 argues is fine post-cutover — the argument should be confirmed, not assumed.
 7. **The four standard production health curls** return 200 throughout, and Aviation AI Pro's endpoint specifically is checked, since it shares the VPS.
