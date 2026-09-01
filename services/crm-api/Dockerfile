@@ -3,7 +3,7 @@ FROM node:22-bullseye-slim AS builder
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm ci --no-audit --progress=false
+RUN npm ci --no-audit --progress=false --include=dev
 
 COPY tsconfig.json ./
 COPY src ./src
