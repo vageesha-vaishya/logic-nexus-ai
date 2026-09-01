@@ -12,6 +12,7 @@ interface AuthRequest extends Request {
   franchiseId?: string | null;
   userId?: string;
   user?: unknown;
+  isPlatformAdmin?: boolean;
 }
 
 type UserRoleScope = {
@@ -360,6 +361,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 
       req.tenantId = requestedTenantId;
       req.franchiseId = requestedFranchiseId;
+      req.isPlatformAdmin = hasPlatformAdmin;
       recordAuthHeaderResult(true, 'authorization', correlationId, req.path);
       next();
       return;
@@ -394,6 +396,7 @@ export async function authMiddleware(req: AuthRequest, res: Response, next: Next
 
     req.tenantId = defaultRole.tenant_id;
     req.franchiseId = defaultRole.franchise_id ?? null;
+    req.isPlatformAdmin = hasPlatformAdmin;
     recordAuthHeaderResult(true, 'authorization', correlationId, req.path);
     next();
   } catch (err) {
