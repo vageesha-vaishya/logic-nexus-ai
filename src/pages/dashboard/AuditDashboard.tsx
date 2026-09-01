@@ -14,7 +14,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { supabaseClient } from '@/integrations/supabase/client';
+import { supabase } from '@/integrations/supabase/client';
 import { logger } from '@/lib/logger';
 import { format } from 'date-fns';
 import { History, RefreshCw, TrendingUp } from 'lucide-react';
@@ -50,7 +50,7 @@ export function AuditDashboard() {
 
     try {
       // Build query
-      let query = supabaseClient
+      let query = supabase
         .from('audit_logs')
         .select('*')
         .order('created_at', { ascending: false })
