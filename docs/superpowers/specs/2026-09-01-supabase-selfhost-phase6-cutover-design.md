@@ -68,6 +68,16 @@ Severity is low in practice but the step is still required: production's newest 
 
 Consequence: §4's requirement 4 — perform a real application write and confirm it appears on self-hosted and **not** on production — is not merely the best check, it is the **only** reliable one, and it must be run per-service rather than once globally if the orphans from Finding A are kept alive. §4 should say so explicitly rather than leaving requirement 4 as one item among seven.
 
+## 1c. Second audit finding (2026-09-01) — the production frontend is 138 commits stale, and that breaks cutover isolation
+
+Discovered while preparing Task 1 for execution. The running `frontend` container was built from commit `7d5d04db`; `main` has since advanced **138 commits**, of which **52 files** are application code (`src/`, `package.json`, `Dockerfile`, `vite.config.ts`) totalling 4,152 insertions and 280 deletions. Coolify deploys this app from `main` with `git_commit_sha = 'HEAD'`, so **any** rebuild pulls all of it.
+
+This matters far beyond a stale deploy. §3's cutover rebuilds the frontend to change `VITE_SUPABASE_URL` — and that rebuild would simultaneously ship 138 commits of application code that has never run in production. The window would then change two independent things at once: the backend moves to self-hosted, and a large release goes out. A failure could not be attributed to either, and rollback would have to undo both. That is the precise opposite of the single-variable discipline the rehearsal/commitment split exists to enforce.
+
+**Decision (plan owner, 2026-09-01): pin the cutover build to `7d5d04db`** — the exact code already running — so the only thing that changes is the Supabase build arguments. The 138 pending commits ship later as their own release, on their own schedule, with their own verification. Cutover stays a single-variable change.
+
+Two consequences for §3 and for the plan: the build-timing measurement must **not** be taken by triggering a live Coolify rebuild (it would deploy those commits); and the cutover's frontend build must explicitly pin the commit rather than tracking `HEAD`, with the pinning mechanism verified before the window rather than discovered during it.
+
 ## 2. Goals / Non-Goals
 
 **Goals:**
