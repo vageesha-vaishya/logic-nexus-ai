@@ -399,6 +399,12 @@ printf '%-70s %-28s %-14s %-14s %s\n' "--------" "---------" "-----------" "----
 
 while IFS= read -r key; do
   [ -z "$key" ] && continue
+  # schema/seq are re-derived from key here, NOT inherited from the earlier
+  # parsing loops' now-out-of-scope locals of the same name - schema and
+  # sequence identifiers in this codebase never contain a dot, so splitting
+  # on the first one is exact.
+  schema="${key%%.*}"
+  seq="${key#*.}"
   in_prod="${PROD_SEEN[$key]:-0}"
   in_self="${SELF_SEEN[$key]:-0}"
 
@@ -546,6 +552,7 @@ declare -A FSELF_LASTVAL FSELF_SEEN
 
 while IFS='|' read -r schema seq lastval ownercol maxowner maxvalue; do
   [ -z "$schema" ] && continue
+  [ -z "$seq" ] && { log "IGNORED non-row output from final-verify production re-read: $schema"; continue; }
   key="${schema}.${seq}"
   FPROD_LASTVAL["$key"]="$lastval"
   FPROD_MAXOWNER["$key"]="$maxowner"
@@ -554,6 +561,7 @@ done <<< "$FPROD_ROWS"
 
 while IFS='|' read -r schema seq lastval ownercol maxowner maxvalue; do
   [ -z "$schema" ] && continue
+  [ -z "$seq" ] && { log "IGNORED non-row output from final-verify self-hosted re-read: $schema"; continue; }
   key="${schema}.${seq}"
   FSELF_LASTVAL["$key"]="$lastval"
   FSELF_SEEN["$key"]=1
