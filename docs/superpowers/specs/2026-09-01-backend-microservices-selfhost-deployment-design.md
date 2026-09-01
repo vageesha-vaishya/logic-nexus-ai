@@ -121,25 +121,45 @@ known, accepted limitation of this phase, not a blocker.
 
 ## Routing (nginx.conf)
 
-New `location` blocks added to `nginx.conf`, mirroring the dev Vite proxy
-table's routing decisions (`vite.config.ts`), each `proxy_pass`-ing to the
-service's container name on its production port:
+New `location` blocks added to `nginx.conf`, each `proxy_pass`-ing to the
+service's container name on its production port. Taken directly from
+`vite.config.ts`'s dev proxy map (lines ~735-785), not reconstructed from
+memory — cross-checked entry by entry against it during self-review, which
+caught several gaps an earlier pass of this table had missed:
 
-| Path prefix | Target |
-|---|---|
-| `/api/v1/platform-domains`, `/api/v1/domain-assignments`, `/api/v1/domain-config`, `/api/v1/franchises` | `uim-api-container:3701` |
-| `/api/v1/invoices`, `/api/v1/tax` | `finance-api-container:3301` |
-| `/api/v1/compliance` | `compliance-api-container:3501` |
-| `/api/v1/comms` | `comms-api-container:3601` |
-| `/api/crm` | `crm-api-container:3011` |
-| `/api/sales` | `sales-api-container:3201` |
-| `/api/logistics` | `logistics-api-container:3401` |
-| `/api/v1` (catch-all, matching dev's fallback ordering) | the existing amro route |
+| Path prefix | Target | Must precede |
+|---|---|---|
+| `/api/crm/v1/leads` | `sales-api-container:3201` | `/api/crm` (leads were lifted from crm-api to sales-api; the narrower prefix must win) |
+| `/api/crm` | `crm-api-container:3011` | — |
+| `/api/sales` | `sales-api-container:3201` | — |
+| `/api/v1/platform-domains`, `/api/v1/domain-assignments`, `/api/v1/domain-config`, `/api/v1/franchises` | `uim-api-container:3701` | `/api/v1` catch-all |
+| `/api/v2/uim` | `uim-api-container:3701` | — |
+| `/api/v1/invoices`, `/api/v1/tax` | `finance-api-container:3301` | `/api/v1` catch-all |
+| `/api/finance` | `finance-api-container:3301` | — |
+| `/api/logistics` | `logistics-api-container:3401` | — |
+| `/api/v1/compliance` | `compliance-api-container:3501` | `/api/v1` catch-all |
+| `/api/compliance` | `compliance-api-container:3501` | — |
+| `/api/v1/comms` | `comms-api-container:3601` | `/api/v1` catch-all |
+| `/api/comms` | `comms-api-container:3601` | — |
+| `/api/v1` (catch-all, matching dev's fallback ordering) | the existing amro route | — |
 
-nginx's `location` prefix-matching means the more specific `/api/v1/...`
-blocks must be declared before the bare `/api/v1` catch-all, the same
-ordering constraint `vite.config.ts`'s comments call out explicitly
-("must sit before ... for the override to win").
+The "must precede" column reflects *Vite's* proxy-table semantics
+(first-match-wins, hence its own comments about ordering). nginx's plain
+(non-regex) `location` blocks resolve overlapping prefixes differently —
+by longest-match, independent of declaration order — so `/api/crm/v1/leads`
+will correctly win over the shorter `/api/crm` in `nginx.conf` regardless of
+which is written first. Declaration order in the new `nginx.conf` blocks is
+therefore not load-bearing the way it is in `vite.config.ts`; grouping
+related blocks together is for readability only. (This assumes all new
+blocks stay plain-prefix `location` blocks, matching every existing block
+in this file today — none use regex (`~`) matching.)
+
+**Explicitly not routed**: `/api/v1/tenant-branding` and
+`/api/v1/tenant-branding.css` proxy (in dev) to a distinct "Tenant Branding
+API" that has no corresponding directory under `services/` at all — it is
+not one of the 7 services this deployment covers, and dev's own proxy setup
+for it is itself incomplete (no default target, a placeholder start
+command). Left out of scope entirely; not an oversight.
 
 All new blocks follow the existing amro blocks' shape exactly:
 `proxy_http_version 1.1`, the four standard `proxy_set_header` lines
