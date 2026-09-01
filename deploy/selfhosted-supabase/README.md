@@ -120,15 +120,20 @@ unrelated app's process.
 
 ## Open items before cutover
 
-- **Self-hosted's own signup/email path is broken — a real cutover
-  blocker, not a nice-to-have.** `SMTP_HOST` is still the unfilled
-  placeholder `REPLACE_WITH_SMTP_HOST` (see the Phase 5 section above).
-  Self-hosted now holds 103 real migrated users. Without working SMTP there
-  is no password-reset, magic-link, email-change, or invite path, and no way
-  to onboard a brand-new user through the normal public signup flow at all —
-  every verification so far has had to route around this via GoTrue's Admin
-  API. This needs real SMTP credentials before this stack can take over from
-  production.
+- **Closed by the auth-email/SMTP repair (see Phase 5c below): self-hosted's
+  own signup/email path now works end-to-end.** `SMTP_HOST`/`SMTP_USER`/
+  `SMTP_PASS` are populated (Resend) via Coolify's env store, the
+  `MAILER_URLPATHS_*` corruption is fixed, `SITE_URL` points at the app
+  domain, and a real password-reset email was delivered with a correct link.
+  Two residual notes, not blockers for cutover but worth knowing: (1) the
+  delivered email landed in the recipient's spam folder on both stacks —
+  diagnosed as a deliverability/reputation issue (bare unbranded template;
+  on production specifically, a From-domain/link-domain mismatch), not an
+  auth-config defect — tracked as its own follow-up, deliberately out of this
+  phase's scope. (2) production's localhost allow-list, added so local dev
+  against production keeps working, was **not** conclusively proven
+  end-to-end during this phase — see Phase 5c below and the corresponding
+  Phase 6 checklist item.
 - **The JWT secret's actual equality with production has never been
   independently verified.** Every check run so far — the `db` GUC's
   length (88 chars), token issuance/validation working end-to-end, the
@@ -724,6 +729,94 @@ it does sign with from this endpoint alone.
 functions. A production-issued token presented directly to those endpoints
 will very likely still be rejected after this phase.
 
+## Phase 5c: Auth email/SMTP configuration repaired (both stacks)
+
+Both self-hosted and production auth email were broken in different ways —
+self-hosted had no SMTP at all (unfilled `REPLACE_WITH_SMTP_*` placeholders),
+production had a working-but-crippled built-in mailer capped at
+`rate_limit_email_sent=2`/hour project-wide, and self-hosted additionally had
+its `MAILER_URLPATHS_*` values corrupted. This phase fixed both stacks to
+send real mail via Resend and repaired the link/redirect defects, then
+proved delivery with real password-reset emails to a real inbox.
+
+**Both stacks now send via Resend from the same identity.** `smtp_host` /
+`SMTP_HOST` = `smtp.resend.com`, port `465`, user `resend`, from
+`noreply@sosservices.online`, sender name `Logic Nexus AI`. Self-hosted's
+credentials live in Coolify's env store and the VPS `.env`; production's live
+in Supabase Cloud's Auth config via the Management API
+(`PATCH /v1/projects/{ref}/config/auth`) — neither is a file in this repo.
+
+**The `MAILER_URLPATHS_*` corruption, its cause, and the rule that prevents
+recurrence.** Self-hosted's `GOTRUE_MAILER_URLPATHS_CONFIRMATION` (and the
+sibling `_RECOVERY`/`_INVITE`/`_EMAIL_CHANGE` vars) held
+`C:/Users/Vimal/AppData/Local/Programs/Git/auth/v1/verify` instead of the
+correct bare `/auth/v1/verify`. Root cause: this is MSYS2/Git-Bash's
+automatic POSIX-path translation on Windows — Git-Bash's runtime rewrites
+any value that *looks like* a POSIX absolute path (starts with `/`) into a
+native Windows path rooted at the Git-Bash install directory, whenever that
+value crosses through a shell/CLI argument or certain env-var tooling
+invoked from Git Bash. A bare `/auth/v1/verify` typed or piped through such a
+path became `C:/Users/Vimal/AppData/Local/Programs/Git` + `/auth/v1/verify`.
+**The rule that prevents recurrence: never pass a leading-slash value as a
+bare shell/CLI argument on this Windows+Git-Bash host.** Stage it to a file
+(or keep it inside a script/heredoc/JSON body constructed in-process) and
+have the consuming step read the file/script — never let MSYS's argv layer
+see the raw string. This is exactly the method Task 1's `.env` rewrite and
+Task 2's Management-API `PATCH` body both used: values were built as Python
+dicts/JSON and written to files, never interpolated into a bare command
+line.
+
+**Why `SITE_URL` (`site_url` in the Management API) must be the *app*
+domain, not the API/auth domain or a placeholder.** GoTrue uses `SITE_URL`
+as the default redirect target after a user follows an auth email's action
+link (verify/reset/invite/etc.) whenever the request that generated the
+email did not supply an explicit, allow-listed `redirect_to`. Before this
+phase, production's `site_url` was still the unchanged default
+`http://localhost:3000` — every real user's password-reset link therefore
+redirected their browser to `localhost` after completing the reset, a
+deployment nobody but a developer's own machine could ever reach. Setting
+`site_url` to the actual frontend, `https://app.sosservices.online`, makes
+GoTrue's default same-origin redirect land on the real application for the
+common case (no explicit `redirect_to` supplied).
+
+**Production's allow-list intentionally carries localhost, self-hosted's
+does not.** `uri_allow_list` on production is
+`http://localhost:8081/**,http://localhost:4173/**`, so a developer running
+the frontend locally against production's live auth/database can still
+complete an auth flow with an explicit `redirectTo` back to their local dev
+server, rather than always being bounced to the production app's
+`site_url`. Self-hosted's own allow-list is deliberately left empty — nobody
+develops against self-hosted the way they develop against production, and
+its `SITE_URL` already points at itself.
+
+**Open finding — the localhost allow-list was not conclusively proven
+end-to-end.** The verification attempted was `POST /auth/v1/recover` with
+`{"email":"...","options":{"redirectTo":"http://localhost:8081/auth"}}` in
+the JSON body (per the plan's own script). The delivered email's
+`redirect_to` came back rewritten to `https://app.sosservices.online`, i.e.
+apparently *not* the localhost target. However, this does not by itself
+prove the allow-list glob failed to match: reading the real
+`@supabase/auth-js` client source in this repo
+(`node_modules/@supabase/auth-js/dist/main/GoTrueClient.js` and
+`lib/fetch.js`) shows the actual SDK sends `redirectTo` as the
+**query-string parameter** `redirect_to` appended to the request URL — never
+as a nested `options.redirectTo` JSON body field. The verification script's
+request shape does not match GoTrue's real API contract, so it is quite
+possible GoTrue never received a redirect target at all and correctly fell
+back to `site_url` by design, independent of whether the allow-list itself
+works. This was **not** re-tested with the corrected shape
+(`POST /auth/v1/recover?redirect_to=http://localhost:8081/auth`) because
+doing so would have required sending a third real email beyond the two the
+task was scoped for. **This is a genuine open item, not a resolved one** —
+see the Phase 6 cutover checklist below for the exact re-test needed before
+relying on this behavior.
+
+**`rate_limit_email_sent` raised 2 → 30/hour on production — a deliberate
+relaxation of a safety limit, not incidental.** A 2/hour project-wide cap is
+unusable for the 103 real migrated users; 30/hour was chosen as the new
+ceiling. Self-hosted's mailer rate limit was not part of this change (it has
+no equivalent field exposed the same way and was not a stated goal).
+
 ## Phase 2: Logical Replication
 
 Phase 2 adds ongoing data replication from Supabase Cloud (production) into
@@ -1273,6 +1366,23 @@ Expected: all four `200`.
   `JWT_SECRET` across all 109 deployed edge functions, with no ES256
   algorithm branching. All three were explicitly out of scope for Phase 5b
   (see that section above) and remain open going into cutover.
+- **Re-verify production's localhost allow-list with a correctly-shaped
+  request (Phase 5c):** the attempted proof that GoTrue accepts an
+  explicit `http://localhost:8081/auth` redirect — rather than silently
+  substituting `site_url` — used `POST /auth/v1/recover` with
+  `{"options":{"redirectTo":...}}` in the JSON body, and the delivered
+  email's `redirect_to` came back as the app domain, not localhost. Per the
+  real `@supabase/auth-js` client (`GoTrueClient.js`/`lib/fetch.js`),
+  `redirectTo` is actually sent as the **query-string parameter**
+  `redirect_to`, never a nested body field — so this result is inconclusive,
+  not a confirmed pass or fail of the allow-list itself. Before cutover,
+  re-run with the corrected shape,
+  `POST /auth/v1/recover?redirect_to=http://localhost:8081/auth` (body
+  `{"email":...}` only), and confirm the delivered email's `redirect_to` is
+  `http://localhost:8081/auth` verbatim. If it still comes back rewritten to
+  the app domain with the corrected shape, local development against
+  production is genuinely still broken and `uri_allow_list`'s glob syntax
+  needs a second look — do not assume the fix works without this re-test.
 
 ## Rollback
 
