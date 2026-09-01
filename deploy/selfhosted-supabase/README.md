@@ -126,14 +126,29 @@ unrelated app's process.
   `MAILER_URLPATHS_*` corruption is fixed, `SITE_URL` points at the app
   domain, and a real password-reset email was delivered with a correct link.
   Two residual notes, not blockers for cutover but worth knowing: (1) the
-  delivered email landed in the recipient's spam folder on both stacks —
-  diagnosed as a deliverability/reputation issue (bare unbranded template;
-  on production specifically, a From-domain/link-domain mismatch), not an
-  auth-config defect — tracked as its own follow-up, deliberately out of this
-  phase's scope. (2) production's localhost allow-list, added so local dev
-  against production keeps working, was **not** conclusively proven
-  end-to-end during this phase — see Phase 5c below and the corresponding
-  Phase 6 checklist item.
+  delivered email landed in the recipient's spam folder on both stacks. The
+  authentication side is not the cause — DKIM is published, SPF is valid, and
+  a DMARC record exists with relaxed alignment — so this is not an
+  auth-config defect. The primary driver is shared by both stacks: a
+  306-character unbranded template (one `<h2>`, one sentence, one link, no
+  footer, no `List-Unsubscribe`) sent from a domain whose only prior traffic
+  to this recipient was monitoring alerts, with DMARC still at `p=none`. A
+  production-specific factor — its link domain
+  (`gzhxgoigflftharcmdqj.supabase.co`) differing from its sender domain
+  (`sosservices.online`), unlike self-hosted where both are on
+  `sosservices.online` — is real but secondary: self-hosted's aligned sender
+  lands in spam too, which rules out domain mismatch as the *primary* driver.
+  Tracked as its own follow-up (branded templates and reputation warming
+  first; a custom auth domain as production-specific polish, demoted from
+  top fix), deliberately out of this phase's scope. (2) production's
+  localhost allow-list, added so local dev against production keeps working,
+  **is** proven end-to-end: verified via the emailless
+  `GET /auth/v1/verify?token=deliberately-invalid&type=recovery&redirect_to=<target>`
+  probe (reads the decision straight off the `Location:` header — no email
+  sent, no token consumed), confirmed in both directions — the allow-listed
+  `http://localhost:8081/auth` is honoured, and the unlisted
+  `https://evil.example/steal` is rejected and falls back to `site_url` (the
+  negative control that rules out an open redirect). See Phase 5c below.
 - **The JWT secret's actual equality with production has never been
   independently verified.** Every check run so far — the `db` GUC's
   length (88 chars), token issuance/validation working end-to-end, the
@@ -789,27 +804,56 @@ server, rather than always being bounced to the production app's
 develops against self-hosted the way they develop against production, and
 its `SITE_URL` already points at itself.
 
-**Open finding — the localhost allow-list was not conclusively proven
-end-to-end.** The verification attempted was `POST /auth/v1/recover` with
+**Resolved — the localhost allow-list is proven end-to-end.** The
+verification first attempted was `POST /auth/v1/recover` with
 `{"email":"...","options":{"redirectTo":"http://localhost:8081/auth"}}` in
 the JSON body (per the plan's own script). The delivered email's
 `redirect_to` came back rewritten to `https://app.sosservices.online`, i.e.
-apparently *not* the localhost target. However, this does not by itself
-prove the allow-list glob failed to match: reading the real
-`@supabase/auth-js` client source in this repo
+apparently *not* the localhost target. That result was inconclusive, not a
+failure: reading the real `@supabase/auth-js` client source in this repo
 (`node_modules/@supabase/auth-js/dist/main/GoTrueClient.js` and
 `lib/fetch.js`) shows the actual SDK sends `redirectTo` as the
 **query-string parameter** `redirect_to` appended to the request URL — never
-as a nested `options.redirectTo` JSON body field. The verification script's
-request shape does not match GoTrue's real API contract, so it is quite
-possible GoTrue never received a redirect target at all and correctly fell
-back to `site_url` by design, independent of whether the allow-list itself
-works. This was **not** re-tested with the corrected shape
-(`POST /auth/v1/recover?redirect_to=http://localhost:8081/auth`) because
-doing so would have required sending a third real email beyond the two the
-task was scoped for. **This is a genuine open item, not a resolved one** —
-see the Phase 6 cutover checklist below for the exact re-test needed before
-relying on this behavior.
+as a nested `options.redirectTo` JSON body field. GoTrue's
+`utilities.GetReferrer` → `getRedirectTo` resolves the redirect target from,
+in order: the query parameter, then post data, then the `Referer` header,
+then `SiteURL` — the original probe supplied none of the first three, so it
+fell straight through to `SiteURL` regardless of whether the allow-list
+itself works.
+
+**Re-tested with the corrected, emailless shape** — `/auth/v1/verify` with a
+deliberately invalid token funnels through the same
+`GetReferrer`/`getRedirectTo`/`isRedirectURLValid` path as `/recover` and
+302s to the result immediately, so the decision is readable straight off the
+`Location:` header, with no email sent and no token consumed:
+```bash
+curl -s -o /dev/null -D - "https://gzhxgoigflftharcmdqj.supabase.co/auth/v1/verify?token=deliberately-invalid&type=recovery&redirect_to=http://localhost:8081/auth" -H "apikey: $SUPABASE_ANON_KEY" | grep -i '^location:'
+curl -s -o /dev/null -D - "https://gzhxgoigflftharcmdqj.supabase.co/auth/v1/verify?token=deliberately-invalid&type=recovery&redirect_to=https://evil.example/steal" -H "apikey: $SUPABASE_ANON_KEY" | grep -i '^location:'
+```
+Both directions passed: the allow-listed `http://localhost:8081/auth` was
+honoured (`Location: http://localhost:8081/auth#error=...`), and the
+unlisted `https://evil.example/steal` was rejected, falling back to
+`site_url` (`Location: https://app.sosservices.online#error=...`) — the
+negative control that rules out an open redirect. **This is a resolved
+item, not an open one** — no further re-test is needed before cutover.
+
+**Two GoTrue allow-list behaviors worth knowing, confirmed during final
+review (upstream GoTrue behavior, not a Supabase Cloud quirk, and not
+specific to this project's config):**
+1. **GoTrue honours loopback-IP redirects regardless of `uri_allow_list`.**
+   `http://127.0.0.1:<any port>/x`, `http://127.0.0.2:<any port>/x`, and
+   `http://[::1]:<any port>/x` are all accepted on production, and also on
+   self-hosted — whose `uri_allow_list` is **empty** — while the *hostname*
+   `localhost:9999` is rejected on both (falls back to `site_url`). An empty
+   or narrow allow-list therefore does **not** mean "no loopback redirects
+   accepted."
+2. **`http://localhost:8081` without a trailing slash does not match the
+   configured pattern `http://localhost:8081/**`** — the `**` needs the
+   literal `/` immediately before it. Confirmed:
+   `redirect_to=http://localhost:8081` (no trailing slash) falls back to
+   `site_url`, while `redirect_to=http://localhost:8081/` is honoured.
+   Harmless today since every real call site appends a path, but worth
+   knowing before hand-testing with a bare origin.
 
 **`rate_limit_email_sent` raised 2 → 30/hour on production — a deliberate
 relaxation of a safety limit, not incidental.** A 2/hour project-wide cap is
@@ -1356,6 +1400,29 @@ Expected: all four `200`.
   compose-generation logic ever changes, this var can silently stop reaching
   the container with no other symptom: GoTrue falls back to
   `GOTRUE_JWT_SECRET` and production ES256 tokens quietly stop verifying.
+- **Assert `GOTRUE_SMTP_HOST`, `GOTRUE_SITE_URL`, and all four
+  `GOTRUE_MAILER_URLPATHS_*` still hold their intended values after any full
+  Coolify redeploy (Phase 5c):** Coolify's API on this instance cannot read
+  back stored env *values* — the list endpoint returns only metadata (no
+  `value`/`real_value`), a per-uuid `GET .../envs/{uuid}` 404s, and the
+  application-show endpoint exposes no environment-variables array (all
+  three confirmed during this phase). The live `auth` container and the VPS
+  `.env` are proven correct today, but the Coolify *store's* actual contents
+  were never independently verified — only inferred from 20/20 `PATCH`
+  responses each returning a `uuid` and a re-`GET` showing exactly 2 entries
+  per key. A targeted `docker compose up -d auth` (what this phase used)
+  reads `.env` directly, but a **full** Coolify redeploy regenerates `.env`
+  from the store — so if any stored value silently differs from what was
+  intended, the whole email fix reverts with no error, no log, and no
+  failing health check. Assert before trusting a post-redeploy `auth`
+  container:
+  ```bash
+  docker inspect <auth-container> --format '{{range .Config.Env}}{{println .}}{{end}}' | grep -E '^GOTRUE_(SMTP_HOST|SITE_URL|MAILER_URLPATHS_(CONFIRMATION|RECOVERY|INVITE|EMAIL_CHANGE))='
+  ```
+  and confirm all six lines hold their intended values
+  (`GOTRUE_SMTP_HOST=smtp.resend.com`,
+  `GOTRUE_SITE_URL=https://app.sosservices.online`, all four
+  `GOTRUE_MAILER_URLPATHS_*=/auth/v1/verify`) before trusting the redeploy.
 - **Confirm `storage`, `realtime`, and `functions` still do not verify
   production ES256 tokens, and that this is still a deliberate deferral, not
   a forgotten gap (Phase 5b):** `storage`'s `AUTH_JWT_SECRET` and
@@ -1366,23 +1433,36 @@ Expected: all four `200`.
   `JWT_SECRET` across all 109 deployed edge functions, with no ES256
   algorithm branching. All three were explicitly out of scope for Phase 5b
   (see that section above) and remain open going into cutover.
-- **Re-verify production's localhost allow-list with a correctly-shaped
-  request (Phase 5c):** the attempted proof that GoTrue accepts an
-  explicit `http://localhost:8081/auth` redirect — rather than silently
-  substituting `site_url` — used `POST /auth/v1/recover` with
-  `{"options":{"redirectTo":...}}` in the JSON body, and the delivered
-  email's `redirect_to` came back as the app domain, not localhost. Per the
-  real `@supabase/auth-js` client (`GoTrueClient.js`/`lib/fetch.js`),
-  `redirectTo` is actually sent as the **query-string parameter**
-  `redirect_to`, never a nested body field — so this result is inconclusive,
-  not a confirmed pass or fail of the allow-list itself. Before cutover,
-  re-run with the corrected shape,
-  `POST /auth/v1/recover?redirect_to=http://localhost:8081/auth` (body
-  `{"email":...}` only), and confirm the delivered email's `redirect_to` is
-  `http://localhost:8081/auth` verbatim. If it still comes back rewritten to
-  the app domain with the corrected shape, local development against
-  production is genuinely still broken and `uri_allow_list`'s glob syntax
-  needs a second look — do not assume the fix works without this re-test.
+- **Localhost allow-list (Phase 5c): closed, not an open cutover item.**
+  Verified end-to-end via the emailless
+  `GET /auth/v1/verify?token=deliberately-invalid&type=recovery&redirect_to=<target>`
+  probe (see Phase 5c above) in both directions —
+  `http://localhost:8081/auth` honoured, `https://evil.example/steal`
+  rejected and falling back to `site_url`. No further re-test is needed
+  before cutover.
+- **Capacitor native deep link is not in production's allow-list — a
+  prerequisite for enabling `VITE_ENABLE_OAUTH`, not a defect of this
+  phase:** `src/lib/auth/oauthSignIn.ts:101` defines `NATIVE_REDIRECT_URI =
+  "com.sos.sthira://auth-callback"` for native (Capacitor) OAuth sign-in,
+  registered in `android/app/src/main/AndroidManifest.xml`'s intent filter
+  (the iOS platform has not been added to this repo yet — no `ios/`
+  directory exists — but
+  `docs/plans/2026-05-27-google-microsoft-auth-design.md` specifies the
+  matching `Info.plist` `CFBundleURLTypes` entry for when it is). This
+  custom-scheme URI is rejected by production's `uri_allow_list` today
+  (confirmed via the emailless `/auth/v1/verify` probe above). Currently
+  inert — `VITE_ENABLE_OAUTH` is absent from `env`, so OAuth sign-in is
+  disabled entirely — but native OAuth will silently fail the day it's
+  enabled unless `com.sos.sthira://auth-callback` is added to
+  `uri_allow_list` first.
+- **Reconsider `rate_limit_email_sent` (currently 30/hour) before cutover
+  (Phase 5c):** raising it from 2 to 30/hour is correct and strictly
+  *reduces* the denial-of-service exposure (exhausting the project-wide
+  budget was 15x cheaper at 2/hour; per-address bombing is separately capped
+  by `smtp_max_frequency=60` seconds). But 30/hour is still low against 103
+  real users: a cutover-day mass password-reset or signup burst will hit it,
+  and the user-visible failure is a silent `429` with no in-app explanation.
+  Decide before cutover whether to raise it further.
 
 ## Rollback
 
