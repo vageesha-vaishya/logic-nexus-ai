@@ -448,18 +448,32 @@ Per the spec's Dependencies section, `comms-api` will boot and serve `/health` w
 - Modify: `nginx.conf` (add new `location` blocks after the existing `/api/v2/amro/`, `/api/amro/`, `/api/markets/` blocks and before the `location /health` block)
 
 **Interfaces:**
-- Consumes: the 7 confirmed container names recorded by Tasks 2–8 (uim-api, crm-api, sales-api, finance-api, logistics-api, compliance-api, comms-api).
+- Consumes: the 7 confirmed container names. **Plan revision, mid-execution**: Tasks 3, 5, 6, 7, 8 (deploy crm-api/finance-api/logistics-api/compliance-api/comms-api) turned out to be unnecessary — a broad Coolify applications-list check (not the original, flawed `docker ps` name-grep check) found all 5 already exist as healthy, correctly-configured production services from an earlier, unrelated deployment. Only `uim-api` (Task 2) and `sales-api` (Task 4) were actually newly deployed tonight. All 7 container names below are already confirmed and filled in directly — no further discovery needed for this step.
 - Produces: production `nginx.conf` routes all 7 services correctly; the frontend is redeployed with these routes live.
+
+Confirmed container names (verbatim, from live `docker ps` on the VPS):
+
+| Service | Container name | Port |
+|---|---|---|
+| crm-api | `bcbbeslsh2h71pl69zw5q0gg-083159351627` | 3011 |
+| sales-api | `3qu9lzupojtxrxxuh7g3bwnh-155143376746` | 3201 |
+| uim-api | `fg1wffj6kp9yzwnwa1ow8wkd-152835457880` | 3701 |
+| finance-api | `uzo1ozwjn0llussqi8fbjqb0-082837933770` | 3301 |
+| logistics-api | `hdmsjbd6ulfq8t7j9zi4panw-082623660677` | 3401 |
+| compliance-api | `x12lnwcgde45v27is4y6326t-082623349600` | 3501 |
+| comms-api | `fcz1wje9cv7wlxe8iwj1lbzn-082918708797` | 3601 |
+
+**Caveat for the implementer**: these container names include a timestamp suffix that Coolify regenerates on every redeploy of that app. If any of these 7 apps gets redeployed between when this was written and when you execute this task, re-confirm the current name via `docker ps` before using it — don't blindly trust this table if there's reason to think time has passed or something changed.
 
 - [ ] **Step 1: Add the new `location` blocks to `nginx.conf`**
 
-Using each task's confirmed container name in place of `<uim-api-container>` etc. below (substitute the real names recorded by Tasks 2–8 — do not assume they match this placeholder pattern). Insert this block into `nginx.conf` immediately after the existing `location /api/markets/ { ... }` block (around line 114 as of this session):
+Insert this block into `nginx.conf` immediately after the existing `location /api/markets/ { ... }` block (around line 114 as of this session), using the container names from the table above (already substituted below — verify they still match live reality first per the caveat above):
 
 ```nginx
     # crm-api: leads sub-route must be a distinct, more specific location
     # than /api/crm below so nginx's longest-prefix match picks it first.
     location /api/crm/v1/leads {
-        proxy_pass http://<sales-api-container>:3201;
+        proxy_pass http://3qu9lzupojtxrxxuh7g3bwnh-155143376746:3201;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -469,7 +483,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/crm {
-        proxy_pass http://<crm-api-container>:3011;
+        proxy_pass http://bcbbeslsh2h71pl69zw5q0gg-083159351627:3011;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -479,7 +493,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/sales {
-        proxy_pass http://<sales-api-container>:3201;
+        proxy_pass http://3qu9lzupojtxrxxuh7g3bwnh-155143376746:3201;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -489,7 +503,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v1/platform-domains {
-        proxy_pass http://<uim-api-container>:3701;
+        proxy_pass http://fg1wffj6kp9yzwnwa1ow8wkd-152835457880:3701;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -499,7 +513,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v1/domain-assignments {
-        proxy_pass http://<uim-api-container>:3701;
+        proxy_pass http://fg1wffj6kp9yzwnwa1ow8wkd-152835457880:3701;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -509,7 +523,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v1/domain-config {
-        proxy_pass http://<uim-api-container>:3701;
+        proxy_pass http://fg1wffj6kp9yzwnwa1ow8wkd-152835457880:3701;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -519,7 +533,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v1/franchises {
-        proxy_pass http://<uim-api-container>:3701;
+        proxy_pass http://fg1wffj6kp9yzwnwa1ow8wkd-152835457880:3701;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -529,7 +543,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v2/uim {
-        proxy_pass http://<uim-api-container>:3701;
+        proxy_pass http://fg1wffj6kp9yzwnwa1ow8wkd-152835457880:3701;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -539,7 +553,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v1/invoices {
-        proxy_pass http://<finance-api-container>:3301;
+        proxy_pass http://uzo1ozwjn0llussqi8fbjqb0-082837933770:3301;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -549,7 +563,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v1/tax {
-        proxy_pass http://<finance-api-container>:3301;
+        proxy_pass http://uzo1ozwjn0llussqi8fbjqb0-082837933770:3301;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -559,7 +573,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/finance {
-        proxy_pass http://<finance-api-container>:3301;
+        proxy_pass http://uzo1ozwjn0llussqi8fbjqb0-082837933770:3301;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -569,7 +583,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/logistics {
-        proxy_pass http://<logistics-api-container>:3401;
+        proxy_pass http://hdmsjbd6ulfq8t7j9zi4panw-082623660677:3401;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -579,7 +593,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v1/compliance {
-        proxy_pass http://<compliance-api-container>:3501;
+        proxy_pass http://x12lnwcgde45v27is4y6326t-082623349600:3501;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -589,7 +603,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/compliance {
-        proxy_pass http://<compliance-api-container>:3501;
+        proxy_pass http://x12lnwcgde45v27is4y6326t-082623349600:3501;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -599,7 +613,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/v1/comms {
-        proxy_pass http://<comms-api-container>:3601;
+        proxy_pass http://fcz1wje9cv7wlxe8iwj1lbzn-082918708797:3601;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
@@ -609,7 +623,7 @@ Using each task's confirmed container name in place of `<uim-api-container>` etc
     }
 
     location /api/comms {
-        proxy_pass http://<comms-api-container>:3601;
+        proxy_pass http://fcz1wje9cv7wlxe8iwj1lbzn-082918708797:3601;
         proxy_http_version 1.1;
         proxy_set_header Host              $host;
         proxy_set_header X-Real-IP         $remote_addr;
