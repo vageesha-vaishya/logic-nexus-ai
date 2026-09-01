@@ -14,6 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package*.json ./
 
 # Install dependencies
+# redis-memory-server is a TEST dependency whose postinstall downloads a Redis
+# binary and, when that download fails, falls back to compiling Redis from
+# source - which needs pkg-config, absent from this slim image. The production
+# build only runs `vite build` and never needs the binary.
+ENV REDISMS_DISABLE_POSTINSTALL=1
 RUN npm ci --no-audit --progress=false --legacy-peer-deps
 
 # Copy source code
