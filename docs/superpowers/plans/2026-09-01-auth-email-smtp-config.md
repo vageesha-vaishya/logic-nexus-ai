@@ -317,15 +317,24 @@ rm -f "$TEMP/_re.json" "$TEMP/_re1.json"
 3. The link's host is `gzhxgoigflftharcmdqj.supabase.co` (production's own auth domain — production's mailer paths are at defaults and were correctly not touched).
 4. `redirect_to` is `https://app.sosservices.online/...` — **not `localhost:3000`**. This is the live user-facing defect being repaired, so it is the single most important assertion in this plan.
 
-- [ ] **Step 6: Confirm the localhost allow-list actually works**
+- [ ] **Step 6: Confirm the localhost allow-list actually works — and is not over-permissive**
 
-The §1a Finding 2 change exists to keep local development working. Verify GoTrue accepts a localhost redirect rather than silently substituting `site_url`:
+The §1a Finding 2 change exists to keep local development working. Verify GoTrue honours an allow-listed localhost redirect rather than silently substituting `site_url`.
+
+**Use `/auth/v1/verify` with a deliberately invalid token, not `/recover`.** It performs the same allow-list resolution and then 302s to the result, so the decision is readable straight off the `Location` header — no email sent, no token consumed. (An earlier version of this step POSTed `{"options":{"redirectTo": ...}}` to `/recover`. That is the **supabase-js client** shape, which the library translates before it reaches the API; GoTrue reads `redirect_to` from query or post data, then `Referer`, then `SiteURL`, so the value was silently ignored and the check falsely appeared to fail.)
+
 ```bash
 cd H:/Projects/logic-nexus-ai
 ANON=$(grep -E '^SUPABASE_ANON_KEY=' env | sed 's/^SUPABASE_ANON_KEY="//;s/"$//')
-curl -s -o /dev/null -w 'HTTP:%{http_code}\n' -X POST "https://gzhxgoigflftharcmdqj.supabase.co/auth/v1/recover" -H "apikey: ${ANON}" -H 'Content-Type: application/json' -d '{"email":"bahuguna.vimal@gmail.com","options":{"redirectTo":"http://localhost:8081/auth"}}'
+# Positive: an allow-listed origin must be honoured.
+curl -s -o /dev/null -D - "https://gzhxgoigflftharcmdqj.supabase.co/auth/v1/verify?token=deliberately-invalid&type=recovery&redirect_to=http://localhost:8081/auth" -H "apikey: ${ANON}" | grep -i '^location:'
+# Negative control: an unlisted origin must NOT be.
+curl -s -o /dev/null -D - "https://gzhxgoigflftharcmdqj.supabase.co/auth/v1/verify?token=deliberately-invalid&type=recovery&redirect_to=https://evil.example/steal" -H "apikey: ${ANON}" | grep -i '^location:'
 ```
-Then re-read the newest Resend email and confirm its `redirect_to` is `http://localhost:8081/auth` — **not** rewritten to `https://app.sosservices.online`. A substitution here means the allow-list glob didn't match and local dev is still broken. (This sends a second real email; it is worth it, since this is the assertion that the audit's headline finding was actually addressed.)
+
+**Pass criteria — both required:**
+1. First `Location:` is `http://localhost:8081/auth#error=...` — the allow-listed destination is **honoured**, so local development against production still works. A substitution to the app domain here means the glob didn't match.
+2. Second `Location:` is `https://app.sosservices.online#error=...` — the unlisted destination is **rejected** and falls back to `site_url`. This negative control is not optional: widening `uri_allow_list` on a live system risks introducing an open redirect, and criterion 1 alone would not catch that.
 
 - [ ] **Step 7: Health curls, and confirm no user data moved**
 
