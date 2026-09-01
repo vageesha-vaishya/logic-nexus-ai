@@ -287,7 +287,31 @@ Expected: HTTP `200`. (Production's `ANON_KEY` here, not self-hosted's.)
 
 - [ ] **Step 5: Assert on production's delivered email — the real verification**
 
-Re-run Task 1 Step 7's Resend script. **Pass criteria:**
+Read what Resend actually delivered — **fetch with `curl`, not python `urllib`** (Cloudflare blocks urllib with `403 error code: 1010`), and use `$TEMP`, not `/tmp`:
+
+```bash
+cd H:/Projects/logic-nexus-ai
+RESEND=$(grep -E '^RESEND_API_KEY=' env | sed 's/^RESEND_API_KEY="//;s/"$//')
+curl -s -H "Authorization: Bearer $RESEND" "https://api.resend.com/emails" -o "$TEMP/_re.json"
+ID=$(python3 -c "import json,os;print(json.load(open(os.environ['TEMP']+'/_re.json'))['data'][0]['id'])")
+curl -s -H "Authorization: Bearer $RESEND" "https://api.resend.com/emails/$ID" -o "$TEMP/_re1.json"
+python3 -c "
+import json,os,re
+l=json.load(open(os.environ['TEMP']+'/_re.json'))['data'][0]
+d=json.load(open(os.environ['TEMP']+'/_re1.json'))
+print('created:  ', l['created_at'])
+print('from:     ', d.get('from'))
+print('to:       ', d.get('to'))
+print('subject:  ', d.get('subject'))
+print('DELIVERY: ', d.get('last_event'))
+body=(d.get('html') or '')+(d.get('text') or '')
+for u in sorted(set(re.findall(r'https?://[^\s\"<>]+', body))):
+    print('LINK:', re.sub(r'(token=)[^&\"]+', r'<REDACTED>', u))
+"
+rm -f "$TEMP/_re.json" "$TEMP/_re1.json"
+```
+
+**Pass criteria:**
 1. Newest email is to `bahuguna.vimal@gmail.com` from `noreply@sosservices.online`, created within the last few minutes — confirming production now sends via Resend rather than Supabase's built-in sender.
 2. `last_event` is `delivered`.
 3. The link's host is `gzhxgoigflftharcmdqj.supabase.co` (production's own auth domain — production's mailer paths are at defaults and were correctly not touched).
