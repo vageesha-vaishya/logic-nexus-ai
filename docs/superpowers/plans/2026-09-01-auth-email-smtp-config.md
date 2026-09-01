@@ -21,7 +21,7 @@
   ssh hostinger-vps "curl -s -o /dev/null -w 'app: %{http_code}\n' https://app.sosservices.online/; curl -s -o /dev/null -w 'api: %{http_code}\n' https://api.sosservices.online/health; curl -s -o /dev/null -w 'amro: %{http_code}\n' https://amro.sosservices.online/health; curl -s -o /dev/null -w 'aviation: %{http_code}\n' https://app.aviation.sosservices.online/"
   ```
 - Kong's `key-auth` gates `/auth/v1/*`, so calls to self-hosted through the public domain need an `apikey` header carrying **self-hosted's own** `ANON_KEY` (from the VPS `.env`), never production's.
-- Verification uses the **Resend API** to read what was actually sent (`GET https://api.resend.com/emails` to find the message, `GET /emails/{id}` for `html`/`text`/`last_event`) — confirmed working during planning. Do not settle for "the user says it arrived"; assert on the delivered body.
+- Verification uses the **Resend API** to read what was actually sent (`GET https://api.resend.com/emails` to find the message, `GET /emails/{id}` for `html`/`text`/`last_event`). Do not settle for "the user says it arrived"; assert on the delivered body. **Fetch it with `curl`, not python `urllib`** — Resend sits behind Cloudflare, which rejects urllib's user-agent with `HTTP 403 error code: 1010`. This bit the first run of Task 1; python is fine for *parsing* the downloaded JSON. Relatedly, python on this Windows host cannot write to `/tmp` — use `$TEMP`.
 
 **Target values** (identical across both stacks except where noted):
 
@@ -178,20 +178,27 @@ Expected: HTTP `200`. Note GoTrue returns `200` whether or not delivery succeeds
 
 ```bash
 cd H:/Projects/logic-nexus-ai
-python3 - <<'PY'
-import json, re, urllib.request
-key = next(re.match(r'^RESEND_API_KEY="?(.*?)"?$', l.rstrip()).group(1)
-           for l in open('env', encoding='utf-8') if l.startswith('RESEND_API_KEY'))
-h = {"Authorization": f"Bearer {key}"}
-lst = json.load(urllib.request.urlopen(urllib.request.Request("https://api.resend.com/emails", headers=h)))
-msg = lst["data"][0]
-print("newest email:", msg["id"], "| to:", msg["to"], "| from:", msg["from"], "| subject:", msg["subject"])
-d = json.load(urllib.request.urlopen(urllib.request.Request(f"https://api.resend.com/emails/{msg['id']}", headers=h)))
-print("delivery status:", d.get("last_event"))
-links = re.findall(r'href="([^"]+)"', d.get("html") or "")
-for l in links:
-    print("LINK:", re.sub(r'(token=)[^&"]+', r'\1<REDACTED>', l))
-PY
+# NOTE: Resend's API sits behind Cloudflare, which rejects python-urllib's
+# user-agent with HTTP 403 "error code: 1010". Use curl to fetch, python only
+# to parse. Also: python on this Windows host cannot write to /tmp - use $TEMP.
+RESEND=$(grep -E '^RESEND_API_KEY=' env | sed 's/^RESEND_API_KEY="//;s/"$//')
+curl -s -H "Authorization: Bearer $RESEND" "https://api.resend.com/emails" -o "$TEMP/_re.json"
+ID=$(python3 -c "import json,os;print(json.load(open(os.environ['TEMP']+'/_re.json'))['data'][0]['id'])")
+curl -s -H "Authorization: Bearer $RESEND" "https://api.resend.com/emails/$ID" -o "$TEMP/_re1.json"
+python3 -c "
+import json,os,re
+l=json.load(open(os.environ['TEMP']+'/_re.json'))['data'][0]
+d=json.load(open(os.environ['TEMP']+'/_re1.json'))
+print('created:  ', l['created_at'])
+print('from:     ', d.get('from'))
+print('to:       ', d.get('to'))
+print('subject:  ', d.get('subject'))
+print('DELIVERY: ', d.get('last_event'))
+body=(d.get('html') or '')+(d.get('text') or '')
+for u in sorted(set(re.findall(r'https?://[^\s\"<>]+', body))):
+    print('LINK:', re.sub(r'(token=)[^&\"]+', r'<REDACTED>', u))
+"
+rm -f "$TEMP/_re.json" "$TEMP/_re1.json"
 ```
 **Pass criteria — all four must hold:**
 1. The newest email is addressed to `bahuguna.vimal@gmail.com` from `noreply@sosservices.online` with a password-reset subject (i.e. it is *our* message, not an unrelated Aviation AI Pro alert — check `created_at` is within the last few minutes).
