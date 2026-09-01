@@ -290,6 +290,14 @@ In this task's completion report, state explicitly: the app's Coolify `uuid`, th
 
 ### Task 3: Deploy crm-api to the self-hosted VPS
 
+> **SUPERSEDED (final whole-branch review, 2026-09-01):** `crm-api` was
+> discovered already deployed, running, and healthy on this VPS
+> (`bcbbeslsh2h71pl69zw5q0gg`, container `bcbbeslsh2h71pl69zw5q0gg-083159351627`)
+> mid-execution, during this task. Nothing below was performed — no new
+> application was created, no env vars set, no deploy triggered. See the
+> ledger (`.superpowers/sdd/2026-09-01-backend-microservices-selfhost-deployment/progress.md`)
+> for the discovery writeup. Task text preserved below for the record.
+
 **Files:** none (infrastructure-only task).
 
 **Interfaces:**
@@ -342,6 +350,13 @@ Substituting:
 
 ### Task 5: Deploy finance-api to the self-hosted VPS
 
+> **SUPERSEDED (final whole-branch review, 2026-09-01):** `finance-api` was
+> discovered already deployed, running, and healthy on this VPS
+> (`uzo1ozwjn0llussqi8fbjqb0`, container `uzo1ozwjn0llussqi8fbjqb0-082837933770`)
+> mid-execution, during Task 3. Nothing below was performed. See the ledger
+> (`.superpowers/sdd/2026-09-01-backend-microservices-selfhost-deployment/progress.md`)
+> for the discovery writeup. Task text preserved below for the record.
+
 **Files:** none (infrastructure-only task). Dockerfile already exists (`services/finance-api/Dockerfile`) — no Task-1 dependency for the Dockerfile itself, only for the confirmed creation endpoint from Task 2.
 
 **Interfaces:**
@@ -366,6 +381,13 @@ Substituting:
 ---
 
 ### Task 6: Deploy logistics-api to the self-hosted VPS
+
+> **SUPERSEDED (final whole-branch review, 2026-09-01):** `logistics-api` was
+> discovered already deployed, running, and healthy on this VPS
+> (`hdmsjbd6ulfq8t7j9zi4panw`, container `hdmsjbd6ulfq8t7j9zi4panw-082623660677`)
+> mid-execution, during Task 3. Nothing below was performed. See the ledger
+> (`.superpowers/sdd/2026-09-01-backend-microservices-selfhost-deployment/progress.md`)
+> for the discovery writeup. Task text preserved below for the record.
 
 **Files:** none (infrastructure-only task). Dockerfile already exists (`services/logistics-api/Dockerfile`).
 
@@ -392,6 +414,13 @@ Substituting:
 
 ### Task 7: Deploy compliance-api to the self-hosted VPS
 
+> **SUPERSEDED (final whole-branch review, 2026-09-01):** `compliance-api`
+> was discovered already deployed, running, and healthy on this VPS
+> (`x12lnwcgde45v27is4y6326t`, container `x12lnwcgde45v27is4y6326t-082623349600`)
+> mid-execution, during Task 3. Nothing below was performed. See the ledger
+> (`.superpowers/sdd/2026-09-01-backend-microservices-selfhost-deployment/progress.md`)
+> for the discovery writeup. Task text preserved below for the record.
+
 **Files:** none (infrastructure-only task). Dockerfile already exists (`services/compliance-api/Dockerfile`).
 
 **Interfaces:**
@@ -416,6 +445,13 @@ Substituting:
 ---
 
 ### Task 8: Deploy comms-api to the self-hosted VPS
+
+> **SUPERSEDED (final whole-branch review, 2026-09-01):** `comms-api` was
+> discovered already deployed, running, and healthy on this VPS
+> (`fcz1wje9cv7wlxe8iwj1lbzn`, container `fcz1wje9cv7wlxe8iwj1lbzn-082918708797`)
+> mid-execution, during Task 3. Nothing below was performed. See the ledger
+> (`.superpowers/sdd/2026-09-01-backend-microservices-selfhost-deployment/progress.md`)
+> for the discovery writeup. Task text preserved below for the record.
 
 **Files:** none (infrastructure-only task). Dockerfile already exists (`services/comms-api/Dockerfile`).
 
@@ -635,6 +671,15 @@ Insert this block into `nginx.conf` immediately after the existing `location /ap
 
 Per the spec: nginx's plain-prefix `location` blocks resolve by longest-match, not declaration order, so the above ordering is for readability only — it is not load-bearing the way `vite.config.ts`'s ordering is. Do not add a bare `/api/v1` block in this task; that catch-all already exists (routes to amro) and must remain last/unchanged.
 
+> **Correction (added during final whole-branch review, 2026-09-01):** the
+> claim above — that a bare `/api/v1` catch-all "already exists (routes to
+> amro)" in production `nginx.conf` — is false. It has never existed there;
+> only `vite.config.ts`'s dev-server proxy has such a fallback. In
+> production, any `/api/v1/*` path not explicitly matched by one of this
+> task's new blocks (or the pre-existing `/api/v2/amro/`, `/api/amro/`,
+> `/api/markets/` blocks) silently falls through to the SPA. This was a
+> pre-existing gap this plan was never asked to close, and it remains open.
+
 - [ ] **Step 2: Verify nginx syntax locally isn't broken**
 
 There's no local nginx to run this against directly, but re-read the full edited file and confirm every new block matches the existing amro blocks' bracket/semicolon structure exactly (a stray missing semicolon or brace here will break nginx startup on the next deploy, the same class of mistake fixed earlier this session with the CSP header).
@@ -677,6 +722,23 @@ Each internal per-service `/health` check already happened in Tasks 2–8 Step 5
 - [ ] **Step 6: Browser verification of the one confirmed dependent feature**
 
 Log in with a fresh magiclink (self-hosted, using the current live `SUPABASE_SERVICE_ROLE_KEY` per Global Constraints — not the stale local `env` file) and load `/dashboard`. Confirm the `[DomainService] non-JSON response from authorized domains API` console error from earlier this session is gone. This is the one feature with a confirmed pre-existing break (`uim-api`'s absence); the other 6 services don't have a confirmed broken feature today, so no further browser verification is required for them per the spec — health-reachable-externally (Step 5) is sufficient.
+
+> **Correction (added during final whole-branch review, 2026-09-01):** this
+> step's "confirmed fixed" reading was a false positive. The console error
+> going away only meant nginx now routes `/api/v1/platform-domains` to
+> `uim-api` instead of the SPA falling through with `text/html` (which is
+> what the "non-JSON response" message was actually detecting). `uim-api`'s
+> own application code has no domain-management routes at all — its real
+> routes are mounted at `/api/v1/uim/*` (confirmed: no file matches "domain"
+> anywhere under `services/uim-api/src/routes/`) — so the request lands on
+> `uim-api`'s own 404 handler, which happens to answer with
+> `application/json`, silencing the specific console warning without making
+> "authorized domains" actually work. **`DomainService`'s "authorized
+> domains" feature is still broken.** A real fix requires implementing
+> those routes in `uim-api`'s own codebase — out of scope for this
+> infrastructure-only plan. A follow-on nginx block for `/api/v1/uim` (added
+> during this final review) does make `uim-api`'s real, already-implemented
+> routes reachable, which is a genuine improvement independent of this gap.
 
 - [ ] **Step 7: Update the SDD-style record**
 

@@ -10,6 +10,21 @@ frontend (`app.sosservices.online`), and exactly one backend microservice
 this VPS at all (confirmed: none exist as Docker containers, running or
 stopped).
 
+> **Correction (added during final whole-branch review, 2026-09-01):** this
+> claim was wrong for 5 of the 7 services. Mid-execution (during Task 3 of
+> the implementation plan), querying Coolify's application list directly
+> (`GET /api/v1/applications`) — rather than trusting the `docker ps -a |
+> grep -iE '<service-name>'` check this design used, which can never match
+> because Coolify container names are `<app-uuid>-<timestamp>` and never
+> contain the service name — turned up pre-existing, live, healthy Coolify
+> applications for `crm-api`, `comms-api`, `compliance-api`, `finance-api`,
+> and `logistics-api`, all correctly configured against this exact repo.
+> Only `sales-api` was genuinely missing (deployed fresh in Task 4); `uim-api`
+> was legitimately created fresh in Task 2. See the implementation plan's
+> ledger (`.superpowers/sdd/2026-09-01-backend-microservices-selfhost-deployment/progress.md`)
+> for the full discovery writeup. Tasks 3, 5, 6, 7, and 8 of the plan were
+> superseded as a result — nothing was deployed for those 5 services.
+
 In local dev, `vite.config.ts`'s dev-server proxy routes specific path
 prefixes to each of these services (e.g. `/api/v1/platform-domains` →
 `uim-api`, `/api/crm` → `crm-api`, `/api/v1/invoices` → `finance-api`).
@@ -132,16 +147,27 @@ caught several gaps an earlier pass of this table had missed:
 | `/api/crm/v1/leads` | `sales-api-container:3201` | `/api/crm` (leads were lifted from crm-api to sales-api; the narrower prefix must win) |
 | `/api/crm` | `crm-api-container:3011` | — |
 | `/api/sales` | `sales-api-container:3201` | — |
-| `/api/v1/platform-domains`, `/api/v1/domain-assignments`, `/api/v1/domain-config`, `/api/v1/franchises` | `uim-api-container:3701` | `/api/v1` catch-all |
+| `/api/v1/platform-domains`, `/api/v1/domain-assignments`, `/api/v1/domain-config`, `/api/v1/franchises` | `uim-api-container:3701` | — |
 | `/api/v2/uim` | `uim-api-container:3701` | — |
-| `/api/v1/invoices`, `/api/v1/tax` | `finance-api-container:3301` | `/api/v1` catch-all |
+| `/api/v1/invoices`, `/api/v1/tax` | `finance-api-container:3301` | — |
 | `/api/finance` | `finance-api-container:3301` | — |
 | `/api/logistics` | `logistics-api-container:3401` | — |
-| `/api/v1/compliance` | `compliance-api-container:3501` | `/api/v1` catch-all |
+| `/api/v1/compliance` | `compliance-api-container:3501` | — |
 | `/api/compliance` | `compliance-api-container:3501` | — |
-| `/api/v1/comms` | `comms-api-container:3601` | `/api/v1` catch-all |
+| `/api/v1/comms` | `comms-api-container:3601` | — |
 | `/api/comms` | `comms-api-container:3601` | — |
-| `/api/v1` (catch-all, matching dev's fallback ordering) | the existing amro route | — |
+
+> **Correction (added during final whole-branch review, 2026-09-01):** the
+> "Must precede: `/api/v1` catch-all" entries above, and the row that used
+> to read `` `/api/v1` (catch-all, matching dev's fallback ordering) | the
+> existing amro route ``, described something that has never existed in
+> production `nginx.conf`. Only `vite.config.ts`'s dev-server proxy has a
+> bare `/api/v1` fallback that routes to amro. In production, any
+> `/api/v1/*` path not explicitly matched by one of the blocks above (or by
+> the pre-existing `/api/v2/amro/`, `/api/amro/`, `/api/markets/` blocks) has
+> always silently fallen through to the SPA's `try_files ... /index.html` —
+> a pre-existing gap, not something this design or its implementation plan
+> was asked to close. It remains open after this deployment.
 
 The "must precede" column reflects *Vite's* proxy-table semantics
 (first-match-wins, hence its own comments about ordering). nginx's plain
@@ -185,6 +211,25 @@ For each of the 7 services, in this order:
    so their verification is limited to steps 1–3 (health reachable end to
    end) unless a specific broken feature is identified during
    implementation.
+
+   > **Correction (added during final whole-branch review, 2026-09-01):**
+   > step 4's "confirmed" claim for `uim-api` was a false positive. The
+   > `/api/v1/platform-domains` etc. nginx blocks route correctly to
+   > `uim-api`, but `uim-api`'s own application code has no domain-management
+   > routes at all (confirmed: no file matches "domain" anywhere under
+   > `services/uim-api/src/routes/`) — its actual routes are mounted at
+   > `/api/v1/uim/*`. The "no longer logging non-JSON response" signal only
+   > showed that nginx now hands the request to `uim-api`'s Express app
+   > instead of falling through to the SPA; the response is `uim-api`'s own
+   > JSON 404, not a working "authorized domains" answer. `DomainService`'s
+   > "authorized domains" feature is **still broken** after this deployment.
+   > A real fix requires implementing those routes in `uim-api`'s own
+   > codebase — a separate, follow-on application-level task, out of scope
+   > for this infrastructure-only deployment. What this deployment does fix
+   > is `uim-api`'s actual implemented surface (integrations, forms,
+   > commands, projections, reservations, analytics, etc.), which is now
+   > reachable at `/api/v1/uim/*` via a dedicated nginx block added during
+   > this final review.
 
 ## Out of scope
 
