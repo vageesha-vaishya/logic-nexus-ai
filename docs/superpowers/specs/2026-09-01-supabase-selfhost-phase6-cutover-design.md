@@ -6,7 +6,7 @@
 
 ## 1. Background
 
-Phases 1–5b stood up a self-hosted Supabase-equivalent stack on the Coolify VPS and brought it to parity: the seven-container stack (Phase 1), ongoing logical replication of 795 tables across 21 schemas (Phase 2), storage sync (Phase 3), 109 edge functions (Phase 4), a GoTrue version match (Phase 5a), 103 users and 101 identities plus the `on_auth_user_created` trigger (Phase 5), JWKS verification of production's ES256 tokens (Phase 5b), and working outbound auth email (the SMTP repair). Production and self-hosted are now functionally equivalent for the application's purposes, and self-hosted has never served real traffic.
+Phases 1–5b stood up a self-hosted Supabase-equivalent stack on the Coolify VPS and brought it to parity: the seven-container stack (Phase 1), ongoing logical replication of 795 tables across 20 schemas (Phase 2), storage sync (Phase 3), 109 edge functions (Phase 4), a GoTrue version match (Phase 5a), 103 users and 101 identities plus the `on_auth_user_created` trigger (Phase 5), JWKS verification of production's ES256 tokens (Phase 5b), and working outbound auth email (the SMTP repair). Production and self-hosted are now functionally equivalent for the application's purposes, and self-hosted has never served real traffic.
 
 **What this phase is not:** a gradual migration, a canary, or a dual-write scheme. It is a single scheduled switch with a defined commitment point, chosen deliberately over lower-downtime alternatives because the application's clients cannot address two backends at once (see §1a) and because a short, well-rehearsed window is easier to reason about — and to abort — than a partial state.
 
@@ -43,7 +43,11 @@ Note the app *appears* to support runtime override — `src/integrations/supabas
 | `task_type_task_type_seq_seq` | 15 | never advanced |
 | `billing_invoice_seq` | NULL | never advanced |
 
-Without a sync step, the first insert into `maintenance_tasks` after cutover claims `task_id = 1` against 7,172 replicated rows — a primary-key violation at best, and silent duplication wherever a sequence backs a non-key column. The table above covers `public` only; the sync must sweep **all 21 application schemas**, and the values must be re-read at execution time because production keeps advancing them until writes stop.
+Without a sync step, the first insert into a table backed by one of these claims id 1 against thousands of replicated rows — a primary-key violation at best, and silent duplication wherever a sequence backs a non-key column.
+
+**Corrected 2026-09-01 (review finding).** This section previously illustrated the risk with `public.maintenance_tasks`. That table does not exist — `to_regclass` returns NULL, and `maintenance_tasks_task_id_seq` actually owns `public.task_templates.tt_sequence`. The sequence *values* quoted above are real; the narrative around them was not. The verified worst case is better anyway, and it is worse than the invented one: **`module_amro.module_amro_task_templates` holds 3,673 rows on both sides with `max(tt_sequence) = 3757`, a UNIQUE constraint on that identity column, and `last_value` NULL on both sides** (the rows were bulk-loaded with explicit ids, so `is_called` was never set). A naive sync that treats NULL as "never used" skips it and reports success — and the first insert after cutover violates that constraint.
+
+The table above covers `public` only; the sync must sweep **all 20 application schemas** in the publication, and the values must be re-read at execution time because production keeps advancing them until writes stop.
 
 **4. The commitment point is dropping the subscription, and it is sharper than it looks.** Replication currently flows production → self-hosted via subscription `phase2_public_migration_sub` (enabled). While it is running, self-hosted cannot safely take writes: incoming replicated rows would race application writes on the same tables. So the subscription must be dropped *before* the application is repointed — and from that instant, production and self-hosted begin diverging. Any write accepted by self-hosted afterwards is absent from production, so a rollback past that point is not a configuration reversal but a data-reconciliation exercise. Everything before the drop is rehearsal and costs nothing to abandon.
 
@@ -74,7 +78,9 @@ Discovered while preparing Task 1 for execution. The running `frontend` containe
 
 This matters far beyond a stale deploy. §3's cutover rebuilds the frontend to change `VITE_SUPABASE_URL` — and that rebuild would simultaneously ship 138 commits of application code that has never run in production. The window would then change two independent things at once: the backend moves to self-hosted, and a large release goes out. A failure could not be attributed to either, and rollback would have to undo both. That is the precise opposite of the single-variable discipline the rehearsal/commitment split exists to enforce.
 
-**Decision (plan owner, 2026-09-01): pin the cutover build to `7d5d04db`** — the exact code already running — so the only thing that changes is the Supabase build arguments. The 138 pending commits ship later as their own release, on their own schedule, with their own verification. Cutover stays a single-variable change.
+**Decision (plan owner, 2026-09-01) — SUPERSEDED, see the correction immediately below: pin the cutover build to `7d5d04db`** — the exact code already running — so the only thing that changes is the Supabase build arguments. The 138 pending commits ship later as their own release, on their own schedule, with their own verification. Cutover stays a single-variable change.
+
+**CORRECTION (2026-09-01, after Task 2): pin to branch `deploy/phase6-cutover` @ `befd7052`, NOT to bare commit `7d5d04db`.** That commit alone still carries the Dockerfile that no longer builds — `redis-memory-server`'s postinstall can no longer download its binary, falls back to compiling Redis from source, and dies on missing `pkg-config`. Pinning to the bare SHA would reintroduce a build failure *inside the window*. The branch is exactly `7d5d04db` plus that one-line fix, so the isolation this decision exists to protect still holds: none of the 138 pending commits ship. The verified mechanism is to set Coolify's `git_branch`/`git_commit_sha` **without** an `instant_deploy` field, which updates the pin without triggering a deploy.
 
 Two consequences for §3 and for the plan: the build-timing measurement must **not** be taken by triggering a live Coolify rebuild (it would deploy those commits); and the cutover's frontend build must explicitly pin the commit rather than tracking `HEAD`, with the pinning mechanism verified before the window rather than discovered during it.
 
@@ -82,7 +88,7 @@ Two consequences for §3 and for the plan: the build-timing measurement must **n
 
 **Goals:**
 - All 10 production-facing containers resolve to the self-hosted stack, verified by their running configuration rather than by intent.
-- Every sequence across all 21 application schemas is advanced past production's value before self-hosted accepts a single write.
+- Every sequence across all 20 application schemas is advanced past production's value before self-hosted accepts a single write.
 - Replication is stopped cleanly, with confirmed zero lag, before the switch — no rows in flight at the moment of commitment.
 - The application is verified working against self-hosted — read, write, authenticate, and file access — before the window is declared closed.
 - Aviation AI Pro's five applications and `sos` are provably untouched.
@@ -110,7 +116,7 @@ Two stages: **rehearsal** (steps 1–3, abandonable at any point, no user impact
 5. **Drain and confirm.** Wait for replication lag to reach zero and stay there, proving every accepted write has landed on self-hosted.
 6. **Drop the subscription** (`phase2_public_migration_sub`) on self-hosted, and drop the corresponding publication/slot on production so no slot is left retaining WAL. **This is the point of no return** — record the wall-clock time, as it bounds any later reconciliation.
 7. **Re-run the storage sync** (§1b Finding B) so any object uploaded to production since the last run is copied across, and fold in the README's existing `owner`/`owner_id` check rather than tracking it separately.
-8. **Sync all sequences.** For every sequence in the 21 application schemas, set self-hosted's value to production's current value (with a safety margin). Read production's values *now*, not from §1a's table.
+8. **Sync all sequences.** For every sequence in the 20 application schemas, set self-hosted's value to production's current value (with a safety margin). Read production's values *now*, not from §1a's table.
 9. **Repoint the runtime services** (env update + restart), then **rebuild and redeploy `frontend`** with the new `VITE_SUPABASE_URL`/keys.
 10. **Verify** (see §4) before declaring the window closed.
 
