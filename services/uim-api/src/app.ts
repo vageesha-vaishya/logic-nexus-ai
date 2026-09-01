@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 
 import { authMiddleware, getAuthHeaderMonitoringSnapshot } from './middleware/auth.middleware.js';
 import integrationsRoutes from './routes/integrations.routes.js';
+import platformDomainsRoutes from './routes/platform-domains.routes.js';
 import dlqRoutes from './routes/dlq.routes.js';
 import outboxRoutes from './routes/outbox.routes.js';
 import inventoryItemsRoutes from './routes/inventory-items.routes.js';
@@ -202,6 +203,7 @@ function auditApiRequest(req: Request, res: Response, next: NextFunction): void 
 }
 
 app.use('/api', authMiddleware, auditApiRequest, integrationsRoutes);
+app.use('/api', authMiddleware, auditApiRequest, platformDomainsRoutes);
 app.use('/api', authMiddleware, auditApiRequest, dlqRoutes);
 app.use('/api', authMiddleware, auditApiRequest, outboxRoutes);
 app.use('/api', authMiddleware, auditApiRequest, inventoryItemsRoutes);
