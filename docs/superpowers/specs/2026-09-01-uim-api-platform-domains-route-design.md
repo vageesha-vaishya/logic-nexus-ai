@@ -120,22 +120,20 @@ with how the rest of this feature already behaves.
 
 **No existing precedent to follow**: neither `uim-api` nor `finance-api` (nor,
 by extension, any other service checked) has a single `*.test.ts` file for
-any route today, despite each having a `jest.config.cjs`. This design adds
-the **first** route-level test in this service family, rather than following
-an established pattern (there isn't one).
+any route today, and neither has a `jest.config.cjs` — there is no test
+framework wired into `uim-api` at all.
 
-Given that, tests are scoped narrowly to this one route, not an attempt to
-establish a broader testing framework for the service: `platform-domains.routes.test.ts`,
-mocking the Supabase client's `.from()/.select()/.eq()` chain, covering:
-- Platform admin → queries `platform_domains` directly, gets all active rows,
-  `isPlatformAdmin: true` in the response.
-- Tenant user → queries the tenant-scoped view with the correct `tenant_id`
-  filter, `isPlatformAdmin: false`.
-- Duplicate domain rows from the view → de-duplicated in the response.
-- Supabase query throws → `500` with the structured error body.
-- (Not tested here, because it can't reach this route at all: the
-  no-tenant-assignment case, which `authMiddleware` already intercepts with
-  its own `401` before this route's code ever runs.)
+**What actually shipped**: per the plan owner's explicit scoping decision
+(Global Constraints in the implementation plan), no automated tests were
+written for this route — not an oversight, a deliberate choice to avoid
+standing up a test framework for one small, low-risk route with no existing
+pattern to follow. Verification instead consisted of `npm run build`
+type-checking locally, followed by live end-to-end checks against the
+deployed VPS (documented in the plan's Task 3): confirming the route exists
+and rejects unauthenticated requests with `401` (not `404`/`500`), and
+confirming a real request reaches either a real domains list or the
+`401 NO_TENANT_ASSIGNMENT` branch, as opposed to the previous fall-through
+to the SPA or a blanket 404.
 
 ## Out of scope
 

@@ -55,7 +55,8 @@ router.get(
         const { data, error } = await supabase
           .from('tenant_active_domain_assignments')
           .select('platform_domains!inner(id, code, name, description, is_active, status)')
-          .eq('tenant_id', authReq.tenantId);
+          .eq('tenant_id', authReq.tenantId)
+          .eq('platform_domains.is_active', true);
         if (error) throw error;
         const seen = new Set<string>();
         for (const row of (data || []) as unknown as Array<{ platform_domains: PlatformDomainRow }>) {
@@ -82,6 +83,7 @@ router.get(
         error: err instanceof Error ? err.message : 'Failed to list platform domains',
         code: 'PLATFORM_DOMAINS_QUERY_FAILED',
         statusCode: 500,
+        correlationId: (req as { correlationId?: string }).correlationId || null,
       } as ErrorResponse);
     }
   }),

@@ -49,7 +49,7 @@ interface AuthRequest extends Request {
 
 `hasPlatformAdmin` is computed at line 303 (`const hasPlatformAdmin = roles.some(isPlatformAdminRole);`) but never attached to `req`. It needs to be set on **both** code paths that call `next()` after this point: the explicit tenant/franchise-scope-override branch (around line 361-364, where `req.tenantId`/`req.franchiseId` are already set before `next()`) and the default-scope branch (around line 395-398, same pattern). Do not add it to the earlier, early-return error branches (401/403/400 responses never reach a route handler, so there's nothing to attach it for).
 
-- [ ] **Step 1: Add `isPlatformAdmin` to the `AuthRequest` interface**
+- [x] **Step 1: Add `isPlatformAdmin` to the `AuthRequest` interface**
 
 In `services/uim-api/src/middleware/auth.middleware.ts`, change:
 ```typescript
@@ -71,7 +71,7 @@ interface AuthRequest extends Request {
 }
 ```
 
-- [ ] **Step 2: Set `req.isPlatformAdmin` on the explicit-scope-override branch**
+- [x] **Step 2: Set `req.isPlatformAdmin` on the explicit-scope-override branch**
 
 Find this existing block (around line 361-364):
 ```typescript
@@ -91,7 +91,7 @@ Change it to:
       return;
 ```
 
-- [ ] **Step 3: Set `req.isPlatformAdmin` on the default-scope branch**
+- [x] **Step 3: Set `req.isPlatformAdmin` on the default-scope branch**
 
 Find this existing block (around line 395-398):
 ```typescript
@@ -109,7 +109,7 @@ Change it to:
     next();
 ```
 
-- [ ] **Step 4: Type-check**
+- [x] **Step 4: Type-check**
 
 ```bash
 cd services/uim-api
@@ -117,7 +117,7 @@ npm run build
 ```
 Expected: succeeds with no TypeScript errors. This is a purely additive optional field — no existing code reads or assigns `isPlatformAdmin`, so nothing should break.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/uim-api/src/middleware/auth.middleware.ts
@@ -144,7 +144,7 @@ own gap)."
 
 The route reads (public schema, not `uim.*` — `platform_domains` and `tenant_active_domain_assignments` are both in the default `public` schema, unlike `integrations.routes.ts`'s `.schema('uim')` calls, which is specific to that route's own UIM-schema tables. Do not copy the `.schema('uim')` call into this route.)
 
-- [ ] **Step 1: Write `services/uim-api/src/routes/platform-domains.routes.ts`**
+- [x] **Step 1: Write `services/uim-api/src/routes/platform-domains.routes.ts`**
 
 ```typescript
 import { Router, Response } from 'express';
@@ -239,7 +239,7 @@ router.get(
 export default router;
 ```
 
-- [ ] **Step 2: Mount the new router in `app.ts`**
+- [x] **Step 2: Mount the new router in `app.ts`**
 
 Add this import alongside the other route imports (near `services/uim-api/src/app.ts:18`, after `import integrationsRoutes from './routes/integrations.routes.js';`):
 ```typescript
@@ -251,7 +251,7 @@ Add this mount line alongside the other `app.use('/api', authMiddleware, auditAp
 app.use('/api', authMiddleware, auditApiRequest, platformDomainsRoutes);
 ```
 
-- [ ] **Step 3: Type-check**
+- [x] **Step 3: Type-check**
 
 ```bash
 cd services/uim-api
@@ -259,7 +259,7 @@ npm run build
 ```
 Expected: succeeds with no TypeScript errors.
 
-- [ ] **Step 4: Manual local sanity check (no test framework — see Global Constraints)**
+- [x] **Step 4: Manual local sanity check (no test framework — see Global Constraints)**
 
 Confirm the built output actually contains the new route, since there's no automated test to catch a build-config or export mistake:
 ```bash
@@ -268,7 +268,7 @@ grep -c "platform-domains" dist/app.js
 ```
 Expected: at least 1 (the mounted path string compiled into the output). If 0, the import/mount didn't make it into the build — investigate before proceeding.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add services/uim-api/src/routes/platform-domains.routes.ts services/uim-api/src/app.ts
@@ -294,13 +294,13 @@ gracefully already."
 - Consumes: Tasks 1-2's committed code.
 - Produces: a live, verified `GET /api/v1/platform-domains` on the deployed `uim-api`.
 
-- [ ] **Step 1: Push**
+- [x] **Step 1: Push**
 
 ```bash
 git push origin main
 ```
 
-- [ ] **Step 2: Trigger a Coolify redeploy for uim-api**
+- [x] **Step 2: Trigger a Coolify redeploy for uim-api**
 
 Using the secret-handling pattern from Global Constraints:
 ```bash
@@ -308,14 +308,14 @@ ssh hostinger-vps 'chmod 600 /tmp/.coolify_env; set -a; source /tmp/.coolify_env
 ```
 This returns a `deployment_uuid`. Poll `GET /api/v1/deployments/<deployment_uuid>` (same secret-handling pattern) every ~15s until `status` is `finished` (or `failed` — if failed, check the deployment logs via the Coolify API/UI before retrying).
 
-- [ ] **Step 3: Confirm the new container is healthy**
+- [x] **Step 3: Confirm the new container is healthy**
 
 ```bash
 ssh hostinger-vps "docker ps --filter 'label=coolify.applicationId' --format '{{.Names}}\t{{.Status}}' | grep -i fg1wffj6kp9yzwnwa1ow8wkd"
 ```
 Expected: a container `Up ... (healthy)`. Record its name — needed for Step 4.
 
-- [ ] **Step 4: Verify the route directly inside the container first**
+- [x] **Step 4: Verify the route directly inside the container first**
 
 This isolates "does the route exist and not crash" from "is nginx/auth working end-to-end" — check the simpler thing first.
 ```bash
@@ -323,7 +323,7 @@ ssh hostinger-vps "docker exec <container-name-from-step-3> curl -s -o /dev/null
 ```
 Expected: `401` (no `Authorization` header sent) — this proves the route exists and `authMiddleware` correctly rejects an unauthenticated request, rather than 404 (route missing) or 500 (route crashes on load).
 
-- [ ] **Step 5: Get a real, authenticated request working externally**
+- [x] **Step 5: Get a real, authenticated request working externally**
 
 Generate a fresh magiclink for the known test account (`phase4-batch1-verify-test@sosservices.online`, used throughout this engagement), using the current live `SUPABASE_SERVICE_ROLE_KEY` per Global Constraints:
 ```bash
@@ -335,6 +335,6 @@ print(d[\"action_link\"])
 ```
 This test account has no tenant/role assignment (confirmed earlier this session via direct DB query) — expect the request to reach `authMiddleware`'s `401 NO_TENANT_ASSIGNMENT` branch, which is itself a valid, meaningful verification (proves auth + routing work correctly end-to-end up to the tenant-scope check) even without a fully-scoped test identity. If a browser tool is available, complete the magiclink flow and check `/dashboard`'s console for the absence of `[DomainService] non-JSON response from authorized domains API`; if not, verify via `curl` against `https://app.sosservices.online/api/v1/platform-domains` with the completed session's access token instead, confirming a JSON response (not HTML, not a generic 404) — either a real domains list or the `401 NO_TENANT_ASSIGNMENT` body, both of which prove the route is live and functioning, as opposed to the previous behavior (falling through nginx to the SPA, or `uim-api`'s own blanket 404).
 
-- [ ] **Step 6: Report the final verification result**
+- [x] **Step 6: Report the final verification result**
 
 Note plainly whether full end-to-end success (a real tenant/platform-admin identity getting a real domains list) was demonstrated, or whether verification stopped at the `401 NO_TENANT_ASSIGNMENT` check due to the test account's own limitations — the latter is still a meaningful, positive verification of this plan's actual scope (the route exists, deploys, and behaves correctly), just not a full proof that a real business user sees real data. If a real business account is available to test with, use it instead of the throwaway test account for a more complete verification.
