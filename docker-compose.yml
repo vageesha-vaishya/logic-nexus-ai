@@ -161,6 +161,13 @@ services:
       - "8083:80"
     environment:
       AMRO_API_UPSTREAM: ${AMRO_API_UPSTREAM:-amro-api:3001}
+      CRM_API_UPSTREAM: ${CRM_API_UPSTREAM:-crm-api:3011}
+      SALES_API_UPSTREAM: ${SALES_API_UPSTREAM:-sales-api:3201}
+      UIM_API_UPSTREAM: ${UIM_API_UPSTREAM:-uim-api:3701}
+      FINANCE_API_UPSTREAM: ${FINANCE_API_UPSTREAM:-finance-api:3301}
+      LOGISTICS_API_UPSTREAM: ${LOGISTICS_API_UPSTREAM:-logistics-api:3401}
+      COMPLIANCE_API_UPSTREAM: ${COMPLIANCE_API_UPSTREAM:-compliance-api:3501}
+      COMMS_API_UPSTREAM: ${COMMS_API_UPSTREAM:-comms-api:3601}
     networks:
       - supabase-network
 
