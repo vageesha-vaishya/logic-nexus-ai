@@ -64,7 +64,6 @@ export const VERIFY_JWT_MAP: Record<string, boolean> = {
   // Remaining functions with verify_jwt=false in config.toml, not in this
   // batch (needs-secrets or excluded) but included so this map stays
   // complete for future batches without regeneration:
-  "ai-advisor": false,
   "ai-agent": false,
   "ai-message-assistant": false,
   "alert-notifier": false,

@@ -49,7 +49,11 @@ serveWithLogger(async (req, logger, supabase) => {
 
     const { user, error: authError } = await requireAuth(req);
     if (authError || !user) {
-      logger.warn("Auth failed, continuing in anonymous mode", { correlationId, error: authError });
+      logger.warn("Rejecting unauthenticated request", { correlationId, error: authError });
+      return new Response(
+        JSON.stringify({ error: authError || "Unauthorized" }),
+        { status: 401, headers: { ...headers, "Content-Type": "application/json" } },
+      );
     }
 
     const { action, payload } = await req.json()
