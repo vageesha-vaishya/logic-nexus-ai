@@ -3,6 +3,7 @@ import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { serveWithLogger } from "../_shared/logger.ts";
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts";
 
 declare const Deno: any;
 
@@ -16,6 +17,21 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: { ...headers, "Content-Type": "application/json" } });
     }
+
+    // Resolve tenant for this caller (needed by the LLM gateway to pick a
+    // per-tenant provider config, or fall through to the self-hosted rig).
+    const { data: roleRows, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .not('tenant_id', 'is', null)
+      .limit(1);
+    const tenantId: string | null = roleRows?.[0]?.tenant_id ?? null;
+    if (roleError || !tenantId) {
+      logger.warn("Caller has no tenant assignment", { userId: user.id, error: roleError?.message });
+      return new Response(JSON.stringify({ error: "No tenant assignment for this user" }), { status: 403, headers: { ...headers, "Content-Type": "application/json" } });
+    }
+
     let payload: EnsembleRequest | null = null;
     try {
       payload = await req.json();
@@ -57,18 +73,34 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       return Math.max(0, Math.round(b0 + b1 * t));
     });
     const ensemble = Array(weeks).fill(0).map((_, i) => Math.round(((timesfm[i] || 0) + linForecast[i]) / 2));
-    const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
+
+    // Narrate the forecast via the shared LLM Gateway (routes to
+    // tenant-configured provider, or falls through to the self-hosted vLLM
+    // rig — see _shared/llm-gateway.ts).
+    const ctxJson = JSON.stringify({ container_type: ct, forecast: ensemble.slice(0, 8) });
+    const { sanitized } = sanitizeForLLM(ctxJson);
     let narrative = "";
-    if (openaiKey) {
-      const ctx = JSON.stringify({ container_type: ct, forecast: ensemble.slice(0, 8) });
-      const { sanitized } = sanitizeForLLM(ctx);
-      const res = await fetch("https://api.openai.com/v1/chat/completions", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` }, body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "system", content: "Write a short weekly forecast summary with risks and actions." }, { role: "user", content: sanitized }], temperature: 0.2, max_tokens: 220 }) });
-      if (res.ok) {
-        const json = await res.json();
-        narrative = json.choices?.[0]?.message?.content || "";
-      }
+    let llmResult: Awaited<ReturnType<typeof callLLM>> | null = null;
+    try {
+      const ctx: LlmCallContext = { tenantId, userId: user.id, supabaseAdmin, logger };
+      llmResult = await callLLM("logistics.demand_narrative", { context_json: sanitized }, ctx);
+      narrative = llmResult.text.trim();
+    } catch (e: any) {
+      logger.warn("ensemble-demand narrative generation failed", { error: e?.message ?? String(e) });
     }
-    await logAiCall(supabase as any, { user_id: user.id, function_name: "ensemble-demand", model_used: "TimesFM+Linear+LLM", output_summary: { narrative_preview: narrative.slice(0, 80) }, pii_detected: false, pii_fields_redacted: [] });
+
+    await logAiCall(supabase as any, {
+      tenant_id: tenantId,
+      user_id: user.id,
+      function_name: "ensemble-demand",
+      model_used: llmResult ? `TimesFM+Linear+${llmResult.provider}:${llmResult.model}` : "TimesFM+Linear",
+      input_tokens: llmResult?.inputTokens,
+      output_tokens: llmResult?.outputTokens,
+      total_cost_usd: llmResult?.costUsd,
+      output_summary: { narrative_preview: narrative.slice(0, 80) },
+      pii_detected: false,
+      pii_fields_redacted: [],
+    });
     return new Response(JSON.stringify({ forecast: ensemble, narrative }), { status: 200, headers: { ...headers, "Content-Type": "application/json" } });
   } catch (e: any) {
     logger.error("Error in ensemble-demand", { error: e });

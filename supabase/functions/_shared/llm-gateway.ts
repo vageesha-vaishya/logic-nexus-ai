@@ -46,7 +46,10 @@ export type LlmTaskId =
   | "ops.agent_plan"
   | "comms.smart_reply"
   | "security.email_threat"
-  | "logistics.invoice_extract";
+  | "logistics.invoice_extract"
+  | "comms.message_assistant"
+  | "logistics.demand_narrative"
+  | "logistics.transport_mode_suggest";
 
 interface RoutingEntry {
   provider: LlmProvider;
@@ -68,6 +71,9 @@ const FALLBACK_ROUTING: Record<LlmTaskId, RoutingEntry> = {
   "comms.smart_reply":           { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  512 },
   "security.email_threat":       { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens:  500 },
   "logistics.invoice_extract":   { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 1500 },
+  "comms.message_assistant":     { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  512 },
+  "logistics.demand_narrative":  { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  300 },
+  "logistics.transport_mode_suggest": { provider: "anthropic", model: "claude-haiku-4-5", maxOutputTokens: 400 },
 };
 
 // Max output token defaults per task. The model name comes from the tenant
@@ -84,6 +90,9 @@ const MAX_OUTPUT_TOKENS: Record<LlmTaskId, number> = {
   "comms.smart_reply":            512,
   "security.email_threat":        500,
   "logistics.invoice_extract":   1500,
+  "comms.message_assistant":      512,
+  "logistics.demand_narrative":   300,
+  "logistics.transport_mode_suggest": 400,
 };
 
 interface PromptTemplate { version: string; system: string; user: string; }
@@ -358,6 +367,27 @@ CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object shown above �
     user:
       "Extract the line items from the invoice at this URL: ${file_url}\n" +
       "File type: ${file_type}",
+  },
+  "comms.message_assistant": {
+    version: "v1-2026-09-05",
+    system:
+      "You are a customer communications assistant for a logistics CRM. " +
+      "Follow the instruction in the user message exactly and respond in plain text only — " +
+      "no JSON, no markdown code fences, no preamble, no explanation — just the requested content.",
+    user: "${instruction}\n\n${text}",
+  },
+  "logistics.demand_narrative": {
+    version: "v1-2026-09-05",
+    system: "Write a short weekly forecast summary with risks and actions.",
+    user: "${context_json}",
+  },
+  "logistics.transport_mode_suggest": {
+    version: "v1-2026-09-05",
+    system:
+      "You are a logistics assistant. Analyze the shipment details described by the caller and " +
+      "recommend an optimal transport mode with a brief rationale. Always respond in English only, " +
+      "regardless of the language of the input.",
+    user: "${prompt}\n\n${format_instruction}",
   },
 };
 

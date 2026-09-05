@@ -2,6 +2,7 @@ import { corsHeaders, preflight } from "../_shared/cors.ts";
 import { serveWithLogger } from "../_shared/logger.ts";
 import { logAiCall } from "../_shared/audit.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts";
 
 type Action = "draft" | "summarize";
 
@@ -21,25 +22,10 @@ function sanitize(text: string): { sanitized: string; redacted: string[] } {
   return { sanitized: s, redacted };
 }
 
-async function callGemini(prompt: string) {
-  const key = Deno.env.get("GOOGLE_API_KEY");
-  if (!key) return null;
-  const url = "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=" + key;
-  const body = {
-    contents: [{ role: "user", parts: [{ text: prompt }]}],
-    generationConfig: { responseMimeType: "text/plain" }
-  };
-  const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
-  if (!res.ok) return null;
-  const data = await res.json();
-  const out = data?.candidates?.[0]?.content?.parts?.[0]?.text ?? data?.candidates?.[0]?.output_text ?? "";
-  return String(out || "").trim();
-}
-
 serveWithLogger(async (req, logger, adminSupabase) => {
   const pre = preflight(req);
   if (pre) return pre;
-  
+
   const { user, error: authError, supabaseClient } = await requireAuth(req, logger);
   if (authError || !user) {
     return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
@@ -65,14 +51,40 @@ serveWithLogger(async (req, logger, adminSupabase) => {
       tenantId = data.tenant_id;
       baseText = [data.subject, data.body_text, data.body_html].filter(Boolean).join("\n\n");
     }
+
+    // Resolve tenant for the LLM gateway if not already known from the
+    // request or the message row (needed to pick a per-tenant provider
+    // config, or fall through to the self-hosted vLLM rig).
+    if (!tenantId) {
+      const { data: roleRows, error: roleError } = await adminSupabase
+        .from("user_roles")
+        .select("tenant_id")
+        .eq("user_id", user.id)
+        .not("tenant_id", "is", null)
+        .limit(1);
+      tenantId = roleRows?.[0]?.tenant_id ?? "";
+      if (!tenantId) {
+        logger.warn("Caller has no tenant assignment", { userId: user.id, error: roleError?.message });
+        return new Response(JSON.stringify({ error: "No tenant assignment for this user" }), { status: 403, headers: corsHeaders });
+      }
+    }
+
     const { sanitized, redacted } = sanitize(baseText);
-    const modelUsed = Deno.env.get("GOOGLE_API_KEY") ? "gemini-2.0-flash" : "fallback";
+    const ctx: LlmCallContext = { tenantId, userId: user.id, supabaseAdmin: adminSupabase, logger };
 
     if (action === "summarize") {
       const t0 = performance.now();
-      const prompt = `Summarize the following customer communication thread in 4 bullet points focusing on intent, urgency, and next steps.\n\n${sanitized}`;
-      const ai = await callGemini(prompt);
-      const summary = ai || "Summary: Customer message received. Intent unclear. No immediate urgency. Next step: acknowledge and clarify.";
+      let summary = "Summary: Customer message received. Intent unclear. No immediate urgency. Next step: acknowledge and clarify.";
+      let llmResult: Awaited<ReturnType<typeof callLLM>> | null = null;
+      try {
+        llmResult = await callLLM("comms.message_assistant", {
+          instruction: "Summarize the following customer communication thread in 4 bullet points focusing on intent, urgency, and next steps.",
+          text: sanitized,
+        }, ctx);
+        if (llmResult.text.trim()) summary = llmResult.text.trim();
+      } catch (e: any) {
+        logger.warn("ai-message-assistant summarize failed", { error: e?.message ?? String(e) });
+      }
       if (message_id) {
         await supabaseClient.from("messages").update({ ai_summary: summary, updated_at: new Date().toISOString() }).eq("id", message_id);
       }
@@ -81,7 +93,10 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         tenant_id: tenantId || null,
         user_id: user.id,
         function_name: "ai-message-assistant",
-        model_used: modelUsed,
+        model_used: llmResult ? `${llmResult.provider}:${llmResult.model}` : "fallback",
+        input_tokens: llmResult?.inputTokens,
+        output_tokens: llmResult?.outputTokens,
+        total_cost_usd: llmResult?.costUsd,
         latency_ms: latency,
         pii_detected: redacted.length > 0,
         pii_fields_redacted: redacted,
@@ -92,15 +107,26 @@ serveWithLogger(async (req, logger, adminSupabase) => {
 
     if (action === "draft") {
       const t0 = performance.now();
-      const prompt = `You are an assistant drafting a professional reply. Respond concisely with gratitude, acknowledge the request, and provide next steps.\n\nOriginal:\n${sanitized}\n\nReply:`;
-      const ai = await callGemini(prompt);
-      const draft = ai || "Thanks for reaching out. We’ve received your message and will follow up with the next steps shortly.";
+      let draft = "Thanks for reaching out. We’ve received your message and will follow up with the next steps shortly.";
+      let llmResult: Awaited<ReturnType<typeof callLLM>> | null = null;
+      try {
+        llmResult = await callLLM("comms.message_assistant", {
+          instruction: "You are drafting a professional reply. Respond concisely with gratitude, acknowledge the request, and provide next steps.",
+          text: sanitized,
+        }, ctx);
+        if (llmResult.text.trim()) draft = llmResult.text.trim();
+      } catch (e: any) {
+        logger.warn("ai-message-assistant draft failed", { error: e?.message ?? String(e) });
+      }
       const latency = Math.round(performance.now() - t0);
       await logAiCall(adminSupabase, {
         tenant_id: tenantId || null,
         user_id: user.id,
         function_name: "ai-message-assistant",
-        model_used: modelUsed,
+        model_used: llmResult ? `${llmResult.provider}:${llmResult.model}` : "fallback",
+        input_tokens: llmResult?.inputTokens,
+        output_tokens: llmResult?.outputTokens,
+        total_cost_usd: llmResult?.costUsd,
         latency_ms: latency,
         pii_detected: redacted.length > 0,
         pii_fields_redacted: redacted,
@@ -116,7 +142,7 @@ serveWithLogger(async (req, logger, adminSupabase) => {
     try {
       await logAiCall(adminSupabase, {
         function_name: "ai-message-assistant",
-        model_used: Deno.env.get("GOOGLE_API_KEY") ? "gemini-2.5-flash" : "fallback",
+        model_used: "unknown",
         error_message: error.message || String(e),
       });
     } catch {
