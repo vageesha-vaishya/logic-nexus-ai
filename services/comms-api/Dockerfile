@@ -4,7 +4,7 @@
 # Node 22 LTS — needed for native WebSocket (supabase-js realtime client
 # crashes on Node <22 without the `ws` package).
 
-FROM node:22-bullseye-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -15,7 +15,7 @@ COPY tsconfig.json ./
 COPY src ./src
 RUN npm run build
 
-FROM node:22-bullseye-slim
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 

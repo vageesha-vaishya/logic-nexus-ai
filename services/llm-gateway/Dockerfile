@@ -7,7 +7,7 @@
 # Run:     docker run -p 3020:3020 -e ANTHROPIC_API_KEY=… llm-gateway:latest
 # Coolify: point the service at this Dockerfile; expose port 3020.
 
-FROM node:22-bullseye-slim AS builder
+FROM node:22-bookworm-slim AS builder
 
 WORKDIR /app
 
@@ -20,7 +20,7 @@ COPY openapi.yaml ./openapi.yaml
 RUN npm run build
 
 # ── Stage 2: lean runtime layer ──────────────────────────────────────
-FROM node:22-bullseye-slim
+FROM node:22-bookworm-slim
 
 WORKDIR /app
 
