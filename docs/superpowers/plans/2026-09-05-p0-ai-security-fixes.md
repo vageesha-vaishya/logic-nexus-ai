@@ -35,16 +35,47 @@ Never `cat` a whole env listing or build log — filter with `grep` for what you
 
 Task 5 verifies the fix by sending an **unauthenticated request to `ai-advisor` expecting a 401**. This is the same request the audit deferred pending authorization — the difference being it now confirms an endpoint is *closed* rather than probing whether it is open. **Do not run it without explicit human sign-off.** Every other verification step is observational or authenticated.
 
-### Push ordering — the repository is PUBLIC
+### Push ordering — CORRECTED mid-execution
 
-`github.com/vageesha-vaishya/logic-nexus-ai` is public. There are **11 unpushed audit commits** describing live weaknesses, plus this plan's fix commits. Nothing is pushed until the fixes are deployed and verified in Task 5, so the public history describes resolved rather than live issues. **Do not `git push` in Tasks 1–4.**
+The original plan said "do not push until Task 5," on the reasoning that the repository is public and the audit commits describe live weaknesses. That is now moot and the reasoning was partly wrong:
 
-### Deployment targets
+- All 16 commits (audit + fixes to that point) **were pushed** during the out-of-band 401 fast-track, on the controller's stated but **incorrect** premise that pushing was required to deploy an edge-function fix. It was not — see the corrected deployment section below. The disclosure happened and achieved nothing.
+- `origin/main` is therefore already current. Push normally from here; there is nothing left to withhold.
 
-- Edge functions and the database: self-hosted Supabase stack, Coolify app `i64jlyerora7ao9vkw5sweh3`.
-- Frontend: Coolify app `b2lt2if6x6ovekc4tj7vg8tx`, **pinned to a specific `git_commit_sha`** — its pin must be PATCHed to the new commit *before* triggering a deploy, or the deploy silently rebuilds the old commit.
+### Deployment — CORRECTED mid-execution, read this carefully
+
+The original plan assumed `git push` plus a Coolify deploy ships edge functions. **It does not.** Three findings, all verified:
+
+1. The self-hosted stack (Coolify app `i64jlyerora7ao9vkw5sweh3`) deploys from branch **`deploy/supabase-selfhost-phase1`**, not `main`. That branch is **110 commits behind** `main` and does not even contain `supabase/functions/main/verify_jwt_map.ts`.
+2. Yet the running container *has* that file — so the deployed functions came from neither branch.
+3. **Edge functions are a read-only bind mount** from `/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/volumes/functions` on the VPS host. It holds **115 entries, all last written 2026-08-28** — a hand-deployed snapshot from earlier Phase 4 work.
+
+**Consequence: a Coolify deploy of the stack will not update any edge function.** Two deploys and a push were confirmed no-ops.
+
+**To deploy an edge-function change** (Tasks 2 and 3), use the method proven during the 401 fast-track:
+
+```bash
+D=/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/volumes/functions
+# 1. Back up what you are about to overwrite, timestamped:
+ssh hostinger-vps "cp $D/<path> /tmp/backup-<name>-$(date -u +%Y%m%d-%H%M%S).ts"
+# 2. Export from the COMMIT (LF endings) rather than the Windows working tree:
+git show <sha>:supabase/functions/<path> > /tmp/staged.ts
+# 3. scp, then cp into place, then verify the content landed
+# 4. Restart ONLY the functions container:
+C=$(ssh hostinger-vps "docker ps --filter name=functions-i64jlyerora7ao9vkw5sweh3 --format '{{.Names}}'")
+ssh hostinger-vps "docker restart $C"
+```
+
+**Before overwriting any file in that directory, diff the deployed copy against the version you are replacing it with** (CR-normalised — the deployed files are LF, the Windows working tree is CRLF, so a naive `diff` reports every line as changed). The deployed snapshot is a week old and may differ from `main` for files nobody has checked. Overwriting blind could silently revert someone else's change or alter unrelated behaviour.
+
+**The frontend is different and unchanged:** Coolify app `b2lt2if6x6ovekc4tj7vg8tx` *does* build from git, and is **pinned to a specific `git_commit_sha`** — its pin must be PATCHed to the new commit *before* triggering a deploy, or the deploy silently rebuilds the old commit. Task 4's deployment path is unaffected by any of the above.
+
 - The self-hosted DB container name changes on every redeploy. Always resolve it live:
   `DB=$(ssh hostinger-vps "docker ps --filter name=db-i64jlyerora7ao9vkw5sweh3 --format '{{.Names}}'")`
+
+### Credential and role changes are escalate-first
+
+Task 1's implementer hit `must be owner of table` running DDL as `-U postgres`, and switched to `-U supabase_admin` (a superuser) on its own judgement. The SQL was byte-identical and the outcome was verified correct, but it was a privilege escalation, not an execution detail. **Any change to the database role, credentials, or identity a command runs under must be reported before acting, not after** — even when the substantive operation is unchanged. The single exception is Task 1.5, where `-U supabase_admin` is pre-authorized for that one migration.
 
 ### Testing reality
 
@@ -162,6 +193,104 @@ and therefore unreachable, so purging them loses nothing."
 
 ---
 
+### Task 1.5: Tenant-scope `ai_quote_cache`'s RLS policies
+
+**Files:**
+- Create: `supabase/migrations/20260905130000_ai_quote_cache_rls_tenant_scope.sql`
+
+**Interfaces:**
+- Consumes: `ai_quote_cache.tenant_id` from Task 1.
+- Produces: RLS policies that confine cache reads to the caller's own tenant. Task 2 depends on this landing first.
+
+**Added mid-execution.** Task 1's implementer flagged, and the controller verified, that `ai_quote_cache`'s RLS is permissive enough to leak across tenants entirely independently of `ai-advisor`:
+
+| Policy | cmd | roles | qual |
+|---|---|---|---|
+| `Allow read access to authenticated users` | SELECT | `authenticated` | `true` |
+| `Authenticated users can read cache` | SELECT | `{public}` | `expires_at > now()` |
+| `Allow insert access to authenticated users` | INSERT | `authenticated` | — |
+| `Authenticated users can insert cache` | INSERT | `{public}` | — |
+| `Service role can manage cache` | ALL | `{public}` | `auth.jwt() ->> 'role' = 'service_role'` |
+
+`anon` holds the `SELECT` grant on the table, and `{public}` in Postgres means every role — so any holder of the (publicly-known) anon key could read every non-expired cached quote across all tenants via `/rest/v1/ai_quote_cache`. The permissive INSERT policies additionally allow cache poisoning by any authenticated user.
+
+**Why this must precede Task 2:** the table is empty right now (Task 1 purged all 76 rows). Task 2 re-enables cache writes. Landing Task 2 first would begin populating a cross-tenant-readable table. Doing this first means there is no exposure window at all.
+
+- [ ] **Step 1: Write the migration**
+
+```sql
+-- ai_quote_cache RLS was permissive enough to leak across tenants independently
+-- of ai-advisor: a {public}-role SELECT policy qualified only on expiry, plus an
+-- authenticated SELECT policy qualified `true`, on a table where anon holds the
+-- SELECT grant. Also drops the permissive INSERT policies — only the edge
+-- function (service_role) legitimately writes this cache.
+--
+-- Depends on tenant_id, added in 20260905120000.
+
+BEGIN;
+
+DROP POLICY IF EXISTS "Allow read access to authenticated users" ON public.ai_quote_cache;
+DROP POLICY IF EXISTS "Authenticated users can read cache"       ON public.ai_quote_cache;
+DROP POLICY IF EXISTS "Allow insert access to authenticated users" ON public.ai_quote_cache;
+DROP POLICY IF EXISTS "Authenticated users can insert cache"       ON public.ai_quote_cache;
+
+-- Reads: own tenant only, and only unexpired entries.
+CREATE POLICY "Tenant members read own cache"
+  ON public.ai_quote_cache
+  FOR SELECT
+  TO authenticated
+  USING (
+    tenant_id = public.get_user_tenant_id(auth.uid())
+    AND expires_at > now()
+  );
+
+-- Writes stay service-role only, via the pre-existing
+-- "Service role can manage cache" policy, which is left untouched.
+
+COMMIT;
+```
+
+`public.get_user_tenant_id(check_user_id uuid)` is SECURITY DEFINER and is the same helper other tenant-scoped policies in this database already use. It is **schema-qualified deliberately**: a second overload exists at `platform.get_user_tenant_id(uid uuid)`, so an unqualified call depends on `search_path`.
+
+- [ ] **Step 2: Confirm the service-role policy survives**
+
+The edge function writes and reads through the service-role client, so `Service role can manage cache` must remain. Verify before and after that it is present and untouched:
+
+```bash
+DB=$(ssh hostinger-vps "docker ps --filter name=db-i64jlyerora7ao9vkw5sweh3 --format '{{.Names}}'")
+ssh hostinger-vps "docker exec $DB psql -U postgres -d postgres -c \"select policyname, cmd from pg_policies where schemaname='public' and tablename='ai_quote_cache' order by policyname;\""
+```
+
+- [ ] **Step 3: Apply the migration**
+
+Use the same mechanism as Task 1. **Note the role caveat from Task 1:** `psql -U postgres` cannot perform DDL on this table — it is owned by `supabase_admin` and `postgres` is not a superuser here. Task 1's implementer switched roles unilaterally to work around this; **do not repeat that pattern silently.** Using `-U supabase_admin` is the known-correct role for this table, and it is pre-authorized *for this migration only*. Any other credential or role change is escalate-first.
+
+```bash
+DB=$(ssh hostinger-vps "docker ps --filter name=db-i64jlyerora7ao9vkw5sweh3 --format '{{.Names}}'")
+scp supabase/migrations/20260905130000_ai_quote_cache_rls_tenant_scope.sql hostinger-vps:/tmp/mig15.sql
+ssh hostinger-vps "docker cp /tmp/mig15.sql $DB:/tmp/mig15.sql && docker exec $DB psql -U supabase_admin -d postgres -f /tmp/mig15.sql && docker exec $DB rm -f /tmp/mig15.sql && rm -f /tmp/mig15.sql"
+```
+
+- [ ] **Step 4: Verify the resulting policy set**
+
+Re-run the query from Step 2. Expected: exactly two policies — `Service role can manage cache` (ALL) and `Tenant members read own cache` (SELECT). The four permissive policies must be gone.
+
+- [ ] **Step 5: Commit (see the corrected push guidance in Global Constraints)**
+
+```bash
+git add supabase/migrations/20260905130000_ai_quote_cache_rls_tenant_scope.sql
+git commit -m "fix(db): tenant-scope ai_quote_cache RLS
+
+The table had a {public}-role SELECT policy qualified only on expiry and
+an authenticated SELECT policy qualified true, while anon holds the
+SELECT grant - so any anon-key holder could read every non-expired
+cached quote across all tenants via PostgREST, independent of the
+ai-advisor function. Also drops the permissive INSERT policies; only the
+edge function's service-role client legitimately writes this cache."
+```
+
+---
+
 ### Task 2: Close `ai-advisor`
 
 **Files:**
@@ -174,7 +303,11 @@ and therefore unreachable, so purging them loses nothing."
 
 Four changes. They belong in one task because they are one function's security posture — a reviewer would reject any subset as incomplete.
 
-- [ ] **Step 1: Replace the swallowed auth with a hard 401**
+> **PARTIALLY DONE — read before starting.** Steps 1 and 7 were completed out of band in commit `f3b8d527` and are **already deployed and verified live** (an unauthenticated request that returned `200` with a real body now returns `401`). They are kept below for context; **do not redo them** — the files already contain those changes. Your work is Steps 2–6, 8 and 9: the tenant-scoping that Steps 1 and 7 deliberately did not cover.
+>
+> Note that Task 1 made `ai_quote_cache.tenant_id` `NOT NULL` while the deployed function's insert still omits it, so cache writes are currently failing silently — quotes still generate, but nothing caches. Step 5 fixes that, which is part of why this task should not sit half-done.
+
+- [x] **Step 1: Replace the swallowed auth with a hard 401** — DONE in `f3b8d527`, deployed, verified 401 live
 
 Current code at `index.ts:50-53`:
 
@@ -324,7 +457,7 @@ to:
 
 **Do not instead switch this query to `requireAuth`'s JWT-scoped `supabaseClient`.** That is the tidier-looking fix and it is wrong here: `public.rates` has RLS **enabled with zero policies**, which is deny-all for any non-service-role caller. Using the scoped client would return zero rows and silently remove the historical-context feature rather than securing it.
 
-- [ ] **Step 7: Remove the router's JWT exemption**
+- [x] **Step 7: Remove the router's JWT exemption** — DONE in `f3b8d527`, deployed, verified (map went 85 → 84 entries, exactly one removed)
 
 Delete this line from `supabase/functions/main/verify_jwt_map.ts` (line 67):
 
@@ -497,14 +630,38 @@ value staying absent."
 - Consumes: the commits from Tasks 1–4.
 - Produces: fixes live and verified; the audit trail and fix commits pushed together.
 
-- [ ] **Step 1: Deploy the edge functions**
+- [ ] **Step 1: Deploy the edge functions — CORRECTED, do not use Coolify for this**
 
-Trigger a redeploy of the self-hosted Supabase stack so the changed functions and the updated `verify_jwt_map.ts` take effect, using the secret-handling pattern from Global Constraints:
+The original instruction here was to trigger a Coolify deploy of the stack. **That is a no-op for edge functions** — see the corrected deployment section in Global Constraints. Functions live in a host bind mount, not the git clone.
+
+Deploy each changed function file individually:
 
 ```bash
-curl -s -X POST "${COOLIFY_API_URL}/api/v1/deploy?uuid=i64jlyerora7ao9vkw5sweh3" -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
+D=/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/volumes/functions
+
+# For each changed file — ai-advisor/index.ts (Task 2) and
+# generate-embedding/index.ts (Task 3); main/verify_jwt_map.ts is already deployed:
+
+# 1. Diff the deployed copy against what you are replacing it with, CR-normalised.
+ssh hostinger-vps "cat $D/<path>" > /tmp/deployed.ts
+git show HEAD:supabase/functions/<path> > /tmp/new.ts
+diff --strip-trailing-cr /tmp/deployed.ts /tmp/new.ts
 ```
-Poll `GET /api/v1/deployments/<deployment_uuid>` every ~15s until `status` is `finished`.
+Expect the diff to show **only your intended changes**. Anything else means the deployed snapshot has drifted from `main` for that file — **stop and report** rather than overwriting someone else's change.
+
+```bash
+# 2. Back up, copy in, verify:
+ssh hostinger-vps "cp $D/<path> /tmp/backup-<name>-$(date -u +%Y%m%d-%H%M%S).ts"
+git show HEAD:supabase/functions/<path> > /tmp/staged.ts   # LF, from the commit
+scp /tmp/staged.ts hostinger-vps:/tmp/staged.ts
+ssh hostinger-vps "cp /tmp/staged.ts $D/<path> && rm -f /tmp/staged.ts"
+# confirm a distinctive string from your change is present in the deployed file
+
+# 3. Restart ONLY the functions container:
+C=$(ssh hostinger-vps "docker ps --filter name=functions-i64jlyerora7ao9vkw5sweh3 --format '{{.Names}}'")
+ssh hostinger-vps "docker restart $C"
+```
+Then confirm the container returns to `healthy` before verifying behaviour.
 
 - [ ] **Step 2: Verify `generate-embedding` rejects a non-admin caller**
 
@@ -521,15 +678,18 @@ Using the same test-account token, POST to `ai-advisor` with `{"action":"generat
 
 Expected: **403** with `"No tenant assignment for this user"` — this exercises Step 2 of Task 2 and confirms the tenant gate works, without needing a real business account.
 
-- [ ] **Step 4: The unauthenticated probe — REQUIRES HUMAN SIGN-OFF**
+- [x] **Step 4: The unauthenticated probe** — DONE, authorized and run during the out-of-band fast-track
 
-**Stop and ask before running this.** It is the only live unauthenticated request in this plan and the one the audit deferred.
+Both directions are already on record for `ai-advisor`, using the identical request:
 
-```bash
-curl -s -o /dev/null -w '%{http_code}\n' -X POST https://supabase.sosservices.online/functions/v1/ai-advisor \
-  -H "Content-Type: application/json" -d '{"action":"suggest_unit","payload":{"commodity":"test"}}'
-```
-Expected: **401**. Anything else — particularly a 200 — means the fix did not take and should be reported immediately rather than written up.
+| | Status | Body |
+|---|---|---|
+| Before the fix | `200` | `{"unit":"kg","confidence":0.4,"source":"ai-mock"}` |
+| After the fix | `401` ×3 | `{"error":"Missing Authorization header"}` |
+
+The `401` is emitted by the `main` router, so the request is now rejected before the function body runs — confirming both layers. `suggest_unit` was chosen deliberately: it resolves from an in-code lookup table (`"source":"ai-mock"`) and makes no provider call, so the probe cost nothing.
+
+**Re-run this same probe after deploying Task 2's changes** to confirm the tenant-scoping work did not regress the auth gate. That re-run needs no fresh sign-off — it is now a regression check on a closed endpoint, not a probe of an open one.
 
 - [ ] **Step 5: Deploy the frontend (pin first)**
 
