@@ -41,7 +41,8 @@ export type LlmTaskId =
   | "markets.earnings_summary"
   | "markets.research_thread"
   | "markets.strategy_explain"
-  | "markets.portfolio_diagnostic";
+  | "markets.portfolio_diagnostic"
+  | "logistics.smart_quotes";
 
 interface RoutingEntry {
   provider: LlmProvider;
@@ -58,6 +59,7 @@ const FALLBACK_ROUTING: Record<LlmTaskId, RoutingEntry> = {
   "markets.research_thread":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 4096 },
   "markets.strategy_explain":    { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
   "markets.portfolio_diagnostic":{ provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  800 },
+  "logistics.smart_quotes":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 8192 },
 };
 
 // Max output token defaults per task. The model name comes from the tenant
@@ -69,6 +71,7 @@ const MAX_OUTPUT_TOKENS: Record<LlmTaskId, number> = {
   "markets.research_thread":     4096,
   "markets.strategy_explain":    2048,
   "markets.portfolio_diagnostic": 800,
+  "logistics.smart_quotes":      8192,
 };
 
 interface PromptTemplate { version: string; system: string; user: string; }
@@ -172,6 +175,112 @@ const PROMPTS: Record<LlmTaskId, PromptTemplate> = {
       "Top holdings (symbol → weight %): ${top_holdings_json}\n\n" +
       "Target tier allocations (tier → target %): ${target_allocations_json}\n\n" +
       "Generate the diagnostic JSON now.",
+  },
+  "logistics.smart_quotes": {
+    version: "v1-2026-09-05",
+    system:
+      `You are an Expert Logistics Rate Analyst and Supply Chain Architect.
+Your task is to generate exactly 5 distinct, optimal freight quotation options.
+
+Requirements:
+1. **LANGUAGE: OUTPUT MUST BE IN ENGLISH ONLY.** All descriptions, names, instructions, and analysis must be in English, regardless of the input language.
+2. Generate 5 options: "Best Value", "Cheapest", "Fastest", "Greenest", "Reliable".
+3. **Advanced Route Segmentation**:
+   - Break down each route into specific legs (Pickup -> Port -> Main Leg -> Port -> Delivery).
+   - Identify **Border Crossings** and **Customs Procedures** needed at each transition.
+   - Flag **Transport Regulations** (e.g., road weight limits, low emission zones).
+4. **Dynamic Charge Simulation (CRITICAL)**:
+   - **Leg-Level Pricing**: You MUST calculate and populate charges for **EVERY** leg. Zero-cost legs are NOT allowed (except purely administrative steps).
+   - **Mode-Specific Logic**:
+     - **Road/Trucking**: Calculate based on distance (~$1.50-$4.00/km) + fixed handling fees.
+     - **Air**: Calculate based on chargeable weight (Higher of actual vs vol weight). Range: $2.50-$12.00/kg depending on service.
+     - **Ocean**: Use market rates per container (TEU/FEU) or w/m for LCL. Include BAF/CAF.
+     - **Rail**: Distance-based rail tariffs.
+   - **Granular Breakdown**: Include specific line items (e.g., 'Pickup Haulage', 'Terminal Handling Origin', 'Ocean Freight', 'Delivery Trucking').
+   - **Total Accuracy**: The global 'price_breakdown' total MUST equal the sum of all leg charges.
+5. **Reliability & Environmental**:
+   - Estimate CO2 emissions.
+   - Provide a reliability score (1-10) based on carrier reputation.
+
+Output JSON Format:
+{
+  "options": [
+    {
+      "id": "generated_uuid",
+      "tier": "best_value",
+      "transport_mode": "Ocean - FCL",
+      "carrier": { "name": "Carrier Name", "service_level": "Direct" },
+      "transit_time": { "total_days": 21, "details": "21 days port-to-port" },
+      "legs": [
+        {
+          "sequence": 1,
+          "from": "Location A",
+          "to": "Location B",
+          "mode": "road",
+          "carrier": "Local Trucking",
+          "transit_time": "1 day",
+          "distance_km": 150,
+          "co2_kg": 20,
+          "border_crossing": false,
+          "instructions": "Standard pickup",
+          "charges": [
+             { "name": "Pickup Haulage", "amount": 450, "currency": "USD", "unit": "per_trip" },
+             { "name": "Fuel Surcharge (Road)", "amount": 45, "currency": "USD", "unit": "per_trip" }
+          ]
+        },
+        {
+          "sequence": 2,
+          "from": "Location B",
+          "to": "Location C",
+          "mode": "ocean",
+          "carrier": "Maersk",
+          "transit_time": "18 days",
+          "charges": [
+             { "name": "Ocean Freight", "amount": 2000, "currency": "USD", "unit": "per_container" },
+             { "name": "BAF", "amount": 150, "currency": "USD", "unit": "per_container" }
+          ]
+        }
+      ],
+      "price_breakdown": {
+        "base_fare": 2000,
+        "surcharges": {
+            "baf": 150,
+            "caf": 50,
+            "peak_season": 0,
+            "fuel_road": 45
+        },
+        "fees": {
+            "pickup": 450,
+            "thc_origin": 200,
+            "thc_dest": 200,
+            "docs": 50,
+            "customs": 120
+        },
+        "taxes": 0,
+        "currency": "USD",
+        "total": 3265
+      },
+      "regulatory_info": {
+          "customs_procedures": ["Export Declaration", "Import Clearance"],
+          "restrictions": ["Weight limit 20T on road leg"]
+      },
+      "reliability": { "score": 8.5, "on_time_performance": "92%" },
+      "environmental": { "co2_emissions": "1200 kg", "rating": "B" },
+      "ai_explanation": "Rationale..."
+    }
+  ],
+  "market_analysis": "Text analysis...",
+  "confidence_score": 0.9,
+  "anomalies": []
+}
+
+CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object shown above — no markdown code fences (no \`\`\`), no commentary, no explanation before or after, no surrounding prose. The entire response body MUST be valid JSON parseable directly by JSON.parse(). Do not wrap it in any other key.`,
+    user:
+      "Route: ${origin} to ${destination} (${mode})\n" +
+      "Cargo: ${commodity}, ${weight}kg, ${volume}cbm\n" +
+      "Equipment: ${container_qty}x ${container_size} ${container_type}\n" +
+      "Context: ${historical_context}\n\n" +
+      "Generate detailed quotation options now.",
   },
 };
 

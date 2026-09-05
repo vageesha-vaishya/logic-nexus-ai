@@ -3,6 +3,7 @@ import { extractBearerToken, requireAuth } from "../_shared/auth.ts"
 import { sanitizeForLLM } from "../_shared/pii-guard.ts"
 import { logAiCall } from "../_shared/audit.ts"
 import { serveWithLogger, Logger } from "../_shared/logger.ts"
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts"
 
 declare const Deno: any;
 
@@ -73,25 +74,7 @@ serveWithLogger(async (req, logger, supabase) => {
     }
 
     const { action, payload } = await req.json()
-    // Check for OpenAI Key
-    const openAiKey = Deno.env.get('OPENAI_API_KEY')
-    logger.info(`Action: ${action}, Key Present: ${!!openAiKey}, correlationId: ${correlationId}, userId: ${user?.id ?? 'anonymous'}`);
-
-    if (action === 'generate_smart_quotes' && !openAiKey) {
-        logger.warn("Missing OpenAI Key. Returning fallback/empty response.");
-        return new Response(
-            JSON.stringify({ 
-                options: [], 
-                market_analysis: "AI Analysis unavailable (Configuration Missing).",
-                confidence_score: 0,
-                anomalies: [] 
-            }),
-            { 
-                headers: { ...headers, "Content-Type": "application/json" },
-                status: 200 
-            }
-        );
-    }
+    logger.info(`Action: ${action}, correlationId: ${correlationId}, userId: ${user?.id ?? 'anonymous'}`);
 
     // Get User Token
     const authHeader = req.headers.get('Authorization');
@@ -110,7 +93,7 @@ serveWithLogger(async (req, logger, supabase) => {
         result = await predictPrice(payload);
         break;
       case 'generate_smart_quotes':
-        result = await generateSmartQuotes(payload, openAiKey, supabase, logger, tenantId, userToken, user.id);
+        result = await generateSmartQuotes(payload, supabase, logger, tenantId, userToken, user.id);
         break;
       case 'lookup_codes':
         result = await lookupCodes(payload.query, payload.mode, supabase);
@@ -245,10 +228,8 @@ async function validateCompliance(payload: any) {
 
 // --- Main Generation Logic ---
 
-async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any, logger: Logger, tenantId: string, userToken?: string, userId?: string) {
-    if (!apiKey) throw new Error("OpenAI API Key is required for Smart Quotes");
-
-    const { 
+async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, tenantId: string, userToken?: string, userId?: string) {
+    const {
         origin, destination, mode, commodity, weight, volume, 
         containerType, containerSize, containerQty,
         dangerousGoods, specialHandling, pickupDate, deliveryDeadline
@@ -302,133 +283,42 @@ async function generateSmartQuotes(payload: any, apiKey: string | undefined, sup
         logger.warn("Failed to fetch historical data:", { error: err });
     }
 
-    // 3. Construct System Prompt
-    const systemPrompt = `
-You are an Expert Logistics Rate Analyst and Supply Chain Architect.
-Your task is to generate exactly 5 distinct, optimal freight quotation options.
+    // 3. Call the LLM Gateway (routes to tenant-configured provider, or
+    //    falls through to the self-hosted vLLM rig — see _shared/llm-gateway.ts)
+    const vars: Record<string, string> = {
+        origin: String(origin ?? ''),
+        destination: String(destination ?? ''),
+        mode: String(mode ?? ''),
+        commodity: String(commodity ?? ''),
+        weight: String(weight ?? ''),
+        volume: String(volume ?? ''),
+        container_qty: String(containerQty || 1),
+        container_size: String(containerSize || 'Standard'),
+        container_type: String(containerType || ''),
+        historical_context: historicalContext,
+    };
 
-Input:
-- Route: ${origin} to ${destination} (${mode})
-- Cargo: ${commodity}, ${weight}kg, ${volume}cbm
-- Equipment: ${containerQty || 1}x ${containerSize || 'Standard'} ${containerType || ''}
-- Context: ${historicalContext}
-
-Requirements:
-1. **LANGUAGE: OUTPUT MUST BE IN ENGLISH ONLY.** All descriptions, names, instructions, and analysis must be in English, regardless of the input language.
-2. Generate 5 options: "Best Value", "Cheapest", "Fastest", "Greenest", "Reliable".
-3. **Advanced Route Segmentation**: 
-   - Break down each route into specific legs (Pickup -> Port -> Main Leg -> Port -> Delivery).
-   - Identify **Border Crossings** and **Customs Procedures** needed at each transition.
-   - Flag **Transport Regulations** (e.g., road weight limits, low emission zones).
-4. **Dynamic Charge Simulation (CRITICAL)**:
-   - **Leg-Level Pricing**: You MUST calculate and populate charges for **EVERY** leg. Zero-cost legs are NOT allowed (except purely administrative steps).
-   - **Mode-Specific Logic**:
-     - **Road/Trucking**: Calculate based on distance (~$1.50-$4.00/km) + fixed handling fees.
-     - **Air**: Calculate based on chargeable weight (Higher of actual vs vol weight). Range: $2.50-$12.00/kg depending on service.
-     - **Ocean**: Use market rates per container (TEU/FEU) or w/m for LCL. Include BAF/CAF.
-     - **Rail**: Distance-based rail tariffs.
-   - **Granular Breakdown**: Include specific line items (e.g., 'Pickup Haulage', 'Terminal Handling Origin', 'Ocean Freight', 'Delivery Trucking').
-   - **Total Accuracy**: The global 'price_breakdown' total MUST equal the sum of all leg charges.
-
-5. **Reliability & Environmental**:
-   - Estimate CO2 emissions.
-   - Provide a reliability score (1-10) based on carrier reputation.
-
-Output JSON Format:
-{
-  "options": [
-    {
-      "id": "generated_uuid",
-      "tier": "best_value",
-      "transport_mode": "Ocean - FCL",
-      "carrier": { "name": "Carrier Name", "service_level": "Direct" },
-      "transit_time": { "total_days": 21, "details": "21 days port-to-port" },
-      "legs": [
-        {
-          "sequence": 1,
-          "from": "Location A",
-          "to": "Location B",
-          "mode": "road",
-          "carrier": "Local Trucking",
-          "transit_time": "1 day",
-          "distance_km": 150,
-          "co2_kg": 20,
-          "border_crossing": false,
-          "instructions": "Standard pickup",
-          "charges": [
-             { "name": "Pickup Haulage", "amount": 450, "currency": "USD", "unit": "per_trip" },
-             { "name": "Fuel Surcharge (Road)", "amount": 45, "currency": "USD", "unit": "per_trip" }
-          ]
-        },
-        {
-          "sequence": 2,
-          "from": "Location B",
-          "to": "Location C",
-          "mode": "ocean",
-          "carrier": "Maersk",
-          "transit_time": "18 days",
-          "charges": [
-             { "name": "Ocean Freight", "amount": 2000, "currency": "USD", "unit": "per_container" },
-             { "name": "BAF", "amount": 150, "currency": "USD", "unit": "per_container" }
-          ]
-        }
-      ],
-      "price_breakdown": {
-        "base_fare": 2000,
-        "surcharges": {
-            "baf": 150,
-            "caf": 50,
-            "peak_season": 0,
-            "fuel_road": 45
-        },
-        "fees": {
-            "pickup": 450,
-            "thc_origin": 200,
-            "thc_dest": 200,
-            "docs": 50,
-            "customs": 120
-        },
-        "taxes": 0,
-        "currency": "USD",
-        "total": 3265
-      },
-      "regulatory_info": {
-          "customs_procedures": ["Export Declaration", "Import Clearance"],
-          "restrictions": ["Weight limit 20T on road leg"]
-      },
-      "reliability": { "score": 8.5, "on_time_performance": "92%" },
-      "environmental": { "co2_emissions": "1200 kg", "rating": "B" },
-      "ai_explanation": "Rationale..."
-    }
-  ],
-  "market_analysis": "Text analysis...",
-  "confidence_score": 0.9,
-  "anomalies": []
-}
-`;
+    const ctx: LlmCallContext = {
+        tenantId,
+        userId: userId ?? null,
+        supabaseAdmin: supabase,
+        logger,
+    };
 
     const start = performance.now();
-    const completion = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: "gpt-4o", 
-            messages: [
-                { role: "system", content: systemPrompt },
-                { role: "user", content: "Generate detailed quotation options." }
-            ],
-            temperature: 0.7,
-            response_format: { type: "json_object" }
-        })
-    });
+    const llmResult = await callLLM("logistics.smart_quotes", vars, ctx);
 
-    const data = await completion.json();
-    if (data.error) throw new Error(data.error.message);
-
-    let aiResponse = JSON.parse(data.choices[0].message.content);
+    let aiResponse: any;
+    try {
+        aiResponse = JSON.parse(llmResult.text);
+    } catch (_err) {
+        // Defensive: unlike the previous OpenAI-only call, the gateway may
+        // route to providers with no native "JSON mode" (response_format is
+        // enforced via the system prompt instead — see llm-gateway.ts). Strip
+        // an accidental markdown code fence before giving up.
+        const stripped = llmResult.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+        aiResponse = JSON.parse(stripped);
+    }
 
     // 4. Dynamic Charge Calculation Engine (Post-Processing)
     // Simulate "Real-time" fuel surcharges based on current month/market conditions
@@ -445,9 +335,13 @@ Output JSON Format:
     const inputSummary = JSON.stringify({ origin, destination, mode, commodity });
     const { sanitized, redacted } = sanitizeForLLM(inputSummary);
     await logAiCall(supabase, {
+      tenant_id: tenantId,
       user_id: userId ?? null,
       function_name: "ai-advisor.generate_smart_quotes",
-      model_used: "gpt-4o",
+      model_used: `${llmResult.provider}:${llmResult.model}`,
+      input_tokens: llmResult.inputTokens,
+      output_tokens: llmResult.outputTokens,
+      total_cost_usd: llmResult.costUsd,
       latency_ms: latency,
       pii_detected: redacted.length > 0,
       pii_fields_redacted: redacted,
