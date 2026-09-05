@@ -1,5 +1,6 @@
 import { serveWithLogger } from "../_shared/logger.ts";
 import { pickEmbeddingModel } from "../_shared/model-router.ts";
+import { requireServiceRoleOrAdmin } from "../_shared/auth.ts";
 
 type Table = "knowledge_base" | "master_hts";
 
@@ -30,6 +31,14 @@ serveWithLogger(async (req, logger, supabase) => {
       status: 405,
       headers: { "Content-Type": "application/json" },
     });
+
+  const { authorized, status, error } = await requireServiceRoleOrAdmin(req, supabase, logger);
+  if (!authorized) {
+    return new Response(
+      JSON.stringify({ error: error || "Forbidden" }),
+      { status, headers: { "Content-Type": "application/json" } },
+    );
+  }
 
   const payload = (await req.json()) as Payload;
   const admin = supabase;
