@@ -175,7 +175,7 @@ ssh hostinger-vps "docker exec $DB psql -U postgres -d postgres -c '\d public.ai
 ```
 Expected: `tenant_id uuid not null` present, `idx_ai_quote_cache_tenant_hash` listed, FK constraint listed.
 
-- [ ] **Step 6: Commit (do not push)**
+- [ ] **Step 6: Commit and push**
 
 ```bash
 git add supabase/migrations/20260905120000_ai_quote_cache_tenant_scope.sql
@@ -474,7 +474,7 @@ npx tsc --noEmit -p supabase/functions/ai-advisor 2>&1 | head -20 || npx tsc --n
 ```
 Deno edge functions are not covered by the repo's main tsconfig; if neither command produces a usable result, say so in your report rather than claiming a clean type-check. At minimum, re-read every changed hunk and confirm `tenantId` is in scope at each use.
 
-- [ ] **Step 9: Commit (do not push)**
+- [ ] **Step 9: Commit and push**
 
 ```bash
 git add supabase/functions/ai-advisor/index.ts supabase/functions/main/verify_jwt_map.ts
@@ -555,7 +555,7 @@ grep -rn "generate-embedding" --include=*.ts --include=*.tsx --include=*.sql --i
 ```
 Expected: only `supabase/functions/main/function_importers.ts:125`. If anything else appears, a caller exists that this gate may break — **report it before committing**.
 
-- [ ] **Step 4: Commit (do not push)**
+- [ ] **Step 4: Commit and push**
 
 ```bash
 git add supabase/functions/generate-embedding/index.ts
@@ -606,7 +606,7 @@ npm run build
 ```
 Expected: both succeed. The build must pass before Task 5 deploys the frontend — a build failure discovered at deploy time costs a full round trip.
 
-- [ ] **Step 5: Commit (do not push)**
+- [ ] **Step 5: Commit and push**
 
 ```bash
 git add src/hooks/useAiAdvisor.ts src/features/module-communications/components/email/EmailToLeadDialog.tsx
