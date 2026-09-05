@@ -56,6 +56,22 @@ serveWithLogger(async (req, logger, supabase) => {
       );
     }
 
+    const { data: roleRows, error: roleError } = await supabase
+      .from('user_roles')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .not('tenant_id', 'is', null)
+      .limit(1);
+
+    const tenantId: string | null = roleRows?.[0]?.tenant_id ?? null;
+    if (roleError || !tenantId) {
+      logger.warn("Caller has no tenant assignment", { correlationId, userId: user.id, error: roleError?.message });
+      return new Response(
+        JSON.stringify({ error: "No tenant assignment for this user" }),
+        { status: 403, headers: { ...headers, "Content-Type": "application/json" } },
+      );
+    }
+
     const { action, payload } = await req.json()
     // Check for OpenAI Key
     const openAiKey = Deno.env.get('OPENAI_API_KEY')
@@ -94,7 +110,7 @@ serveWithLogger(async (req, logger, supabase) => {
         result = await predictPrice(payload);
         break;
       case 'generate_smart_quotes':
-        result = await generateSmartQuotes(payload, openAiKey, supabase, logger, userToken, user?.id);
+        result = await generateSmartQuotes(payload, openAiKey, supabase, logger, tenantId, userToken, user.id);
         break;
       case 'lookup_codes':
         result = await lookupCodes(payload.query, payload.mode, supabase);
@@ -229,7 +245,7 @@ async function validateCompliance(payload: any) {
 
 // --- Main Generation Logic ---
 
-async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any, logger: Logger, userToken?: string, userId?: string) {
+async function generateSmartQuotes(payload: any, apiKey: string | undefined, supabase: any, logger: Logger, tenantId: string, userToken?: string, userId?: string) {
     if (!apiKey) throw new Error("OpenAI API Key is required for Smart Quotes");
 
     const { 
@@ -245,6 +261,7 @@ async function generateSmartQuotes(payload: any, apiKey: string | undefined, sup
         const { data, error } = await supabase
             .from('ai_quote_cache')
             .select('response_payload')
+            .eq('tenant_id', tenantId)
             .eq('request_hash', cacheKey)
             .gt('expires_at', new Date().toISOString())
             .single();
@@ -270,6 +287,7 @@ async function generateSmartQuotes(payload: any, apiKey: string | undefined, sup
         const { data: rates } = await supabase
             .from('rates')
             .select('base_price')
+            .eq('tenant_id', tenantId)
             .eq('mode', mode)
             .ilike('origin', `%${origin}%`)
             .ilike('destination', `%${destination}%`)
@@ -418,6 +436,7 @@ Output JSON Format:
 
     // 5. Cache Result
     await supabase.from('ai_quote_cache').insert({
+        tenant_id: tenantId,
         request_hash: cacheKey,
         response_payload: aiResponse
     });
