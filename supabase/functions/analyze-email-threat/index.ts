@@ -2,8 +2,9 @@
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { serveWithLogger, Logger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts";
 
-serveWithLogger(async (req, logger, _adminSupabase) => {
+serveWithLogger(async (req, logger, supabaseAdmin) => {
   // Handle CORS preflight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: getCorsHeaders(req) });
@@ -33,15 +34,15 @@ serveWithLogger(async (req, logger, _adminSupabase) => {
             .select("subject, body, account_id, tenant_id")
             .eq("id", email_id)
             .single();
-            
+
         if (fetchError || !email) {
             throw new Error("Email not found");
         }
-        
+
         emailSubject = email.subject || "";
         emailBody = email.body || ""; // Assumes plain text body or simple HTML
         tenantId = email.tenant_id;
-        
+
         // Fetch sender from account? No, we need the FROM address of the email itself.
         // Assuming 'raw_headers' or similar has it, or we parse it from body/headers if stored.
         // For Phase 2, we'll assume the body/subject is enough for content analysis.
@@ -53,70 +54,45 @@ serveWithLogger(async (req, logger, _adminSupabase) => {
         throw new Error("Must provide either email_id or content");
     }
 
-    // 5. Call OpenAI for Analysis
-    const openAiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiKey) {
-        // Fallback for dev/test without key: Simulate analysis
-        logger.warn("Missing OPENAI_API_KEY. Using simulation mode.");
-        const isPhishing = emailSubject.toLowerCase().includes("urgent") || emailBody.toLowerCase().includes("wire transfer");
-        
-        const simulatedResult = {
-            threat_level: isPhishing ? "suspicious" : "safe",
-            threat_score: isPhishing ? 0.75 : 0.1,
-            threat_type: isPhishing ? "BEC" : "None",
-            reasoning: isPhishing ? "Detected urgency and financial keywords." : "No threats detected.",
-            analysis_timestamp: new Date().toISOString()
-        };
-        
-        return await handleResult(supabaseClient, email_id, tenantId, simulatedResult, req, user.id);
+    // Resolve tenant if the email row didn't carry one (e.g. the content-only
+    // path). Needed by the LLM gateway to pick a per-tenant provider config,
+    // or fall through to the self-hosted rig.
+    if (!tenantId) {
+        const { data: roleRows, error: roleError } = await supabaseAdmin
+            .from('user_roles')
+            .select('tenant_id')
+            .eq('user_id', user.id)
+            .not('tenant_id', 'is', null)
+            .limit(1);
+        tenantId = roleRows?.[0]?.tenant_id ?? "";
+        if (!tenantId) {
+            logger.error("Caller has no tenant assignment", { userId: user.id, error: roleError?.message });
+            throw new Error("No tenant assignment for this user");
+        }
     }
 
-    const systemPrompt = `You are an expert Cyber Security AI specializing in Email Security.
-    Analyze the provided email for:
-    1. Phishing attempts
-    2. Business Email Compromise (BEC) - e.g., urgent wire transfers, CEO fraud
-    3. Malicious intent or social engineering
-    
-    Output JSON only:
-    {
-        "threat_level": "safe" | "suspicious" | "malicious",
-        "threat_score": float (0.0 to 1.0),
-        "threat_type": "Phishing" | "BEC" | "Malware" | "Spam" | "None",
-        "reasoning": "Brief explanation"
-    }
-    `;
+    // 5. Analyze via the shared LLM Gateway (routes to tenant-configured
+    //    provider, or falls through to the self-hosted vLLM rig — see
+    //    _shared/llm-gateway.ts).
+    const ctx: LlmCallContext = { tenantId, userId: user.id, supabaseAdmin, logger };
+    const llmResult = await callLLM("security.email_threat", {
+        subject: emailSubject,
+        sender: emailSender,
+        body: emailBody.substring(0, 3000),
+    }, ctx);
 
-    const userMessage = `
-    Subject: ${emailSubject}
-    Sender: ${emailSender}
-    Body:
-    ${emailBody.substring(0, 3000)} -- truncated
-    `;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${openAiKey}`,
-            'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-            model: 'gpt-4o',
-            messages: [
-                { role: 'system', content: systemPrompt },
-                { role: 'user', content: userMessage }
-            ],
-            response_format: { type: "json_object" }
-        })
-    });
-
-    const aiData = await response.json();
-    
-    if (!aiData.choices || !aiData.choices[0].message.content) {
-        throw new Error("Invalid response from OpenAI");
+    let analysisResult: any;
+    try {
+        analysisResult = JSON.parse(llmResult.text);
+    } catch (_err) {
+        // Defensive: unlike the previous OpenAI-only call, the gateway may
+        // route to providers with no native "JSON mode" (response_format is
+        // enforced via the system prompt instead — see llm-gateway.ts). Strip
+        // an accidental markdown code fence before giving up.
+        const stripped = llmResult.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+        analysisResult = JSON.parse(stripped);
     }
 
-    const analysisResult = JSON.parse(aiData.choices[0].message.content);
-    
     return await handleResult(supabaseClient, email_id, tenantId, analysisResult, req, user.id);
 
   } catch (error: any) {

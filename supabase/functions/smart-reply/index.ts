@@ -3,8 +3,7 @@ import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { logAiCall } from "../_shared/audit.ts";
-
-declare const Deno: any;
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts";
 
 type SmartReplyRequest = {
   conversation_id?: string;
@@ -21,6 +20,26 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     if (authError || !user) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    }
+
+    // Resolve tenant for this caller (needed by the LLM gateway to pick a
+    // per-tenant provider config, or fall through to the self-hosted rig).
+    // NOTE: this function is called internally by autonomous-email over HTTP
+    // with the same user's Authorization header, so this resolves the same
+    // way regardless of caller.
+    const { data: roleRows, error: roleError } = await supabaseAdmin
+      .from('user_roles')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .not('tenant_id', 'is', null)
+      .limit(1);
+    const tenantId: string | null = roleRows?.[0]?.tenant_id ?? null;
+    if (roleError || !tenantId) {
+      logger.warn("Caller has no tenant assignment", { userId: user.id, error: roleError?.message });
+      return new Response(JSON.stringify({ error: "No tenant assignment for this user" }), {
+        status: 403,
         headers: { ...headers, "Content-Type": "application/json" },
       });
     }
@@ -49,28 +68,40 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       .join("\n\n---\n\n");
     const { sanitized, redacted } = sanitizeForLLM(threadText);
 
-    const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
-    const sys = "You are a logistics CRM assistant. Propose a short, professional reply that addresses the thread context and suggests next steps. Avoid PII; keep under 150 words.";
-    const userMsg = `Thread:\n<user_context>${sanitized}</user_context>\nHint: ${(payload?.prompt_hint || "").slice(0, 200)}\nOutput JSON:\n{"subject":"...","body":"...","tone":"neutral|friendly|formal"}`;
+    // Draft the reply via the shared LLM Gateway (routes to tenant-configured
+    // provider, or falls through to the self-hosted vLLM rig — see
+    // _shared/llm-gateway.ts). Response shape below is unchanged: callers
+    // (notably autonomous-email) expect { draft: { subject, body, tone } }.
+    const hint = (payload?.prompt_hint || "").slice(0, 200);
+    const ctx: LlmCallContext = { tenantId, userId: user.id, supabaseAdmin, logger };
     let draft = { subject: "", body: "", tone: "neutral" };
-    if (openaiKey) {
-      const res = await fetch("https://api.openai.com/v1/chat/completions", {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-        body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }], temperature: 0.3 }),
-      });
-      if (res.ok) {
-        const json = await res.json();
-        try {
-          draft = JSON.parse(json.choices[0].message.content);
-        } catch { /* ignore */ }
+    let llmResult: Awaited<ReturnType<typeof callLLM>> | null = null;
+    try {
+      llmResult = await callLLM("comms.smart_reply", { thread: sanitized, hint }, ctx);
+      let parsed: any;
+      try {
+        parsed = JSON.parse(llmResult.text);
+      } catch {
+        const stripped = llmResult.text.trim().replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
+        parsed = JSON.parse(stripped);
       }
+      draft = {
+        subject: parsed?.subject ?? "",
+        body: parsed?.body ?? "",
+        tone: parsed?.tone ?? "neutral",
+      };
+    } catch (e: any) {
+      logger.warn("smart-reply generation failed", { error: e?.message ?? String(e) });
     }
 
     await logAiCall(supabase, {
+      tenant_id: tenantId,
       user_id: user.id,
       function_name: "smart-reply",
-      model_used: "gpt-4o-mini",
+      model_used: llmResult ? `${llmResult.provider}:${llmResult.model}` : "none",
+      input_tokens: llmResult?.inputTokens,
+      output_tokens: llmResult?.outputTokens,
+      total_cost_usd: llmResult?.costUsd,
       output_summary: { subject: draft.subject?.slice(0, 80) || "", tone: draft.tone || "neutral" },
       pii_detected: redacted.length > 0,
       pii_fields_redacted: redacted,

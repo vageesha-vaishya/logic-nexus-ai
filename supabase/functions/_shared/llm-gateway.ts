@@ -42,7 +42,11 @@ export type LlmTaskId =
   | "markets.research_thread"
   | "markets.strategy_explain"
   | "markets.portfolio_diagnostic"
-  | "logistics.smart_quotes";
+  | "logistics.smart_quotes"
+  | "ops.agent_plan"
+  | "comms.smart_reply"
+  | "security.email_threat"
+  | "logistics.invoice_extract";
 
 interface RoutingEntry {
   provider: LlmProvider;
@@ -60,6 +64,10 @@ const FALLBACK_ROUTING: Record<LlmTaskId, RoutingEntry> = {
   "markets.strategy_explain":    { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
   "markets.portfolio_diagnostic":{ provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  800 },
   "logistics.smart_quotes":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 8192 },
+  "ops.agent_plan":              { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  400 },
+  "comms.smart_reply":           { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  512 },
+  "security.email_threat":       { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens:  500 },
+  "logistics.invoice_extract":   { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 1500 },
 };
 
 // Max output token defaults per task. The model name comes from the tenant
@@ -72,6 +80,10 @@ const MAX_OUTPUT_TOKENS: Record<LlmTaskId, number> = {
   "markets.strategy_explain":    2048,
   "markets.portfolio_diagnostic": 800,
   "logistics.smart_quotes":      8192,
+  "ops.agent_plan":               400,
+  "comms.smart_reply":            512,
+  "security.email_threat":        500,
+  "logistics.invoice_extract":   1500,
 };
 
 interface PromptTemplate { version: string; system: string; user: string; }
@@ -281,6 +293,71 @@ CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object shown above �
       "Equipment: ${container_qty}x ${container_size} ${container_type}\n" +
       "Context: ${historical_context}\n\n" +
       "Generate detailed quotation options now.",
+  },
+  "ops.agent_plan": {
+    version: "v1-2026-09-05",
+    system:
+      "You are an operations agent. Plan tool calls to achieve the goal. Use only allowed tools.\n\n" +
+      "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY a raw JSON array of steps — " +
+      `[{ "name": "<tool name from the allowed list>", "args": { ... } }, ...]. ` +
+      "No markdown code fences, no commentary, no explanation before or after. " +
+      "The entire response body MUST be valid JSON parseable directly by JSON.parse(). " +
+      "If no tool call is needed to achieve the goal, return an empty array [].",
+    user:
+      "Goal: ${goal}\n" +
+      "Allowed tools (JSON array): ${tools_json}\n\n" +
+      "Return the plan now.",
+  },
+  "comms.smart_reply": {
+    version: "v1-2026-09-05",
+    system:
+      "You are a logistics CRM assistant. Propose a short, professional reply that addresses the " +
+      "thread context and suggests next steps. Avoid PII; keep the body under 150 words.\n\n" +
+      "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY a raw JSON object — " +
+      `{ "subject": string, "body": string, "tone": "neutral" | "friendly" | "formal" }. ` +
+      "No markdown code fences, no commentary, no explanation before or after. " +
+      "The entire response body MUST be valid JSON parseable directly by JSON.parse().",
+    user:
+      "Thread:\n<user_context>${thread}</user_context>\n" +
+      "Hint: ${hint}\n\n" +
+      "Generate the reply JSON now.",
+  },
+  "security.email_threat": {
+    version: "v1-2026-09-05",
+    system:
+      "You are an expert Cyber Security AI specializing in Email Security.\n" +
+      "Analyze the provided email for:\n" +
+      "1. Phishing attempts\n" +
+      "2. Business Email Compromise (BEC) - e.g., urgent wire transfers, CEO fraud\n" +
+      "3. Malicious intent or social engineering\n\n" +
+      "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY a raw JSON object of this shape — " +
+      `{ "threat_level": "safe" | "suspicious" | "malicious", "threat_score": float (0.0 to 1.0), ` +
+      `"threat_type": "Phishing" | "BEC" | "Malware" | "Spam" | "None", "reasoning": "Brief explanation" }. ` +
+      "No markdown code fences, no commentary, no explanation before or after. " +
+      "The entire response body MUST be valid JSON parseable directly by JSON.parse().",
+    user:
+      "Subject: ${subject}\n" +
+      "Sender: ${sender}\n" +
+      "Body:\n${body} -- truncated",
+  },
+  "logistics.invoice_extract": {
+    version: "v1-2026-09-05",
+    system:
+      "You are an expert logistics invoice analyzer. Extract line items from the referenced invoice.\n\n" +
+      "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY a raw JSON object with a key \"items\" containing " +
+      "an array of objects. Each object must have:\n" +
+      "- description (string)\n" +
+      "- quantity (number)\n" +
+      "- unit_price (number)\n" +
+      "- total_price (number)\n" +
+      "- hs_code (string, if visible)\n" +
+      "- weight_kg (number, if visible)\n" +
+      "- origin_country (string, if visible)\n\n" +
+      "No markdown code fences (no ```), no commentary, no explanation before or after. " +
+      "The entire response body MUST be valid JSON parseable directly by JSON.parse().",
+    user:
+      "Extract the line items from the invoice at this URL: ${file_url}\n" +
+      "File type: ${file_type}",
   },
 };
 
