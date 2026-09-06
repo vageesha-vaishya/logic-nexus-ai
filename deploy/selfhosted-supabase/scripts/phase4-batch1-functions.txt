@@ -36,6 +36,7 @@ ingest-x
 lead-event-webhook
 lead-scoring
 list-edge-functions
+llm-provider-config
 margin-optimizer
 markets-compute-nav
 markets-ingest-commodity-prices
@@ -45,7 +46,6 @@ markets-ingest-fx-rates
 markets-ingest-mf-nav
 markets-ingest-news
 markets-ingest-prices
-markets-llm-config
 markets-push-notify
 markets-watchlists
 metrics-quotation
