@@ -4,6 +4,12 @@
  * Hooks for tenant_admin / franchise_admin / platform_admin to manage which
  * provider + API key the LLM Gateway uses for each domain's workloads. A
  * config with domain === null is the tenant-wide default.
+ *
+ * The actual API key never round-trips back to the client; the list endpoint
+ * returns only metadata (provider, display_name, default_model, is_default,
+ * last_used_at). Keys are stored in supabase_vault on the server side.
+ *
+ * Per ADR-025: server state via react-query; no direct supabase from UI.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
