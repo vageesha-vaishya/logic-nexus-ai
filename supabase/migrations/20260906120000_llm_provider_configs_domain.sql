@@ -10,20 +10,30 @@
 -- (see LlmTaskId in supabase/functions/_shared/llm-gateway.ts).
 -- ====================================================================
 
--- Before applying to production: confirm the live constraint name dropped
--- below. platform.llm_provider_configs was reconstituted from prod rather
--- than built by replaying this repo's migrations, so its auto-generated
--- constraint name is not guaranteed to match what CREATE TABLE would have
--- produced locally. Run first:
+-- Before applying to production: confirm the live constraint AND index names
+-- used below. platform.llm_provider_configs was reconstituted from prod
+-- rather than built by replaying this repo's migrations, so auto-generated
+-- names are not guaranteed to match what CREATE TABLE/CREATE INDEX would
+-- have produced locally. Run first:
 --
 --   SELECT conname, pg_get_constraintdef(oid)
 --     FROM pg_constraint
 --    WHERE conrelid = 'platform.llm_provider_configs'::regclass
 --      AND contype = 'u';
 --
--- Expected: one row named llm_provider_configs_tenant_id_provider_display_name_key
--- with definition UNIQUE (tenant_id, provider, display_name). If the name
--- differs, use the actual name below instead of the assumed one.
+--   SELECT indexname FROM pg_indexes
+--    WHERE schemaname = 'platform' AND tablename = 'llm_provider_configs';
+--
+-- Expected: a constraint named llm_provider_configs_tenant_id_provider_display_name_key
+-- with definition UNIQUE (tenant_id, provider, display_name), and an index
+-- named llm_provider_configs_one_default_per_tenant. If either name differs,
+-- use the actual name below instead of the assumed one — both the DROP
+-- CONSTRAINT and the DROP INDEX below are deliberately written WITHOUT
+-- IF EXISTS so a name mismatch fails the migration loudly instead of
+-- silently leaving the old, stronger constraint/index in place (which would
+-- make the very first per-domain default a tenant creates raise a unique
+-- violation, killing the feature at runtime while the migration reports
+-- success).
 
 ALTER TABLE platform.llm_provider_configs
   ADD COLUMN domain text NULL
@@ -38,7 +48,7 @@ COMMENT ON COLUMN platform.llm_provider_configs.domain IS
 -- tenant-default rows with is_default = true — breaking the guarantee
 -- on precisely the row every unconfigured domain falls back to.
 
-DROP INDEX IF EXISTS platform.llm_provider_configs_one_default_per_tenant;
+DROP INDEX platform.llm_provider_configs_one_default_per_tenant;
 
 CREATE UNIQUE INDEX llm_provider_configs_one_default_per_tenant_domain
   ON platform.llm_provider_configs (tenant_id, COALESCE(domain, '*'))
@@ -121,6 +131,11 @@ BEGIN
   WHERE c.tenant_id = p_tenant_id
     AND c.is_active = true
     AND (p_domain IS NULL OR c.domain = p_domain OR c.domain IS NULL)
+    -- When p_domain is NULL, restrict to tenant-default rows only. Without
+    -- this, the clause above admits every domain's rows and the ORDER BY
+    -- below would rank an arbitrary domain-specific config above the
+    -- tenant-wide default for a caller that didn't ask for a domain at all.
+    AND (p_domain IS NOT NULL OR c.domain IS NULL)
     AND (
       (p_provider IS NULL AND c.is_default = true)
       OR (p_provider IS NOT NULL AND c.provider = p_provider)

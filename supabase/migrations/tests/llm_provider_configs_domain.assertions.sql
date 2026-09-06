@@ -13,6 +13,7 @@ DECLARE
   v_default_id uuid;
   v_markets_id uuid;
   v_got uuid;
+  v_violation boolean := false;
 BEGIN
   IF v_tenant IS NULL THEN
     RAISE EXCEPTION 'No tenant rows available to run assertions against';
@@ -63,9 +64,12 @@ BEGIN
   END IF;
 
   -- 5. A second is_default row with domain IS NULL leaves exactly one
-  --    default for the tenant. This is the case a bare (tenant_id, domain)
-  --    unique index would have missed, since Postgres treats NULLs as
-  --    distinct.
+  --    default for the tenant — same trigger behaviour as A4, exercised
+  --    against the domain IS NULL (tenant-wide) case instead of a named
+  --    domain. This does NOT exercise the unique index itself: the trigger
+  --    runs BEFORE INSERT and clears the prior default first, so the new
+  --    row's index entry never collides. A6 below exercises the index
+  --    directly, with the trigger taken out of the way.
   INSERT INTO platform.llm_provider_configs
     (tenant_id, provider, display_name, default_model, vault_secret_name, domain, is_default)
   VALUES
@@ -73,6 +77,30 @@ BEGIN
   IF (SELECT count(*) FROM platform.llm_provider_configs
        WHERE tenant_id = v_tenant AND domain IS NULL AND is_default) <> 1 THEN
     RAISE EXCEPTION 'A5 failed: more than one tenant-default row with is_default';
+  END IF;
+
+  -- 6. With the enforce-single-default trigger disabled, two is_default
+  --    rows with domain IS NULL for the same tenant must be rejected by
+  --    the unique index itself. This is the case a bare (tenant_id, domain)
+  --    unique index would have missed, since Postgres treats NULLs as
+  --    distinct — COALESCE(domain, '*') is what makes both NULL rows
+  --    collide.
+  ALTER TABLE platform.llm_provider_configs DISABLE TRIGGER trg_llm_configs_enforce_default;
+
+  BEGIN
+    INSERT INTO platform.llm_provider_configs
+      (tenant_id, provider, display_name, default_model, vault_secret_name, domain, is_default)
+    VALUES
+      (v_tenant, 'custom', 'zz-assert-default-3', 'na', 'zz_assert_default_3', NULL, true);
+    v_violation := false;
+  EXCEPTION WHEN unique_violation THEN
+    v_violation := true;
+  END;
+
+  ALTER TABLE platform.llm_provider_configs ENABLE TRIGGER trg_llm_configs_enforce_default;
+
+  IF NOT v_violation THEN
+    RAISE EXCEPTION 'A6 failed: a second domain-IS-NULL default with the trigger disabled did not raise a unique_violation';
   END IF;
 
   RAISE NOTICE 'All LLM domain assertions passed.';
