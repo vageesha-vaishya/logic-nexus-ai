@@ -1,4 +1,4 @@
-import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, CandlestickChart, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator, Monitor, Lightbulb, Bot, Copy, Sparkles } from 'lucide-react';
+import { type LucideIcon, Home, TrendingUp, UserPlus, CheckSquare, FileText, Building2, Users, Megaphone, BarChart3, PieChart, MessageSquare, UsersRound, CalendarDays, MoreHorizontal, Package, Warehouse, Truck, CreditCard, DollarSign, FileCheck, Ship, MapPin, Users2, Box, Ruler, PackageCheck, Globe, Cog, Palette, GitBranch, Database, ArrowRightLeft, Anchor, LineChart, Landmark, BookOpen, ShieldAlert, Mail, Wallet, Eye, Brain, Newspaper, Activity, Flag, Wifi, PiggyBank, LayoutDashboard, Radar, Calculator, Monitor, Lightbulb, Bot, Copy, Sparkles } from 'lucide-react';
 import type { AppRole, Permission } from '@/config/permissions';
 
 export type MenuScreen = {
@@ -275,13 +275,6 @@ export const APP_MENU: MenuModule[] = [
         path: '/dashboard/markets/risk',
         icon: ShieldAlert,
         description: 'Kill switch, daily loss limits, segment disable toggles',
-      },
-      {
-        name: 'LLM Settings',
-        path: '/dashboard/markets/settings/llm',
-        icon: CandlestickChart,
-        description: 'Configure AI providers for market analysis',
-        roles: ['platform_admin', 'tenant_admin'],
       },
       {
         name: 'Economic Calendar',

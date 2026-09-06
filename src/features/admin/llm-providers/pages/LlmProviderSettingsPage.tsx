@@ -1,7 +1,7 @@
 /**
  * Platform — LLM provider settings page.
  *
- * Route: /dashboard/admin/settings/llm (wired by a later task)
+ * Route: /dashboard/settings/llm-providers
  *
  * Per-tenant, per-domain LLM provider configuration (ADR-024 + the
  * 2026-05-15 per-tenant decision, extended to a per-domain axis). tenant_admin
@@ -36,7 +36,7 @@ export default function LlmProviderSettingsPage() {
     return {
       platformDefault: rows.filter((c) => c.domain === null),
       forDomain: (d: LlmDomain) => rows.filter((c) => c.domain === d),
-      inherited: rows.find((c) => c.domain === null && c.is_default) ?? null,
+      inherited: rows.find((c) => c.domain === null && c.is_active && c.is_default) ?? null,
     };
   }, [configs.data]);
 

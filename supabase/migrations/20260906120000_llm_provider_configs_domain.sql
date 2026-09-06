@@ -94,7 +94,7 @@ $$;
 -- creates an overload rather than replacing, leaving two same-named
 -- functions and an ambiguous PostgREST RPC dispatch.
 
-DROP FUNCTION IF EXISTS platform.get_tenant_llm_config(uuid, text);
+DROP FUNCTION platform.get_tenant_llm_config(uuid, text);
 
 CREATE FUNCTION platform.get_tenant_llm_config(
   p_tenant_id uuid,

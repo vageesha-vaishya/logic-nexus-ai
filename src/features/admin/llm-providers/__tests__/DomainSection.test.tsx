@@ -74,4 +74,29 @@ describe("DomainSection", () => {
     );
     expect(screen.getByText(/No provider configured/i)).toBeInTheDocument();
   });
+
+  it("still shows inherited when a row exists but is not active+default", () => {
+    renderWithClient(
+      <DomainSection
+        domain="markets"
+        configs={[
+          cfg({
+            id: "c3",
+            domain: "markets",
+            provider: "openai",
+            default_model: "gpt-4o-mini",
+            is_default: false,
+          }),
+        ]}
+        inheritedFrom={cfg()}
+        onAdd={vi.fn()}
+        onEdit={vi.fn()}
+      />,
+    );
+    // The row itself is still rendered — nothing disappears from the UI.
+    expect(screen.getByText(/gpt-4o-mini/)).toBeInTheDocument();
+    // But since no row is both active and default, resolution falls back to
+    // the platform default, so the inherited line must still be shown.
+    expect(screen.getByText(/Inherits platform default/i)).toBeInTheDocument();
+  });
 });

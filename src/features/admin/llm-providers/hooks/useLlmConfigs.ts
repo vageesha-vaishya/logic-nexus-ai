@@ -119,7 +119,7 @@ export function defaultModelFor(provider: string): string {
     case "anthropic":  return "claude-sonnet-4-5";
     case "openrouter": return "anthropic/claude-3.5-sonnet";
     case "openai":     return "gpt-4o-mini";
-    case "gemini":     return "gemini-1.5-flash-002";
+    case "gemini":     return "gemini-2.5-flash";
     case "local-qwen": return "qwen2.5:32b";
     case "custom":     return "";
     default:           return "";
