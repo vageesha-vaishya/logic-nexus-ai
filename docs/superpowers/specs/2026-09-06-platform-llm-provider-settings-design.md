@@ -277,11 +277,18 @@ claude-sonnet-4-5" — so the provider that will actually serve that domain's
 calls is always visible without the reader having to infer it. A domain with its
 own config shows that config and an explicit control to revert to inheriting.
 
-"Revert to inheriting" performs the same soft delete the page already uses for
-removing a provider — `DELETE` on the edge function, which sets
-`is_active = false` and removes the Vault secret. It does not null the `domain`
-column, which would silently promote a domain's provider to the tenant default
-and change behaviour for every other domain.
+"Revert to inheriting" reuses the page's existing removal path — `DELETE` on the
+edge function. It does not null the `domain` column, which would silently
+promote a domain's provider to the tenant default and change behaviour for every
+other domain.
+
+Note that this `DELETE` is a **hard** delete: the handler issues
+`.delete().eq("id", configId)` against the table and then removes the Vault
+secret. The function's own header comment describes it as "soft delete
+(is_active=false) + vault key deletion", which is wrong about its own behaviour.
+The behaviour is correct for this feature — removing the row is exactly what
+should make a domain fall back to the tenant default — so the code stays as-is
+and the stale comment is corrected during the rename.
 
 `DOMAIN_LABELS` maps gateway vocabulary to user-facing names, because the
 routing keys are not what users see elsewhere in the product:
