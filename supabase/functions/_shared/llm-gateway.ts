@@ -465,9 +465,14 @@ async function resolveConfig(
   // Try tenant config first.
   if (ctx.tenantId && ctx.tenantId !== "00000000-0000-0000-0000-000000000000") {
     try {
+      // Task IDs are '<domain>.<feature>' (see LlmTaskId). The domain selects
+      // which of the tenant's provider configs serves this call; the RPC falls
+      // back to the tenant-wide default (domain IS NULL) when the domain has
+      // no config of its own.
+      const domain = taskId.split(".")[0];
       const { data, error } = await (ctx.supabaseAdmin as any)
         .schema("platform")
-        .rpc("get_tenant_llm_config", { p_tenant_id: ctx.tenantId });
+        .rpc("get_tenant_llm_config", { p_tenant_id: ctx.tenantId, p_domain: domain });
       if (!error && Array.isArray(data) && data.length > 0) {
         const row = data[0] as {
           config_id: string;
