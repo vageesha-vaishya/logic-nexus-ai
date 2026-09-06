@@ -277,7 +277,7 @@ const MarketsTerminal   = lazy(() => import("./features/markets/pages/TerminalPa
 const MarketsHome       = lazy(() => import("./features/markets/pages/MarketsHomePage"));
 const MarketsPortfolios = lazy(() => import("./features/markets/pages/PortfoliosPage"));
 const MarketsPortfolioDetail = lazy(() => import("./features/markets/pages/PortfolioDetailPage"));
-const MarketsLlmSettings        = lazy(() => import("./features/markets/pages/LlmSettingsPage"));
+const LlmProviderSettings = lazy(() => import("./features/admin/llm-providers/pages/LlmProviderSettingsPage"));
 const MarketsBrokerConnections  = lazy(() => import("./features/markets/pages/BrokerConnectionsPage"));
 const MarketsBrokerPortfolio    = lazy(() => import("./features/markets/pages/BrokerPortfolioPage"));
 const MarketsWatchlists = lazy(() => import("./features/markets/pages/WatchlistsPage"));
@@ -313,8 +313,6 @@ const MarketsTaxPnL         = lazy(() => import("./features/markets/pages/TaxPnL
 const MarketsRebalancing    = lazy(() => import("./features/markets/pages/RebalancingPage"));
 const MarketsOptionsPayoff  = lazy(() => import("./features/markets/pages/OptionsStrategyPage"));
 const MarketsMarketBreadth  = lazy(() => import("./features/markets/pages/MarketBreadthPage"));
-// Platform-wide LLM provider settings — same component, reachable from main settings hub.
-const PlatformLlmSettings = MarketsLlmSettings;
 const FeatureFlagsAdmin = lazy(() => import("./pages/dashboard/settings/FeatureFlagsPage"));
 const AmroWorkCentersMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.WorkCentersMasterDataPage })));
 const AmroSkillCodesMasterData = lazy(() => import("./features/module-amro/settings/pages/AmroMasterDataEntityPages").then((module) => ({ default: module.SkillCodesMasterDataPage })));
@@ -701,7 +699,7 @@ const App = () => (
               path="/dashboard/settings/llm-providers"
               element={
                 <ProtectedRoute>
-                  <PlatformLlmSettings />
+                  <LlmProviderSettings />
                 </ProtectedRoute>
               }
             />
@@ -1273,7 +1271,8 @@ const App = () => (
               <Route path="more"       element={<RetailMoreTab />} />
               <Route path="withdraw"   element={<RetailWithdrawTab />} />
             </Route>
-            <Route path="/dashboard/markets/settings/llm" element={<ProtectedRoute requiredModule="markets"><MarketsLlmSettings /></ProtectedRoute>} />
+            {/* Moved to the platform-wide settings hub; kept so the old URL still resolves. */}
+            <Route path="/dashboard/markets/settings/llm" element={<Navigate to="/dashboard/settings/llm-providers" replace />} />
             <Route path="/dashboard/markets/settings/brokers" element={<ProtectedRoute requiredModule="markets"><MarketsBrokerConnections /></ProtectedRoute>} />
             <Route path="/dashboard/markets/settings/brokers/:connectionId" element={<ProtectedRoute requiredModule="markets"><MarketsBrokerPortfolio /></ProtectedRoute>} />
             <Route path="/dashboard/markets/fno" element={<ProtectedRoute requiredModule="markets"><MarketsFno /></ProtectedRoute>} />
