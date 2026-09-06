@@ -62,48 +62,15 @@ export interface MarketsApiErrorBody {
   code?: string;
 }
 
-// ─── LLM provider configs (per-tenant API key management) ──────────────
-
-export type LlmProviderKind =
-  | "anthropic"
-  | "openai"
-  | "openrouter"
-  | "gemini"
-  | "local-qwen"
-  | "custom";
-
-export interface LlmProviderConfig {
-  id: string;
-  tenant_id: string;
-  provider: LlmProviderKind;
-  display_name: string;
-  base_url: string | null;
-  default_model: string;
-  is_active: boolean;
-  is_default: boolean;
-  created_at: string;
-  updated_at: string;
-  last_used_at: string | null;
-}
-
-export interface CreateLlmConfigInput {
-  provider: LlmProviderKind;
-  display_name: string;
-  default_model: string;
-  api_key: string;
-  base_url?: string | null;
-  is_default?: boolean;
-}
-
-export interface UpdateLlmConfigInput {
-  display_name?: string;
-  default_model?: string;
-  base_url?: string | null;
-  is_active?: boolean;
-  is_default?: boolean;
-  /** If set, the existing vault entry is rotated to this new key. */
-  api_key?: string;
-}
+// ─── LLM provider configs ──────────────────────────────────────────────
+// Moved to features/admin/llm-providers (platform-wide, not markets-scoped).
+// Re-exported here for the markets barrel's existing consumers.
+export type {
+  LlmProviderKind,
+  LlmProviderConfig,
+  CreateLlmConfigInput,
+  UpdateLlmConfigInput,
+} from "@/features/admin/llm-providers/types";
 
 // ─── Briefs (AI-generated portfolio analyses) ───────────────────────────
 

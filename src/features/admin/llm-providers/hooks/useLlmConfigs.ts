@@ -1,24 +1,14 @@
 /**
- * Markets — LLM provider configs (per-tenant).
+ * LLM provider configs — per tenant, per domain.
  *
  * Hooks for tenant_admin / franchise_admin / platform_admin to manage which
- * provider + API key the LLM Gateway uses for their tenant's workloads.
- *
- *   useLlmConfigs()           → list configs for the active tenant
- *   useSaveLlmConfig()        → create OR update (PATCH if id provided)
- *   useDeleteLlmConfig()      → remove (also clears vault entry)
- *
- * The actual API key never round-trips back to the client; the list endpoint
- * returns only metadata (provider, display_name, default_model, is_default,
- * last_used_at). Keys are stored in supabase_vault on the server side.
- *
- * Per ADR-025: server state via react-query; no direct supabase from UI.
+ * provider + API key the LLM Gateway uses for each domain's workloads. A
+ * config with domain === null is the tenant-wide default.
  */
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/useAuth";
-import { marketsKeys } from "./queryKeys";
 import type {
   CreateLlmConfigInput,
   LlmProviderConfig,
@@ -39,12 +29,12 @@ export function useLlmConfigs() {
   const { tenantId } = useActiveScope();
 
   return useQuery({
-    queryKey: ["markets", "llm_configs", { tenantId }] as const,
+    queryKey: ["llm-providers", "configs", { tenantId }] as const,
     enabled: Boolean(tenantId),
     queryFn: async (): Promise<LlmProviderConfig[]> => {
       if (!tenantId) throw new Error("No tenant in context");
       const { data, error } = await supabase.functions.invoke<{ data: LlmProviderConfig[] }>(
-        "markets-llm-config",
+        "llm-provider-config",
         {
           method: "GET",
           headers: { "x-tenant-id": tenantId },
@@ -72,7 +62,7 @@ export function useSaveLlmConfig() {
   return useMutation<LlmProviderConfig, Error, SaveArgs>({
     mutationFn: async ({ id, payload }): Promise<LlmProviderConfig> => {
       if (!tenantId) throw new Error("No tenant in context");
-      const path = id ? `markets-llm-config?id=${encodeURIComponent(id)}` : "markets-llm-config";
+      const path = id ? `llm-provider-config?id=${encodeURIComponent(id)}` : "llm-provider-config";
       const method = id ? "PATCH" : "POST";
 
       const { data, error } = await supabase.functions.invoke<{ data: LlmProviderConfig }>(
@@ -88,7 +78,7 @@ export function useSaveLlmConfig() {
       return data.data;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["markets", "llm_configs"] });
+      queryClient.invalidateQueries({ queryKey: ["llm-providers", "configs"] });
     },
   });
 }
@@ -103,7 +93,7 @@ export function useDeleteLlmConfig() {
     mutationFn: async (id: string): Promise<void> => {
       if (!tenantId) throw new Error("No tenant in context");
       const { error } = await supabase.functions.invoke(
-        `markets-llm-config?id=${encodeURIComponent(id)}`,
+        `llm-provider-config?id=${encodeURIComponent(id)}`,
         {
           method: "DELETE",
           headers: { "x-tenant-id": tenantId },
@@ -112,7 +102,7 @@ export function useDeleteLlmConfig() {
       if (error) throw new Error(error.message ?? "Failed to delete LLM config");
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["markets", "llm_configs"] });
+      queryClient.invalidateQueries({ queryKey: ["llm-providers", "configs"] });
     },
   });
 }

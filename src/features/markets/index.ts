@@ -13,7 +13,7 @@ export {
   useSaveLlmConfig,
   useDeleteLlmConfig,
   defaultModelFor,
-} from "./hooks/useLlmConfigs";
+} from "@/features/admin/llm-providers";
 export {
   useWatchlists,
   useWatchlist,
