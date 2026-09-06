@@ -1,15 +1,18 @@
 // eslint-disable-next-line @typescript-eslint/triple-slash-reference
 /// <reference path="../types.d.ts" />
 
-// markets-llm-config — CRUD for platform.llm_provider_configs.
+// llm-provider-config — CRUD for platform.llm_provider_configs.
 //
 // Endpoints:
-//   GET    /markets-llm-config                       → list configs for x-tenant-id
-//   POST   /markets-llm-config                       → create (stores api_key in vault)
-//          body: { provider, display_name, default_model, api_key, base_url?, is_default? }
-//   PATCH  /markets-llm-config?id=<uuid>             → update non-secret fields + optionally rotate api_key
-//          body: { display_name?, default_model?, base_url?, is_active?, is_default?, api_key? }
-//   DELETE /markets-llm-config?id=<uuid>             → soft delete (is_active=false) + vault key deletion
+//   GET    /llm-provider-config                       → list configs for x-tenant-id
+//   POST   /llm-provider-config                       → create (stores api_key in vault)
+//          body: { provider, display_name, default_model, api_key, base_url?, is_default?, domain? }
+//   PATCH  /llm-provider-config?id=<uuid>             → update non-secret fields + optionally rotate api_key
+//          body: { display_name?, default_model?, base_url?, is_active?, is_default?, api_key?, domain? }
+//   DELETE /llm-provider-config?id=<uuid>             → hard delete of the row + vault key deletion
+//
+// `domain` is the gateway task-ID prefix this config serves; null/omitted
+// means the tenant-wide default, used by any domain without its own config.
 //
 // Auth: tenant_admin / franchise_admin / platform_admin.
 // API keys: stored in supabase_vault, never returned to the client.
@@ -25,6 +28,18 @@ const jsonHeaders = { ...corsHeaders, "Content-Type": "application/json" };
 type LlmProvider = "anthropic" | "openai" | "gemini" | "openrouter" | "local-qwen" | "custom";
 const VALID_PROVIDERS: LlmProvider[] = ["anthropic","openai","gemini","openrouter","local-qwen","custom"];
 
+type LlmDomain = "markets" | "logistics" | "comms" | "ops" | "security";
+const VALID_DOMAINS: LlmDomain[] = ["markets","logistics","comms","ops","security"];
+
+/** null = tenant-wide default. Returns an error string, or null when valid. */
+function validateDomain(d: unknown): string | null {
+  if (d === undefined || d === null) return null;
+  if (typeof d !== "string" || !VALID_DOMAINS.includes(d as LlmDomain)) {
+    return `domain must be null or one of ${VALID_DOMAINS.join(", ")}`;
+  }
+  return null;
+}
+
 interface CreateBody {
   provider: LlmProvider;
   display_name: string;
@@ -32,6 +47,7 @@ interface CreateBody {
   api_key: string;
   base_url?: string;
   is_default?: boolean;
+  domain?: LlmDomain | null;
 }
 
 interface PatchBody {
@@ -41,6 +57,7 @@ interface PatchBody {
   is_active?: boolean;
   is_default?: boolean;
   api_key?: string;   // optional rotation
+  domain?: LlmDomain | null;
 }
 
 serveWithLogger(async (req, logger, supabaseAdmin) => {
@@ -92,7 +109,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         .schema("platform")
         .from("llm_provider_configs")
         .select(
-          "id, tenant_id, provider, display_name, base_url, default_model, is_active, is_default, created_at, updated_at, last_used_at",
+          "id, tenant_id, provider, display_name, base_url, default_model, domain, is_active, is_default, created_at, updated_at, last_used_at",
         )
         .eq("tenant_id", tenantId)
         .order("is_default", { ascending: false })
@@ -141,6 +158,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         display_name: body.display_name.trim().slice(0, 100),
         base_url: body.base_url?.trim() || null,
         default_model: body.default_model.trim(),
+        domain: body.domain ?? null,
         vault_secret_name: vaultSecretName,
         is_default: Boolean(body.is_default),
         created_by: user.id,
@@ -149,7 +167,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         .schema("platform")
         .from("llm_provider_configs")
         .insert(insertPayload)
-        .select("id, provider, display_name, base_url, default_model, is_active, is_default, created_at")
+        .select("id, provider, display_name, base_url, default_model, domain, is_active, is_default, created_at")
         .single();
 
       if (insertErr) {
@@ -172,6 +190,11 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       let body: PatchBody;
       try { body = await req.json(); } catch {
         return new Response(JSON.stringify({ error: "Invalid JSON body" }), { status: 400, headers: jsonHeaders });
+      }
+
+      const domainErr = validateDomain(body.domain);
+      if (domainErr) {
+        return new Response(JSON.stringify({ error: domainErr }), { status: 400, headers: jsonHeaders });
       }
 
       // Load the existing row (need vault_secret_name in case we rotate).
@@ -210,6 +233,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       if (body.base_url !== undefined) updates.base_url = body.base_url?.toString().trim() || null;
       if (typeof body.is_active === "boolean") updates.is_active = body.is_active;
       if (typeof body.is_default === "boolean") updates.is_default = body.is_default;
+      if (body.domain !== undefined) updates.domain = body.domain ?? null;
 
       let updated = null;
       if (Object.keys(updates).length > 0) {
@@ -219,7 +243,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
           .update(updates)
           .eq("id", configId)
           .eq("tenant_id", tenantId)
-          .select("id, provider, display_name, base_url, default_model, is_active, is_default, updated_at, last_used_at")
+          .select("id, provider, display_name, base_url, default_model, domain, is_active, is_default, updated_at, last_used_at")
           .single();
         if (updErr) {
           logger.error("update config failed", { error: updErr.message });
@@ -231,7 +255,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         const { data } = await (supabaseAdmin as any)
           .schema("platform")
           .from("llm_provider_configs")
-          .select("id, provider, display_name, base_url, default_model, is_active, is_default, updated_at, last_used_at")
+          .select("id, provider, display_name, base_url, default_model, domain, is_active, is_default, updated_at, last_used_at")
           .eq("id", configId)
           .single();
         updated = data;
@@ -274,13 +298,13 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       { status: 405, headers: { ...jsonHeaders, Allow: "GET, POST, PATCH, DELETE, OPTIONS" } },
     );
   } catch (e: any) {
-    logger.error("markets-llm-config unhandled", { error: e?.message ?? String(e) });
+    logger.error("llm-provider-config unhandled", { error: e?.message ?? String(e) });
     return new Response(
       JSON.stringify({ error: e?.message ?? "Internal server error" }),
       { status: 500, headers: jsonHeaders },
     );
   }
-}, "markets-llm-config");
+}, "llm-provider-config");
 
 function validateCreate(b: CreateBody): string | null {
   if (!b || typeof b !== "object") return "Body must be an object";
@@ -289,6 +313,8 @@ function validateCreate(b: CreateBody): string | null {
   if (typeof b.default_model !== "string" || !b.default_model.trim()) return "default_model is required";
   if (typeof b.api_key !== "string" || b.api_key.trim().length < 8) return "api_key is required (min 8 chars)";
   if (b.base_url !== undefined && b.base_url !== null && typeof b.base_url !== "string") return "base_url must be a string";
+  const domainErr = validateDomain(b.domain);
+  if (domainErr) return domainErr;
   return null;
 }
 
