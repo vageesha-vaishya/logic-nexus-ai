@@ -102,23 +102,43 @@ caller of that function.
 
 ---
 
-## 3. Pre-existing: `get_default_llm_config` can leak another tenant's API key
+## 3. Pre-existing: `get_default_llm_config` can leak another tenant's API key — FIXED
 
-**Not introduced by this work. Belongs with the AI/LLM audit findings.**
+**Not introduced by this work, but fixed here rather than deferred to the
+AI/LLM audit** — it turned out to be a live, directly exploitable production
+vulnerability, not just a theoretical code path.
 
-`platform.get_default_llm_config(p_tenant_id uuid DEFAULT NULL)` filters with
+`platform.get_default_llm_config(p_tenant_id uuid DEFAULT NULL)` filtered with
 `(p_tenant_id IS NULL OR c.tenant_id = p_tenant_id)`. Called with no argument it
-returns **an arbitrary tenant's configuration including the decrypted API key**,
+returned **an arbitrary tenant's configuration including the decrypted API key**,
 and it is `SECURITY DEFINER`.
 
-There is a reachable route in code: `resolve_llm_config(tenant_id: str | None =
-None)` defaults to `None`, and `jobs/signal_generator.py:869` calls
-`resolve_llm_config(state.get("tenant_id"))` — `.get()` yields `None` when the
-key is absent.
+**Confirmed exploitable, not just reachable in principle:** production's
+`information_schema.routine_privileges` showed `EXECUTE` granted to `PUBLIC`
+on this function, and `platform` is one of PostgREST's exposed schemas
+(`PGRST_DB_SCHEMAS` includes it). Any caller holding the public anon key —
+embedded in every frontend bundle, not a secret — could `POST
+.../rest/v1/rpc/get_default_llm_config` with `Content-Profile: platform` and
+an empty body and receive a random tenant's decrypted LLM provider API key.
+This did not require the `signal_generator.py:869` code path this item
+originally flagged; the REST route alone was sufficient.
 
-To be precise: **it has not been proven that `state` can lack `tenant_id`.** The
-code permits it; whether it happens needs checking. Worth confirming, along with
-who holds EXECUTE on that function.
+**Fix applied** (`20260909100000_secure_get_default_llm_config.sql`, executed
+against production the same way as item 1): a `NULL` (or omitted)
+`p_tenant_id` now returns no rows, mirroring `get_tenant_llm_config`'s
+existing guard. `EXECUTE` is revoked from `PUBLIC` and granted to
+`service_role` only, matching `get_tenant_llm_config`'s posture. Verified
+post-fix in production: `routine_privileges` now lists only `supabase_admin`
+and `service_role`; the security-assertions file
+(`get_default_llm_config_security.assertions.sql`) confirms `NULL`/omitted
+tenant returns 0 rows, a real tenant still resolves its own default
+correctly, and `PUBLIC` no longer holds `EXECUTE`.
+
+No current caller passes `NULL`, or calls this function at all — item 2's
+fix moved `services/markets-worker` (the only caller) onto
+`get_tenant_llm_config`. Signature and return type are unchanged, so this
+was a safe `CREATE OR REPLACE`, and the function is kept (not dropped)
+pending the broader AI/LLM audit's decision on its fate.
 
 ---
 
