@@ -866,7 +866,7 @@ async def score_signal(state: SignalState) -> dict:
     )
 
     try:
-        cfg = resolve_llm_config(state.get("tenant_id"))
+        cfg = resolve_llm_config(state.get("tenant_id"), domain="markets")
         from markets_worker.llm_gateway import _make_client
         _, client = _make_client(cfg)
 

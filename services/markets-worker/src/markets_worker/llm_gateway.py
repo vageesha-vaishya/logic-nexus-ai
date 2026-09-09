@@ -59,17 +59,20 @@ class ResolvedConfig:
         self.config_id = config_id
 
 
-def _resolve_from_db(tenant_id: str | None = None) -> ResolvedConfig | None:
+def _resolve_from_db(tenant_id: str | None = None, domain: str | None = None) -> ResolvedConfig | None:
     """
-    Read the default active LLM config from platform.llm_provider_configs.
-    Retrieves the API key from vault.decrypted_secrets via a single query.
-    Returns None if no config exists (falls back to env vars).
+    Read the tenant's active LLM config for `domain` from platform.llm_provider_configs,
+    falling back to the tenant-wide default (domain IS NULL) when the domain has none of
+    its own. Retrieves the API key from vault.decrypted_secrets via a single query.
+    Returns None if no config exists (falls back to env vars) or tenant_id is None —
+    get_tenant_llm_config returns no rows for a NULL tenant, unlike get_default_llm_config,
+    which would otherwise hand back an arbitrary tenant's decrypted key.
     """
     try:
         db = get_supabase()
         q = (
             db.schema("platform")
-            .rpc("get_default_llm_config", {"p_tenant_id": tenant_id})
+            .rpc("get_tenant_llm_config", {"p_tenant_id": tenant_id, "p_domain": domain})
             .execute()
         )
         if q.data and len(q.data) > 0:
@@ -79,7 +82,7 @@ def _resolve_from_db(tenant_id: str | None = None) -> ResolvedConfig | None:
                 model=row["default_model"],
                 api_key=row["api_key"],
                 base_url=row.get("base_url"),
-                config_id=row.get("id"),
+                config_id=row.get("config_id"),
             )
     except Exception as exc:
         logger.warning("llm_gateway.db_resolve_failed", error=str(exc))
@@ -107,9 +110,9 @@ def _resolve_from_env() -> ResolvedConfig:
     )
 
 
-def resolve_llm_config(tenant_id: str | None = None) -> ResolvedConfig:
-    """Return the active LLM config: DB first, env fallback."""
-    return _resolve_from_db(tenant_id) or _resolve_from_env()
+def resolve_llm_config(tenant_id: str | None = None, domain: str | None = None) -> ResolvedConfig:
+    """Return the active LLM config for `domain`: DB first, env fallback."""
+    return _resolve_from_db(tenant_id, domain) or _resolve_from_env()
 
 
 def _make_client(cfg: ResolvedConfig) -> tuple[str, Any]:
@@ -234,8 +237,11 @@ async def invoke(
     request_id = str(uuid.uuid4())
     t0 = time.monotonic()
 
-    # 1. Resolve LLM config from DB (Settings → LLM Provider) or env fallback
-    cfg = resolve_llm_config(tenant_id)
+    # 1. Resolve LLM config from DB (Settings → LLM Provider) or env fallback.
+    # task_id is '<domain>.<feature>' (e.g. "markets.research_thread"); the domain
+    # selects which of the tenant's provider configs serves this call.
+    domain = task_id.split(".")[0]
+    cfg = resolve_llm_config(tenant_id, domain)
     if model_override:
         cfg.model = model_override
 

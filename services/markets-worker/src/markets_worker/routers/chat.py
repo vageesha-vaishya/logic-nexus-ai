@@ -272,7 +272,7 @@ async def stream_chat(session_id: str, body: StreamBody, auth: Auth):
 
     # 6. Resolve LLM config (Anthropic or OpenAI-compat, whichever is configured)
     try:
-        cfg = resolve_llm_config(auth.tenant_id)
+        cfg = resolve_llm_config(auth.tenant_id, domain="markets")
     except RuntimeError as exc:
         raise HTTPException(status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
 

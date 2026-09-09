@@ -13,7 +13,7 @@ execution ledger. Nothing here blocks merging the branch.
 | --- | --- |
 | Merge to `main` | **Clear.** Final whole-branch review returned READY WITH CAVEATS, no Critical findings. |
 | Deploy | **Blocked** on item 1 — the migration has never been executed. |
-| Exposing the page to users | **Blocked** on item 2 — the markets domain control silently does nothing. |
+| Exposing the page to users | **Clear as of item 2's fix below.** |
 
 ---
 
@@ -69,9 +69,9 @@ SELECT indexname FROM pg_indexes
 
 ---
 
-## 2. `services/markets-worker/` ignores per-domain configuration (blocks release)
+## 2. `services/markets-worker/` ignores per-domain configuration — FIXED
 
-**This is the most important item here**, because it undercuts the feature's
+**Was the most important item here**, because it undercut the feature's
 purpose.
 
 `services/markets-worker/` is a **second, parallel LLM gateway**, written in
@@ -79,29 +79,32 @@ Python, that resolves provider configuration on its own and never goes through
 `supabase/functions/_shared/llm-gateway.ts`. The spec assumed a single gateway
 and did not account for it.
 
-It resolves via `platform.get_default_llm_config`
+It resolved via `platform.get_default_llm_config`
 (`src/markets_worker/llm_gateway.py:72`), reached from two live call sites:
-`jobs/signal_generator.py:869` and `routers/chat.py:275`.
+`jobs/signal_generator.py:869` and `routers/chat.py:275`, plus every task
+routed through `llm_gateway.invoke()`.
 
-That function selects `WHERE is_active AND is_default ORDER BY updated_at DESC
-LIMIT 1` with no domain filter. Before this work the unique index guaranteed one
-`is_default` row per tenant, so that was deterministic. Afterwards the guarantee
-becomes one per `(tenant, domain)`, so it would have returned an arbitrary row.
-The migration therefore adds `AND c.domain IS NULL` to keep it deterministic.
+**Fix applied:** `_resolve_from_db` / `resolve_llm_config` now take a `domain`
+argument and call `platform.get_tenant_llm_config(p_tenant_id, p_domain=...)`
+instead of `get_default_llm_config` — the same RPC the TypeScript gateway uses.
+`invoke()` derives the domain from the task ID prefix (`task_id.split(".")[0]`,
+mirroring `llm-gateway.ts`); the two direct call sites that bypass `invoke()`
+(`signal_generator.py:869`, `chat.py:275`) pass `domain="markets"` explicitly,
+since this worker only ever serves the markets domain. The row's id field also
+changed from `id` to `config_id` to match `get_tenant_llm_config`'s return
+shape.
 
-**Consequence:** the markets-worker always uses the tenant-wide default. A user
-who sets "Markets → OpenAI" in the new settings page changes nothing for market
-signals or chat — the domain the page lists first.
+No callers of `get_default_llm_config` remain in `services/markets-worker/`.
+A user who sets "Markets → OpenAI" in the settings page now changes what the
+worker uses for market signals and chat, as intended.
 
-This is **not a regression** — behaviour is byte-identical to today, and the
-`AND c.domain IS NULL` predicate was the correct call. But shipping a per-domain
-control that silently no-ops for the most prominent domain is worse than not
-shipping it.
-
-**Fix before users see the page.** Either:
-- add `p_domain text DEFAULT NULL` to `get_default_llm_config` mirroring
-  `get_tenant_llm_config`'s precedence, and have the worker pass `'markets'`; or
-- repoint the worker at `get_tenant_llm_config`, which already takes a domain.
+Side effect worth noting: `get_tenant_llm_config` returns no rows for a NULL
+tenant, whereas `get_default_llm_config(NULL)` — item 3 below — would hand
+back an arbitrary tenant's decrypted key. `signal_generator.py:869` passes
+`state.get("tenant_id")`, which item 3 flagged as possibly `None`; that
+specific call site no longer has the leak, since it no longer calls
+`get_default_llm_config` at all. Item 3 itself is unchanged for any other
+caller of that function.
 
 ---
 
