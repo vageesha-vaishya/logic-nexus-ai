@@ -155,11 +155,27 @@ documented decisions.
 | `ProviderCard` uses a native `confirm()` | same | **Fixed.** Replaced with a controlled `AlertDialog` (`@/components/ui/alert-dialog`), matching the pattern already used in `CustomRoles.tsx`. |
 | Re-exports in `markets/types.ts` and `markets/index.ts` have zero consumers | `src/features/markets/` | **Fixed — removed.** Re-confirmed zero consumers anywhere in the codebase (both the LLM types re-export in `types.ts` and the LLM hooks re-export in `index.ts`) before deleting. |
 
-## 5. Explicitly out of scope, unchanged
+## 5. Explicitly out of scope, unchanged — except one, resolved
 
-- **`LlmGatewayAdminPage`'s hardcoded 503.** It points at `services/llm-gateway`,
-  which was never deployed. Deciding that service's fate is audit sub-project B
-  and must come first.
+- **`LlmGatewayAdminPage`'s hardcoded 503 — RESOLVED (`643c1d1c`).** The audit
+  (`docs/audits/2026-09-05-ai-llm-audit-findings.md`, "sub-project B") already
+  decided this: keep the live `_shared/llm-gateway.ts`, retire
+  `services/llm-gateway` (6,726 LOC, zero deployment footprint anywhere) and
+  everything downstream of it. Executed in full: deleted the service; deleted
+  the 16 edge functions whose only backend was the never-set
+  `LLM_GATEWAY_URL` (`llm-score-lead`, `llm-draft-reply`, `llm-aog-triage`,
+  and 13 more — none were ever registered in `function_importers.ts`,
+  `verify_jwt_map.ts`, `config.toml`, or any deploy manifest, confirmed
+  dormant rather than merely undeployed); deleted their 15 frontend
+  hooks/UI sections (real features — lead-scoring "AI rescore", draft-reply
+  assist, etc. — that had always 503'd, not dead code); deleted
+  `LlmGatewayAdminPage` itself, whose four tabs (Prompts/Experiments/Audit
+  log/Budgets) had no data source once the service is gone. Migrating those
+  16 features onto the live gateway instead of deleting them was considered
+  and explicitly declined for this pass — a separate, larger project if
+  they're wanted. Verified: typecheck and lint clean; the two pre-existing
+  test files touching edited components had *more* failures on the
+  unmodified baseline (52 vs. 14 after), confirmed via `git stash`.
 - **The `platform.*` → `core.*` lift.**
 - **Per-task overrides** (e.g. `markets.daily_brief` on a different model from
   `markets.research_thread`).

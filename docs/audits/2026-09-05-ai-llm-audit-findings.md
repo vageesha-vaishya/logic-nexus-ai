@@ -194,8 +194,10 @@ Ordered by severity × how many other findings each unblocks.
 ### P1 — Consolidation (sub-project B)
 
 4. **Pick one gateway and mean it** (F-1.1, F-1.2, F-2.5, F-5.5). The decision is genuinely open: harden the live 863-LOC edge module, or deploy the governed 6,726-LOC service and migrate onto it. W1's recommendation is to harden what's live rather than assume the bigger implementation is the real one. Whichever is chosen, the other two should be retired — three components named "LLM gateway" is a standing source of exactly the confusion this audit had to untangle.
-5. **Migrate the 15 direct-call functions onto the chosen path** (F-2.3, F-2.4, F-2.6).
-6. **Fix `LLM_GATEWAY_AUTH_MODE` to default closed** (F-1.4) before anything deploys that service.
+
+   **Remediated 2026-09-09 (`643c1d1c`), for `services/llm-gateway` — F-1.1, F-1.2, F-1.4 (moot), F-1.6 (moot), F-4.1, F-5.5.** Took W1's recommendation: kept `_shared/llm-gateway.ts` as the sole live gateway, deleted `services/llm-gateway` in full (never deployed anywhere, per F-4.1), deleted the 16 edge functions whose only backend was the never-set `LLM_GATEWAY_URL` (F-2.5's "whole pathway"), their 15 frontend hooks/UI sections, and `LlmGatewayAdminPage` (F-5.5's hardcoded-503 dashboard — its four tabs had no other data source). Migrating those 16 functions onto `_shared/llm-gateway.ts` instead of deleting them was considered and explicitly declined for this pass; F-1.2 and F-1.6 (no PII redaction, no erasure path) are now moot for the deleted service but still describe the live gateway's actual governance gap, which is unresolved. `markets-worker/llm_gateway.py` (the third named gateway) is untouched by this remediation.
+5. **Migrate the 15 direct-call functions onto the chosen path** (F-2.3, F-2.4, F-2.6). **Not part of the 2026-09-09 remediation** — this is the shadow-AI bucket (direct provider calls, no shared layer), a distinct set of functions from the 16 `LLM_GATEWAY_URL`-dependent ones deleted above. Still open.
+6. **Fix `LLM_GATEWAY_AUTH_MODE` to default closed** (F-1.4) before anything deploys that service. **Moot as of 2026-09-09** — the service this guarded is deleted.
 
 ### P2 — Observability and cost (sub-project D)
 
