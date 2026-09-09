@@ -1,0 +1,23 @@
+-- Root-cause fix — platform.audit_log inserts fail with "permission
+-- denied for sequence audit_log_id_seq" for service_role. Third instance
+-- of the identical bug already fixed for platform.llm_usage
+-- (20260909230000) and platform.access_log (20260909231500): table-level
+-- privileges for service_role exist (INSERT/SELECT/etc, confirmed live),
+-- but the bigserial id column's underlying sequence was never granted
+-- USAGE separately -- the two are distinct privileges in Postgres.
+--
+-- platform.audit_log is the table logAudit() (_shared/audit.ts) writes to
+-- -- the general-purpose mutation-audit trail used by execute-sql-external,
+-- push-migrations-to-target, and others fixed earlier this session. This is
+-- very likely the actual root cause of F-5.4/F-5.8 ("2 of 27 instrumented
+-- functions ever wrote a row" / "the general-purpose mutation-audit table
+-- is also effectively unused") -- not that most call sites never call
+-- logAudit(), but that the calls that did try silently failed here.
+--
+-- A broader sweep of platform/core sequences (done alongside the
+-- access_log fix) found this same gap on core.audit_log_id_seq and
+-- core.llm_usage_id_seq too -- those are dead/legacy tables with zero
+-- references anywhere in the codebase (confirmed via full-repo grep) and
+-- are deliberately NOT granted here.
+
+GRANT USAGE, SELECT ON SEQUENCE platform.audit_log_id_seq TO service_role;
