@@ -1,6 +1,10 @@
 // Deno Edge Function: get-opportunity-full
-// Returns complete opportunity data with nested account and contact info
-// Uses service role to bypass tenant filters for quote editing scenarios
+// Returns complete opportunity data with nested account and contact info.
+// Uses the service-role client so the accounts/contacts join always
+// resolves (RLS on those tables can otherwise make the join unreliable),
+// but that also means the tenant boundary must be checked explicitly in
+// code -- see the requester-role check below. "Bypass tenant filters" was
+// never meant to mean "any tenant can read any other tenant's data."
 
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
@@ -37,12 +41,36 @@ serveWithLogger(async (req, logger, supabase) => {
       });
     }
 
+    // requireAuth only checks *some* user is authenticated; the service-role
+    // client this uses (see file header) bypasses RLS entirely, and the
+    // fetch below was scoped only by opportunity id, so any authenticated
+    // user could read another tenant's opportunity name plus its linked
+    // account name and contact first/last name -- resolve the caller's
+    // tenant scope and check the fetched row against it before returning.
+    const { data: requesterRoles, error: rolesError } = await supabase
+      .from("user_roles")
+      .select("role, tenant_id")
+      .eq("user_id", user.id);
+    if (rolesError) {
+      logger.error(`Failed to resolve requester roles for ${user.id}: ${rolesError.message}`);
+      return new Response(JSON.stringify({ error: "Forbidden: cannot resolve requester role scope" }), {
+        status: 403,
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    }
+    const roles = requesterRoles || [];
+    const isPlatformAdmin = roles.some((r: any) => r.role === "platform_admin");
+    const allowedTenantIds = isPlatformAdmin
+      ? null
+      : new Set(roles.map((r: any) => r.tenant_id).filter((tid: string | null) => !!tid));
+
     // Fetch opportunity with account and contact data
     const { data, error } = await supabase
       .from("opportunities")
       .select(`
         id,
         name,
+        tenant_id,
         account_id,
         contact_id,
         accounts:account_id (
@@ -61,6 +89,13 @@ serveWithLogger(async (req, logger, supabase) => {
     if (error) {
       logger.error(`Database error fetching opportunity ${id}: ${error.message}`);
       throw error;
+    }
+
+    if (data && allowedTenantIds && !allowedTenantIds.has((data as any).tenant_id)) {
+      return new Response(JSON.stringify({ error: "Forbidden: opportunity outside caller scope" }), {
+        status: 403,
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(JSON.stringify(data || null), {
