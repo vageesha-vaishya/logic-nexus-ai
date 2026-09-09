@@ -1,0 +1,25 @@
+-- Root-cause fix — platform.access_log inserts fail with "permission
+-- denied for sequence access_log_id_seq" for service_role, same class of
+-- bug as platform.llm_usage (20260909230000), found by the same
+-- investigation: every request through serveWithLogger() attempts a
+-- fire-and-forget access-log write (_shared/logger.ts -> logAccess() in
+-- _shared/audit.ts), and every one of those writes has been silently
+-- failing and swallowed (console.warn only, never surfaced).
+--
+-- platform.access_log.id is `bigint DEFAULT nextval('platform.access_log_id_seq')`
+-- (20260515161737_platform_schema_bootstrap.sql). That migration's GRANTs
+-- section (line 480+) grants service_role full table privileges (present
+-- live, likely applied via an ALTER DEFAULT PRIVILEGES rule or bootstrap
+-- step outside migration history -- not present in this file's own GRANT
+-- statements either) but never the sequence -- the exact same gap as
+-- llm_usage_id_seq. This one likely explains F-5.8 ("the general-purpose
+-- mutation-audit table is also effectively unused") for access_log
+-- specifically, and probably accounts for a meaningful share of why
+-- access-log data has been so sparse.
+--
+-- A broader sweep found the same gap on platform.audit_log_id_seq,
+-- platform.integration_log_id_seq, core.audit_log_id_seq, and
+-- core.llm_usage_id_seq -- not fixed here, scoped to access_log only per
+-- this fix's request; flagged as a follow-up.
+
+GRANT USAGE, SELECT ON SEQUENCE platform.access_log_id_seq TO service_role;
