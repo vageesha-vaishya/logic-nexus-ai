@@ -449,6 +449,30 @@ export class LlmGatewayError extends Error {
   }
 }
 
+// Every provider call below goes through this instead of a bare fetch().
+// Without it, a slow provider (e.g. a self-hosted rig under load) just hangs
+// until the upstream proxy (Cloudflare, ~100-125s here) kills the connection
+// and hands back an opaque HTML 524 page as the "error" — ugly, slow to
+// surface, and indistinguishable from a real outage. Failing fast with a
+// clean timeout error lets callers show the user something meaningful (and
+// do it well within the proxy's own window) instead of waiting on it.
+const LLM_REQUEST_TIMEOUT_MS = 55_000;
+
+async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = LLM_REQUEST_TIMEOUT_MS): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...init, signal: controller.signal });
+  } catch (e: any) {
+    if (e?.name === "AbortError") {
+      throw new LlmGatewayError("timeout", `LLM provider did not respond within ${Math.round(timeoutMs / 1000)}s`, 504);
+    }
+    throw e;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 interface ResolvedConfig {
   provider: LlmProvider;
   model: string;
@@ -632,7 +656,7 @@ async function callAnthropic(
     system,
     messages: [{ role: "user", content: user }],
   };
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method: "POST",
     headers: {
       "x-api-key": cfg.apiKey,
@@ -723,7 +747,7 @@ async function callOpenAiCompatible(
     ],
   };
 
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method: "POST",
     headers,
     body: JSON.stringify(body),
@@ -799,7 +823,7 @@ async function callGemini(
     body.systemInstruction = { parts: [{ text: system }] };
   }
 
-  const resp = await fetch(url, {
+  const resp = await fetchWithTimeout(url, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify(body),
@@ -959,7 +983,7 @@ export async function callLLMConversation(
           system,
           messages:   validMessages,
         };
-        const resp = await fetch(url, {
+        const resp = await fetchWithTimeout(url, {
           method: "POST",
           headers: {
             "x-api-key": config.apiKey,
@@ -997,7 +1021,7 @@ export async function callLLMConversation(
         const baseUrl = rawBase.replace(/\/v1\/?$/, "");
         const url = baseUrl + "/v1/chat/completions";
         const oaiMessages = [{ role: "system", content: system }, ...validMessages];
-        const resp = await fetch(url, {
+        const resp = await fetchWithTimeout(url, {
           method: "POST",
           headers: {
             "Authorization": `Bearer ${config.apiKey}`,
@@ -1033,7 +1057,7 @@ export async function callLLMConversation(
         if (system && system.trim().length > 0) {
           body.systemInstruction = { parts: [{ text: system }] };
         }
-        const resp = await fetch(url, {
+        const resp = await fetchWithTimeout(url, {
           method: "POST",
           headers: { "content-type": "application/json" },
           body: JSON.stringify(body),

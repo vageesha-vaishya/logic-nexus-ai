@@ -35,8 +35,18 @@ export function useAiAdvisor() {
         return { data: null, error };
     }
 
-    // Fallback: If network fails (e.g. "Failed to fetch"), return mock data
-    if (action === 'generate_smart_quotes') {
+    // Fallback: ONLY for a genuine network failure (the request never reached
+    // the Edge Function at all — FunctionsFetchError). A response that DID
+    // reach the function and came back as an error (FunctionsHttpError — e.g.
+    // the LLM gateway timing out, or the provider erroring) must NOT be
+    // masked here: it needs to propagate as a real, visible error so the
+    // caller (useRateFetching's "AI Generation Failed" toast) can show it,
+    // instead of silently presenting fabricated mock quotes as if they were
+    // real AI results.
+    const isNetworkFailure =
+        error.name === 'FunctionsFetchError' ||
+        /failed to fetch|failed to send a request/i.test(error.message || '');
+    if (isNetworkFailure && action === 'generate_smart_quotes') {
             logger.warn("[AI-Advisor] Network error detected. Returning MOCK data for Smart Quotes.");
             const mockData = {
                 options: [
