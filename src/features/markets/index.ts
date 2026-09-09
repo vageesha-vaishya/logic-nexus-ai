@@ -9,12 +9,6 @@ export { useBriefs, useGenerateBrief } from "./hooks/useBriefs";
 export { useNewsEvents } from "./hooks/useNewsEvents";
 export { NewsPanel } from "./components/NewsPanel";
 export {
-  useLlmConfigs,
-  useSaveLlmConfig,
-  useDeleteLlmConfig,
-  defaultModelFor,
-} from "@/features/admin/llm-providers/hooks/useLlmConfigs";
-export {
   useWatchlists,
   useWatchlist,
   useCreateWatchlist,

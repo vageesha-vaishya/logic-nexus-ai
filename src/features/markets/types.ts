@@ -62,16 +62,6 @@ export interface MarketsApiErrorBody {
   code?: string;
 }
 
-// ─── LLM provider configs ──────────────────────────────────────────────
-// Moved to features/admin/llm-providers (platform-wide, not markets-scoped).
-// Re-exported here for the markets barrel's existing consumers.
-export type {
-  LlmProviderKind,
-  LlmProviderConfig,
-  CreateLlmConfigInput,
-  UpdateLlmConfigInput,
-} from "@/features/admin/llm-providers/types";
-
 // ─── Briefs (AI-generated portfolio analyses) ───────────────────────────
 
 export interface BriefSource {
