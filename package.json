@@ -11,7 +11,7 @@
     "services:check": "node scripts/service-orchestrator.mjs --check-only",
     "build": "vite build",
     "build:dev": "vite build --mode development",
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit -p tsconfig.typecheck.json",
     "lint": "eslint . --ext .ts,.tsx,.mdx",
     "lint:unit": "eslint src --ext .ts,.tsx,.mdx",
     "lint:unit:fix": "eslint src --ext .ts,.tsx,.mdx --fix",

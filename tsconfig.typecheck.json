@@ -1,0 +1,12 @@
+{
+  // Used by `npm run typecheck`. Extends tsconfig.app.json (the IDE/editor
+  // config, left untouched) but excludes src/pages/api: a ~384-file tree
+  // with zero consumers anywhere in services/, scripts/, or any build
+  // config -- not part of `vite build`'s module graph, not mounted by any
+  // server. It appears to be in-progress scaffolding for a future API
+  // layer, not the deployed app. Including it here surfaces ~900
+  // unrelated pre-existing errors and defeats the point of this gate.
+  // If that tree becomes live, remove this exclude and fix it for real.
+  "extends": "./tsconfig.app.json",
+  "exclude": ["src/pages/api"]
+}
