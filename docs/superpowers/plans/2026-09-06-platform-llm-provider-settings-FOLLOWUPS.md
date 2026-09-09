@@ -188,7 +188,20 @@ documented decisions.
   deploy failed. Fixed in `a66115e0`. **`npm run typecheck` as documented
   in this repo's `CLAUDE.md` is not a reliable gate for this kind of
   dangling-reference bug; `npx tsc --noEmit -p tsconfig.app.json` or an
-  actual `vite build` is.** Worth fixing the npm script itself separately.
+  actual `vite build` is.**
+
+  **Correction:** `tsc -p tsconfig.app.json` is not simply a drop-in fix
+  for the npm script either — run directly, it reports **935 pre-existing
+  errors**, almost all unrelated to this work: missing `next` module and
+  missing `_utils/*` imports under `src/pages/api/v1/` and
+  `src/pages/api/v2/`, which read as dead Next.js-style API route stubs
+  that `vite build` never reaches (Vite has no notion of a `pages/api`
+  convention) and so were never gated on. Repointing the npm script at
+  that config would immediately surface this backlog as a hard failure
+  for everyone. Fixing the gate properly is a real, separate task — likely
+  either `vite build` in CI, or triaging/excluding the dead API stubs from
+  `tsconfig.app.json`'s `include` — not the one-line change it first
+  looked like.
 - **The `platform.*` → `core.*` lift.**
 - **Per-task overrides** (e.g. `markets.daily_brief` on a different model from
   `markets.research_thread`).
