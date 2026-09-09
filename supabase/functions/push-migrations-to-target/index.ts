@@ -3,6 +3,8 @@ import { Client } from "postgres";
 import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
+import { logAudit, extractIp, extractRequestId } from '../_shared/audit.ts';
+import { assertExternalHostAllowed } from '../_shared/ssrf-guard.ts';
 
 declare const Deno: any;
 
@@ -228,6 +230,28 @@ serveWithLogger(async (req, logger, supabase) => {
 
     logger.info(`[push-migrations-to-target] Processing ${migrations.length} migrations (dryRun: ${dryRun})`);
     logger.info(`[push-migrations-to-target] Connecting to ${connConfig.hostname}:${connConfig.port}/${connConfig.database}`);
+
+    // This tool exists to push migrations onto a tenant's own external
+    // database; it must never be pointed at this platform's own internal
+    // network (SSRF / lateral movement if a platform_admin session is ever
+    // compromised). See _shared/ssrf-guard.ts.
+    await assertExternalHostAllowed(connConfig.hostname);
+
+    // Accountability: this is a platform_admin tool that can run arbitrary
+    // migration SQL against an arbitrary database -- record who did what,
+    // against which host, without logging credentials or SQL contents.
+    logAudit(supabase, {
+      requestId: extractRequestId(req),
+      domain: 'platform-admin',
+      op: 'push-migrations-to-target',
+      userId: user.id,
+      actedBy: user.id,
+      resourceType: 'external_database',
+      resourceId: `${connConfig.hostname}:${connConfig.port}/${connConfig.database}`,
+      action: dryRun ? 'dry_run' : 'apply',
+      ip: extractIp(req),
+      userAgent: req.headers.get('user-agent'),
+    });
 
     // Connect to target database with explicit options
     const client = new Client({

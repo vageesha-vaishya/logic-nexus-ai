@@ -3,6 +3,8 @@ import { Pool } from "https://deno.land/x/postgres@v0.17.0/mod.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { requireAuth } from '../_shared/auth.ts';
 import { serveWithLogger } from '../_shared/logger.ts';
+import { logAudit, extractIp, extractRequestId } from '../_shared/audit.ts';
+import { assertExternalHostAllowed } from '../_shared/ssrf-guard.ts';
 
 declare const Deno: any;
 
@@ -108,6 +110,23 @@ serveWithLogger(async (req, logger, adminSupabase) => {
           );
         }
 
+        // This tool exists to reach a tenant's own external database; it
+        // must never be pointed at this platform's own internal network
+        // (SSRF / lateral movement if a platform_admin session is ever
+        // compromised). See _shared/ssrf-guard.ts.
+        try {
+          await assertExternalHostAllowed(connection.host);
+        } catch (guardErr: any) {
+          return new Response(
+            JSON.stringify({
+              success: false,
+              message: guardErr?.message || 'Refusing to connect to that host',
+              code: 'HOST_NOT_ALLOWED',
+            }),
+            { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
         poolConfig = {
           hostname: connection.host,
           port: connection.port || 5432,
@@ -122,7 +141,23 @@ serveWithLogger(async (req, logger, adminSupabase) => {
         };
         logger.info(`Connecting to ${connection.host}:${connection.port}/${connection.database}`);
     }
-    
+
+    // Accountability: this is a platform_admin tool that can run arbitrary
+    // SQL against an arbitrary database -- record who did what, against
+    // which host, without logging credentials or statement contents.
+    logAudit(adminSupabase, {
+      requestId: extractRequestId(req),
+      domain: 'platform-admin',
+      op: 'execute-sql-external',
+      userId: user.id,
+      actedBy: user.id,
+      resourceType: 'external_database',
+      resourceId: body.useLocalDb ? 'local' : `${connection?.host}:${connection?.port || 5432}/${connection?.database}`,
+      action,
+      ip: extractIp(req),
+      userAgent: req.headers.get('user-agent'),
+    });
+
     pool = new Pool(poolConfig, 1);
     client = await pool.connect();
 
