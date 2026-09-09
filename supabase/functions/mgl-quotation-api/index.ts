@@ -97,6 +97,33 @@ serveWithLogger(async (req, logger, adminSupabase) => {
   const tenantId = body?.tenantId;
   if (!tenantId) return json(req, 400, { error: 'tenantId is required' });
 
+  // tenantId is client-supplied; every query below uses adminSupabase (the
+  // service-role client, which bypasses RLS), so nothing else stands between
+  // an arbitrary tenantId and full read/write/delete on that tenant's rate
+  // options, templates, and history unless checked here. Mirrors
+  // create-franchise's admin-scope check: platform_admin may target any
+  // tenant, everyone else only a tenant they actually hold a role in.
+  const { data: requesterRoles, error: requesterRolesError } = await adminSupabase
+    .from('user_roles')
+    .select('role, tenant_id')
+    .eq('user_id', user.id);
+
+  if (requesterRolesError) {
+    logger.error('Failed to resolve requester roles', { error: requesterRolesError, userId: user.id });
+    return json(req, 403, { error: 'Forbidden: cannot resolve requester role scope' });
+  }
+
+  const roles = requesterRoles || [];
+  const isPlatformAdmin = roles.some((r: any) => r.role === 'platform_admin');
+  if (!isPlatformAdmin) {
+    const allowedTenantIds = new Set(
+      roles.map((r: any) => r.tenant_id).filter((id: string | null) => !!id),
+    );
+    if (!allowedTenantIds.has(tenantId)) {
+      return json(req, 403, { error: 'Forbidden: target tenant outside caller scope' });
+    }
+  }
+
   const logAudit = async (meta: Record<string, unknown>) => {
     await adminSupabase.from('quotation_audit_logs').insert({
       tenant_id: tenantId,
