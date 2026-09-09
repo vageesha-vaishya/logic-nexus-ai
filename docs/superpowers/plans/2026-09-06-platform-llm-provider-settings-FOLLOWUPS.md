@@ -12,60 +12,54 @@ execution ledger. Nothing here blocks merging the branch.
 | Gate | Status |
 | --- | --- |
 | Merge to `main` | **Clear.** Final whole-branch review returned READY WITH CAVEATS, no Critical findings. |
-| Deploy | **Blocked** on item 1 — the migration has never been executed. |
+| Deploy | **Clear as of item 1's execution below.** |
 | Exposing the page to users | **Clear as of item 2's fix below.** |
 
 ---
 
-## 1. The migration is unexecuted (blocks deploy)
+## 1. The migration is unexecuted — FIXED (executed against production)
 
-Docker was unavailable for the whole implementation session, so **every line of
-SQL in this feature is unverified by running**. It has had careful review and
-nothing more. The spec's own success criterion "the SQL assertions above hold"
-is therefore unmet.
+Docker was never available in any implementation session, so the migration
+was applied directly against the live self-hosted Postgres (the VPS
+container behind `https://supabase.sosservices.online`, not a local/dev
+stack) rather than via `npm run supabase:db:reset`.
 
-Failure modes were deliberately made loud — `DROP INDEX`, `DROP CONSTRAINT` and
-`DROP FUNCTION` all omit `IF EXISTS`, so a name mismatch aborts the migration
-rather than half-applying it — but that is a design choice, not evidence.
+**Pre-flight read-only checks, all confirmed to match the migration's
+assumptions before anything was run:**
 
-**Run when Docker is available:**
+- Constraint: `llm_provider_configs_tenant_id_provider_display_name_key`,
+  `UNIQUE (tenant_id, provider, display_name)` — matched.
+- Index: `llm_provider_configs_one_default_per_tenant` — present, matched.
+- Trigger: `trg_llm_configs_enforce_default` — present, matched.
+- Function: `platform.get_tenant_llm_config(uuid,text)` (the old 2-arg form)
+  — present, matched the `DROP FUNCTION` signature in the migration.
+- `public.tenants` had 16 rows — enough for the assertions fixture.
+- `domain` column did not yet exist — confirmed nothing had been applied.
 
-```bash
-npm run supabase:start
-npm run supabase:db:reset
-psql "postgresql://postgres:postgres@127.0.0.1:54322/postgres" -v ON_ERROR_STOP=1 \
-  -f supabase/migrations/tests/llm_provider_configs_domain.assertions.sql
-```
+**Execution, in order:**
+1. Ran the assertions file first — failed as expected with `column "domain"
+   of relation "llm_provider_configs" does not exist` (exit 3). Rolled back
+   automatically (wrapped in `BEGIN`/`ROLLBACK`), confirming the harness
+   works and touches nothing.
+2. Applied the migration wrapped in an explicit `BEGIN`/`COMMIT` — every
+   statement succeeded (`ALTER TABLE`, `DROP INDEX`, `CREATE INDEX` ×3,
+   `CREATE FUNCTION` ×2, `DROP FUNCTION`, `REVOKE`, `GRANT`, `COMMENT` ×2)
+   and committed.
+3. Re-ran the assertions file — all 6 passed: `NOTICE: All LLM domain
+   assertions passed.`
+4. Confirmed exactly one overload remains:
+   `platform.get_tenant_llm_config(uuid,text,text)`. No stale 2-arg version.
 
-Expect `NOTICE: All LLM domain assertions passed.` and exit code 0.
+One wrinkle not anticipated by the plan: `platform.llm_provider_configs` is
+owned by `supabase_admin`, not `postgres` — the migration's DDL
+(`ALTER TABLE`, `DROP CONSTRAINT`) failed with `must be owner of table
+llm_provider_configs` until reconnected as `supabase_admin`. Worth noting
+for any future migration touching this table on this instance.
 
-**The assertions need at least one row in `public.tenants`.** A clean
-`db:reset` with no seed data aborts with "No tenant rows available to run
-assertions against". That is a runbook gap, not a bug — seed a tenant first.
-
-**Then confirm no function overload survived:**
-
-```sql
-SELECT p.oid::regprocedure
-  FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
- WHERE n.nspname = 'platform' AND p.proname = 'get_tenant_llm_config';
-```
-
-Expect exactly one row: `platform.get_tenant_llm_config(uuid,text,text)`. Two
-rows means the drop missed and PostgREST's RPC dispatch is ambiguous between a
-two-arg and three-arg `SECURITY DEFINER` function that returns decrypted API
-keys.
-
-**Before applying to production**, confirm both object names really match, since
-that database was reconstituted from prod rather than built from this
-repository's migrations:
-
-```sql
-SELECT conname FROM pg_constraint
- WHERE conrelid = 'platform.llm_provider_configs'::regclass AND contype = 'u';
-SELECT indexname FROM pg_indexes
- WHERE schemaname = 'platform' AND tablename = 'llm_provider_configs';
-```
+Temp files used for the run (`/tmp/migration.sql`, `/tmp/assertions.sql`
+inside the Postgres container, and their staging copies on the VPS host)
+were deleted after verification. Nothing was left in the shared VPS's
+filesystem.
 
 ---
 
