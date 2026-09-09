@@ -1,6 +1,8 @@
 // Deno Edge Function: get-contact-label
 // Returns minimal label information (id, first_name, last_name) for a contact id
-// Uses service role to bypass tenant filters, but only exposes safe fields
+// Uses service role to bypass tenant filters, but only exposes safe fields.
+// "Bypass tenant filters" was never meant to mean "any tenant can read any
+// other tenant's contact name" -- the tenant boundary is checked in code.
 
 import { getCorsHeaders } from "../_shared/cors.ts";
 import { requireAuth } from "../_shared/auth.ts";
@@ -39,9 +41,28 @@ serveWithLogger(async (req, logger, supabase) => {
       });
     }
 
+    // requireAuth only checks *some* user is authenticated, so the tenant
+    // boundary must be checked explicitly here.
+    const { data: requesterRoles, error: rolesError } = await supabase
+      .from("user_roles")
+      .select("role, tenant_id")
+      .eq("user_id", user.id);
+    if (rolesError) {
+      logger.error(`Failed to resolve requester roles for ${user.id}:`, { error: rolesError });
+      return new Response(JSON.stringify({ error: "Forbidden: cannot resolve requester role scope" }), {
+        status: 403,
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    }
+    const roles = requesterRoles || [];
+    const isPlatformAdmin = roles.some((r: any) => r.role === "platform_admin");
+    const allowedTenantIds = isPlatformAdmin
+      ? null
+      : new Set(roles.map((r: any) => r.tenant_id).filter((tid: string | null) => !!tid));
+
     const { data, error } = await supabase
-      .from("contacts")
-      .select("id, first_name, last_name, account_id")
+      .from("v_contacts")
+      .select("id, first_name, last_name, account_id, tenant_id")
       .eq("id", id)
       .maybeSingle();
 
@@ -56,6 +77,13 @@ serveWithLogger(async (req, logger, supabase) => {
     if (!data) {
       return new Response(JSON.stringify({ id, first_name: null, last_name: null, account_id: null }), {
         status: 200,
+        headers: { ...headers, "Content-Type": "application/json" },
+      });
+    }
+
+    if (allowedTenantIds && !allowedTenantIds.has(data.tenant_id)) {
+      return new Response(JSON.stringify({ error: "Forbidden: contact outside caller scope" }), {
+        status: 403,
         headers: { ...headers, "Content-Type": "application/json" },
       });
     }
