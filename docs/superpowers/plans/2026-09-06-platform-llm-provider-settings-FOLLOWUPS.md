@@ -144,15 +144,16 @@ pending the broader AI/LLM audit's decision on its fate.
 
 ## 4. Deferred minors
 
-None of these block anything.
+None of these blocked anything. Three of five fixed (`777f7725`); two left as
+documented decisions.
 
-| Item | Where | Note |
+| Item | Where | Status |
 | --- | --- | --- |
-| `core.llm_provider_configs` is an unconsumed mirror still carrying the old per-tenant-only default index and an un-domain-scoped trigger | `supabase/migrations/20260528130400_create_core_llm.sql` | Inherits this work whenever the `core.*` lift runs. Zero readers, zero references today. |
-| Natural key demoted from a named constraint to a plain unique index | `supabase/migrations/20260906120000_…sql` | `ON CONFLICT ON CONSTRAINT` no longer resolves; inference must spell out the columns. No upsert caller exists in the repo. |
-| `DomainSection` and `ProviderCard` both render `<h3>` | `src/features/admin/llm-providers/components/` | Headings collide at the same level. Accessibility smell, no functional impact. |
-| `ProviderCard` uses a native `confirm()` | same | Pre-existing, moved verbatim. |
-| Re-exports in `markets/types.ts` and `markets/index.ts` have zero consumers | `src/features/markets/` | The plan mandated them for compatibility that turned out not to exist. Removing them is probably right but contradicts plan text, so it was left as an explicit decision. |
+| `core.llm_provider_configs` is an unconsumed mirror still carrying the old per-tenant-only default index and an un-domain-scoped trigger | `supabase/migrations/20260528130400_create_core_llm.sql` | **Left as-is.** It belongs to a separate, larger, deliberately-staged "core.\* lift" project (its own RLS/partitioning/grants). Retrofitting domain-scoping by editing this already-applied historical migration would be the wrong way to evolve it — that project should do it via its own new migration when it activates. Still zero readers, zero references today. |
+| Natural key demoted from a named constraint to a plain unique index | `supabase/migrations/20260906120000_…sql` | **No action needed.** This is an informational note about a behavior change (`ON CONFLICT ON CONSTRAINT` no longer resolves), not a defect — no upsert caller exists in the repo. |
+| `DomainSection` and `ProviderCard` both render `<h3>` | `src/features/admin/llm-providers/components/` | **Fixed.** `ProviderCard`'s title is now a plain `<h4>` (matching `CardTitle`'s styling) since it nests inside `DomainSection`'s `CardTitle` (`h3`). `DomainSection` is unchanged. |
+| `ProviderCard` uses a native `confirm()` | same | **Fixed.** Replaced with a controlled `AlertDialog` (`@/components/ui/alert-dialog`), matching the pattern already used in `CustomRoles.tsx`. |
+| Re-exports in `markets/types.ts` and `markets/index.ts` have zero consumers | `src/features/markets/` | **Fixed — removed.** Re-confirmed zero consumers anywhere in the codebase (both the LLM types re-export in `types.ts` and the LLM hooks re-export in `index.ts`) before deleting. |
 
 ## 5. Explicitly out of scope, unchanged
 
