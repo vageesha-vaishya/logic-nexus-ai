@@ -8,7 +8,6 @@
 // page is scoped to ONE concern — the directives × this aircraft
 // applicability matrix.
 
-import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -38,21 +37,13 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 
 import { supabase } from '@/integrations/supabase/client';
-import { DirectiveApplicabilityCheck } from '@/features/module-amro/components/mpd/DirectiveApplicabilityCheck';
 import {
   useAircraftApplicability,
   type ApplicabilityVerdict,
   type ApplicabilityStatus,
 } from '../hooks/useDirectiveApplicabilityVerdicts';
-import type {
-  DirectiveInput,
-  AircraftInput,
-} from '../hooks/useDirectiveApplicability';
 
 interface AircraftRow {
   id: string;
@@ -60,20 +51,6 @@ interface AircraftRow {
   manufacturer: string | null;
   model: string | null;
   serial_number: string | null;
-}
-
-interface DirectiveRow {
-  id: string;
-  directive_no: string | null;
-  code_form_no: string | null;
-  description: string | null;
-  ata_code: string | null;
-  applicability: string | null;
-  method_of_compliance: string | null;
-  effective_date: string | null;
-  issuing_authority?: string | null;
-  kind?: string | null;
-  relevant_ata_chapters?: string[] | null;
 }
 
 function confidenceTone(c: number): 'destructive' | 'default' | 'secondary' {
@@ -165,9 +142,6 @@ function VerdictRow({ verdict }: { verdict: ApplicabilityVerdict }) {
 
 export default function AmroAircraftApplicabilityPage() {
   const { id } = useParams<{ id: string }>();
-  const [directiveNo, setDirectiveNo] = useState('');
-  const [selectedDirective, setSelectedDirective] = useState<DirectiveRow | null>(null);
-  const [directiveLookupError, setDirectiveLookupError] = useState<string | null>(null);
 
   const aircraftQuery = useQuery({
     queryKey: ['amro', 'aircraft', id],
@@ -189,50 +163,6 @@ export default function AmroAircraftApplicabilityPage() {
 
   const aircraft = aircraftQuery.data;
   const verdicts = verdictsQuery.data?.records ?? [];
-
-  const handleLookupDirective = async () => {
-    setDirectiveLookupError(null);
-    const q = directiveNo.trim();
-    if (!q) return;
-    const { data, error } = await supabase
-      .from('directives')
-      .select('id, directive_no, code_form_no, description, ata_code, applicability, method_of_compliance, effective_date, issuing_authority, kind, relevant_ata_chapters')
-      .or(`directive_no.eq.${q},code_form_no.eq.${q}`)
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      setDirectiveLookupError(error.message);
-      return;
-    }
-    if (!data) {
-      setDirectiveLookupError(`No directive with number ${q}`);
-      setSelectedDirective(null);
-      return;
-    }
-    setSelectedDirective(data as DirectiveRow);
-  };
-
-  const directiveInputForPanel: DirectiveInput | null = selectedDirective ? {
-    issuing_authority: selectedDirective.issuing_authority ?? 'OTHER',
-    directive_id: selectedDirective.directive_no
-      ?? selectedDirective.code_form_no
-      ?? selectedDirective.id,
-    kind: selectedDirective.kind ?? 'OTHER',
-    title: selectedDirective.description ?? '',
-    effective_date: selectedDirective.effective_date ?? '',
-    applies_to: selectedDirective.applicability ?? '',
-    compliance_action: selectedDirective.method_of_compliance ?? '',
-    relevant_ata_chapters: Array.isArray(selectedDirective.relevant_ata_chapters)
-      ? selectedDirective.relevant_ata_chapters
-      : (selectedDirective.ata_code ? [selectedDirective.ata_code] : []),
-  } : null;
-
-  const aircraftInputForPanel: AircraftInput | null = aircraft ? {
-    manufacturer: aircraft.manufacturer ?? 'Unknown',
-    model: aircraft.model ?? 'Unknown',
-    serial_number: aircraft.serial_number ?? 'Unknown',
-    registration: aircraft.registration ?? undefined,
-  } : null;
 
   if (aircraftQuery.isLoading) {
     return (
@@ -285,45 +215,6 @@ export default function AmroAircraftApplicabilityPage() {
             </Link>
           </Button>
         </div>
-
-        {/* Ad-hoc check */}
-        <Card>
-          <CardHeader className="pb-3">
-            <CardTitle className="text-base">Run ad-hoc check</CardTitle>
-            <CardDescription>
-              Look up a directive by number to run the LLM applicability check against this aircraft.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <Label htmlFor="directive-no" className="text-xs">Directive number</Label>
-                <Input
-                  id="directive-no"
-                  value={directiveNo}
-                  onChange={(e) => setDirectiveNo(e.target.value)}
-                  placeholder="AD-2025-12-05 or SB-A320-25-01"
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') void handleLookupDirective();
-                  }}
-                />
-              </div>
-              <Button onClick={() => void handleLookupDirective()}>Look up</Button>
-            </div>
-            {directiveLookupError && (
-              <p className="text-xs text-rose-600">{directiveLookupError}</p>
-            )}
-            {selectedDirective && directiveInputForPanel && aircraftInputForPanel && (
-              <>
-                <Separator />
-                <DirectiveApplicabilityCheck
-                  directive={directiveInputForPanel}
-                  aircraft={aircraftInputForPanel}
-                />
-              </>
-            )}
-          </CardContent>
-        </Card>
 
         {/* Verdicts matrix */}
         <Card>

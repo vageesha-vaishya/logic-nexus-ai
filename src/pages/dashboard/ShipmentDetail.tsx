@@ -22,21 +22,7 @@ import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
-import { CustomsDocExtractPanel } from '@/features/module-logistics/components/CustomsDocExtractPanel';
-import type { CustomsDocExtractOutput, ShipmentContext } from '@/features/module-logistics/hooks/useCustomsDocExtract';
-import { ChargesSuggestionPanel } from '@/features/module-logistics/components/ChargesSuggestionPanel';
-import type {
-  ChargesSuggestionInput,
-  ShipmentMode as ChargesShipmentMode,
-} from '@/features/module-logistics/hooks/useChargesSuggestion';
-import { ShipmentDelayPredictionPanel } from '@/features/module-logistics/components/ShipmentDelayPredictionPanel';
-import type {
-  CarrierHistoryInput,
-  DelayPredictionInput,
-  ShipmentStatus as DelayShipmentStatus,
-  ReliabilityTier,
-} from '@/features/module-logistics/hooks/useShipmentDelayPrediction';
-import { Shipment, ShipmentStatus, statusConfig, formatShipmentType, ShipmentType } from './shipments-data';
+import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
 import { logger } from '@/lib/logger';
 import { formatContainerSize } from '@/lib/container-utils';
 
@@ -63,7 +49,6 @@ export default function ShipmentDetail() {
   const [creatingInvoice, setCreatingInvoice] = useState(false);
   
   // Cargo state
-  const [carrierHistory, setCarrierHistory] = useState<CarrierHistoryInput | null>(null);
   const [cargoItems, setCargoItems] = useState<any[]>([]);
   const [cargoConfigs, setCargoConfigs] = useState<any[]>([]);
   const [isCargoOpen, setIsCargoOpen] = useState(false);
@@ -190,59 +175,6 @@ export default function ShipmentDetail() {
     }
   }, [id, fetchShipment, fetchAttachments, fetchCargo, fetchCargoConfigs]);
 
-  // Follow-up #6: load carrier_lane_history aggregation once we know
-  // tenant + carrier + lane. Replaces the prior 'unknown' tier stub
-  // in delayPredictionInput. The RPC is fast (single round trip,
-  // index-backed) so this is fire-and-forget on shipment load.
-  useEffect(() => {
-    if (!shipment?.tenant_id || !shipment?.carrier_id) {
-      setCarrierHistory(null);
-      return;
-    }
-    if (!shipment.origin_country || !shipment.destination_country) {
-      setCarrierHistory(null);
-      return;
-    }
-    let cancelled = false;
-    (async () => {
-      try {
-        const { data, error } = await supabase.rpc('carrier_lane_history' as never, {
-          p_tenant_id: shipment.tenant_id,
-          p_carrier_id: shipment.carrier_id,
-          p_origin_country: shipment.origin_country,
-          p_destination_country: shipment.destination_country,
-        } as never);
-        if (error) throw error;
-        if (cancelled || !data) return;
-        const row = data as Record<string, unknown>;
-        const tier = (row.reliability_tier as ReliabilityTier) ?? 'unknown';
-        setCarrierHistory({
-          carrier_name: (row.carrier_name as string | null) ?? null,
-          on_time_rate_pct_lane_90d: (row.on_time_rate_pct_lane_90d as number | null) ?? null,
-          on_time_rate_pct_global_90d: (row.on_time_rate_pct_global_90d as number | null) ?? null,
-          avg_transit_days_lane: (row.avg_transit_days_lane as number | null) ?? null,
-          shipments_observed_lane_90d: (row.shipments_observed_lane_90d as number | null) ?? null,
-          recent_disruption_count_30d: (row.recent_disruption_count_30d as number | null) ?? 0,
-          reliability_tier: tier,
-        });
-      } catch (e) {
-        logger.warn('Failed to load carrier lane history', {
-          shipmentId: id,
-          error: e instanceof Error ? e.message : String(e),
-        });
-        if (!cancelled) setCarrierHistory(null);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [
-    id,
-    shipment?.tenant_id,
-    shipment?.carrier_id,
-    shipment?.origin_country,
-    shipment?.destination_country,
-    supabase,
-  ]);
-
   const handleDeleteCargo = async (cargoId: string) => {
     if (!confirm('Are you sure you want to delete this cargo item?')) return;
     try {
@@ -318,224 +250,6 @@ export default function ShipmentDetail() {
       setPodUploading(false);
     }
   };
-
-  // Map internal ShipmentType to the customs extractor's mode hint.
-  // courier is intentionally null — the document tells us the real mode.
-  const shipmentModeHint = (t: ShipmentType | undefined | null): ShipmentContext['mode'] => {
-    switch (t) {
-      case 'ocean': return 'ocean_fcl';
-      case 'air': return 'air';
-      case 'inland_trucking': return 'road';
-      case 'rail': return 'rail';
-      case 'movers_packers': return 'multimodal';
-      default: return null;
-    }
-  };
-
-  const shipmentContext = useMemo<ShipmentContext>(() => ({
-    shipment_id: id ?? null,
-    booking_reference: shipment?.reference_number ?? null,
-    origin_country: shipment?.origin_address?.country ?? null,
-    destination_country: shipment?.destination_address?.country ?? null,
-    mode: shipmentModeHint(shipment?.shipment_type),
-    incoterm_hint: shipment?.incoterms ?? null,
-    currency_hint: shipment?.currency ?? null,
-    notes_from_uploader: null,
-  }), [
-    id,
-    shipment?.reference_number,
-    shipment?.origin_address?.country,
-    shipment?.destination_address?.country,
-    shipment?.shipment_type,
-    shipment?.incoterms,
-    shipment?.currency,
-  ]);
-
-  // Map the internal ShipmentType to the narrower charges-suggestion mode.
-  // courier maps to courier (unlike the customs panel where we sent null);
-  // here we want a usable spine even for courier shipments.
-  const chargesShipmentMode = (t: ShipmentType | undefined | null): ChargesShipmentMode => {
-    switch (t) {
-      case 'ocean': return 'ocean_fcl';
-      case 'air': return 'air';
-      case 'inland_trucking': return 'road';
-      case 'rail': return 'rail';
-      case 'courier': return 'courier';
-      case 'movers_packers': return 'multimodal';
-      default: return 'multimodal';
-    }
-  };
-
-  const chargesSuggestionInput = useMemo<ChargesSuggestionInput | null>(() => {
-    if (!shipment || !id) return null;
-    if (!shipment.origin_address?.country || !shipment.destination_address?.country) return null;
-    if (!shipment.currency) return null;
-    return {
-      shipment: {
-        shipment_id: id,
-        mode: chargesShipmentMode(shipment.shipment_type),
-        origin: {
-          country: shipment.origin_address.country,
-          port_or_airport: shipment.port_of_loading ?? null,
-          city: shipment.origin_address.city ?? null,
-        },
-        destination: {
-          country: shipment.destination_address.country,
-          port_or_airport: shipment.port_of_discharge ?? null,
-          city: shipment.destination_address.city ?? null,
-        },
-        packages: {
-          total_pieces: shipment.total_packages ?? null,
-          total_weight_kg: shipment.total_weight_kg ?? null,
-          total_volume_m3: null,
-          chargeable_weight_kg: shipment.total_weight_kg ?? null,
-        },
-        containers: null,
-        hazmat: { is_hazmat: false, un_numbers: [], imdg_class: null },
-        temp_controlled: { required: false, range_celsius: null },
-        incoterm: shipment.incoterms ?? null,
-        currency: shipment.currency,
-        declared_value: { amount: shipment.total_charges ?? null, currency: shipment.currency },
-        line_items: [],
-        service_terms: {
-          door_pickup: false,
-          door_delivery: false,
-          customs_clearance: 'destination',
-        },
-      },
-      carrier: {
-        name: shipment.carriers?.carrier_name ?? null,
-        type: null,
-        service_level: 'standard',
-      },
-      tariff_hints: null,
-    };
-  }, [id, shipment]);
-
-  // Map internal ShipmentStatus to the delay-prediction status enum.
-  // Internal: draft / confirmed / in_transit / out_for_delivery / delivered / customs / cancelled / on_hold / returned
-  // LLM:      booked / picked_up / in_transit_origin / departed_origin / in_transit / arrived_destination_port / customs / out_for_delivery / delivered / exception
-  const delayStatus = (s: ShipmentStatus | undefined | null): DelayShipmentStatus => {
-    switch (s) {
-      case 'draft': return 'booked';
-      case 'confirmed': return 'booked';
-      case 'in_transit': return 'in_transit';
-      case 'out_for_delivery': return 'out_for_delivery';
-      case 'delivered': return 'delivered';
-      case 'customs': return 'customs';
-      case 'on_hold': return 'exception';
-      case 'cancelled': return 'exception';
-      case 'returned': return 'exception';
-      default: return 'in_transit';
-    }
-  };
-
-  const delayPredictionInput = useMemo<DelayPredictionInput | null>(() => {
-    if (!shipment || !id) return null;
-    if (!shipment.origin_address?.country || !shipment.destination_address?.country) return null;
-    if (!shipment.estimated_delivery_date) return null;
-    const daysInTransit = shipment.pickup_date
-      ? Math.max(0, Math.floor((Date.now() - new Date(shipment.pickup_date).getTime()) / 86400000))
-      : 0;
-    return {
-      shipment: {
-        shipment_id: id,
-        mode: chargesShipmentMode(shipment.shipment_type),
-        origin: {
-          country: shipment.origin_address.country,
-          port_or_airport: shipment.port_of_loading ?? null,
-        },
-        destination: {
-          country: shipment.destination_address.country,
-          port_or_airport: shipment.port_of_discharge ?? null,
-        },
-        committed_delivery_iso: shipment.estimated_delivery_date,
-        current_status: delayStatus(shipment.status as ShipmentStatus),
-        last_known_location: shipment.current_location
-          ? [shipment.current_location.city, shipment.current_location.country]
-              .filter(Boolean)
-              .join(' ')
-          : null,
-        last_update_iso: shipment.created_at,
-        days_in_transit_so_far: daysInTransit,
-        declared_value: { amount: shipment.total_charges ?? 0, currency: shipment.currency ?? 'USD' },
-        hazmat: { is_hazmat: false, un_numbers: [] },
-      },
-      // Real carrier history from carrier_lane_history RPC when loaded
-      // (Follow-up #6). Falls back to an 'unknown' stub during the brief
-      // window before the RPC resolves OR when carrier_id / lane is
-      // unset — the LLM prompt handles the unknown tier gracefully.
-      carrier_history: carrierHistory ?? {
-        carrier_name: shipment.carriers?.carrier_name ?? null,
-        on_time_rate_pct_lane_90d: null,
-        on_time_rate_pct_global_90d: null,
-        avg_transit_days_lane: null,
-        shipments_observed_lane_90d: null,
-        recent_disruption_count_30d: 0,
-        reliability_tier: 'unknown',
-      },
-      // No lane-conditions data source yet — same honest-unknown pattern.
-      lane_conditions: {
-        port_congestion_signal: 'unknown',
-        weather_disruption: 'unknown',
-        customs_processing_delay_days: null,
-        holiday_or_strike_flag: false,
-        alternative_routes_available: 1,
-      },
-    };
-  }, [id, shipment, carrierHistory]);
-
-  // After the LLM finishes parsing the uploaded customs doc, persist the
-  // file to storage + insert a shipment_attachments row stamped with the
-  // extracted doc_type. The structured output (parties, totals, route) is
-  // toast-summarised; deeper persistence would need a JSONB column the
-  // table doesn't have today — keep the slice tight and toast for now.
-  const handleAttachExtractedDoc = useCallback(async (
-    output: CustomsDocExtractOutput,
-    file: File,
-  ) => {
-    try {
-      if (!id) return;
-      const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_');
-      const path = `${id}/customs_${Date.now()}_${safeName}`;
-      const { error: uploadError } = await supabase.storage
-        .from('shipments')
-        .upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('shipments')
-        .getPublicUrl(path);
-      const publicUrl = urlData?.publicUrl ?? null;
-
-      const targetTenantId = shipment?.tenant_id || context?.tenantId;
-      const targetFranchiseId = shipment?.franchise_id || context?.franchiseId;
-
-      const { error: metaErr } = await (scopedDb
-        .from('shipment_attachments' as any)
-        .insert([{
-          shipment_id: id,
-          tenant_id: targetTenantId,
-          franchise_id: targetFranchiseId,
-          created_by: context?.userId,
-          name: file.name,
-          path,
-          size: file.size,
-          content_type: file.type || null,
-          public_url: publicUrl,
-          document_type: output.doc_type,
-        }]) as any);
-      if (metaErr) throw metaErr;
-
-      const docNum = output.doc_number ? ` (${output.doc_number})` : '';
-      toast.success(`Attached ${output.doc_type}${docNum} to shipment`);
-      await fetchAttachments();
-    } catch (error) {
-      logger.error('Customs doc attach failed', error);
-      const msg = error instanceof Error ? error.message : 'Unknown error';
-      toast.error(`Failed to attach customs doc: ${msg}`);
-    }
-  }, [id, shipment?.tenant_id, shipment?.franchise_id, supabase, scopedDb, context, fetchAttachments]);
 
   const getStatusColor = (status: ShipmentStatus) => {
     return statusConfig[status]?.color || 'bg-gray-500/10 text-gray-500';
@@ -965,16 +679,6 @@ export default function ShipmentDetail() {
           entityId={shipment.id} 
         />
 
-        {/* AI charges suggestion — invoice draft helper */}
-        {chargesSuggestionInput && (
-          <ChargesSuggestionPanel input={chargesSuggestionInput} />
-        )}
-
-        {/* AI delay prediction — operator escalation helper */}
-        {delayPredictionInput && shipment.status !== 'delivered' && shipment.status !== 'cancelled' && (
-          <ShipmentDelayPredictionPanel input={delayPredictionInput} />
-        )}
-
         {/* Attachments */}
         <Card>
           <CardHeader>
@@ -985,14 +689,6 @@ export default function ShipmentDetail() {
             </div>
           </CardHeader>
           <CardContent>
-            {/* AI customs doc extract — drop-in panel from module-logistics */}
-            <div className="mb-4">
-              <CustomsDocExtractPanel
-                context={shipmentContext}
-                onAttach={handleAttachExtractedDoc}
-              />
-            </div>
-
             {/* POD upload control */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4 p-3 border rounded-md">
               <div className="flex items-center gap-2">

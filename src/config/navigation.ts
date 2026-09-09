@@ -340,7 +340,6 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Quote Numbering', path: '/dashboard/settings/quote-numbers', icon: FileCheck, description: 'Prefixes and reset policy', roles: ['platform_admin'] },
       { name: 'Quotation Engine', path: '/dashboard/settings/quotations', icon: FileCheck, description: 'Configure default module & smart mode', roles: ['platform_admin'] },
       { name: 'Feature Flags', path: '/dashboard/settings/feature-flags', icon: Flag, description: 'Control feature availability across tenants', roles: ['platform_admin'] },
-      { name: 'LLM Gateway', path: '/dashboard/admin/llm-gateway', icon: Sparkles, description: 'Browse prompts, experiments, and recent LLM invocations', roles: ['platform_admin'] },
       { name: 'LLM Providers', path: '/dashboard/settings/llm-providers', icon: Sparkles, description: 'Choose the LLM provider and API key each domain uses', roles: ['tenant_admin', 'franchise_admin', 'platform_admin'] },
       { name: 'WhatsApp opt-ins', path: '/dashboard/admin/whatsapp-phones', icon: MessageSquare, description: 'Toggle whatsapp_capable per phone or bulk-enable per tenant', roles: ['platform_admin'] },
       { name: 'Audit Logs', path: '/dashboard/audit-logs', icon: FileText, description: 'View system audit logs', roles: ['platform_admin', 'tenant_admin'] },

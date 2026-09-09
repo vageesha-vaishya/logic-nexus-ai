@@ -1,12 +1,10 @@
-// AmroDirectiveDetailPage — directive detail with an applicability
-// tab that hosts the DirectiveApplicabilityCheck panel (ad-hoc check
-// for a single aircraft) PLUS the fleet × this directive matrix
-// (all aircraft × this directive verdicts).
+// AmroDirectiveDetailPage — directive detail with an applicability tab
+// showing the fleet × this directive matrix (all aircraft × this
+// directive verdicts).
 //
 // Per docs/plans/2026-06-04-directive-applicability-surface-design.md
 // slice S5.
 
-import { useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -37,21 +35,12 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
-
 import { supabase } from '@/integrations/supabase/client';
-import { DirectiveApplicabilityCheck } from '@/features/module-amro/components/mpd/DirectiveApplicabilityCheck';
 import {
   useDirectiveApplicability,
   type ApplicabilityVerdict,
   type ApplicabilityStatus,
 } from '../hooks/useDirectiveApplicabilityVerdicts';
-import type {
-  DirectiveInput,
-  AircraftInput,
-} from '../hooks/useDirectiveApplicability';
 
 interface DirectiveRow {
   id: string;
@@ -65,14 +54,6 @@ interface DirectiveRow {
   issuing_authority?: string | null;
   kind?: string | null;
   relevant_ata_chapters?: string[] | null;
-}
-
-interface AircraftRow {
-  id: string;
-  registration: string | null;
-  manufacturer: string | null;
-  model: string | null;
-  serial_number: string | null;
 }
 
 function confidenceTone(c: number): 'destructive' | 'default' | 'secondary' {
@@ -145,9 +126,6 @@ function VerdictRow({ verdict }: { verdict: ApplicabilityVerdict }) {
 
 export default function AmroDirectiveDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const [aircraftRegistration, setAircraftRegistration] = useState('');
-  const [selectedAircraft, setSelectedAircraft] = useState<AircraftRow | null>(null);
-  const [aircraftLookupError, setAircraftLookupError] = useState<string | null>(null);
 
   const directiveQuery = useQuery({
     queryKey: ['amro', 'directive', id],
@@ -169,48 +147,6 @@ export default function AmroDirectiveDetailPage() {
 
   const directive = directiveQuery.data;
   const verdicts = verdictsQuery.data?.records ?? [];
-
-  const handleLookupAircraft = async () => {
-    setAircraftLookupError(null);
-    const q = aircraftRegistration.trim().toUpperCase();
-    if (!q) return;
-    const { data, error } = await supabase
-      .from('aircraft')
-      .select('id, registration, manufacturer, model, serial_number')
-      .eq('registration', q)
-      .limit(1)
-      .maybeSingle();
-    if (error) {
-      setAircraftLookupError(error.message);
-      return;
-    }
-    if (!data) {
-      setAircraftLookupError(`No aircraft with registration ${q}`);
-      setSelectedAircraft(null);
-      return;
-    }
-    setSelectedAircraft(data as AircraftRow);
-  };
-
-  const directiveInputForPanel: DirectiveInput | null = directive ? {
-    issuing_authority: directive.issuing_authority ?? 'OTHER',
-    directive_id: directive.directive_no ?? directive.code_form_no ?? directive.id,
-    kind: directive.kind ?? 'OTHER',
-    title: directive.description ?? '',
-    effective_date: directive.effective_date ?? '',
-    applies_to: directive.applicability ?? '',
-    compliance_action: directive.method_of_compliance ?? '',
-    relevant_ata_chapters: Array.isArray(directive.relevant_ata_chapters)
-      ? directive.relevant_ata_chapters
-      : (directive.ata_code ? [directive.ata_code] : []),
-  } : null;
-
-  const aircraftInputForPanel: AircraftInput | null = selectedAircraft ? {
-    manufacturer: selectedAircraft.manufacturer ?? 'Unknown',
-    model: selectedAircraft.model ?? 'Unknown',
-    serial_number: selectedAircraft.serial_number ?? 'Unknown',
-    registration: selectedAircraft.registration ?? undefined,
-  } : null;
 
   if (directiveQuery.isLoading) {
     return (
@@ -316,46 +252,6 @@ export default function AmroDirectiveDetailPage() {
           </TabsContent>
 
           <TabsContent value="applicability" className="mt-4 space-y-4">
-            {/* Ad-hoc check panel */}
-            <Card>
-              <CardHeader className="pb-3">
-                <CardTitle className="text-base">Run ad-hoc check</CardTitle>
-                <CardDescription>
-                  Look up an aircraft by registration to run the LLM applicability check
-                  against this directive.
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-end gap-2">
-                  <div className="flex-1">
-                    <Label htmlFor="reg" className="text-xs">Aircraft registration</Label>
-                    <Input
-                      id="reg"
-                      value={aircraftRegistration}
-                      onChange={(e) => setAircraftRegistration(e.target.value.toUpperCase())}
-                      placeholder="VT-INK"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') void handleLookupAircraft();
-                      }}
-                    />
-                  </div>
-                  <Button onClick={() => void handleLookupAircraft()}>Look up</Button>
-                </div>
-                {aircraftLookupError && (
-                  <p className="text-xs text-rose-600">{aircraftLookupError}</p>
-                )}
-                {selectedAircraft && directiveInputForPanel && aircraftInputForPanel && (
-                  <>
-                    <Separator />
-                    <DirectiveApplicabilityCheck
-                      directive={directiveInputForPanel}
-                      aircraft={aircraftInputForPanel}
-                    />
-                  </>
-                )}
-              </CardContent>
-            </Card>
-
             {/* Verdicts matrix */}
             <Card>
               <CardHeader className="pb-3">

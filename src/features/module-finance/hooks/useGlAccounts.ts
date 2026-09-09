@@ -1,7 +1,5 @@
 // useGlAccounts — list + mutate finance.gl_accounts for the
-// configured tenant. Used by the admin chart-of-accounts page AND
-// by the InvoiceLineClassifyPanel host insertion (which feeds the
-// fetched chart straight into the LLM prompt input).
+// configured tenant. Used by the admin chart-of-accounts page.
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
