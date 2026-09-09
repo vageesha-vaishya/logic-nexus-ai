@@ -176,6 +176,19 @@ documented decisions.
   they're wanted. Verified: typecheck and lint clean; the two pre-existing
   test files touching edited components had *more* failures on the
   unmodified baseline (52 vs. 14 after), confirmed via `git stash`.
+
+  **Caveat worth recording:** `npm run typecheck` (bare `tsc --noEmit` at
+  the repo root) did not catch a dangling import left by this removal —
+  `HomeMobilePage.tsx` still imported the deleted `SnapStockTipCard.tsx`.
+  The root `tsconfig.json` has `"files": []` and only `references`, which
+  plain `tsc --noEmit` doesn't build without `-b`; it was effectively
+  checking nothing. The actual production build (`vite build`, same as
+  Coolify's Docker build) caught it immediately with a Rollup "Could not
+  resolve" error, which is how this was found — after an initial frontend
+  deploy failed. Fixed in `a66115e0`. **`npm run typecheck` as documented
+  in this repo's `CLAUDE.md` is not a reliable gate for this kind of
+  dangling-reference bug; `npx tsc --noEmit -p tsconfig.app.json` or an
+  actual `vite build` is.** Worth fixing the npm script itself separately.
 - **The `platform.*` → `core.*` lift.**
 - **Per-task overrides** (e.g. `markets.daily_brief` on a different model from
   `markets.research_thread`).
