@@ -79,6 +79,19 @@ Critical and High are given in full below. Medium, Low and Informational are ind
 **F-2.1 — `ai-advisor` is live, publicly invocable, and queries an unscoped `rates` table with a service-role client, feeding the result to OpenAI.**
 *Revised 2026-09-05 — see correction notice.* Evidence: `supabase/functions/main/verify_jwt_map.ts` lists `"ai-advisor": false`, so the self-hosted router (`main/index.ts:336`, `VERIFY_JWT_MAP[name] !== false`) skips its JWT check entirely; the function's own auth branch (`ai-advisor/index.ts:50-53`) then logs a warning and continues rather than rejecting when `requireAuth` fails. `serveWithLogger` (`_shared/logger.ts:210-211`) builds its Supabase client with `SUPABASE_SERVICE_ROLE_KEY`, bypassing RLS; the `rates` query (`ai-advisor/index.ts:266-272`) filters on `mode`, `origin`, and `destination` but on neither `tenant_id` nor `franchise_id`, both of which exist as columns on that table. Anonymous invocability and the cross-tenant read are both now **observed** — from router code, function code, and schema — where the original finding correctly identified the vulnerability but understated its certainty (it had called both "inferred"). Reachability from the open internet is still separately *inferred* — see the Unknowns section.
 
+**Already remediated, same day (`f3b8d527`, `7fbf51ab`, Sat Sep 5 2026 15:01 — checked 2026-09-09).**
+Found already fixed on `main` when asked to fix it: `f3b8d527` made `requireAuth`'s
+failure branch hard-return 401 instead of logging and continuing, and removed
+`ai-advisor`'s `verify_jwt_map` exemption entirely (so the router itself now
+also requires a valid JWT before the function body runs — the anonymous-access
+route this finding relied on is closed at both layers). `7fbf51ab` scoped
+every DB read in the function, including the `rates` query, to the caller's
+resolved `tenant_id`. Confirmed live in production, not just merged: SSH'd
+into the running self-hosted functions container and read the deployed
+`ai-advisor/index.ts` directly — it matches `main` exactly (`requireAuth`
+hard-fail at line 51, `tenant_id`-scoped queries at lines 245/271). No
+further action needed on F-2.1.
+
 ### Corrected findings (moved out of Critical/High — full text retained given their significance)
 
 **F-2.2 — `generate-embedding` has no in-body authentication and performs unguarded service-role writes, but is not anonymously reachable. Downgraded from Critical to Medium.**
@@ -188,6 +201,8 @@ Ordered by severity × how many other findings each unblocks.
 ### P0 — Immediate (days), feeds sub-project C
 
 1. **Close `ai-advisor`** (F-2.1). Add an in-body auth hard-fail; scope its `rates` query to the caller's tenant (`tenant_id`/`franchise_id` both exist as columns and neither is filtered — now confirmed from schema, not just inferred from the missing filter). This is the one function that is both live and missing a compensating in-body auth check on a platform where the router's gate for it is confirmed off — internet reachability is still inferred, not proven (see §6). **Add an in-body auth check to `generate-embedding`** (F-2.2) too, as a defense-in-depth fix — it is not currently reachable without a valid JWT, but it has no second line of defense if that ever changes, and the fix is cheap.
+
+   **Done, both halves, checked 2026-09-09.** `ai-advisor`: see the remediation note under F-2.1 above (`f3b8d527`, `7fbf51ab`, confirmed live). `generate-embedding`: `032cdac5 fix(generate-embedding): require service-role or admin` adds the in-body check.
 2. **Decide the platform auth default, as a per-function review of `VERIFY_JWT_MAP` — not an all-or-nothing env flag** (F-2.9, F-2.7). The real artefact governing self-hosted auth is `supabase/functions/main/verify_jwt_map.ts`, an 85-entry map, not `FUNCTIONS_VERIFY_JWT` alone — that flag governs a platform-level check the `main` router already supersedes. Review the 85 entries function by function: for each, either add/confirm an in-body auth check, or document why anonymous access is intentional (as it is for `portal-chatbot`). Separately, decide whether to also flip `FUNCTIONS_VERIFY_JWT` on or add Kong `key-auth` as defense-in-depth on top of the map, so the map is not the only thing standing between the internet and 85 functions.
 3. **Remove the client-side OpenAI fallback entirely** (F-3.1, F-3.2, F-4.7). Deleting the code path is stronger than relying on a variable staying unset, and closes the trap permanently.
 
