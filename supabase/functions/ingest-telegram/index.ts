@@ -2,23 +2,49 @@
 /// <reference path="../types.d.ts" />
 import { serveWithLogger } from "../_shared/logger.ts";
 import { corsHeaders, preflight } from "../_shared/cors.ts";
-import { requireAuth } from "../_shared/auth.ts";
 
 serveWithLogger(async (req, logger, supabaseAdmin) => {
   const pre = preflight(req);
   if (pre) return pre;
   try {
     const secretHeader = req.headers.get("x-telegram-bot-api-secret-token");
-    const expected = Deno.env.get("TELEGRAM_WEBHOOK_SECRET") || "";
-    if (!expected || secretHeader !== expected) {
+    const tenantId = req.headers.get("x-tenant-id") || "";
+
+    // Inbound webhook, not a user request -- no Supabase JWT to check.
+    // Previously verified against one global TELEGRAM_WEBHOOK_SECRET, which
+    // proves "this came from Telegram" but not "this came from the right
+    // tenant's Telegram bot" -- any holder of that one secret could set
+    // x-tenant-id to an arbitrary tenant and inject messages into their
+    // inbox. Fixed by verifying the presented secret against *that
+    // tenant's own* stored webhook_secret in channel_accounts instead:
+    // each tenant's bot is configured (via Telegram's setWebhook API) with
+    // its own secret_token, so knowing one tenant's secret no longer lets
+    // you impersonate another. (TELEGRAM_WEBHOOK_SECRET itself is unset in
+    // production -- the old check failed closed for every caller; this
+    // isn't a regression for anyone currently relying on it.)
+    if (!secretHeader || !tenantId) {
       return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
     }
 
-    // Attempt to get authenticated user if provided, otherwise fallback to admin for ingestion
-    // Inbound webhooks usually don't have user JWTs, so we use supabaseAdmin for insertion
-    // but we should still check if tenant_id is valid or provided.
-    
-    const tenantId = req.headers.get("x-tenant-id") || "";
+    const { data: channelAccounts, error: channelError } = await supabaseAdmin
+      .from("channel_accounts")
+      .select("credentials")
+      .eq("tenant_id", tenantId)
+      .eq("provider", "telegram")
+      .eq("is_active", true);
+
+    if (channelError) {
+      logger.error("Failed to resolve telegram channel account", { error: channelError, tenantId });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
+    const isValidSecret = (channelAccounts || []).some(
+      (row: any) => row?.credentials?.webhook_secret && row.credentials.webhook_secret === secretHeader,
+    );
+    if (!isValidSecret) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
     const update = await req.json();
     const msg = update.message || update.edited_message || {};
     const text = msg.text || msg.caption || "";
