@@ -1,0 +1,26 @@
+-- Root-cause fix — platform.llm_usage inserts fail with "permission denied
+-- for sequence llm_usage_id_seq" even for service_role, discovered live
+-- 2026-09-09 while verifying the partition-provisioner fix (e51bc2da) with
+-- a real end-to-end call through suggest-transport-mode.
+--
+-- platform.llm_usage.id is `bigserial`, which creates
+-- platform.llm_usage_id_seq as its default's nextval() source
+-- (20260515053541_platform_schema_and_llm_usage.sql line 22). That
+-- migration's grants (line 82-87) only ever covered the TABLE
+-- (`GRANT ALL ON platform.llm_usage TO service_role` + the default-privileges
+-- block for future tables) -- GRANT ALL ON TABLE does not include sequence
+-- privileges for a serial column's underlying sequence; that needs its own
+-- explicit GRANT. Confirmed live: relacl for platform.llm_usage_id_seq is
+-- empty -- no role has ever been granted anything on it directly.
+--
+-- This means every insert into platform.llm_usage as service_role has
+-- always required USAGE on this sequence and never had it. How rows landed
+-- successfully before 2026-06-30 despite that is undetermined -- possibly a
+-- manual ad-hoc GRANT applied outside migration history, in which case it's
+-- the same "state outside migration replay doesn't survive reconstitution
+-- from prod" pattern already flagged for cron.job (20260909220000) and the
+-- missing llm_usage partitions themselves (20260909210000). Either way the
+-- fix is the same regardless of history: grant it explicitly, in a
+-- migration, so it's part of the schema going forward.
+
+GRANT USAGE, SELECT ON SEQUENCE platform.llm_usage_id_seq TO service_role;

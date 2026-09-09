@@ -20,6 +20,9 @@
 //                    vLLM (or similar) endpoint. Per §9.6 (D-11): tenant
 //                    configs may also set this provider directly with their
 //                    own base_url/api_key.
+//   • custom       — same OpenAI-compatible chat completions as local-qwen,
+//                    for a tenant-supplied endpoint that isn't specifically
+//                    Qwen (Settings UI exposes both under a base_url field).
 // =====================================================================
 
 import { SupabaseClient } from "@supabase/supabase-js";
@@ -572,11 +575,8 @@ export async function callLLM(
         result = await callOpenAiCompatible(config, prompt.system, userMsg, "local-qwen");
         break;
       case "custom":
-        throw new LlmGatewayError(
-          "provider_not_implemented",
-          `Provider '${config.provider}' is configured but not yet wired into the Gateway.`,
-          501,
-        );
+        result = await callOpenAiCompatible(config, prompt.system, userMsg, "custom");
+        break;
     }
   } catch (e: any) {
     const latency = Date.now() - t0;
@@ -696,12 +696,12 @@ async function callOpenAiCompatible(
   cfg: ResolvedConfig,
   system: string,
   user: string,
-  provider: "openrouter" | "openai" | "local-qwen",
+  provider: "openrouter" | "openai" | "local-qwen" | "custom",
 ): Promise<LlmCallResult> {
   const defaultBase =
     provider === "openrouter" ? "https://openrouter.ai/api/v1"
     : provider === "openai" ? "https://api.openai.com/v1"
-    : "https://api.openai.com/v1"; // local-qwen always supplies cfg.baseUrl (required by resolveConfig)
+    : "https://api.openai.com/v1"; // local-qwen/custom always supply cfg.baseUrl (required by resolveConfig)
   const url = (cfg.baseUrl ?? defaultBase) + "/chat/completions";
 
   const headers: Record<string, string> = {
@@ -988,7 +988,8 @@ export async function callLLMConversation(
       }
       case "openrouter":
       case "openai":
-      case "local-qwen": {
+      case "local-qwen":
+      case "custom": {
         // Strip a trailing "/v1" so a configured base_url may include it or
         // not (VLLM_BASE_URL is set with a trailing /v1, matching the
         // single-turn callOpenAiCompatible convention) without doubling up.
