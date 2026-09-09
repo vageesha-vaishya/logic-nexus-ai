@@ -1,6 +1,6 @@
 import { serveWithLogger } from '../_shared/logger.ts';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth } from '../_shared/auth.ts';
+import { requireAuth, isServiceRoleAuthorizationHeader } from '../_shared/auth.ts';
 
 serveWithLogger(async (req, logger, supabaseAdmin) => {
   const headers = getCorsHeaders(req);
@@ -10,16 +10,45 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
   }
 
   try {
-    const { user, error: authError } = await requireAuth(req);
-    if (authError || !user) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+    // Two intended callers: lead-event-webhook triggers this internally
+    // with SUPABASE_SERVICE_ROLE_KEY (its only current caller -- no
+    // frontend reaches this function directly), or a regular authenticated
+    // end user via this function's own requireAuth check. Both paths use
+    // supabaseAdmin (service-role, bypasses RLS -- deliberate, per the
+    // comment this replaces), so a non-service-role caller must be scoped
+    // explicitly: lead_id came straight from the request body with no
+    // check the caller's tenant owns that lead.
+    const authHeader = req.headers.get('Authorization');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const isServiceRole = isServiceRoleAuthorizationHeader(authHeader, serviceRoleKey);
+
+    // null = unrestricted (service-role caller, or an authenticated platform_admin)
+    let allowedTenantIds: Set<string> | null = null;
+
+    if (!isServiceRole) {
+      const { user, error: authError } = await requireAuth(req);
+      if (authError || !user) {
+        return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...headers, 'Content-Type': 'application/json' } });
+      }
+
+      const { data: requesterRoles, error: rolesError } = await supabaseAdmin
+        .from('user_roles')
+        .select('role, tenant_id')
+        .eq('user_id', user.id);
+      if (rolesError) {
+        logger.error('Failed to resolve requester roles', { error: rolesError, userId: user.id });
+        return new Response(JSON.stringify({ error: 'Forbidden: cannot resolve requester role scope' }), { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } });
+      }
+
+      const roles = requesterRoles || [];
+      const isPlatformAdmin = roles.some((r: any) => r.role === 'platform_admin');
+      if (!isPlatformAdmin) {
+        allowedTenantIds = new Set(
+          roles.map((r: any) => r.tenant_id).filter((id: string | null) => !!id),
+        );
+      }
     }
 
-    // Using supabaseAdmin (Service Role) because we need to read/write lead scores which might be protected or we are a system process
-    // However, originally it was using Service Role. 
-    // To respect RLS, we should probably use the user client if possible.
-    // But since this is a "calculate" function often triggered by system or admin, and the original code used Service Role Key, 
-    // I will stick to supabaseAdmin to ensure it works as before (bypassing RLS if needed for scoring).
     const supabase = supabaseAdmin;
 
     const { lead_id } = await req.json();
@@ -36,6 +65,13 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       .single();
 
     if (leadError) throw leadError;
+
+    if (allowedTenantIds && !allowedTenantIds.has(lead.tenant_id)) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: lead outside caller scope' }),
+        { status: 403, headers: { ...headers, 'Content-Type': 'application/json' } },
+      );
+    }
 
     // 2. Fetch Score Config
     let config;
