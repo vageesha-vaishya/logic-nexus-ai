@@ -2,12 +2,23 @@
 /// <reference path="../types.d.ts" />
 import { serveWithLogger } from "../_shared/logger.ts";
 import { corsHeaders, preflight } from "../_shared/cors.ts";
-import { requireAuth } from "../_shared/auth.ts";
 
 serveWithLogger(async (req, logger, supabaseAdmin) => {
   const pre = preflight(req);
   if (pre) return pre;
   try {
+    // Inbound webhook, not a user request — no Supabase JWT to check (this
+    // function imported requireAuth but never called it, leaving it fully
+    // open to anonymous callers). Mirrors ingest-telegram's shared-secret
+    // gate. Does NOT stop x-tenant-id spoofing by a holder of this secret —
+    // that's a pre-existing gap shared by the whole ingest-* family and is
+    // not fixed here.
+    const secretHeader = req.headers.get("x-linkedin-webhook-secret");
+    const expected = Deno.env.get("LINKEDIN_WEBHOOK_SECRET") || "";
+    if (!expected || secretHeader !== expected) {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), { status: 401, headers: corsHeaders });
+    }
+
     const tenantId = req.headers.get("x-tenant-id") || "";
     const data = await req.json();
     const text = data.text || data.body || "";
