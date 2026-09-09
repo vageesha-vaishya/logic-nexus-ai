@@ -190,18 +190,33 @@ documented decisions.
   dangling-reference bug; `npx tsc --noEmit -p tsconfig.app.json` or an
   actual `vite build` is.**
 
-  **Correction:** `tsc -p tsconfig.app.json` is not simply a drop-in fix
-  for the npm script either — run directly, it reports **935 pre-existing
-  errors**, almost all unrelated to this work: missing `next` module and
-  missing `_utils/*` imports under `src/pages/api/v1/` and
-  `src/pages/api/v2/`, which read as dead Next.js-style API route stubs
-  that `vite build` never reaches (Vite has no notion of a `pages/api`
-  convention) and so were never gated on. Repointing the npm script at
-  that config would immediately surface this backlog as a hard failure
-  for everyone. Fixing the gate properly is a real, separate task — likely
-  either `vite build` in CI, or triaging/excluding the dead API stubs from
-  `tsconfig.app.json`'s `include` — not the one-line change it first
-  looked like.
+  **Resolved (`72331a46`):** `tsc -p tsconfig.app.json` run directly
+  reports 935 error lines (566 distinct `error TSxxxx` diagnostics), but
+  only 47 of those trace to `src/pages/api/` — the rest (520) are genuine
+  type errors (`TS2339`/`TS2345`/`TS2322`/`TS2769`, not module-resolution)
+  scattered across `src/pages/dashboard` (134), `src/features/module-amro`
+  (91), `src/services/taxation` (54), `src/features/markets` (32),
+  `src/components/quotation` (32), and more — live, deployed app code.
+  `vite build` never caught any of it: esbuild strips types without
+  validating them, so the build only ever checked that module paths
+  resolve, never that types are correct. This project appears to have
+  never had a working type-check gate.
+
+  `src/pages/api/` (384 files) is confirmed to have zero consumers
+  anywhere in `services/`, `scripts/`, or any build/server config — not
+  reachable from `vite build`'s module graph, not mounted by anything.
+  Reads as in-progress scaffolding for a future API layer, not deployed
+  code.
+
+  Added `tsconfig.typecheck.json` (extends `tsconfig.app.json`, excludes
+  `src/pages/api`) and repointed `npm run typecheck` at it —
+  `tsconfig.app.json` itself (the IDE/editor config) is untouched.
+  Decision, given the choice between silencing the other 520 pre-existing
+  errors behind a baseline/allowlist versus reporting them honestly: **report
+  them.** `npm run typecheck` will fail immediately for anyone who runs it
+  until that debt is triaged — visible rather than hidden, which was the
+  point of fixing this. Triaging the 520 errors is explicitly a separate,
+  much larger task, not part of this fix.
 - **The `platform.*` → `core.*` lift.**
 - **Per-task overrides** (e.g. `markets.daily_brief` on a different model from
   `markets.research_thread`).
