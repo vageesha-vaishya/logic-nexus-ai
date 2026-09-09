@@ -226,6 +226,8 @@ Ordered by severity × how many other findings each unblocks.
    That closes every item from this `VERIFY_JWT_MAP` follow-up review — all ten findings it surfaced (2 anonymous-access, 8 authenticated-cross-tenant/SSRF) are now fixed.
 3. **Remove the client-side OpenAI fallback entirely** (F-3.1, F-3.2, F-4.7). Deleting the code path is stronger than relying on a variable staying unset, and closes the trap permanently.
 
+   **Already done, same day as the audit (`04c89fd0`, checked 2026-09-09) — a second stale finding, like F-2.1.** `04c89fd0 fix(client): remove direct-to-OpenAI fallback` deleted 117 lines across both call sites (`useAiAdvisor.ts`, `EmailToLeadDialog.tsx`) the same day this audit was written. Confirmed on `main` today: neither file contains any `OPENAI`/`VITE_OPENAI` reference (`useAiAdvisor.ts`'s only fallback now returns hardcoded mock quote data on network failure, no key involved). Went further than a source check, per this audit's own F-3.3 methodology: fetched the live production JS bundle (`index-DET7PrPr.js`) and grepped for `VITE_OPENAI`, `sk-proj`, and `OPENAI_API_KEY` — zero matches. All three findings this fed (F-3.1, F-3.2, F-4.7) are closed.
+
 ### P1 — Consolidation (sub-project B)
 
 4. **Pick one gateway and mean it** (F-1.1, F-1.2, F-2.5, F-5.5). The decision is genuinely open: harden the live 863-LOC edge module, or deploy the governed 6,726-LOC service and migrate onto it. W1's recommendation is to harden what's live rather than assume the bigger implementation is the real one. Whichever is chosen, the other two should be retired — three components named "LLM gateway" is a standing source of exactly the confusion this audit had to untangle.
