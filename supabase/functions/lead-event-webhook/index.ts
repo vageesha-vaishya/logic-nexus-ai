@@ -1,7 +1,7 @@
 declare const Deno: any;
 import { z } from 'zod';
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { requireAuth } from '../_shared/auth.ts';
+import { requireAuth, isServiceRoleAuthorizationHeader } from '../_shared/auth.ts';
 import { serveWithLogger } from '../_shared/logger.ts';
 
 const LeadEventSchema = z.object({
@@ -17,10 +17,44 @@ serveWithLogger(async (req, logger, supabase) => {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Auth: require authenticated user
-  const { user, error: authError } = await requireAuth(req);
-  if (authError || !user) {
-    return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  // Auth: this function has two intended callers, per its own documented
+  // sample usage (src/pages/dashboard/EmailManagement.tsx) -- a trusted
+  // external integration authenticating with SUPABASE_SERVICE_ROLE_KEY (full
+  // cross-tenant access, as documented), or a regular authenticated end
+  // user. Every query below runs on the service-role client `supabase`
+  // (serveWithLogger's third param -- named `supabase` here, not
+  // `supabaseAdmin`, but the same client), so a non-service-role caller must
+  // be scoped explicitly: lead_id/tenant_id came straight from the request
+  // body with no check the caller belongs there.
+  const authHeader = req.headers.get('Authorization');
+  const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+  const isServiceRole = isServiceRoleAuthorizationHeader(authHeader, serviceRoleKey);
+
+  // null = unrestricted (service-role caller, or an authenticated platform_admin)
+  let allowedTenantIds: Set<string> | null = null;
+
+  if (!isServiceRole) {
+    const { user, error: authError } = await requireAuth(req);
+    if (authError || !user) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const { data: requesterRoles, error: rolesError } = await supabase
+      .from('user_roles')
+      .select('role, tenant_id')
+      .eq('user_id', user.id);
+    if (rolesError) {
+      logger.error('Failed to resolve requester roles', { error: rolesError, userId: user.id });
+      return new Response(JSON.stringify({ error: 'Forbidden: cannot resolve requester role scope' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const roles = requesterRoles || [];
+    const isPlatformAdmin = roles.some((r: any) => r.role === 'platform_admin');
+    if (!isPlatformAdmin) {
+      allowedTenantIds = new Set(
+        roles.map((r: any) => r.tenant_id).filter((id: string | null) => !!id),
+      );
+    }
   }
 
   const WebIntakeSchema = z.object({
@@ -50,6 +84,20 @@ serveWithLogger(async (req, logger, supabase) => {
     const asEvent = LeadEventSchema.safeParse(body);
     if (asEvent.success) {
       const { lead_id, type, metadata, timestamp } = asEvent.data;
+
+      if (allowedTenantIds) {
+        const { data: leadRow, error: leadLookupErr } = await supabase
+          .from('leads')
+          .select('tenant_id')
+          .eq('id', lead_id)
+          .maybeSingle();
+        if (leadLookupErr || !leadRow || !allowedTenantIds.has(leadRow.tenant_id)) {
+          return new Response(
+            JSON.stringify({ error: 'Forbidden: lead outside caller scope' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+          );
+        }
+      }
 
       const { error: insertError } = await supabase
         .from('lead_activities')
@@ -117,6 +165,13 @@ serveWithLogger(async (req, logger, supabase) => {
       metadata,
       mode
     } = asIntake.data;
+
+    if (allowedTenantIds && !allowedTenantIds.has(tenant_id)) {
+      return new Response(
+        JSON.stringify({ error: 'Forbidden: target tenant outside caller scope' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 403 },
+      );
+    }
 
     const intakeSource = source || (mode === 'chatbot' ? 'chatbot' : 'website');
 
