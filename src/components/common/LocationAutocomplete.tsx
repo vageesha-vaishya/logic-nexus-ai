@@ -67,6 +67,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
   const [selectedLocation, setSelectedLocation] = React.useState<Location | null>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const triggerRef = React.useRef<HTMLButtonElement>(null)
+  const contentRef = React.useRef<HTMLDivElement>(null)
   const isSelecting = React.useRef(false)
   // Radix's FocusScope restores focus to the trigger button when this
   // popover's content unmounts (its default onCloseAutoFocus behavior).
@@ -133,6 +134,29 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
   React.useEffect(() => {
     if (open && inputRef.current) {
       inputRef.current.focus()
+    }
+  }, [open])
+
+  // Radix positions PopoverContent inside its own wrapper div
+  // (data-radix-popper-content-wrapper), rendered as a Portal child of
+  // <body> and NOT reachable through the className prop passed to
+  // PopoverContent below. That wrapper keeps pointer-events: auto for the
+  // full duration of the content's data-[state=closed] exit animation
+  // (Radix/cmdk's Presence keeps it mounted until the animation ends), so
+  // a data-[state=closed]:pointer-events-none class on the content itself
+  // is not enough -- the wrapper underneath it still hit-tests positive.
+  // Confirmed live: right after selecting a value here, elementFromPoint
+  // at a second LocationAutocomplete's trigger position -- which this
+  // field's dropdown can overlap on this form -- still resolved to this
+  // wrapper, not the trigger underneath it, so that click failed to reach
+  // the intended field. Disable the wrapper's own pointer-events directly,
+  // synchronously with the open -> false transition (useLayoutEffect, so
+  // it lands before the first exit-animation frame paints), and restore it
+  // when reopening.
+  React.useLayoutEffect(() => {
+    const wrapper = contentRef.current?.parentElement as HTMLElement | null
+    if (wrapper) {
+      wrapper.style.pointerEvents = open ? '' : 'none'
     }
   }, [open])
 
@@ -541,18 +565,10 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        // Radix keeps this content mounted (and, by default, fully
-        // interactive) for the duration of the data-[state=closed] exit
-        // animation before actually unmounting it -- confirmed live via
-        // document.elementFromPoint immediately after a selection: the
-        // closing dropdown was still hit-testing positive over whatever
-        // sat underneath it. On this form, that "underneath" is the next
-        // LocationAutocomplete field's trigger button, so a click there
-        // right after closing this one can land on this popover's stale
-        // content instead -- the actual cause of selections in a second
-        // field intermittently landing in this one. Disable hit-testing
-        // the instant state flips to closed so the fade-out stays purely
-        // visual and never intercepts a click meant for what's beneath it.
+        ref={contentRef}
+        // Belt-and-suspenders alongside the wrapper-level fix in the
+        // useLayoutEffect above: also non-interactive on the content
+        // itself once closed.
         className="w-[400px] p-0 data-[state=closed]:pointer-events-none"
         align="start"
         onCloseAutoFocus={(e) => {
