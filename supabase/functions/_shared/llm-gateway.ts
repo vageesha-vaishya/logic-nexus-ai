@@ -71,7 +71,7 @@ const FALLBACK_ROUTING: Record<LlmTaskId, RoutingEntry> = {
   "markets.daily_brief":         { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
   "markets.news_sentiment":      { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  256 },
   "markets.earnings_summary":    { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens: 1024 },
-  "markets.research_thread":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 4096 },
+  "markets.research_thread":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2800 },
   "markets.strategy_explain":    { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
   "markets.portfolio_diagnostic":{ provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  800 },
   "logistics.smart_quotes":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2800 },
@@ -99,7 +99,22 @@ const MAX_OUTPUT_TOKENS: Record<LlmTaskId, number> = {
   "markets.daily_brief":         2048,
   "markets.news_sentiment":       256,
   "markets.earnings_summary":    1024,
-  "markets.research_thread":     4096,
+  //
+  // markets.research_thread was 4096 until 2026-09-10, found auditing every
+  // task against the same self-hosted-throughput ceiling that caused the
+  // logistics.smart_quotes bug just above: at the rig's measured ~27
+  // tokens/sec, 4096 tokens is a ~152s worst case -- over BOTH
+  // LLM_REQUEST_TIMEOUT_MS (115s) and Cloudflare's hard 125.1s ceiling on
+  // portal.sosservices.online, so any tenant routing the "markets" domain
+  // to self-hosted would have every long research-thread reply time out.
+  // Unlike smart_quotes this is free-form chat text, not a fixed JSON
+  // schema, so there's no field-shape constraint to work around -- 2800
+  // (same safe margin used for smart_quotes: worst case 2800/27 ≈ 104s)
+  // is still a substantial multi-paragraph reply and simply caps length.
+  // This task also had no PAID_FALLBACK_ON_FAILURE entry at all (see below)
+  // -- worse than smart_quotes' pre-fix state, since a self-hosted timeout
+  // here failed outright instead of silently degrading to a paid provider.
+  "markets.research_thread":     2800,
   "markets.strategy_explain":    2048,
   "markets.portfolio_diagnostic": 800,
   //
@@ -656,6 +671,11 @@ const PAID_FALLBACK_ON_FAILURE: Partial<Record<LlmTaskId, { provider: LlmProvide
   // (VLLM_BASE_URL, a different rig with a known-stale credential) fails too.
   "comms.nexus_copilot_chat":          { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
   "comms.portal_chatbot_reply":        { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+  // Added alongside the token-budget fix above: this task had no fallback
+  // at all, so a self-hosted timeout (structurally guaranteed at the old
+  // 4096-token budget, and still possible near the new one under load)
+  // failed the request outright instead of degrading to a paid provider.
+  "markets.research_thread":           { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
 };
 
 // ─── Resolve tenant config (or env fallback) ───────────────────────────
