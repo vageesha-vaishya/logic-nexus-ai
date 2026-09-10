@@ -435,3 +435,37 @@ Direct follow-up to §7's standing item: an explicit audit of F-2.3's 15 shadow-
 - **New — `OPENAI_API_KEY` is dead platform-wide (server-side).** Distinct from F-3.1/F-3.2's already-fixed *client-side* `VITE_OPENAI_API_KEY` risk and from §6's stale `VLLM_API_KEY` finding — this is the server-side edge-functions/markets-worker credential, confirmed via a live 401 against `api.openai.com`. Still not rotated; anything else server-side still reading it directly (not audited exhaustively in this pass) should be assumed broken until proven otherwise.
 - **Resolved 2026-09-10 (`52a83249`) — `nexus-copilot`'s embedding step no longer crashes the request.** `_shared/model-router.ts`'s `pickEmbeddingModel()` itself still has zero fallback and will keep throwing on the dead `OPENAI_API_KEY` — that part is unchanged and deliberately not touched (see the full writeup above for why routing embeddings to a different provider would be actively wrong, not just unfinished). The caller (`nexus-copilot`) now catches that failure and degrades to no-context instead of 500ing. **This pattern — embeddings fail closed to "no RAG context," not to a different provider's vector space — should be treated as the standing approach for any other embedding call site that hits the same dead key**, not something to solve by giving `pickEmbeddingModel()` a Gemini fallback of its own.
 - **New — the self-hosted rig's vision gap should be tracked as its own item, not folded into "shadow AI."** Even with every shadow-AI function correctly wired onto the gateway, 4 tasks are paid-only in practice because there is nothing self-hosted to route to. Whether to accept that as a documented exception, or to deploy a vision-capable model (e.g. a Qwen-VL variant) on the rig, is a product/infrastructure decision, not a code fix.
+
+---
+
+## 9. Platform-wide audit for the same over-budget-for-self-hosted pattern (2026-09-10)
+
+Direct follow-up to §7's fix: every one of the gateway's 19 `LlmTaskId`s' `MAX_OUTPUT_TOKENS` was checked against the same two constraints that broke `logistics.smart_quotes` — the rig's measured ~27 tokens/sec throughput and Cloudflare's hard 125.1s proxy ceiling on `portal.sosservices.online` — using the same safe-margin math as the smart_quotes fix (worst case ≤ ~104s, i.e. budget ≤ ~2800 tokens).
+
+| Task | Budget (tokens) | Worst case @ 27 tok/s | Verdict |
+|---|---|---|---|
+| `markets.daily_brief` | 2048 | 75.9s | OK |
+| `markets.news_sentiment` | 256 | 9.5s | OK |
+| `markets.earnings_summary` | 1024 | 37.9s | OK |
+| `markets.research_thread` | ~~4096~~ **2800** | ~~151.7s~~ **103.7s** | **Was over — fixed below** |
+| `markets.strategy_explain` | 2048 | 75.9s | OK |
+| `markets.portfolio_diagnostic` | 800 | 29.6s | OK |
+| `logistics.smart_quotes` | 2800 | 103.7s | OK (fixed in §7) |
+| `ops.agent_plan` | 400 | 14.8s | OK |
+| `comms.smart_reply` | 512 | 19.0s | OK |
+| `security.email_threat` | 500 | 18.5s | OK |
+| `logistics.invoice_extract` | 1500 | 55.6s | OK (also vision — self-hosted can't serve it regardless, see §8) |
+| `comms.message_assistant` | 512 | 19.0s | OK |
+| `logistics.demand_narrative` | 300 | 11.1s | OK |
+| `logistics.transport_mode_suggest` | 400 | 14.8s | OK |
+| `logistics.cargo_damage_analysis` / `.document_categorize` / `.bol_extract` | 600 / 200 / 600 | 22.2s / 7.4s / 22.2s | OK (vision, moot per §8 — fails fast before generation, budget never reached) |
+| `comms.nexus_copilot_chat` | 600 | 22.2s | OK |
+| `comms.portal_chatbot_reply` | 500 | 18.5s | OK |
+
+**One real hit: `markets.research_thread`, the only other task sharing the exact same failure shape as `logistics.smart_quotes`.** At its old 4096-token budget, worst-case generation is ~152s — over both `LLM_REQUEST_TIMEOUT_MS` (115s) and Cloudflare's 125.1s ceiling, structurally undeliverable on self-hosted regardless of timeout tuning, identical to smart_quotes' pre-fix state. Unlike smart_quotes this is free-form chat text (`"You are an India-market research analyst chatting with the user"`, `user: "${user_message}"`), not a fixed JSON schema, so there was no field-shape constraint to design around — the fix is just lowering the cap to 2800 (same margin as smart_quotes), still a substantial multi-paragraph reply.
+
+**Compounding factor found alongside it: this task had zero `PAID_FALLBACK_ON_FAILURE` coverage** — worse than smart_quotes' own pre-fix state, since a self-hosted timeout here failed the request outright with no silent degradation to a paid provider at all. Added the same Gemini fallback entry the other text-only tasks (`comms.nexus_copilot_chat`, `.portal_chatbot_reply`) already use.
+
+**Fixed and deployed, `03cc8ead`:** `MAX_OUTPUT_TOKENS`/`FALLBACK_ROUTING` for `markets.research_thread` dropped 4096 → 2800; added its `PAID_FALLBACK_ON_FAILURE` entry (`gemini`/`gemini-2.5-flash`). Exhaustiveness re-verified (all three per-task maps still cover all 19 task IDs), lint clean. Deployed via the host-side bind-mount path (`docker cp` into the container failed with "mounted volume is marked read-only" this time — the mount is read-only *from inside the container*; writing to the host path `/data/coolify/applications/i64jlyerora7ao9vkw5sweh3/volumes/functions/` directly, then `docker restart`, is the correct route) and verified two ways post-restart: the container came back `healthy` with no startup errors, and a real `generate_smart_quotes` call through the freshly-restarted container (which loads the exact `llm-gateway.ts` module just edited) completed normally — `provider: custom, status: ok`, 63.1s / 2093 tokens (`platform.llm_usage` id 3831) — confirming the edit didn't break the shared module for any task.
+
+**No other task needs this fix.** Every other budget already sat well under the ~2800-token safe ceiling; this audit found exactly one instance of the pattern, now closed.
