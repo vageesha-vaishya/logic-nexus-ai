@@ -372,6 +372,20 @@ function applyDynamicPricing(response: any) {
                 if (!mainLeg) mainLeg = opt.legs.reduce((prev: any, current: any) => (prev.distance_km > current.distance_km) ? prev : current);
             }
 
+            // The model also independently generates the option-level
+            // `carrier.name` (what the UI displays) and each leg's own
+            // `carrier` -- another pair with nothing forcing them to agree.
+            // Confirmed live: real responses showed carrier.name as the
+            // *pickup/delivery trucker's* name (e.g. "Local Logistics")
+            // while the ocean leg was correctly assigned a real carrier
+            // (e.g. "CMA CGM") in the very same option. Same fix pattern as
+            // the pricing reconciliation above: trust the main leg, not the
+            // independently-generated summary field.
+            if (mainLeg && mainLeg.carrier) {
+                const existingCarrier = typeof opt.carrier === 'object' && opt.carrier ? opt.carrier : {};
+                opt.carrier = { ...existingCarrier, name: mainLeg.carrier };
+            }
+
             // The model generates price_breakdown (base_fare/surcharges/fees) and
             // legs[].charges as two INDEPENDENT descriptions of the same cost --
             // nothing forces them to agree, and empirically they often don't
