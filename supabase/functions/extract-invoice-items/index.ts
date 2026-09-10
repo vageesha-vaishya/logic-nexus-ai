@@ -1,6 +1,7 @@
 import { getCorsHeaders } from "../_shared/cors.ts"
 import { requireAuth } from "../_shared/auth.ts"
 import { serveWithLogger } from "../_shared/logger.ts"
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts"
 
 serveWithLogger(async (req, logger, supabase) => {
   const headers = getCorsHeaders(req);
@@ -20,88 +21,35 @@ serveWithLogger(async (req, logger, supabase) => {
       );
     }
 
-    const { file_url, file_type } = await req.json()
+    const { data: roleRows } = await supabase
+      .from('user_roles')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .not('tenant_id', 'is', null)
+      .limit(1);
+    const tenantId: string | null = roleRows?.[0]?.tenant_id ?? null;
+
+    const { file_url } = await req.json()
 
     // Validate Input
     if (!file_url || typeof file_url !== 'string') {
       throw new Error('Missing or invalid file_url');
     }
 
-    const openAiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!openAiKey) {
-        throw new Error('Missing OPENAI_API_KEY');
-    }
-
-    // Initialize Supabase with service role for HTS lookups
-    // Already initialized by serveWithLogger as 'supabase'
-
     logger.info(`Processing Invoice: ${file_url}`);
 
-    // 1. Prepare Image for GPT-4o (Vision)
-    // If it's a PDF, we assume the frontend or a previous step converted it to an image or 
-    // we use a service to read it. For this MVP, we support Image URLs directly.
-    // If it is a PDF URL, GPT-4o might not read it directly unless we download and convert.
-    // Assuming the URL is publicly accessible or signed.
-    
-    // 2. Call OpenAI
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an expert logistics invoice analyzer. 
-            Extract line items from the provided invoice image. 
-            Return a JSON object with a key "items" containing an array of objects.
-            Each object must have:
-            - description (string)
-            - quantity (number)
-            - unit_price (number)
-            - total_price (number)
-            - hs_code (string, if visible)
-            - weight_kg (number, if visible)
-            - origin_country (string, if visible)
-            
-            Do not include markdown formatting like \`\`\`json. Just return the raw JSON string.`
-          },
-          {
-            role: 'user',
-            content: [
-              { type: 'text', text: 'Extract the line items from this invoice.' },
-              {
-                type: 'image_url',
-                image_url: {
-                  url: file_url,
-                },
-              },
-            ],
-          },
-        ],
-        max_tokens: 1000,
-      }),
-    });
+    // Routes through the shared LLM gateway (tenant-configured provider,
+    // self-hosted by default; falls back to Gemini only if that fails --
+    // see _shared/llm-gateway.ts's PAID_FALLBACK_ON_FAILURE).
+    const ctx: LlmCallContext = { tenantId, userId: user.id, supabaseAdmin: supabase, logger };
+    const llmResult = await callLLM("logistics.invoice_extract", {}, ctx, { image: { url: file_url } });
 
-    if (!response.ok) {
-        const error = await response.text();
-        logger.error(`OpenAI Error: ${error}`);
-        throw new Error(`OpenAI API Error: ${response.statusText}`);
-    }
-
-    const aiData = await response.json();
-    const content = aiData.choices[0].message.content;
-    
     let extractedData;
     try {
-        // Clean potential markdown code blocks if GPT ignored instructions
-        const cleanContent = content.replace(/```json/g, '').replace(/```/g, '').trim();
+        const cleanContent = llmResult.text.replace(/```json/gi, '').replace(/```/g, '').trim();
         extractedData = JSON.parse(cleanContent);
     } catch (e) {
-        logger.error("JSON Parse Error", { content });
+        logger.error("JSON Parse Error", { content: llmResult.text });
         throw new Error("Failed to parse AI response as JSON");
     }
 

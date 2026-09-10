@@ -2,6 +2,7 @@ import { serveWithLogger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts";
 
 declare const Deno: any;
 
@@ -91,36 +92,32 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     const context = (matches || []).map((m: any) => `Title: ${m.title}\nContent:\n${m.content}`).join("\n\n---\n\n");
 
     const { sanitized, redacted } = sanitizeForLLM(`${quoteContext}\n\n${context}`);
-    const sys = "You are a customer-facing assistant in a logistics quote portal. Answer strictly based on provided context. If unsure, say you don't know. Do not reveal internal details.";
-    const userMsg = `Question:\n<user_context>${q}</user_context>\nQuote:\n${quoteContext}\nDocs:\n${sanitized}\nReply with JSON:\n{"answer":"...", "actions":[{"type":"accept_quote","params":{}},{"type":"predict_eta","params":{"origin_id":"","destination_id":"","mode":""}}]}`;
     let answer = "I'm not sure. Please contact support.";
     let actions: any[] = [];
-    if (openaiKey) {
-      try {
-        const res = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-          body: JSON.stringify({ model: "gpt-4o-mini", messages: [{ role: "system", content: sys }, { role: "user", content: userMsg }], temperature: 0.2, max_tokens: 400 }),
-        });
-        if (res.ok) {
-          const json = await res.json();
-          try {
-            const parsed = JSON.parse(json.choices[0].message.content);
-            answer = parsed.answer || answer;
-            actions = Array.isArray(parsed.actions) ? parsed.actions : [];
-          } catch { /* ignore */ }
-        } else {
-            logger.error(`OpenAI Chat failed: ${res.status}`);
-        }
-      } catch (err) {
-        logger.error("OpenAI Chat error", { error: err });
-      }
+    let modelUsed = "none";
+    try {
+      // Routes through the shared LLM gateway (self-hosted by default,
+      // falls back only if that fails -- see _shared/llm-gateway.ts). No
+      // tenant is resolved for this deliberately-public, token-scoped
+      // portal, so this uses the platform's env-based default routing.
+      const ctx: LlmCallContext = { tenantId: null, userId: user?.id ?? null, supabaseAdmin, logger };
+      const llmResult = await callLLM("comms.portal_chatbot_reply", {
+        question: q,
+        quote_context: quoteContext,
+        docs: sanitized,
+      }, ctx);
+      const parsed = JSON.parse(llmResult.text.replace(/```json/gi, "").replace(/```/g, "").trim());
+      answer = parsed.answer || answer;
+      actions = Array.isArray(parsed.actions) ? parsed.actions : [];
+      modelUsed = `${llmResult.provider}:${llmResult.model}`;
+    } catch (err) {
+      logger.error("Portal chatbot LLM gateway error", { error: err });
     }
 
     await logAiCall(supabase, {
       user_id: user?.id ?? null,
       function_name: "portal-chatbot",
-      model_used: "gpt-4o-mini",
+      model_used: modelUsed,
       output_summary: { answer_preview: answer.slice(0, 80), action_count: actions.length },
       pii_detected: redacted.length > 0,
       pii_fields_redacted: redacted,

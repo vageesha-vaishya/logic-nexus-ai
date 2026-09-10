@@ -1,8 +1,7 @@
 import { serveWithLogger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
-
-declare const Deno: any;
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts";
 
 type CategorizeRequest = {
   url?: string;
@@ -31,8 +30,15 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       });
     }
 
-    const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
     const supabase = supabaseClient;
+
+    const { data: roleRows } = await supabaseAdmin
+      .from("user_roles")
+      .select("tenant_id")
+      .eq("user_id", user.id)
+      .not("tenant_id", "is", null)
+      .limit(1);
+    const tenantId: string | null = roleRows?.[0]?.tenant_id ?? null;
 
     let category = "unknown";
     let confidence = 0.5;
@@ -55,37 +61,20 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       }
     }
 
+    let modelUsed = "heuristics";
     if (!category || category === "unknown") {
-      if (openaiKey && (payload?.url || payload?.base64)) {
-        const imageContent = payload?.url
-          ? { type: "image_url", image_url: { url: payload.url } }
-          : { type: "image_url", image_url: { url: `data:${payload?.mime || "application/octet-stream"};base64,${payload?.base64}` } };
-        
+      if (payload?.url || payload?.base64) {
         try {
-          const res = await fetch("https://api.openai.com/v1/chat/completions", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-            body: JSON.stringify({
-              model: "gpt-4o",
-              messages: [
-                { role: "system", content: "Classify the logistics document type. Choose one of: bill_of_lading, invoice, packing_list, delivery_order, certificate, other." },
-                { role: "user", content: [{ type: "text", text: "What document type is this? Reply with JSON: {\"category\":\"...\",\"confidence\":0-1}" }, imageContent] }
-              ],
-              temperature: 0.0,
-            }),
+          const ctx: LlmCallContext = { tenantId, userId: user.id, supabaseAdmin, logger };
+          const llmResult = await callLLM("logistics.document_categorize", {}, ctx, {
+            image: { url: payload.url, base64: payload.base64, mime: payload.mime },
           });
-          if (res.ok) {
-            const json = await res.json();
-            try {
-              const parsed = JSON.parse(json.choices[0].message.content);
-              category = parsed.category || "unknown";
-              confidence = Number(parsed.confidence ?? 0.6);
-            } catch { /* ignore */ }
-          } else {
-            logger.error(`OpenAI API error: ${res.status} ${res.statusText}`);
-          }
+          const parsed = JSON.parse(llmResult.text.replace(/```json/gi, "").replace(/```/g, "").trim());
+          category = parsed.category || "unknown";
+          confidence = Number(parsed.confidence ?? 0.6);
+          modelUsed = `${llmResult.provider}:${llmResult.model}`;
         } catch (err) {
-          logger.error("Failed to call OpenAI", { error: err });
+          logger.error("Failed to categorize document via LLM gateway", { error: err });
         }
       }
     }
@@ -93,7 +82,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
     await logAiCall(supabase as any, {
       user_id: user.id,
       function_name: "categorize-document",
-      model_used: openaiKey ? "gpt-4o-vision" : "heuristics",
+      model_used: modelUsed,
       output_summary: { category, confidence },
       pii_detected: false,
       pii_fields_redacted: [],

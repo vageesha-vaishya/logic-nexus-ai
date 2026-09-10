@@ -3,8 +3,7 @@ import { requireAuth } from "../_shared/auth.ts";
 import { sanitizeForLLM } from "../_shared/pii-guard.ts";
 import { pickEmbeddingModel } from "../_shared/model-router.ts";
 import { logAiCall } from "../_shared/audit.ts";
-
-declare const Deno: any;
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts";
 
 type CopilotRequest = {
   query: string;
@@ -78,42 +77,18 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       .map((m: any, i: number) => `# Doc ${i + 1}\nTitle: ${m.title}\nContent:\n${m.content}`)
       .join("\n\n");
 
-    const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
-    const chatRes = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${openaiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content:
-              "You are Nexus Copilot for a logistics CRM. Answer strictly based on provided context. If context is insufficient, say you don't know and suggest collecting more data.",
-          },
-          {
-            role: "user",
-            content: `Question:\n${sanitized}\n\nContext:\n${context}\n\nRespond concisely with clear steps or references.`,
-          },
-        ],
-        temperature: 0.2,
-      }),
-    });
-    if (!chatRes.ok) {
-      const t = await chatRes.text();
-      logger.error(`Chat error: ${t}`);
-      throw new Error(`Chat error: ${t}`);
-    }
-    const chatJson = await chatRes.json();
-    const answer = chatJson?.choices?.[0]?.message?.content ?? "";
+    // Routes through the shared LLM gateway (tenant-configured provider,
+    // self-hosted by default; falls back only if that fails -- see
+    // _shared/llm-gateway.ts).
+    const ctx: LlmCallContext = { tenantId: payload?.tenantId ?? null, userId: user?.id ?? null, supabaseAdmin, logger };
+    const llmResult = await callLLM("comms.nexus_copilot_chat", { context, question: sanitized }, ctx);
+    const answer = llmResult.text;
 
     await logAiCall(supabase, {
       tenant_id: payload?.tenantId ?? null,
       user_id: user?.id ?? null,
       function_name: "nexus-copilot",
-      model_used: "gpt-4o-mini",
+      model_used: `${llmResult.provider}:${llmResult.model}`,
       output_summary: { snippet_count: (matches || []).length },
       pii_detected: redacted.length > 0,
       pii_fields_redacted: redacted,

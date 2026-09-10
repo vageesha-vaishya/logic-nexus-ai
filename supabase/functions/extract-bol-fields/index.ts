@@ -1,8 +1,7 @@
 import { serveWithLogger } from "../_shared/logger.ts";
 import { requireAuth } from "../_shared/auth.ts";
 import { logAiCall } from "../_shared/audit.ts";
-
-declare const Deno: any;
+import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts";
 
 type ExtractRequest = {
   url?: string;
@@ -31,8 +30,15 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       });
     }
 
-    const openaiKey = Deno.env.get("OPENAI_API_KEY") ?? "";
     const supabase = supabaseClient;
+
+    const { data: roleRows } = await supabaseAdmin
+      .from("user_roles")
+      .select("tenant_id")
+      .eq("user_id", user.id)
+      .not("tenant_id", "is", null)
+      .limit(1);
+    const tenantId: string | null = roleRows?.[0]?.tenant_id ?? null;
 
     // Fallback regex parsing from text_hint
     const text = (payload?.text_hint ?? "").toString();
@@ -52,43 +58,26 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
       measurement: text.match(/Measurement[:\s]*([0-9.,\sA-Za-z]+)/i)?.[1]?.trim() || null,
     };
 
-    // If no text provided and key exists, try GPT-4o Vision to extract
-    if (!text && openaiKey && (payload?.url || payload?.base64)) {
-      const imageContent = payload?.url
-        ? { type: "image_url", image_url: { url: payload.url } }
-        : { type: "image_url", image_url: { url: `data:${payload?.mime || "application/octet-stream"};base64,${payload?.base64}` } };
-      
+    // If no text provided, try vision extraction via the shared LLM gateway
+    let modelUsed = "regex-fallback";
+    if (!text && (payload?.url || payload?.base64)) {
       try {
-        const res = await fetch("https://api.openai.com/v1/chat/completions", {
-          method: "POST",
-          headers: { "Content-Type": "application/json", Authorization: `Bearer ${openaiKey}` },
-          body: JSON.stringify({
-            model: "gpt-4o",
-            messages: [
-              { role: "system", content: "Extract structured BOL fields. Reply JSON with keys: shipper, consignee, notify_party, booking_no, bl_no, vessel, voyage, port_of_loading, port_of_discharge, marks_numbers, description_goods, gross_weight, measurement." },
-              { role: "user", content: [{ type: "text", text: "Extract all BOL fields as JSON." }, imageContent] }
-            ],
-            temperature: 0.0,
-          }),
+        const ctx: LlmCallContext = { tenantId, userId: user.id, supabaseAdmin, logger };
+        const llmResult = await callLLM("logistics.bol_extract", {}, ctx, {
+          image: { url: payload.url, base64: payload.base64, mime: payload.mime },
         });
-        if (res.ok) {
-          const json = await res.json();
-          try {
-            const parsed = JSON.parse(json.choices[0].message.content);
-            Object.assign(fields, parsed);
-          } catch { /* ignore */ }
-        } else {
-          logger.error(`OpenAI API error: ${res.status} ${res.statusText}`);
-        }
+        const parsed = JSON.parse(llmResult.text.replace(/```json/gi, "").replace(/```/g, "").trim());
+        Object.assign(fields, parsed);
+        modelUsed = `${llmResult.provider}:${llmResult.model}`;
       } catch (err) {
-        logger.error("Failed to call OpenAI", { error: err });
+        logger.error("Failed to extract BOL fields via LLM gateway", { error: err });
       }
     }
 
     await logAiCall(supabase as any, {
       user_id: user.id,
       function_name: "extract-bol-fields",
-      model_used: openaiKey ? "gpt-4o-vision" : "regex-fallback",
+      model_used: modelUsed,
       output_summary: { extracted: Object.keys(fields).filter(k => fields[k]).length },
       pii_detected: false,
       pii_fields_redacted: [],

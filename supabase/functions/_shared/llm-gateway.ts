@@ -52,7 +52,12 @@ export type LlmTaskId =
   | "logistics.invoice_extract"
   | "comms.message_assistant"
   | "logistics.demand_narrative"
-  | "logistics.transport_mode_suggest";
+  | "logistics.transport_mode_suggest"
+  | "logistics.cargo_damage_analysis"
+  | "logistics.document_categorize"
+  | "logistics.bol_extract"
+  | "comms.nexus_copilot_chat"
+  | "comms.portal_chatbot_reply";
 
 interface RoutingEntry {
   provider: LlmProvider;
@@ -77,6 +82,15 @@ const FALLBACK_ROUTING: Record<LlmTaskId, RoutingEntry> = {
   "comms.message_assistant":     { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  512 },
   "logistics.demand_narrative":  { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  300 },
   "logistics.transport_mode_suggest": { provider: "anthropic", model: "claude-haiku-4-5", maxOutputTokens: 400 },
+  // These four need a vision-capable model; Anthropic supports vision too
+  // (not wired here yet — see callAnthropic), so this fallback routing
+  // entry is only reached with no tenant config AND no PAID_FALLBACK_ON_FAILURE
+  // credential, an unlikely combination. Kept for type-completeness.
+  "logistics.cargo_damage_analysis": { provider: "gemini", model: "gemini-2.5-flash", maxOutputTokens: 600 },
+  "logistics.document_categorize":   { provider: "gemini", model: "gemini-2.5-flash", maxOutputTokens: 200 },
+  "logistics.bol_extract":           { provider: "gemini", model: "gemini-2.5-flash", maxOutputTokens: 600 },
+  "comms.nexus_copilot_chat":        { provider: "anthropic", model: "claude-haiku-4-5", maxOutputTokens: 600 },
+  "comms.portal_chatbot_reply":      { provider: "anthropic", model: "claude-haiku-4-5", maxOutputTokens: 500 },
 };
 
 // Max output token defaults per task. The model name comes from the tenant
@@ -96,6 +110,11 @@ const MAX_OUTPUT_TOKENS: Record<LlmTaskId, number> = {
   "comms.message_assistant":      512,
   "logistics.demand_narrative":   300,
   "logistics.transport_mode_suggest": 400,
+  "logistics.cargo_damage_analysis": 600,
+  "logistics.document_categorize":   200,
+  "logistics.bol_extract":           600,
+  "comms.nexus_copilot_chat":        600,
+  "comms.portal_chatbot_reply":      500,
 };
 
 interface PromptTemplate { version: string; system: string; user: string; }
@@ -353,9 +372,14 @@ CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object shown above �
       "Body:\n${body} -- truncated",
   },
   "logistics.invoice_extract": {
-    version: "v1-2026-09-05",
+    // v2: the image is now attached as real multimodal content (see the
+    // `image` param on callLLM) instead of being interpolated as a
+    // ${file_url} string -- the original v1 user template asked the model
+    // to "extract from the invoice at this URL" without ever actually
+    // sending the image, which no provider can act on.
+    version: "v2-2026-09-10",
     system:
-      "You are an expert logistics invoice analyzer. Extract line items from the referenced invoice.\n\n" +
+      "You are an expert logistics invoice analyzer. Extract line items from the provided invoice image.\n\n" +
       "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY a raw JSON object with a key \"items\" containing " +
       "an array of objects. Each object must have:\n" +
       "- description (string)\n" +
@@ -367,9 +391,63 @@ CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object shown above �
       "- origin_country (string, if visible)\n\n" +
       "No markdown code fences (no ```), no commentary, no explanation before or after. " +
       "The entire response body MUST be valid JSON parseable directly by JSON.parse().",
+    user: "Extract the line items from this invoice.",
+  },
+  "logistics.cargo_damage_analysis": {
+    version: "v1-2026-09-10",
+    system:
+      "You are an expert cargo inspector and logistics compliance officer. " +
+      "Analyze the provided image of cargo/packaging for any signs of damage or non-compliance.\n\n" +
+      "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY a raw JSON object of this shape — " +
+      "{\"damage_detected\": boolean, \"damage_type\": \"none\"|\"crushed\"|\"wet\"|\"punctured\"|\"torn\"|\"broken_seal\"|\"other\", " +
+      "\"severity\": \"none\"|\"low\"|\"medium\"|\"high\"|\"critical\", \"description\": string, " +
+      "\"recommendation\": \"Accept\"|\"Reject\"|\"Inspect Content\"|\"Repack\", \"confidence\": number (0-1)}. " +
+      "If the image is not of cargo or packaging, set damage_type to \"other\" and description to " +
+      "\"Image does not appear to be cargo\". " +
+      "The entire response body MUST be valid JSON parseable directly by JSON.parse().",
+    user: "Inspect this cargo for damage.",
+  },
+  "logistics.document_categorize": {
+    version: "v1-2026-09-10",
+    system:
+      "Classify the logistics document type from the provided image. Choose one of: " +
+      "bill_of_lading, invoice, packing_list, delivery_order, certificate, other.\n\n" +
+      "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY a raw JSON object — " +
+      "{\"category\": \"...\", \"confidence\": 0-1}. " +
+      "The entire response body MUST be valid JSON parseable directly by JSON.parse().",
+    user: "What document type is this?",
+  },
+  "logistics.bol_extract": {
+    version: "v1-2026-09-10",
+    system:
+      "Extract structured Bill of Lading fields from the provided image. " +
+      "Reply JSON with keys: shipper, consignee, notify_party, booking_no, bl_no, vessel, voyage, " +
+      "port_of_loading, port_of_discharge, marks_numbers, description_goods, gross_weight, measurement. " +
+      "Use null for any field not visible in the image.\n\n" +
+      "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object described above. " +
+      "The entire response body MUST be valid JSON parseable directly by JSON.parse().",
+    user: "Extract all BOL fields as JSON.",
+  },
+  "comms.nexus_copilot_chat": {
+    version: "v1-2026-09-10",
+    system:
+      "You are Nexus Copilot for a logistics CRM. Answer strictly based on provided context. " +
+      "If context is insufficient, say you don't know and suggest collecting more data. " +
+      "Respond in plain text only — no JSON, no markdown code fences.",
+    user: "Context:\n${context}\n\nQuestion:\n${question}",
+  },
+  "comms.portal_chatbot_reply": {
+    version: "v1-2026-09-10",
+    system:
+      "You are a customer-facing assistant in a logistics quote portal. Answer strictly based on " +
+      "provided context. If unsure, say you don't know. Do not reveal internal details.\n\n" +
+      "CRITICAL OUTPUT CONSTRAINT: Respond with ONLY a raw JSON object — " +
+      "{\"answer\": \"...\", \"actions\": [{\"type\": \"accept_quote\"|\"predict_eta\", \"params\": {}}]}. " +
+      "The entire response body MUST be valid JSON parseable directly by JSON.parse().",
     user:
-      "Extract the line items from the invoice at this URL: ${file_url}\n" +
-      "File type: ${file_type}",
+      "Question:\n<user_context>${question}</user_context>\n" +
+      "Quote:\n${quote_context}\n" +
+      "Docs:\n${docs}",
   },
   "comms.message_assistant": {
     version: "v1-2026-09-05",
@@ -473,6 +551,50 @@ async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = LLM_
   }
 }
 
+// ─── Vision / multimodal image input ───────────────────────────────────
+//
+// Callers pass either a URL or raw base64 (matching each function's own
+// input contract). Resolved once, up front, to {base64, mime} regardless
+// of source -- this lets every provider dispatch function work from the
+// same shape, and means the image is fetched at most once even if the
+// primary attempt fails and a fallback provider is retried.
+
+export interface LlmImageInput {
+  url?: string;
+  base64?: string;
+  mime?: string;
+}
+
+interface ResolvedImage {
+  base64: string;
+  mime: string;
+}
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+async function resolveImageInput(img: LlmImageInput): Promise<ResolvedImage> {
+  if (img.base64) {
+    return { base64: img.base64, mime: img.mime || "image/jpeg" };
+  }
+  if (img.url) {
+    const resp = await fetchWithTimeout(img.url, { method: "GET" }, 20_000);
+    if (!resp.ok) {
+      throw new LlmGatewayError("image_fetch_failed", `Failed to fetch image (${resp.status})`, 400);
+    }
+    const mime = resp.headers.get("content-type")?.split(";")[0] || img.mime || "image/jpeg";
+    const buf = new Uint8Array(await resp.arrayBuffer());
+    return { base64: encodeBase64(buf), mime };
+  }
+  throw new LlmGatewayError("missing_image", "No image url or base64 provided", 400);
+}
+
 interface ResolvedConfig {
   provider: LlmProvider;
   model: string;
@@ -498,8 +620,30 @@ interface ResolvedConfig {
 // in this environment, rather than surfacing the failure to the caller.
 // Absent here (or missing its env credential) simply means no fallback --
 // the original error propagates, which is always safe.
+// The four vision tasks below have no self-hosted default at all today --
+// the only model this platform's self-hosted rig currently serves
+// (qwen3.8-27b-awq) has no vision capability, confirmed live against its
+// /v1/models endpoint. The primary attempt still always runs first per
+// policy (and will simply fail fast, cleanly, since the model can't accept
+// image input) before this fallback is used -- this is a real capability
+// gap in the self-hosted deployment, not a policy exception, and should be
+// revisited if a vision-capable self-hosted model is ever deployed.
+// Gemini, not OpenAI, is the fallback here even though these functions
+// originally called OpenAI directly: OPENAI_API_KEY in this environment is
+// stale (confirmed via a live 401 against api.openai.com), so it would fail
+// too; GOOGLE_API_KEY is confirmed valid.
 const PAID_FALLBACK_ON_FAILURE: Partial<Record<LlmTaskId, { provider: LlmProvider; model: string; envKey: string }>> = {
-  "logistics.smart_quotes": { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+  "logistics.smart_quotes":            { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+  "logistics.cargo_damage_analysis":   { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+  "logistics.document_categorize":     { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+  "logistics.bol_extract":             { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+  "logistics.invoice_extract":         { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+  // Both text-only, no vision blocker -- fallback covers the case where the
+  // self-hosted attempt errors, or (nexus-copilot/portal-chatbot specifically)
+  // no tenant is resolved at all and env-based routing's other fallback
+  // (VLLM_BASE_URL, a different rig with a known-stale credential) fails too.
+  "comms.nexus_copilot_chat":          { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+  "comms.portal_chatbot_reply":        { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
 };
 
 // ─── Resolve tenant config (or env fallback) ───────────────────────────
@@ -591,11 +735,15 @@ export async function callLLM(
   taskId: LlmTaskId,
   vars: Record<string, string>,
   ctx: LlmCallContext,
+  opts?: { image?: LlmImageInput },
 ): Promise<LlmCallResult> {
   const prompt = PROMPTS[taskId];
   if (!prompt) throw new LlmGatewayError("unknown_task", `Unknown LLM task '${taskId}'`, 400);
 
   const userMsg = interpolate(prompt.user, vars);
+  // Resolved once, before either attempt, so a fallback retry doesn't
+  // re-fetch the image -- see resolveImageInput's comment above.
+  const image = opts?.image ? await resolveImageInput(opts.image) : undefined;
 
   async function attempt(cfg: ResolvedConfig): Promise<LlmCallResult> {
     const t0 = Date.now();
@@ -603,22 +751,24 @@ export async function callLLM(
     try {
       switch (cfg.provider) {
         case "anthropic":
+          if (image) throw new LlmGatewayError("vision_not_supported", "Vision input is not wired for the anthropic provider yet", 501);
           result = await callAnthropic(cfg, prompt.system, userMsg);
           break;
         case "openrouter":
+          if (image) throw new LlmGatewayError("vision_not_supported", "Vision input is not wired for the openrouter provider yet", 501);
           result = await callOpenRouter(cfg, prompt.system, userMsg);
           break;
         case "openai":
-          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "openai");
+          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "openai", image);
           break;
         case "gemini":
-          result = await callGemini(cfg, prompt.system, userMsg, taskId);
+          result = await callGemini(cfg, prompt.system, userMsg, taskId, image);
           break;
         case "local-qwen":
-          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "local-qwen");
+          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "local-qwen", image);
           break;
         case "custom":
-          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "custom");
+          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "custom", image);
           break;
       }
     } catch (e: any) {
@@ -776,6 +926,7 @@ async function callOpenAiCompatible(
   system: string,
   user: string,
   provider: "openrouter" | "openai" | "local-qwen" | "custom",
+  image?: ResolvedImage,
 ): Promise<LlmCallResult> {
   const defaultBase =
     provider === "openrouter" ? "https://openrouter.ai/api/v1"
@@ -793,12 +944,23 @@ async function callOpenAiCompatible(
     headers["X-Title"] = "SOS-Nexus Markets";
   }
 
+  // Standard OpenAI vision content-array shape -- also what vLLM's
+  // OpenAI-compatible server expects for a vision-capable served model, so
+  // this same code path works unmodified the moment one is deployed
+  // self-hosted (see PAID_FALLBACK_ON_FAILURE's comment on the current gap).
+  const userContent = image
+    ? [
+        { type: "text", text: user },
+        { type: "image_url", image_url: { url: `data:${image.mime};base64,${image.base64}` } },
+      ]
+    : user;
+
   const body = {
     model: cfg.model,
     max_tokens: cfg.maxOutputTokens,
     messages: [
       { role: "system", content: system },
-      { role: "user",   content: user },
+      { role: "user",   content: userContent },
     ],
   };
 
@@ -869,13 +1031,22 @@ async function callOpenAiCompatible(
 // leaving only 314 for the actual JSON, which is why it kept truncating.
 // Disabling thinking gives large structured-output tasks like this one the
 // entire budget for the output we actually asked for.
-const GEMINI_JSON_MODE_TASKS = new Set<LlmTaskId>(["logistics.smart_quotes"]);
+const GEMINI_JSON_MODE_TASKS = new Set<LlmTaskId>([
+  "logistics.smart_quotes",
+  "logistics.cargo_damage_analysis",
+  "logistics.document_categorize",
+  "logistics.bol_extract",
+  "logistics.invoice_extract",
+  "comms.portal_chatbot_reply",
+  // comms.nexus_copilot_chat deliberately excluded -- its output is plain text, not JSON.
+]);
 
 async function callGemini(
   cfg: ResolvedConfig,
   system: string,
   user: string,
   taskId?: LlmTaskId,
+  image?: ResolvedImage,
 ): Promise<LlmCallResult> {
   const base = cfg.baseUrl ?? "https://generativelanguage.googleapis.com";
   // model names in the DB may or may not be prefixed with `models/`
@@ -883,10 +1054,17 @@ async function callGemini(
   const url = `${base}/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
 
   // Gemini API takes `systemInstruction` separately and `contents[]` for the
-  // turn-by-turn conversation. We send a single user turn.
+  // turn-by-turn conversation. We send a single user turn. Images go in the
+  // same turn's parts[] as inline_data (base64) -- Gemini also supports a
+  // file_data/file_uri form for its own File API, not used here since we
+  // already have the bytes from resolveImageInput.
+  const userParts: any[] = [{ text: user }];
+  if (image) {
+    userParts.push({ inline_data: { mime_type: image.mime, data: image.base64 } });
+  }
   const body: any = {
     contents: [
-      { role: "user", parts: [{ text: user }] },
+      { role: "user", parts: userParts },
     ],
     generationConfig: {
       maxOutputTokens: cfg.maxOutputTokens,
