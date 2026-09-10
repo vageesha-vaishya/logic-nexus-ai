@@ -66,16 +66,21 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
   const [errorMsg, setErrorMsg] = React.useState<string | null>(null)
   const [selectedLocation, setSelectedLocation] = React.useState<Location | null>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
+  const triggerRef = React.useRef<HTMLButtonElement>(null)
   const isSelecting = React.useRef(false)
-  // Radix restores focus to the trigger button when this popover's content
-  // unmounts (on any close, not just Escape). That restore fires the
-  // trigger's onFocus below, which would otherwise reopen this same popover
-  // a moment after it was legitimately closed -- e.g. select a value here,
-  // then immediately click a different field's trigger: the restore can
-  // land after that click and re-open this popover on top of it, so the
-  // next selection hits this field instead of the one the user clicked.
-  // Set right before every close so the one resulting restore-focus event
-  // is swallowed instead of reopening.
+  // Radix's FocusScope restores focus to the trigger button when this
+  // popover's content unmounts (its default onCloseAutoFocus behavior).
+  // That restore calls trigger.focus(), which fires the trigger's onFocus
+  // below -- and since that handler opens the popover, the restore would
+  // otherwise reopen this same popover a moment after it was legitimately
+  // closed. E.g. select a value here, then immediately click a different
+  // field's trigger: the restore can land after that click and reopen this
+  // field on top of it, so the next selection hits this field instead of
+  // the one actually clicked. We take over the restore ourselves below
+  // (preventDefault + focus the trigger manually) and set this flag
+  // synchronously right before doing so, so only that one, self-triggered
+  // focus event is swallowed -- ordinary clicks/tabbing into the trigger
+  // are untouched and still open it normally.
   const suppressFocusOpenRef = React.useRef(false)
   
   const { scopedDb, user } = useCRM()
@@ -482,17 +487,11 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
     ? `${selectedLocation!.location_name} ${selectedLocation!.location_code ? `(${selectedLocation!.location_code})` : ''}`
     : value || ""
 
-  const handleOpenChange = React.useCallback((next: boolean) => {
-    if (!next) {
-      suppressFocusOpenRef.current = true
-    }
-    setOpen(next)
-  }, [])
-
   return (
-    <Popover open={open} onOpenChange={handleOpenChange}>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
+          ref={triggerRef}
           variant="outline"
           role="combobox"
           aria-expanded={open}
@@ -522,7 +521,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
               setInputValue((prev) => prev.slice(0, Math.max(0, prev.length - 1)))
               e.preventDefault()
             } else if (e.key === 'Escape') {
-              handleOpenChange(false)
+              setOpen(false)
             }
           }}
           onPaste={(e) => {
@@ -541,7 +540,18 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-[400px] p-0" align="start">
+      <PopoverContent
+        className="w-[400px] p-0"
+        align="start"
+        onCloseAutoFocus={(e) => {
+          // Take over Radix's default restore-focus-to-trigger behavior so
+          // it can't fire the trigger's onFocus (see suppressFocusOpenRef
+          // above) and reopen this popover.
+          e.preventDefault()
+          suppressFocusOpenRef.current = true
+          triggerRef.current?.focus()
+        }}
+      >
         <Command shouldFilter={false}> 
           <CommandInput 
             placeholder="Search port, airport, city..." 
@@ -578,7 +588,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
                     isSelecting.current = true
                     setSelectedLocation(location)
                     onChange(location.location_name, location)
-                    handleOpenChange(false)
+                    setOpen(false)
                   }}
                 >
                   <div className="flex items-center gap-2 w-full">
