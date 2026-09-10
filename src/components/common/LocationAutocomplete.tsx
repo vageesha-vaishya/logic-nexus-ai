@@ -104,6 +104,14 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
         setLocations([])
         setPage(0)
         setHasMore(false)
+        // Without this, a stale search string survives across opens: if this
+        // trigger button ever regains focus after closing (Radix returns
+        // focus to the trigger on close), a printable keystroke replays the
+        // "type while closed" fallback below, which reopens the popover and
+        // appends onto whatever was last typed here -- e.g. selecting "Nhava
+        // Sheva" then later typing "Rotterdam" into this same field produced
+        // "Nhava ShevaRotterdam" instead of a fresh search.
+        setInputValue("")
     }
   }, [open])
 
