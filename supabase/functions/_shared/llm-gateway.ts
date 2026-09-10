@@ -1249,147 +1249,189 @@ export async function callLLMConversation(
   const prompt = PROMPTS[taskId];
   if (!prompt) throw new LlmGatewayError("unknown_task", `Unknown LLM task '${taskId}'`, 400);
 
-  const config = await resolveConfig(taskId, ctx);
   const system = systemSuffix ? `${prompt.system}\n\n${systemSuffix}` : prompt.system;
-  const t0 = Date.now();
 
   // Build provider-specific message array (assistant messages may not start with "user")
   // Anthropic requires alternating user/assistant starting with user.
   // Ensure messages array is valid.
   const validMessages: ConversationMessage[] = messages.length > 0 ? messages : [{ role: "user", content: "" }];
 
-  let result: LlmCallResult;
-  try {
-    switch (config.provider) {
-      case "anthropic": {
-        const url = (config.baseUrl ?? "https://api.anthropic.com") + "/v1/messages";
-        const body = {
-          model:      config.model,
-          max_tokens: config.maxOutputTokens,
-          system,
-          messages:   validMessages,
-        };
-        const resp = await fetchWithTimeout(url, {
-          method: "POST",
-          headers: {
-            "x-api-key": config.apiKey,
-            "anthropic-version": "2023-06-01",
-            "content-type": "application/json",
-          },
-          body: JSON.stringify(body),
-        });
-        if (!resp.ok) {
-          const txt = await resp.text().catch(() => "");
-          throw new LlmGatewayError(`anthropic_${resp.status}`, `Anthropic ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
+  async function attempt(cfg: ResolvedConfig): Promise<LlmCallResult> {
+    const t0 = Date.now();
+    let result: LlmCallResult;
+    try {
+      switch (cfg.provider) {
+        case "anthropic": {
+          const url = (cfg.baseUrl ?? "https://api.anthropic.com") + "/v1/messages";
+          const body = {
+            model:      cfg.model,
+            max_tokens: cfg.maxOutputTokens,
+            system,
+            messages:   validMessages,
+          };
+          const resp = await fetchWithTimeout(url, {
+            method: "POST",
+            headers: {
+              "x-api-key": cfg.apiKey,
+              "anthropic-version": "2023-06-01",
+              "content-type": "application/json",
+            },
+            body: JSON.stringify(body),
+          });
+          if (!resp.ok) {
+            const txt = await resp.text().catch(() => "");
+            throw new LlmGatewayError(`anthropic_${resp.status}`, `Anthropic ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
+          }
+          const json: any = await resp.json();
+          const text = Array.isArray(json?.content)
+            ? json.content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("")
+            : "";
+          const inputTokens  = Number(json?.usage?.input_tokens  ?? 0);
+          const outputTokens = Number(json?.usage?.output_tokens ?? 0);
+          const cachedInputTokens = Number(json?.usage?.cache_read_input_tokens ?? 0);
+          const p = ANTHROPIC_PRICING[cfg.model];
+          const costUsd = p
+            ? ((inputTokens - cachedInputTokens) * p.inputPerMillion + cachedInputTokens * (p.cachedInputPerMillion ?? p.inputPerMillion) + outputTokens * p.outputPerMillion) / 1_000_000
+            : 0;
+          result = { text, provider: "anthropic", model: cfg.model, inputTokens, outputTokens, cachedInputTokens, costUsd, latencyMs: 0, promptVersion: "", raw: json };
+          break;
         }
-        const json: any = await resp.json();
-        const text = Array.isArray(json?.content)
-          ? json.content.filter((b: any) => b?.type === "text").map((b: any) => b.text).join("")
-          : "";
-        const inputTokens  = Number(json?.usage?.input_tokens  ?? 0);
-        const outputTokens = Number(json?.usage?.output_tokens ?? 0);
-        const cachedInputTokens = Number(json?.usage?.cache_read_input_tokens ?? 0);
-        const p = ANTHROPIC_PRICING[config.model];
-        const costUsd = p
-          ? ((inputTokens - cachedInputTokens) * p.inputPerMillion + cachedInputTokens * (p.cachedInputPerMillion ?? p.inputPerMillion) + outputTokens * p.outputPerMillion) / 1_000_000
-          : 0;
-        result = { text, provider: "anthropic", model: config.model, inputTokens, outputTokens, cachedInputTokens, costUsd, latencyMs: 0, promptVersion: "", raw: json };
-        break;
+        case "openrouter":
+        case "openai":
+        case "local-qwen":
+        case "custom": {
+          // Strip a trailing "/v1" so a configured base_url may include it or
+          // not (VLLM_BASE_URL is set with a trailing /v1, matching the
+          // single-turn callOpenAiCompatible convention) without doubling up.
+          const rawBase = cfg.baseUrl ?? (cfg.provider === "openrouter" ? "https://openrouter.ai/api" : "https://api.openai.com");
+          const baseUrl = rawBase.replace(/\/v1\/?$/, "");
+          const url = baseUrl + "/v1/chat/completions";
+          const oaiMessages = [{ role: "system", content: system }, ...validMessages];
+          const resp = await fetchWithTimeout(url, {
+            method: "POST",
+            headers: {
+              "Authorization": `Bearer ${cfg.apiKey}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ model: cfg.model, max_tokens: cfg.maxOutputTokens, messages: oaiMessages }),
+          });
+          if (!resp.ok) {
+            const txt = await resp.text().catch(() => "");
+            throw new LlmGatewayError(`provider_${resp.status}`, `Provider ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
+          }
+          const json: any = await resp.json();
+          const text = json?.choices?.[0]?.message?.content ?? "";
+          result = { text, provider: cfg.provider, model: cfg.model, inputTokens: Number(json?.usage?.prompt_tokens ?? 0), outputTokens: Number(json?.usage?.completion_tokens ?? 0), cachedInputTokens: 0, costUsd: 0, latencyMs: 0, promptVersion: "", raw: json };
+          break;
+        }
+        case "gemini": {
+          // Conversation-mode Gemini. Same generateContent endpoint as the
+          // single-turn path; the multi-turn shape is just `contents[]` of
+          // {role, parts[{text}]} per https://ai.google.dev/api/generate-content.
+          const base = cfg.baseUrl ?? "https://generativelanguage.googleapis.com";
+          const modelPath = cfg.model.startsWith("models/") ? cfg.model : `models/${cfg.model}`;
+          const url = `${base}/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(cfg.apiKey)}`;
+          const contents = validMessages.map((m) => ({
+            // Gemini uses "user" / "model" (not "assistant")
+            role: m.role === "assistant" ? "model" : m.role,
+            parts: [{ text: m.content }],
+          }));
+          const body: any = {
+            contents,
+            generationConfig: { maxOutputTokens: cfg.maxOutputTokens },
+          };
+          if (system && system.trim().length > 0) {
+            body.systemInstruction = { parts: [{ text: system }] };
+          }
+          const resp = await fetchWithTimeout(url, {
+            method: "POST",
+            headers: { "content-type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          if (!resp.ok) {
+            const txt = await resp.text().catch(() => "");
+            throw new LlmGatewayError(`gemini_${resp.status}`, `Gemini ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
+          }
+          const json: any = await resp.json();
+          const text = Array.isArray(json?.candidates)
+            ? (json.candidates[0]?.content?.parts ?? [])
+                .filter((p: any) => typeof p?.text === "string")
+                .map((p: any) => p.text)
+                .join("")
+            : "";
+          const usage = json?.usageMetadata ?? {};
+          const inputTokens  = Number(usage.promptTokenCount     ?? 0);
+          const outputTokens = Number(usage.candidatesTokenCount ?? 0);
+          const cachedInputTokens = Number(usage.cachedContentTokenCount ?? 0);
+          const p = GEMINI_PRICING[cfg.model] ?? GEMINI_PRICING[cfg.model.replace(/^models\//, "")];
+          const costUsd = p
+            ? ((inputTokens - cachedInputTokens) * p.inputPerMillion +
+               cachedInputTokens * (p.cachedInputPerMillion ?? p.inputPerMillion) +
+               outputTokens * p.outputPerMillion) / 1_000_000
+            : 0;
+          result = { text, provider: "gemini", model: cfg.model, inputTokens, outputTokens, cachedInputTokens, costUsd: Math.round(costUsd * 1e6) / 1e6, latencyMs: 0, promptVersion: "", raw: json };
+          break;
+        }
+        default:
+          throw new LlmGatewayError("provider_not_implemented", `Provider '${cfg.provider}' not wired for conversation mode.`, 501);
       }
-      case "openrouter":
-      case "openai":
-      case "local-qwen":
-      case "custom": {
-        // Strip a trailing "/v1" so a configured base_url may include it or
-        // not (VLLM_BASE_URL is set with a trailing /v1, matching the
-        // single-turn callOpenAiCompatible convention) without doubling up.
-        const rawBase = config.baseUrl ?? (config.provider === "openrouter" ? "https://openrouter.ai/api" : "https://api.openai.com");
-        const baseUrl = rawBase.replace(/\/v1\/?$/, "");
-        const url = baseUrl + "/v1/chat/completions";
-        const oaiMessages = [{ role: "system", content: system }, ...validMessages];
-        const resp = await fetchWithTimeout(url, {
-          method: "POST",
-          headers: {
-            "Authorization": `Bearer ${config.apiKey}`,
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ model: config.model, max_tokens: config.maxOutputTokens, messages: oaiMessages }),
-        });
-        if (!resp.ok) {
-          const txt = await resp.text().catch(() => "");
-          throw new LlmGatewayError(`provider_${resp.status}`, `Provider ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
-        }
-        const json: any = await resp.json();
-        const text = json?.choices?.[0]?.message?.content ?? "";
-        result = { text, provider: config.provider, model: config.model, inputTokens: Number(json?.usage?.prompt_tokens ?? 0), outputTokens: Number(json?.usage?.completion_tokens ?? 0), cachedInputTokens: 0, costUsd: 0, latencyMs: 0, promptVersion: "", raw: json };
-        break;
-      }
-      case "gemini": {
-        // Conversation-mode Gemini. Same generateContent endpoint as the
-        // single-turn path; the multi-turn shape is just `contents[]` of
-        // {role, parts[{text}]} per https://ai.google.dev/api/generate-content.
-        const base = config.baseUrl ?? "https://generativelanguage.googleapis.com";
-        const modelPath = config.model.startsWith("models/") ? config.model : `models/${config.model}`;
-        const url = `${base}/v1beta/${modelPath}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
-        const contents = validMessages.map((m) => ({
-          // Gemini uses "user" / "model" (not "assistant")
-          role: m.role === "assistant" ? "model" : m.role,
-          parts: [{ text: m.content }],
-        }));
-        const body: any = {
-          contents,
-          generationConfig: { maxOutputTokens: config.maxOutputTokens },
-        };
-        if (system && system.trim().length > 0) {
-          body.systemInstruction = { parts: [{ text: system }] };
-        }
-        const resp = await fetchWithTimeout(url, {
-          method: "POST",
-          headers: { "content-type": "application/json" },
-          body: JSON.stringify(body),
-        });
-        if (!resp.ok) {
-          const txt = await resp.text().catch(() => "");
-          throw new LlmGatewayError(`gemini_${resp.status}`, `Gemini ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
-        }
-        const json: any = await resp.json();
-        const text = Array.isArray(json?.candidates)
-          ? (json.candidates[0]?.content?.parts ?? [])
-              .filter((p: any) => typeof p?.text === "string")
-              .map((p: any) => p.text)
-              .join("")
-          : "";
-        const usage = json?.usageMetadata ?? {};
-        const inputTokens  = Number(usage.promptTokenCount     ?? 0);
-        const outputTokens = Number(usage.candidatesTokenCount ?? 0);
-        const cachedInputTokens = Number(usage.cachedContentTokenCount ?? 0);
-        const p = GEMINI_PRICING[config.model] ?? GEMINI_PRICING[config.model.replace(/^models\//, "")];
-        const costUsd = p
-          ? ((inputTokens - cachedInputTokens) * p.inputPerMillion +
-             cachedInputTokens * (p.cachedInputPerMillion ?? p.inputPerMillion) +
-             outputTokens * p.outputPerMillion) / 1_000_000
-          : 0;
-        result = { text, provider: "gemini", model: config.model, inputTokens, outputTokens, cachedInputTokens, costUsd: Math.round(costUsd * 1e6) / 1e6, latencyMs: 0, promptVersion: "", raw: json };
-        break;
-      }
-      default:
-        throw new LlmGatewayError("provider_not_implemented", `Provider '${config.provider}' not wired for conversation mode.`, 501);
+    } catch (e: any) {
+      const latency = Date.now() - t0;
+      await recordUsage(ctx, { taskId, promptVersion: prompt.version, provider: cfg.provider, model: cfg.model, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, costUsd: 0, latencyMs: latency, status: "error", errorCode: e?.code ?? "provider_error", errorMessage: e?.message, configSource: cfg.source });
+      if (e instanceof LlmGatewayError) throw e;
+      throw new LlmGatewayError("provider_error", e?.message ?? "Provider call failed", 502);
     }
-  } catch (e: any) {
-    const latency = Date.now() - t0;
-    await recordUsage(ctx, { taskId, promptVersion: prompt.version, provider: config.provider, model: config.model, inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, costUsd: 0, latencyMs: latency, status: "error", errorCode: e?.code ?? "provider_error", errorMessage: e?.message, configSource: config.source });
-    if (e instanceof LlmGatewayError) throw e;
-    throw new LlmGatewayError("provider_error", e?.message ?? "Provider call failed", 502);
+
+    result.latencyMs    = Date.now() - t0;
+    result.promptVersion = prompt.version;
+
+    await recordUsage(ctx, { taskId, promptVersion: prompt.version, provider: result.provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, cachedInputTokens: result.cachedInputTokens, costUsd: result.costUsd, latencyMs: result.latencyMs, status: "ok", configSource: cfg.source, configId: cfg.configId });
+
+    if (cfg.source === "tenant_config" && cfg.configId) {
+      await (ctx.supabaseAdmin as any).schema("platform").from("llm_provider_configs").update({ last_used_at: new Date().toISOString() }).eq("id", cfg.configId);
+    }
+
+    return result;
   }
 
-  result.latencyMs    = Date.now() - t0;
-  result.promptVersion = prompt.version;
+  // Same primary-then-paid-fallback policy as callLLM (see its comment
+  // above PAID_FALLBACK_ON_FAILURE). This function previously had no
+  // fallback at all -- found live, 2026-09-10, testing the
+  // markets.research_thread budget fix in the browser: this tenant's
+  // tenant-wide-default config (a "gemini" row with no domain set) has a
+  // missing vault secret, so the primary attempt threw a 401, and the
+  // request just failed outright even though research_thread had just been
+  // given a PAID_FALLBACK_ON_FAILURE entry -- because that entry is only
+  // ever consulted by callLLM, and markets-research (the only caller of
+  // this function) never reaches it.
+  const primaryConfig = await resolveConfig(taskId, ctx);
+  try {
+    return await attempt(primaryConfig);
+  } catch (primaryError: any) {
+    const fallback = PAID_FALLBACK_ON_FAILURE[taskId];
+    if (!fallback || primaryConfig.provider === fallback.provider) throw primaryError;
 
-  await recordUsage(ctx, { taskId, promptVersion: prompt.version, provider: result.provider, model: result.model, inputTokens: result.inputTokens, outputTokens: result.outputTokens, cachedInputTokens: result.cachedInputTokens, costUsd: result.costUsd, latencyMs: result.latencyMs, status: "ok", configSource: config.source, configId: config.configId });
+    const fallbackKey = Deno.env.get(fallback.envKey);
+    if (!fallbackKey) throw primaryError;
 
-  if (config.source === "tenant_config" && config.configId) {
-    await (ctx.supabaseAdmin as any).schema("platform").from("llm_provider_configs").update({ last_used_at: new Date().toISOString() }).eq("id", config.configId);
+    if (ctx.logger) {
+      ctx.logger.warn("primary provider failed; retrying once with paid fallback per platform policy", {
+        taskId,
+        primaryProvider: primaryConfig.provider,
+        primarySource: primaryConfig.source,
+        fallbackProvider: fallback.provider,
+        error: primaryError?.message ?? String(primaryError),
+      });
+    }
+
+    const fallbackConfig: ResolvedConfig = {
+      provider: fallback.provider,
+      model: fallback.model,
+      apiKey: fallbackKey,
+      baseUrl: null,
+      maxOutputTokens: MAX_OUTPUT_TOKENS[taskId],
+      source: "env_fallback",
+    };
+    return await attempt(fallbackConfig);
   }
-
-  return result;
 }
