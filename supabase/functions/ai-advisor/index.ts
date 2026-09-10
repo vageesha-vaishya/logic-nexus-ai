@@ -359,50 +359,91 @@ function applyDynamicPricing(response: any) {
 
     if (response.options) {
         response.options = response.options.map((opt: any) => {
-            const base = opt.price_breakdown.base_fare || 0;
-            
-            // Adjust surcharges if AI didn't provide them explicitly or to enforce our logic
-            if (!opt.price_breakdown.surcharges) opt.price_breakdown.surcharges = {};
-            
-            // Calculate dynamic values
-            const fuelAmt = Math.round(base * fuelSurchargeRate);
-            const currencyAmt = Math.round(base * exchangeRateBuffer);
+            if (!opt.price_breakdown) opt.price_breakdown = {};
+            if (!opt.price_breakdown.fees) opt.price_breakdown.fees = {};
+            const currency = opt.price_breakdown.currency || 'USD';
 
-            // Overwrite/Add to Global Breakdown
-            opt.price_breakdown.surcharges.fuel_adjustment = fuelAmt;
-            opt.price_breakdown.surcharges.currency_adj = currencyAmt;
-
-            // --- INJECT INTO LEGS FOR CONSISTENCY ---
-            if (opt.legs && Array.isArray(opt.legs) && opt.legs.length > 0) {
+            const hasLegs = Array.isArray(opt.legs) && opt.legs.length > 0;
+            let mainLeg: any = null;
+            if (hasLegs) {
                 // Find Main Leg (longest distance or Ocean/Air)
                 // Heuristic: Look for leg with same mode as option, or longest distance
-                let mainLeg = opt.legs.find((l: any) => opt.transport_mode && l.mode && opt.transport_mode.toLowerCase().includes(l.mode.toLowerCase()));
+                mainLeg = opt.legs.find((l: any) => opt.transport_mode && l.mode && opt.transport_mode.toLowerCase().includes(l.mode.toLowerCase()));
                 if (!mainLeg) mainLeg = opt.legs.reduce((prev: any, current: any) => (prev.distance_km > current.distance_km) ? prev : current);
-
-                if (mainLeg) {
-                    if (!mainLeg.charges) mainLeg.charges = [];
-                    
-                    // Remove existing dynamic charges to avoid duplication if re-running
-                    mainLeg.charges = mainLeg.charges.filter((c: any) => c.name !== 'Fuel Adjustment (Dynamic)' && c.name !== 'Currency Adjustment (Dynamic)');
-
-                    // Add new charges
-                    if (fuelAmt > 0) {
-                        mainLeg.charges.push({ name: 'Fuel Adjustment (Dynamic)', amount: fuelAmt, currency: opt.price_breakdown.currency || 'USD', unit: 'per_shipment' });
-                    }
-                    if (currencyAmt > 0) {
-                        mainLeg.charges.push({ name: 'Currency Adjustment (Dynamic)', amount: currencyAmt, currency: opt.price_breakdown.currency || 'USD', unit: 'per_shipment' });
-                    }
-                }
             }
-            // ----------------------------------------
 
-            // Recalculate Total
-            const surcharges = Object.values(opt.price_breakdown.surcharges).reduce((a: any, b: any) => a + b, 0) as number;
-            const fees = opt.price_breakdown.fees ? Object.values(opt.price_breakdown.fees).reduce((a: any, b: any) => a + b, 0) as number : 0;
+            // The model generates price_breakdown (base_fare/surcharges/fees) and
+            // legs[].charges as two INDEPENDENT descriptions of the same cost --
+            // nothing forces them to agree, and empirically they often don't
+            // (~17-38% of options across both self-hosted and paid providers in
+            // live sampling, 2026-09-10). Rather than trust the model's own
+            // arithmetic, make legs the source of truth for base_fare/fees when
+            // legs exist, then rebuild every dynamic/model surcharge back into
+            // the main leg's charges. That makes sum(legs[].charges) and
+            // price_breakdown.total identical by construction, not by hoping
+            // the model's two independent numbers happened to match.
+            let base: number;
+            if (mainLeg) {
+                base = (mainLeg.charges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+                const otherLegsTotal = opt.legs
+                    .filter((l: any) => l !== mainLeg)
+                    .reduce((sum: number, l: any) => sum + (l.charges || []).reduce((s: number, c: any) => s + (Number(c.amount) || 0), 0), 0);
+                // Collapses whatever fee categories the model may have split out
+                // (e.g. "terminal_charges") into one reconciled figure -- keeps
+                // the fee bucket true to the legs instead of an independent guess.
+                opt.price_breakdown.fees = { handling_docs: otherLegsTotal };
+            } else {
+                // No legs to reconcile against -- fall back to trusting the
+                // model's own base_fare, same as before this fix.
+                base = opt.price_breakdown.base_fare || 0;
+            }
+            opt.price_breakdown.base_fare = base;
+
+            // Discard any other surcharge key the model reported (e.g.
+            // "baf_caf") rather than carry it through: requirement #4 in the
+            // prompt explicitly tells the model to fold BAF/CAF "included in
+            // the rolled-up leg charge" -- confirmed live, base_fare +
+            // surcharges.baf_caf consistently equals the main leg's own
+            // charge amount exactly (e.g. 2500 + 350 = 2850). Since `base`
+            // above is already taken from that same leg charge, it already
+            // contains whatever the model folded in; keeping baf_caf as a
+            // separate addend on top would double-count it. Only the two
+            // dynamic surcharges below are genuinely additional -- they're
+            // computed by this function, not something the model could have
+            // already baked into the leg.
+            const fuelAmt = Math.round(base * fuelSurchargeRate);
+            const currencyAmt = Math.round(base * exchangeRateBuffer);
+            opt.price_breakdown.surcharges = { fuel_adjustment: fuelAmt, currency_adj: currencyAmt };
+
             const taxes = opt.price_breakdown.taxes || 0;
-            
-            opt.price_breakdown.total = base + surcharges + fees + taxes;
-            
+            const surchargesSum = fuelAmt + currencyAmt;
+            const feesSum = Object.values(opt.price_breakdown.fees).reduce((a: any, b: any) => (Number(a) || 0) + (Number(b) || 0), 0) as number;
+
+            // --- REBUILD THE MAIN LEG'S CHARGES FROM THE FINAL NUMBERS ---
+            // Replaces whatever charge line(s) the model originally put on
+            // this leg with one line per price_breakdown component (base
+            // freight + fuel/currency adjustment + taxes). This is what
+            // makes sum(legs[].charges) equal price_breakdown's base_fare +
+            // surcharges + fees + taxes unconditionally -- fees already
+            // matches by construction (it's literally the sum of every
+            // other leg, set above), so once this leg's own total equals
+            // base + surcharges + taxes, the two grand totals match.
+            if (mainLeg) {
+                const unit = (mainLeg.charges && mainLeg.charges[0]?.unit) || 'per_shipment';
+                mainLeg.charges = [
+                    { name: 'Freight', amount: base, currency, unit },
+                    ...(fuelAmt !== 0 ? [{ name: 'Fuel Adjustment (Dynamic)', amount: fuelAmt, currency, unit: 'per_shipment' }] : []),
+                    ...(currencyAmt !== 0 ? [{ name: 'Currency Adjustment (Dynamic)', amount: currencyAmt, currency, unit: 'per_shipment' }] : []),
+                    ...(taxes !== 0 ? [{ name: 'Taxes', amount: taxes, currency, unit: 'per_shipment' }] : []),
+                ];
+            }
+            // ------------------------------------------------------------
+
+            // Recalculate Total -- always the sum of the fields above, so it
+            // can never disagree with itself, or (via the leg rebuild above)
+            // with sum(legs[].charges).
+            opt.price_breakdown.total = base + surchargesSum + feesSum + taxes;
+
             return opt;
         });
     }
