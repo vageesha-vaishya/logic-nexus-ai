@@ -67,6 +67,16 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
   const [selectedLocation, setSelectedLocation] = React.useState<Location | null>(null)
   const inputRef = React.useRef<HTMLInputElement>(null)
   const isSelecting = React.useRef(false)
+  // Radix restores focus to the trigger button when this popover's content
+  // unmounts (on any close, not just Escape). That restore fires the
+  // trigger's onFocus below, which would otherwise reopen this same popover
+  // a moment after it was legitimately closed -- e.g. select a value here,
+  // then immediately click a different field's trigger: the restore can
+  // land after that click and re-open this popover on top of it, so the
+  // next selection hits this field instead of the one the user clicked.
+  // Set right before every close so the one resulting restore-focus event
+  // is swallowed instead of reopening.
+  const suppressFocusOpenRef = React.useRef(false)
   
   const { scopedDb, user } = useCRM()
   const debouncedSearch = useDebounce(inputValue, 300)
@@ -472,8 +482,15 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
     ? `${selectedLocation!.location_name} ${selectedLocation!.location_code ? `(${selectedLocation!.location_code})` : ''}`
     : value || ""
 
+  const handleOpenChange = React.useCallback((next: boolean) => {
+    if (!next) {
+      suppressFocusOpenRef.current = true
+    }
+    setOpen(next)
+  }, [])
+
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={handleOpenChange}>
       <PopoverTrigger asChild>
         <Button
           variant="outline"
@@ -486,7 +503,13 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
             className
           )}
           disabled={disabled}
-          onFocus={() => setOpen(true)}
+          onFocus={() => {
+            if (suppressFocusOpenRef.current) {
+              suppressFocusOpenRef.current = false
+              return
+            }
+            setOpen(true)
+          }}
           onKeyDown={(e) => {
             if (disabled) return
             const isPrintable = e.key.length === 1 && !e.ctrlKey && !e.metaKey && !e.altKey
@@ -499,7 +522,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
               setInputValue((prev) => prev.slice(0, Math.max(0, prev.length - 1)))
               e.preventDefault()
             } else if (e.key === 'Escape') {
-              setOpen(false)
+              handleOpenChange(false)
             }
           }}
           onPaste={(e) => {
@@ -555,7 +578,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
                     isSelecting.current = true
                     setSelectedLocation(location)
                     onChange(location.location_name, location)
-                    setOpen(false)
+                    handleOpenChange(false)
                   }}
                 >
                   <div className="flex items-center gap-2 w-full">
