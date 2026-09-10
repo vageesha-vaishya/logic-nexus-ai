@@ -108,7 +108,7 @@ further action needed on F-2.1.
 
 **F-1.4 — The Express service's service-token auth defaults to fully open** unless an operator explicitly sets `LLM_GATEWAY_AUTH_MODE=enforced`. Latent today (it isn't deployed); a trap the moment anyone deploys it.
 
-**F-2.3 — 15 of 38 AI-calling functions (39%) bypass every shared layer.** The headline shadow-AI number.
+**F-2.3 — 15 of 38 AI-calling functions (39%) bypass every shared layer.** The headline shadow-AI number. **Largely closed 2026-09-10 (`49e320b8`)** — see §8 for the full audit against the self-hosted-default policy and the migration of 6 more functions onto the gateway. 13 of the 15 are now resolved (7 already compliant pre-dating this pass, 6 migrated); 2 (`forecast-demand`, `route-optimization`) remain dormant/undeployed and unmigrated.
 
 **F-2.6 — `portal-chatbot` is intentionally public** and can be invoked to spend AI budget with no credentials. Its router-level gate is off (`VERIFY_JWT_MAP["portal-chatbot"] === false`) and its body likewise does not hard-fail on missing auth — the same shape as `ai-advisor` — but its exposure is deliberately bounded by token-scoped data access and `sanitizeForLLM`, which is why this stays High rather than Critical.
 
@@ -242,6 +242,8 @@ Ordered by severity × how many other findings each unblocks.
 
    **Remediated 2026-09-09 (`643c1d1c`), for `services/llm-gateway` — F-1.1, F-1.2, F-1.4 (moot), F-1.6 (moot), F-4.1, F-5.5.** Took W1's recommendation: kept `_shared/llm-gateway.ts` as the sole live gateway, deleted `services/llm-gateway` in full (never deployed anywhere, per F-4.1), deleted the 16 edge functions whose only backend was the never-set `LLM_GATEWAY_URL` (F-2.5's "whole pathway"), their 15 frontend hooks/UI sections, and `LlmGatewayAdminPage` (F-5.5's hardcoded-503 dashboard — its four tabs had no other data source). Migrating those 16 functions onto `_shared/llm-gateway.ts` instead of deleting them was considered and explicitly declined for this pass; F-1.2 and F-1.6 (no PII redaction, no erasure path) are now moot for the deleted service but still describe the live gateway's actual governance gap, which is unresolved. `markets-worker/llm_gateway.py` (the third named gateway) is untouched by this remediation.
 5. **Migrate the 15 direct-call functions onto the chosen path** (F-2.3, F-2.4, F-2.6). **Not part of the 2026-09-09 remediation** — this is the shadow-AI bucket (direct provider calls, no shared layer), a distinct set of functions from the 16 `LLM_GATEWAY_URL`-dependent ones deleted above. Still open.
+
+   **Largely done, 2026-09-10 (`49e320b8`) — see §8 for full detail.** 6 more functions migrated onto the gateway (`analyze-cargo-damage`, `categorize-document`, `extract-bol-fields`, `extract-invoice-items`, `nexus-copilot`, `portal-chatbot`), on top of 7 already migrated before this pass. 13 of 15 done; only the 2 dormant/undeployed functions (`forecast-demand`, `route-optimization`) remain. Required adding genuine vision/multimodal support to the gateway, which didn't exist before this — a real capability addition, not just a migration.
 6. **Fix `LLM_GATEWAY_AUTH_MODE` to default closed** (F-1.4) before anything deploys that service. **Moot as of 2026-09-09** — the service this guarded is deleted.
 
 ### P2 — Observability and cost (sub-project D)
@@ -290,6 +292,18 @@ Union of all five workstreams, plus what synthesis could not settle. This sectio
 
 **Coverage caveat, stated plainly.** W2's 38-function figure came from a layered keyword/hostname/import/env-var sweep with every positive hit opened and read — not a line-by-line read of all 152 functions. Two functions (`markets-import-holdings`, `markets-portfolios`) are where that distinction is most likely to matter.
 
+**Deployment history and hosting completeness for `services/llm-gateway`.** W1 confirmed only current absence, not whether the service was deployed in the past and later decommissioned — deployment history was not checked. W2 separately could not rule out a third Supabase Cloud project/organization outside the two reachable via the connected account. W5 found `gateway.llm_invocations` (1 row) and `gateway.prompts` (6 rows) — a schema only `services/llm-gateway` is known to write — with no determined origin given the service's observed non-deployment. None of this overturns "not deployed anywhere observed," but the caveat should travel with the claim.
+
+**Bundle-scan point-in-time caveat.** F-3.3's "count 0" result is a scan of today's live bundle only; whether any earlier deployed bundle ever contained `VITE_OPENAI_API_KEY`, or whether the frontend build environment has ever had it set, was not checked (W3).
+
+**`markets-worker`'s Fly.io deployment target and the vLLM rig's token-issuance process.** F-4.3 flags a second declared deploy target (`fly.toml`) whose live state could not be checked (no Fly API token available) — whether it is active, and if so whether it duplicates AI spend against the same provider budget, is unresolved (W4). Separately, the operational issuance/rotation process for the vLLM rig's own `OLLAMA_PROXY_TOKEN` lives entirely in the externally-operated rig's own documentation and was not observable from this codebase (W4).
+
+**Whether any AI-calling path writes usage data to a destination outside the tables this audit queried** — an external provider's own dashboard, a log aggregator, or nowhere at all — was not determined (W5); relevant to how much weight the "no usage row" observation above can carry.
+
+**Server-side vaulting details of `markets-llm-config`** — whether it actually stores keys in a proper Vault versus a plaintext column, and correctly enforces its claimed role check — was flagged by W3 as open and not independently verified by any workstream.
+
+**Deployment-config drift:** `deploy/selfhosted-supabase/docker-compose.yml` carries a stale comment claiming no functions are deployed. The checked-in compose file is not an accurate mirror of what Coolify runs — the extent of that drift was not mapped.
+
 ---
 
 ## 7. Post-audit verification: Email-to-Lead and Smart Quote (2026-09-09/10)
@@ -321,16 +335,55 @@ Worse than the timeout itself: `useAiAdvisor.ts` caught *any* non-401 error for 
 
 Total ≈88s in the fallback case — worse than routing straight to a paid provider, better than the original 125s hang, and it correctly gives the self-hosted rig a full, genuine attempt first on every call, per policy. `ai_quote_cache` and `ai_audit_logs` both received their first real rows for this task since 2026-05-20. All four standard health-check endpoints (`app`, `api`, `amro`, `app.aviation`) stayed green through every deploy in this sequence.
 
-**New standing item, not previously tracked by this audit:** the self-hosted/vLLM-default, paid-fallback-only policy stated above applies platform-wide, not just to `logistics.smart_quotes`. No other task has been audited against it; F-2.3's "15 of 38 AI-calling functions bypass every shared layer" (shadow-AI, still open per P1 item 5) is the most likely place other violations would hide, since those functions don't go through this gateway's resolution logic at all.
+**New standing item, not previously tracked by this audit, that led directly into §8:** the self-hosted/vLLM-default, paid-fallback-only policy stated above applies platform-wide, not just to `logistics.smart_quotes`. F-2.3's 15 shadow-AI functions were the most likely place other violations would hide, since those functions don't go through this gateway's resolution logic at all.
 
-**Deployment history and hosting completeness for `services/llm-gateway`.** W1 confirmed only current absence, not whether the service was deployed in the past and later decommissioned — deployment history was not checked. W2 separately could not rule out a third Supabase Cloud project/organization outside the two reachable via the connected account. W5 found `gateway.llm_invocations` (1 row) and `gateway.prompts` (6 rows) — a schema only `services/llm-gateway` is known to write — with no determined origin given the service's observed non-deployment. None of this overturns "not deployed anywhere observed," but the caveat should travel with the claim.
+---
 
-**Bundle-scan point-in-time caveat.** F-3.3's "count 0" result is a scan of today's live bundle only; whether any earlier deployed bundle ever contained `VITE_OPENAI_API_KEY`, or whether the frontend build environment has ever had it set, was not checked (W3).
+## 8. Shadow-AI remediation and vision support (2026-09-10)
 
-**`markets-worker`'s Fly.io deployment target and the vLLM rig's token-issuance process.** F-4.3 flags a second declared deploy target (`fly.toml`) whose live state could not be checked (no Fly API token available) — whether it is active, and if so whether it duplicates AI spend against the same provider budget, is unresolved (W4). Separately, the operational issuance/rotation process for the vLLM rig's own `OLLAMA_PROXY_TOKEN` lives entirely in the externally-operated rig's own documentation and was not observable from this codebase (W4).
+Direct follow-up to §7's standing item: an explicit audit of F-2.3's 15 shadow-AI functions against the self-hosted-default/paid-fallback-only policy, then fixing what it found.
 
-**Whether any AI-calling path writes usage data to a destination outside the tables this audit queried** — an external provider's own dashboard, a log aggregator, or nowhere at all — was not determined (W5); relevant to how much weight the "no usage row" observation above can carry.
+**7 of 15 were already compliant**, migrated onto `_shared/llm-gateway.ts` at some point after the original 2026-09-05 audit (F-2.3's per-function table, in `workstream-2-edge-functions.md`, is stale for these): `ai-advisor`, `ai-agent`, `ai-message-assistant`, `analyze-email-threat`, `ensemble-demand`, `smart-reply`, `suggest-transport-mode`. Each gets self-hosted-default/paid-fallback behavior automatically through the gateway's tenant/domain resolution now — this wasn't found or fixed today, just confirmed.
 
-**Server-side vaulting details of `markets-llm-config`** — whether it actually stores keys in a proper Vault versus a plaintext column, and correctly enforces its claimed role check — was flagged by W3 as open and not independently verified by any workstream.
+**8 of 15 were still genuine violations** — 100% paid provider (`OPENAI_API_KEY`), zero self-hosted path at all. Split two ways:
 
-**Deployment-config drift:** `deploy/selfhosted-supabase/docker-compose.yml` carries a stale comment claiming no functions are deployed. The checked-in compose file is not an accurate mirror of what Coolify runs — the extent of that drift was not mapped.
+| Function | Live on self-host? | Status |
+|---|---|---|
+| `analyze-cargo-damage` | Yes | **Migrated (`49e320b8`)** — vision |
+| `categorize-document` | Yes | **Migrated (`49e320b8`)** — vision |
+| `extract-bol-fields` | Yes | **Migrated (`49e320b8`)** — vision |
+| `extract-invoice-items` | Yes | **Migrated (`49e320b8`)** — vision |
+| `nexus-copilot` | Yes | **Chat call migrated (`49e320b8`)**; blocked end-to-end by a separate bug, see below |
+| `portal-chatbot` | Yes | **Migrated (`49e320b8`)** — text-only |
+| `forecast-demand` | No (dormant) | Not migrated — undeployed, lower priority |
+| `route-optimization` | No (dormant) | Not migrated — undeployed, lower priority |
+
+**A critical finding surfaced before any migration work started: `OPENAI_API_KEY` is dead platform-wide.** Confirmed live — a direct call to `api.openai.com/v1/models` with the exact deployed key returned `401 invalid_api_key`, in both the edge-functions container and `markets-worker`'s container (same key value, hash-confirmed identical, so not a sync issue — the credential itself is revoked or expired). Confirmed by reproducing the failure through a real function: `categorize-document`'s logs showed `OpenAI API error: 401 Unauthorized` on every call, silently degrading to `{"category":"unknown","confidence":0.5}` with no visible error. All 6 live functions in the table above read this same env var, so all 6 were almost certainly broken in production before today's fix, independent of the shadow-AI/policy question — this wasn't a "these functions violate policy" problem alone, it was "these functions don't work," full stop. `GOOGLE_API_KEY` was confirmed valid (used successfully for §7's Smart Quote fallback), which is why Gemini — not OpenAI — was chosen as the paid fallback for all 6 migrations, per explicit user direction.
+
+**Vision/multimodal support didn't exist in the gateway before this pass**, discovered while porting `extract-invoice-items`: its one existing vision-shaped task, `logistics.invoice_extract`, had a v1 prompt that interpolated a file URL as *text* (`"Extract the line items from the invoice at this URL: ${file_url}"`) — no provider can act on a URL mentioned in a text prompt; the image itself was never actually sent. Added properly in this pass:
+- `resolveImageInput()`: resolves a caller-supplied URL or raw base64 to `{base64, mime}` once, up front (so a fallback retry doesn't re-fetch the image).
+- `callOpenAiCompatible()` and `callGemini()` both accept the resolved image and embed it in each provider's native multimodal shape (OpenAI-style `image_url` content array; Gemini `inline_data` parts).
+- Anthropic/OpenRouter throw a clear `vision_not_supported` error rather than silently sending an image they can't use — not wired in this pass, since no current path needs them for vision.
+
+**The self-hosted rig has no vision-capable model at all — a real capability gap, not a policy exception.** `GET /v1/models` against the tenant's self-hosted endpoint (`portal.sosservices.online`) lists exactly one model, `qwen3.8-27b-awq`, text-only. Per policy, the primary (self-hosted) attempt still always runs first for all 4 vision tasks — and it does, confirmed live: it fails fast and cleanly (52–252ms, `error_code: custom_400`, the vLLM server rejecting image content outright) before Gemini serves the request. This is architecturally correct and fully policy-compliant; it just means these 4 tasks are paid-only *in practice* until a vision-capable model is deployed on the rig, which is separate infrastructure work outside what's reachable from this codebase (the GPU rig is a machine this session has no access to — same limitation noted for the other, unrelated `vllm.sosservices.online` rig in §6).
+
+**Verified live end-to-end, 5 of 6** (real test images/queries through the actual function, not synthetic gateway-only tests):
+
+| Function | Self-hosted attempt | Fallback | Result |
+|---|---|---|---|
+| `analyze-cargo-damage` | fails, 107ms (`custom_400`) | Gemini, 1957ms | Correct JSON, correctly identified a non-cargo test image |
+| `categorize-document` | fails, 64ms | Gemini, 1898ms | Correctly classified a synthetic BOL-labeled test image (confidence 1.0) |
+| `extract-bol-fields` | fails, 252ms | Gemini, 2993ms | Correctly extracted shipper/consignee/bl_no/vessel from the test image |
+| `extract-invoice-items` | fails, 52ms | Gemini, 1992ms | Correct empty-items result (test image had no invoice content) + HTS enrichment ran cleanly |
+| `portal-chatbot` | fails, 204ms (`local-qwen_401` — hit the *other* stale vLLM rig via env fallback, since no tenant is resolved for this public endpoint) | Gemini, 1079ms | Correct graceful "I don't know" (no context matched) |
+
+**`nexus-copilot` — chat-completion fix is correct but unverified end-to-end, blocked by a separate, pre-existing bug.** Its embedding step (`pickEmbeddingModel()` in `_shared/model-router.ts`, a different code path from the chat call fixed here) is hardcoded to `OPENAI_API_KEY` with **no fallback at all** — it `throw`s on the dead key before the function ever reaches the newly-migrated chat call. Confirmed live: the function errored with the same `401 invalid_api_key` message, sourced from the embedding step, not the chat step. Not fixed in this pass — flagged as a new, distinct follow-up below.
+
+**All four standard health-check endpoints stayed green through every deploy in this sequence.**
+
+### New findings from this section
+
+- **F-2.3, F-2.4, F-2.6 are now resolved for 13 of the 15 shadow-AI functions** (7 pre-existing + 6 migrated today). Only `forecast-demand` and `route-optimization` remain, both dormant/undeployed.
+- **New — `OPENAI_API_KEY` is dead platform-wide (server-side).** Distinct from F-3.1/F-3.2's already-fixed *client-side* `VITE_OPENAI_API_KEY` risk and from §6's stale `VLLM_API_KEY` finding — this is the server-side edge-functions/markets-worker credential, confirmed via a live 401 against `api.openai.com`. Any code path still relying on it (the `nexus-copilot` embedding step, and potentially other server-side callers not audited in this pass) is broken until it's rotated or migrated off OpenAI entirely.
+- **New — `nexus-copilot`'s embedding step needs the same fallback treatment as its chat step.** `_shared/model-router.ts`'s `pickEmbeddingModel()` has zero fallback and will keep throwing on the dead key regardless of anything fixed in `_shared/llm-gateway.ts`. Not fixed; a smaller, separate change from today's work (a different file, a different call shape — embeddings, not chat/vision completions).
+- **New — the self-hosted rig's vision gap should be tracked as its own item, not folded into "shadow AI."** Even with every shadow-AI function correctly wired onto the gateway, 4 tasks are paid-only in practice because there is nothing self-hosted to route to. Whether to accept that as a documented exception, or to deploy a vision-capable model (e.g. a Qwen-VL variant) on the rig, is a product/infrastructure decision, not a code fix.
