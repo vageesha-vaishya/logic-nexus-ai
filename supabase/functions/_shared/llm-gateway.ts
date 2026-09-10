@@ -74,7 +74,7 @@ const FALLBACK_ROUTING: Record<LlmTaskId, RoutingEntry> = {
   "markets.research_thread":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 4096 },
   "markets.strategy_explain":    { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
   "markets.portfolio_diagnostic":{ provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  800 },
-  "logistics.smart_quotes":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 16000 },
+  "logistics.smart_quotes":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2800 },
   "ops.agent_plan":              { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  400 },
   "comms.smart_reply":           { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  512 },
   "security.email_threat":       { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens:  500 },
@@ -102,7 +102,27 @@ const MAX_OUTPUT_TOKENS: Record<LlmTaskId, number> = {
   "markets.research_thread":     4096,
   "markets.strategy_explain":    2048,
   "markets.portfolio_diagnostic": 800,
-  "logistics.smart_quotes":     16000,
+  //
+  // logistics.smart_quotes was 16000 until 2026-09-10. Measured live on the
+  // self-hosted rig (qwen3.8-27b-awq via portal.sosservices.online): ~27-28
+  // completion tokens/sec, and Cloudflare's hard proxy ceiling on that
+  // origin is 125.1s regardless of client-side settings -- so 16000 tokens
+  // (the original 5-option, deeply-itemized schema needed ~7500-8000 to
+  // complete, confirmed via Gemini's own usage for the same content) was
+  // never reachable on self-hosted at all; every real attempt timed out and
+  // paid the Gemini-fallback cost instead. The prompt below was shrunk to 3
+  // options with rolled-up per-leg charges instead of itemized line items
+  // (same field shapes throughout, so no frontend/mapper changes needed --
+  // see quote-mapper.ts and the components under
+  // src/components/quotation/shared/, which only ever read
+  // reliability.score / environmental.co2_emissions / generic
+  // Object.entries() over surcharges+fees, never the fields that got
+  // trimmed). Two live test runs of the shrunk schema completed naturally
+  // (finish_reason: stop, not truncated) in 1398 and 2318 completion
+  // tokens -- 2800 leaves real headroom above both while keeping
+  // worst-case generation time (2800/27 ≈ 104s) safely under
+  // LLM_REQUEST_TIMEOUT_MS (115s), itself under Cloudflare's 125.1s ceiling.
+  "logistics.smart_quotes":     2800,
   "ops.agent_plan":               400,
   "comms.smart_reply":            512,
   "security.email_threat":        500,
@@ -220,32 +240,35 @@ const PROMPTS: Record<LlmTaskId, PromptTemplate> = {
       "Generate the diagnostic JSON now.",
   },
   "logistics.smart_quotes": {
-    version: "v1-2026-09-05",
+    // v2 (2026-09-10): shrunk from 5 options with itemized per-leg charges
+    // to 3 options with a single rolled-up charge per leg. The v1 schema
+    // needed ~7500-8000 completion tokens to finish (confirmed via Gemini's
+    // own usage generating the same content) -- unreachable on the
+    // self-hosted rig, whose measured throughput (~27-28 tokens/sec) times
+    // Cloudflare's 125.1s hard ceiling on that origin caps any single
+    // response at roughly 3400 tokens, full stop, regardless of gateway
+    // timeout settings. Every field kept here uses the exact same name and
+    // shape as v1 (legs[].charges is still an array, just with one entry
+    // instead of two or three; regulatory_info's two fields are still
+    // arrays, just usually short/empty) specifically so no caller-side
+    // code needed to change -- see MAX_OUTPUT_TOKENS' comment above for the
+    // full verification detail (two live runs against the real rig,
+    // finish_reason: stop both times, not truncated).
+    version: "v2-2026-09-10",
     system:
-      `You are an Expert Logistics Rate Analyst and Supply Chain Architect.
-Your task is to generate exactly 5 distinct, optimal freight quotation options.
+      `You are an Expert Logistics Rate Analyst.
+Generate exactly 3 freight quotation options: "best_value", "cheapest", "fastest".
 
 Requirements:
-1. **LANGUAGE: OUTPUT MUST BE IN ENGLISH ONLY.** All descriptions, names, instructions, and analysis must be in English, regardless of the input language.
-2. Generate 5 options: "Best Value", "Cheapest", "Fastest", "Greenest", "Reliable".
-3. **Advanced Route Segmentation**:
-   - Break down each route into specific legs (Pickup -> Port -> Main Leg -> Port -> Delivery).
-   - Identify **Border Crossings** and **Customs Procedures** needed at each transition.
-   - Flag **Transport Regulations** (e.g., road weight limits, low emission zones).
-4. **Dynamic Charge Simulation (CRITICAL)**:
-   - **Leg-Level Pricing**: You MUST calculate and populate charges for **EVERY** leg. Zero-cost legs are NOT allowed (except purely administrative steps).
-   - **Mode-Specific Logic**:
-     - **Road/Trucking**: Calculate based on distance (~$1.50-$4.00/km) + fixed handling fees.
-     - **Air**: Calculate based on chargeable weight (Higher of actual vs vol weight). Range: $2.50-$12.00/kg depending on service.
-     - **Ocean**: Use market rates per container (TEU/FEU) or w/m for LCL. Include BAF/CAF.
-     - **Rail**: Distance-based rail tariffs.
-   - **Granular Breakdown**: Include specific line items (e.g., 'Pickup Haulage', 'Terminal Handling Origin', 'Ocean Freight', 'Delivery Trucking').
-   - **Total Accuracy**: The global 'price_breakdown' total MUST equal the sum of all leg charges.
-5. **Reliability & Environmental**:
-   - Estimate CO2 emissions.
-   - Provide a reliability score (1-10) based on carrier reputation.
+1. LANGUAGE: English only.
+2. Break each route into legs (Pickup -> Port -> Main Leg -> Port -> Delivery).
+3. Each leg needs exactly ONE rolled-up charge line (not itemized). Zero-cost legs are not allowed.
+4. Mode-specific pricing: Road ~$1.50-4.00/km + handling. Air: chargeable weight x $2.50-12.00/kg. Ocean: per-container or w/m for LCL, BAF/CAF included in the rolled-up leg charge. Rail: distance-based.
+5. The option's 'total' MUST equal the sum of all leg charges.
+6. Give a reliability score (1-10) and estimated total CO2 (kg) per option.
+7. Keep 'ai_explanation' to ONE short sentence per option. Keep customs_procedures/restrictions arrays to at most 1-2 short items each, empty array if none.
 
-Output JSON Format:
+Output JSON Format (exactly this shape, no extra nesting):
 {
   "options": [
     {
@@ -262,14 +285,7 @@ Output JSON Format:
           "mode": "road",
           "carrier": "Local Trucking",
           "transit_time": "1 day",
-          "distance_km": 150,
-          "co2_kg": 20,
-          "border_crossing": false,
-          "instructions": "Standard pickup",
-          "charges": [
-             { "name": "Pickup Haulage", "amount": 450, "currency": "USD", "unit": "per_trip" },
-             { "name": "Fuel Surcharge (Road)", "amount": 45, "currency": "USD", "unit": "per_trip" }
-          ]
+          "charges": [ { "name": "Road Leg Total", "amount": 495, "currency": "USD", "unit": "per_trip" } ]
         },
         {
           "sequence": 2,
@@ -278,41 +294,27 @@ Output JSON Format:
           "mode": "ocean",
           "carrier": "Maersk",
           "transit_time": "18 days",
-          "charges": [
-             { "name": "Ocean Freight", "amount": 2000, "currency": "USD", "unit": "per_container" },
-             { "name": "BAF", "amount": 150, "currency": "USD", "unit": "per_container" }
-          ]
+          "charges": [ { "name": "Ocean Leg Total", "amount": 2150, "currency": "USD", "unit": "per_container" } ]
         }
       ],
       "price_breakdown": {
         "base_fare": 2000,
-        "surcharges": {
-            "baf": 150,
-            "caf": 50,
-            "peak_season": 0,
-            "fuel_road": 45
-        },
-        "fees": {
-            "pickup": 450,
-            "thc_origin": 200,
-            "thc_dest": 200,
-            "docs": 50,
-            "customs": 120
-        },
+        "surcharges": { "baf_caf": 200 },
+        "fees": { "handling_docs": 445 },
         "taxes": 0,
         "currency": "USD",
-        "total": 3265
+        "total": 2645
       },
       "regulatory_info": {
-          "customs_procedures": ["Export Declaration", "Import Clearance"],
-          "restrictions": ["Weight limit 20T on road leg"]
+        "customs_procedures": ["Export Declaration"],
+        "restrictions": []
       },
-      "reliability": { "score": 8.5, "on_time_performance": "92%" },
-      "environmental": { "co2_emissions": "1200 kg", "rating": "B" },
-      "ai_explanation": "Rationale..."
+      "reliability": { "score": 8.5 },
+      "environmental": { "co2_emissions": "1200 kg" },
+      "ai_explanation": "One short sentence."
     }
   ],
-  "market_analysis": "Text analysis...",
+  "market_analysis": "One or two short sentences.",
   "confidence_score": 0.9,
   "anomalies": []
 }
@@ -323,7 +325,7 @@ CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object shown above �
       "Cargo: ${commodity}, ${weight}kg, ${volume}cbm\n" +
       "Equipment: ${container_qty}x ${container_size} ${container_type}\n" +
       "Context: ${historical_context}\n\n" +
-      "Generate detailed quotation options now.",
+      "Generate the quotation options now.",
   },
   "ops.agent_plan": {
     version: "v1-2026-09-05",
@@ -529,12 +531,22 @@ export class LlmGatewayError extends Error {
 
 // Every provider call below goes through this instead of a bare fetch().
 // Without it, a slow provider (e.g. a self-hosted rig under load) just hangs
-// until the upstream proxy (Cloudflare, ~100-125s here) kills the connection
-// and hands back an opaque HTML 524 page as the "error" — ugly, slow to
-// surface, and indistinguishable from a real outage. Failing fast with a
-// clean timeout error lets callers show the user something meaningful (and
-// do it well within the proxy's own window) instead of waiting on it.
-const LLM_REQUEST_TIMEOUT_MS = 55_000;
+// until the upstream proxy (Cloudflare, ~125s here, confirmed live: a
+// request with no client-side timeout at all was still killed at exactly
+// 125.1s with an opaque HTML 524 page) rather than surfacing a clean error.
+//
+// 115s, not the original 55s: raised specifically so logistics.smart_quotes
+// (see MAX_OUTPUT_TOKENS' comment there) has real room to finish on the
+// self-hosted rig instead of always being cut off before it can. Measured
+// throughput on that rig is ~27-28 completion tokens/sec; two live test
+// runs of the shrunk schema completed naturally in 53.2s/1398 tokens and
+// 83.8s/2318 tokens, and even a full worst-case run at that task's 2800-
+// token ceiling (~104s at this rate) still leaves ~11s of margin under
+// this timeout, and ~10s under Cloudflare's 125.1s hard ceiling. Other
+// tasks' much smaller token budgets mean they'd never approach either
+// number regardless of which constant is used here, so this is safe to
+// share globally rather than needing a per-task override.
+const LLM_REQUEST_TIMEOUT_MS = 115_000;
 
 async function fetchWithTimeout(url: string, init: RequestInit, timeoutMs = LLM_REQUEST_TIMEOUT_MS): Promise<Response> {
   const controller = new AbortController();
