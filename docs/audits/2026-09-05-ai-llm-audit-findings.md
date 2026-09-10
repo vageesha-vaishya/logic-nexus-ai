@@ -483,3 +483,36 @@ Direct follow-up to §7's fix: every one of the gateway's 19 `LlmTaskId`s' `MAX_
 | 3834 | `gemini` | `gemini-2.5-flash` | `ok` | 2485ms | fallback, post-fix — fires correctly this time, 124 output tokens, <$0.001 |
 
 Row 3832 (no fallback row after it) vs. rows 3833→3834 (primary fails, fallback immediately follows and succeeds) is the before/after proof. This also means the tenant's broken tenant-wide-default `gemini` config (missing vault secret) is a real, separate, pre-existing gap worth fixing on its own — flagged here, not fixed in this pass since it's a tenant-configuration data issue, not a code bug, and was already working around itself via the (now-fixed) fallback path.
+
+---
+
+## 10. Smart Quote realism investigation and charges/cost fix (2026-09-10)
+
+User-reported: AI-generated quotes in the Smart Quote module looked "totally fake and unrealistic." Investigated end-to-end against real persisted data (`ai_quote_requests`, `ai_quote_cache`), not just what's rendered.
+
+**Finding 1 — carrier field inconsistency.** In one real persisted response, an option's top-level `carrier` field (what the UI displays) was `"Local Logistics"`/`"Budget Trucker"` — the *local pickup trucker's* name — while the same option's own `legs[]` correctly had the ocean carrier (`CMA CGM`/`Maersk`). The model wrote two contradictory answers to "who's the carrier" inside one JSON object. Sampled 4 Gemini + 5 self-hosted runs of the identical prompt: 0/12 Gemini options mismatched, 1/5 self-hosted runs did (an isolated case, not reproduced across the other 4). Not code-side — the mapper (`quote-mapper.ts`) just reads the model's own `carrier.name` verbatim.
+
+**Finding 2 (larger sample, requested by user) — arithmetic mismatches, the real driver of "looks fake."** Checked whether `price_breakdown.total` actually equals both `base_fare + surcharges + fees + taxes` and `sum(legs[].charges)` — the prompt's own requirement #5. Across 8 Gemini runs (24 options) and 6 self-hosted runs (18 options), using the exact production prompt/schema:
+
+| | Carrier mismatch | Arithmetic mismatch (total ≠ sum of charges) |
+|---|---|---|
+| Gemini (paid) | 0/24 | 9/24 (37.5%) |
+| Self-hosted | 0/18 | 3/18 (16.7%, all one bad run) |
+
+Every mismatch, on both providers, was one-directional: `stated total > sum of components`, never the reverse — a systematic bias, not random noise. Confirmed this is user-visible, not just a display curiosity: `QuoteDetailView.tsx`'s "Detailed Charges" card and CSV export both render every `legs[].charges` line item *and* `price_breakdown.total` side by side — a real user expanding the breakdown would see numbers that don't add up.
+
+**Root cause, precisely located: `ai-advisor/index.ts`'s `applyDynamicPricing()` already recomputed `total` from `price_breakdown`'s own fields (so it never disagreed with itself) but never reconciled that total against `legs[].charges` — a completely separate, independently model-generated number.** The model is asked to describe the same cost twice, in two different shapes, with nothing forcing them to agree.
+
+**Fix, `0266e6ea`: make `legs[]` the source of truth when legs exist, and derive `price_breakdown` from them instead of trusting the model's independent numbers.**
+- Main (transport) leg's own charge → `base_fare`.
+- Sum of every other leg → `fees.handling_docs` (collapsing whatever fee categories the model split out, e.g. `terminal_charges`).
+- Every `price_breakdown` component rebuilt back into the main leg's charges (base freight + fuel/currency adjustment + taxes).
+- `total` recomputed from these — now identical to `sum(legs[].charges)` by construction, not by chance.
+
+**Caught and fixed before deploying, not present in the original code: a double-counting bug in my own first draft of this fix.** The prompt's requirement #4 tells the model to fold BAF/CAF *into* the leg's rolled-up charge — confirmed live in a real sample: `base_fare (2500) + surcharges.baf_caf (350) = 2850` matched the ocean leg's own charge amount exactly. My first draft carried the model's `baf_caf` through as a separate addend on top of the leg-derived `base_fare`, double-counting it (inflating totals by an unexplained ~15-25% even on options that were already internally consistent). Fixed by dropping every model-reported surcharge key except the two genuinely-additional, code-computed ones (fuel/currency adjustment) — the model's other surcharges are already inside the leg amount used as `base_fare`.
+
+**Verified two ways before considering this done:**
+1. Standalone Node.js harness running the exact deployed logic against 5 freshly-captured real Gemini responses: 2/15 options mismatched pre-fix, 0/15 post-fix, and the price shift settled to a small, consistent ~12-14% (matching the existing 12% fuel + 2% currency dynamic-pricing design) rather than the double-counted first draft's inflated jump.
+2. Real production call through the freshly-restarted container (stale `ai_quote_cache` rows cleared first, to avoid re-testing a pre-fix cached response by accident): all 3 options showed `total == legs_sum == components` exactly, `provider: custom, model: qwen3.8-27b-awq, status: ok` (`platform.llm_usage` id 3835) — genuinely self-hosted, not a paid fallback.
+
+**Not yet investigated:** whether the same arithmetic-mismatch pattern (or its root cause) affects any other structured-JSON task in the gateway besides `logistics.smart_quotes` — this pass was scoped to Smart Quote specifically, per the user's request.
