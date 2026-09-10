@@ -483,18 +483,22 @@ interface ResolvedConfig {
   configId?: string;
 }
 
-// Tasks pinned to a specific fast cloud provider regardless of tenant/domain
-// config. For most logistics.* tasks a tenant's self-hosted provider is fine
-// (small max_tokens, fast turnaround), but logistics.smart_quotes asks for
-// up to 8192 tokens of deeply structured JSON -- self-hosted rigs observed
-// in production can't reliably finish that within the upstream proxy's
-// ~100-125s timeout window (see fetchWithTimeout above, and the 524s this
-// was pinned from). Overriding here means every tenant's smart_quotes call
-// uses this provider, not just tenants without their own config -- that's
-// intentional: the point is output volume, which doesn't vary by tenant.
-// Falls through to normal tenant/env resolution if the override's own
-// credential isn't configured, so removing it here is always safe.
-const FAST_PROVIDER_OVERRIDE: Partial<Record<LlmTaskId, { provider: LlmProvider; model: string; envKey: string }>> = {
+// Platform policy: self-hosted/vLLM-backed providers are the default for
+// every task. Paid cloud providers are a FALLBACK ONLY, used solely when
+// the tenant's own (self-hosted) provider actually fails or times out --
+// never chosen ahead of it. This is consulted in callLLM's catch block
+// below, not in resolveConfig: the tenant/domain config is always tried
+// first, unconditionally, for every task.
+//
+// logistics.smart_quotes needs up to 16000 tokens of deeply structured
+// JSON -- self-hosted rigs observed in production can't reliably finish
+// that within the upstream proxy's ~100-125s timeout window (see
+// fetchWithTimeout above, and the 524 this was diagnosed from). When that
+// happens, retry once with Gemini via the GOOGLE_API_KEY already present
+// in this environment, rather than surfacing the failure to the caller.
+// Absent here (or missing its env credential) simply means no fallback --
+// the original error propagates, which is always safe.
+const PAID_FALLBACK_ON_FAILURE: Partial<Record<LlmTaskId, { provider: LlmProvider; model: string; envKey: string }>> = {
   "logistics.smart_quotes": { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
 };
 
@@ -504,22 +508,6 @@ async function resolveConfig(
   taskId: LlmTaskId,
   ctx: LlmCallContext,
 ): Promise<ResolvedConfig> {
-  const override = FAST_PROVIDER_OVERRIDE[taskId];
-  if (override) {
-    const overrideKey = Deno.env.get(override.envKey);
-    if (overrideKey) {
-      return {
-        provider: override.provider,
-        model: override.model,
-        apiKey: overrideKey,
-        baseUrl: null,
-        maxOutputTokens: MAX_OUTPUT_TOKENS[taskId],
-        source: "env_fallback",
-      };
-    }
-    if (ctx.logger) ctx.logger.warn("fast-provider override configured but env credential missing", { taskId, envKey: override.envKey });
-  }
-
   // Try tenant config first.
   if (ctx.tenantId && ctx.tenantId !== "00000000-0000-0000-0000-000000000000") {
     try {
@@ -607,70 +595,106 @@ export async function callLLM(
   const prompt = PROMPTS[taskId];
   if (!prompt) throw new LlmGatewayError("unknown_task", `Unknown LLM task '${taskId}'`, 400);
 
-  const config = await resolveConfig(taskId, ctx);
   const userMsg = interpolate(prompt.user, vars);
-  const t0 = Date.now();
 
-  let result: LlmCallResult;
-  try {
-    switch (config.provider) {
-      case "anthropic":
-        result = await callAnthropic(config, prompt.system, userMsg);
-        break;
-      case "openrouter":
-        result = await callOpenRouter(config, prompt.system, userMsg);
-        break;
-      case "openai":
-        result = await callOpenAiCompatible(config, prompt.system, userMsg, "openai");
-        break;
-      case "gemini":
-        result = await callGemini(config, prompt.system, userMsg, taskId);
-        break;
-      case "local-qwen":
-        result = await callOpenAiCompatible(config, prompt.system, userMsg, "local-qwen");
-        break;
-      case "custom":
-        result = await callOpenAiCompatible(config, prompt.system, userMsg, "custom");
-        break;
+  async function attempt(cfg: ResolvedConfig): Promise<LlmCallResult> {
+    const t0 = Date.now();
+    let result: LlmCallResult;
+    try {
+      switch (cfg.provider) {
+        case "anthropic":
+          result = await callAnthropic(cfg, prompt.system, userMsg);
+          break;
+        case "openrouter":
+          result = await callOpenRouter(cfg, prompt.system, userMsg);
+          break;
+        case "openai":
+          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "openai");
+          break;
+        case "gemini":
+          result = await callGemini(cfg, prompt.system, userMsg, taskId);
+          break;
+        case "local-qwen":
+          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "local-qwen");
+          break;
+        case "custom":
+          result = await callOpenAiCompatible(cfg, prompt.system, userMsg, "custom");
+          break;
+      }
+    } catch (e: any) {
+      const latency = Date.now() - t0;
+      await recordUsage(ctx, {
+        taskId, promptVersion: prompt.version,
+        provider: cfg.provider, model: cfg.model,
+        inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, costUsd: 0,
+        latencyMs: latency, status: "error",
+        errorCode: e?.code ?? "provider_error",
+        errorMessage: e?.message ?? String(e),
+        configSource: cfg.source,
+      });
+      if (e instanceof LlmGatewayError) throw e;
+      throw new LlmGatewayError("provider_error", e?.message ?? "Provider call failed", 502);
     }
-  } catch (e: any) {
-    const latency = Date.now() - t0;
+
+    result.latencyMs = Date.now() - t0;
+    result.promptVersion = prompt.version;
+
     await recordUsage(ctx, {
       taskId, promptVersion: prompt.version,
-      provider: config.provider, model: config.model,
-      inputTokens: 0, outputTokens: 0, cachedInputTokens: 0, costUsd: 0,
-      latencyMs: latency, status: "error",
-      errorCode: e?.code ?? "provider_error",
-      errorMessage: e?.message ?? String(e),
-      configSource: config.source,
+      provider: result.provider, model: result.model,
+      inputTokens: result.inputTokens, outputTokens: result.outputTokens,
+      cachedInputTokens: result.cachedInputTokens, costUsd: result.costUsd,
+      latencyMs: result.latencyMs, status: "ok",
+      configSource: cfg.source,
+      configId: cfg.configId,
     });
-    if (e instanceof LlmGatewayError) throw e;
-    throw new LlmGatewayError("provider_error", e?.message ?? "Provider call failed", 502);
+
+    // Update last_used_at if it was a tenant config.
+    if (cfg.source === "tenant_config" && cfg.configId) {
+      await (ctx.supabaseAdmin as any)
+        .schema("platform")
+        .from("llm_provider_configs")
+        .update({ last_used_at: new Date().toISOString() })
+        .eq("id", cfg.configId);
+    }
+
+    return result;
   }
 
-  result.latencyMs = Date.now() - t0;
-  result.promptVersion = prompt.version;
+  // Platform policy: the tenant's own (self-hosted, by default) config is
+  // always tried first, unconditionally -- see PAID_FALLBACK_ON_FAILURE's
+  // comment above resolveConfig. A paid provider is only ever attempted
+  // here, second, and only when the primary attempt actually threw.
+  const primaryConfig = await resolveConfig(taskId, ctx);
+  try {
+    return await attempt(primaryConfig);
+  } catch (primaryError: any) {
+    const fallback = PAID_FALLBACK_ON_FAILURE[taskId];
+    if (!fallback || primaryConfig.provider === fallback.provider) throw primaryError;
 
-  await recordUsage(ctx, {
-    taskId, promptVersion: prompt.version,
-    provider: result.provider, model: result.model,
-    inputTokens: result.inputTokens, outputTokens: result.outputTokens,
-    cachedInputTokens: result.cachedInputTokens, costUsd: result.costUsd,
-    latencyMs: result.latencyMs, status: "ok",
-    configSource: config.source,
-    configId: config.configId,
-  });
+    const fallbackKey = Deno.env.get(fallback.envKey);
+    if (!fallbackKey) throw primaryError;
 
-  // Update last_used_at if it was a tenant config.
-  if (config.source === "tenant_config" && config.configId) {
-    await (ctx.supabaseAdmin as any)
-      .schema("platform")
-      .from("llm_provider_configs")
-      .update({ last_used_at: new Date().toISOString() })
-      .eq("id", config.configId);
+    if (ctx.logger) {
+      ctx.logger.warn("primary provider failed; retrying once with paid fallback per platform policy", {
+        taskId,
+        primaryProvider: primaryConfig.provider,
+        primarySource: primaryConfig.source,
+        fallbackProvider: fallback.provider,
+        error: primaryError?.message ?? String(primaryError),
+      });
+    }
+
+    const fallbackConfig: ResolvedConfig = {
+      provider: fallback.provider,
+      model: fallback.model,
+      apiKey: fallbackKey,
+      baseUrl: null,
+      maxOutputTokens: MAX_OUTPUT_TOKENS[taskId],
+      source: "env_fallback",
+    };
+    return await attempt(fallbackConfig);
   }
-
-  return result;
 }
 
 // ─── Anthropic native ──────────────────────────────────────────────────
