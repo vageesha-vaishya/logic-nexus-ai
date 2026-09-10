@@ -255,23 +255,25 @@ const PROMPTS: Record<LlmTaskId, PromptTemplate> = {
       "Generate the diagnostic JSON now.",
   },
   "logistics.smart_quotes": {
-    // v2 (2026-09-10): shrunk from 5 options with itemized per-leg charges
-    // to 3 options with a single rolled-up charge per leg. The v1 schema
-    // needed ~7500-8000 completion tokens to finish (confirmed via Gemini's
-    // own usage generating the same content) -- unreachable on the
-    // self-hosted rig, whose measured throughput (~27-28 tokens/sec) times
-    // Cloudflare's 125.1s hard ceiling on that origin caps any single
-    // response at roughly 3400 tokens, full stop, regardless of gateway
-    // timeout settings. Every field kept here uses the exact same name and
-    // shape as v1 (legs[].charges is still an array, just with one entry
-    // instead of two or three; regulatory_info's two fields are still
-    // arrays, just usually short/empty) specifically so no caller-side
-    // code needed to change -- see MAX_OUTPUT_TOKENS' comment above for the
-    // full verification detail (two live runs against the real rig,
-    // finish_reason: stop both times, not truncated).
-    version: "v2-2026-09-10",
+    // v3 (2026-09-11): adds maritime-chokepoint (Suez/Panama) and
+    // competitive-benchmark grounding, per the Smart Quote module design
+    // doc (docs/smart-quote-module-design.md). Deliberately does NOT add
+    // any new JSON fields or grow the per-option schema -- v2's 2800-token
+    // budget is a hard ceiling derived from the self-hosted rig's measured
+    // throughput and Cloudflare's 125.1s proxy timeout (see
+    // MAX_OUTPUT_TOKENS' comment above), not a preference, and this task
+    // already timed out in production once (v1) from ignoring it. Canal
+    // fees fold into the existing ocean leg's rolled-up charge, the same
+    // way BAF/CAF already does; risk/routing commentary folds into the
+    // existing market_analysis/ai_explanation fields. All new grounding
+    // data (MARITIME CONTEXT, BENCHMARK) is computed server-side in
+    // ai-advisor/index.ts and injected as read-only context -- the model is
+    // never asked to know today's canal tolls or a real competitor's price
+    // itself, only to reason about what it's given, per the same
+    // STRICT GROUNDING pattern already used in markets.daily_brief.
+    version: "v3-2026-09-11",
     system:
-      `You are an Expert Logistics Rate Analyst.
+      `You are an Expert Logistics Rate Analyst producing quotes that must be both competitive enough to win the deal and priced to sustain healthy margin -- not just technically valid.
 Generate exactly 3 freight quotation options: "best_value", "cheapest", "fastest".
 
 Requirements:
@@ -282,6 +284,11 @@ Requirements:
 5. The option's 'total' MUST equal the sum of all leg charges.
 6. Give a reliability score (1-10) and estimated total CO2 (kg) per option.
 7. Keep 'ai_explanation' to ONE short sentence per option. Keep customs_procedures/restrictions arrays to at most 1-2 short items each, empty array if none.
+
+STRICT GROUNDING RULES for MARITIME CONTEXT and BENCHMARK (these override anything else, and override your own training knowledge specifically):
+8. If a MARITIME CONTEXT line is provided in the user message, treat it as the current, authoritative routing/toll reality for this lane -- fold its cost impact into the ocean leg's single rolled-up charge (do not add a separate canal-fee line item) and reflect its routing/transit-time impact in transit_time and ai_explanation. Do not state a canal toll figure, routing assumption, or transit-time impact that contradicts it.
+9. If NO maritime context line is provided (blank), do not mention canal fees, Suez, Panama, or Red Sea routing risk at all -- say nothing rather than guess from your training data, which will be stale for regulatory tolls and current geopolitical routing.
+10. If a BENCHMARK line is provided, price 'cheapest' at or below it and 'best_value' within a reasonable band above it, per its own instruction. Never invent a competitor's price or cite a specific competitor by name -- you have no real data on either.
 
 Output JSON Format (exactly this shape, no extra nesting):
 {
@@ -329,7 +336,7 @@ Output JSON Format (exactly this shape, no extra nesting):
       "ai_explanation": "One short sentence."
     }
   ],
-  "market_analysis": "One or two short sentences.",
+  "market_analysis": "One or two short sentences. Reflect MARITIME CONTEXT/BENCHMARK here if either was provided.",
   "confidence_score": 0.9,
   "anomalies": []
 }
@@ -339,7 +346,9 @@ CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object shown above â€
       "Route: ${origin} to ${destination} (${mode})\n" +
       "Cargo: ${commodity}, ${weight}kg, ${volume}cbm\n" +
       "Equipment: ${container_qty}x ${container_size} ${container_type}\n" +
-      "Context: ${historical_context}\n\n" +
+      "Historical context: ${historical_context}\n" +
+      "${maritime_context}\n" +
+      "${benchmark_context}\n\n" +
       "Generate the quotation options now.",
   },
   "ops.agent_plan": {

@@ -214,6 +214,102 @@ async function lookupCodes(query: string, mode: string, supabase: any) {
     return { suggestions };
 }
 
+// ─── Maritime chokepoint reference (Suez / Panama) ─────────────────────
+//
+// Verified via live web search 2026-09-11 -- NOT from the model's training
+// data, which is stale and would either miss 2026's toll changes entirely
+// or (worse) confidently state the pre-crisis Suez/Cape routing norm that
+// no longer holds. This is a dated snapshot, not a live feed: the values
+// below need a human to re-verify and bump SOURCED_AT periodically (see
+// docs/smart-quote-module-design.md "Maintenance" section for the
+// suggested cadence and source links). Injected into the prompt as
+// read-only context the model must not contradict or embellish -- same
+// STRICT GROUNDING pattern already used for markets.daily_brief.
+const MARITIME_REFERENCE = {
+  sourcedAt: "2026-09-11",
+  suez: {
+    tollTrend:
+      "Suez Canal Authority raised transit tolls three times in 2026 (Mar 1, May 1, Jul 15); " +
+      "containership tier surcharge is ~12% on top of the base tariff, which has been unchanged since 2024.",
+    routingReality:
+      "Despite the toll increases, most carriers are NOT actually transiting Suez right now. Ongoing Houthi " +
+      "attacks in the Red Sea have kept the large majority of Asia-Europe and Asia-US East Coast services on " +
+      "Cape of Good Hope diversion since late 2023 -- Suez traffic in 2026 remains roughly 60% below pre-crisis " +
+      "levels, and the industry expects this to continue through at least 2027.",
+    costImpact:
+      "Cape diversion adds ~10-14 days transit and a war-risk/diversion surcharge of roughly $200-800 per " +
+      "container; the per-TEU cost differential between a (rare) Suez transit and the Cape diversion routing " +
+      "most carriers actually use is roughly $200-400/TEU.",
+  },
+  panama: {
+    tollTrend:
+      "Panama Canal Authority has frozen its main toll structure through September 30, 2026. Container vessels " +
+      "are charged per laden TEU, roughly $35-45/TEU (so ~$70-90 per 40ft/2-TEU container), plus a fixed " +
+      "per-transit vessel fee that is not directly allocable to an individual shipper's container.",
+    routingReality:
+      "Panama routing (used for Asia <-> US East/Gulf Coast and Caribbean lanes) has not seen the same disruption " +
+      "as Suez; it remains the standard routing for those lanes in 2026, subject to normal seasonal draft " +
+      "restrictions.",
+  },
+} as const;
+
+// Deliberately coarse keyword/region heuristic, not a real geo-routing
+// service -- see docs/smart-quote-module-design.md "Phase 2" for the
+// recommended upgrade path (a proper port/region lookup). Good enough to
+// decide whether to spend any of the token budget on maritime context at
+// all; a false negative just means the model gets no canal guidance (falls
+// back to its own, weaker judgement) rather than anything actively wrong,
+// and a false positive just adds a short, accurate paragraph that happens
+// not to apply -- a stricter guardrail than the alternative.
+const SUEZ_SIDE_A = ["china", "hong kong", "shanghai", "shenzhen", "ningbo", "qingdao", "vietnam", "singapore", "malaysia", "thailand", "india", "japan", "korea", "uae", "dubai", "taiwan"];
+const SUEZ_SIDE_B = ["netherlands", "rotterdam", "germany", "hamburg", "belgium", "antwerp", "uk", "united kingdom", "london", "felixstowe", "france", "le havre", "italy", "genoa", "spain", "valencia", "mediterranean"];
+const PANAMA_SIDE_A = ["china", "hong kong", "shanghai", "shenzhen", "vietnam", "singapore", "japan", "korea", "taiwan"];
+const PANAMA_SIDE_B = ["usa", "united states", "new york", "savannah", "charleston", "miami", "houston", "gulf coast", "caribbean", "jamaica", "panama", "colombia", "brazil"];
+
+function matchesAny(value: string, keywords: string[]): boolean {
+    const v = value.toLowerCase();
+    return keywords.some((k) => v.includes(k));
+}
+
+function buildMaritimeContext(origin: string, destination: string, mode: string): string {
+    if (String(mode || '').toLowerCase() !== 'ocean') return '';
+    const o = String(origin || '');
+    const d = String(destination || '');
+
+    const suezRoute =
+        (matchesAny(o, SUEZ_SIDE_A) && matchesAny(d, SUEZ_SIDE_B)) ||
+        (matchesAny(d, SUEZ_SIDE_A) && matchesAny(o, SUEZ_SIDE_B));
+    const panamaRoute =
+        (matchesAny(o, PANAMA_SIDE_A) && matchesAny(d, PANAMA_SIDE_B)) ||
+        (matchesAny(d, PANAMA_SIDE_A) && matchesAny(o, PANAMA_SIDE_B));
+
+    if (!suezRoute && !panamaRoute) return '';
+
+    const parts: string[] = [];
+    if (suezRoute) {
+        parts.push(
+            `SUEZ CANAL CONTEXT (as of ${MARITIME_REFERENCE.sourcedAt}): ${MARITIME_REFERENCE.suez.tollTrend} ` +
+            `${MARITIME_REFERENCE.suez.routingReality} ${MARITIME_REFERENCE.suez.costImpact}`
+        );
+    }
+    if (panamaRoute) {
+        parts.push(
+            `PANAMA CANAL CONTEXT (as of ${MARITIME_REFERENCE.sourcedAt}): ${MARITIME_REFERENCE.panama.tollTrend} ` +
+            `${MARITIME_REFERENCE.panama.routingReality}`
+        );
+    }
+    return parts.join(' ');
+}
+
+function buildBenchmarkContext(historicalAvg: number, ratesFound: number): string {
+    if (ratesFound === 0 || historicalAvg <= 0) return '';
+    return (
+        `Internal benchmark: this tenant's own last ${ratesFound} quotes on this lane averaged ` +
+        `$${historicalAvg.toFixed(2)} base freight. Position 'cheapest' at or below this figure and ` +
+        `'best_value' within a reasonable band above it -- do not invent a competitor's price, only use this figure.`
+    );
+}
+
 async function validateCompliance(payload: any) {
     const { destination, commodity, mode, dangerous_goods } = payload;
     const issues = [];
@@ -264,6 +360,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     // 2. Fetch Historical Context
     let historicalContext = "No specific historical rates found for this route.";
     let historicalAvg = 0;
+    let historicalRatesFound = 0;
     try {
         const { data: rates } = await supabase
             .from('rates')
@@ -275,6 +372,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
             .limit(5);
 
         if (rates && rates.length > 0) {
+            historicalRatesFound = rates.length;
             const prices = rates.map((r: any) => Number(r.base_price));
             historicalAvg = prices.reduce((a: number, b: number) => a + b, 0) / prices.length;
             historicalContext = `Internal Historical Data: Found ${rates.length} past rates. Average base price: $${historicalAvg.toFixed(2)}.`;
@@ -282,6 +380,15 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     } catch (err) {
         logger.warn("Failed to fetch historical data:", { error: err });
     }
+
+    // 2b. Maritime chokepoint + competitive-benchmark context. Both are
+    // deterministic, code-computed strings (not something the model is
+    // asked to invent) -- see buildMaritimeContext/buildBenchmarkContext
+    // above. Either can legitimately be empty (non-ocean mode, no canal on
+    // this lane, no internal rate history yet); the prompt below treats an
+    // empty value as "say nothing about it" rather than a gap to fill in.
+    const maritimeContext = buildMaritimeContext(origin, destination, mode);
+    const benchmarkContext = buildBenchmarkContext(historicalAvg, historicalRatesFound);
 
     // 3. Call the LLM Gateway (routes to tenant-configured provider, or
     //    falls through to the self-hosted vLLM rig — see _shared/llm-gateway.ts)
@@ -296,6 +403,8 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
         container_size: String(containerSize || 'Standard'),
         container_type: String(containerType || ''),
         historical_context: historicalContext,
+        maritime_context: maritimeContext,
+        benchmark_context: benchmarkContext,
     };
 
     const ctx: LlmCallContext = {
