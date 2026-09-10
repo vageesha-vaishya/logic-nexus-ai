@@ -69,7 +69,7 @@ const FALLBACK_ROUTING: Record<LlmTaskId, RoutingEntry> = {
   "markets.research_thread":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 4096 },
   "markets.strategy_explain":    { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 2048 },
   "markets.portfolio_diagnostic":{ provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  800 },
-  "logistics.smart_quotes":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 8192 },
+  "logistics.smart_quotes":     { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens: 16000 },
   "ops.agent_plan":              { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  400 },
   "comms.smart_reply":           { provider: "anthropic", model: "claude-haiku-4-5",  maxOutputTokens:  512 },
   "security.email_threat":       { provider: "anthropic", model: "claude-sonnet-4-5", maxOutputTokens:  500 },
@@ -88,7 +88,7 @@ const MAX_OUTPUT_TOKENS: Record<LlmTaskId, number> = {
   "markets.research_thread":     4096,
   "markets.strategy_explain":    2048,
   "markets.portfolio_diagnostic": 800,
-  "logistics.smart_quotes":      8192,
+  "logistics.smart_quotes":     16000,
   "ops.agent_plan":               400,
   "comms.smart_reply":            512,
   "security.email_threat":        500,
@@ -483,12 +483,43 @@ interface ResolvedConfig {
   configId?: string;
 }
 
+// Tasks pinned to a specific fast cloud provider regardless of tenant/domain
+// config. For most logistics.* tasks a tenant's self-hosted provider is fine
+// (small max_tokens, fast turnaround), but logistics.smart_quotes asks for
+// up to 8192 tokens of deeply structured JSON -- self-hosted rigs observed
+// in production can't reliably finish that within the upstream proxy's
+// ~100-125s timeout window (see fetchWithTimeout above, and the 524s this
+// was pinned from). Overriding here means every tenant's smart_quotes call
+// uses this provider, not just tenants without their own config -- that's
+// intentional: the point is output volume, which doesn't vary by tenant.
+// Falls through to normal tenant/env resolution if the override's own
+// credential isn't configured, so removing it here is always safe.
+const FAST_PROVIDER_OVERRIDE: Partial<Record<LlmTaskId, { provider: LlmProvider; model: string; envKey: string }>> = {
+  "logistics.smart_quotes": { provider: "gemini", model: "gemini-2.5-flash", envKey: "GOOGLE_API_KEY" },
+};
+
 // ─── Resolve tenant config (or env fallback) ───────────────────────────
 
 async function resolveConfig(
   taskId: LlmTaskId,
   ctx: LlmCallContext,
 ): Promise<ResolvedConfig> {
+  const override = FAST_PROVIDER_OVERRIDE[taskId];
+  if (override) {
+    const overrideKey = Deno.env.get(override.envKey);
+    if (overrideKey) {
+      return {
+        provider: override.provider,
+        model: override.model,
+        apiKey: overrideKey,
+        baseUrl: null,
+        maxOutputTokens: MAX_OUTPUT_TOKENS[taskId],
+        source: "env_fallback",
+      };
+    }
+    if (ctx.logger) ctx.logger.warn("fast-provider override configured but env credential missing", { taskId, envKey: override.envKey });
+  }
+
   // Try tenant config first.
   if (ctx.tenantId && ctx.tenantId !== "00000000-0000-0000-0000-000000000000") {
     try {
@@ -593,7 +624,7 @@ export async function callLLM(
         result = await callOpenAiCompatible(config, prompt.system, userMsg, "openai");
         break;
       case "gemini":
-        result = await callGemini(config, prompt.system, userMsg);
+        result = await callGemini(config, prompt.system, userMsg, taskId);
         break;
       case "local-qwen":
         result = await callOpenAiCompatible(config, prompt.system, userMsg, "local-qwen");
@@ -799,10 +830,28 @@ async function callOpenAiCompatible(
 //
 // Docs: https://ai.google.dev/api/generate-content
 
+// Tasks whose prompt demands a raw, directly-JSON.parse()-able response.
+// Unlike OpenAI-compatible providers, Gemini supports enforcing this
+// server-side (responseMimeType) rather than relying purely on the prompt's
+// own instructions -- worth it for logistics.smart_quotes specifically since
+// its output is large and deeply nested, exactly where a model is most
+// likely to slip in a formatting mistake (confirmed live: Gemini returned
+// unparseable JSON for this task before this was added).
+//
+// These same tasks also get thinkingBudget: 0 (below). Gemini 2.5 models
+// spend part of maxOutputTokens on an invisible "thinking" pass before
+// producing visible output -- confirmed live for smart_quotes: with the
+// default thinking budget, 7861 of an 8192-token budget went to thinking,
+// leaving only 314 for the actual JSON, which is why it kept truncating.
+// Disabling thinking gives large structured-output tasks like this one the
+// entire budget for the output we actually asked for.
+const GEMINI_JSON_MODE_TASKS = new Set<LlmTaskId>(["logistics.smart_quotes"]);
+
 async function callGemini(
   cfg: ResolvedConfig,
   system: string,
   user: string,
+  taskId?: LlmTaskId,
 ): Promise<LlmCallResult> {
   const base = cfg.baseUrl ?? "https://generativelanguage.googleapis.com";
   // model names in the DB may or may not be prefixed with `models/`
@@ -817,6 +866,9 @@ async function callGemini(
     ],
     generationConfig: {
       maxOutputTokens: cfg.maxOutputTokens,
+      ...(taskId && GEMINI_JSON_MODE_TASKS.has(taskId)
+        ? { responseMimeType: "application/json", thinkingConfig: { thinkingBudget: 0 } }
+        : {}),
     },
   };
   if (system && system.trim().length > 0) {
