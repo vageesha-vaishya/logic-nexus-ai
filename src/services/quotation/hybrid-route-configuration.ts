@@ -244,6 +244,25 @@ const selectLegCarrier = (
   return ranked[0] || null;
 };
 
+// legs[0] is very often a local pickup/drayage leg, not the option's actual
+// carrier -- picking it unconditionally as "the" carrier (as this used to)
+// surfaces the trucker's name instead of the ocean/air carrier for
+// multi-leg door-to-door quotes. Same heuristic as the server-side fix in
+// ai-advisor's applyDynamicPricing: prefer the leg whose mode matches the
+// option's overall transport_mode, then the highest-charge leg, and only
+// fall back to legs[0] when neither signal is available.
+const selectMainLeg = (legs: TransportLeg[], transportMode: string): TransportLeg | undefined => {
+  if (legs.length === 0) return undefined;
+  const modeMatch = transportMode
+    ? legs.find((leg) => leg.mode && transportMode.toLowerCase().includes(String(leg.mode).toLowerCase()))
+    : undefined;
+  if (modeMatch) return modeMatch;
+  const legAmount = (leg: TransportLeg) => (leg.charges || []).reduce((sum, c: any) => sum + (Number(c.amount) || 0), 0);
+  const hasCharges = legs.some((leg) => legAmount(leg) > 0);
+  if (hasCharges) return legs.reduce((prev, current) => (legAmount(current) > legAmount(prev) ? current : prev), legs[0]);
+  return legs[0];
+};
+
 const recalculateOption = (
   option: RateOption,
   routeInput: SmartRouteInput,
@@ -292,7 +311,8 @@ const recalculateOption = (
     };
   });
 
-  const primaryCarrier = normalizeText(legs[0]?.carrier) || fallbackCarrier;
+  const mainLeg = selectMainLeg(legs, normalizeModeCode(option.transport_mode || routeInput.mode));
+  const primaryCarrier = normalizeText(mainLeg?.carrier) || fallbackCarrier;
   return {
     option: {
       ...option,

@@ -195,6 +195,41 @@ describe('hybrid-route-configuration', () => {
     expect(result.options[0].legs?.[0]?.destination).toBeDefined();
   });
 
+  it('picks the main (ocean) leg carrier, not the first (pickup) leg, for multi-leg door-to-door options', async () => {
+    // Reproduces the real bug: a road pickup leg listed first, ocean main
+    // leg second, road delivery leg third. The option's carrier must come
+    // from the ocean leg (the actual carrier), not legs[0] (the local
+    // trucker) -- confirmed live 2026-09-10, this surfaced "Local Haulage"
+    // as the displayed carrier for an AI-generated ocean quote.
+    const result = await buildHybridRouteConfiguration({
+      options: [
+        {
+          ...baseOptions[0],
+          id: 'opt-multi-leg-carrier',
+          carrier: 'Existing Ocean Carrier',
+          transport_mode: 'ocean',
+          legs: [
+            { id: 'pickup-leg', mode: 'road', origin: 'Nhava Sheva', destination: 'Nhava Sheva Port', carrier: 'Local Haulage' },
+            { id: 'ocean-leg', mode: 'ocean', origin: 'Nhava Sheva Port', destination: 'Rotterdam Port', carrier: 'Existing Ocean Carrier' },
+            { id: 'delivery-leg', mode: 'road', origin: 'Rotterdam Port', destination: 'Rotterdam', carrier: 'EU Logistics' },
+          ],
+        },
+      ],
+      routeInput: {
+        origin: 'Nhava Sheva',
+        destination: 'Rotterdam',
+        mode: 'ocean',
+        requested_departure_date: '2026-09-20',
+      },
+      carrierProfiles: [
+        { carrier_name: 'Existing Ocean Carrier', carrier_type: 'ocean', pricing_index: 1, reliability_score: 0.9 },
+      ],
+    });
+
+    expect(result.options[0].carrier).toBe('Existing Ocean Carrier');
+    expect(result.options[0].carrier).not.toBe('Local Haulage');
+  });
+
   it('uses lower pricing index as tie-breaker when carrier scores are equal', async () => {
     const result = await buildHybridRouteConfiguration({
       options: [
