@@ -363,6 +363,17 @@ The UI correctly rendered 5 options — 3 legacy market-rate options (ZIM/PIL/CO
 
 Both real pipeline runs succeeded **without any Gemini fallback at all** — the first time in this entire investigation that Smart Quote has genuinely completed on the self-hosted model rather than timing out and paying the paid-fallback cost. All four health-check endpoints green after deploying; deployed file hash-verified against the committed source.
 
+**Re-verified live through the actual rendered form, 2026-09-10, as final confirmation the fix holds under real UI use (not just direct API calls):** filled the Smart Quote form in a real browser session (Origin: Nhava Sheva (INNSA), Destination: Port of Rotterdam (NLRTM), Ocean, 1×40ft Dry Standard, commodity "Electronic Integrated Circuits, NESOI", 5000kg/28m³) and clicked **Generate Smart Quotes**. The UI rendered 5 options (3 legacy market-rate + 2 AI-generated: `cheapest`/`best_value`) with no visible errors. Cross-checked against `platform.llm_usage` immediately after:
+
+```
+id=3830 | task_id=logistics.smart_quotes | provider=custom | model=qwen3.8-27b-awq
+status=ok | latency_ms=68941 | input_tokens=921 | output_tokens=2278 | ts=2026-09-10 13:28:58 UTC
+```
+
+Genuinely self-hosted end to end — `provider: custom`, no Gemini fallback row alongside it — with output_tokens (2278) comfortably inside the 2800 budget and latency (68.9s) comfortably inside both the 115s client timeout and Cloudflare's 125.1s ceiling. This closes the loop the correction notice above left open: the fix is now confirmed both at the API level and through the actual product surface a user would touch.
+
+**Unrelated bug found during this browser session, not yet root-caused: a second `LocationAutocomplete` defect, distinct from the `c7891cbb` stale-`inputValue` fix earlier in this workstream.** While filling Origin then Destination, a selection made in the second field repeatedly landed in the *first* field instead — reproduced 3 times, with clean (non-concatenated) text, so it is not the same bug `c7891cbb` fixed. Worked around for this session by explicitly clicking a neutral page element to blur focus between filling Origin and Destination, which reliably prevented the mistargeting on retry. Not yet fixed in code — the underlying cause (suspected: Radix Popover's "return focus to trigger on close" interacting with some timing/race condition across two adjacent `LocationAutocomplete` instances) has not been isolated. Flagged here for follow-up; not in scope for this pass since the goal was verifying the LLM pipeline, not a full UI fix.
+
 **New standing item, not previously tracked by this audit, that led directly into §8:** the self-hosted/vLLM-default, paid-fallback-only policy stated above applies platform-wide, not just to `logistics.smart_quotes`. F-2.3's 15 shadow-AI functions were the most likely place other violations would hide, since those functions don't go through this gateway's resolution logic at all.
 
 ---
