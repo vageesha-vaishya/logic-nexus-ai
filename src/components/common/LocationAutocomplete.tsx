@@ -83,7 +83,17 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
   // focus event is swallowed -- ordinary clicks/tabbing into the trigger
   // are untouched and still open it normally.
   const suppressFocusOpenRef = React.useRef(false)
-  
+  // The value-sync effect below calls onChange when it resolves a location
+  // from typed text (see the ref's usage for why). Kept out of that
+  // effect's dependency array via a ref -- callers typically pass a fresh
+  // inline function each render, and listing onChange directly would rerun
+  // the whole sync/resolve effect (including its network calls) on every
+  // parent render instead of only when `value` etc. actually change.
+  const onChangeRef = React.useRef(onChange)
+  React.useEffect(() => {
+    onChangeRef.current = onChange
+  })
+
   const { scopedDb, user } = useCRM()
   const debouncedSearch = useDebounce(inputValue, 300)
   const [cache, setCache] = React.useState<Record<string, Location[]>>({})
@@ -231,12 +241,23 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
                 selectedLocation &&
                 selectedLocation.location_name.toLowerCase() === normalized.location_name.toLowerCase() &&
                 selectedLocation.location_code.toLowerCase() === normalized.location_code.toLowerCase()
-              if (!isSame) setSelectedLocation(normalized)
+              if (!isSame) {
+                setSelectedLocation(normalized)
+                // Tell the caller too, not just the internal display state.
+                // Without this, typing a value that happens to exactly match
+                // a real location (no dropdown click needed) left the caller
+                // thinking no location was ever selected -- e.g.
+                // SmartQuoteWorkspace's originDetails/destinationDetails
+                // stayed null, which downstream broke rate-engine's and
+                // ai-advisor's carrier_rates lookups for that field (see
+                // docs/smart-quote-module-design.md §10 item 11).
+                onChangeRef.current(normalized.location_name, normalized)
+              }
             }
             return;
           }
         }
-        
+
         // 2. If not in preloaded and no selectedLocation (or mismatch), fetch via RPC
         if (!selectedLocation || selectedLocation.location_name.toLowerCase() !== valueLower) {
              try {
@@ -247,7 +268,7 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
                      search_text: valueTrimmed,
                      limit_count: 1
                  });
-                 
+
                  if (error) {
                    Sentry.captureException(error, {
                      tags: { feature: 'quick_quote', component: 'LocationAutocomplete', stage: 'sync-by-rpc' },
@@ -267,7 +288,13 @@ export const LocationAutocomplete = React.memo(function LocationAutocomplete({
                        (codeLower && cLower === codeLower) ||
                        (valueLower && cLower === valueLower)
 
-                     if (isStrictMatch) setSelectedLocation(normalized);
+                     if (isStrictMatch) {
+                       setSelectedLocation(normalized);
+                       // Same reasoning as the preloaded-match branch above --
+                       // a strict match found via search is just as real a
+                       // selection as an explicit dropdown click.
+                       onChangeRef.current(normalized.location_name, normalized)
+                     }
                  }
              } catch (e) {
                  if (isMounted) {

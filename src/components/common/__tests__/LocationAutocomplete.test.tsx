@@ -437,6 +437,96 @@ describe('LocationAutocomplete', () => {
         expect(button).toHaveTextContent(/NLRTM/);
     });
 
+    it('calls onChange with the resolved location when typed text strictly matches an RPC result, without a dropdown click', async () => {
+        // Regression test: typing "Rotterdam" and having it auto-resolve to
+        // a real location (as the "fetches details and populates input..."
+        // test above already verifies for the *display*) must also notify
+        // the caller via onChange -- otherwise a caller like
+        // SmartQuoteWorkspace never learns the real location id unless the
+        // user explicitly clicks a dropdown suggestion.
+        const rpcData = [{
+            id: '2',
+            location_name: 'Rotterdam',
+            location_code: 'NLRTM',
+            city: 'Rotterdam',
+            country: 'Netherlands',
+            location_type: 'port'
+        }];
+
+        mockSupabase.rpc.mockResolvedValue({ data: rpcData, error: null });
+
+        const handleChange = vi.fn();
+        render(
+            <LocationAutocomplete
+                value="Rotterdam"
+                onChange={handleChange}
+            />
+        );
+
+        await waitFor(() => {
+            expect(handleChange).toHaveBeenCalledWith(
+                'Rotterdam',
+                expect.objectContaining({ id: '2', location_name: 'Rotterdam', location_code: 'NLRTM' })
+            );
+        });
+    });
+
+    it('calls onChange with the resolved location when typed text strictly matches a preloaded location, without a dropdown click', async () => {
+        const preloaded = [
+            { id: 'pre-1', location_name: 'Mumbai Port', location_code: 'BOM', location_type: 'Port', country: 'India', city: 'Mumbai' }
+        ];
+
+        const handleChange = vi.fn();
+        render(
+            <LocationAutocomplete
+                value="Mumbai Port"
+                onChange={handleChange}
+                preloadedLocations={preloaded}
+            />
+        );
+
+        await waitFor(() => {
+            expect(handleChange).toHaveBeenCalledWith(
+                'Mumbai Port',
+                expect.objectContaining({ id: 'pre-1', location_name: 'Mumbai Port', location_code: 'BOM' })
+            );
+        });
+
+        // No dropdown click happened -- confirms this fired from the
+        // value-sync effect, not the CommandItem onSelect handler.
+        expect(mockSupabase.rpc).not.toHaveBeenCalled();
+    });
+
+    it('does NOT call onChange for a partial (non-strict) match on initial load', async () => {
+        // Companion to "does NOT auto-select partial matches on initial
+        // load" below -- a partial match must not fire onChange either,
+        // since it never becomes the resolved selectedLocation.
+        const rpcData = [{
+            id: '3',
+            location_name: 'Rotterdam Port', // partial match for "Rotterdam"
+            location_code: 'NLRTM',
+            city: 'Rotterdam',
+            country: 'Netherlands',
+            location_type: 'port'
+        }];
+
+        mockSupabase.rpc.mockResolvedValue({ data: rpcData, error: null });
+
+        const handleChange = vi.fn();
+        render(
+            <LocationAutocomplete
+                value="Rotterdam"
+                onChange={handleChange}
+            />
+        );
+
+        await waitFor(() => {
+            expect(mockSupabase.rpc).toHaveBeenCalled();
+        });
+
+        expect(handleChange).not.toHaveBeenCalled();
+    });
+
     it('hydrates initial value from legacy RPC shape (name/code/type)', async () => {
         const legacyRpcData = [{
             id: '2',
