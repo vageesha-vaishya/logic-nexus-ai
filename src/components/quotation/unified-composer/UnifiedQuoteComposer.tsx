@@ -33,6 +33,7 @@ import { RateOption, TransportLeg } from '@/types/quote-breakdown';
 import { invokeFunction } from '@/lib/supabase-functions';
 import { logger } from '@/lib/logger';
 import { sanitizePayload } from '@/lib/utils/sanitizer';
+import { pickTenantScopedRow } from '@/lib/db/access';
 import { supabase } from '@/integrations/supabase/client';
 
 import { QuoteStoreProvider, useQuoteStore } from '@/components/quotation/composer/store/QuoteStore';
@@ -2409,6 +2410,7 @@ function UnifiedQuoteComposerContent({
         payload: {
           origin: params.origin,
           destination: params.destination,
+          destinationDetails: params.destinationDetails,
           commodity: params.commodity,
           mode: params.mode,
           dangerous_goods: params.dangerousGoods,
@@ -2861,9 +2863,20 @@ function UnifiedQuoteComposerContent({
         .order('updated_at', { ascending: false });
       if (error || !Array.isArray(data) || data.length === 0) return null;
 
-      const matchingRow = data.find((row: any) =>
-        isUUID(row?.id) && (!tenantId || !row?.tenant_id || String(row.tenant_id) === String(tenantId))
-      );
+      // scopedDb returns quotes UNSCOPED (all tenants) for a platform admin
+      // with no tenant selected -- quote_number is not guaranteed globally
+      // unique across tenants, so pickTenantScopedRow is the only thing
+      // standing between a cross-tenant quote_number collision and
+      // resolving to the wrong tenant's row. See its doc comment for the
+      // exact-match-or-fail-closed rules.
+      const candidateRows = data.filter((row: any) => isUUID(row?.id));
+      const matchingRow = pickTenantScopedRow(candidateRows, tenantId);
+      if (!matchingRow && candidateRows.length > 1) {
+        logger.warn('[UnifiedComposer] Ambiguous quote_number across tenants with no tenant context to disambiguate', {
+          quoteRef,
+          candidateCount: candidateRows.length,
+        });
+      }
       return matchingRow?.id ? String(matchingRow.id) : null;
     } catch (error) {
       logger.warn('[UnifiedComposer] Failed to resolve quote id from quote number', {

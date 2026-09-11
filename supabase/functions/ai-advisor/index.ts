@@ -663,15 +663,44 @@ function buildBenchmarkContext(avg: number, count: number, source: 'market' | 'h
     );
 }
 
+// Matches a resolved location against a country, tolerant of what callers
+// actually send: `destination` is a free-text label typed into
+// LocationAutocomplete (e.g. "Tehran, Iran", or literally "Global" as a
+// QuoteDetailsStep default) -- it is NEVER an ISO-2 code in practice, so an
+// exact `destination === 'IR'` comparison silently never matches anything a
+// real user would type. `destinationDetails.formatted_address` (when the
+// frontend has a resolved ports_locations row) is `"<city>, <country>"` and
+// is the more reliable signal when present.
+function destinationMatchesCountry(candidates: string[], isoCode: string, names: string[]): boolean {
+    const iso = isoCode.toLowerCase();
+    return candidates.some(v => v === iso || names.some(n => v.includes(n)));
+}
+
 async function validateCompliance(payload: any) {
-    const { destination, commodity, mode, dangerous_goods } = payload;
+    const { destination, commodity, mode, dangerous_goods, destinationDetails } = payload;
     const issues = [];
-    if (destination === 'KP' || destination === 'IR') issues.push({ level: 'critical', message: 'Destination is under sanctions.' });
+
+    const destinationCandidates = [
+        destination,
+        destinationDetails?.formatted_address,
+        destinationDetails?.name,
+        destinationDetails?.code,
+    ].filter(Boolean).map((s: any) => String(s).trim().toLowerCase());
+
+    // NOTE: not a comprehensive sanctions list -- only the two countries
+    // this check has always targeted. Expand with compliance/legal sign-off,
+    // not ad hoc, and treat this as an advisory signal, not a hard gate.
+    const isSanctionedDestination =
+        destinationMatchesCountry(destinationCandidates, 'KP', ['north korea', 'dprk']) ||
+        destinationMatchesCountry(destinationCandidates, 'IR', ['iran']);
+    if (isSanctionedDestination) issues.push({ level: 'critical', message: 'Destination is under sanctions.' });
+
     if (dangerous_goods) {
         if (mode === 'air') issues.push({ level: 'warning', message: 'IATA DGR check required for Air Cargo.' });
         if (commodity && commodity.toLowerCase().includes('battery')) issues.push({ level: 'info', message: 'Lithium Battery regulations apply (UN3480/UN3481).' });
     }
-    if (commodity && commodity.toLowerCase().includes('chip') && destination === 'CN') issues.push({ level: 'warning', message: 'Check Export Administration Regulations (EAR) for semiconductors.' });
+    const isChinaDestination = destinationMatchesCountry(destinationCandidates, 'CN', ['china']);
+    if (commodity && commodity.toLowerCase().includes('chip') && isChinaDestination) issues.push({ level: 'warning', message: 'Check Export Administration Regulations (EAR) for semiconductors.' });
     return { compliant: issues.length === 0 || issues.every(i => i.level === 'info'), issues };
 }
 

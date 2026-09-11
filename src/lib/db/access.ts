@@ -111,6 +111,32 @@ export async function checkDomainAccess(
   };
 }
 
+export interface TenantScopedRowCandidate {
+  id: string;
+  tenant_id?: string | null;
+}
+
+/**
+ * Picks the correct row from a result set that may span multiple tenants --
+ * e.g. a lookup made via ScopedDataAccess as a platform admin with no
+ * tenant selected, which `applyScopeFilter` deliberately leaves unscoped.
+ * A "natural key" like quote_number is not guaranteed globally unique
+ * across tenants, so this is the last line of defense against resolving to
+ * a different tenant's row on a collision. Never guesses: with a known
+ * tenantId, only an exact tenant_id match is accepted (a row with a
+ * null/missing tenant_id is NOT a wildcard); without one, only resolves
+ * when the candidate set is unambiguous.
+ */
+export function pickTenantScopedRow<T extends TenantScopedRowCandidate>(
+  rows: T[],
+  tenantId: string | null | undefined,
+): T | null {
+  if (tenantId) {
+    return rows.find((row) => String(row.tenant_id) === String(tenantId)) ?? null;
+  }
+  return rows.length === 1 ? rows[0] : null;
+}
+
 /**
  * Applies mandatory scope filters to a Supabase query based on user context.
  * This is a standalone function that can be used with any query builder.

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { ScopedDataAccess, DataAccessContext, withScope } from './access';
+import { ScopedDataAccess, DataAccessContext, withScope, pickTenantScopedRow } from './access';
 import { SupabaseClient } from '@supabase/supabase-js';
 
 // Mock Supabase Client and Query Builder
@@ -333,5 +333,47 @@ describe('ScopedDataAccess', () => {
       expect(mockQueryBuilder.select).toHaveBeenCalledWith('setting_value');
       expect(mockQueryBuilder.eq).toHaveBeenCalledWith('setting_key', 'standalone_quote_mode_enabled');
     });
+  });
+});
+
+describe('pickTenantScopedRow', () => {
+  it('picks the row matching a known tenantId, ignoring other tenants', () => {
+    const rows = [
+      { id: 'row-a', tenant_id: 'tenant-1' },
+      { id: 'row-b', tenant_id: 'tenant-2' },
+    ];
+    expect(pickTenantScopedRow(rows, 'tenant-2')).toEqual(rows[1]);
+  });
+
+  it('does not treat a row with a null tenant_id as a wildcard match', () => {
+    const rows = [
+      { id: 'row-a', tenant_id: null },
+      { id: 'row-b', tenant_id: 'tenant-2' },
+    ];
+    expect(pickTenantScopedRow(rows, 'tenant-1')).toBeNull();
+  });
+
+  it('returns null when a known tenantId matches nothing (fails closed, never falls back)', () => {
+    const rows = [{ id: 'row-a', tenant_id: 'tenant-1' }];
+    expect(pickTenantScopedRow(rows, 'tenant-does-not-exist')).toBeNull();
+  });
+
+  it('resolves the single row when no tenantId is known and the set is unambiguous', () => {
+    const rows = [{ id: 'row-a', tenant_id: 'tenant-1' }];
+    expect(pickTenantScopedRow(rows, null)).toEqual(rows[0]);
+  });
+
+  it('regression: does NOT pick an arbitrary row across tenants when tenantId is unknown (the cross-tenant bug)', () => {
+    const rows = [
+      { id: 'row-a', tenant_id: 'tenant-1' },
+      { id: 'row-b', tenant_id: 'tenant-2' },
+    ];
+    expect(pickTenantScopedRow(rows, null)).toBeNull();
+    expect(pickTenantScopedRow(rows, undefined)).toBeNull();
+  });
+
+  it('returns null for an empty candidate set regardless of tenantId', () => {
+    expect(pickTenantScopedRow([], 'tenant-1')).toBeNull();
+    expect(pickTenantScopedRow([], null)).toBeNull();
   });
 });
