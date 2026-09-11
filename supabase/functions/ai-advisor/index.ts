@@ -303,12 +303,70 @@ function buildMaritimeContext(origin: string, destination: string, mode: string)
     return parts.join(' ');
 }
 
-function buildBenchmarkContext(historicalAvg: number, ratesFound: number): string {
-    if (ratesFound === 0 || historicalAvg <= 0) return '';
+// Live competitive benchmark, sourced from real carrier_rates rows on this
+// exact lane -- the same table rate-engine's "MARKET RATE" tier reads from
+// (see docs/smart-quote-module-design.md §10 item 1). Deliberately does NOT
+// call rate-engine's HTTP endpoint and filter its response: rate-engine pads
+// out to 10+ options with RANDOMLY SIMULATED prices (see rate-engine/index.ts
+// section 6, "Fallback / 10+ Options Guarantee Strategy") whenever fewer than
+// 10 real DB rows exist for a lane -- the common case -- and its response
+// gives no field distinguishing a real row from a simulated one except the
+// simulated rows' `sim_`-prefixed id, which isn't worth parsing for when a
+// direct, real-rows-only query is simpler and cheaper. Feeding a randomly
+// generated number into the prompt as a "real competitive benchmark" is
+// exactly the failure mode §4 exists to prevent, so this queries carrier_rates
+// directly and only ever sees genuine DB rows.
+async function fetchLiveMarketRateBenchmark(
+    supabase: any,
+    originPortId: string,
+    destinationPortId: string,
+    mode: string,
+    containerQty: number,
+    weightKg: number,
+    accountId?: string,
+): Promise<{ avg: number; count: number }> {
+    try {
+        const today = new Date().toISOString().split('T')[0];
+        const { data: rates, error } = await supabase
+            .from('carrier_rates')
+            .select('total_amount, tier, account_id')
+            .eq('origin_port_id', originPortId)
+            .eq('destination_port_id', destinationPortId)
+            .eq('mode', mode)
+            .eq('status', 'active')
+            .or(`valid_to.is.null,valid_to.gte.${today}`);
+
+        if (error || !rates) return { avg: 0, count: 0 };
+
+        const prices: number[] = [];
+        for (const r of rates) {
+            // Same restriction rate-engine applies: a contract-tier rate is
+            // only a real, usable price for the account it was negotiated
+            // for -- never treat another account's contract rate as a public
+            // market benchmark.
+            if (r.tier === 'contract' && r.account_id !== accountId) continue;
+            let price = Number(r.total_amount);
+            if (!Number.isFinite(price) || price <= 0) continue;
+            if (mode === 'ocean' && containerQty) price *= containerQty;
+            else if (weightKg > 0) price *= weightKg;
+            prices.push(price);
+        }
+
+        if (prices.length === 0) return { avg: 0, count: 0 };
+        return { avg: prices.reduce((a, b) => a + b, 0) / prices.length, count: prices.length };
+    } catch {
+        return { avg: 0, count: 0 };
+    }
+}
+
+function buildBenchmarkContext(avg: number, count: number, source: 'market' | 'historical'): string {
+    if (count === 0 || avg <= 0) return '';
+    const basis = source === 'market'
+        ? `real, currently-active carrier rate agreements on this exact lane (${count} found)`
+        : `this tenant's own last ${count} quotes on this lane`;
     return (
-        `Internal benchmark: this tenant's own last ${ratesFound} quotes on this lane averaged ` +
-        `$${historicalAvg.toFixed(2)} base freight. Position 'cheapest' at or below this figure and ` +
-        `'best_value' within a reasonable band above it -- do not invent a competitor's price, only use this figure.`
+        `Internal benchmark: ${basis} averaged $${avg.toFixed(2)} base freight. Position 'cheapest' at or below ` +
+        `this figure and 'best_value' within a reasonable band above it -- do not invent a competitor's price, only use this figure.`
     );
 }
 
@@ -328,9 +386,10 @@ async function validateCompliance(payload: any) {
 
 async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, tenantId: string, userToken?: string, userId?: string) {
     const {
-        origin, destination, mode, commodity, weight, volume, 
+        origin, destination, mode, commodity, weight, volume,
         containerType, containerSize, containerQty,
-        dangerousGoods, specialHandling, pickupDate, deliveryDeadline
+        dangerousGoods, specialHandling, pickupDate, deliveryDeadline,
+        originDetails, destinationDetails, account_id: accountId,
     } = payload;
 
     // 1. Check Cache
@@ -383,6 +442,33 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
         logger.warn("Failed to fetch historical data:", { error: err });
     }
 
+    // 2c. Live market-rate benchmark, sourced directly from carrier_rates
+    // (real, currently-active carrier pricing) when the frontend resolved
+    // both locations to a ports_locations id via LocationAutocomplete
+    // (originDetails.id/destinationDetails.id -- set by SmartQuoteWorkspace,
+    // see docs/smart-quote-module-design.md §10 item 1). This is preferred
+    // over the historical `rates`-table average above whenever real rows
+    // exist: it reflects actual current carrier pricing on this exact lane,
+    // not just what this tenant happened to quote before. Falls back to the
+    // historical average when no live carrier rate exists for this lane
+    // (new lane, no ports_locations id available) -- never falls back to a
+    // simulated/random number (see fetchLiveMarketRateBenchmark's comment).
+    let benchmarkAvg = historicalAvg;
+    let benchmarkCount = historicalRatesFound;
+    let benchmarkSource: 'market' | 'historical' = 'historical';
+    if (originDetails?.id && destinationDetails?.id) {
+        const weightKg = Number(weight) || 0;
+        const market = await fetchLiveMarketRateBenchmark(
+            supabase, originDetails.id, destinationDetails.id, mode,
+            Number(containerQty) || 1, weightKg, accountId,
+        );
+        if (market.count > 0) {
+            benchmarkAvg = market.avg;
+            benchmarkCount = market.count;
+            benchmarkSource = 'market';
+        }
+    }
+
     // 2b. Maritime chokepoint + competitive-benchmark context. Both are
     // deterministic, code-computed strings (not something the model is
     // asked to invent) -- see buildMaritimeContext/buildBenchmarkContext
@@ -390,7 +476,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     // this lane, no internal rate history yet); the prompt below treats an
     // empty value as "say nothing about it" rather than a gap to fill in.
     const maritimeContext = buildMaritimeContext(origin, destination, mode);
-    const benchmarkContext = buildBenchmarkContext(historicalAvg, historicalRatesFound);
+    const benchmarkContext = buildBenchmarkContext(benchmarkAvg, benchmarkCount, benchmarkSource);
 
     // 3. Call the LLM Gateway (routes to tenant-configured provider, or
     //    falls through to the self-hosted vLLM rig — see _shared/llm-gateway.ts)
