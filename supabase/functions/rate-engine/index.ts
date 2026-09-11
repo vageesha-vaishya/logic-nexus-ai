@@ -167,21 +167,36 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
     // 5. Query 3-Tier Rates from DB
     if (originId && destId) {
-        const now = new Date().toISOString().split('T')[0]; 
+        const now = new Date().toISOString().split('T')[0];
 
+        // BUG FIXED HERE (found 2026-09-11 alongside the location-matching fix
+        // above): this select() named a `transit_days` column that does not
+        // exist on carrier_rates (see \d carrier_rates -- it has `etd`/`eta`
+        // instead). PostgREST 400s on an unknown column, so `error` below was
+        // ALWAYS truthy whenever this query ran, and the silent `if (!error
+        // && rates)` guard just skipped every real row with no log. This means
+        // section 5 has never actually returned a real rate to anyone,
+        // independent of the location-matching bug -- that bug simply hid
+        // this one, since originId/destId were never both non-null before, so
+        // this query never even ran. Now uses etd/eta (both nullable; transit
+        // days is only computable when a rate has both) to derive transitTime.
         const query = supabase
             .from('carrier_rates')
             .select(`
                 id, tier, carrier:carrier_id(name),
-                total_amount, transit_days, valid_to, account_id
+                total_amount, etd, eta, valid_to, account_id
             `)
             .eq('origin_port_id', originId)
             .eq('destination_port_id', destId)
             .eq('mode', mode)
             .eq('status', 'active')
             .or(`valid_to.is.null,valid_to.gte.${now}`)
-        
+
         const { data: rates, error } = await query;
+
+        if (error) {
+            logger.warn("carrier_rates query failed, proceeding to simulation:", { error: error.message });
+        }
 
         if (!error && rates) {
             rates.forEach((r: any) => {
@@ -222,6 +237,12 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
                 const breakdownTotal = breakdown.reduce((sum, item) => sum + item.amount, 0);
                 const finalPrice = breakdownTotal; // Recalculate based on breakdown
 
+                let transitDays: number | null = null;
+                if (r.etd && r.eta) {
+                    const days = Math.round((new Date(r.eta).getTime() - new Date(r.etd).getTime()) / 86400000);
+                    if (Number.isFinite(days) && days > 0) transitDays = days;
+                }
+
                 options.push({
                     id: r.id,
                     tier: r.tier as any,
@@ -231,7 +252,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
                     buyPrice: Math.round(originalCost * 100) / 100,
                     marginAmount: 0, // Will be updated if margins applied
                     currency: 'USD',
-                    transitTime: r.transit_days ? `${r.transit_days} Days` : '3-5 Days',
+                    transitTime: transitDays ? `${transitDays} Days` : '3-5 Days',
                     validUntil: r.valid_to,
                     charge_breakdown: breakdown // Add breakdown to option
                 });
