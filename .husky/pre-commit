@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 
-# ── 1. Block staged .env files ────────────────────────────────────────────────
-if git diff --cached --name-only | grep -qE '(^|/)\.env($|\.)'; then
+# ── 1. Block staged .env files (but allow tracked .env*.example templates) ───
+if git diff --cached --name-only | grep -E '(^|/)\.env($|\.)' | grep -qvE '\.example$'; then
   echo ""
   echo "  ERROR: Staged file matches .env pattern."
   echo "  Remove it from staging: git reset HEAD <file>"
