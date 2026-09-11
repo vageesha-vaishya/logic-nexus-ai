@@ -27,19 +27,33 @@ export function useDashboardPreferences(defaultWidgets: WidgetInstance[]) {
         if (data?.widgets && Array.isArray(data.widgets)) {
           // Deduplicate widgets by both ID and Type to prevent display issues if DB has duplicates
           // We prioritize the first occurrence of each type to maintain cleaner dashboards
+          const validTypes = new Set(defaultWidgets.map(w => w.type));
           const uniqueWidgets: WidgetInstance[] = [];
           const seenTypes = new Set<string>();
           const seenIds = new Set<string>();
 
           for (const w of (data.widgets as WidgetInstance[])) {
+            // dashboard_preferences is shared across dashboards with incompatible
+            // widget-type vocabularies (e.g. the generic Dashboards page's
+            // 'stats'/'financial'/'volume' vs. this role dashboard's own types) --
+            // a row saved by one can't be rendered by another, so drop anything
+            // this dashboard doesn't recognize rather than render it as broken.
+            if (!validTypes.has(w.type)) continue;
             if (!seenTypes.has(w.type) && !seenIds.has(w.id)) {
               seenTypes.add(w.type);
               seenIds.add(w.id);
               uniqueWidgets.push(w);
             }
           }
-          
-          setWidgets(uniqueWidgets);
+
+          if (uniqueWidgets.length === 0) {
+            logger.warn('Saved dashboard_preferences had no widgets valid for this dashboard; using defaults', {
+              userId: user.id,
+            });
+            setWidgets(defaultWidgets);
+          } else {
+            setWidgets(uniqueWidgets);
+          }
         } else if (!error) {
           // No preferences found, use defaults
           setWidgets(defaultWidgets);
