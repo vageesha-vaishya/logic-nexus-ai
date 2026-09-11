@@ -11,6 +11,7 @@ import { Container, Trash2, Plus, AlertCircle, Edit } from 'lucide-react';
 import { toast } from 'sonner';
 import { Badge } from '@/components/ui/badge';
 import { logger } from "@/lib/logger";
+import { deriveContainerSizeLabel } from "@/lib/container-utils";
 
 interface ShipmentContainerManagerProps {
   shipmentId: string;
@@ -38,8 +39,21 @@ export function ShipmentContainerManager({ shipmentId, cargoConfigs }: ShipmentC
         logger.error('Failed to load container types', err);
       }
       try {
-        const { data: sizes } = await supabase.from('container_sizes').select('id, name, iso_code, type_id').order('name');
-        setContainerSizes(sizes || []);
+        // container_sizes has no name/iso_code/type_id column at all --
+        // only dimensional data (length_ft/is_high_cube/is_pallet_wide).
+        // Derive a label instead of selecting columns that don't exist.
+        const { data: sizes } = await supabase
+          .from('container_sizes')
+          .select('id, container_type_id, length_ft, is_high_cube, is_pallet_wide')
+          .order('length_ft');
+        setContainerSizes(
+          (sizes || []).map((row: any) => ({
+            id: row.id,
+            name: deriveContainerSizeLabel(row),
+            iso_code: '',
+            type_id: row.container_type_id ?? undefined,
+          }))
+        );
       } catch (err) {
         logger.error('Failed to load container sizes', err);
       }

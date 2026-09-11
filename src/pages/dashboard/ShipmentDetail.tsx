@@ -24,7 +24,7 @@ import { format } from 'date-fns';
 import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
 import { Shipment, ShipmentStatus, statusConfig, formatShipmentType } from './shipments-data';
 import { logger } from '@/lib/logger';
-import { formatContainerSize } from '@/lib/container-utils';
+import { formatContainerSize, deriveContainerSizeLabel } from '@/lib/container-utils';
 
 export default function ShipmentDetail() {
   const { id } = useParams();
@@ -59,7 +59,10 @@ export default function ShipmentDetail() {
     try {
       const { data, error } = await scopedDb
               .from('shipment_cargo_configurations' as any)
-              .select('*, container_types(name), container_sizes(name)')
+              // container_sizes has no name column at all -- only
+              // dimensional data (length_ft/is_high_cube/is_pallet_wide);
+              // a label is derived from those at render time below.
+              .select('*, container_types(name), container_sizes(length_ft, is_high_cube, is_pallet_wide)')
               .eq('shipment_id', id);
       
       if (error) throw error;
@@ -515,9 +518,9 @@ export default function ShipmentDetail() {
                         <div className="font-medium">
                           {config.container_types?.name || config.container_type || config.cargo_type}
                         </div>
-                        {(config.container_sizes?.name || config.container_size) && (
+                        {(deriveContainerSizeLabel(config.container_sizes || {}) || config.container_size) && (
                           <div className="text-xs text-muted-foreground">
-                            {formatContainerSize(config.container_sizes?.name || config.container_size)}
+                            {deriveContainerSizeLabel(config.container_sizes || {}) || formatContainerSize(config.container_size)}
                           </div>
                         )}
                       </TableCell>

@@ -6,6 +6,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useDebug } from '@/hooks/useDebug';
 import { toast } from 'sonner';
 import { PortsService } from '@/services/PortsService';
+import { deriveContainerSizeLabel } from '@/lib/container-utils';
 import { quoteKeys } from './queryKeys';
 import {
   QuoteFormValues,
@@ -538,11 +539,19 @@ export function useQuoteRepositoryContext(): QuoteRepositoryContextData {
     queryKey: ['quote', 'reference', 'container_sizes'],
     queryFn: async () => {
       try {
+        // container_sizes has no name/code column at all -- only
+        // dimensional data (length_ft/is_high_cube/is_pallet_wide); derive
+        // a label from those instead of selecting columns that don't exist.
         const { data, error } = await scopedDb
           .from('container_sizes', true)
-          .select('id, name, code');
+          .select('id, container_type_id, length_ft, is_high_cube, is_pallet_wide');
         if (error) throw error;
-        return data || [];
+        return (data || []).map((row: any) => ({
+          id: row.id,
+          container_type_id: row.container_type_id,
+          name: deriveContainerSizeLabel(row),
+          code: '',
+        }));
       } catch (e: any) {
         debug.error('Failed to load container sizes', { error: e, tenantId });
         logger.error('[useQuoteRepository] Failed to load container sizes', e);

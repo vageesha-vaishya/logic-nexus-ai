@@ -1,7 +1,7 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useCRM } from '@/hooks/useCRM';
-import { formatContainerSize } from '@/lib/container-utils';
+import { formatContainerSize, deriveContainerSizeLabel } from '@/lib/container-utils';
 import { useAuth } from '@/hooks/useAuth';
 import { fetchContainerSizesApi, fetchContainerTypesApi, logContainerMetadataError } from '@/lib/api/containerMetadata';
 
@@ -84,16 +84,20 @@ export function useContainerRefs() {
         logContainerMetadataError('fetchContainerSizesApi', apiError);
       }
 
+      // container_sizes has no name/iso_code/type_id column at all -- only
+      // dimensional data (length_ft/is_high_cube/is_pallet_wide). Derive a
+      // label from those instead of selecting columns that don't exist.
       const { data, error } = await scopedDb
         .from('container_sizes', true)
-        .select('id, name, iso_code, container_type_id, type_id')
-        .order('name');
+        .select('id, container_type_id, length_ft, is_high_cube, is_pallet_wide')
+        .order('length_ft');
       if (error || !data?.length) return FALLBACK_SIZES;
       return (data as any[]).map((row) => ({
-        ...row,
-        // Backward compatibility: ensure both keys exist
-        type_id: row.type_id ?? row.container_type_id ?? undefined,
-        container_type_id: row.container_type_id ?? row.type_id ?? undefined,
+        id: row.id,
+        name: deriveContainerSizeLabel(row),
+        iso_code: '',
+        type_id: row.container_type_id ?? undefined,
+        container_type_id: row.container_type_id ?? undefined,
       })) as ContainerSize[];
     },
     staleTime: 1000 * 60 * 60, // 1 hour

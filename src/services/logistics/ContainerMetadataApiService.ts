@@ -1,6 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { checkDbPoolHealth, runPoolQuery } from '@/pages/api/_utils/dbPool';
 import { ConnectionPoolException } from '@/pages/api/_utils/errors';
+import { deriveContainerSizeLabel } from '@/lib/container-utils';
 
 export interface ContainerTypeResponse {
   id: number;
@@ -98,35 +99,47 @@ export class ContainerMetadataApiService {
 
   private mapSizeRow(row: any): ContainerSizeResponse {
     const sourceId = String(row.id);
-    const typeSourceId = String(row.container_type_id || row.type_id || '');
+    const typeSourceId = String(row.container_type_id || '');
+    const label = deriveContainerSizeLabel(row);
     return {
       id: stableNumericId(sourceId),
       sourceId,
       containerTypeSourceId: typeSourceId,
-      name: String(row.name || row.size_name || row.size_code || ''),
-      description: String(row.description || row.name || row.size_name || ''),
-      isActive: row.is_active !== false,
-      isoCode: String(row.iso_code || ''),
+      name: label,
+      description: label,
+      // No is_active column exists on container_sizes -- every row is
+      // implicitly active (see this function's own header comment).
+      isActive: true,
+      // No iso_code column exists either -- never fabricate a specific
+      // ISO 6346 code the table doesn't actually record.
+      isoCode: '',
     };
   }
 
+  // public.container_types and public.container_sizes both have no
+  // is_active column (confirmed via information_schema.columns on the
+  // production DB) -- every row is implicitly active. container_sizes also
+  // has no name/description/iso_code/size_name/size_code/type_id columns at
+  // all, only dimensional data (length_ft/is_high_cube/is_pallet_wide/etc);
+  // mapSizeRow derives a label from those instead. Both queries below
+  // previously referenced all of these nonexistent columns, so this pool
+  // path always threw and every call silently fell through to the
+  // (previously also broken) Supabase fallback below it.
   private async queryTypesViaPool(tenantId: string): Promise<ContainerTypeResponse[]> {
     const rows = tenantId
       ? await runPoolQuery<any>(
           `
-          select id, name, description, code, is_active
+          select id, name, description, code
           from container_types
-          where is_active = true
-            and (tenant_id = $1 or tenant_id is null)
+          where tenant_id = $1 or tenant_id is null
           order by name asc
           `,
           [tenantId]
         )
       : await runPoolQuery<any>(
           `
-          select id, name, description, code, is_active
+          select id, name, description, code
           from container_types
-          where is_active = true
           order by name asc
           `,
           []
@@ -138,20 +151,18 @@ export class ContainerMetadataApiService {
     const rows = typeId
       ? await runPoolQuery<any>(
           `
-          select id, name, description, iso_code, container_type_id, type_id, is_active, size_name, size_code
+          select id, container_type_id, length_ft, is_high_cube, is_pallet_wide
           from container_sizes
-          where is_active = true
-            and (container_type_id = $1 or type_id = $1)
-          order by name asc
+          where container_type_id = $1
+          order by length_ft asc
           `,
           [typeId]
         )
       : await runPoolQuery<any>(
           `
-          select id, name, description, iso_code, container_type_id, type_id, is_active, size_name, size_code
+          select id, container_type_id, length_ft, is_high_cube, is_pallet_wide
           from container_sizes
-          where is_active = true
-          order by name asc
+          order by length_ft asc
           `,
           []
         );
@@ -175,8 +186,7 @@ export class ContainerMetadataApiService {
 
       const query = this.db
         .from('container_types')
-        .select('id, name, description, code, is_active')
-        .eq('is_active', true);
+        .select('id, name, description, code');
 
       if (tenantId) {
         query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
@@ -206,13 +216,13 @@ export class ContainerMetadataApiService {
     } catch {
       let query = this.db
         .from('container_sizes')
-        .select('id, name, description, size_name, iso_code, size_code, container_type_id, type_id, is_active');
+        .select('id, container_type_id, length_ft, is_high_cube, is_pallet_wide');
 
       if (typeId) {
-        query = query.or(`container_type_id.eq.${typeId},type_id.eq.${typeId}`);
+        query = query.eq('container_type_id', typeId);
       }
 
-      const queryResult = query.order('name', { ascending: true });
+      const queryResult = query.order('length_ft', { ascending: true });
 
       const { data, error } = await this.withTimeout(queryResult as any, 'container_sizes query');
       if (error) throw new Error(`Failed to fetch container sizes: ${error.message}`);

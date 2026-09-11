@@ -31,6 +31,27 @@ export function formatContainerSize(name: string | null | undefined): string {
   return str;
 }
 
+/**
+ * public.container_sizes has no name/code/iso_code label column at all --
+ * only dimensional data (length_ft, is_high_cube, is_pallet_wide, etc, see
+ * \d public.container_sizes). Every consumer that queried this table for a
+ * "name" column was silently 400ing and falling back to a small hardcoded
+ * list. This derives a human label from the real columns instead of
+ * inventing a fact (like a specific ISO 6346 code) the table doesn't have.
+ */
+export function deriveContainerSizeLabel(row: {
+  length_ft?: number | string | null;
+  is_high_cube?: boolean | null;
+  is_pallet_wide?: boolean | null;
+}): string {
+  const lengthFt = row.length_ft != null ? Number(row.length_ft) : NaN;
+  if (!Number.isFinite(lengthFt)) return '';
+  const parts = [`${lengthFt}ft`];
+  if (row.is_high_cube) parts.push('High Cube');
+  if (row.is_pallet_wide) parts.push('Pallet Wide');
+  return parts.join(' ');
+}
+
 export function reconcileContainerTypeWithSize(
   containerSizeId: string | null | undefined,
   containerTypeId: string | null | undefined,
