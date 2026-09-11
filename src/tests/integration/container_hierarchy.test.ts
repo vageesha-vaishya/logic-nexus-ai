@@ -11,7 +11,12 @@ function loadEnv() {
     const envPath = path.resolve(process.cwd(), '.env');
     if (fs.existsSync(envPath)) {
       const envConfig = fs.readFileSync(envPath, 'utf8');
-      envConfig.split('\n').forEach(line => {
+      // .split('\n') alone leaves a trailing \r on each line for a
+      // CRLF-saved .env (common on Windows) -- the regex below has no /m
+      // flag, so its $ can't match before that \r and every line silently
+      // fails to parse, leaving SUPABASE_SERVICE_ROLE_KEY unset and this
+      // suite's createClient() crashing instead of skipping.
+      envConfig.split(/\r?\n/).forEach(line => {
         const match = line.match(/^([^=]+)=(.*)$/);
         if (match) {
           const key = match[1].trim();

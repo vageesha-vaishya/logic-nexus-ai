@@ -10,7 +10,7 @@ import { Loader2, Package, Scale, Activity, Download, Filter, ChevronRight, Ship
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { formatContainerSize } from '@/lib/container-utils';
+import { formatContainerSize, deriveContainerSizeLabel } from '@/lib/container-utils';
 import {
   Table,
   TableBody,
@@ -55,9 +55,11 @@ export default function ContainerAnalytics() {
   useEffect(() => {
     if (!selectedClassId) return;
     const loadCapacities = async () => {
+      // container_sizes has no name/iso_code column at all -- only
+      // dimensional data; a label is derived from it below.
       const { data } = await scopedDb
         .from('vessel_class_capacities')
-        .select('*, container_sizes(name, iso_code)')
+        .select('*, container_sizes(length_ft, is_high_cube, is_pallet_wide)')
         .eq('class_id', selectedClassId);
       if (data) setClassCapacities(data);
     };
@@ -65,7 +67,7 @@ export default function ContainerAnalytics() {
   }, [selectedClassId, scopedDb]);
 
   const capacityData = classCapacities.map(c => ({
-    name: formatContainerSize(c.container_sizes?.name || 'Unknown'),
+    name: deriveContainerSizeLabel(c.container_sizes || {}) || 'Unknown',
     max_slots: c.max_slots,
     weight_limit: c.weight_limit_per_slot_kg
   }));
@@ -469,19 +471,21 @@ export default function ContainerAnalytics() {
                                         key={i} 
                                         className="cursor-pointer hover:bg-muted/50 transition-colors"
                                         onClick={() => {
-                                            if (item.container_sizes?.name) {
-                                                setSelectedSize(formatContainerSize(item.container_sizes.name));
+                                            const sizeLabel = deriveContainerSizeLabel(item.container_sizes || {});
+                                            if (sizeLabel) {
+                                                setSelectedSize(formatContainerSize(sizeLabel));
                                                 setActiveTab('inventory');
                                             }
                                         }}
                                     >
                                         <TableCell>
                                             <div className="flex items-center gap-2">
-                                                {formatContainerSize(item.container_sizes?.name)}
+                                                {formatContainerSize(deriveContainerSizeLabel(item.container_sizes || {}))}
                                                 <ChevronRight className="h-3 w-3 text-muted-foreground" />
                                             </div>
                                         </TableCell>
-                                        <TableCell><Badge variant="outline">{item.container_sizes?.iso_code}</Badge></TableCell>
+                                        {/* container_sizes has no iso_code column -- never fabricate one */}
+                                        <TableCell><Badge variant="outline">{''}</Badge></TableCell>
                                         <TableCell className="text-right">{item.max_slots}</TableCell>
                                         <TableCell className="text-right">{item.weight_limit_per_slot_kg?.toLocaleString()}</TableCell>
                                     </TableRow>

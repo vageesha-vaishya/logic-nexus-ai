@@ -10,7 +10,7 @@ import { Label } from '@/components/ui/label';
 import { useCRM } from '@/hooks/useCRM';
 import type { Database } from '@/integrations/supabase/types';
 import { Badge } from '@/components/ui/badge';
-import { formatContainerSize } from '@/lib/container-utils';
+import { deriveContainerSizeLabel } from '@/lib/container-utils';
 
 export default function ContainerTracking() {
   type InventoryRow = Database['public']['Views']['view_container_inventory_summary']['Row'];
@@ -34,9 +34,15 @@ export default function ContainerTracking() {
   });
 
   const load = async () => {
+    // container_sizes has no name column to order by -- length_ft is the
+    // real, comparable column. (Separately: view_container_inventory_summary
+    // does not exist on the production DB at all -- confirmed via
+    // information_schema.tables, 0 rows -- so `items` below is always
+    // empty; that's a missing-view problem, not a container_sizes one, and
+    // is out of scope for this fix.)
     const [viewRes, sizesRes] = await Promise.all([
       scopedDb.from('view_container_inventory_summary' as any).select('*'),
-      scopedDb.from('container_sizes').select('*').order('name')
+      scopedDb.from('container_sizes').select('*').order('length_ft')
     ]);
     
     setItems((viewRes.data ?? []) as InventoryRow[]);
@@ -176,7 +182,7 @@ export default function ContainerTracking() {
                 <SelectTrigger><SelectValue placeholder="Select Container Size" /></SelectTrigger>
                 <SelectContent>
                   {sizes.map(s => (
-                    <SelectItem key={s.id} value={s.id}>{formatContainerSize(s.name)} ({s.code})</SelectItem>
+                    <SelectItem key={s.id} value={s.id}>{deriveContainerSizeLabel(s)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

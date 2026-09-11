@@ -15,6 +15,7 @@ import { useDomain } from '@/contexts/DomainContext';
 import { RequestContext, QuoteResult } from '@/services/quotation/types';
 import { PricingService } from '@/services/pricing.service';
 import { logger } from "@/lib/logger";
+import { deriveContainerSizeLabel } from "@/lib/container-utils";
 
 export function QuoteFinancials() {
   const { control, setValue } = useFormContext();
@@ -35,8 +36,14 @@ export function QuoteFinancials() {
         const { data: types } = await supabase.from('container_types').select('id, name');
         if (types) setContainerTypes(types);
         
-        const { data: sizes } = await supabase.from('container_sizes').select('id, name');
-        if (sizes) setContainerSizes(sizes);
+        // container_sizes has no name column at all -- only dimensional
+        // data (length_ft/is_high_cube/is_pallet_wide); derive a label.
+        const { data: sizes } = await supabase
+          .from('container_sizes')
+          .select('id, length_ft, is_high_cube, is_pallet_wide');
+        if (sizes) {
+          setContainerSizes(sizes.map((row: any) => ({ id: row.id, name: deriveContainerSizeLabel(row) })));
+        }
     };
     loadMasterData();
   }, [supabase]);

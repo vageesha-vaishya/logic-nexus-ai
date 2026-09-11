@@ -39,8 +39,11 @@ describe('ContainerService', () => {
         { id: 's1', container_type_id: 't1', length_ft: 20, capacity_cbm: 33 }
       ];
 
-      // Mock chain for types
-      mockDb.from.mockImplementationOnce((table: string) => {
+      // getAllContainers calls db.from() twice (types, then sizes), so this
+      // must stub every call, not just the first (mockImplementationOnce
+      // left the second call falling through to the bare mockReturnThis()
+      // stub in beforeEach, which resolves 'sizes' to undefined).
+      mockDb.from.mockImplementation((table: string) => {
         if (table === 'container_types') {
           return {
             select: vi.fn().mockResolvedValue({ data: mockTypes, error: null })

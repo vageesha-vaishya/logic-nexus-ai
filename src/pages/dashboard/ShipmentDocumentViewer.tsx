@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Printer, ArrowLeft } from 'lucide-react';
 import { format } from 'date-fns';
 import { logger } from "@/lib/logger";
+import { deriveContainerSizeLabel, formatContainerSize } from "@/lib/container-utils";
 
 export default function ShipmentDocumentViewer() {
   const { id, type } = useParams();
@@ -39,9 +40,12 @@ export default function ShipmentDocumentViewer() {
         if (iErr) throw iErr;
 
         // Fetch Containers
+        // container_sizes has no name column at all -- only dimensional
+        // data (length_ft/is_high_cube/is_pallet_wide); a label is derived
+        // from those below wherever c.container_sizes is read.
         const { data: containers, error: cErr } = await scopedDb
           .from('shipment_containers' as any)
-          .select('*, container_types(name), container_sizes(name)')
+          .select('*, container_types(name), container_sizes(length_ft, is_high_cube, is_pallet_wide)')
           .eq('shipment_id', id);
         
         if (cErr && cErr.code !== '42P01') throw cErr; // Ignore table missing if so
@@ -389,11 +393,7 @@ function BillOfLading({ shipment, items, containers }: any) {
                     <div className="col-span-3 font-mono">
                         {c.container_number}<br/>
                         SEAL: {c.seal_number}<br/>
-                        {c.container_types?.name || c.container_type} {c.container_sizes?.name ? `(${
-                            (c.container_types?.name || c.container_type) 
-                            ? (c.container_sizes.name.match(/(\d+)/)?.[0] || c.container_sizes.name)
-                            : c.container_sizes.name
-                        })` : ''}
+                        {c.container_types?.name || c.container_type} {deriveContainerSizeLabel(c.container_sizes || {}) ? `(${formatContainerSize(deriveContainerSizeLabel(c.container_sizes))})` : ''}
                     </div>
                     <div className="col-span-2">1 CNT</div>
                     <div className="col-span-5">
@@ -460,11 +460,7 @@ function PackingList({ shipment, items, containers }: any) {
                             <tr key={c.id}>
                                 <td className="border border-black p-2 font-mono">{c.container_number}</td>
                                 <td className="border border-black p-2">
-                                    {c.container_types?.name || c.container_type} {c.container_sizes?.name ? `(${
-                                        (c.container_types?.name || c.container_type)
-                                        ? (c.container_sizes.name.match(/(\d+)/)?.[0] || c.container_sizes.name)
-                                        : c.container_sizes.name
-                                    })` : ''} - Seal: {c.seal_number}<br/>
+                                    {c.container_types?.name || c.container_type} {deriveContainerSizeLabel(c.container_sizes || {}) ? `(${formatContainerSize(deriveContainerSizeLabel(c.container_sizes))})` : ''} - Seal: {c.seal_number}<br/>
                                     <span className="text-xs">{c.remarks}</span>
                                 </td>
                                 <td className="border border-black p-2 text-right">1</td>

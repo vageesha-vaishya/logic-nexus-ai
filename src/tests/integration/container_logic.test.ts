@@ -12,7 +12,12 @@ function loadEnv() {
     const envPath = path.resolve(process.cwd(), '.env');
     if (fs.existsSync(envPath)) {
       const envConfig = fs.readFileSync(envPath, 'utf8');
-      envConfig.split('\n').forEach(line => {
+      // .split('\n') alone leaves a trailing \r on each line for a
+      // CRLF-saved .env (common on Windows) -- the regex below has no /m
+      // flag, so its $ can't match before that \r and every line silently
+      // fails to parse, leaving SUPABASE_SERVICE_ROLE_KEY unset and this
+      // suite's createClient() crashing instead of skipping.
+      envConfig.split(/\r?\n/).forEach(line => {
         const match = line.match(/^([^=]+)=(.*)$/);
         if (match) {
           const key = match[1].trim();
@@ -58,11 +63,23 @@ runTests('Enhanced Container Logic Integration', () => {
     name: `Test Logic Type ${timestamp}`
   };
   
+  // public.container_sizes has no name/code/teu_factor/iso_code/type_id
+  // column -- only dimensional data, keyed by container_type_id. See
+  // container_hierarchy.test.ts and the container_sizes fix in
+  // container-utils.ts for the same real-schema shape.
   const testSize = {
-    name: `40FT Logic ${shortSuffix}`,
-    code: `40${shortSuffix}`,
-    teu_factor: 2.0,
-    iso_code: '42G1'
+    length_ft: 40,
+    width_ft: 8,
+    height_ft: 8.5,
+    internal_length_mm: 12032,
+    internal_width_mm: 2352,
+    internal_height_mm: 2393,
+    door_width_mm: 2340,
+    door_height_mm: 2280,
+    capacity_cbm: 67.7,
+    max_payload_kg: 26512,
+    tare_weight_kg: 3800,
+    is_high_cube: false,
   };
 
   const cleanup = async () => {
@@ -110,7 +127,7 @@ runTests('Enhanced Container Logic Integration', () => {
     // Size
     const { data: sizeData, error: sizeError } = await supabase
       .from('container_sizes')
-      .insert({ ...testSize, type_id: typeId })
+      .insert({ ...testSize, container_type_id: typeId })
       .select()
       .single();
 
@@ -161,6 +178,12 @@ runTests('Enhanced Container Logic Integration', () => {
   it('should calculate TEU correctly in analytics view', async () => {
     if (!tenantId) return;
 
+    // NOTE: container_sizes has no teu_factor column, and
+    // view_container_inventory_summary does not exist on the production DB
+    // at all (see ContainerTracking.tsx) -- this test's TEU assertions
+    // below are pre-existing, out-of-scope breakage unrelated to the
+    // container_sizes column fix above; flagging rather than changing
+    // behavior here.
     // View query
     const { data: rawViewData, error: viewError } = await supabase
       .from('view_container_inventory_summary')
