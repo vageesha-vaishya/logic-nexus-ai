@@ -1,6 +1,6 @@
 # Smart Quote Module — Design & LLM Prompt Documentation
 
-**Status:** v3 prompt live in production (`logistics.smart_quotes`, version `v3-2026-09-11`)
+**Status:** v3 prompt live in production (`logistics.smart_quotes`, version `v3-2026-09-11`). Third-party rate-provider tool-calling framework (§9) is built and deployed but dormant — zero real provider adapters registered yet (§9.6).
 **Scope:** Import/export/inland freight quotation generation (`ai-advisor` → `generate_smart_quotes`)
 **Last updated:** 2026-09-11
 **Prerequisite reading:** `docs/audits/2026-09-05-ai-llm-audit-findings.md` §7–§10 — this doc builds directly on findings and fixes made there today (self-hosted throughput ceiling, charges/carrier reconciliation bugs and fixes). Nothing here repeats that investigation; it assumes the reader has it as background.
@@ -99,9 +99,9 @@ What a competitive, margin-aware quote needs to account for, and where each piec
 | **Canal fees (Suez/Panama)** | Folded into main (ocean) leg's rolled-up charge, no separate field | ✅ **New this doc** — §6, model-grounded via injected reference, not invented |
 | War-risk / diversion surcharge (Cape of Good Hope routing) | Folded into main leg charge; described in `ai_explanation`/`market_analysis` | ✅ **New this doc** — §6 |
 | Documentation / handling fees | `price_breakdown.fees.handling_docs` | ✅ Code-computed as the sum of the non-main legs since 2026-09-10 (audit doc §10) |
-| Peak season surcharge | Not currently modeled | ❌ Not in scope of this pass — candidate for Phase 2 (§9), same pattern as canal fees once a reference source exists |
+| Peak season surcharge | Not currently modeled | ❌ Not in scope of this pass — candidate for Phase 2 (§10), same pattern as canal fees once a reference source exists |
 | Duties / taxes | `price_breakdown.taxes` | ⚠️ Model-generated, currently almost always 0 in practice; not reconciled against any reference — flagged as a Phase 2 gap, not fixed here |
-| Port congestion surcharge | Not currently modeled | ❌ Phase 2 candidate — `public.dynamic_surcharges` (see §9) already has a `port_congestion` surcharge type in its schema, unused |
+| Port congestion surcharge | Not currently modeled | ❌ Phase 2 candidate — `public.dynamic_surcharges` (see §10) already has a `port_congestion` surcharge type in its schema, unused |
 
 ---
 
@@ -111,7 +111,7 @@ What a competitive, margin-aware quote needs to account for, and where each piec
 
 `supabase/functions/ai-advisor/index.ts` now has:
 
-- **`MARITIME_REFERENCE`** — a dated, sourced constant (see below for the actual content and sources). This is a **snapshot, not a feed** — see §10 for the required refresh cadence.
+- **`MARITIME_REFERENCE`** — a dated, sourced constant (see below for the actual content and sources). This is a **snapshot, not a feed** — see §11 for the required refresh cadence.
 - **`buildMaritimeContext(origin, destination, mode)`** — a coarse keyword/region heuristic that decides whether a lane plausibly transits Suez or Panama, and if so, returns the relevant reference text; returns an empty string otherwise (including for any non-ocean mode).
 - The prompt (§8) treats this as authoritative, dated context: fold its cost/time impact into the existing ocean leg charge and `transit_time`, never state a figure or routing assumption that contradicts it, and say nothing about canal fees at all when no context was provided.
 
@@ -214,7 +214,150 @@ Generate the quotation options now.
 
 ---
 
-## 9. Phased roadmap (not built in this pass)
+## 9. Rate & charge retrieval workflow (third-party providers, LLM tool-calling)
+
+Everything in §4–§8 covers data the *code* fetches or computes and hands the model as read-only context. This section covers a different, explicitly-decided-differently case: **live rates from named third-party freight-rate platforms** ("11 specified third-party quote rate platforms" per the original request). For those, the product decision — made explicitly, after the tradeoff below was raised — is that **the LLM itself decides when and which platform to call**, via real OpenAI-compatible tool-calling (function-calling), not a deterministic pre-fetch the way §6/§7's context is built.
+
+### 9.1 Why this is a deliberate exception to §4's grounding principle
+
+§4's rule is "give the model the facts, never ask it to be the source of the facts." Tool-calling looks like it violates that — the model is choosing *whether* to call a tool, which is itself a kind of judgment call over facts. It doesn't actually violate it, because the boundary is drawn differently here: the model never originates a rate number. It can only ever receive one of two things back from `get_freight_rate` — a real `NormalizedRate` object from a real HTTP call the orchestrator made, or a structured error string — and every other rule in §4 still applies to what it does with that result (it still can't invent a rate if the tool call fails; §9.4 covers exactly what happens then). What the model is trusted to decide is *when a live lookup is worth making*, not *what the number is*.
+
+The tradeoff this doc originally flagged: a deterministic pre-fetch (code always calls whichever rate providers are configured for a lane, before the model ever runs, the same pattern as §6's maritime context) is simpler, has bounded and predictable latency, and can't be skipped by the model. Tool-calling is more flexible — the model can choose not to bother calling a slow/irrelevant provider for a lane where it has good context already — at the cost of the latency and complexity in §9.3, and at the cost of one real failure mode already caught in testing (§9.2's enum note). The tool-calling approach was chosen anyway as the explicit, informed product decision; §9.3's bounded-loop design and §9.6's dormant-risk note exist specifically to contain the downside of that choice rather than re-argue it.
+
+### 9.2 The tool contract
+
+`_shared/rate-providers/registry.ts`'s `getRateProviderTool()` builds the exact schema offered to the model:
+
+```json
+{
+  "type": "function",
+  "function": {
+    "name": "get_freight_rate",
+    "description": "Look up a live, real freight rate from one of this tenant's configured rate providers. Only call this for the 'provider' values listed in the enum -- there is no provider available beyond that list, regardless of what you may know about other freight rate platforms.",
+    "parameters": {
+      "type": "object",
+      "properties": {
+        "provider": { "type": "string", "enum": ["<tenant's configured, callable provider names only>"] },
+        "origin": { "type": "string" },
+        "destination": { "type": "string" },
+        "mode": { "type": "string", "enum": ["ocean", "air", "road", "rail"] },
+        "container_type": { "type": "string" }
+      },
+      "required": ["provider", "origin", "destination", "mode"]
+    }
+  }
+}
+```
+
+**The `provider` field's `enum` constraint is not incidental — it is the direct fix for a real, observed failure.** A live curl test against the self-hosted rig, run with an earlier draft of this schema that left `provider` as a free-form string, got back a tool call with `provider: "Xeneta"` — a real freight-rate platform the model knows about from training data, but one this deployment has no adapter or credentials for. The model was never told "you may only use these platforms"; it inferred a plausible-sounding one from context and called it anyway. Constraining `provider` to an `enum` of only the tenant's actually-callable providers is what makes this safe: `tool_choice` sampling in every OpenAI-compatible implementation is expected to respect an `enum`, and `orchestrator.ts`'s `executeRateToolCall` re-validates the value against the same list server-side regardless (§9.4), so even a model that doesn't respect the enum perfectly can't reach a real, uncontrolled HTTP call.
+
+If the tenant has zero callable providers (true for every tenant today — see §9.6), `getRateProviderTool()` returns `null` and the tool is not offered at all — an empty `enum` was deliberately rejected as the way to represent "no providers," since some models will still attempt a call with a hallucinated value against an empty enum rather than skip the tool.
+
+### 9.3 The retrieval workflow, step by step
+
+```
+generateSmartQuotes()                                    [ai-advisor/index.ts]
+  │
+  ├─ 1. loadTenantRateProviders(supabase, tenantId)       [rate-providers/registry.ts]
+  │      → calls public.get_tenant_rate_providers(tenant_id)   [SECURITY DEFINER RPC]
+  │        · reads rate_provider_configs (this tenant, is_active = true)
+  │        · decrypts each config's API key from vault.decrypted_secrets
+  │        · excludes any provider whose rate_provider_health.status = 'open'
+  │          and open_until is still in the future (circuit still tripped)
+  │      → matches each returned row against the code-side ADAPTERS registry
+  │        (a config with no matching registered adapter, or no resolvable
+  │        API key, is silently excluded from `callable` and counted in
+  │        `unmatchedConfigCount` — logged as an ops gap, never surfaced to
+  │        the model or the client)
+  │
+  ├─ 2. getRateProviderTool(registry)                     [rate-providers/registry.ts]
+  │      → builds the §9.2 tool schema from `callable`, or returns null
+  │
+  ├─ 3. callLLMWithTools("logistics.smart_quotes", vars, ctx, tools, executor)  [llm-gateway.ts]
+  │      │
+  │      ├─ tools.length === 0, OR resolved provider isn't tool-calling-capable
+  │      │    (only openrouter/openai/local-qwen/custom are wired for tool-calling
+  │      │    today; anthropic/gemini fall back here too — no real rate provider
+  │      │    exists yet to justify building their different tool-calling wire
+  │      │    formats)
+  │      │    → delegate straight to plain callLLM() — IDENTICAL to pre-tool-calling
+  │      │      behavior. This is the only path any tenant exercises today (§9.6).
+  │      │
+  │      └─ otherwise, bounded to exactly 2 LLM round trips, never more:
+  │           │
+  │           ├─ ROUND 1 — "decide" turn: tool_choice="auto", max_tokens=500
+  │           │    (small on purpose — this call only decides whether/which
+  │           │    tool(s) to invoke, not the quote itself)
+  │           │    → model returns either final content directly (no tool
+  │           │      needed) or up to 5 tool_calls (hard cap — prevents a
+  │           │      pathological fan-out from inflating latency/cost)
+  │           │
+  │           ├─ if tool_calls present: execute ALL of them IN PARALLEL via
+  │           │    the caller-supplied executor → ai-advisor's executor calls
+  │           │    executeRateToolCall(supabase, tenantId, registry, argsJson)
+  │           │    for each one (§9.4 covers what that does internally)
+  │           │
+  │           └─ ROUND 2 — "answer" turn: tool_choice="none" (forces real
+  │                content, blocks further tool calls), max_tokens=2800
+  │                (the task's FULL budget — this is where the actual quote
+  │                JSON gets generated, now with real tool results as
+  │                additional conversation context)
+  │
+  └─ 4. applyDynamicPricing() — unchanged; still recomputes price_breakdown
+       deterministically regardless of whether any tool was called (§4's
+       "money that has to reconcile with itself" row applies identically
+       whether the leg charge came from the model's own reasoning or from
+       a live rate the model was handed)
+```
+
+Any unexpected failure in the tool-loop mechanics itself (not a normal per-provider HTTP error, which §9.4 already handles) is caught and falls back to plain `callLLM()` — tool-calling breaking can never block Smart Quote generation outright.
+
+### 9.4 Validation rules and the circuit-breaker state machine
+
+Every `get_freight_rate` call the model makes runs through `orchestrator.ts`'s `executeRateToolCall`, which applies the same checks to every provider uniformly — no individual adapter can skip one:
+
+1. **Argument parsing.** Malformed JSON in the tool call's arguments → `invalid_response`, returned immediately, no network call attempted.
+2. **Provider re-validation.** The `provider` value is looked up against `registry.callable` again server-side — defense in depth against the enum not being respected (§9.2's Xeneta case). An unmatched value → `provider_error`, no network call.
+3. **Field validation.** `mode` must be one of `ocean|air|road|rail`; `origin`/`destination` are required. Either failing → `invalid_response`, no network call.
+4. **Circuit-breaker check.** If `rate_provider_health.status = 'open'` and `open_until` is still future for this `(tenant, provider)` pair → `circuit_open`, no network call. The breaker itself: `CIRCUIT_BREAKER_THRESHOLD = 3` consecutive failures trips it (`status → 'open'`, `open_until = now() + 5 min`); any success resets `consecutive_failures` to 0 and `status → 'closed'` immediately. There is no explicit "half-open" transition in code today — the breaker simply becomes callable again once `open_until` passes, and the next call's own success/failure decides the next state. (The `half_open` value exists in the DB `CHECK` constraint for a future, more gradual retry policy; it's not populated by the current implementation.)
+5. **SSRF guard.** `assertExternalHostAllowed(new URL(config.baseUrl).hostname)` — reused as-is from `_shared/ssrf-guard.ts` (blocks loopback/RFC1918/link-local/cloud-metadata addresses, by literal IP or DNS resolution) — runs even though `base_url` is admin-configured, not LLM-supplied. This is defense in depth against a misconfigured or compromised config pointing at an internal address, not a defense against the model (the model never supplies a URL, only a `provider` name).
+6. **Timeout.** Each adapter's real HTTP call is wrapped in `withTimeout(..., config.timeoutMs, ...)`, where `timeout_ms` is a per-provider, admin-configured value the migration constrains to `1000–30000` (1–30s).
+7. **Response normalization.** Every adapter must map its provider's own response into the shared `NormalizedRate` shape (`types.ts`) — the rest of the system (including `applyDynamicPricing`'s reconciliation) never sees a provider-specific field name or unit. An adapter that can't produce a valid `NormalizedRate` must throw (§9.5), never return a partially-filled or best-guess object.
+
+On any success: `rate_provider_health` is upserted (`status: 'closed'`, `consecutive_failures: 0`, `avg_latency_ms`, `calls_today` incremented for that UTC day), and the normalized result is best-effort cached into `external_rate_cache` (1-hour TTL — short enough that a stale quote is unlikely, long enough to avoid re-paying for a repeat call within the same buying session). A cache-write failure never fails the tool call that already succeeded.
+
+### 9.5 Error handling and classification
+
+`classifyError()` maps a thrown error's message to one of the `RateProviderErrorCode` values via regex on the message text:
+
+| Code | Trigger | What the model sees | What happens to health |
+|---|---|---|---|
+| `timeout` | Message matches `/timed? ?out\|timeout/i` (including the orchestrator's own `withTimeout` wrapper firing) | A tool-result string describing the timeout | Counts as a failure toward the 3-strike breaker |
+| `auth_failed` | `/401\|403\|unauthorized\|forbidden/i` | Same | Same |
+| `rate_not_found` | `/404\|not found/i` | Same | Same |
+| `provider_error` | Anything else (including the pre-network validation failures in §9.4 steps 1–3, which are classified this way without a network call ever happening) | Same | Only network-attempt failures update `rate_provider_health` — pre-network validation failures (bad args, unmatched provider) are returned to the model but don't count against that provider's circuit breaker, since the provider itself was never actually contacted |
+| `circuit_open` | Breaker already tripped (§9.4 step 4) | A tool-result string saying this provider is temporarily unavailable | No-op (already open) |
+| `ssrf_blocked` | `assertExternalHostAllowed` threw | A tool-result string saying the provider's base URL was rejected | Counts as a failure |
+| `invalid_response` | Malformed tool-call JSON, or (reserved for adapter use) a response that can't be normalized | Same | N/A (pre-network) or counts as a failure if the adapter's own HTTP call succeeded but returned unparseable data |
+| `daily_cap_exceeded` | Reserved in `types.ts`; the daily-cap check itself is not yet wired into `executeRateToolCall` — `calls_today` is tracked in `rate_provider_health` but nothing currently short-circuits a call once `daily_call_cap` is reached | — | **Known gap**, not yet built — see §10 |
+
+**`executeRateToolCall` never throws.** Every failure mode above returns a structured `RateLookupResult` (`{ ok: false, error, errorCode, latencyMs }`), which `ai-advisor`'s executor callback `JSON.stringify()`s directly into the tool-result message the model receives in Round 2. This is the deliberate design: the model gets an honest, structured description of *why* the lookup failed and can react to it in its final answer (e.g. fall back to its own reasoning for that leg, or note the platform was unavailable) — the request never crashes over one provider's failure, and neither does the `catch` in `callLLMWithTools` need to fire for an ordinary per-provider error (only for a failure in the loop mechanics itself, e.g. a malformed model response).
+
+### 9.6 Current status: dormant, framework-only
+
+`_shared/rate-providers/registry.ts`'s `ADAPTERS` map is empty. `example-provider.ts` is an explicit, commented-out **template** (it is not registered, and its request/response shapes are made up, not any real platform's actual API contract) — it exists so that once real platforms are named, building each adapter is "copy this file, replace the fetch call and mapping with that platform's real contract," not "invent the pattern from scratch." Concretely, this means:
+
+- `loadTenantRateProviders()` returns `{ callable: [], unmatchedConfigCount: 0 }` for every tenant today, since no tenant has a `rate_provider_configs` row *and* no adapter exists to match one against even if they did.
+- `getRateProviderTool()` therefore always returns `null`, and `callLLMWithTools()` always takes its `tools.length === 0` branch — degrading to exactly today's `callLLM()` behavior. **This entire section describes a real, built, tested code path that is not yet reachable in production**, by design: it should ship and be verified structurally (§9.7) before any real credential or adapter exists, not after.
+- **Blocked, pending the user:** the actual names, API contracts, and credentials for the "11 specified third-party quote rate platforms" from the original request. The generic framework (DB schema, registry, orchestrator, tool schema, bounded loop) is complete and ready to receive them; building a real, named adapter for each platform is the remaining, still-unstarted piece, and cannot proceed until that list exists. Each one is expected to be a same-shaped `RateProviderAdapter` (§9.4 step 7), following `example-provider.ts`'s pattern.
+
+### 9.7 Open risk, not yet load-tested
+
+The combined worst-case wall-clock time for one tool-calling round trip — Round 1 (~19s worst case at the self-hosted rig's measured ~27–28 tok/s and 500-token cap) + parallel external provider calls (bounded by the slowest configured provider's `timeout_ms`, up to 30s per the migration's `CHECK` constraint) + Round 2 (~104s, unchanged from today's plain `logistics.smart_quotes` budget, §3) — could approach or exceed ~150s. It is **unverified** whether the *outer* `ai-advisor` HTTP request (served through `supabase.sosservices.online` / `app.sosservices.online`, not necessarily the same Cloudflare zone as `portal.sosservices.online`, where the 125.1s ceiling in §3 was specifically measured) tolerates that. This risk is currently dormant and untestable precisely because §9.6 means the tool is never actually offered to the model in production yet — it must be measured for real, end-to-end, the moment the first real adapter goes live, not assumed safe by extrapolation from §3's single-call numbers.
+
+---
+
+## 10. Phased roadmap (not built in this pass)
 
 Ordered by leverage-to-effort, not by the order requested in the brief:
 
@@ -224,13 +367,17 @@ Ordered by leverage-to-effort, not by the order requested in the brief:
 4. **A real port/region lookup for chokepoint detection**, replacing the keyword heuristic in §6, using `ports_locations`' existing country/type columns (or a small dedicated routing table) to determine actual likely canal transit rather than string matching on origin/destination text.
 5. **Duty/tax reconciliation.** Currently ungrounded and unreconciled — same category of risk the charges-arithmetic bug (audit doc §10) was, just not yet measured. Worth a dedicated sampling pass before trusting it in a client-facing quote.
 6. **Predictive/ML cost modeling.** Out of scope for a prompt-and-reference-data pass entirely — this is a genuine time-series/ML project (rate trend forecasting from `platform.llm_usage`-adjacent cost history, or a proper freight-index feed), not something either the LLM or a static reference table can deliver.
+7. **Wire the daily call cap into `executeRateToolCall`.** `rate_provider_configs.daily_call_cap` and `rate_provider_health.calls_today`/`calls_today_date` already exist and are maintained, but nothing yet compares one against the other before a call — `daily_cap_exceeded` (§9.5) is a defined error code with no code path that produces it. Needed before any real adapter with a metered/paid per-call third-party API goes live, to avoid an unbounded per-tenant bill.
+8. **A more gradual circuit-breaker retry (`half_open`).** The DB schema already reserves the `half_open` status value; today a provider goes straight from `open` back to fully callable the instant `open_until` passes, with no single-probe-before-resuming-full-traffic step. Worth adding once real provider call volume exists to observe whether the current binary behavior causes flapping.
+9. **Build real, named adapters for the "11 specified third-party quote rate platforms.”** Still blocked on the user providing the actual platform list (§9.6) — everything else in §9 is ready to receive them the moment that list exists.
 
-None of these are required for the v3 prompt to be a real, verified improvement over v2 — they're what "comprehensive" actually requires, sequenced by what's achievable without a larger architecture change.
+None of these are required for the v3 prompt to be a real, verified improvement over v2, or for §9's tool-calling framework to be a real, complete, and safe implementation of the architecture the user explicitly chose — they're what "comprehensive" actually requires, sequenced by what's achievable without a larger architecture change.
 
 ---
 
-## 10. Maintenance requirements
+## 11. Maintenance requirements
 
 - **`MARITIME_REFERENCE` (ai-advisor/index.ts) needs periodic re-verification.** It is a snapshot dated 2026-09-11, not a feed. Recommended cadence: monthly, or immediately on any Suez Canal Authority circular / Panama Canal Authority (ACP) toll notice / material change in Red Sea security posture. Primary sources to re-check: [SCA Tolls Table](https://www.suezcanal.gov.eg/English/Navigation/Tolls/Pages/TollsTable.aspx), [ACP toll structure](https://porteconomicsmanagement.org/pemp/contents/part1/interoceanic-passages/panama-canal-toll-structure/), and a current Red Sea shipping status source (e.g. Lloyd's List Intelligence's Red Sea Brief series). Bump `MARITIME_REFERENCE.sourcedAt` on every update, and update this doc's §6 sourced figures to match.
 - **Re-run the sampling verification (audit doc §10's methodology) whenever the prompt changes.** 8+ samples per provider, checking (a) `total == sum(legs[].charges)`, (b) `carrier.name` matches the main leg's own carrier, (c) — new for v3 — that maritime context, when injected, is actually reflected in the output and not contradicted. A single live test is a smoke test, not a verification; today's numbers (16.7–37.5% mismatch rates) only surfaced at a sample size of 8+ per provider.
 - **Any future schema change to `logistics.smart_quotes` must re-verify the token budget** against the current measured throughput (§3) before shipping — throughput can change if the self-hosted deployment's hardware or model changes, and a schema that fit at 2,800 tokens today is not guaranteed to fit forever without re-checking the underlying math.
+- **The first real rate-provider adapter that goes live must re-measure §9.7's latency risk end-to-end** before being trusted in production — with real network latency to a real third-party platform, not assumed from §3's single-call numbers.
