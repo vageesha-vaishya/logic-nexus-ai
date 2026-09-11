@@ -264,14 +264,17 @@ const MARITIME_REFERENCE = {
   },
 } as const;
 
-// Deliberately coarse keyword/region heuristic, not a real geo-routing
-// service -- see docs/smart-quote-module-design.md "Phase 2" for the
-// recommended upgrade path (a proper port/region lookup). Good enough to
-// decide whether to spend any of the token budget on maritime context at
-// all; a false negative just means the model gets no canal guidance (falls
-// back to its own, weaker judgement) rather than anything actively wrong,
-// and a false positive just adds a short, accurate paragraph that happens
-// not to apply -- a stricter guardrail than the alternative.
+// FALLBACK ONLY (see buildMaritimeContext below) -- deliberately coarse
+// keyword/region heuristic matched against the free-text origin/destination
+// display strings. Used only when the real port/region lookup (§10 item 4,
+// classifySuezSide/classifyPanamaSide below) isn't available for this
+// request -- no originDetails/destinationDetails id (an older caller, or
+// LocationAutocomplete never resolved a real location), or the resolved
+// country isn't in the real lookup's classification sets. A false negative
+// just means the model gets no canal guidance (falls back to its own,
+// weaker judgement) rather than anything actively wrong, and a false
+// positive just adds a short, accurate paragraph that happens not to
+// apply -- a stricter guardrail than the alternative either way.
 const SUEZ_SIDE_A = ["china", "hong kong", "shanghai", "shenzhen", "ningbo", "qingdao", "vietnam", "singapore", "malaysia", "thailand", "india", "japan", "korea", "uae", "dubai", "taiwan"];
 const SUEZ_SIDE_B = ["netherlands", "rotterdam", "germany", "hamburg", "belgium", "antwerp", "uk", "united kingdom", "london", "felixstowe", "france", "le havre", "italy", "genoa", "spain", "valencia", "mediterranean"];
 const PANAMA_SIDE_A = ["china", "hong kong", "shanghai", "shenzhen", "vietnam", "singapore", "japan", "korea", "taiwan"];
@@ -280,6 +283,108 @@ const PANAMA_SIDE_B = ["usa", "united states", "new york", "savannah", "charlest
 function matchesAny(value: string, keywords: string[]): boolean {
     const v = value.toLowerCase();
     return keywords.some((k) => v.includes(k));
+}
+
+// Real port/region lookup (docs/smart-quote-module-design.md §10 item 4),
+// replacing the keyword heuristic above as the PRIMARY path. Same
+// conceptual structure as the old side-A/side-B keyword lists -- these are
+// just backed by ports_locations' real `country`/`state_province` columns,
+// looked up by the real UUID LocationAutocomplete already resolves
+// (originDetails.id/destinationDetails.id), instead of substring-matching
+// whatever free-text label happened to be typed. Built from the actual 59
+// distinct country values present in ports_locations today (checked live,
+// 2026-09-11), not a guessed list.
+//
+// A country can legitimately belong to more than one set (e.g. China is
+// both a Suez-side and a Panama-side "Asia" origin -- which canal actually
+// matters depends on the OTHER end of the route, decided in
+// buildMaritimeContext below, exactly like the old keyword lists worked).
+const REAL_SUEZ_SIDE_A_COUNTRIES = new Set([
+    "china", "hong kong", "taiwan", "japan", "south korea", "singapore", "malaysia", "thailand",
+    "vietnam", "indonesia", "philippines", "india", "sri lanka", "bangladesh", "pakistan",
+    "united arab emirates", "saudi arabia", "qatar", "oman",
+]);
+const REAL_SUEZ_SIDE_B_COUNTRIES = new Set([
+    "netherlands", "germany", "united kingdom", "belgium", "france", "italy", "spain", "ireland",
+    "portugal", "sweden", "denmark", "norway", "finland", "poland", "greece", "israel", "turkey",
+]);
+// Deliberately narrower than SUEZ_SIDE_A -- South Asia/Middle East origins
+// don't typically route to the US via Panama (same restriction the old
+// PANAMA_SIDE_A keyword list already applied by simply omitting India/UAE).
+const REAL_PANAMA_SIDE_A_COUNTRIES = new Set([
+    "china", "hong kong", "taiwan", "japan", "south korea", "singapore", "malaysia", "thailand",
+    "vietnam", "indonesia", "philippines",
+]);
+// Non-US Americas-Atlantic side of Panama -- from the actual country values
+// present in ports_locations, not every plausible Caribbean nation.
+const REAL_PANAMA_SIDE_B_OTHER_COUNTRIES = new Set(["panama", "colombia", "brazil", "uruguay", "argentina"]);
+
+// A country-level classification can't distinguish US East/Gulf (Panama-
+// relevant from Asia) from US West Coast (direct trans-Pacific, no canal
+// needed) -- unlike every other country here, the US genuinely has ports on
+// both sides. ports_locations.state_province is populated for 609/613
+// (99.3%) of its US rows (checked live), which is precise enough to make
+// this distinction for real instead of guessing "USA" means one coast.
+// Values are a real, if imperfect, mix of 2-letter codes and full names
+// (plus some city/facility names that clearly belong in a different column
+// -- those simply won't match either set below and fall through to "can't
+// tell," the same safe failure mode as an unrecognized country).
+const US_WEST_COAST_STATES = new Set([
+    "ca", "california", "or", "oregon", "wa", "washington", "ak", "alaska", "hi", "hawaii",
+]);
+
+function isUsCountry(country: string): boolean {
+    const c = country.trim().toLowerCase();
+    return c === "usa" || c === "united states" || c === "united states of america";
+}
+
+function isUsEastOrGulfCoast(country: string, stateProvince: string | null): boolean {
+    if (!isUsCountry(country)) return false;
+    const s = String(stateProvince || "").trim().toLowerCase();
+    if (!s) return false; // no state on record -- can't tell, don't guess which coast
+    return !US_WEST_COAST_STATES.has(s);
+}
+
+function isRealPanamaSideB(country: string, stateProvince: string | null): boolean {
+    if (isUsEastOrGulfCoast(country, stateProvince)) return true;
+    return REAL_PANAMA_SIDE_B_OTHER_COUNTRIES.has(country.trim().toLowerCase());
+}
+
+interface PortRegionInfo { country: string; stateProvince: string | null; }
+
+// One query, both ports, by their real ports_locations UUIDs -- returns
+// null for either side whenever a real id isn't available or the row
+// wasn't found, so the caller can fall back to the keyword heuristic
+// cleanly rather than half-apply the real lookup to only one side.
+async function lookupPortRegions(
+    supabase: any,
+    originId?: string,
+    destinationId?: string,
+): Promise<{ origin: PortRegionInfo | null; destination: PortRegionInfo | null }> {
+    const ids = [originId, destinationId].filter((id): id is string => !!id);
+    if (ids.length === 0) return { origin: null, destination: null };
+
+    try {
+        const { data, error } = await supabase
+            .from('ports_locations')
+            .select('id, country, state_province')
+            .in('id', ids);
+
+        if (error || !data) return { origin: null, destination: null };
+
+        const byId = new Map(data.map((row: any) => [row.id, row]));
+        const toInfo = (id?: string): PortRegionInfo | null => {
+            if (!id || !byId.has(id)) return null;
+            const row: any = byId.get(id);
+            const country = String(row.country || '').trim();
+            if (!country) return null;
+            return { country, stateProvince: row.state_province || null };
+        };
+
+        return { origin: toInfo(originId), destination: toInfo(destinationId) };
+    } catch {
+        return { origin: null, destination: null };
+    }
 }
 
 function fallbackMaritimeContext(chokepoint: 'suez' | 'panama'): string {
@@ -331,17 +436,58 @@ async function fetchAdvisoryContext(supabase: any, chokepoint: 'suez' | 'panama'
     }
 }
 
-async function buildMaritimeContext(supabase: any, origin: string, destination: string, mode: string): Promise<string> {
+async function buildMaritimeContext(
+    supabase: any,
+    origin: string,
+    destination: string,
+    mode: string,
+    originDetails?: { id?: string } | null,
+    destinationDetails?: { id?: string } | null,
+): Promise<string> {
     if (String(mode || '').toLowerCase() !== 'ocean') return '';
-    const o = String(origin || '');
-    const d = String(destination || '');
 
-    const suezRoute =
-        (matchesAny(o, SUEZ_SIDE_A) && matchesAny(d, SUEZ_SIDE_B)) ||
-        (matchesAny(d, SUEZ_SIDE_A) && matchesAny(o, SUEZ_SIDE_B));
-    const panamaRoute =
-        (matchesAny(o, PANAMA_SIDE_A) && matchesAny(d, PANAMA_SIDE_B)) ||
-        (matchesAny(d, PANAMA_SIDE_A) && matchesAny(o, PANAMA_SIDE_B));
+    let suezRoute = false;
+    let panamaRoute = false;
+    let classifiedFromRealData = false;
+
+    if (originDetails?.id && destinationDetails?.id) {
+        const regions = await lookupPortRegions(supabase, originDetails.id, destinationDetails.id);
+        if (regions.origin && regions.destination) {
+            const oc = regions.origin.country.toLowerCase();
+            const dc = regions.destination.country.toLowerCase();
+            const oSuezA = REAL_SUEZ_SIDE_A_COUNTRIES.has(oc);
+            const dSuezA = REAL_SUEZ_SIDE_A_COUNTRIES.has(dc);
+            const oSuezB = REAL_SUEZ_SIDE_B_COUNTRIES.has(oc);
+            const dSuezB = REAL_SUEZ_SIDE_B_COUNTRIES.has(dc);
+            const oPanamaA = REAL_PANAMA_SIDE_A_COUNTRIES.has(oc);
+            const dPanamaA = REAL_PANAMA_SIDE_A_COUNTRIES.has(dc);
+            const oPanamaB = isRealPanamaSideB(regions.origin.country, regions.origin.stateProvince);
+            const dPanamaB = isRealPanamaSideB(regions.destination.country, regions.destination.stateProvince);
+
+            // "Classified" means at least one side matched a known bucket --
+            // if neither country appears in any of these real sets at all
+            // (e.g. Australia <-> New Zealand), that's a genuine "no chokepoint
+            // applies" answer from real data, not a lookup failure, so it
+            // should NOT fall through to the free-text keyword heuristic below.
+            classifiedFromRealData = oSuezA || dSuezA || oSuezB || dSuezB || oPanamaA || dPanamaA || oPanamaB || dPanamaB;
+            suezRoute = (oSuezA && dSuezB) || (dSuezA && oSuezB);
+            panamaRoute = (oPanamaA && dPanamaB) || (dPanamaA && oPanamaB);
+        }
+    }
+
+    if (!classifiedFromRealData) {
+        // Real lookup unavailable (no location ids on this request) or found
+        // nothing recognizable for either port -- fall back to the original
+        // free-text heuristic rather than silently produce no context at all.
+        const o = String(origin || '');
+        const d = String(destination || '');
+        suezRoute =
+            (matchesAny(o, SUEZ_SIDE_A) && matchesAny(d, SUEZ_SIDE_B)) ||
+            (matchesAny(d, SUEZ_SIDE_A) && matchesAny(o, SUEZ_SIDE_B));
+        panamaRoute =
+            (matchesAny(o, PANAMA_SIDE_A) && matchesAny(d, PANAMA_SIDE_B)) ||
+            (matchesAny(d, PANAMA_SIDE_A) && matchesAny(o, PANAMA_SIDE_B));
+    }
 
     if (!suezRoute && !panamaRoute) return '';
 
@@ -622,7 +768,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     // above. Either can legitimately be empty (non-ocean mode, no canal on
     // this lane, no internal rate history yet); the prompt below treats an
     // empty value as "say nothing about it" rather than a gap to fill in.
-    const maritimeContext = await buildMaritimeContext(supabase, origin, destination, mode);
+    const maritimeContext = await buildMaritimeContext(supabase, origin, destination, mode, originDetails, destinationDetails);
     const benchmarkContext = buildBenchmarkContext(benchmarkAvg, benchmarkCount, benchmarkSource);
 
     // 2c. Duty/tax context (docs/smart-quote-module-design.md §10 item 5).
