@@ -282,7 +282,19 @@ const PROMPTS: Record<LlmTaskId, PromptTemplate> = {
     // commodity's HTS code + destination jurisdiction, lets the model cite
     // the real rate informationally without ever computing a dollar amount
     // from it (no declared customs value exists anywhere in this flow).
-    version: "v4-2026-09-11",
+    //
+    // v5 (2026-09-11): CO2 grounding (docs/smart-quote-module-design.md §10
+    // item 6). Audited a live production response: the frontend actually
+    // sent weight=0 (no weight was captured for that request) and the model
+    // still confidently stated a specific CO2 figure ("1600 kg"/"1800 kg")
+    // per option with zero real basis -- the same "states a fact it wasn't
+    // given" failure mode this whole module exists to prevent, just for
+    // environmental.co2_emissions instead of a price. Rule 12 tells the
+    // model not to; ai-advisor's applyDynamicPricing also strips
+    // environmental.co2_emissions in code whenever the real weight is 0,
+    // regardless of what the model outputs (same never-trust-the-prompt-alone
+    // pattern as taxes above).
+    version: "v5-2026-09-11",
     system:
       `You are an Expert Logistics Rate Analyst producing quotes that must be both competitive enough to win the deal and priced to sustain healthy margin -- not just technically valid.
 Generate exactly 3 freight quotation options: "best_value", "cheapest", "fastest".
@@ -296,11 +308,12 @@ Requirements:
 6. Give a reliability score (1-10) and estimated total CO2 (kg) per option.
 7. Keep 'ai_explanation' to ONE short sentence per option. Keep customs_procedures/restrictions arrays to at most 1-2 short items each, empty array if none.
 
-STRICT GROUNDING RULES for MARITIME CONTEXT, BENCHMARK, and DUTY CONTEXT (these override anything else, and override your own training knowledge specifically):
+STRICT GROUNDING RULES for MARITIME CONTEXT, BENCHMARK, DUTY CONTEXT, and CO2 (these override anything else, and override your own training knowledge specifically):
 8. If a MARITIME CONTEXT line is provided in the user message, treat it as the current, authoritative routing/toll reality for this lane -- fold its cost impact into the ocean leg's single rolled-up charge (do not add a separate canal-fee line item) and reflect its routing/transit-time impact in transit_time and ai_explanation. Do not state a canal toll figure, routing assumption, or transit-time impact that contradicts it.
 9. If NO maritime context line is provided (blank), do not mention canal fees, Suez, Panama, or Red Sea routing risk at all -- say nothing rather than guess from your training data, which will be stale for regulatory tolls and current geopolitical routing.
 10. If a BENCHMARK line is provided, price 'cheapest' at or below it and 'best_value' within a reasonable band above it, per its own instruction. Never invent a competitor's price or cite a specific competitor by name -- you have no real data on either.
 11. price_breakdown.taxes is ALWAYS 0, for every option, regardless of commodity, destination, or anything else. No declared customs value is ever available to you, so any nonzero figure you produced would be invented, not calculated. If a DUTY CONTEXT line is provided, you may mention its real, sourced rate in regulatory_info.customs_procedures as one short informational item (e.g. "Estimated duty: 16.5% ad valorem, subject to customs valuation") -- but never convert it into a dollar amount, and never add it to price_breakdown or any leg charge. If NO duty context line is provided, do not mention duty rates or estimated tariffs at all.
+12. If the cargo weight given above is 0, blank, or missing, you have no real basis for a CO2 estimate -- set environmental.co2_emissions to an empty string "" for every option rather than stating a specific figure. Only state a real number when a genuine nonzero weight was given.
 
 Output JSON Format (exactly this shape, no extra nesting):
 {

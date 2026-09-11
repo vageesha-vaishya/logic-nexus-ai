@@ -46,6 +46,12 @@ interface RateOption {
   co2_kg?: number
   route_type?: 'Direct' | 'Transshipment'
   stops?: number
+  // False for a real carrier_rates row, true for the "10+ Options Guarantee"
+  // fallback below (a random price within a band of a hardcoded base rate --
+  // never a real, bookable quote). The frontend/UI must not label this a
+  // "Verified"/"Market Rate" option -- see docs/smart-quote-module-design.md
+  // §10 item 12 and useRateFetching.ts.
+  is_simulated: boolean
   charge_breakdown?: {
       code: string
       name: string
@@ -254,6 +260,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
                     currency: 'USD',
                     transitTime: transitDays ? `${transitDays} Days` : '3-5 Days',
                     validUntil: r.valid_to,
+                    is_simulated: false,
                     charge_breakdown: breakdown // Add breakdown to option
                 });
             });
@@ -340,6 +347,7 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
                 route_type: routeType,
                 stops: stops,
                 co2_kg: estimatedCo2,
+                is_simulated: true,
                 validUntil: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0] // Valid for 7 days
             });
         });

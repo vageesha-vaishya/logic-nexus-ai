@@ -192,6 +192,7 @@ export function generateSimulatedRates(params: SimulationParams): RateOption[] {
             transit_time: { details: `${simulatedTransit} Days` }, // Map to complex object
             valid_to: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
             source_attribution: 'Simulation Engine (Fallback)',
+            is_simulated: true,
             legs: legs,
             charges: [],
             total_co2_kg: estimatedCo2,

@@ -187,7 +187,16 @@ export const mapOptionToQuote = (opt: any) => {
         source_attribution: opt.source_attribution || 'manual',
         ai_generated: opt.ai_generated === true || opt.source === 'ai_generated' || opt.source_attribution === 'AI Smart Engine',
         ai_explanation: opt.ai_explanation || null,
-        reliability_score: safeNumber(opt.reliability_score ?? opt.reliability?.score)
+        // Distinct from safeNumber's 0-default: no reliability field means no
+        // real data exists (rate-engine never sets one for market/simulated
+        // options), and that must stay distinguishable from a genuine score
+        // of 0 -- otherwise every option with no reliability data renders as
+        // "Reliability 0/10" (looks like a real, terrible score) instead of
+        // correctly showing nothing. Only AI-generated options currently
+        // supply a real score (the LLM prompt asks for one, 1-10).
+        reliability_score: (opt.reliability_score ?? opt.reliability?.score) != null
+            ? safeNumber(opt.reliability_score ?? opt.reliability?.score)
+            : undefined
     };
     
     // Calculate price breakdown if not present
@@ -554,7 +563,9 @@ export const mapOptionToQuote = (opt: any) => {
         price_breakdown,
         legs,
         charges,
-        reliability: { score: normalized.reliability_score || normalized.reliability?.score || 0 },
+        reliability: normalized.reliability_score != null
+            ? { score: normalized.reliability_score }
+            : undefined,
         tier: normalized.tier || 'standard',
         environmental: normalized.environmental || (normalized.total_co2_kg ? { co2_emissions: `${normalized.total_co2_kg} kg` } : undefined),
         ai_generated: normalized.ai_generated || (normalized.source_attribution && normalized.source_attribution.includes("AI"))

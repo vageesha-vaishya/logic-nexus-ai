@@ -29,10 +29,15 @@ function tierLabel(tier?: string): string | null {
   return TIER_LABELS[tier] || tier.replace(/_/g, ' ');
 }
 
-function sourceBadge(option: RateOption): { label: string; tone: 'tide' | 'neutral' } {
+function sourceBadge(option: RateOption): { label: string; tone: 'tide' | 'neutral' | 'warning' } {
   const source = option.source_attribution || '';
   if (source.includes('AI')) return { label: 'AI Generated', tone: 'tide' };
   if (option.is_manual || source.includes('Manual')) return { label: 'Manual', tone: 'neutral' };
+  // No real carrier_rates row existed for this lane -- rate-engine
+  // fabricated this option (a random price within a band of a hardcoded
+  // base rate). Must not read as "Market Rate", which implies a real,
+  // checked carrier price. See docs/smart-quote-module-design.md §10 item 12.
+  if (option.is_simulated) return { label: 'Estimated Rate', tone: 'warning' };
   return { label: 'Market Rate', tone: 'neutral' };
 }
 
@@ -78,8 +83,8 @@ export function SmartQuoteRateCard({ option, isSelected, onToggleSelection, onSe
         <span
           className="rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
           style={{
-            background: source.tone === 'tide' ? 'var(--sq-tide)' : 'var(--sq-border)',
-            color: source.tone === 'tide' ? 'var(--sq-accent-ink)' : 'var(--sq-ink)',
+            background: source.tone === 'tide' ? 'var(--sq-tide)' : source.tone === 'warning' ? 'var(--sq-rust)' : 'var(--sq-border)',
+            color: source.tone === 'tide' || source.tone === 'warning' ? 'var(--sq-accent-ink)' : 'var(--sq-ink)',
           }}
         >
           {source.label}
@@ -123,7 +128,7 @@ export function SmartQuoteRateCard({ option, isSelected, onToggleSelection, onSe
             Reliability {option.reliability.score}/10
           </span>
         )}
-        {(option.co2_kg || option.environmental) && (
+        {(option.co2_kg || option.environmental?.co2_emissions) && (
           <span style={{ color: 'var(--sq-good)' }}>
             {option.co2_kg ? `${option.co2_kg} kg CO2` : option.environmental?.co2_emissions}
           </span>

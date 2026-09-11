@@ -76,6 +76,7 @@ export interface RateOption {
     verified?: boolean;
     verificationTimestamp?: string;
     is_manual?: boolean; // Indicates if this option was manually created
+    is_simulated?: boolean; // True when rate-engine had no real carrier_rates row for this lane and fabricated this option (random price within a band of a hardcoded base rate) -- never a real, bookable rate. See rate-engine/index.ts's "10+ Options Guarantee" fallback.
     rank_score?: number;
     rank_details?: Record<string, number>;
     is_recommended?: boolean;

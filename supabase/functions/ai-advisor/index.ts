@@ -841,7 +841,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     // where any exist (docs/smart-quote-module-design.md §10 item 3), falling
     // back to the previous hardcoded fuel/currency defaults otherwise -- see
     // applyDynamicPricing's own comments for why.
-    aiResponse = await applyDynamicPricing(aiResponse, supabase, tenantId, mode, logger);
+    aiResponse = await applyDynamicPricing(aiResponse, supabase, tenantId, mode, Number(weight) || 0, logger);
 
     // 5. Cache Result
     await supabase.from('ai_quote_cache').insert({
@@ -956,7 +956,7 @@ const EXTRA_SURCHARGE_LABELS: Record<string, string> = {
     port_congestion_surcharge: 'Port Congestion Surcharge',
 };
 
-async function applyDynamicPricing(response: any, supabase: any, tenantId: string, mode: string, logger?: Logger) {
+async function applyDynamicPricing(response: any, supabase: any, tenantId: string, mode: string, weightKg: number, logger?: Logger) {
     const configured = await fetchDynamicSurcharges(supabase, tenantId, mode, logger);
 
     // Fuel and currency are the only two categories with an established
@@ -1095,6 +1095,17 @@ async function applyDynamicPricing(response: any, supabase: any, tenantId: strin
                 ];
             }
             // ------------------------------------------------------------
+
+            // CO2 grounding (docs/smart-quote-module-design.md §10 item 12,
+            // prompt rule 12): a live production response showed the model
+            // stating a specific CO2 figure ("1600 kg") for a request where
+            // the real cargo weight was 0 -- no real basis for that number
+            // exists. Never trust the prompt alone for this, same as taxes
+            // above: strip whatever the model claimed whenever the real
+            // weight it was actually given is 0/missing.
+            if (weightKg <= 0 && opt.environmental) {
+                opt.environmental.co2_emissions = '';
+            }
 
             // Recalculate Total -- always the sum of the fields above, so it
             // can never disagree with itself, or (via the leg rebuild above)

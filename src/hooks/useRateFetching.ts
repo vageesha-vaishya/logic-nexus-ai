@@ -84,6 +84,60 @@ const rankAiOptions = (options: RateOption[], preferredCarriers: string[]): Rate
   });
 };
 
+// The AI advisor labels 'cheapest'/'best_value' by looking only at the 2-5
+// AI-generated options in isolation (see ai-advisor's prompt rule -- a
+// self-reported claim, never checked). It has no visibility into the
+// separate market-rate/rate-engine options the user sees in the very same
+// result set (audited live 2026-09-11: a "Cheapest" AI option priced 40%+
+// above three real carrier options shown right alongside it, and a
+// "Best Value" option that was slower AND pricier than a real option --
+// i.e. strictly dominated, not just "unverified"). Reconciles both claims
+// against the FULL combined set (market + AI) actually rendered together,
+// stripping a tag that doesn't hold up rather than trusting the model's
+// self-report. Deliberately does not reassign the tag elsewhere -- picking
+// a new "cheapest"/"best value" winner is a UI/ranking decision (already
+// handled by sort order), not something this reconciliation should invent.
+const PRICE_EPSILON = 0.01;
+
+const reconcileOptionTiers = (options: RateOption[]): RateOption[] => {
+  if (!options || options.length < 2) return options;
+
+  const minPrice = Math.min(...options.map(o => (typeof o.price === 'number' ? o.price : Infinity)));
+
+  return options.map(opt => {
+    if (opt.tier !== 'cheapest' && opt.tier !== 'best_value') return opt;
+
+    const price = typeof opt.price === 'number' ? opt.price : Infinity;
+    const transitDays = getTransitDaysFromString(opt.transitTime);
+
+    if (opt.tier === 'cheapest') {
+      // An objective, falsifiable claim: either this option holds the
+      // lowest price in the set, or it doesn't.
+      if (price > minPrice + PRICE_EPSILON) {
+        return { ...opt, tier: '' };
+      }
+      return opt;
+    }
+
+    // 'best_value': not re-derived (that's a genuine judgment call over
+    // price/speed/reliability trade-offs, legitimate LLM reasoning) -- only
+    // stripped when another option in the same set is strictly better on
+    // every axis (Pareto-dominated), which isn't a value judgment at all.
+    const isDominated = options.some(other => {
+      if (other === opt) return false;
+      const otherPrice = typeof other.price === 'number' ? other.price : Infinity;
+      const otherTransit = getTransitDaysFromString(other.transitTime);
+      const otherReliability = other.reliability?.score ?? 0;
+      const optReliability = opt.reliability?.score ?? 0;
+      const noWorse = otherPrice <= price + PRICE_EPSILON && otherTransit <= transitDays && otherReliability >= optReliability;
+      const strictlyBetter = otherPrice < price - PRICE_EPSILON || otherTransit < transitDays || otherReliability > optReliability;
+      return noWorse && strictlyBetter;
+    });
+
+    return isDominated ? { ...opt, tier: '' } : opt;
+  });
+};
+
 const normalizeLocationValue = (value: unknown): string => {
   const normalized = String(value || '').trim();
   if (!normalized) return '';
@@ -562,15 +616,24 @@ export function useRateFetching(): RateFetchingResult {
               if (calc.buyPrice > 0) {
                 markupPercent = Number(((calc.marginAmount / calc.buyPrice) * 100).toFixed(2));
               }
+              // rate-engine marks its own "10+ Options Guarantee" fallback
+              // rows with is_simulated: true (a random price within a band
+              // of a hardcoded base rate -- never a real, bookable quote).
+              // Only a real carrier_rates row earns "Verified" -- showing a
+              // live timestamp next to a random number misrepresents it as
+              // an actual, checked rate. See docs/smart-quote-module-design.md
+              // §10 item 12.
+              const isSimulated = mapped.is_simulated === true;
               return {
                 ...mapped,
                 price: sell,
                 currency: mapped.currency || 'USD',
                 is_manual: false,
+                is_simulated: isSimulated,
                 carrier: mapped.carrier || 'Unknown Carrier',
                 markupPercent,
-                verified: true,
-                verificationTimestamp: new Date().toISOString(),
+                verified: !isSimulated,
+                verificationTimestamp: isSimulated ? undefined : new Date().toISOString(),
               };
             })
           );
@@ -671,15 +734,18 @@ export function useRateFetching(): RateFetchingResult {
               if (calc.buyPrice > 0) {
                 markupPercent = Number(((calc.marginAmount / calc.buyPrice) * 100).toFixed(2));
               }
+              // Unconditionally simulated (see the toast right below) -- never
+              // "Verified", regardless of what the mapped option carries.
               return {
                 ...mapped,
                 price: sell,
                 currency: mapped.currency || 'USD',
                 is_manual: false,
+                is_simulated: true,
                 carrier: mapped.carrier || 'Unknown Carrier',
                 markupPercent,
-                verified: true,
-                verificationTimestamp: new Date().toISOString(),
+                verified: false,
+                verificationTimestamp: undefined,
               };
             })
           );
@@ -697,6 +763,12 @@ export function useRateFetching(): RateFetchingResult {
           throw new Error(`No quotes available. Legacy: ${legacyErrorMsg || 'No Data'}. AI: ${aiError}`);
         }
       }
+
+      // 4b. Reconcile AI-self-reported 'cheapest'/'best_value' tags against
+      // the full combined set (market + AI) now that both are known -- see
+      // reconcileOptionTiers' own comment for why this can't happen any
+      // earlier (the AI never sees the market-rate options, and vice versa).
+      combinedOptions = reconcileOptionTiers(combinedOptions);
 
       // 5. Final Ranking and Recommendations
       const realtimeCarrierValidator = smartMode
