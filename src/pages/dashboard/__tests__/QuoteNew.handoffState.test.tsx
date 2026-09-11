@@ -54,7 +54,7 @@ vi.mock('@/hooks/useCRM', () => ({
       channel: () => ({ on: () => ({ on: () => ({ on: () => ({ subscribe: () => ({}) }) }) }), unsubscribe: () => ({}) }),
       removeChannel: vi.fn(),
     },
-    context: { tenantId: 'test-tenant' },
+    context: { tenantId: 'test-tenant', franchiseId: 'test-franchise' },
     scopedDb: makeScopedDb(),
   }),
 }));

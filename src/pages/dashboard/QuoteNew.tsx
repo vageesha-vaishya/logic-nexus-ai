@@ -117,17 +117,35 @@ function QuoteNewInner() {
         return;
       }
 
+      // public.quotes.franchise_id and .title are both NOT NULL with no
+      // default (confirmed via \d public.quotes on the production DB) --
+      // this insert previously omitted both, so every single quote creation
+      // failed with a NOT NULL violation (PostgREST 400) before the
+      // composer ever loaded. franchise_id also has no fallback: the
+      // INSERT RLS policy requires franchise_id = get_user_franchise_id(),
+      // so a user with no franchise role can never create a quote here --
+      // a pre-existing data-model constraint, not something to work around.
+      const resolvedFranchiseId = context?.franchiseId || null;
+      if (!resolvedFranchiseId) {
+        logger.error('[QuoteNew] No franchise context available -- cannot create a quote (franchise_id is required)');
+        setInitializing(false);
+        return;
+      }
+
       // Check the mount-time navigation-state snapshot for pre-populated data
       const state = arrivalState;
       const originLabel = state?.origin || '';
       const destLabel = state?.destination || '';
       const mode = state?.mode || 'ocean';
+      const shellTitle = originLabel && destLabel ? `${originLabel} to ${destLabel}` : 'New Quote';
 
       // Create quote record
       const { data: quote, error: quoteError } = await scopedDb
         .from('quotes')
         .insert({
           tenant_id: resolvedTenantId,
+          franchise_id: resolvedFranchiseId,
+          title: shellTitle,
           owner_id: currentUser?.id,
           created_by: currentUser?.id,
           status: 'draft',
