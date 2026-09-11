@@ -841,6 +841,16 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     // real adapters built yet -- see _shared/rate-providers/registry.ts),
     // so getRateProviderTool() returns null and callLLMWithTools degrades
     // to plain callLLM() with zero behavior change from before this change.
+    // NOTE: an empty registry is NOT the only thing that degrades this to
+    // plain callLLM() -- llm-gateway.ts's callLLMWithTools also degrades
+    // whenever the resolved provider isn't one it has an OpenAI-compatible
+    // tool-calling wire format for (currently openrouter/openai/local-qwen/
+    // custom; anthropic/gemini are not wired for tool-calling there at all).
+    // So once real adapters exist, a tenant routed to anthropic or gemini
+    // (via their own tenant config, or via FALLBACK_ROUTING/
+    // PAID_FALLBACK_ON_FAILURE, both of which point at anthropic/gemini for
+    // this task) will still silently get plain callLLM with no tool access,
+    // independent of the registry. See callLLMWithTools's own doc comment.
     const rateProviderRegistry = await loadTenantRateProviders(supabase, tenantId);
     const rateProviderTool = getRateProviderTool(rateProviderRegistry);
     const tools: ToolDefinition[] = rateProviderTool ? [rateProviderTool as unknown as ToolDefinition] : [];

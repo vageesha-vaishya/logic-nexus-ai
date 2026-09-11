@@ -1193,6 +1193,17 @@ export async function callLLMWithTools(
   const cfg = await resolveConfig(taskId, ctx);
   const toolCapableProviders = new Set(["openrouter", "openai", "local-qwen", "custom"]);
   if (!toolCapableProviders.has(cfg.provider)) {
+    // Caller supplied real tools (tools.length > 0 guaranteed above), but
+    // this provider has no wired tool-calling format here (anthropic/gemini
+    // use their own native shapes, not this OpenAI-compatible one) -- log
+    // it, since this is a silent capability loss distinct from "no tools
+    // were offered," and would otherwise be indistinguishable from that
+    // case to anyone debugging why tool-calling isn't firing for a tenant.
+    if (ctx.logger) {
+      ctx.logger.warn("callLLMWithTools: provider has no tool-calling wire format here, degrading to plain callLLM", {
+        taskId, provider: cfg.provider, configSource: cfg.source,
+      });
+    }
     return callLLM(taskId, vars, ctx);
   }
 
@@ -1207,14 +1218,25 @@ export async function callLLMWithTools(
     const round1 = await callOpenAiCompatibleToolTurn(cfg, messages, tools, "auto", TOOL_DECISION_MAX_TOKENS);
 
     if (round1.toolCalls.length === 0) {
-      // Model answered directly without needing a tool -- treat as final.
-      const latencyMs = Date.now() - t0;
+      // Model answered directly without needing a tool. round1 was capped
+      // at TOOL_DECISION_MAX_TOKENS (500) -- deliberately cheap because
+      // round 1 is meant to be a tool-or-not decision, not the final
+      // answer, on the assumption the real answer always comes from round 2
+      // (after tool results) with the task's full maxOutputTokens budget.
+      // That assumption breaks here: the model can just answer directly in
+      // round 1 instead of calling a tool, and that answer is then
+      // truncated at 500 tokens -- nowhere near enough for a task like
+      // logistics.smart_quotes (~1400-2800 tokens), so treating round1.content
+      // as final produced truncated JSON that failed to parse downstream.
+      // Record round1's own (real, successful) usage, then get the actual
+      // answer via the normal non-tool path, which correctly uses
+      // cfg.maxOutputTokens.
       await recordUsage(ctx, {
         taskId, promptVersion: prompt.version, provider: cfg.provider, model: cfg.model,
         inputTokens: round1.inputTokens, outputTokens: round1.outputTokens, cachedInputTokens: 0,
-        costUsd: 0, latencyMs, status: "ok", configSource: cfg.source, configId: cfg.configId,
+        costUsd: 0, latencyMs: Date.now() - t0, status: "ok", configSource: cfg.source, configId: cfg.configId,
       });
-      return { text: round1.content, provider: cfg.provider, model: cfg.model, inputTokens: round1.inputTokens, outputTokens: round1.outputTokens, cachedInputTokens: 0, costUsd: 0, latencyMs, promptVersion: prompt.version, raw: round1 };
+      return callLLM(taskId, vars, ctx);
     }
 
     messages.push({
