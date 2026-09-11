@@ -7,7 +7,7 @@ const mockFrom = vi.fn();
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
-      getSession: vi.fn(),
+      getUser: vi.fn(),
     },
     from: (...args: any[]) => mockFrom(...args),
   },
@@ -47,23 +47,9 @@ function createTenantTableMock(
 describe('TenantBrandingService.updateBranding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('fetch', vi.fn());
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
-      data: {
-        session: {
-          access_token: 'session-token',
-        },
-      },
-    } as any);
   });
 
-  it('falls back to direct tenant update when branding API is unavailable', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: vi.fn().mockRejectedValue(new Error('Not JSON')),
-    } as any);
-
+  it('updates tenant branding directly via Supabase', async () => {
     const branding = { primary_color: '#2563EB' };
     const { table } = createTenantTableMock(
       { data: { id: 'tenant-1', settings: {} }, error: null },
@@ -81,9 +67,7 @@ describe('TenantBrandingService.updateBranding', () => {
     });
   });
 
-  it('falls back to direct tenant update when fetch throws', async () => {
-    vi.mocked(fetch).mockRejectedValue(new Error('Network unavailable'));
-
+  it('merges into existing settings when updating', async () => {
     const branding = { accent_color: '#F59E0B' };
     const { table } = createTenantTableMock(
       { data: { id: 'tenant-1', settings: { timezone: 'UTC' } }, error: null },
@@ -100,15 +84,9 @@ describe('TenantBrandingService.updateBranding', () => {
     });
   });
 
-  it('throws API error when tenant id is unavailable for fallback', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: false,
-      status: 403,
-      json: vi.fn().mockResolvedValue({ error: 'Forbidden', correlationId: 'corr-2' }),
-    } as any);
-
+  it('throws when tenant id is not provided', async () => {
     await expect(TenantBrandingService.updateBranding({ primary_color: '#111111' } as any)).rejects.toThrow(
-      'Forbidden (ref: corr-2)'
+      'Tenant scope required'
     );
     expect(mockFrom).not.toHaveBeenCalled();
   });
@@ -117,26 +95,12 @@ describe('TenantBrandingService.updateBranding', () => {
 describe('TenantBrandingService.getResolvedBranding', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal('fetch', vi.fn());
-    vi.mocked(supabase.auth.getSession).mockResolvedValue({
-      data: {
-        session: {
-          access_token: 'session-token',
-        },
-      },
-    } as any);
     (supabase.auth as any).getUser = vi.fn().mockResolvedValue({
       data: { user: { id: 'user-1' } },
     });
   });
 
-  it('falls back to direct tenant branding resolution when endpoint returns 404', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: vi.fn().mockResolvedValue({ error: 'Not Found' }),
-    } as any);
-
+  it('resolves tenant branding directly via Supabase using the authenticated user', async () => {
     const profileSelectChain: any = {
       eq: vi.fn(() => profileSelectChain),
       limit: vi.fn(() => profileSelectChain),
@@ -179,100 +143,7 @@ describe('TenantBrandingService.getResolvedBranding', () => {
     expect(result.primaryColor).toBe('#112233');
   });
 
-  it('falls back to direct tenant branding resolution when fetch throws', async () => {
-    vi.mocked(fetch).mockRejectedValue(new Error('Network unavailable'));
-
-    const profileSelectChain: any = {
-      eq: vi.fn(() => profileSelectChain),
-      limit: vi.fn(() => profileSelectChain),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: { tenant_id: 'tenant-1' },
-        error: null,
-      }),
-    };
-    const tenantSelectChain: any = {
-      eq: vi.fn(() => tenantSelectChain),
-      limit: vi.fn(() => tenantSelectChain),
-      maybeSingle: vi.fn().mockResolvedValue({
-        data: {
-          id: 'tenant-1',
-          name: 'Acme',
-          slug: 'acme',
-          domain: 'acme.com',
-          logo_url: 'logos/main.png',
-          branding_settings: {},
-          settings: {},
-        },
-        error: null,
-      }),
-    };
-
-    mockFrom.mockImplementation((table: string) => {
-      if (table === 'profiles') {
-        return { select: vi.fn(() => profileSelectChain) };
-      }
-      if (table === 'tenants') {
-        return { select: vi.fn(() => tenantSelectChain) };
-      }
-      throw new Error(`Unexpected table: ${table}`);
-    });
-
-    const result = await TenantBrandingService.getResolvedBranding({ hostname: 'localhost' });
-
-    expect(result.tenantId).toBe('tenant-1');
-    expect(result.companyName).toBe('Acme');
-  });
-
-  it('includes explicit tenant scope in branding API request', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: true,
-      json: vi.fn().mockResolvedValue({
-        data: {
-          tenantId: 'tenant-deccan',
-          tenantName: 'Deccan',
-          tenantSlug: 'deccan',
-          logoUrl: '',
-          faviconUrl: '',
-          companyName: 'Deccan',
-          primaryColor: '#2563EB',
-          secondaryColor: '#1D4ED8',
-          accentColor: '#F59E0B',
-          fontFamily: 'Inter, system-ui, sans-serif',
-          customCss: '',
-          whiteLabelEnabled: false,
-          headerText: '',
-          subHeaderText: '',
-          footerText: '',
-          disclaimerText: '',
-          metadata: {
-            domain: 'deccan.test',
-            hostname: 'localhost',
-            resolvedAt: '2026-03-23T00:00:00.000Z',
-          },
-        },
-      }),
-    } as any);
-
-    await TenantBrandingService.getResolvedBranding({
-      hostname: 'localhost',
-      franchiseId: 'fr-deccan-fly',
-      tenantId: 'tenant-deccan',
-    });
-
-    expect(fetch).toHaveBeenCalledTimes(1);
-    const requestUrl = String((vi.mocked(fetch).mock.calls[0] || [])[0] || '');
-    expect(requestUrl).toContain('/api/v1/tenant-branding?');
-    expect(requestUrl).toContain('tenant_id=tenant-deccan');
-    expect(requestUrl).toContain('franchise_id=fr-deccan-fly');
-  });
-
-  it('uses explicit tenant scope for fallback without profile lookup', async () => {
-    vi.mocked(fetch).mockResolvedValue({
-      ok: false,
-      status: 404,
-      json: vi.fn().mockResolvedValue({ error: 'Not Found' }),
-    } as any);
-
+  it('uses explicit tenant scope without a profile lookup', async () => {
     const tenantSelectChain: any = {
       eq: vi.fn(() => tenantSelectChain),
       limit: vi.fn(() => tenantSelectChain),

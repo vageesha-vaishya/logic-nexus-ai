@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { useCRM } from '@/hooks/useCRM';
 import { useDomain } from '@/contexts/DomainContext';
-import { TenantBrandingService, shouldUseTenantBrandingStylesheetEndpoint } from '@/services/branding/TenantBrandingService';
+import { TenantBrandingService } from '@/services/branding/TenantBrandingService';
 import type { ResolvedTenantBranding } from '@/services/branding/brandingResolver';
 import { buildTenantBrandingCssVariables } from '@/services/branding/brandingResolver';
 import { logger } from '@/lib/logger';
@@ -21,34 +21,6 @@ function applyCssVariables(branding: ResolvedTenantBranding | null) {
   root.style.setProperty('--tenant-brand-secondary', vars['--tenant-brand-secondary'] || '#1D4ED8');
   root.style.setProperty('--tenant-brand-accent', vars['--tenant-brand-accent'] || '#F59E0B');
   root.style.setProperty('--tenant-brand-font', vars['--tenant-brand-font'] || 'Inter, system-ui, sans-serif');
-}
-
-function ensureStylesheet(hostname: string, domainCode: string, franchiseId: string, tenantId: string) {
-  const id = 'tenant-branding-css-endpoint';
-  if (!shouldUseTenantBrandingStylesheetEndpoint()) {
-    const existing = document.getElementById(id) as HTMLLinkElement | null;
-    if (existing) {
-      existing.remove();
-    }
-    return;
-  }
-  const existing = document.getElementById(id) as HTMLLinkElement | null;
-  const params = new URLSearchParams();
-  if (hostname) params.set('hostname', hostname);
-  if (domainCode) params.set('domain_code', domainCode);
-  if (franchiseId) params.set('franchise_id', franchiseId);
-  if (tenantId) params.set('tenant_id', tenantId);
-  const href = `/api/v1/tenant-branding.css${params.toString() ? `?${params.toString()}` : ''}`;
-  if (existing) {
-    if (existing.href.endsWith(href)) return;
-    existing.href = href;
-    return;
-  }
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href = href;
-  document.head.appendChild(link);
 }
 
 function applyFavicon(branding: ResolvedTenantBranding | null) {
@@ -94,7 +66,6 @@ export function TenantBrandingProvider({ children }: { children: React.ReactNode
       setBranding(data);
       applyCssVariables(data);
       applyFavicon(data);
-      ensureStylesheet(hostname, currentDomain?.code || '', context?.franchiseId || '', context?.tenantId || '');
     } catch (error) {
       logger.error('[TenantBrandingContext] failed to load branding', {
         component: 'TenantBrandingContext',
