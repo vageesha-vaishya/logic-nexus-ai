@@ -593,8 +593,11 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     }
 
     // 4. Dynamic Charge Calculation Engine (Post-Processing)
-    // Simulate "Real-time" fuel surcharges based on current month/market conditions
-    aiResponse = applyDynamicPricing(aiResponse);
+    // Applies real, tenant-configured surcharges from public.dynamic_surcharges
+    // where any exist (docs/smart-quote-module-design.md §10 item 3), falling
+    // back to the previous hardcoded fuel/currency defaults otherwise -- see
+    // applyDynamicPricing's own comments for why.
+    aiResponse = await applyDynamicPricing(aiResponse, supabase, tenantId, mode, logger);
 
     // 5. Cache Result
     await supabase.from('ai_quote_cache').insert({
@@ -625,9 +628,103 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
 
  
 
-function applyDynamicPricing(response: any) {
-    const fuelSurchargeRate = 0.12; // Mock 12% global fuel surcharge
-    const exchangeRateBuffer = 0.02; // 2% currency buffer
+type DynamicSurchargeType = 'fuel' | 'currency' | 'peak_season' | 'port_congestion' | 'security';
+interface ResolvedSurcharge { calculationMethod: 'percentage' | 'fixed'; baseValue: number; }
+
+// Real, tenant-configured surcharges from public.dynamic_surcharges
+// (docs/smart-quote-module-design.md §10 item 3 -- schema already existed,
+// was never queried anywhere before this). One query per generateSmartQuotes
+// request (not per-option): the shipment mode is the same for every option
+// in one response, so the applicable rows don't vary within it.
+//
+// `geographic_scope` (jsonb) is deliberately NOT filtered on here: the only
+// data that exists in it today is placeholder metadata (`{"seed_ref": ...,
+// "rate_type": ...}`), not a real lane/region shape -- there is no
+// established convention yet for what a real geographic scope should
+// contain. Filtering on an undefined shape would either match nothing
+// (if treated strictly) or require guessing a schema (exactly what this
+// module exists to avoid). Left as a documented gap for whenever a real
+// geo-scoping convention is defined, not silently implemented as a guess.
+//
+// `calculation_method = 'formula'` rows are excluded outright: no formula
+// evaluator exists anywhere in this codebase, and evaluating an
+// admin-authored formula string would need its own careful design
+// (safe expression language, not `eval`) -- out of scope here.
+async function fetchDynamicSurcharges(
+    supabase: any,
+    tenantId: string,
+    mode: string,
+    logger?: Logger,
+): Promise<Partial<Record<DynamicSurchargeType, ResolvedSurcharge>>> {
+    const today = new Date().toISOString().slice(0, 10);
+    const result: Partial<Record<DynamicSurchargeType, ResolvedSurcharge>> = {};
+    try {
+        // NOTE: deliberately NOT using the .contains() helper for
+        // applicable_modes. It serializes a JS array as a Postgres array
+        // literal ("{ocean}"), which is correct for a text[] column but
+        // invalid for this column's actual type, jsonb -- PostgREST 400s
+        // with "invalid input syntax for type json" (confirmed live while
+        // testing this). Using .filter() with an explicit JSON string
+        // forces the correct "[\"ocean\"]" representation.
+        const { data, error } = await supabase
+            .from('dynamic_surcharges')
+            .select('surcharge_type, calculation_method, base_value')
+            .eq('tenant_id', tenantId)
+            .in('calculation_method', ['percentage', 'fixed'])
+            .filter('applicable_modes', 'cs', JSON.stringify([String(mode || '').toLowerCase()]))
+            .filter('validity_period', 'cs', `[${today},${today}]`)
+            .order('created_at', { ascending: false });
+
+        if (error) {
+            logger?.warn("dynamic_surcharges query failed, using fuel/currency defaults:", { error: error.message });
+            return result;
+        }
+        if (!data) return result;
+
+        for (const row of data) {
+            const type = row.surcharge_type as DynamicSurchargeType;
+            // First row per type wins -- rows are ordered created_at DESC,
+            // so this is "the most recently configured override," a
+            // reasonable default when an admin has entered more than one
+            // (e.g. superseding an old rate) without deleting the old one.
+            if (!type || result[type]) continue;
+            const baseValue = Number(row.base_value);
+            if (!Number.isFinite(baseValue)) continue;
+            result[type] = { calculationMethod: row.calculation_method, baseValue };
+        }
+    } catch {
+        // Best-effort: an outage here must never block quote generation.
+        // Callers fall back to their own hardcoded defaults (fuel/currency)
+        // or simply omit the surcharge entirely (security/peak_season/
+        // port_congestion have no fallback -- see applyDynamicPricing).
+    }
+    return result;
+}
+
+function surchargeAmount(entry: ResolvedSurcharge | undefined, base: number): number {
+    if (!entry) return 0;
+    return entry.calculationMethod === 'fixed' ? entry.baseValue : base * entry.baseValue;
+}
+
+const EXTRA_SURCHARGE_LABELS: Record<string, string> = {
+    security_surcharge: 'Security Surcharge',
+    peak_season_surcharge: 'Peak Season Surcharge',
+    port_congestion_surcharge: 'Port Congestion Surcharge',
+};
+
+async function applyDynamicPricing(response: any, supabase: any, tenantId: string, mode: string, logger?: Logger) {
+    const configured = await fetchDynamicSurcharges(supabase, tenantId, mode, logger);
+
+    // Fuel and currency are the only two categories with an established
+    // fallback: they were already being shown to every user as a hardcoded
+    // 12%/2% "Mock" value (see git history) before this change, so falling
+    // back to that same default when a tenant hasn't configured a real
+    // dynamic_surcharges row yet is a continuity measure, not a new
+    // fabrication. Security/peak_season/port_congestion were never modeled
+    // at all before this change -- they have no equivalent fallback, and
+    // are simply omitted (not invented) when nothing is configured.
+    const fuelSurcharge: ResolvedSurcharge = configured.fuel ?? { calculationMethod: 'percentage', baseValue: 0.12 };
+    const currencySurcharge: ResolvedSurcharge = configured.currency ?? { calculationMethod: 'percentage', baseValue: 0.02 };
 
     if (response.options) {
         response.options = response.options.map((opt: any) => {
@@ -697,12 +794,24 @@ function applyDynamicPricing(response: any) {
             // dynamic surcharges below are genuinely additional -- they're
             // computed by this function, not something the model could have
             // already baked into the leg.
-            const fuelAmt = Math.round(base * fuelSurchargeRate);
-            const currencyAmt = Math.round(base * exchangeRateBuffer);
-            opt.price_breakdown.surcharges = { fuel_adjustment: fuelAmt, currency_adj: currencyAmt };
+            const fuelAmt = Math.round(surchargeAmount(fuelSurcharge, base));
+            const currencyAmt = Math.round(surchargeAmount(currencySurcharge, base));
+
+            // Only added when a real, currently-valid dynamic_surcharges row
+            // exists for this tenant/mode -- no fallback, no fabrication.
+            const extraSurcharges: Record<string, number> = {};
+            for (const type of ['security', 'peak_season', 'port_congestion'] as const) {
+                const entry = configured[type];
+                if (!entry) continue;
+                const amt = Math.round(surchargeAmount(entry, base));
+                if (amt !== 0) extraSurcharges[`${type}_surcharge`] = amt;
+            }
+
+            opt.price_breakdown.surcharges = { fuel_adjustment: fuelAmt, currency_adj: currencyAmt, ...extraSurcharges };
 
             const taxes = opt.price_breakdown.taxes || 0;
-            const surchargesSum = fuelAmt + currencyAmt;
+            const extraSurchargesSum = Object.values(extraSurcharges).reduce((a: number, b: number) => a + b, 0);
+            const surchargesSum = fuelAmt + currencyAmt + extraSurchargesSum;
             const feesSum = Object.values(opt.price_breakdown.fees).reduce((a: any, b: any) => (Number(a) || 0) + (Number(b) || 0), 0) as number;
 
             // --- REBUILD THE MAIN LEG'S CHARGES FROM THE FINAL NUMBERS ---
@@ -720,6 +829,12 @@ function applyDynamicPricing(response: any) {
                     { name: 'Freight', amount: base, currency, unit },
                     ...(fuelAmt !== 0 ? [{ name: 'Fuel Adjustment (Dynamic)', amount: fuelAmt, currency, unit: 'per_shipment' }] : []),
                     ...(currencyAmt !== 0 ? [{ name: 'Currency Adjustment (Dynamic)', amount: currencyAmt, currency, unit: 'per_shipment' }] : []),
+                    ...Object.entries(extraSurcharges).map(([key, amt]) => ({
+                        name: EXTRA_SURCHARGE_LABELS[key] ?? key,
+                        amount: amt,
+                        currency,
+                        unit: 'per_shipment',
+                    })),
                     ...(taxes !== 0 ? [{ name: 'Taxes', amount: taxes, currency, unit: 'per_shipment' }] : []),
                 ];
             }
