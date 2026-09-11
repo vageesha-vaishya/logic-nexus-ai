@@ -715,8 +715,15 @@ export default defineConfig(({ mode }) => {
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob: https:",
         "font-src 'self' data: https:",
-        // Dev: allow localhost WS for Vite HMR + Supabase Realtime, HTTP for markets-worker (port 8001)
-        "connect-src 'self' https://*.supabase.co wss://*.supabase.co ws://localhost:* ws://0.0.0.0:* http://localhost:* https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com",
+        // Dev: allow localhost WS for Vite HMR + Supabase Realtime, HTTP for markets-worker (port 8001).
+        // https://*.supabase.co / wss://*.supabase.co kept for the AVAIPRO_* Supabase Cloud project
+        // (a separate app, still on Cloud) and as a safety net for any lingering Cloud reference;
+        // supabase.sosservices.online is this app's own self-hosted instance post phase6-cutover --
+        // added 2026-09-11 after this CSP silently blocked every REST/Auth/Realtime call to it with
+        // no console CSP-violation message surfacing through the usual debugging tools, only
+        // "TypeError: Failed to fetch" (verified: a plain top-level navigation to the same URL
+        // succeeded, since connect-src doesn't govern navigation -- only fetch/XHR/WebSocket).
+        "connect-src 'self' https://supabase.sosservices.online wss://supabase.sosservices.online https://*.supabase.co wss://*.supabase.co ws://localhost:* ws://0.0.0.0:* http://localhost:* https://api.anthropic.com https://api.openai.com https://generativelanguage.googleapis.com",
         "frame-src 'self' https://challenges.cloudflare.com",
         "worker-src 'self' blob:",
         "base-uri 'self'",
