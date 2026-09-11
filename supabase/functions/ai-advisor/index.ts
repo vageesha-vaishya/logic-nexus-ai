@@ -3,7 +3,9 @@ import { extractBearerToken, requireAuth } from "../_shared/auth.ts"
 import { sanitizeForLLM } from "../_shared/pii-guard.ts"
 import { logAiCall } from "../_shared/audit.ts"
 import { serveWithLogger, Logger } from "../_shared/logger.ts"
-import { callLLM, LlmCallContext } from "../_shared/llm-gateway.ts"
+import { callLLM, callLLMWithTools, LlmCallContext, ToolDefinition } from "../_shared/llm-gateway.ts"
+import { loadTenantRateProviders, getRateProviderTool } from "../_shared/rate-providers/registry.ts"
+import { executeRateToolCall } from "../_shared/rate-providers/orchestrator.ts"
 
 declare const Deno: any;
 
@@ -414,8 +416,24 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
         logger,
     };
 
+    // 3b. Offer the LLM the get_freight_rate tool when this tenant has at
+    // least one real, callable rate-provider adapter registered (see
+    // docs/smart-quote-module-design.md §11). Registry is empty today (no
+    // real adapters built yet -- see _shared/rate-providers/registry.ts),
+    // so getRateProviderTool() returns null and callLLMWithTools degrades
+    // to plain callLLM() with zero behavior change from before this change.
+    const rateProviderRegistry = await loadTenantRateProviders(supabase, tenantId);
+    const rateProviderTool = getRateProviderTool(rateProviderRegistry);
+    const tools: ToolDefinition[] = rateProviderTool ? [rateProviderTool as unknown as ToolDefinition] : [];
+
     const start = performance.now();
-    const llmResult = await callLLM("logistics.smart_quotes", vars, ctx);
+    const llmResult = await callLLMWithTools("logistics.smart_quotes", vars, ctx, tools, async (toolName, argsJson) => {
+        if (toolName !== "get_freight_rate") {
+            return `Unknown tool '${toolName}'.`;
+        }
+        const result = await executeRateToolCall(supabase, tenantId, rateProviderRegistry, argsJson);
+        return JSON.stringify(result);
+    });
 
     let aiResponse: any;
     try {

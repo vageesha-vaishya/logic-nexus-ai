@@ -1048,6 +1048,188 @@ async function callOpenAiCompatible(
   };
 }
 
+// ─── Tool-calling (function-calling) support ───────────────────────────
+//
+// Added 2026-09-11 for the Smart Quote module's rate-provider retrieval
+// (docs/smart-quote-module-design.md §11) -- an explicit product decision
+// to have the LLM itself decide when and which third-party rate API to
+// call, rather than the gateway pre-fetching deterministically. This file
+// stays task-agnostic and provider-mechanics-only: it knows how to run an
+// OpenAI-compatible tool-calling round trip, nothing about what a
+// "get_freight_rate" tool actually does. The caller (ai-advisor/index.ts)
+// supplies the tool schema and an executor callback; this module never
+// imports anything rate-provider-specific.
+//
+// Bounded to exactly two LLM round trips, never more, regardless of what
+// the model wants: (1) a small, cheap "decide which tool(s) to call"
+// turn, tool_choice="auto", then (2) a forced final turn, tool_choice=
+// "none", using the task's full completion budget. This is a deliberate,
+// hard cap -- letting the model loop through additional tool-call rounds
+// would multiply latency against the SAME 125.1s-per-request Cloudflare
+// ceiling documented in MAX_OUTPUT_TOKENS' comment above, this time
+// stacked across N round trips instead of one. See the design doc's
+// "Known risk, not yet load-tested" note: this path is currently dormant
+// (no real rate-provider adapters are registered yet -- see
+// _shared/rate-providers/registry.ts), so there is no live exposure to
+// this risk today, but it must be re-verified with a real timing test
+// the moment a real provider adapter goes live.
+
+export interface ToolDefinition {
+  type: "function";
+  function: { name: string; description: string; parameters: Record<string, unknown> };
+}
+
+/** Returns the tool result content as a string (an OpenAI tool-role message's `content`). Must never throw -- return a description of the failure as the string instead, so the model can react to it in its final answer. */
+export type ToolCallHandler = (toolName: string, argsJson: string) => Promise<string>;
+
+const TOOL_DECISION_MAX_TOKENS = 500; // round 1 is a decision, not the quote itself -- keep it cheap and fast
+const MAX_TOOL_CALLS_PER_TURN = 5; // guards against a pathological fan-out inflating round-1 latency/cost
+
+interface ToolTurnResult {
+  content: string;
+  toolCalls: Array<{ id: string; name: string; argsJson: string }>;
+  inputTokens: number;
+  outputTokens: number;
+}
+
+async function callOpenAiCompatibleToolTurn(
+  cfg: ResolvedConfig,
+  messages: any[],
+  tools: ToolDefinition[],
+  toolChoice: "auto" | "none",
+  maxTokens: number,
+): Promise<ToolTurnResult> {
+  const rawBase = cfg.baseUrl ?? "https://api.openai.com/v1";
+  const url = rawBase.replace(/\/v1\/?$/, "") + "/v1/chat/completions";
+
+  const resp = await fetchWithTimeout(url, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${cfg.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: cfg.model,
+      max_tokens: maxTokens,
+      messages,
+      tools,
+      tool_choice: toolChoice,
+    }),
+  });
+
+  if (!resp.ok) {
+    const txt = await resp.text().catch(() => "");
+    throw new LlmGatewayError(`tool_turn_${resp.status}`, `Tool-calling turn ${resp.status}: ${txt.slice(0, 300)}`, resp.status >= 500 ? 502 : 400);
+  }
+
+  const json: any = await resp.json();
+  const message = json?.choices?.[0]?.message ?? {};
+  const toolCalls = Array.isArray(message.tool_calls)
+    ? message.tool_calls.slice(0, MAX_TOOL_CALLS_PER_TURN).map((tc: any) => ({
+        id: tc.id,
+        name: tc.function?.name ?? "",
+        argsJson: tc.function?.arguments ?? "{}",
+      }))
+    : [];
+
+  return {
+    content: message.content ?? "",
+    toolCalls,
+    inputTokens: Number(json?.usage?.prompt_tokens ?? 0),
+    outputTokens: Number(json?.usage?.completion_tokens ?? 0),
+  };
+}
+
+/**
+ * Like callLLM, but offers the model a set of tools it may call before
+ * producing its final answer. Degrades to plain callLLM() -- identical
+ * behavior, zero risk -- whenever tool-calling isn't applicable: no tools
+ * supplied, or the resolved provider isn't one this module has a
+ * tool-calling wire format for (currently: openrouter/openai/local-qwen/
+ * custom; anthropic/gemini fall back to plain callLLM since neither has
+ * been wired for tool-calling here yet -- no real provider needs it today).
+ * Any unexpected failure in the tool-loop machinery itself also degrades
+ * to plain callLLM rather than failing the whole quote request over a
+ * tool-calling bug.
+ */
+export async function callLLMWithTools(
+  taskId: LlmTaskId,
+  vars: Record<string, string>,
+  ctx: LlmCallContext,
+  tools: ToolDefinition[],
+  executeToolCall: ToolCallHandler,
+): Promise<LlmCallResult> {
+  if (tools.length === 0) return callLLM(taskId, vars, ctx);
+
+  const prompt = PROMPTS[taskId];
+  if (!prompt) throw new LlmGatewayError("unknown_task", `Unknown LLM task '${taskId}'`, 400);
+
+  const cfg = await resolveConfig(taskId, ctx);
+  const toolCapableProviders = new Set(["openrouter", "openai", "local-qwen", "custom"]);
+  if (!toolCapableProviders.has(cfg.provider)) {
+    return callLLM(taskId, vars, ctx);
+  }
+
+  const t0 = Date.now();
+  const userMsg = interpolate(prompt.user, vars);
+  const messages: any[] = [
+    { role: "system", content: prompt.system },
+    { role: "user", content: userMsg },
+  ];
+
+  try {
+    const round1 = await callOpenAiCompatibleToolTurn(cfg, messages, tools, "auto", TOOL_DECISION_MAX_TOKENS);
+
+    if (round1.toolCalls.length === 0) {
+      // Model answered directly without needing a tool -- treat as final.
+      const latencyMs = Date.now() - t0;
+      await recordUsage(ctx, {
+        taskId, promptVersion: prompt.version, provider: cfg.provider, model: cfg.model,
+        inputTokens: round1.inputTokens, outputTokens: round1.outputTokens, cachedInputTokens: 0,
+        costUsd: 0, latencyMs, status: "ok", configSource: cfg.source, configId: cfg.configId,
+      });
+      return { text: round1.content, provider: cfg.provider, model: cfg.model, inputTokens: round1.inputTokens, outputTokens: round1.outputTokens, cachedInputTokens: 0, costUsd: 0, latencyMs, promptVersion: prompt.version, raw: round1 };
+    }
+
+    messages.push({
+      role: "assistant",
+      content: round1.content || null,
+      tool_calls: round1.toolCalls.map((tc) => ({ id: tc.id, type: "function", function: { name: tc.name, arguments: tc.argsJson } })),
+    });
+
+    const toolResults = await Promise.all(
+      round1.toolCalls.map(async (tc) => ({
+        tool_call_id: tc.id,
+        content: await executeToolCall(tc.name, tc.argsJson).catch((e) => `Tool call failed: ${e instanceof Error ? e.message : String(e)}`),
+      })),
+    );
+    for (const r of toolResults) {
+      messages.push({ role: "tool", tool_call_id: r.tool_call_id, content: r.content });
+    }
+
+    const round2 = await callOpenAiCompatibleToolTurn(cfg, messages, tools, "none", cfg.maxOutputTokens);
+    const latencyMs = Date.now() - t0;
+    const inputTokens = round1.inputTokens + round2.inputTokens;
+    const outputTokens = round1.outputTokens + round2.outputTokens;
+
+    await recordUsage(ctx, {
+      taskId, promptVersion: prompt.version, provider: cfg.provider, model: cfg.model,
+      inputTokens, outputTokens, cachedInputTokens: 0, costUsd: 0, latencyMs, status: "ok",
+      configSource: cfg.source, configId: cfg.configId,
+    });
+    if (cfg.source === "tenant_config" && cfg.configId) {
+      await (ctx.supabaseAdmin as any).schema("platform").from("llm_provider_configs").update({ last_used_at: new Date().toISOString() }).eq("id", cfg.configId);
+    }
+
+    return { text: round2.content, provider: cfg.provider, model: cfg.model, inputTokens, outputTokens, cachedInputTokens: 0, costUsd: 0, latencyMs, promptVersion: prompt.version, raw: round2 };
+  } catch (e: any) {
+    if (ctx.logger) {
+      ctx.logger.warn("tool-calling turn failed; falling back to plain callLLM", { taskId, error: e?.message ?? String(e) });
+    }
+    return callLLM(taskId, vars, ctx);
+  }
+}
+
 // ─── Google Gemini (direct, not via OpenRouter) ────────────────────────
 //
 // Hits generativelanguage.googleapis.com directly so a tenant who configured
