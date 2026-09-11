@@ -4,9 +4,14 @@ import { serveWithLogger } from '../_shared/logger.ts'
 
 declare const Deno: any;
 
+interface LocationDetails {
+  id?: string // ports_locations.id, already resolved client-side by LocationAutocomplete
+  [key: string]: unknown
+}
+
 interface RateRequest {
-  origin: string // Code (e.g., "LAX") or UUID
-  destination: string // Code (e.g., "PVG") or UUID
+  origin: string // Display name (e.g., "Nhava Sheva"), a location_code (e.g., "LAX"), or UUID -- see originDetails
+  destination: string // Display name, a location_code, or UUID -- see destinationDetails
   weight: number | string
   mode: 'air' | 'ocean' | 'road' | 'rail'
   commodity?: string
@@ -19,6 +24,11 @@ interface RateRequest {
   dims?: string
   vehicleType?: string
   dangerousGoods?: boolean
+  // Set by LocationAutocomplete (see SmartQuoteWorkspace.tsx's deriveSharedPayload) when the
+  // caller picked a location from the dropdown -- .id is a real ports_locations UUID and should
+  // always be preferred over re-resolving `origin`/`destination` as a string (see resolveLocation).
+  originDetails?: LocationDetails | null
+  destinationDetails?: LocationDetails | null
 }
 
 interface RateOption {
@@ -89,9 +99,10 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
     await logger.info("Processing Request Body:", { body });
 
-    const { 
+    const {
         origin, destination, weight, mode, unit, account_id,
-        containerQty, containerSize, vehicleType 
+        containerQty, containerSize, vehicleType,
+        originDetails, destinationDetails,
     } = body;
 
     if (!origin || !destination || !mode) {
@@ -105,9 +116,31 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
         if (unit === 'lbs') weightKg = weightKg * 0.453592;
     }
 
-    // 4. Resolve Locations (Code -> UUID)
-    const resolveLocation = async (loc: string): Promise<string | null> => {
+    // 4. Resolve Locations (Code/Name -> UUID)
+    //
+    // BUG FIXED HERE (found 2026-09-11 while wiring ai-advisor's live
+    // market-rate benchmark to this same table): the Smart Quote page sends
+    // the location's DISPLAY NAME in `origin`/`destination` (e.g. "Nhava
+    // Sheva"), not its `location_code` (e.g. "INNSA"). The old version of
+    // this function only ever matched `origin`/`destination` against
+    // `location_code` exactly, so on the common case that match silently
+    // failed, `originId`/`destId` came back null, the real carrier_rates
+    // query below was skipped entirely, and every "MARKET RATE" option
+    // shown to the user was actually the random simulation in section 6 --
+    // with nothing in the response distinguishing a real rate from a
+    // fabricated one. See docs/smart-quote-module-design.md §7.1/§10 item 1.
+    //
+    // The fix: the frontend's LocationAutocomplete already resolves the
+    // user's selection to a real `ports_locations.id` UUID and sends it as
+    // `originDetails.id`/`destinationDetails.id` (SmartQuoteWorkspace.tsx's
+    // deriveSharedPayload) -- use that directly when present instead of
+    // re-resolving a free-text string. Falls back to the original
+    // UUID-passthrough / location_code-exact-match behavior, unchanged, for
+    // any caller that doesn't send `*Details` (e.g. RateManagement.tsx's
+    // simpler analysis call) -- no regression for those callers.
+    const resolveLocation = async (loc: string, details?: LocationDetails | null): Promise<string | null> => {
       const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+      if (details?.id && uuidRegex.test(details.id)) return details.id;
       if (uuidRegex.test(loc)) return loc;
 
       const { data } = await supabase
@@ -123,8 +156,8 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
 
     try {
         [originId, destId] = await Promise.all([
-            resolveLocation(origin),
-            resolveLocation(destination)
+            resolveLocation(origin, originDetails),
+            resolveLocation(destination, destinationDetails)
         ]);
     } catch (e) {
         logger.warn("Location resolution failed, proceeding to simulation:", { error: e });
