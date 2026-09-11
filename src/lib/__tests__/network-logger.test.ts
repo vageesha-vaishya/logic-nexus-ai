@@ -3,11 +3,13 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const addLog = vi.fn();
 const getCorrelationId = vi.fn(() => 'corr-123');
 
+const loggerError = vi.fn();
+
 vi.mock('@/lib/logger', () => ({
   logger: {
     getCorrelationId,
     debug: vi.fn(),
-    error: vi.fn(),
+    error: loggerError,
     warn: vi.fn(),
   },
 }));
@@ -115,5 +117,36 @@ describe('network-logger', () => {
     const headers = new Headers(patchedInit.headers || patchedRequest.headers);
     expect(headers.get('Authorization')).toBe('Bearer user_jwt_token');
     expect(headers.get('apikey')).toBeTruthy();
+  });
+
+  it('does not log an error for the bare REST root connectivity ping, even on a non-2xx response', async () => {
+    // Mirrors UnifiedQuoteComposer's checkNetworkConnectivity(), which HEADs
+    // the bare /rest/v1/ root and explicitly treats any HTTP response
+    // (401/403/404 included) as "online" -- this should never surface as a
+    // logged "API Error".
+    const baseFetch = vi.fn().mockResolvedValue(new Response(null, { status: 403 }));
+    window.fetch = baseFetch as unknown as typeof window.fetch;
+
+    const { initNetworkLogger } = await import('@/lib/network-logger');
+    initNetworkLogger();
+
+    await window.fetch('https://project.supabase.co/rest/v1/', { method: 'HEAD' });
+
+    expect(loggerError).not.toHaveBeenCalled();
+  });
+
+  it('still logs an error for a real REST table request that fails', async () => {
+    const baseFetch = vi.fn().mockResolvedValue(new Response('{}', { status: 403, headers: { 'content-type': 'application/json' } }));
+    window.fetch = baseFetch as unknown as typeof window.fetch;
+
+    const { initNetworkLogger } = await import('@/lib/network-logger');
+    initNetworkLogger();
+
+    await window.fetch('https://project.supabase.co/rest/v1/quotes?select=id', { method: 'GET' });
+
+    expect(loggerError).toHaveBeenCalledWith(
+      expect.stringContaining('API Error: 403'),
+      expect.anything()
+    );
   });
 });

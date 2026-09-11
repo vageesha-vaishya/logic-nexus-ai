@@ -64,6 +64,17 @@ export const initNetworkLogger = () => {
     // Check ignoredUrls from debug config
     const isIgnored = debugConfig.network.ignoredUrls.some(ignore => url.includes(ignore));
 
+    // UnifiedQuoteComposer's checkNetworkConnectivity() deliberately HEADs
+    // the bare Supabase REST root (no table/RPC path) purely to see whether
+    // *any* HTTP response comes back -- its own comment says "we don't care
+    // about the status code (401/404 is fine)". A real REST call always has
+    // a table or rpc/ segment after /rest/v1/, so this pattern uniquely
+    // identifies that intentional ping and nothing else. Without this, every
+    // non-2xx response from it (typically 403, since it sends no auth
+    // beyond the anon apikey) was logged as a spurious "API Error", even
+    // though the calling code already treats that exact response as success.
+    const isRestConnectivityPing = /\/rest\/v1\/?($|\?)/.test(url);
+
     // Third-party APIs whose CORS allow-headers list does NOT include `X-Correlation-ID`.
     // Injecting it would cause the browser's preflight to fail. Bypass the wrapper entirely.
     const isThirdPartyApi =
@@ -77,7 +88,8 @@ export const initNetworkLogger = () => {
       url.includes('ingest.sentry.io') ||
       url.includes('app.posthog.com') ||
       isThirdPartyApi ||
-      isIgnored
+      isIgnored ||
+      isRestConnectivityPing
     ) {
       return originalFetch(...args);
     }
