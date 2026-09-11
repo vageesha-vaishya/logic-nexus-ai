@@ -222,9 +222,18 @@ async function lookupCodes(query: string, mode: string, supabase: any) {
 // data, which is stale and would either miss 2026's toll changes entirely
 // or (worse) confidently state the pre-crisis Suez/Cape routing norm that
 // no longer holds. This is a dated snapshot, not a live feed: the values
-// below need a human to re-verify and bump SOURCED_AT periodically (see
-// docs/smart-quote-module-design.md "Maintenance" section for the
-// suggested cadence and source links). Injected into the prompt as
+// LAST-RESORT FALLBACK ONLY (see buildMaritimeContext below). The primary
+// source is now the admin-editable public.maritime_advisories table
+// (docs/smart-quote-module-design.md §6/§10 item 2) -- this hardcoded
+// snapshot is used only if that query itself errors (DB unreachable),
+// never when the query succeeds but simply returns no matching rows,
+// since an empty-but-successful result is a real fact ("no known active
+// advisory for this chokepoint right now") that this stale constant must
+// not override. Kept around specifically so a maritime_advisories outage
+// degrades to today's old behavior rather than to no context at all.
+// Values below need a human to re-verify and bump SOURCED_AT periodically
+// -- see docs/smart-quote-module-design.md "Maintenance" for the
+// suggested cadence and source links. Injected into the prompt as
 // read-only context the model must not contradict or embellish -- same
 // STRICT GROUNDING pattern already used for markets.daily_brief.
 const MARITIME_REFERENCE = {
@@ -273,7 +282,56 @@ function matchesAny(value: string, keywords: string[]): boolean {
     return keywords.some((k) => v.includes(k));
 }
 
-function buildMaritimeContext(origin: string, destination: string, mode: string): string {
+function fallbackMaritimeContext(chokepoint: 'suez' | 'panama'): string {
+    const label = chokepoint === 'suez' ? 'SUEZ CANAL' : 'PANAMA CANAL';
+    const ref = MARITIME_REFERENCE[chokepoint];
+    const bits = chokepoint === 'suez'
+        ? [ref.tollTrend, (ref as typeof MARITIME_REFERENCE.suez).routingReality, (ref as typeof MARITIME_REFERENCE.suez).costImpact]
+        : [ref.tollTrend, (ref as typeof MARITIME_REFERENCE.panama).routingReality];
+    return `${label} CONTEXT (as of ${MARITIME_REFERENCE.sourcedAt}, fallback snapshot -- advisories table unavailable): ${bits.filter(Boolean).join(' ')}`;
+}
+
+// Queries public.maritime_advisories (docs/smart-quote-module-design.md
+// §6/§10 item 2) for every active, currently-effective advisory matching
+// a given chokepoint, and concatenates them into one dated context block
+// -- same STRICT GROUNDING pattern as before, just sourced from an
+// admin-editable table instead of a hardcoded constant. Never throws:
+// a query error degrades to the hardcoded MARITIME_REFERENCE snapshot for
+// that chokepoint (see its comment above for why that's the right
+// fallback), while a query that succeeds but returns zero rows correctly
+// produces no context at all -- "nothing currently on record" is itself
+// real information the STRICT GROUNDING prompt rule (§8, rule 9) already
+// knows how to handle (say nothing rather than guess).
+async function fetchAdvisoryContext(supabase: any, chokepoint: 'suez' | 'panama'): Promise<string> {
+    const today = new Date().toISOString().slice(0, 10);
+    try {
+        const { data, error } = await supabase
+            .from('maritime_advisories')
+            .select('headline, cost_impact_text, transit_impact_text')
+            .eq('chokepoint', chokepoint)
+            .eq('is_active', true)
+            .or(`effective_from.is.null,effective_from.lte.${today}`)
+            .or(`effective_to.is.null,effective_to.gte.${today}`)
+            .order('effective_from', { ascending: true, nullsFirst: true });
+
+        if (error) {
+            return fallbackMaritimeContext(chokepoint);
+        }
+        if (!data || data.length === 0) {
+            return '';
+        }
+
+        const label = chokepoint === 'suez' ? 'SUEZ CANAL' : 'PANAMA CANAL';
+        const body = data
+            .map((row: any) => [row.headline, row.cost_impact_text, row.transit_impact_text].filter(Boolean).join(' '))
+            .join(' ');
+        return `${label} CONTEXT (advisories current as of ${today}): ${body}`;
+    } catch {
+        return fallbackMaritimeContext(chokepoint);
+    }
+}
+
+async function buildMaritimeContext(supabase: any, origin: string, destination: string, mode: string): Promise<string> {
     if (String(mode || '').toLowerCase() !== 'ocean') return '';
     const o = String(origin || '');
     const d = String(destination || '');
@@ -287,20 +345,12 @@ function buildMaritimeContext(origin: string, destination: string, mode: string)
 
     if (!suezRoute && !panamaRoute) return '';
 
-    const parts: string[] = [];
-    if (suezRoute) {
-        parts.push(
-            `SUEZ CANAL CONTEXT (as of ${MARITIME_REFERENCE.sourcedAt}): ${MARITIME_REFERENCE.suez.tollTrend} ` +
-            `${MARITIME_REFERENCE.suez.routingReality} ${MARITIME_REFERENCE.suez.costImpact}`
-        );
-    }
-    if (panamaRoute) {
-        parts.push(
-            `PANAMA CANAL CONTEXT (as of ${MARITIME_REFERENCE.sourcedAt}): ${MARITIME_REFERENCE.panama.tollTrend} ` +
-            `${MARITIME_REFERENCE.panama.routingReality}`
-        );
-    }
-    return parts.join(' ');
+    const [suezContext, panamaContext] = await Promise.all([
+        suezRoute ? fetchAdvisoryContext(supabase, 'suez') : Promise.resolve(''),
+        panamaRoute ? fetchAdvisoryContext(supabase, 'panama') : Promise.resolve(''),
+    ]);
+
+    return [suezContext, panamaContext].filter(Boolean).join(' ');
 }
 
 // Live competitive benchmark, sourced from real carrier_rates rows on this
@@ -484,7 +534,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     // above. Either can legitimately be empty (non-ocean mode, no canal on
     // this lane, no internal rate history yet); the prompt below treats an
     // empty value as "say nothing about it" rather than a gap to fill in.
-    const maritimeContext = buildMaritimeContext(origin, destination, mode);
+    const maritimeContext = await buildMaritimeContext(supabase, origin, destination, mode);
     const benchmarkContext = buildBenchmarkContext(benchmarkAvg, benchmarkCount, benchmarkSource);
 
     // 3. Call the LLM Gateway (routes to tenant-configured provider, or
