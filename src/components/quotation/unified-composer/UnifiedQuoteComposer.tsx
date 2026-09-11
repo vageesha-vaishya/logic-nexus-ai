@@ -808,16 +808,26 @@ function UnifiedQuoteComposerContent({
   const calculateOptionTotalSell = useCallback((option: RateOption): number => {
     const collectAmount = (charge: any): number =>
       Number(charge?.sell?.amount ?? charge?.amount ?? 0) || 0;
-    const globalTotal = (Array.isArray(option?.charges) ? option.charges : []).reduce(
+    const hasChargeCharges = Array.isArray(option?.charges);
+    const globalTotal = (hasChargeCharges ? option.charges : []).reduce(
       (sum: number, charge: any) => sum + collectAmount(charge),
       0
     );
-    const legTotal = (Array.isArray(option?.legs) ? option.legs : []).reduce((sum: number, leg: any) => {
-      const legCharges = Array.isArray(leg?.charges) ? leg.charges : [];
-      return sum + legCharges.reduce((legSum: number, charge: any) => legSum + collectAmount(charge), 0);
+    const legsWithCharges = (Array.isArray(option?.legs) ? option.legs : []).filter((leg: any) => Array.isArray(leg?.charges));
+    const legTotal = legsWithCharges.reduce((sum: number, leg: any) => {
+      return sum + leg.charges.reduce((legSum: number, charge: any) => legSum + collectAmount(charge), 0);
     }, 0);
     const total = globalTotal + legTotal;
-    if (total > 0) return Number(total.toFixed(2));
+    // Trust the computed total -- including a real $0 -- whenever there is
+    // an itemized charges array to compute from at all (option.charges or
+    // any leg.charges), even if the user has emptied it down to nothing.
+    // Only fall back to the option's own summary price when no itemized
+    // structure exists yet (a raw, never-decomposed rate). Checking
+    // `total > 0` instead of structural presence was the bug: it couldn't
+    // tell "never had charge data" apart from "charges intentionally
+    // cleared to a genuine zero," and silently kept showing the latter's
+    // stale nonzero price.
+    if (hasChargeCharges || legsWithCharges.length > 0) return Number(total.toFixed(2));
     return Number(option.total_amount ?? option.price ?? 0) || 0;
   }, []);
 

@@ -1038,10 +1038,21 @@ async function applyDynamicPricing(response: any, supabase: any, tenantId: strin
             const hasLegs = Array.isArray(opt.legs) && opt.legs.length > 0;
             let mainLeg: any = null;
             if (hasLegs) {
-                // Find Main Leg (longest distance or Ocean/Air)
-                // Heuristic: Look for leg with same mode as option, or longest distance
+                // Find Main Leg: same mode as the option, or (fallback) the
+                // highest-cost leg.
                 mainLeg = opt.legs.find((l: any) => opt.transport_mode && l.mode && opt.transport_mode.toLowerCase().includes(l.mode.toLowerCase()));
-                if (!mainLeg) mainLeg = opt.legs.reduce((prev: any, current: any) => (prev.distance_km > current.distance_km) ? prev : current);
+                if (!mainLeg) {
+                    // distance_km is never part of the LLM's leg output --
+                    // comparing it was always `undefined > undefined` =
+                    // false, which silently always resolved to the LAST
+                    // leg (e.g. a final trucking leg) regardless of its
+                    // real significance. charges are guaranteed-present,
+                    // real data, and the long-haul leg (ocean/air)
+                    // reliably costs far more than a pickup/delivery
+                    // trucking leg, so use total charge amount instead.
+                    const legTotal = (l: any) => (l.charges || []).reduce((sum: number, c: any) => sum + (Number(c.amount) || 0), 0);
+                    mainLeg = opt.legs.reduce((prev: any, current: any) => (legTotal(current) > legTotal(prev) ? current : prev));
+                }
             }
 
             // The model also independently generates the option-level
@@ -1080,8 +1091,14 @@ async function applyDynamicPricing(response: any, supabase: any, tenantId: strin
                 opt.price_breakdown.fees = { handling_docs: otherLegsTotal };
             } else {
                 // No legs to reconcile against -- fall back to trusting the
-                // model's own base_fare, same as before this fix.
-                base = opt.price_breakdown.base_fare || 0;
+                // model's own base_fare, same as before this fix. Coerced
+                // the same way the has-legs branch above coerces each
+                // charge amount: an LLM-produced non-numeric base_fare
+                // (e.g. "2,645" or "TBD") must not reach the `+` below,
+                // where a string left operand turns the whole total
+                // calculation into concatenation instead of addition --
+                // and that garbage total then gets cached in ai_quote_cache.
+                base = Number(opt.price_breakdown.base_fare) || 0;
             }
             opt.price_breakdown.base_fare = base;
 

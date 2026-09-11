@@ -213,9 +213,15 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
                 // Simple Price Calc
                 let price = Number(r.total_amount);
                 
-                // Adjust for quantity/weight
-                if (mode === 'ocean' && containerQty) {
-                    price = price * Number(containerQty);
+                // Adjust for quantity/weight. containerQty arrives as
+                // string | number from the request body -- a plain truthy
+                // check on the raw value lets the string "0" through (only
+                // the empty string, undefined, NaN etc. are falsy), which
+                // zeroes out an otherwise-valid carrier rate via `price * 0`.
+                // Check the coerced numeric value instead.
+                const containerQtyNum = Number(containerQty);
+                if (mode === 'ocean' && containerQtyNum > 0) {
+                    price = price * containerQtyNum;
                 } else if (weightKg > 0) {
                     // Assume rate is per kg for Air/Road unless specified otherwise
                     // In real app, check rate unit (per kg, per shipment)
@@ -400,8 +406,12 @@ serveWithLogger(async (req, logger, supabaseAdmin) => {
                 opt.price = finalPrice;
                 opt.margin_applied = appliedMargins;
                 
-                // Calculate Margin Amount
-                const cost = opt.buyPrice || finalPrice; // Fallback to final if no buyPrice (should not happen)
+                // Calculate Margin Amount. `??` (not `||`): a genuine $0
+                // buyPrice is a real value, not a missing one -- `||` was
+                // treating it as "no buyPrice" and substituting finalPrice,
+                // which silently reports margin as 0 instead of the true
+                // full-price margin when cost is actually 0.
+                const cost = opt.buyPrice ?? finalPrice; // Fallback to final only if buyPrice is genuinely absent
                 opt.marginAmount = Math.round((finalPrice - cost) * 100) / 100;
             } else {
                  // No margin applied, but we should ensure consistency
