@@ -3107,8 +3107,16 @@ function UnifiedQuoteComposerContent({
       const serviceTypeId = repoData.serviceTypes?.find((s: any) => s.name === 'Export' || s.code === 'EXP')?.id;
 
       const cargoSnapshot = buildCargoSnapshot(formData?.values, formData?.extended);
+      // For a genuinely new quote, generate the id client-side ONCE here
+      // (not inside the RPC via gen_random_uuid()) so every saveWithRetry
+      // attempt below reuses the identical id. save_quote_atomic's INSERT
+      // is `ON CONFLICT (id) DO UPDATE`, so a retry after a lost-but-
+      // actually-successful response now safely upserts the same row
+      // instead of inserting a full duplicate quote (previously: id stayed
+      // undefined, so the RPC minted a fresh random id on every retry).
+      const newQuoteId = currentQuoteId || crypto.randomUUID();
       const quotePayload: any = {
-        id: currentQuoteId || undefined,
+        id: newQuoteId,
         quote_number: finalQuoteNumber,
         title: (formData?.values.quoteTitle || storeState.quoteData?.title) || `Quote - ${formData?.values.origin || ''} to ${formData?.values.destination || ''}`,
         transport_mode: formData?.values.mode || 'ocean',
@@ -3691,8 +3699,13 @@ function UnifiedQuoteComposerContent({
       if (!currentQuoteId && manualQuoteNumber) {
         currentQuoteId = await resolveQuoteIdByNumber(manualQuoteNumber);
       }
+      // Same fix as the main save handler above: generate the id client-side
+      // ONCE so every saveWithRetry attempt below (an upsert via
+      // ON CONFLICT (id) DO UPDATE) reuses it, instead of the RPC minting a
+      // fresh random id per retry and inserting a duplicate quote.
+      const newQuoteId = currentQuoteId || crypto.randomUUID();
       const quotePayload: any = {
-        id: currentQuoteId || undefined,
+        id: newQuoteId,
         quote_number: manualQuoteNumber,
         title: (formData.values.quoteTitle || storeState.quoteData?.title) || `Draft - ${formData.values.origin || ''} to ${formData.values.destination || ''}`,
         transport_mode: formData.values.mode || 'ocean',
