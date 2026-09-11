@@ -271,7 +271,18 @@ const PROMPTS: Record<LlmTaskId, PromptTemplate> = {
     // never asked to know today's canal tolls or a real competitor's price
     // itself, only to reason about what it's given, per the same
     // STRICT GROUNDING pattern already used in markets.daily_brief.
-    version: "v3-2026-09-11",
+    //
+    // v4 (2026-09-11): adds duty/tax grounding (docs/smart-quote-module-design.md
+    // ยง10 item 5). Still zero new JSON fields -- taxes and
+    // regulatory_info.customs_procedures already existed in the schema.
+    // price_breakdown.taxes is now unconditionally forced to 0 (rule 11,
+    // and enforced again in code by applyDynamicPricing -- never trust the
+    // prompt alone for something this consequential); an optional DUTY
+    // CONTEXT line, when a real public.duty_rates row exists for the
+    // commodity's HTS code + destination jurisdiction, lets the model cite
+    // the real rate informationally without ever computing a dollar amount
+    // from it (no declared customs value exists anywhere in this flow).
+    version: "v4-2026-09-11",
     system:
       `You are an Expert Logistics Rate Analyst producing quotes that must be both competitive enough to win the deal and priced to sustain healthy margin -- not just technically valid.
 Generate exactly 3 freight quotation options: "best_value", "cheapest", "fastest".
@@ -285,10 +296,11 @@ Requirements:
 6. Give a reliability score (1-10) and estimated total CO2 (kg) per option.
 7. Keep 'ai_explanation' to ONE short sentence per option. Keep customs_procedures/restrictions arrays to at most 1-2 short items each, empty array if none.
 
-STRICT GROUNDING RULES for MARITIME CONTEXT and BENCHMARK (these override anything else, and override your own training knowledge specifically):
+STRICT GROUNDING RULES for MARITIME CONTEXT, BENCHMARK, and DUTY CONTEXT (these override anything else, and override your own training knowledge specifically):
 8. If a MARITIME CONTEXT line is provided in the user message, treat it as the current, authoritative routing/toll reality for this lane -- fold its cost impact into the ocean leg's single rolled-up charge (do not add a separate canal-fee line item) and reflect its routing/transit-time impact in transit_time and ai_explanation. Do not state a canal toll figure, routing assumption, or transit-time impact that contradicts it.
 9. If NO maritime context line is provided (blank), do not mention canal fees, Suez, Panama, or Red Sea routing risk at all -- say nothing rather than guess from your training data, which will be stale for regulatory tolls and current geopolitical routing.
 10. If a BENCHMARK line is provided, price 'cheapest' at or below it and 'best_value' within a reasonable band above it, per its own instruction. Never invent a competitor's price or cite a specific competitor by name -- you have no real data on either.
+11. price_breakdown.taxes is ALWAYS 0, for every option, regardless of commodity, destination, or anything else. No declared customs value is ever available to you, so any nonzero figure you produced would be invented, not calculated. If a DUTY CONTEXT line is provided, you may mention its real, sourced rate in regulatory_info.customs_procedures as one short informational item (e.g. "Estimated duty: 16.5% ad valorem, subject to customs valuation") -- but never convert it into a dollar amount, and never add it to price_breakdown or any leg charge. If NO duty context line is provided, do not mention duty rates or estimated tariffs at all.
 
 Output JSON Format (exactly this shape, no extra nesting):
 {
@@ -348,7 +360,8 @@ CRITICAL OUTPUT CONSTRAINT: Respond with ONLY the raw JSON object shown above โ€
       "Equipment: ${container_qty}x ${container_size} ${container_type}\n" +
       "Historical context: ${historical_context}\n" +
       "${maritime_context}\n" +
-      "${benchmark_context}\n\n" +
+      "${benchmark_context}\n" +
+      "${duty_context}\n\n" +
       "Generate the quotation options now.",
   },
   "ops.agent_plan": {

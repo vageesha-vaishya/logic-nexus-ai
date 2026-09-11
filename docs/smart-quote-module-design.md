@@ -102,7 +102,7 @@ What a competitive, margin-aware quote needs to account for, and where each piec
 | Security surcharge | `price_breakdown.surcharges.security_surcharge` | ✅ **New this doc** — §5.1, added only when a real, currently-valid `dynamic_surcharges` row exists; no fallback, omitted otherwise |
 | Peak season surcharge | `price_breakdown.surcharges.peak_season_surcharge` | ✅ **New this doc** — §5.1, same as security surcharge: real-data-only, no fallback |
 | Port congestion surcharge | `price_breakdown.surcharges.port_congestion_surcharge` | ✅ **New this doc** — §5.1, same as security surcharge: real-data-only, no fallback |
-| Duties / taxes | `price_breakdown.taxes` | ⚠️ Model-generated, currently almost always 0 in practice; not reconciled against any reference — flagged as a Phase 2 gap, not fixed here |
+| Duties / taxes | `price_breakdown.taxes` | ✅ **New this doc** — §5.2, code-forced to 0 unconditionally; real duty *rate* (not amount) surfaced informationally when `public.duty_rates` has one for the HTS code + destination |
 
 ### 5.1 `dynamic_surcharges` wiring (2026-09-11)
 
@@ -117,6 +117,24 @@ What a competitive, margin-aware quote needs to account for, and where each piec
 **A real bug found and fixed while building this:** supabase-js's `.contains(column, array)` helper serializes a JS array as a Postgres array literal (`{ocean}`), which is valid for a `text[]` column but not for `applicable_modes`' actual type, `jsonb` — PostgREST returned a 400 ("invalid input syntax for type json"), and the code's own `if (error) return {}` swallowed it completely silently, exactly the kind of masked failure the location-matching/rate-engine fixes (§7.1) already ran into once this session. Fixed by using `.filter('applicable_modes', 'cs', JSON.stringify([mode]))` to force the correct JSON representation, and by adding a `logger.warn` on query error so a repeat of this class of bug surfaces in logs instead of silently degrading to defaults forever.
 
 **Verified live:** a temporary, currently-valid `security` surcharge ($175 fixed) inserted for the test tenant appeared as a real "Security Surcharge" line item in a fresh generation's cost breakdown, correctly included in the option's total — test row deleted after.
+
+### 5.2 Duty/tax reconciliation (2026-09-11)
+
+**Measured first, per this item's own instruction (§10 item 5 originally said "worth a dedicated sampling pass before trusting it").** Sampled 30 real cached options from `ai_quote_cache` before changing anything: `price_breakdown.taxes` was `0` in every single one — not "almost always," genuinely always, in this sample. This means the risk this item flagged is **latent, not actively manifesting**: nothing was previously stopping the model from inventing a nonzero figure for a route/commodity it decided looked dutiable, but it hadn't (yet) done so in practice.
+
+**A real `public.duty_rates` table exists** (`aes_hts_id` FK to `aes_hts_codes`, `country_code`/`jurisdiction` CHECK-constrained to `('US','EU','CN','UK')` only, `ad_valorem_rate`/`specific_amount`/`specific_unit`, `effective_date`/`end_date`), with 30 real seeded rows (real HTS codes, real-looking ad valorem percentages — e.g. 16.5% for cotton T-shirts into the US). **But it cannot produce a real dollar duty amount today**, for two structural reasons found while investigating:
+
+1. **Every one of the 30 seed rows is `ad_valorem`** (a percentage of the shipment's *declared customs value*) — zero rows use `specific_amount` (a flat per-unit duty, which weight/quantity alone could compute). Computing a percentage-based duty requires a value.
+2. **No declared customs/commercial value is captured anywhere in the Smart Quote flow.** Weight, volume, and container count are captured; a dollar value of the goods is not. (`public.master_commodities.unit_value` exists as a column, but the Smart Quote commodity search doesn't source from that table — it searches `aes_hts_codes` directly, per the "Global HTS / Schedule B Codes" grouping in the UI.)
+
+Also found: `ports_locations.country_code` (the natural join key to `duty_rates.jurisdiction`) is unpopulated for every row, and `aes_hts_codes.duty_rate` (a simpler, always-present text column that looks like the obvious source) is empty across all 9,737 rows — a dead column. The only usable destination-jurisdiction signal is the free-text country name already in `destinationDetails.formatted_address`, mapped to one of the 4 supported jurisdictions via a small, deliberately coarse heuristic (`resolveDutyJurisdiction()`) — same spirit as the Suez/Panama keyword lists in §6, and same failure mode: a miss just means no duty context, never a wrong one.
+
+**Fix, following the same pattern already used for charges/carrier reconciliation:**
+
+1. **Code-level reconciliation (the real fix):** `applyDynamicPricing` now sets `taxes = 0` **unconditionally**, full stop, regardless of what the model outputs. Not a fallback, not a default — a hard override, the same way `base_fare`/`surcharges` are already reconciled from the legs rather than trusted from the model's own arithmetic. This closes the latent gap for good.
+2. **Prompt-level grounding (transparency, not computation):** a new `buildDutyContext()` looks up `duty_rates` (two simple sequential queries — `aes_hts_codes` by exact `hts_code`, then `duty_rates` by `aes_hts_id` + resolved `jurisdiction` + current `effective_date`/`end_date` window) and, when a real row exists, injects it as a `DUTY CONTEXT` line. The v4 prompt's new rule 11 lets the model cite that real rate informationally in `regulatory_info.customs_procedures` (e.g. "Estimated duty: 16.5% ad valorem, subject to customs valuation") but explicitly forbids converting it into a dollar figure or touching `price_breakdown` with it. When no real rate is found (the common case — 30 HTS codes and 4 jurisdictions is narrow coverage), the model says nothing about duties at all, same STRICT GROUNDING pattern as maritime context.
+
+**Verified live:** commodity "T-shirts, singlets and other vests... of cotton" (HTS `6109.10.00`) to Long Beach, CA (US) correctly produced `"Estimated duty: 16.50% ad valorem, subject to customs valuation"` in the Compliance tab, while the Cost Analysis total remained exactly Freight + Fuel + Currency with zero dollar tax/duty line anywhere.
 
 ---
 
@@ -179,9 +197,9 @@ Both were verified together with a temporary, since-deleted test row: confirmed 
 
 ---
 
-## 8. The v3 prompt
+## 8. The v4 prompt
 
-Full text as deployed (`llm-gateway.ts`, `PROMPTS["logistics.smart_quotes"]`, version `v3-2026-09-11`). Annotated inline; the actual template has no comments (JSON must be exactly as specified for the self-hosted model's `responseMimeType`-equivalent instruction-following to hold).
+Full text as deployed (`llm-gateway.ts`, `PROMPTS["logistics.smart_quotes"]`, version `v4-2026-09-11`). Annotated inline; the actual template has no comments (JSON must be exactly as specified for the self-hosted model's `responseMimeType`-equivalent instruction-following to hold). v4 adds only rule 11 (duty/tax grounding, §5.2) and the `${duty_context}` template line over v3 — still zero new JSON fields, same token-budget discipline as §3 requires.
 
 ### System prompt
 
@@ -214,6 +232,13 @@ override your own training knowledge specifically):
 10. If a BENCHMARK line is provided, price 'cheapest' at or below it and 'best_value' within a
     reasonable band above it, per its own instruction. Never invent a competitor's price or cite a
     specific competitor by name -- you have no real data on either.
+11. price_breakdown.taxes is ALWAYS 0, for every option, regardless of commodity, destination, or
+    anything else. No declared customs value is ever available to you, so any nonzero figure you
+    produced would be invented, not calculated. If a DUTY CONTEXT line is provided, you may mention
+    its real, sourced rate in regulatory_info.customs_procedures as one short informational item
+    (e.g. "Estimated duty: 16.5% ad valorem, subject to customs valuation") -- but never convert it
+    into a dollar amount, and never add it to price_breakdown or any leg charge. If NO duty context
+    line is provided, do not mention duty rates or estimated tariffs at all.
 
 Output JSON Format (exactly this shape, no extra nesting):
 { ...unchanged from v2, see §5's taxonomy for what maps where... }
@@ -232,11 +257,12 @@ Equipment: ${container_qty}x ${container_size} ${container_type}
 Historical context: ${historical_context}
 ${maritime_context}
 ${benchmark_context}
+${duty_context}
 
 Generate the quotation options now.
 ```
 
-`${maritime_context}` and `${benchmark_context}` are computed server-side (`ai-advisor/index.ts`) and are legitimately empty strings on most requests — a non-ocean-mode shipment, an ocean lane the chokepoint heuristic doesn't match, or a lane with no historical rate data yet. An empty value renders as a blank line, which costs effectively nothing and produces no dangling label (both context builders return fully-formed, self-labeled text or nothing — the template doesn't add its own "Maritime context:" prefix that would otherwise show up empty).
+`${maritime_context}`, `${benchmark_context}`, and `${duty_context}` are computed server-side (`ai-advisor/index.ts`) and are legitimately empty strings on most requests — a non-ocean-mode shipment, an ocean lane the chokepoint heuristic doesn't match, a lane with no historical rate data yet, or (the common case for duty context) no `duty_rates` row for this HTS code + destination jurisdiction. An empty value renders as a blank line, which costs effectively nothing and produces no dangling label (all three context builders return fully-formed, self-labeled text or nothing — the template doesn't add its own prefix that would otherwise show up empty).
 
 ### Live verification (2026-09-10/11, self-hosted rig, `qwen3.8-27b-awq`)
 
@@ -417,7 +443,7 @@ Ordered by leverage-to-effort, not by the order requested in the brief. Item num
 2. ~~A maintained geopolitical/regulatory advisories table, replacing the static `MARITIME_REFERENCE` snapshot.~~ **Done — §6.** Built `public.maritime_advisories` with exactly the proposed shape (`chokepoint, region, headline, cost_impact_text, transit_impact_text, effective_from, effective_to, source_url`, plus `is_active`/audit columns), admin-editable (RLS: `platform_admin` write, any authenticated user read), seeded with the original hardcoded facts split into 3 rows. `buildMaritimeContext` is now `async` and queries it, falling back to the old hardcoded constant only on a genuine query error, never on a real empty result. This is still not "real-time assessment of geopolitical risks" in the sense of an automated feed -- a human still has to add a row when something changes -- but it is now the honest version of that requirement: a maintained table with a human in the loop, not the LLM guessing, and not a snapshot frozen at whatever date this doc happened to be written.
 3. ~~Wire up `public.dynamic_surcharges`~~ **Done — §5.1.** `applyDynamicPricing` now queries it for real fuel/currency/security/peak_season/port_congestion rows instead of only ever using the hardcoded 12%/2% fuel/currency default. Canal fees were **not** moved here, though — that requirement was satisfied differently: §6/§10 item 2 built a dedicated `public.maritime_advisories` table instead, since canal advisories needed multiple free-text fields (headline, cost/transit impact narrative, source URL) that don't fit `dynamic_surcharges`' numeric `calculation_method`/`base_value` shape. No `canal_fee` surcharge_type was added to this table as a result.
 4. **A real port/region lookup for chokepoint detection**, replacing the keyword heuristic in §6, using `ports_locations`' existing country/type columns (or a small dedicated routing table) to determine actual likely canal transit rather than string matching on origin/destination text.
-5. **Duty/tax reconciliation.** Currently ungrounded and unreconciled — same category of risk the charges-arithmetic bug (audit doc §10) was, just not yet measured. Worth a dedicated sampling pass before trusting it in a client-facing quote.
+5. ~~Duty/tax reconciliation.~~ **Done — §5.2.** Measured first, per this item's own instruction: sampled 30 real cached options before changing anything -- `taxes` was 0 in every single one, so this wasn't fixing an observed fabrication, it was closing a latent gap (nothing previously stopped the model from inventing a nonzero figure). Fixed with the same two-pronged pattern used for charges/carrier earlier: `price_breakdown.taxes` is now unconditionally forced to 0 in code (never trust the model's own number, regardless of the prompt), and a real, sourced duty RATE from `public.duty_rates` is surfaced as prompt context when one exists for the commodity's HTS code + destination jurisdiction, letting the model cite it informationally (`regulatory_info.customs_procedures`) without ever computing a dollar amount from it -- no declared customs value exists anywhere in this flow to compute one from. Verified live: HTS 6109.10.00 to the US correctly produced "Estimated duty: 16.50% ad valorem, subject to customs valuation" with zero dollar impact on the total.
 6. **Predictive/ML cost modeling.** Out of scope for a prompt-and-reference-data pass entirely — this is a genuine time-series/ML project (rate trend forecasting from `platform.llm_usage`-adjacent cost history, or a proper freight-index feed), not something either the LLM or a static reference table can deliver.
 7. **Wire the daily call cap into `executeRateToolCall`.** `rate_provider_configs.daily_call_cap` and `rate_provider_health.calls_today`/`calls_today_date` already exist and are maintained, but nothing yet compares one against the other before a call — `daily_cap_exceeded` (§9.5) is a defined error code with no code path that produces it. Needed before any real adapter with a metered/paid per-call third-party API goes live, to avoid an unbounded per-tenant bill.
 8. **A more gradual circuit-breaker retry (`half_open`).** The DB schema already reserves the `half_open` status value; today a provider goes straight from `open` back to fully callable the instant `open_until` passes, with no single-probe-before-resuming-full-traffic step. Worth adding once real provider call volume exists to observe whether the current binary behavior causes flapping.

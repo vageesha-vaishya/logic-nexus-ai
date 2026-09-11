@@ -353,6 +353,93 @@ async function buildMaritimeContext(supabase: any, origin: string, destination: 
     return [suezContext, panamaContext].filter(Boolean).join(' ');
 }
 
+// Deliberately coarse, same spirit as the SUEZ/PANAMA keyword lists above --
+// public.duty_rates.jurisdiction is CHECK-constrained to only 4 values
+// ('US','EU','CN','UK'), and ports_locations.country_code is unpopulated
+// for every row today, so the only usable signal is the free-text country
+// name already present in destinationDetails.formatted_address. A false
+// negative (an EU country name this list misses) just means no duty
+// context is offered, same as today; there's no false-positive risk since
+// an unmatched jurisdiction returns no context at all.
+const EU_COUNTRY_NAMES = new Set([
+    "netherlands", "germany", "france", "italy", "spain", "belgium", "poland", "austria",
+    "portugal", "ireland", "sweden", "denmark", "finland", "greece", "czech republic",
+    "czechia", "hungary", "romania", "bulgaria", "croatia", "slovakia", "slovenia",
+    "lithuania", "latvia", "estonia", "luxembourg", "malta", "cyprus",
+]);
+
+function resolveDutyJurisdiction(country: string): "US" | "EU" | "CN" | "UK" | null {
+    const c = String(country || '').trim().toLowerCase();
+    if (!c) return null;
+    if (c === 'usa' || c === 'us' || c === 'united states' || c === 'united states of america') return 'US';
+    if (c === 'china' || c === 'cn' || c === "people's republic of china") return 'CN';
+    if (c === 'uk' || c === 'united kingdom' || c === 'great britain' || c === 'england') return 'UK';
+    if (EU_COUNTRY_NAMES.has(c)) return 'EU';
+    return null;
+}
+
+// Real duty-rate lookup against public.duty_rates (docs/smart-quote-module-design.md
+// §10 item 5 -- schema already existed, was never queried anywhere before this).
+// Informational only, by design: every row in this table today is
+// calculation_method-equivalent "ad_valorem" (a PERCENTAGE of the shipment's
+// declared customs value) -- and no declared value is captured anywhere in
+// the Smart Quote flow (weight/volume/container count exist; a commercial/
+// customs value does not). A percentage without a value can't produce a
+// real dollar figure, so this never computes one -- it only surfaces the
+// real, sourced RATE as context the model may cite informationally
+// (regulatory_info.customs_procedures), while price_breakdown.taxes stays
+// grounded at 0 unconditionally (enforced in code, see applyDynamicPricing --
+// not left to the prompt alone). Coverage is intentionally narrow today
+// (30 seed HTS codes, 4 jurisdictions): a query that finds nothing is the
+// overwhelmingly common, correct case, not a failure.
+async function buildDutyContext(supabase: any, htsCode: string, destinationCountry: string, logger?: Logger): Promise<string> {
+    const jurisdiction = resolveDutyJurisdiction(destinationCountry);
+    const cleanHts = String(htsCode || '').trim();
+    if (!jurisdiction || !cleanHts) return '';
+
+    try {
+        const { data: htsRow, error: htsError } = await supabase
+            .from('aes_hts_codes')
+            .select('id, description')
+            .eq('hts_code', cleanHts)
+            .maybeSingle();
+
+        if (htsError || !htsRow) return '';
+
+        const today = new Date().toISOString().slice(0, 10);
+        const { data: dutyRows, error: dutyError } = await supabase
+            .from('duty_rates')
+            .select('rate_type, ad_valorem_rate, specific_amount, specific_unit, effective_date')
+            .eq('aes_hts_id', htsRow.id)
+            .eq('jurisdiction', jurisdiction)
+            .lte('effective_date', today)
+            .or(`end_date.is.null,end_date.gte.${today}`)
+            .order('effective_date', { ascending: false })
+            .limit(1);
+
+        if (dutyError) {
+            logger?.warn("duty_rates query failed, omitting duty context:", { error: dutyError.message });
+            return '';
+        }
+        if (!dutyRows || dutyRows.length === 0) return '';
+
+        const row = dutyRows[0];
+        const rateText = row.ad_valorem_rate != null
+            ? `${(Number(row.ad_valorem_rate) * 100).toFixed(2)}% ad valorem`
+            : (row.specific_amount != null ? `$${row.specific_amount} per ${row.specific_unit || 'unit'}` : null);
+        if (!rateText) return '';
+
+        return (
+            `DUTY RATE CONTEXT (informational only, real sourced rate): the ${jurisdiction} ${row.rate_type} duty rate for ` +
+            `HTS ${cleanHts} (${htsRow.description}) is ${rateText}, effective ${row.effective_date}. You may cite this rate in ` +
+            `regulatory_info.customs_procedures as informational context for the buyer. Do NOT compute or state a dollar duty/tax ` +
+            `amount from it -- no declared customs value is available in this request, so price_breakdown.taxes must remain 0.`
+        );
+    } catch {
+        return '';
+    }
+}
+
 // Live competitive benchmark, sourced from real carrier_rates rows on this
 // exact lane -- the same table rate-engine's "MARKET RATE" tier reads from
 // (see docs/smart-quote-module-design.md §10 item 1). Deliberately does NOT
@@ -449,6 +536,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
         containerType, containerSize, containerQty,
         dangerousGoods, specialHandling, pickupDate, deliveryDeadline,
         originDetails, destinationDetails, account_id: accountId,
+        htsCode,
     } = payload;
 
     // 1. Check Cache
@@ -537,6 +625,15 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     const maritimeContext = await buildMaritimeContext(supabase, origin, destination, mode);
     const benchmarkContext = buildBenchmarkContext(benchmarkAvg, benchmarkCount, benchmarkSource);
 
+    // 2c. Duty/tax context (docs/smart-quote-module-design.md §10 item 5).
+    // Real, sourced rate when public.duty_rates has one for this exact HTS
+    // code + destination jurisdiction; empty otherwise. Informational only
+    // -- see buildDutyContext's comment for why price_breakdown.taxes stays
+    // 0 regardless (no declared customs value exists anywhere in this flow
+    // to compute a real dollar duty amount from).
+    const destinationCountry = String(destinationDetails?.formatted_address || '').split(',').pop()?.trim() || '';
+    const dutyContext = await buildDutyContext(supabase, htsCode, destinationCountry, logger);
+
     // 3. Call the LLM Gateway (routes to tenant-configured provider, or
     //    falls through to the self-hosted vLLM rig — see _shared/llm-gateway.ts)
     const vars: Record<string, string> = {
@@ -552,6 +649,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
         historical_context: historicalContext,
         maritime_context: maritimeContext,
         benchmark_context: benchmarkContext,
+        duty_context: dutyContext,
     };
 
     const ctx: LlmCallContext = {
@@ -809,7 +907,19 @@ async function applyDynamicPricing(response: any, supabase: any, tenantId: strin
 
             opt.price_breakdown.surcharges = { fuel_adjustment: fuelAmt, currency_adj: currencyAmt, ...extraSurcharges };
 
-            const taxes = opt.price_breakdown.taxes || 0;
+            // Duty/tax reconciliation (docs/smart-quote-module-design.md §10
+            // item 5): the model's own `taxes` figure is never trusted here,
+            // regardless of what it outputs. Sampled empirically across 30
+            // real cached options before this change -- it was 0 every
+            // single time, so this isn't fixing an observed fabrication, it's
+            // closing the latent gap: nothing previously stopped the model
+            // from inventing a nonzero figure for a route/commodity it
+            // decided looked dutiable. There is no declared customs value
+            // anywhere in this flow to compute a REAL duty amount from (see
+            // buildDutyContext), so the only grounded value is 0 -- always,
+            // unconditionally, the same way base_fare/surcharges are already
+            // reconciled above rather than trusted from the model's own math.
+            const taxes = 0;
             const extraSurchargesSum = Object.values(extraSurcharges).reduce((a: number, b: number) => a + b, 0);
             const surchargesSum = fuelAmt + currencyAmt + extraSurchargesSum;
             const feesSum = Object.values(opt.price_breakdown.fees).reduce((a: any, b: any) => (Number(a) || 0) + (Number(b) || 0), 0) as number;
