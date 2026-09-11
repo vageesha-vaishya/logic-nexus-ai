@@ -104,6 +104,9 @@ serveWithLogger(async (req, logger, supabase) => {
       case 'validate_compliance':
         result = await validateCompliance(payload);
         break;
+      case 'validate_carrier_service_availability':
+        result = await validateCarrierServiceAvailability(payload, supabase, tenantId);
+        break;
       default:
         throw new Error(`Unknown action: ${action}`);
     }
@@ -702,6 +705,82 @@ async function validateCompliance(payload: any) {
     const isChinaDestination = destinationMatchesCountry(destinationCandidates, 'CN', ['china']);
     if (commodity && commodity.toLowerCase().includes('chip') && isChinaDestination) issues.push({ level: 'warning', message: 'Check Export Administration Regulations (EAR) for semiconductors.' });
     return { compliant: issues.length === 0 || issues.every(i => i.level === 'info'), issues };
+}
+
+// Real-time carrier-service-availability check the frontend has always
+// called (src/hooks/useRateFetching.ts, buildHybridRouteConfiguration's
+// realtimeValidator) but this function never implemented -- every call hit
+// the `default: throw new Error('Unknown action: ...')` branch below,
+// logging an error on every single Smart Quote generation. The frontend
+// caller already treats a failed/errored call as "no opinion" (catches and
+// returns [], see useRateFetching.ts), so this was silently a no-op, not a
+// visible bug -- but the action genuinely didn't exist.
+//
+// There is no live external carrier-service API integrated (same "registry
+// is empty today" situation as the rate-provider adapters above), so this
+// grounds its verdict in the one real, tenant-scoped data source that does
+// exist: the `carriers` master table (32 real rows checked in production,
+// 2026-09-11). Its `service_routes` column is always empty there (0/32
+// populated) -- not enough real route-level data to validate origin/
+// destination against, so this only checks carrier_name + mode + is_active,
+// the fields that are actually populated. Conservative by design: it only
+// ever returns `available: false` (which the caller uses to FILTER OUT the
+// option entirely) when a carrier is found in master data AND explicitly
+// marked inactive -- real negative evidence. A carrier simply not present
+// in master data is not treated as unavailable (master data is known
+// incomplete, and an AI-generated carrier name may not match it exactly) --
+// same "don't fabricate a negative verdict without real grounds" pattern as
+// destinationMatchesCountry above. A mode mismatch on an otherwise-active,
+// matched carrier is downgraded to price_valid: false (a non-blocking
+// warning) rather than available: false, since mode data is real but
+// thinner evidence than an explicit is_active flag.
+async function validateCarrierServiceAvailability(payload: any, supabase: any, tenantId: string) {
+    const route = payload?.route || {};
+    const options: any[] = Array.isArray(payload?.options) ? payload.options : [];
+    if (options.length === 0) return [];
+
+    const { data: carriers, error } = await supabase
+        .from('carriers')
+        .select('carrier_name, mode, is_active')
+        .or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+
+    if (error || !carriers) {
+        // Can't check master data right now -- don't fabricate a verdict
+        // either way.
+        return options.map((opt: any) => ({ option_id: opt.option_id, available: true, price_valid: true }));
+    }
+
+    return options.map((opt: any) => {
+        const carrierName = String(opt.carrier || '').trim().toLowerCase();
+        const requestedMode = String(opt.mode || route.mode || '').trim().toLowerCase();
+        const matches = carriers.filter((c: any) => String(c.carrier_name || '').trim().toLowerCase() === carrierName);
+
+        if (matches.length === 0) {
+            return { option_id: opt.option_id, available: true, price_valid: true };
+        }
+
+        const inactiveMatch = matches.every((c: any) => c.is_active === false);
+        if (inactiveMatch) {
+            return {
+                option_id: opt.option_id,
+                available: false,
+                price_valid: true,
+                message: `${opt.carrier} is on record but marked inactive`,
+            };
+        }
+
+        const modeMatches = !requestedMode || matches.some((c: any) => String(c.mode || '').toLowerCase() === requestedMode);
+        if (!modeMatches) {
+            return {
+                option_id: opt.option_id,
+                available: true,
+                price_valid: false,
+                message: `${opt.carrier} is on record but not for ${requestedMode} mode`,
+            };
+        }
+
+        return { option_id: opt.option_id, available: true, price_valid: true };
+    });
 }
 
 // --- Main Generation Logic ---
