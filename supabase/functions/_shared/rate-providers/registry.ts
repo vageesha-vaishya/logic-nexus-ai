@@ -8,21 +8,32 @@
 import { SupabaseClient } from "@supabase/supabase-js";
 import type { RateProviderAdapter, ResolvedProviderConfig } from "./types.ts";
 
-// Real adapters register themselves here. Empty until the actual 11
-// platforms are named and built (see design doc §11/§9) -- an empty
-// registry is the correct, safe default: registerProviderAdapters() with
-// nothing added means getRateProviderTool() returns null, so no tool is
-// ever offered to the model, and callLLMWithTools() behaves identically
-// to plain callLLM(). Nothing here breaks or degrades in the interim.
+// Real adapters register themselves here. Of the user's "11 specified
+// third-party quote rate platforms" (see design doc §9.8 for the full
+// research), only SeaRates has genuinely public API documentation -- the
+// other 5 distinct platforms (Freightify, VelocityOS, CargoRates.ai,
+// Cargofive, Freightoscope) all gate their real API contract behind a
+// sales/demo engagement, so no adapter is registered for them yet (building
+// one without their real docs would mean fabricating a request/response
+// shape -- exactly what §4's grounding principle exists to prevent).
+//
+// Registering an adapter here does NOT, by itself, offer it to the LLM or
+// call it: a tenant must also have an active `rate_provider_configs` row
+// for that `provider_name` (§9.4/§9.6) before it appears in `callable`.
+// Zero tenants have one today, so this registration is inert in production
+// until an admin configures a real SeaRates account.
 const ADAPTERS = new Map<string, RateProviderAdapter>();
 
 export function registerRateProviderAdapter(adapter: RateProviderAdapter): void {
   ADAPTERS.set(adapter.providerName, adapter);
 }
 
+import { searatesAdapter } from "./searates-provider.ts";
+registerRateProviderAdapter(searatesAdapter);
+
 // import { exampleAdapter } from "./example-provider.ts";
-// registerRateProviderAdapter(exampleAdapter);   // <- pattern for real adapters, left commented: this file is
-//                                                     a template, not a real integration -- see example-provider.ts.
+// registerRateProviderAdapter(exampleAdapter);   // <- pattern for a template/reference adapter, left commented:
+//                                                     this one is not a real integration -- see example-provider.ts.
 
 export interface TenantRateProviderRegistry {
   /** Providers with both a DB config AND a registered code adapter -- the only ones actually callable. */
