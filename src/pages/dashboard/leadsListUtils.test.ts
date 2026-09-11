@@ -201,7 +201,7 @@ describe('leadsListUtils', () => {
       searchQuery: 'Acme, Inc. (West)',
       nameQuery: 'A(B), C',
       nameOp: 'contains',
-      companyQuery: '',
+      companyQuery: 'Acme, Inc.',
       companyOp: 'contains',
       emailQuery: '',
       emailOp: 'contains',
@@ -221,8 +221,25 @@ describe('leadsListUtils', () => {
       userId: null,
     });
 
-    expect(plan.or[0]).toContain('Acme\\, Inc. \\(West\\)');
-    expect(plan.or[1]).toContain('A\\(B\\)\\, C');
+    // Regression coverage for a live production 400 (found fixing an
+    // identical bug in src/components/logistics/SmartCargoInput.tsx): this
+    // test used to assert the OLD backslash-escaped format
+    // ('Acme\\, Inc. \\(West\\)'), which looked plausible but does NOT
+    // actually work against this project's PostgREST -- verified live
+    // 2026-09-11 that `or=(name.ilike.%foo\,bar%)` still 400s. Only
+    // wrapping the value in double quotes, with the comma/parens left as
+    // literal characters, is confirmed working.
+    expect(plan.or[0]).toContain('"%Acme, Inc. (West)%"');
+    expect(plan.or[1]).toContain('"%A(B), C%"');
+
+    // The single-field company filter goes through query.ilike(column,
+    // value) directly (see Leads.tsx's filterPlan.ilike.forEach), not a
+    // query.or(...) string -- that value must stay completely raw/
+    // unescaped, since supabase-js handles its own encoding there and
+    // quoting it would search for a value that doesn't exist in the data.
+    expect(plan.ilike).toEqual(expect.arrayContaining([
+      { column: 'company', value: '%Acme, Inc.%' },
+    ]));
   });
 
   it('supports empty-result filter combinations via strict range constraints', () => {

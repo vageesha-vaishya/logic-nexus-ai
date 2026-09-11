@@ -16,7 +16,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
-import { SmartCargoInput, CommoditySelection } from '@/components/logistics/SmartCargoInput';
+import { SmartCargoInput, CommoditySelection, escapeOrFilterValue } from '@/components/logistics/SmartCargoInput';
 import { AsyncComboboxField } from '@/components/forms/AdvancedFields';
 import {
   Select,
@@ -112,10 +112,15 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
   // HTS Loader for AsyncCombobox
   const htsLoader = React.useCallback(async (search: string) => {
     if (!search) return [];
+    // See SmartCargoInput.tsx's escapeOrFilterValue: a raw search term
+    // containing `,`/`(`/`)` breaks PostgREST's or=(...) filter with a 400
+    // (confirmed live against production 2026-09-11) unless the value is
+    // wrapped in double quotes.
+    const pattern = escapeOrFilterValue(`%${search}%`);
     const { data, error } = await supabase
       .from('aes_hts_codes')
       .select('id, hts_code, description')
-      .or(`hts_code.ilike.%${search}%,description.ilike.%${search}%`)
+      .or(`hts_code.ilike.${pattern},description.ilike.${pattern}`)
       .limit(20);
     
     if (error) {

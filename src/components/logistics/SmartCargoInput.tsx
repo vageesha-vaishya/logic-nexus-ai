@@ -23,6 +23,27 @@ import { useCRM } from '@/hooks/useCRM';
 import { Badge } from '@/components/ui/badge';
 import { logger } from "@/lib/logger";
 
+// PostgREST's or=(...) filter syntax uses `,`/`(`/`)` as structural
+// delimiters between conditions -- a raw search term containing any of
+// those (e.g. a commodity description like "ELECTRONIC INTEGRATED
+// CIRCUITS, NESOI") breaks the whole filter with a 400. Wrap the value in
+// double quotes (PostgREST's quoted-value syntax) so those characters are
+// read literally instead, backslash-escaping any literal backslash/double
+// quote within the value itself.
+//
+// NOTE: backslash-escaping `,`/`(`/`)` directly, WITHOUT quoting -- e.g.
+// `foo\,bar` -- looks like it should work per some PostgREST docs/examples
+// floating around, and is what src/pages/dashboard/leadsListUtils.ts's
+// own escapeOrFilterValue does, but it does NOT work against this
+// project's actual PostgREST version: verified live against production
+// 2026-09-11, `or=(name.ilike.%foo\,bar%)` still 400s with the identical
+// "unexpected %" parse error as the fully-unescaped version. Only the
+// quoted form (`name.ilike."%foo,bar%"`) was confirmed working, including
+// with parens and an embedded escaped double-quote inside the value.
+export function escapeOrFilterValue(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+}
+
 export interface CommoditySelection {
   description: string;
   aes_hts_id?: string;
@@ -77,10 +98,11 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       if (debouncedSearch.length < 2) return [];
 
       const fetchMasterFallback = async () => {
+        const pattern = escapeOrFilterValue(`%${debouncedSearch}%`);
         const { data: fallbackData, error: fallbackError } = await scopedDb
           .from('master_commodities')
           .select('id, name, sku, description, aes_hts_id, default_cargo_type_id, unit_value, hazmat_class, aes_hts_codes(hts_code)')
-          .or(`name.ilike.%${debouncedSearch}%,sku.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`)
+          .or(`name.ilike.${pattern},sku.ilike.${pattern},description.ilike.${pattern}`)
           .limit(5);
 
         if (fallbackError) {
@@ -121,10 +143,11 @@ export function SmartCargoInput({ onSelect, className, placeholder = "Search com
       if (debouncedSearch.length < 2) return [];
 
       const fetchHtsFallback = async () => {
+        const pattern = escapeOrFilterValue(`%${debouncedSearch}%`);
         const { data: fallbackData, error: fallbackError } = await scopedDb
           .from('aes_hts_codes')
           .select('id, hts_code, description, category')
-          .or(`hts_code.ilike.%${debouncedSearch}%,description.ilike.%${debouncedSearch}%`)
+          .or(`hts_code.ilike.${pattern},description.ilike.${pattern}`)
           .limit(10);
 
         if (fallbackError) {

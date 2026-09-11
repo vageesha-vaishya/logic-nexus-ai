@@ -138,24 +138,44 @@ export function resolveLeadsFallbackBannerCopy(reason: LeadApiFallbackReason | n
   return resolveCrmFallbackBannerCopy('leads', reason);
 }
 
-function escapeOrFilterValue(value: string): string {
-  return value
-    .replace(/\\/g, '\\\\')
-    .replace(/,/g, '\\,')
-    .replace(/\(/g, '\\(')
-    .replace(/\)/g, '\\)');
+// Raw %value%/value%/%value ilike pattern, deliberately unescaped -- safe
+// to pass straight to supabase-js's .ilike(column, value)/.eq(column, value)
+// (see this function's two call sites below: the direct query.ilike/.eq
+// forEach loop in Leads.tsx, and buildTextFilterClause for the .or(...)
+// path). supabase-js handles its own value encoding for a direct method
+// call; quoting or escaping the value here would corrupt the match (a
+// company search for "Acme, Inc" would otherwise search for the literal
+// text "Acme\, Inc", which doesn't exist in the data).
+function toLikePattern(value: string, op: LeadFilterTextOp): string {
+  if (op === 'equals') return value;
+  if (op === 'startsWith') return `${value}%`;
+  if (op === 'endsWith') return `%${value}`;
+  return `%${value}%`;
 }
 
-function toLikePattern(value: string, op: LeadFilterTextOp): string {
-  const escaped = escapeOrFilterValue(value);
-  if (op === 'equals') return escaped;
-  if (op === 'startsWith') return `${escaped}%`;
-  if (op === 'endsWith') return `%${escaped}`;
-  return `%${escaped}%`;
+// PostgREST's or=(...) filter grammar treats `,`/`(`/`)` as structural
+// delimiters between conditions -- wrap the value in double quotes
+// (PostgREST's quoted-value syntax) so those are read literally instead,
+// backslash-escaping any literal backslash/double quote within the value
+// itself. Only use this for a value embedded in a query.or(...) clause
+// string (buildTextFilterClause below) -- NOT for a direct .ilike()/.eq()
+// call, which must receive the raw toLikePattern() value untouched.
+//
+// NOTE: backslash-escaping `,`/`(`/`)` directly, WITHOUT quoting, is what
+// this function used to do and looks like it should work per some
+// PostgREST docs/examples floating around, but it does NOT work against
+// this project's actual PostgREST version -- verified live against
+// production 2026-09-11 (same finding independently confirmed for
+// src/components/logistics/SmartCargoInput.tsx's identical bug):
+// `or=(name.ilike.%foo\,bar%)` still 400s with an "unexpected %" parse
+// error. Only the quoted form (`name.ilike."%foo,bar%"`) was confirmed
+// working, including with parens and an embedded escaped double-quote.
+function escapeOrFilterValue(value: string): string {
+  return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
 function buildTextFilterClause(column: string, query: string, op: LeadFilterTextOp): string {
-  const pattern = toLikePattern(query, op);
+  const pattern = escapeOrFilterValue(toLikePattern(query, op));
   if (op === 'equals') return `${column}.eq.${pattern}`;
   return `${column}.ilike.${pattern}`;
 }

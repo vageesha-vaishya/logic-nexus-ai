@@ -1,7 +1,7 @@
 import { render, screen, waitFor, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SmartCargoInput } from './SmartCargoInput';
+import { SmartCargoInput, escapeOrFilterValue } from './SmartCargoInput';
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 
@@ -216,5 +216,34 @@ describe('SmartCargoInput', () => {
     });
 
     expect(screen.queryByText('Search encountered an issue. You can still use a custom description.')).toBeNull();
+  });
+});
+
+describe('escapeOrFilterValue', () => {
+  // Regression coverage for a live production 400: a commodity search
+  // term containing a comma (e.g. "ELECTRONIC INTEGRATED CIRCUITS, NESOI")
+  // broke PostgREST's or=(...) filter parser entirely. Confirmed live
+  // against production 2026-09-11 that quoting the value is the fix that
+  // actually works -- backslash-escaping the comma directly (without
+  // quoting) still 400s with the same parse error.
+  it('wraps the value in double quotes', () => {
+    expect(escapeOrFilterValue('%plain%')).toBe('"%plain%"');
+  });
+
+  it('leaves a comma as a literal character inside the quotes (the actual production bug)', () => {
+    expect(escapeOrFilterValue('%ELECTRONIC INTEGRATED CIRCUITS, NESOI%'))
+      .toBe('"%ELECTRONIC INTEGRATED CIRCUITS, NESOI%"');
+  });
+
+  it('leaves parentheses as literal characters inside the quotes', () => {
+    expect(escapeOrFilterValue('%foo(bar)%')).toBe('"%foo(bar)%"');
+  });
+
+  it('escapes an embedded double quote', () => {
+    expect(escapeOrFilterValue('%foo"bar%')).toBe('"%foo\\"bar%"');
+  });
+
+  it('escapes an embedded backslash', () => {
+    expect(escapeOrFilterValue('%foo\\bar%')).toBe('"%foo\\\\bar%"');
   });
 });
