@@ -6,6 +6,7 @@ import { serveWithLogger, Logger } from "../_shared/logger.ts"
 import { callLLM, callLLMWithTools, LlmCallContext, ToolDefinition } from "../_shared/llm-gateway.ts"
 import { loadTenantRateProviders, getRateProviderTool } from "../_shared/rate-providers/registry.ts"
 import { executeRateToolCall } from "../_shared/rate-providers/orchestrator.ts"
+import { NormalizedRate } from "../_shared/rate-providers/types.ts"
 
 declare const Deno: any;
 
@@ -807,7 +808,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
 
     // 3b. Offer the LLM the get_freight_rate tool when this tenant has at
     // least one real, callable rate-provider adapter registered (see
-    // docs/smart-quote-module-design.md §11). Registry is empty today (no
+    // docs/smart-quote-module-design.md §9). Registry is empty today (no
     // real adapters built yet -- see _shared/rate-providers/registry.ts),
     // so getRateProviderTool() returns null and callLLMWithTools degrades
     // to plain callLLM() with zero behavior change from before this change.
@@ -815,12 +816,25 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     const rateProviderTool = getRateProviderTool(rateProviderRegistry);
     const tools: ToolDefinition[] = rateProviderTool ? [rateProviderTool as unknown as ToolDefinition] : [];
 
+    // Collected here so the model's FINAL option list can be reconciled
+    // against them below (docs/smart-quote-module-design.md §10 item 12,
+    // §9's own closing note): a real tool result handed to the model as
+    // Round 2 context is not automatically reflected in what it generates --
+    // nothing stops the model from restating a different price/carrier for
+    // the same lane, the same "two independent numbers, nothing forces them
+    // to agree" failure mode already fixed for carrier name/charges above.
+    // Empty today for every tenant (§9.6: no real adapter configured yet),
+    // so this is a no-op until the first one is -- fixed now so it's correct
+    // before that happens, not after.
+    const realRatesFetched: NormalizedRate[] = [];
+
     const start = performance.now();
     const llmResult = await callLLMWithTools("logistics.smart_quotes", vars, ctx, tools, async (toolName, argsJson) => {
         if (toolName !== "get_freight_rate") {
             return `Unknown tool '${toolName}'.`;
         }
         const result = await executeRateToolCall(supabase, tenantId, rateProviderRegistry, argsJson);
+        if (result.ok) realRatesFetched.push(result.rate);
         return JSON.stringify(result);
     });
 
@@ -841,7 +855,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     // where any exist (docs/smart-quote-module-design.md §10 item 3), falling
     // back to the previous hardcoded fuel/currency defaults otherwise -- see
     // applyDynamicPricing's own comments for why.
-    aiResponse = await applyDynamicPricing(aiResponse, supabase, tenantId, mode, Number(weight) || 0, logger);
+    aiResponse = await applyDynamicPricing(aiResponse, supabase, tenantId, mode, Number(weight) || 0, realRatesFetched, logger);
 
     // 5. Cache Result
     await supabase.from('ai_quote_cache').insert({
@@ -956,7 +970,23 @@ const EXTRA_SURCHARGE_LABELS: Record<string, string> = {
     port_congestion_surcharge: 'Port Congestion Surcharge',
 };
 
-async function applyDynamicPricing(response: any, supabase: any, tenantId: string, mode: string, weightKg: number, logger?: Logger) {
+// Finds a real, tool-fetched rate (§9's LLM tool-calling framework) that
+// covers the same carrier/mode as one of the model's own final options.
+// Matched by carrier name only (case-insensitive) -- NormalizedRate doesn't
+// carry an option id the model could echo back, and carrier name is the
+// only field both sides share. A miss just means no real rate to reconcile
+// against for that option, not an error.
+function findMatchingRealRate(realRates: NormalizedRate[], carrierName: unknown, optionMode: unknown): NormalizedRate | null {
+    const normalizedCarrier = String(carrierName || '').trim().toLowerCase();
+    if (!normalizedCarrier || realRates.length === 0) return null;
+    const normalizedMode = String(optionMode || '').trim().toLowerCase();
+    return realRates.find((r) => {
+        if (!r.carrier || r.carrier.trim().toLowerCase() !== normalizedCarrier) return false;
+        return !normalizedMode || normalizedMode.includes(r.mode);
+    }) ?? null;
+}
+
+async function applyDynamicPricing(response: any, supabase: any, tenantId: string, mode: string, weightKg: number, realRatesFetched: NormalizedRate[], logger?: Logger) {
     const configured = await fetchDynamicSurcharges(supabase, tenantId, mode, logger);
 
     // Fuel and currency are the only two categories with an established
@@ -1026,6 +1056,44 @@ async function applyDynamicPricing(response: any, supabase: any, tenantId: strin
             }
             opt.price_breakdown.base_fare = base;
 
+            // Real, tool-fetched rate reconciliation (docs/smart-quote-module-design.md
+            // §10 item 12, §9's own closing note). The model receives a real
+            // NormalizedRate as Round 2 context when it calls get_freight_rate,
+            // but nothing about that forces its FINAL option to actually use
+            // those numbers -- it could restate a different price for the
+            // same carrier, the exact "two independent numbers, nothing
+            // forces them to agree" failure mode already fixed above for
+            // carrier name and legs/price_breakdown. When this option's
+            // (already carrier-reconciled) carrier matches a real rate this
+            // request actually fetched, trust that real number over the
+            // model's own restatement -- same principle, now extended to a
+            // genuinely external, verified figure instead of just the
+            // model's own internal consistency. Always empty today (no
+            // tenant has a real adapter configured -- §9.6), so this has no
+            // effect in production yet; fixed now so it's correct before
+            // that changes, not discovered after.
+            const matchedRealRate = findMatchingRealRate(realRatesFetched, opt.carrier?.name, opt.transport_mode || mode);
+            const toolSurcharges: Record<string, number> = {};
+            const toolSurchargeLabels: Record<string, string> = {};
+            if (matchedRealRate) {
+                base = matchedRealRate.baseRate;
+                opt.price_breakdown.base_fare = base;
+                if (matchedRealRate.transitDays && typeof opt.transit_time === 'object' && opt.transit_time) {
+                    opt.transit_time.total_days = matchedRealRate.transitDays;
+                }
+                // Itemized separately per NormalizedRate's own contract --
+                // never pre-summed by the adapter, so don't fold them into
+                // `base` here either. Prefixed to keep them visually
+                // distinct from the platform's own dynamic surcharges below.
+                for (const [key, amt] of Object.entries(matchedRealRate.surcharges || {})) {
+                    const rounded = Math.round(Number(amt) || 0);
+                    if (rounded === 0) continue;
+                    const prefixedKey = `provider_${key}`;
+                    toolSurcharges[prefixedKey] = rounded;
+                    toolSurchargeLabels[prefixedKey] = `${matchedRealRate.provider} ${key.replace(/_/g, ' ')}`;
+                }
+            }
+
             // Discard any other surcharge key the model reported (e.g.
             // "baf_caf") rather than carry it through: requirement #4 in the
             // prompt explicitly tells the model to fold BAF/CAF "included in
@@ -1043,7 +1111,7 @@ async function applyDynamicPricing(response: any, supabase: any, tenantId: strin
 
             // Only added when a real, currently-valid dynamic_surcharges row
             // exists for this tenant/mode -- no fallback, no fabrication.
-            const extraSurcharges: Record<string, number> = {};
+            const extraSurcharges: Record<string, number> = { ...toolSurcharges };
             for (const type of ['security', 'peak_season', 'port_congestion'] as const) {
                 const entry = configured[type];
                 if (!entry) continue;
@@ -1086,7 +1154,7 @@ async function applyDynamicPricing(response: any, supabase: any, tenantId: strin
                     ...(fuelAmt !== 0 ? [{ name: 'Fuel Adjustment (Dynamic)', amount: fuelAmt, currency, unit: 'per_shipment' }] : []),
                     ...(currencyAmt !== 0 ? [{ name: 'Currency Adjustment (Dynamic)', amount: currencyAmt, currency, unit: 'per_shipment' }] : []),
                     ...Object.entries(extraSurcharges).map(([key, amt]) => ({
-                        name: EXTRA_SURCHARGE_LABELS[key] ?? key,
+                        name: EXTRA_SURCHARGE_LABELS[key] ?? toolSurchargeLabels[key] ?? key,
                         amount: amt,
                         currency,
                         unit: 'per_shipment',

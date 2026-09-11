@@ -60,6 +60,7 @@ import {
     Train,
     Trash2,
     Pencil,
+    AlertTriangle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatContainerSize } from '@/lib/container-utils';
@@ -184,6 +185,27 @@ const OptionSourceBadge = ({ option }: { option: RateOption }) => {
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>Manually created option.</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+        );
+    }
+
+    // No real carrier_rates row existed for this lane -- rate-engine
+    // fabricated this option (a random price within a band of a hardcoded
+    // base rate). Must not claim "verified via Carrier API", which is false
+    // for this option. See docs/smart-quote-module-design.md §10 item 12.
+    if (option.is_simulated) {
+        return (
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Badge variant="secondary" className="bg-amber-100 text-amber-700 hover:bg-amber-100 text-[10px] px-1.5 h-5 whitespace-nowrap border-0 flex items-center gap-1 cursor-help">
+                            <AlertTriangle className="w-3 h-3" /> Estimated Rate
+                        </Badge>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>No live carrier rate was found for this lane -- this is an estimated price, not a verified quote.</p>
                     </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
@@ -371,7 +393,7 @@ export function QuoteResultsList({
                                         <span>{option.reliability.score}/10</span>
                                     </div>
                                 )}
-                                {(option.co2_kg || option.environmental) && (
+                                {(option.co2_kg || option.environmental?.co2_emissions) && (
                                     <div className="px-2 py-1 rounded text-xs font-medium bg-green-50 text-green-700 border border-green-200 flex items-center justify-between">
                                         <span className="flex items-center gap-1"><Leaf className="h-3 w-3" /> CO2</span>
                                         <span>{option.co2_kg ? `${option.co2_kg} kg` : option.environmental?.co2_emissions}</span>
@@ -488,7 +510,7 @@ export function QuoteResultsList({
                                             )}
                                         </div>
                                     )}
-                                    {(option.co2_kg || option.environmental) && (
+                                    {(option.co2_kg || option.environmental?.co2_emissions) && (
                                         <div className="text-xs text-muted-foreground flex items-center justify-end gap-1">
                                             <Leaf className="w-3 h-3" />
                                             <span className="whitespace-nowrap">{option.co2_kg ? `${option.co2_kg} kg` : option.environmental?.co2_emissions}</span>
@@ -591,7 +613,7 @@ export function QuoteResultsList({
                                         ) : '-'}
                                     </TableCell>
                                     <TableCell>
-                                        {(option.co2_kg || option.environmental) ? (
+                                        {(option.co2_kg || option.environmental?.co2_emissions) ? (
                                             <span>{option.co2_kg ? `${option.co2_kg} kg` : option.environmental?.co2_emissions}</span>
                                         ) : '-'}
                                     </TableCell>
