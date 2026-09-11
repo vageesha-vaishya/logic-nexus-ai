@@ -318,6 +318,7 @@ function buildMaritimeContext(origin: string, destination: string, mode: string)
 // directly and only ever sees genuine DB rows.
 async function fetchLiveMarketRateBenchmark(
     supabase: any,
+    tenantId: string,
     originPortId: string,
     destinationPortId: string,
     mode: string,
@@ -327,13 +328,21 @@ async function fetchLiveMarketRateBenchmark(
 ): Promise<{ avg: number; count: number }> {
     try {
         const today = new Date().toISOString().split('T')[0];
+        // ai-advisor runs on the service-role admin client (serveWithLogger),
+        // which bypasses RLS entirely -- unlike rate-engine's own carrier_rates
+        // query, which runs on a user-scoped client and relies on RLS to
+        // enforce tenant isolation. An explicit tenant_id filter here is NOT
+        // optional: without it this would leak other tenants' negotiated
+        // carrier rates into this tenant's quote-generation prompt.
         const { data: rates, error } = await supabase
             .from('carrier_rates')
             .select('total_amount, tier, account_id')
+            .eq('tenant_id', tenantId)
             .eq('origin_port_id', originPortId)
             .eq('destination_port_id', destinationPortId)
             .eq('mode', mode)
             .eq('status', 'active')
+            .eq('is_simulated', false)
             .or(`valid_to.is.null,valid_to.gte.${today}`);
 
         if (error || !rates) return { avg: 0, count: 0 };
@@ -459,7 +468,7 @@ async function generateSmartQuotes(payload: any, supabase: any, logger: Logger, 
     if (originDetails?.id && destinationDetails?.id) {
         const weightKg = Number(weight) || 0;
         const market = await fetchLiveMarketRateBenchmark(
-            supabase, originDetails.id, destinationDetails.id, mode,
+            supabase, tenantId, originDetails.id, destinationDetails.id, mode,
             Number(containerQty) || 1, weightKg, accountId,
         );
         if (market.count > 0) {
