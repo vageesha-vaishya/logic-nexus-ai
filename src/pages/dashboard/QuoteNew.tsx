@@ -150,8 +150,14 @@ function QuoteNewInner() {
           created_by: currentUser?.id,
           status: 'draft',
           transport_mode: mode,
-          origin: originLabel,
-          destination: destLabel,
+          // public.quotes has no plain `origin`/`destination` column at all
+          // (confirmed via the actual PostgREST error, PGRST204 "Could not
+          // find the 'destination' column of 'quotes' in the schema cache")
+          // -- the real text columns are origin_code/destination_code
+          // (there's also a separate jsonb origin_location/destination_location
+          // pair, unused here since arrivalState only carries a display string).
+          origin_code: originLabel,
+          destination_code: destLabel,
           account_id: state?.accountId || null,
           contact_id: state?.contactId || null,
           opportunity_id: state?.opportunityId || null,
