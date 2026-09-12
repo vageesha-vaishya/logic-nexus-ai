@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2, ArrowLeft, ArrowRight, Check, Calendar, Clock, User, Building2, Phone, Mail, FileText, CheckSquare, HelpCircle, AlertTriangle } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { SearchableSelect } from '@/components/crm/SearchableSelect';
@@ -53,9 +52,6 @@ const STEPS = [
 
 export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormProps) {
   const [step, setStep] = useState(1);
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingData, setPendingData] = useState<ActivityFormData | null>(null);
-  
   // Calculate progress percentage
   const progress = (step / STEPS.length) * 100;
 
@@ -136,19 +132,7 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
   };
 
   const handleFormSubmit = async (data: ActivityFormData) => {
-    if (initialData?.id) {
-      setPendingData(data);
-      setShowConfirmDialog(true);
-    } else {
-      await onSubmit(data);
-    }
-  };
-
-  const handleConfirmUpdate = async () => {
-    if (pendingData) {
-      await onSubmit(pendingData);
-      setShowConfirmDialog(false);
-    }
+    await onSubmit(data);
   };
 
   return (
@@ -532,21 +516,6 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
           </Card>
         </form>
       </Form>
-
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Update</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to update this activity? This action cannot be undone.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmUpdate}>Update</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }

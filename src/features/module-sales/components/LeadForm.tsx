@@ -8,7 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 import { Loader2, Bold, Italic, Underline, List, ListOrdered, Save, X } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { FormSection, FormGrid, FormItem as LayoutItem } from '@/components/forms/FormLayout';
@@ -134,8 +133,6 @@ export function LeadForm({
   sectionDescription = 'Complex entity form layout for lead profile and qualification',
   hideNarrativeFields = false,
 }: LeadFormProps) {
-  const [showConfirmDialog, setShowConfirmDialog] = useState(false);
-  const [pendingData, setPendingData] = useState<LeadFormData | null>(null);
   const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
   const autoSaveTimeoutRef = useRef<number | null>(null);
   const isAutoSavingRef = useRef(false);
@@ -308,23 +305,14 @@ export function LeadForm({
   const attachments = form.watch('attachments');
   const [signedUrlEnabled, setSignedUrlEnabled] = useState(false);
 
-  const handleFormSubmit = (data: LeadFormData) => {
-    setPendingData(data);
-    setShowConfirmDialog(true);
-  };
-
-  const handleConfirm = async () => {
-    if (pendingData) {
-      setShowConfirmDialog(false);
-      const mode = pendingSubmitModeRef.current;
-      if (mode === 'save_and_new' && onSaveAndNew) {
-        await onSaveAndNew(pendingData);
-      } else {
-        await onSubmit(pendingData);
-      }
-      pendingSubmitModeRef.current = 'save';
-      setPendingData(null);
+  const handleFormSubmit = async (data: LeadFormData) => {
+    const mode = pendingSubmitModeRef.current;
+    if (mode === 'save_and_new' && onSaveAndNew) {
+      await onSaveAndNew(data);
+    } else {
+      await onSubmit(data);
     }
+    pendingSubmitModeRef.current = 'save';
   };
 
   const execRichText = (target: 'description' | 'notes', command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList' | 'insertOrderedList') => {
@@ -983,21 +971,6 @@ export function LeadForm({
         </div>
         </form>
       </Form>
-
-      <AlertDialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Confirm {initialData?.id ? 'Update' : 'Create'}</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to {initialData?.id ? 'update' : 'create'} this lead?
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirm}>Confirm</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </>
   );
 }

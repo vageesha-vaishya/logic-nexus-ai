@@ -69,9 +69,7 @@ describe('LeadForm complex layout integration', () => {
     expect(screen.getByText('Lead Details')).toBeInTheDocument();
     expect(screen.queryByText('Editable Fields')).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-    await screen.findByText('Confirm Update');
-    fireEvent.click(screen.getByText('Confirm'));
+    fireEvent.click(screen.getByRole('button', { name: 'Save lead' }));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalled();
@@ -95,8 +93,6 @@ describe('LeadForm complex layout integration', () => {
     fireEvent.change(screen.getByLabelText('Interested Service *'), { target: { value: 'Air Freight' } });
 
     fireEvent.click(screen.getByRole('button', { name: 'Save & New' }));
-    await screen.findByText('Confirm Create');
-    fireEvent.click(screen.getByText('Confirm'));
 
     await waitFor(() => {
       expect(onSaveAndNew).toHaveBeenCalled();
@@ -201,7 +197,7 @@ describe('LeadForm complex layout integration', () => {
     }, { timeout: 2000 });
   }, 10000);
 
-  it('submits through keyboard shortcut with confirmation', async () => {
+  it('submits through keyboard shortcut', async () => {
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     render(
       <LeadForm
@@ -222,8 +218,6 @@ describe('LeadForm complex layout integration', () => {
     );
 
     fireEvent.keyDown(window, { key: 's', ctrlKey: true });
-    await screen.findByText('Confirm Update');
-    fireEvent.click(screen.getByText('Confirm'));
 
     await waitFor(() => {
       expect(onSubmit).toHaveBeenCalled();
