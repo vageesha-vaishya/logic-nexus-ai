@@ -7,9 +7,13 @@ import {
   buildLeadsFilterPlan,
   LEADS_FILTER_MIGRATION_KEY,
   deserializeLeadsListUrlState,
+  formatLeadCurrency,
+  formatLeadDate,
+  formatLeadDateTime,
   groupLeadsForWorkspaceDetails,
   migrateLegacyLeadsFilterPayload,
   normalizeLeadsStatusFilterValue,
+  renderLeadCustomFieldsPreview,
   resolveCrmFallbackBannerCopy,
   resolveLeadsFallbackBannerCopy,
   runOneTimeLeadsFilterMigration,
@@ -353,5 +357,64 @@ describe('leadsListUtils', () => {
   it('renders localized ES fallback banner text for activities', async () => {
     renderFallbackBanner('es', 'activities');
     expect(screen.getByText('Datos de relación de actividades no disponibles, mostrando registros base')).toBeInTheDocument();
+  });
+});
+
+describe('formatLeadDate', () => {
+  it('formats a valid ISO date as a locale date string', () => {
+    expect(formatLeadDate('2024-03-15T00:00:00.000Z')).toBe(new Date('2024-03-15T00:00:00.000Z').toLocaleDateString());
+  });
+
+  it('returns a dash for null', () => {
+    expect(formatLeadDate(null)).toBe('-');
+  });
+
+  it('returns a dash for an unparseable value', () => {
+    expect(formatLeadDate('not-a-date')).toBe('-');
+  });
+});
+
+describe('formatLeadDateTime', () => {
+  it('formats a valid ISO timestamp as a locale date-time string', () => {
+    expect(formatLeadDateTime('2024-03-15T10:30:00.000Z')).toBe(new Date('2024-03-15T10:30:00.000Z').toLocaleString());
+  });
+
+  it('returns a dash for null', () => {
+    expect(formatLeadDateTime(null)).toBe('-');
+  });
+
+  it('returns a dash for an unparseable value', () => {
+    expect(formatLeadDateTime('not-a-date')).toBe('-');
+  });
+});
+
+describe('formatLeadCurrency', () => {
+  it('formats a positive number as USD currency', () => {
+    expect(formatLeadCurrency(5000)).toBe('$5,000.00');
+  });
+
+  it('formats zero as USD currency', () => {
+    expect(formatLeadCurrency(0)).toBe('$0.00');
+  });
+
+  it('returns a dash for null', () => {
+    expect(formatLeadCurrency(null)).toBe('-');
+  });
+});
+
+describe('renderLeadCustomFieldsPreview', () => {
+  it('returns a dash for null', () => {
+    expect(renderLeadCustomFieldsPreview(null)).toBe('-');
+  });
+
+  it('renders short custom fields as compact JSON', () => {
+    expect(renderLeadCustomFieldsPreview({ industry: 'Logistics' })).toBe('{"industry":"Logistics"}');
+  });
+
+  it('truncates long custom fields JSON to 120 characters plus an ellipsis', () => {
+    const value = { note: 'x'.repeat(200) };
+    const result = renderLeadCustomFieldsPreview(value);
+    expect(result.endsWith('...')).toBe(true);
+    expect(result.length).toBe(123);
   });
 });

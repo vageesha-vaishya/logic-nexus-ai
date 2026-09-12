@@ -22,6 +22,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
+import { useCrmApiHeaders } from '@/hooks/useCrmApiHeaders';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
@@ -44,8 +45,12 @@ import {
   buildLeadsFilterPlan,
   buildLeadsImportExportParams,
   deserializeLeadsListUrlState,
+  formatLeadCurrency,
+  formatLeadDate,
+  formatLeadDateTime,
   groupLeadsForWorkspaceDetails,
   normalizeLeadsStatusFilterValue,
+  renderLeadCustomFieldsPreview,
   resolveLeadsFallbackBannerCopy,
   runOneTimeLeadsFilterMigration,
   serializeLeadsListUrlState,
@@ -522,18 +527,7 @@ export default function Leads() {
     return '';
   }, []);
 
-  const getCrmApiHeaders = useCallback(async () => {
-    const { data: sessionData } = await supabase.auth.getSession();
-    const token = sessionData?.session?.access_token || '';
-    const tenantId = context?.tenantId || '';
-    return {
-      'Content-Type': 'application/json',
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
-      ...(context?.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
-      ...(context?.userId ? { 'x-user-id': context.userId } : {}),
-    };
-  }, [context?.franchiseId, context?.tenantId, context?.userId, supabase.auth]);
+  const getCrmApiHeaders = useCrmApiHeaders();
 
   const fetchLeads = useCallback(async () => {
     const requestId = ++leadsRequestSequenceRef.current;
@@ -1367,31 +1361,6 @@ export default function Leads() {
     });
   };
 
-  const formatDate = (value: string | null) => {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString();
-  };
-
-  const formatDateTime = (value: string | null) => {
-    if (!value) return '-';
-    const date = new Date(value);
-    if (Number.isNaN(date.getTime())) return '-';
-    return date.toLocaleString();
-  };
-
-  const formatCurrency = (value: number | null) => {
-    if (value === null) return '-';
-    return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
-  };
-
-  const renderCustomFields = (value: Lead['custom_fields']) => {
-    if (!value) return '-';
-    const text = JSON.stringify(value);
-    return text.length > 120 ? `${text.slice(0, 120)}...` : text;
-  };
-
   const getLeadGroupLabel = (lead: Lead, selectedGroupBy: LeadGroupBy) => {
     if (selectedGroupBy === 'status') return lead.status || t('leads.groupBy.unknown', 'Unknown');
     if (selectedGroupBy === 'source') return lead.source || t('leads.groupBy.unknown', 'Unknown');
@@ -1520,17 +1489,17 @@ export default function Leads() {
           </div>
         );
       case 'estimated_value':
-        return formatCurrency(lead.estimated_value);
+        return formatLeadCurrency(lead.estimated_value);
       case 'expected_close_date':
-        return formatDate(lead.expected_close_date);
+        return formatLeadDate(lead.expected_close_date);
       case 'last_activity_date':
-        return formatDate(lead.last_activity_date);
+        return formatLeadDate(lead.last_activity_date);
       case 'created_at':
-        return formatDateTime(lead.created_at);
+        return formatLeadDateTime(lead.created_at);
       case 'updated_at':
-        return formatDateTime(lead.updated_at);
+        return formatLeadDateTime(lead.updated_at);
       case 'converted_at':
-        return formatDate(lead.converted_at);
+        return formatLeadDate(lead.converted_at);
       case 'owner_id':
         return lead.owner_id || '-';
       case 'description':
@@ -1538,7 +1507,7 @@ export default function Leads() {
       case 'notes':
         return lead.notes || '-';
       case 'custom_fields':
-        return renderCustomFields(lead.custom_fields);
+        return renderLeadCustomFieldsPreview(lead.custom_fields);
       case 'franchise_id':
         return lead.franchise_id || '-';
       case 'tenant_id':
@@ -2308,8 +2277,8 @@ export default function Leads() {
                               <TableCell className="capitalize" style={getActivityColumnStyle('activity_type')}>{activity.activity_type || '-'}</TableCell>
                               <TableCell className="capitalize" style={getActivityColumnStyle('status')}>{(activity.status || '-').replace(/_/g, ' ')}</TableCell>
                               <TableCell className="capitalize" style={getActivityColumnStyle('priority')}>{activity.priority || '-'}</TableCell>
-                              <TableCell style={getActivityColumnStyle('due_date')}>{formatDate(activity.due_date)}</TableCell>
-                              <TableCell style={getActivityColumnStyle('created_at')}>{formatDateTime(activity.created_at)}</TableCell>
+                              <TableCell style={getActivityColumnStyle('due_date')}>{formatLeadDate(activity.due_date)}</TableCell>
+                              <TableCell style={getActivityColumnStyle('created_at')}>{formatLeadDateTime(activity.created_at)}</TableCell>
                               <TableCell className="text-right" style={getActivityColumnStyle('actions')}>
                                 <Button
                                   variant="ghost"
@@ -2358,7 +2327,7 @@ export default function Leads() {
                       </div>
                       <div className="rounded-md border p-3 text-sm">
                         <span className="text-xs text-muted-foreground">{t('leads.listDetails.estimatedValue', 'Estimated Value')}</span>
-                        <p className="font-medium">{focusedLead ? formatCurrency(focusedLead.estimated_value) : '-'}</p>
+                        <p className="font-medium">{focusedLead ? formatLeadCurrency(focusedLead.estimated_value) : '-'}</p>
                       </div>
                       <div className="rounded-md border p-3 text-sm">
                         <span className="text-xs text-muted-foreground">{t('leads.listDetails.status', 'Status')}</span>

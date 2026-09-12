@@ -459,3 +459,28 @@ export function runOneTimeLeadsFilterMigration(storage: Storage): number {
   storage.setItem(LEADS_FILTER_MIGRATION_KEY, 'done');
   return rewrites;
 }
+
+export function formatLeadDate(value: string | null): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleDateString();
+}
+
+export function formatLeadDateTime(value: string | null): string {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString();
+}
+
+export function formatLeadCurrency(value: number | null): string {
+  if (value === null) return '-';
+  return new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(value);
+}
+
+export function renderLeadCustomFieldsPreview(value: Record<string, unknown> | null): string {
+  if (!value) return '-';
+  const text = JSON.stringify(value);
+  return text.length > 120 ? `${text.slice(0, 120)}...` : text;
+}

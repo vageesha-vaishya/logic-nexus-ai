@@ -22,6 +22,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 import { Download, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon, PanelLeftClose, PanelLeftOpen, Bold, Italic, Underline, List, ListOrdered, ChevronDown, ChevronUp, Save } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
+import { useCrmApiHeaders } from '@/hooks/useCrmApiHeaders';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Lead, statusConfig } from './leads-data';
@@ -116,18 +117,7 @@ export default function LeadDetail() {
     navigate('/dashboard/leads');
   }, [navigate, scopedDb, setPipeline, setView]);
 
-  const getCrmApiHeaders = useCallback(async () => {
-    const session = await supabase.auth.getSession();
-    const token = session.data.session?.access_token || '';
-    const tenantId = context.tenantId || '';
-    return {
-      'Content-Type': 'application/json',
-      ...(tenantId ? { 'x-tenant-id': tenantId } : {}),
-      ...(context.franchiseId ? { 'x-franchise-id': context.franchiseId } : {}),
-      ...(context.userId ? { 'x-user-id': context.userId } : {}),
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    };
-  }, [context.franchiseId, context.tenantId, context.userId, supabase.auth]);
+  const getCrmApiHeaders = useCrmApiHeaders();
 
   useEffect(() => {
     if (location.state && (location.state as any).openComposer) {
