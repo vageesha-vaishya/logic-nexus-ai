@@ -306,6 +306,7 @@ export function UnifiedPartnerForm({
                             name="name"
                             render={({ field }) => (
                             <FormItem>
+                                <FormLabel className={labelStyle}>Company Name</FormLabel>
                                 <FormControl>
                                 <Input
                                     placeholder="e.g. Lumber Inc"
@@ -324,6 +325,7 @@ export function UnifiedPartnerForm({
                                 name="first_name"
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
+                                    <FormLabel className={labelStyle}>First Name</FormLabel>
                                     <FormControl>
                                     <Input
                                         placeholder="First Name"
@@ -340,6 +342,7 @@ export function UnifiedPartnerForm({
                                 name="last_name"
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
+                                    <FormLabel className={labelStyle}>Last Name</FormLabel>
                                     <FormControl>
                                     <Input
                                         placeholder="Last Name"
@@ -407,6 +410,7 @@ export function UnifiedPartnerForm({
                             name="address.street"
                             render={({ field }) => (
                             <FormItem>
+                                <FormLabel className={labelStyle}>Street</FormLabel>
                                 <FormControl>
                                 <Input placeholder="Street..." className={inputStyle} {...field} />
                                 </FormControl>
@@ -419,6 +423,7 @@ export function UnifiedPartnerForm({
                                 name="address.city"
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
+                                    <FormLabel className={labelStyle}>City</FormLabel>
                                     <FormControl>
                                     <Input placeholder="City" className={inputStyle} {...field} />
                                     </FormControl>
@@ -430,6 +435,7 @@ export function UnifiedPartnerForm({
                                 name="address.state"
                                 render={({ field }) => (
                                 <FormItem className="w-24">
+                                    <FormLabel className={labelStyle}>State</FormLabel>
                                     <FormControl>
                                     <Input placeholder="State" className={inputStyle} {...field} />
                                     </FormControl>
@@ -443,6 +449,7 @@ export function UnifiedPartnerForm({
                                 name="address.postal_code"
                                 render={({ field }) => (
                                 <FormItem className="w-32">
+                                    <FormLabel className={labelStyle}>ZIP</FormLabel>
                                     <FormControl>
                                     <Input placeholder="ZIP" className={inputStyle} {...field} />
                                     </FormControl>
@@ -454,6 +461,7 @@ export function UnifiedPartnerForm({
                                 name="address.country"
                                 render={({ field }) => (
                                 <FormItem className="flex-1">
+                                    <FormLabel className={labelStyle}>Country</FormLabel>
                                     <FormControl>
                                     <Input placeholder="Country" className={inputStyle} {...field} />
                                     </FormControl>
