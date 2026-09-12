@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
@@ -24,6 +24,7 @@ import { logger } from "@/lib/logger";
 export default function ContactDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { context, scopedDb } = useCRM();
   const [contact, setContact] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -31,6 +32,7 @@ export default function ContactDetail() {
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [activeSegments, setActiveSegments] = useState<any[]>([]);
   const [activities, setActivities] = useState<any[]>([]);
+  const autoSave = Boolean((location.state as { autoSave?: boolean } | null)?.autoSave);
 
   useEffect(() => {
     if (id) {
@@ -73,7 +75,7 @@ export default function ContactDetail() {
     }
   };
 
-  const handleUpdate = async (formData: any) => {
+  const saveContact = async (formData: any, options?: { silent?: boolean; keepEditing?: boolean }) => {
       try {
         // Remove form-specific fields
         const updateData = { ...formData };
@@ -81,10 +83,26 @@ export default function ContactDetail() {
 
         const { error } = await scopedDb.from('v_contacts').update(updateData).eq('id', id);
         if (error) throw error;
-        toast.success('Contact updated');
-        setIsEditing(false);
+        if (!options?.silent) {
+          toast.success('Contact updated');
+        }
+        if (!options?.keepEditing) {
+          setIsEditing(false);
+        }
         fetchContact();
-      } catch (e) { toast.error('Update failed'); }
+      } catch (e) {
+        if (!options?.silent) {
+          toast.error('Update failed');
+        }
+      }
+  };
+
+  const handleUpdate = async (formData: any) => {
+    await saveContact(formData);
+  };
+
+  const handleAutoSaveUpdate = async (formData: any) => {
+    await saveContact(formData, { silent: true, keepEditing: true });
   };
 
   const handleDelete = async () => {
@@ -223,12 +241,14 @@ export default function ContactDetail() {
                 }
             >
                 {isEditing ? (
-                    <UnifiedPartnerForm 
-                        initialData={contact} 
+                    <UnifiedPartnerForm
+                        initialData={contact}
                         entityType="contact"
                         mode="edit"
-                        onSubmit={handleUpdate} 
-                        onCancel={() => setIsEditing(false)} 
+                        onSubmit={handleUpdate}
+                        onAutoSave={autoSave ? handleAutoSaveUpdate : undefined}
+                        onCancel={() => setIsEditing(false)}
+                        autoSave={autoSave}
                     />
                 ) : (
                     <EnterpriseNotebook>

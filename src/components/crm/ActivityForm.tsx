@@ -17,6 +17,7 @@ import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { logger } from "@/lib/logger";
+import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
 
 const activitySchema = z.object({
   activity_type: z.enum(['call', 'email', 'meeting', 'task', 'note']),
@@ -41,7 +42,9 @@ type ActivityFormData = z.infer<typeof activitySchema>;
 interface ActivityFormProps {
   initialData?: Partial<ActivityFormData> & { id?: string };
   onSubmit: (data: ActivityFormData) => Promise<void>;
+  onAutoSave?: (data: ActivityFormData) => Promise<void>;
   onCancel: () => void;
+  autoSave?: boolean;
 }
 
 const STEPS = [
@@ -50,7 +53,7 @@ const STEPS = [
   { id: 3, title: 'Details', description: 'Schedule and description' },
 ];
 
-export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormProps) {
+export function ActivityForm({ initialData, onSubmit, onAutoSave, onCancel, autoSave = false }: ActivityFormProps) {
   const [step, setStep] = useState(1);
   // Calculate progress percentage
   const progress = (step / STEPS.length) * 100;
@@ -78,6 +81,12 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
   const { isSubmitting, isValid, errors } = form.formState;
   logger.debug('ActivityForm State:', { isSubmitting, isValid, errors, step });
   const activityType = form.watch('activity_type');
+
+  const { autoSaveError } = useAutoSaveForm({
+    form,
+    onAutoSave: onAutoSave ?? (async () => {}),
+    enabled: autoSave && !!onAutoSave && !!initialData?.id,
+  });
 
   // Smart defaults based on type
   useEffect(() => {
@@ -137,6 +146,10 @@ export function ActivityForm({ initialData, onSubmit, onCancel }: ActivityFormPr
 
   return (
     <div className="max-w-3xl mx-auto">
+      {autoSave && autoSaveError ? (
+        <p className="mb-4 text-xs text-destructive">{autoSaveError}</p>
+      ) : null}
+
       {/* Progress Header */}
       <div className="mb-8">
         <div className="flex justify-between text-sm font-medium text-muted-foreground mb-2">

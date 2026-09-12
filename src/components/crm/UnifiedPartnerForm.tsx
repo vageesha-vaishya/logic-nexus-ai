@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -26,6 +26,7 @@ import { H5 } from '@/components/ui/Heading';
 import { useCRM } from '@/hooks/useCRM';
 import { cn } from '@/lib/utils';
 import { logger } from "@/lib/logger";
+import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
 
 // --- Zod Schemas ---
 
@@ -106,21 +107,23 @@ interface UnifiedPartnerFormProps {
   entityType?: 'account' | 'contact'; // If editing, force type
   mode?: 'create' | 'edit';
   onSubmit: (data: PartnerFormData) => Promise<void>;
+  onAutoSave?: (data: PartnerFormData) => Promise<void>;
   onCancel: () => void;
   isLoading?: boolean;
   autoSave?: boolean;
   autoSaveDelayMs?: number;
 }
 
-export function UnifiedPartnerForm({ 
-  initialData, 
-  entityType, 
-  mode = 'create', 
-  onSubmit, 
+export function UnifiedPartnerForm({
+  initialData,
+  entityType,
+  mode = 'create',
+  onSubmit,
+  onAutoSave,
   onCancel,
   isLoading = false,
   autoSave = false,
-  autoSaveDelayMs = 1200
+  autoSaveDelayMs = 30000
 }: UnifiedPartnerFormProps) {
   // Determine initial type
   const defaultType = entityType === 'contact' ? 'individual' : 'company';
@@ -160,7 +163,6 @@ export function UnifiedPartnerForm({
   const { scopedDb, context, supabase } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [tenants, setTenants] = useState<any[]>([]);
-  const autoSaveTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     async function fetchTenants() {
@@ -190,24 +192,12 @@ export function UnifiedPartnerForm({
     fetchAccounts();
   }, [scopedDb]);
 
-  useEffect(() => {
-    if (!autoSave || mode !== 'edit') return;
-    const subscription = form.watch(() => {
-      if (!form.formState.isDirty || form.formState.isSubmitting) return;
-      if (autoSaveTimerRef.current) {
-        window.clearTimeout(autoSaveTimerRef.current);
-      }
-      autoSaveTimerRef.current = window.setTimeout(() => {
-        form.handleSubmit(onSubmit)();
-      }, autoSaveDelayMs);
-    });
-    return () => {
-      subscription.unsubscribe();
-      if (autoSaveTimerRef.current) {
-        window.clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  }, [autoSave, autoSaveDelayMs, form, mode, onSubmit]);
+  const { autoSaveError } = useAutoSaveForm({
+    form,
+    onAutoSave: onAutoSave ?? (async () => {}),
+    enabled: autoSave && mode === 'edit' && !!onAutoSave,
+    delayMs: autoSaveDelayMs,
+  });
 
   // Enterprise Input Style Helper
   const inputStyle = "border-0 border-b border-border rounded-none focus-visible:ring-0 focus-visible:border-primary px-0 h-9 placeholder:text-muted-foreground/50";
@@ -217,7 +207,10 @@ export function UnifiedPartnerForm({
     <div className="w-full max-w-5xl mx-auto p-6 bg-white shadow-sm border border-border/50 rounded-sm">
       <Form {...form}>
         <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-8">
-          
+          {autoSave && autoSaveError ? (
+            <p className="text-xs text-destructive">{autoSaveError}</p>
+          ) : null}
+
           {/* Platform Admin: Tenant Selector */}
           {mode === 'create' && context?.isPlatformAdmin && (
             <div className="mb-6">

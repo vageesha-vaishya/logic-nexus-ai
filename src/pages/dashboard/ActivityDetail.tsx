@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,11 +14,13 @@ import { logger } from "@/lib/logger";
 export default function ActivityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { supabase, context } = useCRM();
   const [activity, setActivity] = useState<any>(null);
   const [rawActivity, setRawActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const autoSave = Boolean((location.state as { autoSave?: boolean } | null)?.autoSave);
 
   useEffect(() => {
     if (id) {
@@ -53,7 +55,7 @@ export default function ActivityDetail() {
     }
   };
 
-  const handleUpdate = async (formData: any) => {
+  const saveActivity = async (formData: any, options?: { silent?: boolean; keepEditing?: boolean }) => {
     try {
       let tenantId = context.tenantId || activity?.tenant_id || null;
       let franchiseId = context.franchiseId || activity?.franchise_id || null;
@@ -128,12 +130,28 @@ export default function ActivityDetail() {
 
       if (error) throw error;
 
-      toast.success('Activity updated successfully');
-      navigate('/dashboard/activities');
+      if (!options?.silent) {
+        toast.success('Activity updated successfully');
+      }
+      if (!options?.keepEditing) {
+        navigate('/dashboard/activities');
+        return;
+      }
+      fetchActivity();
     } catch (error: any) {
-      toast.error('Failed to update activity');
+      if (!options?.silent) {
+        toast.error('Failed to update activity');
+      }
       logger.error('Error:', error);
     }
+  };
+
+  const handleUpdate = async (formData: any) => {
+    await saveActivity(formData);
+  };
+
+  const handleAutoSaveUpdate = async (formData: any) => {
+    await saveActivity(formData, { silent: true, keepEditing: true });
   };
 
   const handleDelete = async () => {
@@ -235,7 +253,9 @@ export default function ActivityDetail() {
               <ActivityForm
                 initialData={activity}
                 onSubmit={handleUpdate}
+                onAutoSave={autoSave ? handleAutoSaveUpdate : undefined}
                 onCancel={() => navigate('/dashboard/activities')}
+                autoSave={autoSave}
               />
             </CardContent>
           </Card>

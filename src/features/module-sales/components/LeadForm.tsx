@@ -20,6 +20,7 @@ import { sanitizeRichTextHtml, stripHtmlTags } from '@/lib/utils/sanitizer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { logger } from "@/lib/logger";
 import { leadSources, stages, LeadStatus } from '@/pages/dashboard/leads-data';
+import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
 
 export const leadSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
@@ -133,9 +134,6 @@ export function LeadForm({
   sectionDescription = 'Complex entity form layout for lead profile and qualification',
   hideNarrativeFields = false,
 }: LeadFormProps) {
-  const [autoSaveError, setAutoSaveError] = useState<string | null>(null);
-  const autoSaveTimeoutRef = useRef<number | null>(null);
-  const isAutoSavingRef = useRef(false);
   const draftSaveTimeoutRef = useRef<number | null>(null);
   const descriptionEditorRef = useRef<HTMLDivElement | null>(null);
   const notesEditorRef = useRef<HTMLDivElement | null>(null);
@@ -336,38 +334,11 @@ export function LeadForm({
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [form]);
 
-  useEffect(() => {
-    if (!autoSave || !onAutoSave) return;
-    const subscription = form.watch(() => {
-      if (!form.formState.isDirty) return;
-      if (autoSaveTimeoutRef.current) {
-        window.clearTimeout(autoSaveTimeoutRef.current);
-      }
-      autoSaveTimeoutRef.current = window.setTimeout(async () => {
-        if (isAutoSavingRef.current) return;
-        const valid = await form.trigger();
-        if (!valid) return;
-        try {
-          isAutoSavingRef.current = true;
-          setAutoSaveError(null);
-          const payload = form.getValues();
-          await onAutoSave(payload);
-          form.reset(payload);
-        } catch (error) {
-          const message = error instanceof Error ? error.message : 'Auto-save failed';
-          setAutoSaveError(message);
-        } finally {
-          isAutoSavingRef.current = false;
-        }
-      }, 30000);
-    });
-    return () => {
-      subscription.unsubscribe();
-      if (autoSaveTimeoutRef.current) {
-        window.clearTimeout(autoSaveTimeoutRef.current);
-      }
-    };
-  }, [autoSave, form, onAutoSave]);
+  const { autoSaveError } = useAutoSaveForm({
+    form,
+    onAutoSave: onAutoSave ?? (async () => {}),
+    enabled: autoSave && !!onAutoSave,
+  });
 
   useEffect(() => {
     if (!draftStorageKey) return;

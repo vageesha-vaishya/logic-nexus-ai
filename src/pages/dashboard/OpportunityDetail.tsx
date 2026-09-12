@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, useLocation } from 'react-router-dom';
 import { DashboardLayout } from '@/components/layout/DashboardLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -28,7 +28,9 @@ import { logger } from "@/lib/logger";
 export default function OpportunityDetail() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { supabase, context, scopedDb } = useCRM();
+  const autoSave = Boolean((location.state as { autoSave?: boolean } | null)?.autoSave);
   const [opportunity, setOpportunity] = useState<Opportunity | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -104,7 +106,7 @@ export default function OpportunityDetail() {
     }
   };
 
-  const handleUpdate = async (formData: {
+  type OpportunityUpdateFormData = {
     name: string;
     description?: string;
     stage: OpportunityStage;
@@ -121,7 +123,12 @@ export default function OpportunityDetail() {
     forecast_category?: string;
     tenant_id?: string;
     franchise_id?: string;
-  }) => {
+  };
+
+  const saveOpportunity = async (
+    formData: OpportunityUpdateFormData,
+    options?: { silent?: boolean; keepEditing?: boolean }
+  ) => {
     try {
       const updateData = {
         name: formData.name,
@@ -148,15 +155,29 @@ export default function OpportunityDetail() {
 
       if (error) throw error;
 
-      toast.success('Opportunity updated successfully');
-      setIsEditing(false);
+      if (!options?.silent) {
+        toast.success('Opportunity updated successfully');
+      }
+      if (!options?.keepEditing) {
+        setIsEditing(false);
+      }
       fetchOpportunity();
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Unknown error';
-      toast.error('Failed to update opportunity', {
-        description: message,
-      });
+      if (!options?.silent) {
+        toast.error('Failed to update opportunity', {
+          description: message,
+        });
+      }
     }
+  };
+
+  const handleUpdate = async (formData: OpportunityUpdateFormData) => {
+    await saveOpportunity(formData);
+  };
+
+  const handleAutoSaveUpdate = async (formData: OpportunityUpdateFormData) => {
+    await saveOpportunity(formData, { silent: true, keepEditing: true });
   };
 
   const saveSalesforceId = async () => {
@@ -363,7 +384,9 @@ export default function OpportunityDetail() {
               <OpportunityForm
                 opportunity={opportunity}
                 onSubmit={handleUpdate}
+                onAutoSave={autoSave ? handleAutoSaveUpdate : undefined}
                 onCancel={() => setIsEditing(false)}
+                autoSave={autoSave}
               />
             </CardContent>
           </Card>

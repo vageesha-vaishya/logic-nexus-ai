@@ -11,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useCRM } from '@/hooks/useCRM';
 import { stageProbabilityMap, OpportunityStage } from '@/pages/dashboard/opportunities-data';
 import { leadSources } from '@/pages/dashboard/leads-data';
+import { useAutoSaveForm } from '@/hooks/useAutoSaveForm';
 
 const opportunitySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -41,7 +42,9 @@ type OpportunityFormData = z.infer<typeof opportunitySchema>;
 interface OpportunityFormProps {
   opportunity?: any;
   onSubmit: (data: OpportunityFormData) => Promise<void>;
+  onAutoSave?: (data: OpportunityFormData) => Promise<void>;
   onCancel: () => void;
+  autoSave?: boolean;
 }
 
 const stageLabels = {
@@ -55,7 +58,7 @@ const stageLabels = {
   closed_lost: 'Closed Lost',
 };
 
-export function OpportunityForm({ opportunity, onSubmit, onCancel }: OpportunityFormProps) {
+export function OpportunityForm({ opportunity, onSubmit, onAutoSave, onCancel, autoSave = false }: OpportunityFormProps) {
   const { context, scopedDb } = useCRM();
   const [accounts, setAccounts] = useState<any[]>([]);
   const [contacts, setContacts] = useState<any[]>([]);
@@ -137,6 +140,12 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
     fetchData();
   }, [context]);
 
+  const { autoSaveError } = useAutoSaveForm({
+    form,
+    onAutoSave: onAutoSave ?? (async () => {}),
+    enabled: autoSave && !!onAutoSave && !!opportunity,
+  });
+
   // Filter contacts by selected account
   const selectedAccountId = form.watch('account_id');
   const filteredContacts = useMemo(() => {
@@ -157,6 +166,10 @@ export function OpportunityForm({ opportunity, onSubmit, onCancel }: Opportunity
   return (
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+        {autoSave && autoSaveError ? (
+          <p className="text-xs text-destructive">{autoSaveError}</p>
+        ) : null}
+
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}

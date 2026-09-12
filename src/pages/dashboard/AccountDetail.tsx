@@ -94,7 +94,7 @@ export default function AccountDetail() {
     }
   };
 
-  const handleUpdate = async (formData: any) => {
+  const saveAccount = async (formData: any, options?: { silent?: boolean; keepEditing?: boolean }) => {
     try {
         // Flatten address object if present
         const updateData = { ...formData };
@@ -111,16 +111,30 @@ export default function AccountDetail() {
 
         const { error } = await scopedDb.from('v_accounts').update(updateData).eq('id', id);
         if (error) throw error;
-        toast.success('Account updated');
-        if (returnTo) {
+        if (!options?.silent) {
+          toast.success('Account updated');
+        }
+        if (returnTo && !options?.keepEditing) {
           navigate(returnTo, { replace: true, state: { accountUpdated: true } });
           return;
         }
-        setIsEditing(false);
+        if (!options?.keepEditing) {
+          setIsEditing(false);
+        }
         fetchAccount();
     } catch (e) {
-        toast.error('Update failed');
+        if (!options?.silent) {
+          toast.error('Update failed');
+        }
     }
+  };
+
+  const handleUpdate = async (formData: any) => {
+    await saveAccount(formData);
+  };
+
+  const handleAutoSaveUpdate = async (formData: any) => {
+    await saveAccount(formData, { silent: true, keepEditing: true });
   };
 
   const handleDelete = async () => {
@@ -329,7 +343,8 @@ export default function AccountDetail() {
                             initialData={account} 
                             entityType="account"
                             mode="edit"
-                            onSubmit={handleUpdate} 
+                            onSubmit={handleUpdate}
+                            onAutoSave={autoSave ? handleAutoSaveUpdate : undefined}
                             onCancel={() => setIsEditing(false)}
                             autoSave={autoSave}
                         />
