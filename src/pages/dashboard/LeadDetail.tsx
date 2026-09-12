@@ -534,7 +534,7 @@ export default function LeadDetail() {
       title: lead.title ?? '',
       email: lead.email ?? '',
       phone: lead.phone ?? '',
-      status: (lead.status === 'converted' ? 'new' : lead.status) as LeadFormData['status'],
+      status: lead.status as LeadFormData['status'],
       source: ((leadSources as readonly string[]).includes(lead.source)
         ? (lead.source as LeadFormData['source'])
         : 'other'),
