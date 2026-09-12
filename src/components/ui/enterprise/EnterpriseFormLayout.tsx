@@ -1,8 +1,8 @@
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ChevronRight, ChevronLeft, LayoutGrid, Search } from 'lucide-react';
+import { ChevronRight, LayoutGrid } from 'lucide-react';
 import { Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 
 interface Breadcrumb {
   label: string;
@@ -36,24 +36,11 @@ export function EnterpriseFormLayout({
         <div className="bg-primary text-primary-foreground px-4 h-12 flex items-center justify-between shadow-md shrink-0 z-30">
           <div className="flex items-center gap-6">
             {!hideLabelSection && (
-              <>
-                <div className="flex items-center gap-2 font-medium cursor-pointer hover:bg-white/10 px-2 py-1 rounded transition-colors">
-                  <LayoutGrid className="h-5 w-5" />
-                  <span>{breadcrumbs[0]?.label || 'App'}</span>
-                </div>
-                <nav className="flex items-center gap-4 text-sm font-medium">
-                  <span className="opacity-90 hover:opacity-100 cursor-pointer">Contacts</span>
-                  <span className="opacity-70 hover:opacity-100 cursor-pointer">Configuration</span>
-                </nav>
-              </>
+              <div className="flex items-center gap-2 font-medium px-2 py-1">
+                <LayoutGrid className="h-5 w-5" />
+                <span>{breadcrumbs[0]?.label || 'App'}</span>
+              </div>
             )}
-          </div>
-          <div className="flex items-center gap-4">
-             <div className="flex items-center gap-3 text-sm">
-               <span className="bg-green-500 text-white text-xs px-1.5 py-0.5 rounded-full">7</span>
-               <span className="bg-gray-500 text-white text-xs px-1.5 py-0.5 rounded-full">14</span>
-               <div className="w-8 h-8 bg-primary-foreground/20 rounded-full flex items-center justify-center text-xs">US</div>
-             </div>
           </div>
         </div>
       )}
@@ -62,9 +49,7 @@ export function EnterpriseFormLayout({
         <div className="flex items-center gap-4">
           {!hideLabelSection && (
             <>
-              <Button className="shadow-sm h-8 px-4 text-sm font-medium rounded-md">
-                New
-              </Button>
+              <span className="text-sm font-semibold text-foreground">{title}</span>
               <div className="h-6 w-px bg-gray-300 mx-2" />
               <nav className="flex items-center gap-1 text-sm text-muted-foreground">
                 {breadcrumbs.map((crumb, i) => (
@@ -80,32 +65,14 @@ export function EnterpriseFormLayout({
                   </React.Fragment>
                 ))}
               </nav>
+              {status && (
+                <Badge variant="secondary" className="rounded-full px-2 font-normal">
+                  {status}
+                </Badge>
+              )}
             </>
           )}
           {actions}
-        </div>
-        
-        <div className="flex items-center gap-3">
-           <div className="relative w-64 hidden md:block">
-             <input 
-               type="text" 
-               placeholder="Search..." 
-               className="w-full pl-8 pr-3 py-1 text-sm border-b border-gray-300 focus:border-primary focus:outline-none bg-transparent"
-             />
-             <Search className="h-4 w-4 absolute left-0 top-1.5 text-gray-400" />
-           </div>
-
-           <div className="flex items-center gap-2 text-sm text-gray-600 border-l pl-4 ml-2">
-             <span>1 / 1</span>
-             <div className="flex items-center">
-               <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100" disabled>
-                 <ChevronLeft className="h-4 w-4" />
-               </Button>
-               <Button variant="ghost" size="icon" className="h-8 w-8 hover:bg-gray-100" disabled>
-                 <ChevronRight className="h-4 w-4" />
-               </Button>
-             </div>
-           </div>
         </div>
       </div>
 
