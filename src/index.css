@@ -162,6 +162,8 @@ All colors MUST be HSL.
     --menu-strip-financials: 150 83% 40%;
     --menu-strip-logistics: 38 92% 50%;
     --menu-strip-amro: 190 95% 42%;
+    --menu-strip-markets: 173 80% 40%;
+    --menu-strip-uim: 239 84% 60%;
     --menu-strip-administration: 310 78% 55%;
     --menu-strip-other: 220 15% 60%;
     --gradient-brand-golden: linear-gradient(
@@ -288,6 +290,8 @@ All colors MUST be HSL.
     --menu-strip-financials: 150 70% 58%;
     --menu-strip-logistics: 38 92% 62%;
     --menu-strip-amro: 190 85% 60%;
+    --menu-strip-markets: 173 70% 55%;
+    --menu-strip-uim: 239 84% 72%;
     --menu-strip-administration: 310 78% 70%;
     --menu-strip-other: 220 15% 72%;
   }

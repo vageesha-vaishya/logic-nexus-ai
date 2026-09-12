@@ -65,87 +65,42 @@ const GROUP_STRIP_COLOR_TOKEN: Record<string, { cssVar: string; fallback: string
   sales: { cssVar: '--menu-strip-sales', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.sales },
   financials: { cssVar: '--menu-strip-financials', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.financials },
   logistics: { cssVar: '--menu-strip-logistics', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.logistics },
-  uim: { cssVar: '--menu-strip-uim', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.other },
+  uim: { cssVar: '--menu-strip-uim', fallback: '239 84% 60%' },
   amro: { cssVar: '--menu-strip-amro', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.amro },
-  markets: { cssVar: '--menu-strip-markets', fallback: '#0d9488' },
+  markets: { cssVar: '--menu-strip-markets', fallback: '173 80% 40%' },
   admin: { cssVar: '--menu-strip-administration', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.administration },
   administration: { cssVar: '--menu-strip-administration', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.administration },
   other: { cssVar: '--menu-strip-other', fallback: DEFAULT_MENU_GROUP_STRIP_COLORS.other },
 };
-const GROUP_THEME: Record<string, { heading: string; trigger: string; item: string; active: string; icon: string; iconActive: string; panel: string }> = {
-  crm: {
-    heading: 'text-violet-700 dark:text-violet-300',
-    trigger: 'hover:bg-violet-500/10 hover:text-violet-900 dark:hover:text-violet-100',
-    item: 'hover:bg-violet-500/10',
-    active: 'border-violet-500/30 bg-gradient-to-r from-violet-500/20 to-violet-500/5 text-violet-900 dark:text-violet-100',
-    icon: 'bg-violet-500/10 text-violet-700 dark:text-violet-300',
-    iconActive: 'bg-violet-500/20 text-violet-900 dark:text-violet-100',
-    panel: 'border-violet-500/10 bg-gradient-to-br from-violet-500/[0.06] via-transparent to-transparent',
-  },
-  sales: {
-    heading: 'text-blue-700 dark:text-blue-300',
-    trigger: 'hover:bg-blue-500/10 hover:text-blue-900 dark:hover:text-blue-100',
-    item: 'hover:bg-blue-500/10',
-    active: 'border-blue-500/30 bg-gradient-to-r from-blue-500/20 to-blue-500/5 text-blue-900 dark:text-blue-100',
-    icon: 'bg-blue-500/10 text-blue-700 dark:text-blue-300',
-    iconActive: 'bg-blue-500/20 text-blue-900 dark:text-blue-100',
-    panel: 'border-blue-500/10 bg-gradient-to-br from-blue-500/[0.06] via-transparent to-transparent',
-  },
-  financials: {
-    heading: 'text-emerald-700 dark:text-emerald-300',
-    trigger: 'hover:bg-emerald-500/10 hover:text-emerald-900 dark:hover:text-emerald-100',
-    item: 'hover:bg-emerald-500/10',
-    active: 'border-emerald-500/30 bg-gradient-to-r from-emerald-500/20 to-emerald-500/5 text-emerald-900 dark:text-emerald-100',
-    icon: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-    iconActive: 'bg-emerald-500/20 text-emerald-900 dark:text-emerald-100',
-    panel: 'border-emerald-500/10 bg-gradient-to-br from-emerald-500/[0.06] via-transparent to-transparent',
-  },
-  logistics: {
-    heading: 'text-amber-700 dark:text-amber-300',
-    trigger: 'hover:bg-amber-500/10 hover:text-amber-900 dark:hover:text-amber-100',
-    item: 'hover:bg-amber-500/10',
-    active: 'border-amber-500/30 bg-gradient-to-r from-amber-500/20 to-amber-500/5 text-amber-900 dark:text-amber-100',
-    icon: 'bg-amber-500/10 text-amber-700 dark:text-amber-300',
-    iconActive: 'bg-amber-500/20 text-amber-900 dark:text-amber-100',
-    panel: 'border-amber-500/10 bg-gradient-to-br from-amber-500/[0.06] via-transparent to-transparent',
-  },
-  uim: {
-    heading: 'text-indigo-700 dark:text-indigo-300',
-    trigger: 'hover:bg-indigo-500/10 hover:text-indigo-900 dark:hover:text-indigo-100',
-    item: 'hover:bg-indigo-500/10',
-    active: 'border-indigo-500/30 bg-gradient-to-r from-indigo-500/20 to-indigo-500/5 text-indigo-900 dark:text-indigo-100',
-    icon: 'bg-indigo-500/10 text-indigo-700 dark:text-indigo-300',
-    iconActive: 'bg-indigo-500/20 text-indigo-900 dark:text-indigo-100',
-    panel: 'border-indigo-500/10 bg-gradient-to-br from-indigo-500/[0.06] via-transparent to-transparent',
-  },
-  amro: {
-    heading: 'text-cyan-700 dark:text-cyan-300',
-    trigger: 'hover:bg-cyan-500/10 hover:text-cyan-900 dark:hover:text-cyan-100',
-    item: 'hover:bg-cyan-500/10',
-    active: 'border-cyan-500/30 bg-gradient-to-r from-cyan-500/20 to-cyan-500/5 text-cyan-900 dark:text-cyan-100',
-    icon: 'bg-cyan-500/10 text-cyan-700 dark:text-cyan-300',
-    iconActive: 'bg-cyan-500/20 text-cyan-900 dark:text-cyan-100',
-    panel: 'border-cyan-500/10 bg-gradient-to-br from-cyan-500/[0.06] via-transparent to-transparent',
-  },
-  admin: {
-    heading: 'text-fuchsia-700 dark:text-fuchsia-300',
-    trigger: 'hover:bg-fuchsia-500/10 hover:text-fuchsia-900 dark:hover:text-fuchsia-100',
-    item: 'hover:bg-fuchsia-500/10',
-    active: 'border-fuchsia-500/30 bg-gradient-to-r from-fuchsia-500/20 to-fuchsia-500/5 text-fuchsia-900 dark:text-fuchsia-100',
-    icon: 'bg-fuchsia-500/10 text-fuchsia-700 dark:text-fuchsia-300',
-    iconActive: 'bg-fuchsia-500/20 text-fuchsia-900 dark:text-fuchsia-100',
-    panel: 'border-fuchsia-500/10 bg-gradient-to-br from-fuchsia-500/[0.06] via-transparent to-transparent',
-  },
-  markets: {
-    heading: 'text-teal-700 dark:text-teal-300',
-    trigger: 'hover:bg-teal-500/10 hover:text-teal-900 dark:hover:text-teal-100',
-    item: 'hover:bg-teal-500/10',
-    active: 'border-teal-500/30 bg-gradient-to-r from-teal-500/20 to-teal-500/5 text-teal-900 dark:text-teal-100',
-    icon: 'bg-teal-500/10 text-teal-700 dark:text-teal-300',
-    iconActive: 'bg-teal-500/20 text-teal-900 dark:text-teal-100',
-    panel: 'border-teal-500/10 bg-gradient-to-br from-teal-500/[0.06] via-transparent to-transparent',
-  },
-};
+
+// Every hover/active/icon color below is derived from the SAME CSS variable
+// that drives the customizable strip color (see GROUP_STRIP_COLOR_TOKEN and
+// ThemeManagement.tsx) via Tailwind arbitrary values, rather than a separate
+// hardcoded hue table. Previously these were two independent sources of
+// truth that happened to agree on their *default* hues but silently drifted
+// out of sync the moment a tenant customized a group's strip color in Theme
+// Management -- the strip would update, everything else here would not.
+// Light/dark variants don't need separate classes either: the CSS variable
+// itself is redefined under the `.dark` selector (src/index.css), so a
+// single `hsl(var(--menu-strip-x))` resolves correctly in both modes.
+function buildGroupTheme(groupId: string) {
+  const token = GROUP_STRIP_COLOR_TOKEN[groupId] ?? GROUP_STRIP_COLOR_TOKEN.other;
+  const solid = `hsl(var(${token.cssVar}, ${token.fallback}))`;
+  const alpha = (value: number) => `hsl(var(${token.cssVar}, ${token.fallback}) / ${value})`;
+  return {
+    heading: `text-[${solid}]`,
+    trigger: `hover:bg-[${alpha(0.1)}] hover:text-[${solid}]`,
+    item: `hover:bg-[${alpha(0.1)}]`,
+    active: `border-[${alpha(0.3)}] bg-gradient-to-r from-[${alpha(0.2)}] to-[${alpha(0.05)}] text-[${solid}]`,
+    icon: `bg-[${alpha(0.1)}] text-[${solid}]`,
+    iconActive: `bg-[${alpha(0.2)}] text-[${solid}]`,
+    panel: `border-[${alpha(0.1)}] bg-gradient-to-br from-[${alpha(0.06)}] via-transparent to-transparent`,
+  };
+}
+
+const GROUP_THEME: Record<string, ReturnType<typeof buildGroupTheme>> = Object.fromEntries(
+  Object.keys(GROUP_STRIP_COLOR_TOKEN).map((groupId) => [groupId, buildGroupTheme(groupId)])
+);
 
 // Domain-only builds (VITE_DOMAIN_ONLY=markets, etc.) never reach these
 // routes — they aren't in the Markets manifest. Gating the prefetcher
