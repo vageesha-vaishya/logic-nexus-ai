@@ -7,17 +7,7 @@ import { ActivityForm } from '@/components/crm/ActivityForm';
 import { ArrowLeft, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import { logger } from "@/lib/logger";
 
 export default function ActivityDetail() {
@@ -27,6 +17,7 @@ export default function ActivityDetail() {
   const [activity, setActivity] = useState<any>(null);
   const [rawActivity, setRawActivity] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -201,26 +192,17 @@ export default function ActivityDetail() {
               <p className="text-muted-foreground">Update activity details</p>
             </div>
           </div>
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button variant="destructive" size="sm">
-                <Trash2 className="mr-2 h-4 w-4" />
-                Delete
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Delete Activity</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Are you sure you want to delete this activity? This action cannot be undone.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <AlertDialogAction onClick={handleDelete}>Delete</AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button variant="destructive" size="sm" onClick={() => setShowDeleteDialog(true)}>
+            <Trash2 className="mr-2 h-4 w-4" />
+            Delete
+          </Button>
+          <DeleteConfirmDialog
+            open={showDeleteDialog}
+            onOpenChange={setShowDeleteDialog}
+            onConfirm={handleDelete}
+            title="Delete Activity"
+            description="Are you sure you want to delete this activity? This action cannot be undone."
+          />
         </div>
 
         {activity?.activity_type === 'email' && (emailTo || emailFrom || emailBody) && (

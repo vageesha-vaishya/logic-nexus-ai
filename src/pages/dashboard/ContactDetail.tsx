@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
 import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
 import { EmailHistoryPanel } from '@/features/module-communications/components/email/EmailHistoryPanel';
 import { Building2, Phone, Mail, User, Linkedin, Star, Clock, Trash2 } from 'lucide-react';
@@ -277,18 +277,13 @@ export default function ContactDetail() {
         </EnterpriseFormLayout>
         <StickyActionsBar right={stickyActions} />
 
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete Contact?</AlertDialogTitle>
-                    <AlertDialogDescription>This action cannot be undone.</AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDelete} className="bg-destructive">Delete</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
+        <DeleteConfirmDialog
+            open={showDeleteDialog}
+            onOpenChange={setShowDeleteDialog}
+            onConfirm={handleDelete}
+            title="Delete Contact?"
+            description="This action cannot be undone."
+        />
     </div>
   );
 }
