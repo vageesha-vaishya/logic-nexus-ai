@@ -5,6 +5,7 @@ import { H1 } from '@/components/ui/Heading';
 import { LeadForm } from '@/features/module-sales/components/LeadForm';
 import { LeadWorkspaceSections } from '@/features/module-sales/components/LeadWorkspaceSections';
 import { useCRM } from '@/hooks/useCRM';
+import { useCrmApiHeaders } from '@/hooks/useCrmApiHeaders';
 import { toast } from 'sonner';
 import { logger } from '@/lib/logger';
 import * as Sentry from '@sentry/react';
@@ -15,7 +16,8 @@ import { FEATURE_FLAGS, useAppFeatureFlag } from '@/lib/feature-flags';
 
 export default function LeadNew() {
   const navigate = useNavigate();
-  const { context, scopedDb, supabase } = useCRM();
+  const { context, scopedDb } = useCRM();
+  const getCrmApiHeaders = useCrmApiHeaders();
   const { state: viewState, setTheme, setView, setPipeline } = useLeadsViewState();
   const currentTheme = viewState.theme;
   const threeSectionLeadWorkspace = useAppFeatureFlag(FEATURE_FLAGS.LEAD_THREE_SECTION_LAYOUT);
@@ -87,18 +89,14 @@ export default function LeadNew() {
         custom_fields: Object.keys(customFields).length ? customFields : null,
       };
 
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token || '';
+      const headers = await getCrmApiHeaders({
+        tenantId,
+        franchiseId: formData.franchise_id || context.franchiseId,
+      });
       const response = await fetch('/api/crm/v1/leads', {
         method: 'POST',
         credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          'x-tenant-id': tenantId,
-          ...(formData.franchise_id || context.franchiseId ? { 'x-franchise-id': formData.franchise_id || context.franchiseId } : {}),
-          ...(context.userId ? { 'x-user-id': context.userId } : {}),
-        },
+        headers,
         body: JSON.stringify(payload),
       });
 
