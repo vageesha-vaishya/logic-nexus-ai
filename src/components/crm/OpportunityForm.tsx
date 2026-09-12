@@ -10,6 +10,7 @@ import { useState, useEffect, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useCRM } from '@/hooks/useCRM';
 import { stageProbabilityMap, OpportunityStage } from '@/pages/dashboard/opportunities-data';
+import { leadSources } from '@/pages/dashboard/leads-data';
 
 const opportunitySchema = z.object({
   name: z.string().min(1, 'Name is required'),
@@ -26,7 +27,7 @@ const opportunitySchema = z.object({
   contact_id: z.string().optional(),
   lead_id: z.string().optional(),
   // Align lead_source options with the shared enum used across Leads and Opportunities
-  lead_source: z.enum(['website', 'referral', 'email', 'phone', 'social', 'event', 'other']).optional(),
+  lead_source: z.enum(leadSources).optional(),
   next_step: z.string().optional(),
   competitors: z.string().optional(),
   type: z.string().optional(),

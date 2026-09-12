@@ -20,6 +20,7 @@ import { ROLE_PERMISSIONS } from '@/config/permissions';
 import { sanitizeRichTextHtml, stripHtmlTags } from '@/lib/utils/sanitizer';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { logger } from "@/lib/logger";
+import { leadSources } from '@/pages/dashboard/leads-data';
 
 export const leadSchema = z.object({
   first_name: z.string().min(1, 'First name is required').max(100),
@@ -29,7 +30,7 @@ export const leadSchema = z.object({
   email: z.string().email('Invalid email').optional().or(z.literal('')),
   phone: z.string().optional(),
   status: z.enum(['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost']),
-  source: z.enum(['website', 'referral', 'email', 'phone', 'social', 'event', 'other']),
+  source: z.enum(leadSources),
   estimated_value: z.string().optional(),
   expected_close_date: z.string().min(1, 'Expected Close Date is required'),
   description: z.string().optional(),

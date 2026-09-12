@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Lead } from '@/pages/dashboard/leads-data';
+import { Lead, stages, leadSources } from '@/pages/dashboard/leads-data';
 
 export type LeadMasterDataFormValues = {
   first_name: string;
@@ -34,8 +34,12 @@ type LeadsMasterDataFormModalProps = {
   onSubmit: (values: LeadMasterDataFormValues, mode: LeadModalMode, leadId?: string) => Promise<void>;
 };
 
-const STATUS_OPTIONS = ['new', 'contacted', 'qualified', 'proposal', 'negotiation', 'won', 'lost', 'converted'];
-const SOURCE_OPTIONS = ['website', 'referral', 'cold_call', 'email_campaign', 'social_media', 'event', 'partner', 'other'];
+// Kept in sync with the DB enums via leads-data.ts, not hand-maintained here --
+// this previously had made-up source values (cold_call, email_campaign,
+// social_media, partner) that don't exist in the lead_source DB enum and
+// would have failed on write.
+const STATUS_OPTIONS: readonly string[] = stages;
+const SOURCE_OPTIONS: readonly string[] = leadSources;
 
 function createInitialValues(initialLead: Lead | null): LeadMasterDataFormValues {
   return {

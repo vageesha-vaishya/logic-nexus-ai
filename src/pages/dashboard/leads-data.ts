@@ -1,4 +1,4 @@
-export type LeadStatus = 
+export type LeadStatus =
   | 'new'
   | 'contacted'
   | 'qualified'
@@ -7,6 +7,10 @@ export type LeadStatus =
   | 'won'
   | 'lost'
   | 'converted';
+
+/** Matches the DB `lead_source` enum exactly -- keep in sync with supabase/types.ts. */
+export const leadSources = ['website', 'referral', 'email', 'phone', 'social', 'event', 'other'] as const;
+export type LeadSource = (typeof leadSources)[number];
 
 export interface Lead {
   id: string;

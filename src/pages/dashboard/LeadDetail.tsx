@@ -26,7 +26,7 @@ import { useCrmApiHeaders } from '@/hooks/useCrmApiHeaders';
 import { useAutoSaveRichTextField } from '@/hooks/useAutoSaveRichTextField';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
-import { Lead, statusConfig } from './leads-data';
+import { Lead, statusConfig, leadSources } from './leads-data';
 import { exportCsv, exportExcel } from '@/lib/import-export';
 import { getScoreGrade } from '@/utils/leadScoring';
 import { DetailScreenTemplate } from '@/components/system/DetailScreenTemplate';
@@ -535,7 +535,7 @@ export default function LeadDetail() {
       email: lead.email ?? '',
       phone: lead.phone ?? '',
       status: (lead.status === 'converted' ? 'new' : lead.status) as LeadFormData['status'],
-      source: (['website', 'referral', 'email', 'phone', 'social', 'event', 'other'].includes(lead.source)
+      source: ((leadSources as readonly string[]).includes(lead.source)
         ? (lead.source as LeadFormData['source'])
         : 'other'),
       estimated_value: lead.estimated_value != null ? String(lead.estimated_value) : '',
