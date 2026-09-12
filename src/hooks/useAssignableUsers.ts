@@ -6,6 +6,7 @@ export type AssignableUser = {
   first_name: string | null;
   last_name: string | null;
   email: string | null;
+  avatar_url: string | null;
 };
 
 type FetchOptions = {
@@ -33,7 +34,7 @@ export function useAssignableUsers() {
       if (context?.isPlatformAdmin && !context.adminOverrideEnabled) {
         let query = supabase
           .from("profiles")
-          .select("id, first_name, last_name, email")
+          .select("id, first_name, last_name, email, avatar_url")
           .limit(limit);
 
         if (like) {

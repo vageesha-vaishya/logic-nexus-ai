@@ -53,7 +53,7 @@ export const APP_MENU: MenuModule[] = [
       { name: 'Campaigns', path: '/dashboard/campaigns', icon: Megaphone, description: 'Marketing campaigns' },
       { name: 'Dashboards', path: '/dashboard/dashboards', icon: BarChart3, description: 'Visual dashboards' },
       { name: 'Migration Baseline', path: '/dashboard/migration-baseline', icon: LineChart, description: 'Compatibility baseline and dual-run migration KPIs', permissions: ['dashboards.view'] },
-      { name: 'CRM Workspace', path: '/dashboard/crm-workspace', icon: BarChart3, description: 'Integrated CRM prototype workspace', permissions: ['dashboards.view', 'leads.view'] },
+      { name: 'CRM Workspace', path: '/dashboard/crm-workspace', icon: BarChart3, description: 'Unified overview, pipeline, analytics, and tasks', permissions: ['dashboards.view', 'leads.view'] },
       // Duplicate entry removed to fix key conflict
       // { name: 'Leads Workspace', path: '/dashboard/leads/pipeline', icon: Users, description: 'Leads-focused workspace variant' },
       { name: 'Reports', path: '/dashboard/reports', icon: PieChart, description: 'Analytics and reports', permissions: ['reports.view'] },
