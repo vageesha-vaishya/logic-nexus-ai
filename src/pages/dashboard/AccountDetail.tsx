@@ -18,7 +18,7 @@ import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/En
 import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
 import { EnterpriseTable, type Column, EnterpriseCard } from '@/components/ui/enterprise';
 import { Badge } from '@/components/ui/badge';
-import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
+import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { logger } from "@/lib/logger";
 
 export default function AccountDetail() {
@@ -183,26 +183,44 @@ export default function AccountDetail() {
     { key: 'stage', label: 'Stage', width: '120px', render: (value) => <Badge>{value}</Badge> },
     { key: 'amount', label: 'Amount', width: '150px', render: (value) => `$${value?.toLocaleString() || '0.00'}` },
   ];
-  const stickyActions = isEditing
-    ? [
-        <Button key="cancel-edit" variant="outline" onClick={() => setIsEditing(false)}>
-          Cancel
-        </Button>,
-      ]
-    : [
-        <Button key="new-account" variant="outline" onClick={() => navigate('/dashboard/accounts/new')}>
-          New Account
-        </Button>,
-        <Button key="edit-account" variant="outline" onClick={() => setIsEditing(true)}>
-          Edit
-        </Button>,
-        <Button key="delete-account" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-          Delete
-        </Button>,
-      ];
+  const StickyActionsRegister = () => {
+    const { setActions, clearActions } = useStickyActions();
+
+    useEffect(() => {
+      if (isEditing) {
+        setActions({
+          right: [
+            <Button key="cancel-edit" variant="outline" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>,
+          ],
+        });
+        return () => clearActions();
+      }
+
+      setActions({
+        right: [
+          <Button key="new-account" variant="outline" onClick={() => navigate('/dashboard/accounts/new')}>
+            New Account
+          </Button>,
+          <Button key="edit-account" variant="outline" onClick={() => setIsEditing(true)}>
+            Edit
+          </Button>,
+          <Button key="delete-account" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+            Delete
+          </Button>,
+        ],
+      });
+
+      return () => clearActions();
+    }, [clearActions, isEditing, navigate, setActions]);
+
+    return null;
+  };
 
   return (
     <DashboardLayout>
+        <StickyActionsRegister />
         <DetailScreenTemplate
             title={account.name}
             subtitle={
@@ -399,7 +417,6 @@ export default function AccountDetail() {
                 <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
             </div>
         </DetailScreenTemplate>
-        <StickyActionsBar right={stickyActions} />
 
         <DeleteConfirmDialog
             open={showDeleteDialog}

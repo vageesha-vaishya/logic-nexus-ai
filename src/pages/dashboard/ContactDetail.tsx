@@ -18,7 +18,7 @@ import { EnterpriseNotebook, EnterpriseTab } from '@/components/ui/enterprise/En
 import { EnterpriseActivityFeed } from '@/components/ui/enterprise/EnterpriseActivityFeed';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { StickyActionsBar } from '@/components/ui/StickyActionsBar';
+import { useStickyActions } from '@/components/layout/StickyActionsContext';
 import { logger } from "@/lib/logger";
 
 export default function ContactDetail() {
@@ -122,26 +122,44 @@ export default function ContactDetail() {
     );
   }
 
-  const stickyActions = isEditing
-    ? [
-        <Button key="cancel-edit" variant="outline" onClick={() => setIsEditing(false)}>
-          Cancel
-        </Button>,
-      ]
-    : [
-        <Button key="new-contact" variant="outline" onClick={() => navigate('/dashboard/contacts/new')}>
-          New Contact
-        </Button>,
-        <Button key="edit-contact" variant="outline" onClick={() => setIsEditing(true)}>
-          Edit
-        </Button>,
-        <Button key="delete-contact" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
-          Delete
-        </Button>,
-      ];
+  const StickyActionsRegister = () => {
+    const { setActions, clearActions } = useStickyActions();
+
+    useEffect(() => {
+      if (isEditing) {
+        setActions({
+          right: [
+            <Button key="cancel-edit" variant="outline" onClick={() => setIsEditing(false)}>
+              Cancel
+            </Button>,
+          ],
+        });
+        return () => clearActions();
+      }
+
+      setActions({
+        right: [
+          <Button key="new-contact" variant="outline" onClick={() => navigate('/dashboard/contacts/new')}>
+            New Contact
+          </Button>,
+          <Button key="edit-contact" variant="outline" onClick={() => setIsEditing(true)}>
+            Edit
+          </Button>,
+          <Button key="delete-contact" variant="destructive" onClick={() => setShowDeleteDialog(true)}>
+            Delete
+          </Button>,
+        ],
+      });
+
+      return () => clearActions();
+    }, [clearActions, isEditing, navigate, setActions]);
+
+    return null;
+  };
 
   return (
     <DashboardLayout>
+        <StickyActionsRegister />
         <DetailScreenTemplate
             title={`${contact.first_name} ${contact.last_name}`}
             subtitle={contact.is_primary ? <Badge variant="outline" className="rounded-full px-2 font-normal">Primary</Badge> : undefined}
@@ -297,7 +315,6 @@ export default function ContactDetail() {
             <EnterpriseActivityFeed className="hidden xl:flex shrink-0 w-[400px]" />
             </div>
         </DetailScreenTemplate>
-        <StickyActionsBar right={stickyActions} />
 
         <DeleteConfirmDialog
             open={showDeleteDialog}

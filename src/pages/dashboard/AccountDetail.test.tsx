@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { describe, it, vi, expect } from 'vitest';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import AccountDetail from './AccountDetail';
+import { StickyActionsProvider } from '@/components/layout/StickyActionsContext';
 import { createChainableQuery } from '../../../test/supabaseQueryMock';
 
 vi.mock('@/components/layout/DashboardLayout', () => ({
@@ -44,9 +45,11 @@ describe('AccountDetail', () => {
   it('renders the account header and related sections without crashing', async () => {
     render(
       <MemoryRouter initialEntries={['/dashboard/accounts/acc-1']}>
-        <Routes>
-          <Route path="/dashboard/accounts/:id" element={<AccountDetail />} />
-        </Routes>
+        <StickyActionsProvider>
+          <Routes>
+            <Route path="/dashboard/accounts/:id" element={<AccountDetail />} />
+          </Routes>
+        </StickyActionsProvider>
       </MemoryRouter>,
     );
 
