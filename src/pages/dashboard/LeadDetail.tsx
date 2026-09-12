@@ -23,6 +23,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { Download, Edit, Trash2, UserPlus, DollarSign, Calendar, Mail, Phone, Building2, GitBranch, Users as UsersIcon, PanelLeftClose, PanelLeftOpen, Bold, Italic, Underline, List, ListOrdered, ChevronDown, ChevronUp, Save } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
 import { useCrmApiHeaders } from '@/hooks/useCrmApiHeaders';
+import { useAutoSaveRichTextField } from '@/hooks/useAutoSaveRichTextField';
 import { toast } from 'sonner';
 import { format } from 'date-fns';
 import { Lead, statusConfig } from './leads-data';
@@ -66,19 +67,7 @@ export default function LeadDetail() {
   });
   const [infoTab, setInfoTab] = useState<'description' | 'notes'>('description');
   const [infoCollapsed, setInfoCollapsed] = useState(false);
-  const [descriptionHtml, setDescriptionHtml] = useState('');
-  const [notesHtml, setNotesHtml] = useState('');
-  const [descriptionDirty, setDescriptionDirty] = useState(false);
-  const [notesDirty, setNotesDirty] = useState(false);
-  const [isDescriptionSaving, setIsDescriptionSaving] = useState(false);
-  const [isNotesSaving, setIsNotesSaving] = useState(false);
-  const [descriptionSaveError, setDescriptionSaveError] = useState<string | null>(null);
-  const [notesSaveError, setNotesSaveError] = useState<string | null>(null);
   const [lastInfoSavedAt, setLastInfoSavedAt] = useState<string | null>(null);
-  const descriptionEditorRef = useRef<HTMLDivElement | null>(null);
-  const notesEditorRef = useRef<HTMLDivElement | null>(null);
-  const descriptionAutoSaveRef = useRef<number | null>(null);
-  const notesAutoSaveRef = useRef<number | null>(null);
   const returnTo = (location.state as { returnTo?: string } | null)?.returnTo;
   const shouldOpenInEditMode = Boolean((location.state as { openEdit?: boolean } | null)?.openEdit);
   const shouldAutoSaveInEditMode = Boolean((location.state as { autoSave?: boolean } | null)?.autoSave);
@@ -191,8 +180,8 @@ export default function LeadDetail() {
     }
   }, [getCrmApiHeaders, id, scopedDb]);
 
-  const upsertLeadDescription = useCallback(async (nextDescription: string) => {
-    if (!id || !context.tenantId) return;
+  const upsertLeadDescription = useCallback(async (nextDescription: string): Promise<string> => {
+    if (!id || !context.tenantId) throw new Error('Missing lead context');
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
     const response = await fetch(`/api/leads/${encodeURIComponent(id)}/description`, {
@@ -210,13 +199,13 @@ export default function LeadDetail() {
       throw new Error(payload.error || 'Failed to save description');
     }
     const cleanDescription = sanitizeRichTextHtml(String(payload?.data?.description || ''));
-    setDescriptionHtml(cleanDescription);
     setLead(prev => prev ? { ...prev, description: cleanDescription } : prev);
     setLastInfoSavedAt(payload?.data?.updatedAt || new Date().toISOString());
+    return cleanDescription;
   }, [context.tenantId, context.userId, id, supabase.auth]);
 
-  const upsertLeadNotes = useCallback(async (nextNotes: string) => {
-    if (!id || !context.tenantId) return;
+  const upsertLeadNotes = useCallback(async (nextNotes: string): Promise<string> => {
+    if (!id || !context.tenantId) throw new Error('Missing lead context');
     const session = await supabase.auth.getSession();
     const token = session.data.session?.access_token;
     const response = await fetch(`/api/leads/${encodeURIComponent(id)}/notes`, {
@@ -234,10 +223,13 @@ export default function LeadDetail() {
       throw new Error(payload.error || 'Failed to save notes');
     }
     const cleanNotes = sanitizeRichTextHtml(String(payload?.data?.notes || ''));
-    setNotesHtml(cleanNotes);
     setLead(prev => prev ? { ...prev, notes: cleanNotes } : prev);
     setLastInfoSavedAt(payload?.data?.updatedAt || new Date().toISOString());
+    return cleanNotes;
   }, [context.tenantId, context.userId, id, supabase.auth]);
+
+  const descriptionField = useAutoSaveRichTextField({ save: upsertLeadDescription, sanitizeHtml: sanitizeRichTextHtml });
+  const notesField = useAutoSaveRichTextField({ save: upsertLeadNotes, sanitizeHtml: sanitizeRichTextHtml });
 
   const fetchDescriptionNotes = useCallback(async () => {
     if (!id || !context.tenantId) return;
@@ -258,17 +250,15 @@ export default function LeadDetail() {
       }
       const cleanDescription = sanitizeRichTextHtml(String(payload?.data?.description || ''));
       const cleanNotes = sanitizeRichTextHtml(String(payload?.data?.notes || ''));
-      setDescriptionHtml(cleanDescription);
-      setNotesHtml(cleanNotes);
+      descriptionField.setHtml(cleanDescription);
+      notesField.setHtml(cleanNotes);
       setLastInfoSavedAt(payload?.data?.updatedAt || null);
-      setDescriptionDirty(false);
-      setNotesDirty(false);
       setLead(prev => prev ? { ...prev, description: cleanDescription, notes: cleanNotes } : prev);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : 'Failed to load description and notes';
       toast.error('Failed to load description and notes', { description: message });
     }
-  }, [context.tenantId, context.userId, id, supabase.auth]);
+  }, [context.tenantId, context.userId, id, supabase.auth, descriptionField.setHtml, notesField.setHtml]);
 
   useEffect(() => {
     if (id) {
@@ -297,83 +287,6 @@ export default function LeadDetail() {
       };
     }
   }, [id, fetchDescriptionNotes, fetchLead, supabase]);
-
-  useEffect(() => {
-    if (descriptionEditorRef.current && descriptionEditorRef.current.innerHTML !== descriptionHtml) {
-      descriptionEditorRef.current.innerHTML = descriptionHtml;
-    }
-  }, [descriptionHtml]);
-
-  useEffect(() => {
-    if (notesEditorRef.current && notesEditorRef.current.innerHTML !== notesHtml) {
-      notesEditorRef.current.innerHTML = notesHtml;
-    }
-  }, [notesHtml]);
-
-  useEffect(() => {
-    if (!descriptionDirty) return;
-    if (descriptionAutoSaveRef.current) {
-      window.clearTimeout(descriptionAutoSaveRef.current);
-    }
-    descriptionAutoSaveRef.current = window.setTimeout(async () => {
-      try {
-        setIsDescriptionSaving(true);
-        setDescriptionSaveError(null);
-        await upsertLeadDescription(descriptionHtml);
-        setDescriptionDirty(false);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Auto-save failed';
-        setDescriptionSaveError(message);
-      } finally {
-        setIsDescriptionSaving(false);
-      }
-    }, 30000);
-    return () => {
-      if (descriptionAutoSaveRef.current) {
-        window.clearTimeout(descriptionAutoSaveRef.current);
-      }
-    };
-  }, [descriptionDirty, descriptionHtml, upsertLeadDescription]);
-
-  useEffect(() => {
-    if (!notesDirty) return;
-    if (notesAutoSaveRef.current) {
-      window.clearTimeout(notesAutoSaveRef.current);
-    }
-    notesAutoSaveRef.current = window.setTimeout(async () => {
-      try {
-        setIsNotesSaving(true);
-        setNotesSaveError(null);
-        await upsertLeadNotes(notesHtml);
-        setNotesDirty(false);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : 'Auto-save failed';
-        setNotesSaveError(message);
-      } finally {
-        setIsNotesSaving(false);
-      }
-    }, 30000);
-    return () => {
-      if (notesAutoSaveRef.current) {
-        window.clearTimeout(notesAutoSaveRef.current);
-      }
-    };
-  }, [notesDirty, notesHtml, upsertLeadNotes]);
-
-  const execInfoCommand = (target: 'description' | 'notes', command: 'bold' | 'italic' | 'underline' | 'insertUnorderedList' | 'insertOrderedList') => {
-    const editor = target === 'description' ? descriptionEditorRef.current : notesEditorRef.current;
-    if (!editor) return;
-    editor.focus();
-    document.execCommand(command);
-    const nextValue = sanitizeRichTextHtml(editor.innerHTML);
-    if (target === 'description') {
-      setDescriptionHtml(nextValue);
-      setDescriptionDirty(true);
-    } else {
-      setNotesHtml(nextValue);
-      setNotesDirty(true);
-    }
-  };
 
   const fetchInteractionStats = useCallback(async () => {
     if (!id) return;
@@ -1258,8 +1171,8 @@ export default function LeadDetail() {
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <CardTitle>Additional Information</CardTitle>
                     <div className="flex items-center gap-2">
-                      <Badge variant={isDescriptionSaving || isNotesSaving ? 'default' : 'outline'}>
-                        {isDescriptionSaving || isNotesSaving ? 'Auto-saving...' : 'Auto-save 30s'}
+                      <Badge variant={descriptionField.isSaving || notesField.isSaving ? 'default' : 'outline'}>
+                        {descriptionField.isSaving || notesField.isSaving ? 'Auto-saving...' : 'Auto-save 30s'}
                       </Badge>
                       <Button
                         type="button"
@@ -1295,56 +1208,52 @@ export default function LeadDetail() {
                       </TabsList>
                       <TabsContent value="description" className="pt-4 space-y-3">
                         <div className="flex flex-wrap items-center gap-1 rounded-md border bg-muted/20 p-1">
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('description', 'bold')} aria-label="Description bold"><Bold className="h-4 w-4" /></Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('description', 'italic')} aria-label="Description italic"><Italic className="h-4 w-4" /></Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('description', 'underline')} aria-label="Description underline"><Underline className="h-4 w-4" /></Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('description', 'insertUnorderedList')} aria-label="Description unordered list"><List className="h-4 w-4" /></Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('description', 'insertOrderedList')} aria-label="Description ordered list"><ListOrdered className="h-4 w-4" /></Button>
-                          <Button type="button" variant="outline" size="sm" className="ml-auto" onClick={() => upsertLeadDescription(descriptionHtml)} disabled={isDescriptionSaving}>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => descriptionField.applyCommand('bold')} aria-label="Description bold"><Bold className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => descriptionField.applyCommand('italic')} aria-label="Description italic"><Italic className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => descriptionField.applyCommand('underline')} aria-label="Description underline"><Underline className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => descriptionField.applyCommand('insertUnorderedList')} aria-label="Description unordered list"><List className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => descriptionField.applyCommand('insertOrderedList')} aria-label="Description ordered list"><ListOrdered className="h-4 w-4" /></Button>
+                          <Button type="button" variant="outline" size="sm" className="ml-auto" onClick={() => descriptionField.saveNow()} disabled={descriptionField.isSaving}>
                             <Save className="h-3.5 w-3.5 mr-1" />
                             Save now
                           </Button>
                         </div>
                         <div
-                          ref={descriptionEditorRef}
+                          ref={descriptionField.editorRef}
                           contentEditable
                           className="min-h-[140px] rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                           onInput={(event) => {
-                            const next = sanitizeRichTextHtml((event.target as HTMLDivElement).innerHTML);
-                            setDescriptionHtml(next);
-                            setDescriptionDirty(true);
+                            descriptionField.setHtmlFromInput(sanitizeRichTextHtml((event.target as HTMLDivElement).innerHTML));
                           }}
                         />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{stripHtmlTags(descriptionHtml).length}/5000 characters</span>
-                          {descriptionSaveError ? <span className="text-destructive">{descriptionSaveError}</span> : null}
+                          <span>{stripHtmlTags(descriptionField.html).length}/5000 characters</span>
+                          {descriptionField.saveError ? <span className="text-destructive">{descriptionField.saveError}</span> : null}
                         </div>
                       </TabsContent>
                       <TabsContent value="notes" className="pt-4 space-y-3">
                         <div className="flex flex-wrap items-center gap-1 rounded-md border bg-muted/20 p-1">
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('notes', 'bold')} aria-label="Notes bold"><Bold className="h-4 w-4" /></Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('notes', 'italic')} aria-label="Notes italic"><Italic className="h-4 w-4" /></Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('notes', 'underline')} aria-label="Notes underline"><Underline className="h-4 w-4" /></Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('notes', 'insertUnorderedList')} aria-label="Notes unordered list"><List className="h-4 w-4" /></Button>
-                          <Button type="button" variant="ghost" size="sm" onClick={() => execInfoCommand('notes', 'insertOrderedList')} aria-label="Notes ordered list"><ListOrdered className="h-4 w-4" /></Button>
-                          <Button type="button" variant="outline" size="sm" className="ml-auto" onClick={() => upsertLeadNotes(notesHtml)} disabled={isNotesSaving}>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => notesField.applyCommand('bold')} aria-label="Notes bold"><Bold className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => notesField.applyCommand('italic')} aria-label="Notes italic"><Italic className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => notesField.applyCommand('underline')} aria-label="Notes underline"><Underline className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => notesField.applyCommand('insertUnorderedList')} aria-label="Notes unordered list"><List className="h-4 w-4" /></Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => notesField.applyCommand('insertOrderedList')} aria-label="Notes ordered list"><ListOrdered className="h-4 w-4" /></Button>
+                          <Button type="button" variant="outline" size="sm" className="ml-auto" onClick={() => notesField.saveNow()} disabled={notesField.isSaving}>
                             <Save className="h-3.5 w-3.5 mr-1" />
                             Save now
                           </Button>
                         </div>
                         <div
-                          ref={notesEditorRef}
+                          ref={notesField.editorRef}
                           contentEditable
                           className="min-h-[160px] rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
                           onInput={(event) => {
-                            const next = sanitizeRichTextHtml((event.target as HTMLDivElement).innerHTML);
-                            setNotesHtml(next);
-                            setNotesDirty(true);
+                            notesField.setHtmlFromInput(sanitizeRichTextHtml((event.target as HTMLDivElement).innerHTML));
                           }}
                         />
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>{stripHtmlTags(notesHtml).length}/10000 characters</span>
-                          {notesSaveError ? <span className="text-destructive">{notesSaveError}</span> : null}
+                          <span>{stripHtmlTags(notesField.html).length}/10000 characters</span>
+                          {notesField.saveError ? <span className="text-destructive">{notesField.saveError}</span> : null}
                         </div>
                       </TabsContent>
                     </Tabs>
