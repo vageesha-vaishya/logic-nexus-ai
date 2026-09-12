@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { matchText, TextOp, formatCurrency } from '@/lib/utils';
+import { matchText, TextOp, formatCurrency, formatDate } from '@/lib/utils';
 import { OpportunityForm } from '@/components/crm/OpportunityForm';
 import { ArrowLeft, Edit, Trash2 } from 'lucide-react';
 import { useCRM } from '@/hooks/useCRM';
@@ -251,11 +251,6 @@ export default function OpportunityDetail() {
       const message = err instanceof Error ? err.message : 'Unknown error';
       toast.error('Failed to set primary quote', { description: message });
     }
-  };
-
-  const formatDate = (date: string | null) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString();
   };
 
   // Derived list: apply advanced filters to related quotes

@@ -12,7 +12,7 @@ import { toast } from 'sonner';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { matchText, TextOp, formatCurrency } from '@/lib/utils';
+import { matchText, TextOp, formatCurrency, formatDate } from '@/lib/utils';
 import { Opportunity, OpportunityStage, stageColors, stageLabels } from './opportunities-data';
 import { useCRMModuleNavigationState } from '@/hooks/useCRMModuleNavigationState';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
@@ -80,11 +80,6 @@ export default function Opportunities() {
   useEffect(() => {
     refreshOpportunities();
   }, [refreshOpportunities]);
-
-  const formatDate = (date: string | null) => {
-    if (!date) return '-';
-    return new Date(date).toLocaleDateString();
-  };
 
   const totalValue = opportunities.reduce((sum, opp) => sum + (Number(opp.amount) || 0), 0);
   const openOpportunities = opportunities.filter(opp => !['closed_won', 'closed_lost'].includes(opp.stage));

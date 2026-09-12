@@ -54,3 +54,10 @@ export function formatCurrency(
     return `${resolvedCode} ${amount.toFixed(2)}`;
   }
 }
+
+export function formatDate(value: string | null | undefined, placeholder = '-'): string {
+  if (!value) return placeholder;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return placeholder;
+  return date.toLocaleDateString();
+}
