@@ -1,10 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
+import { EntityCreatePageShell } from '@/components/crm/EntityCreatePageShell';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
-import { EnterpriseSheet } from '@/components/ui/enterprise/EnterpriseComponents';
 import { AccountService } from '@/services/account-service';
 import { AccountInput } from '@/lib/account-validation';
 import { logger } from "@/lib/logger";
@@ -74,37 +71,12 @@ export default function AccountNew() {
   };
 
   return (
-    <div className="h-screen w-full bg-muted overflow-hidden">
-        <EnterpriseFormLayout 
-            title="New Account"
-            breadcrumbs={[
-                { label: 'Accounts', to: '/dashboard/accounts' },
-                { label: 'New' },
-            ]}
-            status="Draft"
-            actions={
-                <div className="flex items-center gap-2">
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => navigate('/dashboard/accounts')}
-                    >
-                        Cancel
-                    </Button>
-                </div>
-            }
-        >
-            <EnterpriseSheet>
-                <div className="p-6">
-                    <UnifiedPartnerForm
-                        entityType="account"
-                        mode="create"
-                        onSubmit={handleCreate}
-                        onCancel={() => navigate('/dashboard/accounts')}
-                    />
-                </div>
-            </EnterpriseSheet>
-        </EnterpriseFormLayout>
-    </div>
+    <EntityCreatePageShell
+      title="New Account"
+      listLabel="Accounts"
+      listPath="/dashboard/accounts"
+      entityType="account"
+      onSubmit={handleCreate}
+    />
   );
 }

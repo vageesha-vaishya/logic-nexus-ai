@@ -1,10 +1,7 @@
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { UnifiedPartnerForm } from '@/components/crm/UnifiedPartnerForm';
+import { EntityCreatePageShell } from '@/components/crm/EntityCreatePageShell';
 import { useCRM } from '@/hooks/useCRM';
 import { toast } from 'sonner';
-import { EnterpriseFormLayout } from '@/components/ui/enterprise/EnterpriseFormLayout';
-import { EnterpriseSheet } from '@/components/ui/enterprise/EnterpriseComponents';
 import { logger } from "@/lib/logger";
 
 export default function ContactNew() {
@@ -72,37 +69,12 @@ export default function ContactNew() {
   };
 
   return (
-    <div className="h-screen w-full bg-muted overflow-hidden">
-        <EnterpriseFormLayout 
-            title="New Contact"
-            breadcrumbs={[
-                { label: 'Contacts', to: '/dashboard/contacts' },
-                { label: 'New' },
-            ]}
-            status="Draft"
-            actions={
-                <div className="flex items-center gap-2">
-                    <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        onClick={() => navigate('/dashboard/contacts')}
-                    >
-                        Cancel
-                    </Button>
-                </div>
-            }
-        >
-            <EnterpriseSheet>
-                <div className="p-6">
-                    <UnifiedPartnerForm
-                        entityType="contact"
-                        mode="create"
-                        onSubmit={handleCreate}
-                        onCancel={() => navigate('/dashboard/contacts')}
-                    />
-                </div>
-            </EnterpriseSheet>
-        </EnterpriseFormLayout>
-    </div>
+    <EntityCreatePageShell
+      title="New Contact"
+      listLabel="Contacts"
+      listPath="/dashboard/contacts"
+      entityType="contact"
+      onSubmit={handleCreate}
+    />
   );
 }
