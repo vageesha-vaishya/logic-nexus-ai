@@ -352,7 +352,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
 
               <Collapsible open={accountOpen && createAccountChecked}>
                 <CollapsibleContent className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="accountName"
@@ -407,7 +407,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
                     />
                   </div>
                   <Separator />
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="accountAddress"
@@ -507,7 +507,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
 
               <Collapsible open={contactOpen && createContactChecked}>
                 <CollapsibleContent className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="firstName"
@@ -600,7 +600,7 @@ export function LeadConversionDialog({ open, onOpenChange, lead, onConversionCom
 
               <Collapsible open={opportunityOpen && createOpportunityChecked}>
                 <CollapsibleContent className="space-y-4 pt-2">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField
                       control={form.control}
                       name="opportunityName"

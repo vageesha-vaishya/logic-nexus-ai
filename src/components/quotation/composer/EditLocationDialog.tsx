@@ -111,7 +111,7 @@ export function EditLocationDialog({
             />
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="edit-city">City *</Label>
               <Input 
@@ -134,7 +134,7 @@ export function EditLocationDialog({
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="edit-code">Location Code</Label>
               <Input 

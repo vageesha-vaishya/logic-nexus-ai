@@ -131,7 +131,7 @@ function QuoteLineItemRow({ index, remove }: { index: number; remove: (index: nu
 
                 {/* Financials / Commercial */}
                 <div className="md:col-span-4 flex flex-col gap-4">
-                    <div className="grid grid-cols-2 gap-3">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                          <FormField
                             control={control}
                             name={`items.${index}.quantity`}

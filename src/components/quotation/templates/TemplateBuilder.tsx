@@ -85,7 +85,7 @@ function SortableSection({ section, onRemove, onUpdate }: { section: TemplateSec
         </CardHeader>
         <CardContent className="p-3 pt-0">
           <div className="grid gap-2">
-             <div className="grid grid-cols-3 items-center gap-2">
+             <div className="grid grid-cols-1 md:grid-cols-3 items-center gap-2">
                <Label className="text-xs">Title</Label>
                <Input 
                  className="col-span-2 h-7 text-xs" 

@@ -154,7 +154,7 @@ export function OpportunityItemsEditor({ opportunityId }: { opportunityId: strin
                   </Button>
                 )}
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label>Product Name</Label>
                   <Input value={item.product_name} onChange={(e) => updateItem(index, 'product_name', e.target.value)} placeholder="Product Name" />

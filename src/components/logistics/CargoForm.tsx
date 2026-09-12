@@ -236,7 +236,7 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         <FormField
           control={form.control}
           name="cargo_type_id"
@@ -284,7 +284,7 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
           )}
         />
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <FormField
             control={form.control}
             name="package_count"
@@ -326,7 +326,7 @@ export function CargoForm({ defaultValues, onSuccess, onCancel, cargoId, service
           />
         </div>
 
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <FormField
             control={form.control}
             name="value_amount"

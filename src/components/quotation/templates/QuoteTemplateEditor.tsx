@@ -102,7 +102,7 @@ export function QuoteTemplateEditor({ template, open, onOpenChange }: QuoteTempl
         <ScrollArea className="flex-1 px-6 py-4">
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                  <FormField
                   control={form.control}
                   name="name"

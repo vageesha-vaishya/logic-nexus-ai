@@ -127,7 +127,7 @@ export function HazmatWizard({ open, onOpenChange, onComplete, initialData }: Ha
             case 'identification':
                 return (
                     <div className="space-y-4 py-4">
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>UN Number</Label>
                                 <Popover open={unSearchOpen} onOpenChange={setUnSearchOpen}>
@@ -189,7 +189,7 @@ export function HazmatWizard({ open, onOpenChange, onComplete, initialData }: Ha
                                 <p className="text-[10px] text-muted-foreground">The standard technical name.</p>
                             </div>
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Class / Division</Label>
                                 <Select 
@@ -245,7 +245,7 @@ export function HazmatWizard({ open, onOpenChange, onComplete, initialData }: Ha
                             </Tabs>
                         </div>
                         
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
                                 <Label>Flash Point</Label>
                                 <div className="flex gap-2">
@@ -302,7 +302,7 @@ export function HazmatWizard({ open, onOpenChange, onComplete, initialData }: Ha
 
                         <div className="space-y-3">
                             <Label>Emergency Contact</Label>
-                            <div className="grid grid-cols-2 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <Input placeholder="Name" />
                                 <Input placeholder="Phone Number" />
                             </div>
