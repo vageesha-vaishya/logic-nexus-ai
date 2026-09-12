@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo, useRef, Fragment } from 'react';
-import { Search, UserPlus, Filter, TrendingUp, Users as UsersIcon, MoreHorizontal, ArrowUpDown, SlidersHorizontal, X, Pencil, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
+import { UserPlus, MoreHorizontal, ArrowUpDown, Pencil, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
@@ -12,14 +12,6 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { DeleteConfirmDialog } from '@/components/common/DeleteConfirmDialog';
-import {
-  DropdownMenu,
-  DropdownMenuCheckboxItem,
-  DropdownMenuContent,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger
-} from '@/components/ui/dropdown-menu';
 import { ViewMode } from '@/components/ui/view-toggle';
 import { useCRM } from '@/hooks/useCRM';
 import { useCrmApiHeaders } from '@/hooks/useCrmApiHeaders';
@@ -34,6 +26,7 @@ import { EmptyState } from '@/components/system/EmptyState';
 import { TableSkeleton } from '@/components/system/TableSkeleton';
 import { LeadsBulkActionBar } from '@/features/module-sales/components/LeadsBulkActionBar';
 import { LeadCardsView } from '@/features/module-sales/components/LeadCardsView';
+import { LeadsFilterToolbar } from '@/features/module-sales/components/LeadsFilterToolbar';
 import { CRM_HEADER_PRIMARY_CONTROL_SEQUENCE, CRMModuleHeaderNavigation } from '@/components/crm/CRMModuleHeaderNavigation';
 import LeadsMasterDataFormModal, { LeadMasterDataFormValues } from '@/features/module-sales/components/LeadsMasterDataFormModal';
 import { themeStyleFromPreset } from '@/lib/theme-utils';
@@ -50,6 +43,9 @@ import {
   formatLeadDate,
   formatLeadDateTime,
   groupLeadsForWorkspaceDetails,
+  LeadGroupBy,
+  LIST_FIELD_OPTIONS,
+  ListFieldKey,
   normalizeLeadsStatusFilterValue,
   renderLeadCustomFieldsPreview,
   resolveLeadsFallbackBannerCopy,
@@ -64,32 +60,6 @@ import {
   DEFAULT_RETRY_POLICY,
 } from '@/lib/fetch-resilience';
 
-const LIST_FIELD_OPTIONS = [
-  { key: 'email_under_name', label: 'Email under Name', tableColumn: false },
-  { key: 'title', label: 'Title', tableColumn: true },
-  { key: 'company', label: 'Company', tableColumn: true },
-  { key: 'email', label: 'Email', tableColumn: true },
-  { key: 'phone', label: 'Phone', tableColumn: true },
-  { key: 'status', label: 'Status', tableColumn: true },
-  { key: 'source', label: 'Source', tableColumn: true },
-  { key: 'qualification_status', label: 'Qualification', tableColumn: true },
-  { key: 'score', label: 'Score', tableColumn: true },
-  { key: 'estimated_value', label: 'Value', tableColumn: true },
-  { key: 'expected_close_date', label: 'Expected Close', tableColumn: true },
-  { key: 'last_activity_date', label: 'Last Activity', tableColumn: true },
-  { key: 'created_at', label: 'Created At', tableColumn: true },
-  { key: 'updated_at', label: 'Updated At', tableColumn: true },
-  { key: 'converted_at', label: 'Converted At', tableColumn: true },
-  { key: 'owner_id', label: 'Owner', tableColumn: true },
-  { key: 'description', label: 'Description', tableColumn: true },
-  { key: 'notes', label: 'Notes', tableColumn: true },
-  { key: 'custom_fields', label: 'Custom Fields', tableColumn: true },
-  { key: 'franchise_id', label: 'Franchise', tableColumn: true },
-  { key: 'tenant_id', label: 'Tenant', tableColumn: true },
-  { key: 'actions', label: 'Actions', tableColumn: true },
-] as const;
-
-type ListFieldKey = (typeof LIST_FIELD_OPTIONS)[number]['key'];
 type ListTableColumnKey = 'name' | Exclude<ListFieldKey, 'email_under_name'>;
 type WorkspaceActivity = {
   id: string;
@@ -100,7 +70,6 @@ type WorkspaceActivity = {
   due_date: string | null;
   created_at: string | null;
 };
-type LeadGroupBy = 'none' | 'status' | 'source' | 'assigned_to' | 'industry' | 'created_date';
 type ActivitySortableColumn = 'subject' | 'activity_type' | 'status' | 'priority' | 'due_date' | 'created_at';
 type ActivitySortDirection = 'asc' | 'desc';
 const DEFAULT_LIST_FIELDS: ListFieldKey[] = ['company', 'status', 'score', 'estimated_value', 'actions', 'email_under_name'];
@@ -1708,178 +1677,34 @@ export default function Leads() {
             <CardTitle>Lead Search and Filter</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="flex flex-col gap-0.5 mb-1.5">
-          <div className="w-full overflow-x-auto">
-            <div className="flex flex-nowrap items-center gap-0.5 min-w-max">
-              <div className="relative w-[280px] shrink-0">
-              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder={t('leads.filters.searchPlaceholder', 'Search by name, company, or email')}
-                value={localSearch}
-                onChange={(e) => setLocalSearch(e.target.value)}
-                onKeyDown={(event) => {
-                  if (!hasActiveSearch) return;
-                  if (event.key === 'ArrowDown') {
-                    event.preventDefault();
-                    navigateMatchedLeads('next');
-                  }
-                  if (event.key === 'ArrowUp') {
-                    event.preventDefault();
-                    navigateMatchedLeads('prev');
-                  }
-                }}
-                className="h-7 pl-8.5 bg-background"
-              />
-              </div>
-              {hasActiveSearch && (
-                <span className="text-xs text-muted-foreground px-1">
-                  {matchedLeadIds.length > 0
-                    ? `${Math.max(1, matchedLeadIds.indexOf(activeMatchedLeadId || '') + 1)} / ${matchedLeadIds.length}`
-                    : '0 / 0'}
-                </span>
-              )}
-
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
-                <Filter className="mr-0.5 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder={t('leads.filters.status', 'Stage')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">{t('leads.filters.allStatus', 'All Status')}</SelectItem>
-                <SelectItem value="new">{t('leads.filters.statusOptions.new', 'New')}</SelectItem>
-                <SelectItem value="contacted">{t('leads.filters.statusOptions.contacted', 'Contacted')}</SelectItem>
-                <SelectItem value="qualified">{t('leads.filters.statusOptions.qualified', 'Qualified')}</SelectItem>
-                <SelectItem value="proposal">{t('leads.filters.statusOptions.proposal', 'Proposal')}</SelectItem>
-                <SelectItem value="negotiation">{t('leads.filters.statusOptions.negotiation', 'Negotiation')}</SelectItem>
-                <SelectItem value="won">{t('leads.filters.statusOptions.won', 'Won')}</SelectItem>
-                <SelectItem value="lost">{t('leads.filters.statusOptions.lost', 'Lost')}</SelectItem>
-              </SelectContent>
-              </Select>
-
-              <Select value={ownerFilter} onValueChange={(v) => setOwnerFilter(v as 'any' | 'unassigned' | 'me')}>
-              <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
-                <UsersIcon className="mr-0.5 h-4 w-4 text-muted-foreground" />
-                <SelectValue placeholder={t('leads.filters.owner', 'Owner')} />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="any">{t('leads.filters.anyOwner', 'Any Owner')}</SelectItem>
-                <SelectItem value="me">{t('leads.filters.ownerOptions.me', 'Assigned to Me')}</SelectItem>
-                <SelectItem value="unassigned">{t('leads.filters.ownerOptions.unassigned', 'Unassigned')}</SelectItem>
-              </SelectContent>
-              </Select>
-
-              <Select value={scoreFilter} onValueChange={setScoreFilter}>
-                <SelectTrigger className="h-7 w-[160px] shrink-0 bg-background px-1">
-                  <TrendingUp className="mr-0.5 h-4 w-4 text-muted-foreground" />
-                  <SelectValue placeholder={t('leads.filters.score', 'Score')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">{t('leads.filters.allScores', 'All Scores')}</SelectItem>
-                  <SelectItem value="high">{t('leads.filters.scoreOptions.high', 'High')}</SelectItem>
-                  <SelectItem value="medium">{t('leads.filters.scoreOptions.medium', 'Medium')}</SelectItem>
-                  <SelectItem value="low">{t('leads.filters.scoreOptions.low', 'Low')}</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <Select value={groupBy} onValueChange={(value) => setGroupBy(value as LeadGroupBy)}>
-                <SelectTrigger className="h-7 w-[170px] shrink-0 bg-background px-1" aria-label={t('leads.filters.groupBy', 'Group By')}>
-                  <SelectValue placeholder={t('leads.filters.groupBy', 'Group By')} />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">{t('leads.groupBy.none', 'No Grouping')}</SelectItem>
-                  <SelectItem value="status">{t('leads.groupBy.status', 'Lead Status')}</SelectItem>
-                  <SelectItem value="source">{t('leads.groupBy.source', 'Lead Source')}</SelectItem>
-                  <SelectItem value="assigned_to">{t('leads.groupBy.assignedTo', 'Assigned To')}</SelectItem>
-                  <SelectItem value="industry">{t('leads.groupBy.industry', 'Industry')}</SelectItem>
-                  <SelectItem value="created_date">{t('leads.groupBy.createdDate', 'Created Date')}</SelectItem>
-                </SelectContent>
-              </Select>
-
-              <div className="flex flex-nowrap items-center gap-0.5 shrink-0">
-                <Input
-                  type="number"
-                  placeholder={t('leads.filters.valueMin', 'Min Value')}
-                  value={valueMin}
-                  onChange={(e) => setValueMin(e.target.value)}
-                  className="h-7 w-[120px] bg-background"
-                />
-                <span className="text-muted-foreground">-</span>
-                <Input
-                  type="number"
-                  placeholder={t('leads.filters.valueMax', 'Max Value')}
-                  value={valueMax}
-                  onChange={(e) => setValueMax(e.target.value)}
-                  className="h-7 w-[120px] bg-background"
-                />
-              </div>
-
-              <div className="flex flex-nowrap items-center gap-0.5 shrink-0">
-                <Select value={nameOp} onValueChange={(v) => setNameOp(v as TextOp)}>
-                  <SelectTrigger className="h-7 w-[130px] bg-background px-1">
-                    <SelectValue placeholder={t('leads.filters.nameMatch', 'Name Match')} />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="contains">{t('leads.filters.ops.contains', 'Contains')}</SelectItem>
-                    <SelectItem value="equals">{t('leads.filters.ops.equals', 'Equals')}</SelectItem>
-                  </SelectContent>
-                </Select>
-                <Input
-                  placeholder={t('leads.filters.name', 'Lead Name')}
-                  value={nameQuery}
-                  onChange={(e) => setNameQuery(e.target.value)}
-                  className="h-7 w-[150px] bg-background"
-                />
-              </div>
-
-              <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" className="h-7 shrink-0 px-1.5">
-                  <SlidersHorizontal className="mr-2 h-4 w-4" />
-                  {t('leads.filters.fields', 'Fields')}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-72 max-h-96 overflow-y-auto">
-                <DropdownMenuLabel>{t('leads.filters.visibleFields', 'Visible Fields')}</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                {LIST_FIELD_OPTIONS.map((field) => (
-                  <DropdownMenuCheckboxItem
-                    key={field.key}
-                    checked={visibleFieldSet.has(field.key)}
-                    onCheckedChange={(checked) => handleFieldVisibilityChange(field.key, checked)}
-                  >
-                    {field.label}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-              </DropdownMenu>
-              <Button
-                variant="ghost"
-                className="h-7 shrink-0 px-1.5"
-                disabled={activeFilterTags.length === 0}
-                onClick={clearAllFilters}
-              >
-                {t('leads.filters.clearFilters', 'Clear Filters')}
-              </Button>
-            </div>
-          </div>
-          {activeFilterTags.length > 0 && (
-            <div className="flex flex-wrap gap-1.5">
-              {activeFilterTags.map((tag) => (
-                <Badge key={tag.key} variant="secondary" className="flex items-center gap-1 pr-1">
-                  <span>{tag.label}</span>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-4 w-4 p-0"
-                    onClick={tag.onClear}
-                  >
-                    <X className="h-3 w-3" />
-                  </Button>
-                </Badge>
-              ))}
-            </div>
-          )}
-            </div>
+            <LeadsFilterToolbar
+              localSearch={localSearch}
+              onLocalSearchChange={setLocalSearch}
+              hasActiveSearch={hasActiveSearch}
+              matchedLeadIds={matchedLeadIds}
+              activeMatchedLeadId={activeMatchedLeadId}
+              onNavigateMatchedLeads={navigateMatchedLeads}
+              statusFilter={statusFilter}
+              onStatusFilterChange={setStatusFilter}
+              ownerFilter={ownerFilter}
+              onOwnerFilterChange={setOwnerFilter}
+              scoreFilter={scoreFilter}
+              onScoreFilterChange={setScoreFilter}
+              groupBy={groupBy}
+              onGroupByChange={setGroupBy}
+              valueMin={valueMin}
+              onValueMinChange={setValueMin}
+              valueMax={valueMax}
+              onValueMaxChange={setValueMax}
+              nameOp={nameOp}
+              onNameOpChange={setNameOp}
+              nameQuery={nameQuery}
+              onNameQueryChange={setNameQuery}
+              visibleFieldSet={visibleFieldSet}
+              onFieldVisibilityChange={handleFieldVisibilityChange}
+              activeFilterTags={activeFilterTags}
+              onClearAllFilters={clearAllFilters}
+            />
           </CardContent>
         </Card>
 

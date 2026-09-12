@@ -1,5 +1,33 @@
 import type { LeadApiFallbackReason } from '@/services/pipeline-service';
 
+export const LIST_FIELD_OPTIONS = [
+  { key: 'email_under_name', label: 'Email under Name', tableColumn: false },
+  { key: 'title', label: 'Title', tableColumn: true },
+  { key: 'company', label: 'Company', tableColumn: true },
+  { key: 'email', label: 'Email', tableColumn: true },
+  { key: 'phone', label: 'Phone', tableColumn: true },
+  { key: 'status', label: 'Status', tableColumn: true },
+  { key: 'source', label: 'Source', tableColumn: true },
+  { key: 'qualification_status', label: 'Qualification', tableColumn: true },
+  { key: 'score', label: 'Score', tableColumn: true },
+  { key: 'estimated_value', label: 'Value', tableColumn: true },
+  { key: 'expected_close_date', label: 'Expected Close', tableColumn: true },
+  { key: 'last_activity_date', label: 'Last Activity', tableColumn: true },
+  { key: 'created_at', label: 'Created At', tableColumn: true },
+  { key: 'updated_at', label: 'Updated At', tableColumn: true },
+  { key: 'converted_at', label: 'Converted At', tableColumn: true },
+  { key: 'owner_id', label: 'Owner', tableColumn: true },
+  { key: 'description', label: 'Description', tableColumn: true },
+  { key: 'notes', label: 'Notes', tableColumn: true },
+  { key: 'custom_fields', label: 'Custom Fields', tableColumn: true },
+  { key: 'franchise_id', label: 'Franchise', tableColumn: true },
+  { key: 'tenant_id', label: 'Tenant', tableColumn: true },
+  { key: 'actions', label: 'Actions', tableColumn: true },
+] as const;
+
+export type ListFieldKey = (typeof LIST_FIELD_OPTIONS)[number]['key'];
+export type LeadGroupBy = 'none' | 'status' | 'source' | 'assigned_to' | 'industry' | 'created_date';
+
 export type LeadsListUrlState = {
   searchQuery: string;
   statusFilter: string;
